@@ -1,0 +1,25 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "cd /Users/testadmin/Documents/bro-split-app/server && node server.js",
+    "dev": "cd /Users/testadmin/Documents/bro-split-app/server && nodemon server.js",
+    "seed": "cd /Users/testadmin/Documents/bro-split-app/server && node seedExercises.js",
+    "normalize:workouts": "cd /Users/testadmin/Documents/bro-split-app/server && node scripts/normalizeWorkouts.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@clerk/clerk-sdk-node": "^4.13.23",
+    "@clerk/express": "^1.7.37",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "mongoose": "^8.19.1"
+  }
+}

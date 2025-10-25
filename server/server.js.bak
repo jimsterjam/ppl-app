@@ -1,0 +1,53 @@
+import express from "express";
+import mongoose from "mongoose";
+import cors from "cors";
+import dotenv from "dotenv";
+import workoutRoutes from "./routes/workouts.js";
+import exerciseRoutes from "./routes/exercises.js";
+
+dotenv.config();
+
+const app = express();
+
+// CORS konfigurieren
+app.use(cors({
+  origin: "http://localhost:5173", // Frontend-URL
+  methods: ["GET", "POST", "PUT", "DELETE"],
+  credentials: true
+}));
+
+// JSON-Parsing
+app.use(express.json());
+
+// MongoDB verbinden
+mongoose
+  .connect(process.env.MONGO_URI)
+  .then(() => console.log("MongoDB verbunden"))
+  .catch(err => console.error("DB Fehler:", err));
+
+// Test-Route
+app.get("/api/test", (req, res) => {
+  res.json({ 
+    message: "API funktioniert!", 
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      "GET /api/workouts": "Alle Workouts abrufen (Auth erforderlich)",
+      "GET /api/workouts/:id": "Einzelnes Workout abrufen (Auth erforderlich)", 
+      "POST /api/workouts": "Neues Workout erstellen (Auth erforderlich)",
+      "PUT /api/workouts/:id": "Workout aktualisieren (Auth erforderlich)",
+      "DELETE /api/workouts/:id": "Workout löschen (Auth erforderlich)",
+      "GET /api/workouts/stats/overview": "Workout-Statistiken (Auth erforderlich)",
+      "GET /api/exercises": "Alle Übungen abrufen",
+      "GET /api/exercises/category/:category": "Übungen nach Kategorie abrufen",
+      "GET /api/exercises/:id": "Einzelne Übung abrufen"
+    }
+  });
+});
+
+// Routen einbinden
+app.use("/api/workouts", workoutRoutes);
+app.use("/api/exercises", exerciseRoutes);
+
+// Server starten
+const PORT = process.env.PORT || 5000;
+app.listen(3001, () => console.log("Server läuft auf Port 3001"));

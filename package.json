@@ -1,0 +1,14 @@
+{
+  "name": "bro-split-app",
+  "version": "1.0.0",
+  "scripts": {
+    "server": "cd server && npm start",
+    "client": "cd client && npm run dev",
+    "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "start:server": "cd server && node server.js",
+    "start:client": "cd client && npm run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
