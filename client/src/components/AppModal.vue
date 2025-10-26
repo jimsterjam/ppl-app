@@ -1,6 +1,6 @@
 <template>
   <teleport to="body">
-    <div v-if="modelValue" class="modal-overlay" @click.self="onCancel" role="presentation">
+    <div v-if="modelValue" class="modal-overlay" role="presentation" @click.self="onCancel">
       <div
         class="modal"
         role="dialog"
@@ -9,7 +9,7 @@
       >
         <div class="modal-header">
           <h3 v-if="title" id="modal-title">{{ title }}</h3>
-          <button class="close" @click="onCancel" aria-label="Schließen">✕</button>
+          <button class="close" aria-label="Schließen" @click="onCancel">✕</button>
         </div>
         <div class="modal-body">
           <slot>
@@ -26,7 +26,7 @@
   </template>
 
 <script setup>
-import { onMounted, onBeforeUnmount, nextTick, watch, ref } from 'vue'
+import { onBeforeUnmount, nextTick, watch, ref } from 'vue'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },

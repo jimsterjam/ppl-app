@@ -4,7 +4,7 @@
       <div v-for="m in toast.messages" :key="m.id" class="toast" :class="m.type">
         <span class="icon">{{ m.type === 'success' ? '✅' : m.type === 'error' ? '⚠️' : 'ℹ️' }}</span>
         <span class="text">{{ m.text }}</span>
-        <button class="close" @click="toast.dismiss(m.id)" aria-label="Schließen">✕</button>
+        <button class="close" aria-label="Schließen" @click="toast.dismiss(m.id)">✕</button>
       </div>
     </transition-group>
   </div>

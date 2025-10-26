@@ -12,7 +12,7 @@
       </li>
     </ul>
 
-    <button @click="$emit('start', workout)">Start</button>
+  <button @click="$emit('start', workout)">Start</button>
   </div>
 </template>
 
@@ -22,6 +22,9 @@ import { computed } from 'vue'
 const props = defineProps({
   workout: { type: Object, required: true }
 });
+
+// Declare emitted events for linting/auto-complete
+defineEmits(['start'])
 
 const normalizedType = computed(() => {
   const t = (props.workout?.type ?? '').toString().trim().toLowerCase();

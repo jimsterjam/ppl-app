@@ -59,11 +59,7 @@ watch(clerkReady, (ready) => {
   if (!ready) return
   const coreAuthed = !!window?.Clerk?.session
   if (coreAuthed || isSignedIn.value) {
-    // Eingeloggt: Stelle sicher, dass wir nicht auf Welcome hängen bleiben
-    if (route.name === 'welcome') {
-      const target = (route.query?.redirect && String(route.query.redirect)) || '/dashboard'
-      if (route.fullPath !== target) router.replace(target)
-    }
+    // Eingeloggt: WelcomePage übernimmt Motivation/Redirect
     return
   }
   // Sicher ausgeloggt -> Welcome mit Redirect-Ziel
@@ -74,6 +70,4 @@ watch(clerkReady, (ready) => {
 
 <style scoped>
 .auth-splash { min-height: 50vh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--muted); }
-.spinner { width: 36px; height: 36px; border: 3px solid color-mix(in oklab, var(--accent-color) 30%, transparent); border-top: 3px solid var(--accent-color); border-radius: 50%; animation: spin 1s linear infinite; }
-@keyframes spin { 0%{transform:rotate(0)} 100%{transform:rotate(360deg)} }
 </style>

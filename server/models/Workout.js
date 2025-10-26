@@ -52,7 +52,14 @@ const workoutSchema = new mongoose.Schema({
     reps: Number,
     weight: Number,
     // optional zur Ableitung
-    category: String
+    category: String,
+    // Detaillierte Set-Informationen (modernes Format)
+    setDetails: [{
+      reps: Number,
+      weight: Number,
+      restTime: Number, // in Sekunden
+      notes: String
+    }]
   }],
   date: {
     type: Date,

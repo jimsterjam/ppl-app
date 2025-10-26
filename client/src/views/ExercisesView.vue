@@ -7,17 +7,17 @@
 
       <!-- Schnellfilter -->
       <div class="quick-buttons">
-        <button @click="loadPushExercises" class="push-btn">Push Day</button>
-        <button @click="loadPullExercises" class="pull-btn">Pull Day</button>
-        <button @click="loadLegExercises" class="leg-btn">Leg Day</button>
-        <button @click="loadAllExercises" class="all-btn">Alle</button>
+        <button class="push-btn" @click="loadPushExercises">Push Day</button>
+        <button class="pull-btn" @click="loadPullExercises">Pull Day</button>
+        <button class="leg-btn" @click="loadLegExercises">Leg Day</button>
+        <button class="all-btn" @click="loadAllExercises">Alle</button>
       </div>
 
       <!-- Aktiver Filterstatus -->
-      <div class="filter-status" v-if="selectedCategory || selectedMuscleGroup">
+      <div v-if="selectedCategory || selectedMuscleGroup" class="filter-status">
         <span v-if="selectedCategory">Kategorie: {{ selectedCategory }}</span>
         <span v-if="selectedMuscleGroup">Muskelgruppe: {{ selectedMuscleGroup }}</span>
-        <button @click="resetFilters" class="reset-btn">Reset</button>
+        <button class="reset-btn" @click="resetFilters">Reset</button>
       </div>
 
       <!-- Ladezustand -->

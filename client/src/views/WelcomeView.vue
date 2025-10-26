@@ -1,16 +1,12 @@
 <template>
-  <WelcomePage :handleChangeDisplay="handleNavigation" />
+  <WelcomePage :handle-change-display="handleNavigation" />
 </template>
 
 <script setup>
-import { useRouter, useRoute } from 'vue-router'
-import { watch, onMounted } from 'vue'
-import { useUser } from '@clerk/vue'
+import { useRouter } from 'vue-router'
 import WelcomePage from '../components/WelcomePage.vue'
 
 const router = useRouter()
-const route = useRoute()
-const { isSignedIn } = useUser()
 
 function handleNavigation(displayType) {
   // displayType 2 = Dashboard basierend auf Ihrer Komponente
@@ -19,21 +15,7 @@ function handleNavigation(displayType) {
   }
 }
 
-// Minimaler Redirect nach erfolgreichem Login
-function redirectAfterLogin() {
-  const target = (route.query?.redirect && String(route.query.redirect)) || '/dashboard'
-  if (route.fullPath !== target) {
-    router.replace(target)
-  }
-}
-
-watch(isSignedIn, (v) => {
-  if (v) redirectAfterLogin()
-})
-
-onMounted(() => {
-  if (isSignedIn.value) redirectAfterLogin()
-})
+// Keine automatische Weiterleitung hier – WelcomePage steuert Motivation & Redirect
 </script>
 
 <style scoped>

@@ -7,7 +7,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import workoutRoutes from "./routes/workouts.js";
 import exerciseRoutes from "./routes/exercises.js";
-import { clerkMiddleware, requireAuth } from './middleware/clerkAuth.js';
+import { clerkMiddleware } from './middleware/clerkAuth.js';
 
 
 // .env zuverlässig relativ zu dieser Datei laden (unabhängig vom CWD)
@@ -20,8 +20,14 @@ const app = express();
 app.use(clerkMiddleware());
 
 // CORS konfigurieren
+// CORS: erlaube Vite-Dev-Server Ports 5173/5174 (Proxy) und fehlende Origin (Server-zu-Server)
+const allowedOrigins = new Set(["http://localhost:5173", "http://localhost:5174"]);
 app.use(cors({
-  origin: "http://localhost:5173", // Frontend-URL
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true);
+    if (allowedOrigins.has(origin)) return cb(null, true);
+    return cb(null, false);
+  },
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
 }));
@@ -31,10 +37,22 @@ app.use(express.json());
 
 // MongoDB verbinden (nur wenn MONGO_URI gesetzt ist)
 if (process.env.MONGO_URI) {
+  // Verbindungsaufbau mit defensiven Timeouts
   mongoose
-    .connect(process.env.MONGO_URI)
+    .connect(process.env.MONGO_URI, {
+      serverSelectionTimeoutMS: 5000,
+      maxPoolSize: 10
+    })
     .then(() => console.log("MongoDB verbunden"))
     .catch(err => console.error("DB Fehler:", err));
+
+  // Connection Event-Logging & Reconnect-Monitoring
+  const conn = mongoose.connection;
+  conn.on('connected', () => console.log('🟢 MongoDB connected'));
+  conn.on('disconnected', () => console.warn('🟠 MongoDB disconnected'));
+  // 'reconnected' wird vom Treiber emittiert
+  conn.on('reconnected', () => console.log('🟢 MongoDB reconnected'));
+  conn.on('error', (err) => console.error('🔴 MongoDB error:', err));
 } else {
   console.warn("Hinweis: MONGO_URI ist nicht gesetzt – DB-Verbindung wird übersprungen.");
 }
@@ -62,8 +80,19 @@ app.get("/api/test", (req, res) => {
 app.use("/api/workouts", workoutRoutes);
 app.use("/api/exercises", exerciseRoutes);
 
+// Health Endpoint: erleichtert Diagnose (Client/Monitoring)
+app.get('/api/health', (req, res) => {
+  const state = mongoose.connection?.readyState; // 0 = disconnected, 1 = connected, 2 = connecting, 3 = disconnecting
+  const map = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
+  res.json({
+    status: 'ok',
+    db: map[state] ?? 'unknown',
+    readyState: state
+  });
+});
+
 // Generischer Error-Handler (Clerk-Unauthenticated → 401 JSON; sonst 500)
-app.use((err, req, res, next) => {
+app.use((err, req, res, _next) => {
   if (err && (err.message === "Unauthenticated" || err.status === 401 || err.code === "unauthenticated")) {
     return res.status(401).json({ error: "Unauthenticated" });
   }

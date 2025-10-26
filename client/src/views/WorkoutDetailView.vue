@@ -33,7 +33,7 @@
         <div class="ex-list">
           <div class="ex-list-header">
             <h3>Übungen</h3>
-            <button class="reorder-toggle" @click="toggleReorder" :aria-pressed="isReordering">
+            <button class="reorder-toggle" :aria-pressed="isReordering" @click="toggleReorder">
               {{ isReordering ? 'Fertig' : 'Reihenfolge bearbeiten' }}
             </button>
           </div>
@@ -77,11 +77,11 @@
                   </div>
                 </span>
                 <span class="col actions">
-                  <button class="remove-row-btn" @click="removeSetRow(i, rIdx)" title="Satz entfernen">−</button>
+                  <button class="remove-row-btn" title="Satz entfernen" @click="removeSetRow(i, rIdx)">−</button>
                 </span>
               </div>
               <div class="row-actions">
-                <button class="add-row-btn" @click="addSetRow(i)" title="Satz hinzufügen">＋</button>
+                <button class="add-row-btn" title="Satz hinzufügen" @click="addSetRow(i)">＋</button>
               </div>
             </div>
           </div>
@@ -106,8 +106,8 @@
       v-model="showLeaveModal"
       title="Änderungen verwerfen?"
       message="Du hast ungespeicherte Änderungen. Wirklich zum Dashboard zurückkehren?"
-      confirmText="Verwerfen und zurück"
-      cancelText="Weiter bearbeiten"
+      confirm-text="Verwerfen und zurück"
+      cancel-text="Weiter bearbeiten"
       type="warning"
       @confirm="confirmLeave"
     />
@@ -118,6 +118,7 @@
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuth, useClerk } from '@clerk/vue'
+import { getAuthToken } from '@/utils/authToken'
 import { fetchWorkout } from '@/api/workouts'
 import { useUserStore } from '@/stores/userStore'
 import HeaderBar from '@/components/HeaderBar.vue'
@@ -149,7 +150,7 @@ function formatDate(dateStr) {
   try {
     const d = new Date(dateStr)
     return d.toLocaleString('de-DE')
-  } catch (e) {
+  } catch {
     return String(dateStr)
   }
 }
@@ -167,7 +168,7 @@ async function loadWorkout() {
       workout.value = store.workouts.find(w => w._id === id) || null
       return
     }
-    const token = await getAuthToken().catch(() => null)
+  const token = await getAuthToken({ clerk, auth }).catch(() => null)
     const data = await fetchWorkout(id, token)
     workout.value = data || null
   } catch (e) {
@@ -225,16 +226,18 @@ async function saveWorkout() {
   try {
     saving.value = true
     const id = route.params.id
-    // Aggregiere optionale Legacy-Felder aus erstem Satz
+    // Aggregiere optionale Legacy-Felder aus erstem Satz und behalte setDetails
     const normalized = {
       ...workout.value,
       exercises: (workout.value.exercises || []).map(ex => ({
         ...ex,
         sets: Array.isArray(ex.setDetails) ? ex.setDetails.length : ex.sets || 0,
         reps: ex.setDetails?.[0]?.reps ?? ex.reps ?? 10,
-        weight: ex.setDetails?.[0]?.weight ?? ex.weight ?? 0
+        weight: ex.setDetails?.[0]?.weight ?? ex.weight ?? 0,
+        setDetails: ex.setDetails || [] // Übertrage die setDetails!
       }))
     }
+    
     // Draft-Workouts nur lokal aktualisieren
     if (String(id).startsWith('draft-')) {
       const idx = store.workouts.findIndex(w => w._id === id)
@@ -247,8 +250,8 @@ async function saveWorkout() {
       router.push('/dashboard')
       return
     }
-  let token = await getAuthToken().catch(() => null)
-  if (!token) token = await getAuthToken({ skipCache: true }).catch(() => null)
+  let token = await getAuthToken({ clerk, auth }).catch(() => null)
+  if (!token) token = await getAuthToken({ clerk, auth, options: { skipCache: true } }).catch(() => null)
     await store.updateWorkout(id, normalized, token)
     saveMsg.value = 'Gespeichert.'
     saveError.value = false
@@ -269,7 +272,7 @@ function onDragStart(index) {
   draggingIndex.value = index
 }
 
-function onDragOver(index) {
+function onDragOver(_index) {
   // Optional: visuelle Platzhalter
 }
 
@@ -288,7 +291,7 @@ function onDrop(index) {
 onMounted(async () => { await loadWorkout(); ensureSetDetailsStructure() })
 
 // Snapshot initialisieren, nachdem Daten geladen und normalisiert wurden
-watch(workout, (w, prev) => {
+watch(workout, (w, _prev) => {
   if (w && !initialSnapshot) {
     try {
       const core = {
@@ -337,27 +340,7 @@ function beforeUnloadHandler(e) {
 onMounted(() => window.addEventListener('beforeunload', beforeUnloadHandler))
 onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnloadHandler))
 
-// Robuster Token-Helper mit Fallbacks
-async function getAuthToken(options = {}) {
-  const template = import.meta.env.VITE_CLERK_JWT_TEMPLATE
-  const opts = template ? { ...options, template } : options
-  try {
-    const t = await clerk?.session?.getToken?.(opts)
-    if (t) return t
-  } catch (_) {}
-  try {
-    const t = await window?.Clerk?.session?.getToken?.(opts)
-    if (t) return t
-  } catch (_) {}
-  try {
-    const maybe = auth?.getToken
-    if (typeof maybe === 'function') {
-      const t = await maybe(opts)
-      if (t) return t
-    }
-  } catch (_) {}
-  return null
-}
+// Token-Helfer wird zentral aus '@/utils/authToken' importiert
 
 // Abschluss-Flow entfernt – Speichern/Redirect ist der primäre Abschlussweg
 </script>

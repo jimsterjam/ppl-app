@@ -2,24 +2,27 @@
   <header class="header-bar">
     <div class="header-content">
       <h1>{{ title }}</h1>
-      <div class="auth-section">
-        <SignedOut>
-          <SignInButton class="sign-in-btn">
-            <template #default>
-              <button class="auth-button">Anmelden</button>
-            </template>
-          </SignInButton>
-        </SignedOut>
-        <SignedIn>
-          <UserButton 
-            :appearance="{
-              elements: {
-                userButtonBox: 'user-button-custom',
-                userButtonTrigger: 'user-button-trigger'
-              }
-            }"
-          />
-        </SignedIn>
+      <div class="header-actions">
+        <slot name="actions"></slot>
+        <div class="auth-section">
+          <SignedOut>
+            <SignInButton class="sign-in-btn">
+              <template #default>
+                <button class="auth-button">Anmelden</button>
+              </template>
+            </SignInButton>
+          </SignedOut>
+          <SignedIn>
+            <UserButton 
+              :appearance="{
+                elements: {
+                  userButtonBox: 'user-button-custom',
+                  userButtonTrigger: 'user-button-trigger'
+                }
+              }"
+            />
+          </SignedIn>
+        </div>
       </div>
     </div>
   </header>
@@ -54,6 +57,17 @@ defineProps({
   align-items: center;
   max-width: 1200px;
   margin: 0 auto;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.auth-section {
+  display: flex;
+  align-items: center;
 }
 
 .header-bar h1 {

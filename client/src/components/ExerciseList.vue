@@ -7,15 +7,15 @@
       <button
         v-for="cat in ['Push', 'Pull', 'Legs']"
         :key="cat"
-        @click="setCategory(cat)"
         class="px-4 py-2 rounded-lg font-semibold text-white"
         :class="selectedCategory === cat ? 'bg-blue-600' : 'bg-gray-600 hover:bg-gray-700'"
+        @click="setCategory(cat)"
       >
         {{ cat }}
       </button>
       <button
-        @click="resetFilters"
         class="px-4 py-2 rounded-lg bg-gray-300 text-black hover:bg-gray-400"
+        @click="resetFilters"
       >
         Zurücksetzen
       </button>
@@ -26,8 +26,8 @@
       <label class="block mb-1 text-sm text-gray-500">Muskelgruppe:</label>
       <select
         v-model="selectedMuscleGroup"
-        @change="loadExercises"
         class="border rounded-lg p-2 w-full"
+        @change="loadExercises"
       >
         <option value="">Alle</option>
         <option v-for="group in muscleGroups" :key="group" :value="group">

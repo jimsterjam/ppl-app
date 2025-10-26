@@ -1,6 +1,17 @@
 <template>
   <div class="dashboard">
-    <HeaderBar :title="greeting" />
+    <HeaderBar :title="greeting">
+      <template #actions>
+        <button 
+          class="refresh-btn" 
+          :disabled="store.isWorkoutsLoading"
+          title="Daten aktualisieren"
+          @click="refreshData"
+        >
+          <span :class="{ 'spinning': store.isWorkoutsLoading }">🔄</span>
+        </button>
+      </template>
+    </HeaderBar>
 
     <!-- Clerk Loading State -->
     <div v-if="!isClerkReady" class="loading-section">
@@ -45,18 +56,27 @@
         </div>
       </div>
 
+      <!-- Subtiler Refresh: nur Spinner im Button, kein großes Banner -->
+
+
+      <!-- Quick Overview with 7-day chart and streak -->
+      <QuickOverview :workouts="store.workouts" />
+
       <section class="today">
         <div class="next-card">
           <div class="next-header">
             <h3>Nächstes Workout</h3>
-            <span class="muted" v-if="lastLabel">Zuletzt: {{ lastLabel }}</span>
+            <span v-if="lastLabel" class="muted">Zuletzt: {{ lastLabel }}</span>
           </div>
           <p class="next-title">{{ nextLabel }}</p>
-          <button @click="startWorkout(nextType)" :disabled="workoutCreated">
+          <button :disabled="workoutCreated" @click="startWorkout(nextType)">
             {{ workoutCreated ? 'Workout erstellt!' : `Starten (${nextLabel})` }}
           </button>
         </div>
       </section>
+
+      <!-- Recent Workouts -->
+      <RecentWorkouts :workouts="store.workouts" />
 
       <StatsWidget v-if="!store.isWorkoutsLoading" :workouts="store.workouts" />
       <div v-if="store.isWorkoutsLoading" class="stats-skeleton">
@@ -71,24 +91,41 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted, watch, nextTick } from 'vue'
+import { computed, ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUser, useAuth, useClerk } from '@clerk/vue'
+import { getAuthToken } from '@/utils/authToken'
 import { useUserStore } from "../stores/userStore";
-import WorkoutCard from "../components/WorkoutCard.vue";
+import { useToastStore } from "../stores/toastStore";
 import StatsWidget from "../components/StatsWidget.vue";
 import HeaderBar from "../components/HeaderBar.vue";
 import BottomNav from "../components/BottomNav.vue";
 import EmptyState from "../components/EmptyState.vue";
+import QuickOverview from "../components/QuickOverview.vue";
+import RecentWorkouts from "../components/RecentWorkouts.vue";
 
 const store = useUserStore();
 const router = useRouter();
 const clerk = useClerk();
 const auth = useAuth();
-const { user, isSignedIn } = useUser();
+const { isSignedIn } = useUser();
 const selectedWorkoutType = ref('push')
 const isClerkReady = ref(false)
 const workoutCreated = ref(false) // Für visuelles Feedback
+const toast = useToastStore()
+
+// Fokus-Handler als stabile Referenz definieren (wird in onMounted registriert)
+const handleFocus = () => {
+  if (isClerkReady.value && isSignedIn.value) {
+    console.log('🔄 Fenster fokussiert - aktualisiere Workouts...');
+    loadWorkoutsData(true);
+  }
+};
+
+// Cleanup früh registrieren (muss im Setup-Kontext stattfinden)
+onUnmounted(() => {
+  window.removeEventListener('focus', handleFocus);
+});
 
 // Warte auf Clerk Initialisierung
 onMounted(async () => {
@@ -103,15 +140,8 @@ onMounted(async () => {
 
     if (!isSignedIn.value) return; // AuthLayout übernimmt Redirect
 
-    console.log('🔄 DashboardView - Angemeldet, lade Daten (Cache erlaubt)...');
-    try {
-      const token = await getAuthToken();
-      console.log('📥 DashboardView - Lade Workouts mit Token (cached allowed):', !!token);
-      await store.loadWorkouts(token, { force: false });
-    } catch (error) {
-      console.warn('⚠️ DashboardView - Fehler beim Laden der Workouts mit Token, versuche ohne:', error);
-      await store.loadWorkouts(null, { force: false });
-    }
+    console.log('🔄 DashboardView - Angemeldet, lade Daten...');
+    await loadWorkoutsData();
   };
 
   // Clerk-Loaded: sofort wenn bereits geladen, sonst auf Event warten
@@ -128,7 +158,38 @@ onMounted(async () => {
       if (!isClerkReady.value) handler();
     }, 2000);
   }
+
+  // Lausche auf Navigation zurück zum Dashboard
+  router.afterEach((to, from) => {
+    if (to.path === '/' && from.path !== '/') {
+      console.log('🔄 Zurück zum Dashboard - aktualisiere Workouts...');
+      loadWorkoutsData(true); // Force refresh
+    }
+  });
+
+  // Aktualisiere Daten wenn das Fenster wieder fokussiert wird
+  window.addEventListener('focus', handleFocus);
 });
+
+// Separate Funktion für das Laden der Workout-Daten
+async function loadWorkoutsData(force = false) {
+  try {
+    const token = await getAuthToken({ clerk, auth });
+    console.log('📥 DashboardView - Lade Workouts mit Token:', !!token, force ? '(forced)' : '(cached allowed)');
+    await store.loadWorkouts(token, { force });
+  } catch (error) {
+    console.warn('⚠️ DashboardView - Fehler beim Laden der Workouts mit Token, versuche ohne:', error);
+    await store.loadWorkouts(null, { force });
+  }
+}
+
+// Manueller Refresh
+async function refreshData() {
+  console.log('🔄 Manueller Daten-Refresh...');
+  await loadWorkoutsData(true);
+  // Subtiles Feedback statt großem Banner
+  toast.show('Aktualisiert', { type: 'success', duration: 1500 })
+}
 
 // Überwache Auth-Änderungen nur nach Clerk-Initialisierung
 // Auth-Redirect wird zentral im AuthLayout gehandhabt
@@ -191,7 +252,7 @@ async function startWorkout(type) {
 
 async function retryLoadWorkouts() {
   try {
-    const token = await getAuthToken();
+    const token = await getAuthToken({ clerk, auth });
     console.log('🔄 DashboardView - Retry loading workouts with token:', !!token);
     store.loadWorkouts(token, { force: true });
   } catch (error) {
@@ -201,26 +262,7 @@ async function retryLoadWorkouts() {
 }
 
 // Robuster Token-Helper analog zum WorkoutBuilder
-async function getAuthToken(options = {}) {
-  const template = import.meta.env.VITE_CLERK_JWT_TEMPLATE
-  const opts = template ? { ...options, template } : options
-  try {
-    const t = await clerk?.session?.getToken?.(opts)
-    if (t) return t
-  } catch {}
-  try {
-    const t = await window?.Clerk?.session?.getToken?.(opts)
-    if (t) return t
-  } catch {}
-  try {
-    const maybe = auth?.getToken
-    if (typeof maybe === 'function') {
-      const t = await maybe(opts)
-      if (t) return t
-    }
-  } catch {}
-  return null
-}
+/* Token-Helfer wird zentral aus '@/utils/authToken' importiert */
 </script>
 
 <style scoped>
@@ -232,19 +274,65 @@ async function getAuthToken(options = {}) {
   overflow-x: hidden;
 }
 
-.today {
-  padding: 16px;
+.refresh-btn {
+  background: transparent;
+  border: none;
+  color: var(--fg);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  font-size: 1.2rem;
 }
 
-.today button { background: var(--accent); color: var(--accent-contrast); border: none; padding: 16px 24px; border-radius: 12px; font-size: 16px; font-weight: 600; cursor: pointer; margin-top: 16px; width: 100%; min-height: 50px; box-shadow: 0 4px 12px color-mix(in oklab, var(--accent-color) 40%, transparent); transition: all 0.2s ease; -webkit-tap-highlight-color: transparent; }
-.today button:hover { transform: translateY(-2px); box-shadow: 0 6px 16px color-mix(in oklab, var(--accent-color) 60%, transparent); }
+.refresh-btn:hover {
+  background: var(--surface);
+}
 
-.today button:active { transform: translateY(0); box-shadow: 0 2px 8px color-mix(in oklab, var(--accent-color) 30%, transparent); }
+.refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.spinning {
+  animation: spin 1s linear infinite;
+}
+
+.today {
+  padding: 0 16px 16px;
+}
+
+.today button { 
+  background: var(--accent); 
+  color: var(--accent-contrast); 
+  border: none; 
+  padding: 16px 24px; 
+  border-radius: 12px; 
+  font-size: 16px; 
+  font-weight: 600; 
+  cursor: pointer; 
+  margin-top: 16px; 
+  width: 100%; 
+  min-height: 50px; 
+  box-shadow: 0 4px 12px color-mix(in oklab, var(--accent-color) 40%, transparent); 
+  transition: all 0.2s ease; 
+  -webkit-tap-highlight-color: transparent; 
+}
+
+.today button:hover { 
+  transform: translateY(-2px); 
+  box-shadow: 0 6px 16px color-mix(in oklab, var(--accent-color) 60%, transparent); 
+}
+
+.today button:active { 
+  transform: translateY(0); 
+  box-shadow: 0 2px 8px color-mix(in oklab, var(--accent-color) 30%, transparent); 
+}
 
 /* Tablet Styles */
 @media (min-width: 768px) {
   .today {
-    padding: 24px;
+    padding: 0 24px 24px;
     max-width: 600px;
     margin: 0 auto;
   }
@@ -264,7 +352,7 @@ async function getAuthToken(options = {}) {
   }
   
   .today {
-    padding: 32px;
+    padding: 0 32px 32px;
   }
 }
 
@@ -277,12 +365,8 @@ async function getAuthToken(options = {}) {
   gap: 1rem;
 }
 
-.spinner { width: 40px; height: 40px; border: 3px solid color-mix(in oklab, var(--accent-color) 30%, transparent); border-top: 3px solid var(--accent-color); border-radius: 50%; animation: spin 1s linear infinite; }
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
+/* Globale .spinner nutzen; nur Größe hier setzen */
+.loading-section .spinner { width: 40px; height: 40px; }
 
 .loading-section p {
   color: var(--muted);
@@ -296,6 +380,7 @@ async function getAuthToken(options = {}) {
 .no-workout-today p { color: var(--muted); margin: 0; }
 
 .success-message { background: color-mix(in oklab, var(--success-color) 20%, transparent); border: 1px solid color-mix(in oklab, var(--success-color) 50%, transparent); margin: 1rem; border-radius: 12px; padding: 1rem; animation: slideInFromTop 0.5s ease-out; }
+
 
 .success-content {
   display: flex;
@@ -328,13 +413,50 @@ async function getAuthToken(options = {}) {
 .today button:disabled { background: color-mix(in oklab, var(--success-color) 80%, white); color: #fff; cursor: not-allowed; transform: none; }
 .today button:disabled:hover { transform: none; }
 
-.next-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 16px; }
-.next-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.next-title { font-size: 1.15rem; font-weight: 600; margin: 6px 0 0; }
-.muted { color: var(--muted); font-size: 0.85rem; }
+.next-card { 
+  background: var(--card-bg); 
+  border: 1px solid var(--card-border); 
+  border-radius: 12px; 
+  padding: 16px; 
+  margin: 16px; 
+}
+
+.next-header { 
+  display: flex; 
+  justify-content: space-between; 
+  align-items: center; 
+  margin-bottom: 8px; 
+}
+
+.next-title { 
+  font-size: 1.15rem; 
+  font-weight: 600; 
+  margin: 6px 0 0; 
+}
+
+.muted { 
+  color: var(--muted); 
+  font-size: 0.85rem; 
+}
+
+/* Stats Skeleton Styles */
+.stats-skeleton {
+  margin: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sk-card {
+  height: 80px;
+  background: var(--surface);
+  border-radius: 12px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
 </style>
-.hero-content { animation: fadeIn .25s ease-out; }
-.hero-skeleton { padding: 4px 0 8px; }
-.sk-title { height: 28px; width: 60%; background: var(--surface); border-radius: 6px; margin-bottom: 10px; }
-.sk-sub { height: 16px; width: 70%; background: var(--surface); border-radius: 6px; margin-bottom: 14px; }
-.sk-btn { height: 44px; width: 220px; background: var(--surface); border-radius: 10px; }
+

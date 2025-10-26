@@ -1,33 +1,105 @@
 <script setup>
-import { useClerk, useUser } from '@clerk/vue';
-import { ref, onMounted, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { useClerk, useUser } from '@clerk/vue'
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
+import MotivationWidget from '@/components/MotivationWidget.vue'
 
-const props = defineProps({
-        handleChangeDisplay: Function
-});
+// Optionaler Callback vom Wrapper (aktuell nicht genutzt, behalten für Abwärtskompat.)
+defineProps({
+    handleChangeDisplay: { type: Function, default: null }
+})
 
-const clerk = useClerk();
-const { user, isSignedIn } = useUser();
-const router = useRouter();
+const clerk = useClerk()
+const { isSignedIn } = useUser()
+const router = useRouter()
+const route = useRoute()
 
-// Router-Guard übernimmt die Weiterleitung; hier keine verzögerten Redirects mehr
+// Motivation-Overlay Steuerung (ohne Tages-Limit: bei jedem Login anzeigen)
+const showMotivation = ref(false)
+let redirectTimer = null
+
+function getRedirectTarget() {
+    const q = route.query?.redirect
+    return typeof q === 'string' && q.startsWith('/') ? q : '/dashboard'
+}
+
+function goNow() {
+    router.replace(getRedirectTarget())
+}
+
+function startMotivationFlow() {
+    showMotivation.value = true
+    // Sicherheits-Reset, falls bereits ein Timer existiert
+    if (redirectTimer) {
+        clearTimeout(redirectTimer)
+        redirectTimer = null
+    }
+    redirectTimer = setTimeout(() => {
+        goNow()
+    }, 5000)
+}
+
+function skipNow() {
+    if (redirectTimer) {
+        clearTimeout(redirectTimer)
+        redirectTimer = null
+    }
+    goNow()
+}
+
+onBeforeUnmount(() => {
+    if (redirectTimer) {
+        clearTimeout(redirectTimer)
+        redirectTimer = null
+    }
+})
+
+function maybeProceed() {
+    if (!isSignedIn.value) return
+    // Immer Motivation anzeigen
+    startMotivationFlow()
+}
+
+onMounted(() => {
+    maybeProceed()
+})
+
+watch(
+    () => isSignedIn.value,
+    (signedIn) => {
+        if (signedIn) {
+            maybeProceed()
+        }
+    }
+)
 </script>
 
 <template>
-  <div class="welcome-page">
-    <div v-if="!isSignedIn" class="sign-in-container">
-      <h2>Willkommen bei der Bro Split App!</h2>
-      <p>Bitte melden Sie sich an, um fortzufahren.</p>
-      <button @click="clerk.openSignIn()" class="sign-in-btn">Anmelden</button>
+    <div class="welcome-page">
+        <!-- Nicht eingeloggt: Sign-In -->
+        <div v-if="!isSignedIn" class="sign-in-container">
+            <h2>Willkommen bei der Bro Split App!</h2>
+            <p>Bitte melden Sie sich an, um fortzufahren.</p>
+            <button class="sign-in-btn" @click="clerk.openSignIn()">Anmelden</button>
+        </div>
+
+        <!-- Eingeloggt: Motivation-Overlay -->
+        <div v-else>
+            <div v-if="showMotivation" class="motivation-overlay">
+                <div class="motivation-card">
+                    <MotivationWidget />
+                    <button class="skip-btn" @click="skipNow">Überspringen</button>
+                </div>
+            </div>
+
+            <!-- Fallback: kleiner Loader, während der Overlay-Start initialisiert -->
+            <div v-else class="loading-container">
+                <h2>Weiterleitung...</h2>
+                <p>Sie werden zum Dashboard weitergeleitet.</p>
+                <div class="spinner"></div>
+            </div>
+        </div>
     </div>
-    
-    <div v-else class="loading-container">
-      <h2>Weiterleitung...</h2>
-      <p>Sie werden zum Dashboard weitergeleitet.</p>
-      <div class="spinner"></div>
-    </div>
-  </div>
 </template>
 
 <style scoped>
@@ -66,20 +138,8 @@ const router = useRouter();
     border: 1px solid color-mix(in oklab, var(--accent-color) 30%, transparent);
     }
 
-    .spinner {
-        width: 40px;
-        height: 40px;
-    border: 4px solid color-mix(in oklab, var(--accent-color) 30%, transparent);
-    border-top: 4px solid var(--accent-color);
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-        margin-top: 1rem;
-    }
-
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
+    /* Verwende globale .spinner; skaliere hier nur Größe wenn nötig */
+    .loading-container .spinner { width: 40px; height: 40px; margin-top: 1rem; }
 
     .sign-in-btn { background: var(--accent); color: var(--accent-contrast); border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 16px; font-weight: 600; transition: all 0.3s ease; }
 
@@ -102,4 +162,43 @@ const router = useRouter();
     @media (min-width: 640px) {
         h2 { font-size: 2.2rem; }
     }
+
+        /* Motivation Overlay */
+        .motivation-overlay {
+            position: fixed;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            background: color-mix(in oklab, var(--bg) 70%, transparent);
+            backdrop-filter: blur(6px);
+            z-index: 50;
+            padding: 16px;
+        }
+        .motivation-card {
+            width: min(620px, 100%);
+            border-radius: 16px;
+            padding: 16px;
+            background: color-mix(in oklab, var(--fg) 5%, transparent);
+            border: 1px solid var(--card-border);
+            box-shadow: 0 10px 30px color-mix(in oklab, #000 30%, transparent);
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            align-items: stretch;
+        }
+        .skip-btn {
+            align-self: center;
+            background: transparent;
+            color: var(--muted);
+            border: 1px solid color-mix(in oklab, var(--muted) 40%, transparent);
+            padding: 10px 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all .2s ease;
+        }
+        .skip-btn:hover {
+            color: var(--fg);
+            border-color: var(--fg);
+            transform: translateY(-1px);
+        }
 </style>

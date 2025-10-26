@@ -14,7 +14,7 @@
 </template>
 
 <script setup>
-const props = defineProps({
+defineProps({
   active: { type: Number, default: 1 },
   steps: { type: Array, default: () => ['Typ', 'Übungen', 'Review'] }
 })

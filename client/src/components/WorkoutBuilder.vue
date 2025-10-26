@@ -2,7 +2,7 @@
   <div class="workout-builder">
     <!-- Oben immer sichtbarer Zurück-Button -->
     <div class="builder-topbar">
-      <button class="back-top-btn" @click="goDashboard" title="Zurück zum Dashboard">← Zurück</button>
+      <button class="back-top-btn" title="Zurück zum Dashboard" @click="goDashboard">← Zurück</button>
       <h2>Workout erstellen</h2>
     </div>
 
@@ -48,9 +48,9 @@
         <div 
           v-for="exercise in filteredExercises" 
           :key="exercise._id"
-          @click="toggleExercise(exercise)"
           :class="{ selected: isSelected(exercise) }"
           class="exercise-item"
+          @click="toggleExercise(exercise)"
         >
           <h4>{{ exercise.name }}</h4>
           <p>{{ exercise.muscleGroup }}</p>
@@ -76,7 +76,7 @@
           <button class="drag-handle" aria-label="Reihenfolge ändern" title="Ziehen zum Umordnen">⋮⋮</button>
           <span class="ex-name">{{ exercise.name }}</span>
           <div class="row-actions">
-            <button @click="removeExercise(index)" class="remove-btn" title="Übung entfernen">×</button>
+            <button class="remove-btn" title="Übung entfernen" @click="removeExercise(index)">×</button>
           </div>
         </div>
         <p v-if="!isSignedIn" class="auth-hint">Bitte melde dich an, um ein Workout zu erstellen.</p>
@@ -84,18 +84,15 @@
       </div>
     </div>
 
-    <!-- Loading State -->
-    <div v-else-if="isSignedIn && loading" class="loading">
-      Lade Übungen...
-    </div>
+    <!-- Loading State außerhalb nicht nötig, da innerhalb der exercises-section bereits Skeleton/Loading angezeigt wird -->
 
     <!-- Sticky Bottom CTA -->
     <div v-if="isSignedIn" class="sticky-cta">
       <button 
-        @click="createWorkout" 
         class="create-btn" 
-        :disabled="!isSignedIn || creating || selectedExercises.length === 0"
+        :disabled="!isSignedIn || creating || selectedExercises.length === 0" 
         :title="!isSignedIn ? 'Bitte zuerst anmelden' : (selectedExercises.length === 0 ? 'Wähle Übungen aus' : 'Workout erstellen')"
+        @click="createWorkout"
       >
         {{ creating ? 'Erstelle…' : `Erstellen (${selectedExercises.length})` }}
       </button>
@@ -106,6 +103,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useAuth, useUser, useClerk } from '@clerk/vue'
+import { getAuthToken } from '@/utils/authToken'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
 import axios from 'axios'
@@ -225,7 +223,7 @@ async function loadExercises() {
     // Token hinzufügen falls verfügbar
     if (isSignedIn.value) {
       try {
-        const token = await getAuthToken()
+  const token = await getAuthToken({ clerk, auth })
         if (token) {
           headers.Authorization = `Bearer ${token}`
           console.log('🔑 WorkoutBuilder - Token verfügbar')
@@ -364,7 +362,7 @@ function onDragStart(index) {
   draggingIndex.value = index
 }
 
-function onDragOver(index) {
+function onDragOver(_index) {
   // Optional: visuelle Platzhalter könnten hier gesetzt werden
 }
 
@@ -401,10 +399,10 @@ async function createWorkout() {
     }
 
     // Token holen (Preflight)
-    let token = await getAuthToken().catch(() => null)
+    let token = await getAuthToken({ clerk, auth }).catch(() => null)
     if (!token) {
       // Zweiter Versuch ohne Cache
-      token = await getAuthToken({ skipCache: true }).catch(() => null)
+  token = await getAuthToken({ clerk, auth, options: { skipCache: true } }).catch(() => null)
     }
     if (!token) {
       errorMsg.value = 'Sitzung noch nicht bereit. Bitte kurz warten und erneut versuchen.'
@@ -474,36 +472,7 @@ function goDashboard() {
   router.push({ name: 'dashboard' })
 }
 
-// Robuster Token-Helper: versucht mehrere Quellen (useClerk, window.Clerk, useAuth)
-async function getAuthToken(options = {}) {
-  const template = import.meta.env.VITE_CLERK_JWT_TEMPLATE
-  const opts = template ? { ...options, template } : options
-  // 1) useClerk Session
-  try {
-    const t = await clerk?.session?.getToken?.(opts)
-    if (t) return t
-  } catch (e) {
-    // ignore
-  }
-  // 2) window.Clerk
-  try {
-    const t = await window?.Clerk?.session?.getToken?.(opts)
-    if (t) return t
-  } catch (e) {
-    // ignore
-  }
-  // 3) useAuth
-  try {
-    const maybe = auth?.getToken
-    if (typeof maybe === 'function') {
-      const t = await maybe(opts)
-      if (t) return t
-    }
-  } catch (e) {
-    // ignore
-  }
-  return null
-}
+// Token-Helfer wird zentral aus '@/utils/authToken' importiert
 </script>
 
 <style scoped>

@@ -1,14 +1,24 @@
 {
   "name": "bro-split-app",
   "version": "1.0.0",
+  "type": "module",
   "scripts": {
     "server": "cd server && npm start",
     "client": "cd client && npm run dev",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "start:server": "cd server && node server.js",
-    "start:client": "cd client && npm run dev"
+    "start:client": "cd client && npm run dev",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier -w ."
   },
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "@eslint/js": "^9.38.0",
+    "concurrently": "^8.2.2",
+    "eslint": "^9.38.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-unused-imports": "^4.3.0",
+    "eslint-plugin-vue": "^10.5.1",
+    "prettier": "^3.6.2"
   }
 }

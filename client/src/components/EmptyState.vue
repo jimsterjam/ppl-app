@@ -4,7 +4,7 @@
       <div class="icon">{{ icon }}</div>
       <h3>{{ title }}</h3>
       <p>{{ message }}</p>
-      <button v-if="actionText" @click="$emit('action')" class="action-btn">
+      <button v-if="actionText" class="action-btn" @click="$emit('action')">
         {{ actionText }}
       </button>
     </div>

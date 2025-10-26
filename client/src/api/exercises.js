@@ -1,7 +1,7 @@
 import axios from "axios";
 
-// Zentrale Exercises-API (Backend läuft auf Port 3001)
-const API_URL = "http://localhost:3001/api/exercises";
+// Dev: über Vite-Proxy, Prod: relativ hinter gleichem Origin
+const API_URL = "/api/exercises";
 
 // Axios-Instance für Exercises (aktuell ohne zwingende Auth)
 const api = axios.create({

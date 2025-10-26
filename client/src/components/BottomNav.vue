@@ -5,8 +5,8 @@
         <button
           class="nav-btn"
           :class="{ active: $route.path.startsWith(link.path) }"
-          @click="$router.push(link.path)"
           :aria-current="$route.path.startsWith(link.path) ? 'page' : undefined"
+          @click="$router.push(link.path)"
         >
           <span class="icon" aria-hidden="true">{{ link.icon }}</span>
           <span class="label">{{ link.label }}</span>
