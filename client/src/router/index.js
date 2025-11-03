@@ -31,8 +31,8 @@ const routes = [
   {
     path: '/plan',
     name: 'plan',
-    // Temporäre Weiterleitung zur WelcomePage
-    redirect: '/'
+    // Weiterleitung zum Workout-Builder
+    redirect: '/workout-builder'
   }
 ]
 

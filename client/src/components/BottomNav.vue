@@ -21,7 +21,7 @@ const links = [
   { label: "Home", path: "/dashboard", icon: "🏠" },
   { label: "Stats", path: "/stats", icon: "📊" },
   { label: "Übungen", path: "/exercises", icon: "💪" },
-  { label: "Plan", path: "/plan", icon: "🧭" },
+  { label: "Plan", path: "/workout-builder", icon: "🧭" },
   { label: "Settings", path: "/settings", icon: "⚙️" }
 ];
 </script>

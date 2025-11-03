@@ -28,15 +28,24 @@
         Keine Übungen aus MongoDB gefunden. Backend prüfen!
       </div>
 
-      <!-- Übungsliste -->
+      <!-- Übungsliste (mit Thumbnail) -->
       <div v-else class="exercises-list">
         <div v-for="exercise in exercises" :key="exercise._id" class="exercise-card">
-          <h3>{{ exercise.name }}</h3>
-          <p><strong>Kategorie:</strong> {{ exercise.category }}</p>
-          <p><strong>Muskelgruppe:</strong> {{ exercise.muscleGroup }}</p>
-          <p><strong>Equipment:</strong> {{ exercise.equipment || 'Körpergewicht' }}</p>
+          <div class="thumb-row">
+            <img :src="getExerciseImage(exercise)" alt="Bild der Übung" class="thumb" @error="onImgError($event, exercise)" />
+            <div class="meta">
+              <h3 class="title">{{ exercise.name }}</h3>
+              <p class="sub">{{ exercise.category }} · {{ exercise.muscleGroup }}</p>
+            </div>
+          </div>
           <p v-if="exercise.description" class="description">{{ exercise.description }}</p>
-          <p><strong>ID:</strong> {{ exercise._id }}</p>
+          <p class="equip"><strong>Equipment:</strong> {{ exercise.equipment || 'Körpergewicht' }}</p>
+
+          <div class="img-actions">
+            <button class="img-btn" @click="pickImage(exercise)">Foto hinzufügen/ändern</button>
+            <button v-if="exercise.imageUrl" class="img-btn danger" @click="removeImage(exercise)">Foto entfernen</button>
+          </div>
+
         </div>
       </div>
     </div>
@@ -51,6 +60,8 @@ import axios from 'axios'
 import { useClerk, useUser } from '@clerk/vue'
 import HeaderBar from '../components/HeaderBar.vue'
 import BottomNav from '../components/BottomNav.vue'
+import { deleteExerciseImage, uploadExerciseImage } from '@/api/exercises'
+import { useToastStore } from '@/stores/toastStore'
 
 const { isSignedIn } = useUser()
 const clerk = useClerk()
@@ -59,6 +70,10 @@ const exercises = ref([])
 const loading = ref(false)
 const selectedCategory = ref('')
 const selectedMuscleGroup = ref('')
+const fileInput = ref(null)
+const targetExerciseId = ref('')
+const bust = ref({}) // Cache-Busting pro Übung nach Upload
+const toast = useToastStore()
 
 // Relative URL; in Dev routed über Vite-Proxy auf 3001
 const API_URL = '/api/exercises'
@@ -142,6 +157,130 @@ function resetFilters() {
 
 // 🔁 Initiale Ladung
 onMounted(() => loadAllExercises())
+
+function ensureFileInput() {
+  if (fileInput.value) return
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = 'image/*'
+  input.capture = 'environment'
+  input.style.display = 'none'
+  input.addEventListener('change', onFileSelected)
+  document.body.appendChild(input)
+  fileInput.value = input
+}
+
+function pickImage(exercise) {
+  targetExerciseId.value = exercise._id
+  ensureFileInput()
+  try {
+    fileInput.value.setAttribute('accept', 'image/*')
+    fileInput.value.setAttribute('capture', 'environment')
+  } catch {}
+  fileInput.value.click()
+}
+
+async function onFileSelected(e) {
+  try {
+    const files = e.target.files || []
+    if (!files.length || !targetExerciseId.value) return
+    const rawFile = files[0]
+    const resized = await resizeImageFile(rawFile, 1280, 0.85).catch(() => rawFile)
+
+    // Auth-Token (optional)
+    let token = null
+    if (isSignedIn.value && clerk.session) {
+      try { token = await clerk.session.getToken() } catch {}
+    }
+
+    // Einheitlicher Upload mit Fallbacks (Multipart → Alias → JSON)
+    await uploadExerciseImage(targetExerciseId.value, resized, token)
+    // Cache-Busting für genau diese Übung
+    bust.value = { ...bust.value, [targetExerciseId.value]: Date.now() }
+    await loadExercises()
+  toast.show('Foto hochgeladen.', { type: 'success', duration: 3000, position: 'top' })
+  } finally {
+    if (fileInput.value) fileInput.value.value = ''
+    targetExerciseId.value = ''
+  }
+}
+
+async function removeImage(exercise) {
+  if (!exercise?._id) return
+  let token = null
+  if (isSignedIn.value && clerk.session) {
+    try { token = await clerk.session.getToken() } catch {}
+  }
+  try {
+    await deleteExerciseImage(exercise._id, token)
+    await loadExercises()
+    toast.show('Foto entfernt.', { type: 'success', duration: 3000 })
+  } catch (e) {
+    toast.show('Entfernen fehlgeschlagen.', { type: 'error', duration: 3000 })
+  }
+}
+
+function resizeImageFile(file, maxSize = 1280, quality = 0.85) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => {
+      const scale = Math.min(maxSize / img.width, maxSize / img.height, 1)
+      const w = Math.round(img.width * scale)
+      const h = Math.round(img.height * scale)
+      const canvas = document.createElement('canvas')
+      canvas.width = w; canvas.height = h
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(img, 0, 0, w, h)
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const f = new File([blob], (file.name || 'upload').replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' })
+          resolve(f)
+        } else {
+          reject(new Error('Blob-Erzeugung fehlgeschlagen'))
+        }
+      }, 'image/jpeg', quality)
+    }
+    img.onerror = reject
+    const reader = new FileReader()
+    reader.onload = () => { img.src = reader.result }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
+function blobToDataURL(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = reject
+    reader.readAsDataURL(blob)
+  })
+}
+
+// Bildlogik analog ExerciseList / WorkoutBuilder
+function categoryToImage(category) {
+  const map = {
+    push: '/exercises/push.svg',
+    pull: '/exercises/pull.svg',
+    legs: '/exercises/legs.svg'
+  }
+  const key = String(category || '').toLowerCase()
+  return map[key] || '/exercises/camera.svg'
+}
+
+function getExerciseImage(ex) {
+  const base = ex?.thumbnailUrl || ex?.imageUrl || ex?.mediaUrl || '/exercises/camera.svg'
+  const id = ex?._id
+  const stamp = id && bust.value?.[id] ? `?t=${bust.value[id]}` : ''
+  return `${base}${stamp}`
+}
+
+function onImgError(evt, ex) {
+  const img = evt?.target
+  if (!img) return
+  img.onerror = null
+  img.src = '/exercises/camera.svg'
+}
 </script>
 
 <style scoped>
@@ -194,6 +333,11 @@ onMounted(() => loadAllExercises())
 
 .exercise-card p { margin: 4px 0; font-size: 0.9rem; color: var(--muted); }
 
+.img-actions { display: flex; gap: 8px; margin-top: 10px; }
+.img-btn { padding: 8px 12px; border-radius: 10px; border: 1px solid var(--card-border); background: var(--surface); color: var(--fg); cursor: pointer; font-weight: 600; }
+.img-btn:hover { background: var(--accent-soft); }
+.img-btn.danger { border-color: var(--danger-color); color: var(--danger-color); }
+
 .description { color: var(--muted) !important; font-style: italic; }
 
 .filter-status {
@@ -208,4 +352,28 @@ onMounted(() => loadAllExercises())
 
 .reset-btn { padding: 8px 16px; border-radius: 8px; border: 1px solid var(--accent-color); background: transparent; color: var(--accent-color); cursor: pointer; }
 .reset-btn:hover { background: var(--accent-soft); }
+
+/* Thumbnail-Styles */
+.thumb-row { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+.thumb {
+  width: 56px;
+  height: 56px;
+  flex: 0 0 56px;
+  object-fit: contain;
+  background: #f8fafc;
+  border-radius: 10px;
+  border: 1px solid var(--card-border);
+  padding: 6px;
+}
+.meta { display: flex; flex-direction: column; min-width: 0; }
+.title { margin: 0; line-height: 1.2; }
+.sub { color: var(--muted); font-size: 0.9rem; }
+.equip, .id { color: var(--muted); font-size: 0.85rem; }
+
+/* Mobile: Thumbnail rechts und größer */
+@media (max-width: 480px) {
+  .thumb-row { flex-direction: row-reverse; justify-content: space-between; }
+  .thumb { width: 84px; height: 84px; flex-basis: 84px; }
+  .meta { flex: 1 1 auto; }
+}
 </style>

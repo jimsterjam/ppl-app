@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="100" viewBox="0 0 160 100">
+  <rect width="160" height="100" rx="12" fill="#2a2a2d" />
+  <rect x="8" y="8" width="144" height="84" rx="10" fill="#1c1c1e" stroke="#444" />
+  <g font-family="Arial, sans-serif" font-size="14" fill="#999" text-anchor="middle">
+    <text x="80" y="55">Kein Bild</text>
+  </g>
+</svg>

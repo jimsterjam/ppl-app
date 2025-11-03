@@ -15,10 +15,6 @@
       </div>
 
       <div v-else class="workout">
-        <div v-if="createdBanner" class="banner success">
-          Workout erstellt.
-          <button class="dismiss" @click="createdBanner=false">✕</button>
-        </div>
         <div v-if="draftBanner" class="banner warning">
           Lokaler Entwurf – bitte anmelden, um dauerhaft zu speichern.
           <button class="dismiss" @click="draftBanner=false">✕</button>
@@ -30,7 +26,7 @@
           <span v-if="workout.completed" class="completed">✓ Abgeschlossen</span>
         </p>
 
-        <div class="ex-list">
+  <div id="exercises" ref="exListRef" class="ex-list">
           <div class="ex-list-header">
             <h3>Übungen</h3>
             <button class="reorder-toggle" :aria-pressed="isReordering" @click="toggleReorder">
@@ -53,6 +49,15 @@
             <div class="ex-header">
               <strong>{{ ex.name }}</strong>
               <small>{{ ex.muscleGroup }}</small>
+            </div>
+            <div class="ex-media">
+              <img :src="getExerciseImage(ex)" alt="Übungsbild" class="ex-thumb" @click="onExerciseImageClick(ex)" @error="onImgError" />
+              <div class="img-actions" v-if="ex.imageUrl || ex.thumbnailUrl">
+                <button class="link" @click.prevent="replaceExerciseImage(ex)">Ersetzen</button>
+                <span class="sep">•</span>
+                <button class="link danger" @click.prevent="openRemoveModal(ex)">Entfernen</button>
+              </div>
+              <small class="media-hint">Tippe auf das Bild, um es zu {{ ex.imageUrl || ex.thumbnailUrl ? 'vergrößern' : 'hinzufügen' }}.</small>
             </div>
             <div class="ex-sets">
               <div class="set-row header">
@@ -101,6 +106,14 @@
 
     <BottomNav />
     
+    <!-- Vollbild-Bildvorschau -->
+    <div v-if="preview.open" class="img-overlay" @click="closePreview">
+      <img :src="preview.url" alt="Vorschau" class="img-large" />
+    </div>
+    
+    <!-- Unsichtbarer File-Input für Uploads -->
+    <input ref="uploadInput" type="file" accept="image/*" capture="environment" style="display:none" @change="onUploadSelected" />
+    
     <!-- Bestätigungsmodal bei ungespeicherten Änderungen -->
     <AppModal
       v-model="showLeaveModal"
@@ -111,19 +124,32 @@
       type="warning"
       @confirm="confirmLeave"
     />
+
+    <!-- Bestätigungsmodal für Foto-Entfernen -->
+    <AppModal
+      v-model="showRemoveModal"
+      title="Foto entfernen?"
+      message="Möchtest du das Foto wirklich entfernen?"
+      confirm-text="Entfernen"
+      cancel-text="Abbrechen"
+      type="warning"
+      @confirm="confirmRemoveImage"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, nextTick, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuth, useClerk } from '@clerk/vue'
 import { getAuthToken } from '@/utils/authToken'
 import { fetchWorkout } from '@/api/workouts'
+import { fetchExercise, fetchExercises, uploadExerciseImage, deleteExerciseImage } from '@/api/exercises'
 import { useUserStore } from '@/stores/userStore'
 import HeaderBar from '@/components/HeaderBar.vue'
 import BottomNav from '@/components/BottomNav.vue'
 import AppModal from '@/components/AppModal.vue'
+import { useToastStore } from '@/stores/toastStore'
 
 const route = useRoute()
 const router = useRouter()
@@ -131,19 +157,26 @@ const auth = useAuth()
 const clerk = useClerk()
 
 const store = useUserStore()
+const toast = useToastStore()
 const workout = ref(null)
 const loading = ref(false)
 const error = ref('')
 const saving = ref(false)
-const createdBanner = ref(false)
 const saveMsg = ref('')
 const saveError = ref(false)
 const draftBanner = ref(false)
 const isReordering = ref(false)
 const draggingIndex = ref(null)
 const isDirty = ref(false)
+const exListRef = ref(null)
+const didAutoScroll = ref(false)
 let initialSnapshot = ''
 const showLeaveModal = ref(false)
+const showRemoveModal = ref(false)
+const removeTarget = ref(null)
+const uploadInput = ref(null)
+const uploadTarget = ref(null)
+const preview = reactive({ open: false, url: '' })
 
 function formatDate(dateStr) {
   if (!dateStr) return ''
@@ -155,28 +188,219 @@ function formatDate(dateStr) {
   }
 }
 
+function snapshotCore(w) {
+  if (!w) return ''
+  try {
+    const core = {
+      name: w.name,
+      type: w.type,
+      date: w.date,
+      completed: w.completed,
+      exercises: (w.exercises || []).map(ex => ({
+        exerciseId: ex.exerciseId,
+        name: ex.name,
+        muscleGroup: ex.muscleGroup,
+        setDetails: (ex.setDetails || []).map(s => ({ reps: s.reps, weight: s.weight }))
+      }))
+    }
+    return JSON.stringify(core)
+  } catch {
+    return ''
+  }
+}
+
 async function loadWorkout() {
   loading.value = true
   error.value = ''
   try {
     const id = route.params.id
-    // Banner aus Query ableiten
-    if (route.query.created === '1') createdBanner.value = true
     if (route.query.draft === '1') draftBanner.value = true
-    // Draft-Fall: Aus Store lesen und nicht vom Server
+    // Nur Toast bei frisch erstellt (kein Banner, um Layout-Jitter zu vermeiden)
+    if (route.query.created === '1') {
+      toast.show('Workout erstellt.', { type: 'success', duration: 3000 })
+    }
+    // Draft-Fall: lokal aus dem Store
     if (String(id).startsWith('draft-')) {
       workout.value = store.workouts.find(w => w._id === id) || null
+      ensureSetDetailsStructure()
+      await enrichExerciseImages()
+      initialSnapshot = snapshotCore(workout.value)
       return
     }
-  const token = await getAuthToken({ clerk, auth }).catch(() => null)
+    const token = await getAuthToken({ clerk, auth }).catch(() => null)
     const data = await fetchWorkout(id, token)
     workout.value = data || null
+    ensureSetDetailsStructure()
+    await enrichExerciseImages()
+    initialSnapshot = snapshotCore(workout.value)
   } catch (e) {
     console.error('Workout laden fehlgeschlagen:', e)
     error.value = e?.message || 'Unbekannter Fehler'
   } finally {
     loading.value = false
   }
+}
+
+async function enrichExerciseImages() {
+  try {
+    const list = workout.value?.exercises || []
+    for (let idx = 0; idx < list.length; idx++) {
+      const ex = list[idx]
+      if (!ex.exerciseId) continue
+      try {
+        const full = await fetchExercise(ex.exerciseId)
+        if (full?.imageUrl || full?.thumbnailUrl) {
+          ex.imageUrl = full.imageUrl
+          ex.thumbnailUrl = full.thumbnailUrl
+        }
+      } catch {}
+    }
+  } catch {}
+}
+
+function getExerciseImage(ex) {
+  return ex?.thumbnailUrl || ex?.imageUrl || '/exercises/camera.svg'
+}
+
+function onImgError(evt) {
+  const img = evt?.target
+  if (img) { img.onerror = null; img.src = '/exercises/camera.svg' }
+}
+
+function onExerciseImageClick(ex) {
+  if (ex?.imageUrl || ex?.thumbnailUrl) {
+    preview.url = ex.imageUrl || ex.thumbnailUrl
+    preview.open = true
+    return
+  }
+  // Kein Bild vorhanden: Upload starten
+  uploadTarget.value = ex
+  // Versuche ggf. die Exercise-ID zu ermitteln, falls noch nicht vorhanden
+  ensureExerciseId(uploadTarget.value).finally(() => {
+    try {
+      uploadInput.value?.setAttribute?.('accept', 'image/*')
+      uploadInput.value?.setAttribute?.('capture', 'environment')
+    } catch {}
+    uploadInput.value?.click?.()
+  })
+}
+
+function closePreview() { preview.open = false; preview.url = '' }
+
+async function onUploadSelected(e) {
+  const files = e?.target?.files || []
+  if (!files.length || !uploadTarget.value) return
+  const file = files[0]
+  // Reset Input
+  try { e.target.value = '' } catch {}
+  try {
+    let token = await getAuthToken({ clerk, auth }).catch(() => null)
+    if (!token) token = await getAuthToken({ clerk, auth, options: { skipCache: true } }).catch(() => null)
+    const target = uploadTarget.value
+    if (!target?.exerciseId) {
+      const ok = await ensureExerciseId(target)
+      if (!ok || !target.exerciseId) {
+        console.warn('Kein exerciseId für Upload ermittelbar – Upload abgebrochen')
+        return
+      }
+    }
+    const res = await uploadExerciseImage(target.exerciseId, file, token)
+    const updated = res?.exercise
+    if (updated) {
+      const bust = `?t=${Date.now()}`
+      target.imageUrl = (updated.imageUrl || '') + bust
+      target.thumbnailUrl = (updated.thumbnailUrl || '') + bust
+      toast.show('Foto hochgeladen.', { type: 'success', duration: 3000, position: 'top' })
+    }
+  } catch (err) {
+    console.warn('Bild-Upload fehlgeschlagen:', err)
+    toast.show('Upload fehlgeschlagen.', { type: 'error', duration: 3000 })
+  } finally {
+    uploadTarget.value = null
+  }
+}
+
+function replaceExerciseImage(ex) {
+  // Expliziter Upload-Start ohne Preview
+  uploadTarget.value = ex
+  ensureExerciseId(uploadTarget.value).finally(() => {
+    try {
+      uploadInput.value?.setAttribute?.('accept', 'image/*')
+      uploadInput.value?.setAttribute?.('capture', 'environment')
+    } catch {}
+    uploadInput.value?.click?.()
+  })
+}
+
+function openRemoveModal(ex) {
+  removeTarget.value = ex
+  showRemoveModal.value = true
+}
+
+async function confirmRemoveImage() {
+  try {
+    const ex = removeTarget.value
+    if (!ex) return
+    let token = await getAuthToken({ clerk, auth }).catch(() => null)
+    if (!token) token = await getAuthToken({ clerk, auth, options: { skipCache: true } }).catch(() => null)
+    // Stelle sicher, dass eine exerciseId vorhanden ist
+    if (!ex.exerciseId) {
+      const okId = await ensureExerciseId(ex)
+      if (!okId || !ex.exerciseId) {
+        toast.show('Bild konnte nicht entfernt werden (fehlende Übungs-ID).', { type: 'error', duration: 3000 })
+        return
+      }
+    }
+    await deleteExerciseImage(ex.exerciseId, token)
+    // Lokalen Zustand bereinigen
+    ex.imageUrl = undefined
+    ex.thumbnailUrl = undefined
+    toast.show('Foto entfernt.', { type: 'success', duration: 2500 })
+    showRemoveModal.value = false
+    removeTarget.value = null
+  } catch (err) {
+    console.warn('Bild entfernen fehlgeschlagen:', err)
+    toast.show('Entfernen fehlgeschlagen.', { type: 'error', duration: 3000 })
+  } finally {
+    // Falls Modal offen blieb (Fehler), bleibt es offen; Nutzer kann erneut versuchen oder abbrechen
+  }
+}
+
+// Falls ein Übungseintrag im Workout keine exerciseId trägt, versuche diese über den Namen zu ermitteln
+async function ensureExerciseId(ex) {
+  try {
+    if (!ex || ex.exerciseId) return true
+    const list = await fetchExercises({})
+    if (!Array.isArray(list) || list.length === 0) return false
+    const name = (ex.name || '').trim().toLowerCase()
+    const mg = (ex.muscleGroup || '').trim().toLowerCase()
+    let match = list.find(e => String(e.name || '').trim().toLowerCase() === name && String(e.muscleGroup || '').trim().toLowerCase() === mg)
+    if (!match) {
+      // Fallback: nur nach Name
+      match = list.find(e => String(e.name || '').trim().toLowerCase() === name)
+    }
+    if (match?._id) {
+      ex.exerciseId = match._id
+      return true
+    }
+    return false
+  } catch {
+    return false
+  }
+}
+
+function scrollToExercises() {
+  const el = exListRef.value || document.getElementById('exercises')
+  if (!el) return
+  const headerOffset = 72
+  try {
+    const top = el.getBoundingClientRect().top + window.pageYOffset - headerOffset
+    window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
+  } catch {}
+}
+
+function shouldAutoScroll() {
+  return route.query.created === '1' || route.query.focus === 'exercises' || route.hash === '#exercises'
 }
 
 function goDashboard() {
@@ -209,7 +433,8 @@ function addSetRow(exIndex) {
   const ex = workout.value?.exercises?.[exIndex]
   if (!ex) return
   if (!Array.isArray(ex.setDetails)) ex.setDetails = []
-  ex.setDetails.push({ reps: ex.setDetails.at(-1)?.reps || 10, weight: ex.setDetails.at(-1)?.weight || 0 })
+  const last = ex.setDetails.at(-1)
+  ex.setDetails.push({ reps: last?.reps || 10, weight: last?.weight || 0 })
 }
 
 function removeSetRow(exIndex, rowIndex) {
@@ -226,36 +451,41 @@ async function saveWorkout() {
   try {
     saving.value = true
     const id = route.params.id
+    const w = workout.value || {}
     // Aggregiere optionale Legacy-Felder aus erstem Satz und behalte setDetails
     const normalized = {
-      ...workout.value,
-      exercises: (workout.value.exercises || []).map(ex => ({
-        ...ex,
-        sets: Array.isArray(ex.setDetails) ? ex.setDetails.length : ex.sets || 0,
+      name: w.name,
+      type: w.type,
+      date: w.date,
+      completed: w.completed,
+      exercises: (w.exercises || []).map(ex => ({
+        exerciseId: ex.exerciseId,
+        name: ex.name,
+        muscleGroup: ex.muscleGroup,
         reps: ex.setDetails?.[0]?.reps ?? ex.reps ?? 10,
         weight: ex.setDetails?.[0]?.weight ?? ex.weight ?? 0,
-        setDetails: ex.setDetails || [] // Übertrage die setDetails!
+        setDetails: ex.setDetails || []
       }))
     }
-    
+
     // Draft-Workouts nur lokal aktualisieren
     if (String(id).startsWith('draft-')) {
-      const idx = store.workouts.findIndex(w => w._id === id)
+      const idx = store.workouts.findIndex(wi => wi._id === id)
       if (idx !== -1) {
         store.workouts[idx] = { ...store.workouts[idx], ...normalized }
       }
       saveMsg.value = 'Gespeichert (Entwurf lokal).'
       saveError.value = false
-      // Direkt zurück zum Dashboard – kein zusätzlicher Toast nötig
+      initialSnapshot = snapshotCore({ ...store.workouts[idx] })
       router.push('/dashboard')
       return
     }
-  let token = await getAuthToken({ clerk, auth }).catch(() => null)
-  if (!token) token = await getAuthToken({ clerk, auth, options: { skipCache: true } }).catch(() => null)
+    let token = await getAuthToken({ clerk, auth }).catch(() => null)
+    if (!token) token = await getAuthToken({ clerk, auth, options: { skipCache: true } }).catch(() => null)
     await store.updateWorkout(id, normalized, token)
     saveMsg.value = 'Gespeichert.'
     saveError.value = false
-    // Direkt weiterleiten – ein separater Toast ist hier nicht erforderlich
+    initialSnapshot = snapshotCore({ ...w, ...normalized })
     router.push('/dashboard')
   } catch (e) {
     console.error('Speichern fehlgeschlagen:', e)
@@ -288,47 +518,32 @@ function onDrop(index) {
   draggingIndex.value = null
 }
 
-onMounted(async () => { await loadWorkout(); ensureSetDetailsStructure() })
-
-// Snapshot initialisieren, nachdem Daten geladen und normalisiert wurden
-watch(workout, (w, _prev) => {
-  if (w && !initialSnapshot) {
-    try {
-      const core = {
-        name: w.name,
-        type: w.type,
-        date: w.date,
-        exercises: (w.exercises || []).map(ex => ({
-          exerciseId: ex.exerciseId,
-          name: ex.name,
-          muscleGroup: ex.muscleGroup,
-          setDetails: (ex.setDetails || []).map(s => ({ reps: s.reps, weight: s.weight }))
-        }))
-      }
-      initialSnapshot = JSON.stringify(core)
-    } catch {}
+onMounted(async () => {
+  await loadWorkout()
+  await nextTick()
+  // Nach Erstellen direkt zu den Übungen scrollen
+  if (shouldAutoScroll()) {
+    setTimeout(scrollToExercises, 50)
+    didAutoScroll.value = true
   }
-}, { immediate: true })
+})
 
-// Dirty-Tracking bei Änderungen
+// Falls Daten erst später kommen: bei erstem Auftreten der Übungen automatisch scrollen
+watch(() => workout.value?.exercises?.length || 0, async (len) => {
+  if (didAutoScroll.value) return
+  if (!len) return
+  if (!shouldAutoScroll()) return
+  await nextTick()
+  setTimeout(() => {
+    scrollToExercises()
+    didAutoScroll.value = true
+  }, 0)
+})
+
+// Dirty-Tracking gegen initialen Snapshot
 watch(() => workout.value, (w) => {
-  if (!w || !initialSnapshot) { isDirty.value = false; return }
-  try {
-    const core = {
-      name: w.name,
-      type: w.type,
-      date: w.date,
-      exercises: (w.exercises || []).map(ex => ({
-        exerciseId: ex.exerciseId,
-        name: ex.name,
-        muscleGroup: ex.muscleGroup,
-        setDetails: (ex.setDetails || []).map(s => ({ reps: s.reps, weight: s.weight }))
-      }))
-    }
-    isDirty.value = JSON.stringify(core) !== initialSnapshot
-  } catch {
-    isDirty.value = true
-  }
+  const current = snapshotCore(w || {})
+  isDirty.value = !!initialSnapshot && current !== initialSnapshot
 }, { deep: true })
 
 // Warnung beim Schließen/Reload
@@ -339,10 +554,6 @@ function beforeUnloadHandler(e) {
 }
 onMounted(() => window.addEventListener('beforeunload', beforeUnloadHandler))
 onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnloadHandler))
-
-// Token-Helfer wird zentral aus '@/utils/authToken' importiert
-
-// Abschluss-Flow entfernt – Speichern/Redirect ist der primäre Abschlussweg
 </script>
 
 <style scoped>
@@ -382,4 +593,19 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnloadHan
 .banner .dismiss { background: transparent; border: none; color: inherit; cursor: pointer; font-size: 1rem; }
 .save-msg { display: block; margin-top: 8px; color: var(--success-color); }
 .save-msg.error { color: var(--danger-color); }
+
+/* Bildbereich je Übung */
+.ex-media { display: flex; align-items: center; gap: 12px; margin: 8px 0; }
+.ex-thumb { width: 72px; height: 72px; object-fit: contain; background: #0b1220; border: 1px solid var(--card-border); border-radius: 10px; padding: 6px; cursor: pointer; }
+.media-hint { color: var(--muted); font-size: 0.8rem; }
+
+/* Actions unter dem Bild */
+.img-actions { display: flex; align-items: center; gap: 8px; }
+.img-actions .link { background: transparent; border: none; color: var(--accent); cursor: pointer; padding: 0; font-size: 0.85rem; }
+.img-actions .link.danger { color: var(--danger-color); }
+.img-actions .sep { color: var(--muted); }
+
+/* Overlay für Großansicht */
+.img-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000; }
+.img-large { max-width: min(92vw, 1200px); max-height: 86vh; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.4); border: 1px solid var(--card-border); }
 </style>

@@ -7,7 +7,10 @@ import path from "path";
 import { fileURLToPath } from "url";
 import workoutRoutes from "./routes/workouts.js";
 import exerciseRoutes from "./routes/exercises.js";
-import { clerkMiddleware } from './middleware/clerkAuth.js';
+import { clerkMiddleware, requireAuth } from './middleware/clerkAuth.js';
+import multer from 'multer';
+import sharp from 'sharp';
+import fs from 'fs';
 
 
 // .env zuverlässig relativ zu dieser Datei laden (unabhängig vom CWD)
@@ -34,6 +37,198 @@ app.use(cors({
 
 // JSON-Parsing
 app.use(express.json());
+
+// Statische Auslieferung von Uploads
+app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
+
+// Minimaler direkter Upload-Endpunkt (um Router-Match-Probleme auszuschließen)
+const uploadsDir = path.join(__dirname, 'public', 'uploads', 'exercises');
+const uploadsDirWorkouts = path.join(__dirname, 'public', 'uploads', 'workouts');
+fs.mkdirSync(uploadsDir, { recursive: true });
+fs.mkdirSync(uploadsDirWorkouts, { recursive: true });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
+
+// Hilfsfunktion für Bildspeicherung
+async function processAndStoreImage(fileBuffer, baseName) {
+  const outPath = path.join(uploadsDir, `${baseName}.jpg`);
+  const thumbPath = path.join(uploadsDir, `${baseName}_thumb.jpg`);
+  let wroteMain = false;
+  try {
+    const img = sharp(fileBuffer, { failOnError: false });
+    await img.rotate().resize({ width: 1280, height: 1280, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 82, chromaSubsampling: '4:4:4' })
+      .toFile(outPath);
+    wroteMain = true;
+  } catch {}
+  if (!wroteMain) {
+    fs.writeFileSync(outPath, fileBuffer);
+  }
+  try {
+    const img2 = sharp(fileBuffer, { failOnError: false });
+    await img2.rotate().resize({ width: 256, height: 256, fit: 'cover' })
+      .jpeg({ quality: 78 })
+      .toFile(thumbPath);
+  } catch { try { fs.copyFileSync(outPath, thumbPath); } catch {} }
+  return {
+    imageUrl: `/uploads/exercises/${baseName}.jpg`,
+    thumbnailUrl: `/uploads/exercises/${baseName}_thumb.jpg`
+  };
+}
+
+// Bildspeicherung für Workouts
+async function processAndStoreWorkoutImage(fileBuffer, baseName) {
+  const outPath = path.join(uploadsDirWorkouts, `${baseName}.jpg`);
+  const thumbPath = path.join(uploadsDirWorkouts, `${baseName}_thumb.jpg`);
+  let wroteMain = false;
+  try {
+    const img = sharp(fileBuffer, { failOnError: false });
+    await img.rotate().resize({ width: 1280, height: 1280, fit: 'inside', withoutEnlargement: true })
+      .jpeg({ quality: 82, chromaSubsampling: '4:4:4' })
+      .toFile(outPath);
+    wroteMain = true;
+  } catch {}
+  if (!wroteMain) {
+    fs.writeFileSync(outPath, fileBuffer);
+  }
+  try {
+    const thumb = sharp(fileBuffer, { failOnError: false });
+    await thumb.rotate().resize({ width: 256, height: 256, fit: 'cover' })
+      .jpeg({ quality: 78 })
+      .toFile(thumbPath);
+  } catch { try { fs.copyFileSync(outPath, thumbPath); } catch {} }
+  return {
+    imageUrl: `/uploads/workouts/${baseName}.jpg`,
+    thumbnailUrl: `/uploads/workouts/${baseName}_thumb.jpg`
+  };
+}
+
+// Direkt: POST /api/exercises/:id/image
+app.post('/api/exercises/:id/image', upload.single('image'), async (req, res) => {
+  try {
+    const { default: Exercise } = await import('./models/Exercise.js');
+    const ex = await Exercise.findById(req.params.id);
+    if (!ex) return res.status(404).json({ error: 'Exercise not found' });
+    if (!req.file) return res.status(400).json({ error: 'Kein Bild hochgeladen' });
+    const { imageUrl, thumbnailUrl } = await processAndStoreImage(req.file.buffer, String(ex._id));
+    ex.imageUrl = imageUrl;
+    ex.thumbnailUrl = thumbnailUrl;
+    await ex.save();
+    res.json({ success: true, exercise: ex });
+  } catch (err) {
+    console.error('Direct upload error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Alias: POST /api/exercises/image/:id
+app.post('/api/exercises/image/:id', upload.single('image'), async (req, res) => {
+  try {
+    const { default: Exercise } = await import('./models/Exercise.js');
+    const ex = await Exercise.findById(req.params.id);
+    if (!ex) return res.status(404).json({ error: 'Exercise not found' });
+    if (!req.file) return res.status(400).json({ error: 'Kein Bild hochgeladen' });
+    const { imageUrl, thumbnailUrl } = await processAndStoreImage(req.file.buffer, String(ex._id));
+    ex.imageUrl = imageUrl;
+    ex.thumbnailUrl = thumbnailUrl;
+    await ex.save();
+    res.json({ success: true, exercise: ex });
+  } catch (err) {
+    console.error('Direct upload (alias) error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Workout-Cover: POST /api/workouts/:id/image (auth erforderlich)
+app.post('/api/workouts/:id/image', requireAuth(), upload.single('image'), async (req, res) => {
+  try {
+    const { default: Workout } = await import('./models/Workout.js');
+    const workout = await Workout.findById(req.params.id);
+    if (!workout) return res.status(404).json({ error: 'Workout not found' });
+    if (!req.file) return res.status(400).json({ error: 'Kein Bild hochgeladen' });
+    const { imageUrl, thumbnailUrl } = await processAndStoreWorkoutImage(req.file.buffer, String(workout._id));
+    workout.imageUrl = imageUrl;
+    workout.thumbnailUrl = thumbnailUrl;
+    await workout.save();
+    res.json({ success: true, workout });
+  } catch (err) {
+    console.error('Workout upload error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Alias: POST /api/workouts/image/:id
+app.post('/api/workouts/image/:id', requireAuth(), upload.single('image'), async (req, res) => {
+  try {
+    const { default: Workout } = await import('./models/Workout.js');
+    const workout = await Workout.findById(req.params.id);
+    if (!workout) return res.status(404).json({ error: 'Workout not found' });
+    if (!req.file) return res.status(400).json({ error: 'Kein Bild hochgeladen' });
+    const { imageUrl, thumbnailUrl } = await processAndStoreWorkoutImage(req.file.buffer, String(workout._id));
+    workout.imageUrl = imageUrl;
+    workout.thumbnailUrl = thumbnailUrl;
+    await workout.save();
+    res.json({ success: true, workout });
+  } catch (err) {
+    console.error('Workout upload (alias) error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// JSON-Fallback: PUT /api/workouts/:id/photo
+app.put('/api/workouts/:id/photo', requireAuth(), express.json({ limit: '12mb' }), async (req, res) => {
+  try {
+    const { imageData } = req.body || {};
+    if (!imageData || typeof imageData !== 'string') {
+      return res.status(400).json({ error: 'imageData (Data-URL) fehlt' });
+    }
+    const match = imageData.match(/^data:(image\/[^;]+);base64,(.+)$/);
+    if (!match) {
+      return res.status(400).json({ error: 'Ungültiges Data-URL-Format' });
+    }
+    const buffer = Buffer.from(match[2], 'base64');
+    const { default: Workout } = await import('./models/Workout.js');
+    const workout = await Workout.findById(req.params.id);
+    if (!workout) return res.status(404).json({ error: 'Workout not found' });
+    const { imageUrl, thumbnailUrl } = await processAndStoreWorkoutImage(buffer, String(workout._id));
+    workout.imageUrl = imageUrl;
+    workout.thumbnailUrl = thumbnailUrl;
+    await workout.save();
+    res.json({ success: true, workout });
+  } catch (err) {
+    console.error('Workout JSON upload error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Fallback (JSON-Route): PUT /api/exercises/:id/photo
+// Erwartet { imageData: "data:image/...;base64,XXXXX" } im Body
+app.put('/api/exercises/:id/photo', express.json({ limit: '12mb' }), async (req, res) => {
+  try {
+    const { imageData } = req.body || {};
+    if (!imageData || typeof imageData !== 'string') {
+      return res.status(400).json({ error: 'imageData (Data-URL) fehlt' });
+    }
+    const match = imageData.match(/^data:(image\/[^;]+);base64,(.+)$/);
+    if (!match) {
+      return res.status(400).json({ error: 'Ungültiges Data-URL-Format' });
+    }
+    const base64 = match[2];
+    const buffer = Buffer.from(base64, 'base64');
+    const { default: Exercise } = await import('./models/Exercise.js');
+    const ex = await Exercise.findById(req.params.id);
+    if (!ex) return res.status(404).json({ error: 'Exercise not found' });
+
+    const { imageUrl, thumbnailUrl } = await processAndStoreImage(buffer, String(ex._id));
+    ex.imageUrl = imageUrl;
+    ex.thumbnailUrl = thumbnailUrl;
+    await ex.save();
+    res.json({ success: true, exercise: ex });
+  } catch (err) {
+    console.error('JSON photo upload error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 
 // MongoDB verbinden (nur wenn MONGO_URI gesetzt ist)
 if (process.env.MONGO_URI) {

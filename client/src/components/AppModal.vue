@@ -1,6 +1,6 @@
 <template>
   <teleport to="body">
-    <div v-if="modelValue" class="modal-overlay" role="presentation" @click.self="onCancel">
+    <div v-if="modelValue" class="modal-overlay" role="presentation" @click.self="overlayClick">
       <div
         class="modal"
         role="dialog"
@@ -9,7 +9,7 @@
       >
         <div class="modal-header">
           <h3 v-if="title" id="modal-title">{{ title }}</h3>
-          <button class="close" aria-label="Schließen" @click="onCancel">✕</button>
+          <button v-if="!persistent && showCancel" class="close" aria-label="Schließen" @click="onCancel">✕</button>
         </div>
         <div class="modal-body">
           <slot>
@@ -17,7 +17,7 @@
           </slot>
         </div>
         <div class="modal-actions">
-          <button class="btn secondary" @click="onCancel">{{ cancelText }}</button>
+          <button v-if="showCancel" class="btn secondary" @click="onCancel">{{ cancelText }}</button>
           <button ref="confirmBtn" class="btn primary" :class="type" @click="onConfirm">{{ confirmText }}</button>
         </div>
       </div>
@@ -34,7 +34,9 @@ const props = defineProps({
   message: { type: String, default: '' },
   confirmText: { type: String, default: 'Bestätigen' },
   cancelText: { type: String, default: 'Abbrechen' },
-  type: { type: String, default: 'danger' } // danger | warning | info
+  type: { type: String, default: 'danger' }, // danger | warning | info
+  showCancel: { type: Boolean, default: true },
+  persistent: { type: Boolean, default: false }
 })
 
 const emit = defineEmits(['update:modelValue', 'confirm', 'cancel'])
@@ -45,8 +47,12 @@ function close() { emit('update:modelValue', false) }
 function onCancel() { emit('cancel'); close() }
 function onConfirm() { emit('confirm'); close() }
 
+function overlayClick() {
+  if (!props.persistent) onCancel()
+}
+
 function onKey(e) {
-  if (e.key === 'Escape') { onCancel() }
+  if (e.key === 'Escape' && !props.persistent) { onCancel() }
 }
 
 watch(() => props.modelValue, async (open) => {

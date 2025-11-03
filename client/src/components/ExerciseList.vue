@@ -46,12 +46,17 @@
       <div
         v-for="ex in exercises"
         :key="ex._id"
-        class="p-4 border rounded-xl shadow-sm bg-white hover:shadow-md transition"
+        class="exercise-card p-4 border rounded-xl shadow-sm bg-white hover:shadow-md transition"
       >
-        <h2 class="font-bold text-lg mb-1">{{ ex.name }}</h2>
-        <p class="text-sm text-gray-600">{{ ex.category }} · {{ ex.muscleGroup }}</p>
-        <p class="mt-2 text-gray-700">{{ ex.description }}</p>
-        <p class="text-xs mt-1 text-gray-500">Equipment: {{ ex.equipment }}</p>
+        <div class="thumb-row">
+          <img :src="getExerciseImage(ex)" alt="Bild der Übung" class="thumb" @error="onImgError($event, ex)" />
+          <div class="meta">
+            <h2 class="title">{{ ex.name }}</h2>
+            <p class="sub">{{ ex.category }} · {{ ex.muscleGroup || (ex.muscleGroups?.[0] || '') }}</p>
+          </div>
+        </div>
+        <p class="desc">{{ ex.description }}</p>
+        <p class="equip">Equipment: {{ ex.equipment }}</p>
       </div>
     </div>
 
@@ -118,4 +123,62 @@ function setCategory(cat) {
 
 // Lädt initial alle Übungen
 onMounted(() => loadExercises());
+
+// Bildlogik: Versuche spezifisches Bild, sonst Kategorie-Fallback, sonst Placeholder
+function slugify(name) {
+  return String(name || '')
+    .toLowerCase()
+    .replace(/[ä]/g, 'ae')
+    .replace(/[ö]/g, 'oe')
+    .replace(/[ü]/g, 'ue')
+    .replace(/[ß]/g, 'ss')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+// Kategorie-Icons werden in der Liste nicht mehr verwendet; Kamera ist der generische Placeholder
+
+function getExerciseImage(ex) {
+  // 1) Bevorzugt Thumbnail, dann großes Bild, dann evtl. externe Media-URL
+  if (ex?.thumbnailUrl) return ex.thumbnailUrl;
+  if (ex?.imageUrl) return ex.imageUrl;
+  if (ex?.mediaUrl) return ex.mediaUrl;
+  // 2) Generischer Kamera-Placeholder
+  return '/exercises/camera.svg';
+}
+
+function onImgError(evt, ex) {
+  const img = evt?.target;
+  if (!img) return;
+  // Einmalig auf Kamera-Placeholder fallen
+  img.onerror = null;
+  img.src = '/exercises/camera.svg';
+}
 </script>
+
+<style scoped>
+.exercise-card { display: flex; flex-direction: column; gap: 8px; }
+.thumb-row { display: flex; align-items: center; gap: 12px; }
+.thumb {
+  width: 56px;
+  height: 56px;
+  flex: 0 0 56px;
+  object-fit: contain;
+  background: #f8fafc;
+  border-radius: 10px;
+  border: 1px solid #eef2f7;
+  padding: 6px;
+}
+.meta { display: flex; flex-direction: column; min-width: 0; }
+.title { font-weight: 700; font-size: 1.125rem; line-height: 1.4; }
+.sub { color: #64748b; font-size: 0.875rem; }
+.desc { margin-top: 6px; color: #334155; }
+.equip { font-size: 0.75rem; color: #94a3b8; margin-top: 2px; }
+
+/* Mobile: Thumbnail rechts und größer */
+@media (max-width: 480px) {
+  .thumb-row { flex-direction: row-reverse; justify-content: space-between; }
+  .thumb { width: 84px; height: 84px; flex-basis: 84px; }
+  .meta { flex: 1 1 auto; }
+}
+</style>

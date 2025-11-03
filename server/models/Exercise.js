@@ -46,6 +46,12 @@ const exerciseSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// Medien-Felder (Optional): Pfade/URLs zu Bild und Thumbnail
+exerciseSchema.add({
+  imageUrl: { type: String },
+  thumbnailUrl: { type: String }
+});
+
 const Exercise = mongoose.model("Exercise", exerciseSchema);
 
 export default Exercise;

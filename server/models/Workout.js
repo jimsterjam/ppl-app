@@ -70,6 +70,10 @@ const workoutSchema = new mongoose.Schema({
     default: 0
   },
   notes: String
+  ,
+  // Optionales Workout-Coverbild
+  imageUrl: { type: String },
+  thumbnailUrl: { type: String }
 }, {
   timestamps: true
 });

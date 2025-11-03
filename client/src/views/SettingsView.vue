@@ -40,6 +40,8 @@
           <span class="goal-badge">{{ weeklyGoal }} pro Woche</span>
         </div>
       </section>
+
+      
     </div>
 
     <BottomNav />
@@ -66,6 +68,8 @@ function onInput(e) { setGoal(e.target.value) }
 function onRange(e) { setGoal(e.target.value) }
 function inc() { setGoal((weeklyGoal.value || 4) + 1) }
 function dec() { setGoal((weeklyGoal.value || 4) - 1) }
+
+// Toast-Settings entfernt – Toaster ist fest oben
 </script>
 
 <style scoped>
@@ -98,4 +102,6 @@ function dec() { setGoal((weeklyGoal.value || 4) - 1) }
 .goal-input input { width: 72px; text-align: center; border: none; padding: 10px; background: var(--surface); color: var(--fg); }
 .goal-input .step { background: var(--surface); color: var(--fg); border: none; padding: 10px 12px; cursor: pointer; }
 .goal-badge { background: var(--surface); border: 1px solid var(--card-border); padding: 6px 10px; border-radius: 999px; color: var(--muted); font-size: 0.9rem; }
+
+/* Toast Einstellungen entfernt */
 </style>
