@@ -48,13 +48,6 @@
               🔄
             </button>
             <button 
-              class="action-btn view"
-              title="Workout öffnen"
-              @click.stop="viewWorkout(workout)"
-            >
-              👁️
-            </button>
-            <button 
               class="action-btn edit"
               title="Workout bearbeiten"
               @click.stop="editWorkout(workout)"

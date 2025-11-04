@@ -5,10 +5,18 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:lan": "vite --host",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "cap:add:ios": "cap add ios",
+    "cap:copy": "cap copy",
+    "cap:sync": "cap sync",
+    "ios": "cap open ios",
+    "cap:serve:auto": "node scripts/toggle-cap-server.mjs enable auto",
+    "cap:serve:off": "node scripts/toggle-cap-server.mjs disable"
   },
   "dependencies": {
+    "@capacitor/core": "^6.1.2",
     "@clerk/vue": "^1.14.3",
     "axios": "^1.12.2",
     "chart.js": "^4.5.1",
@@ -17,7 +25,10 @@
     "vue-router": "^4.0.0"
   },
   "devDependencies": {
+    "@capacitor/cli": "^6.1.2",
+    "@capacitor/ios": "^6.1.2",
     "@vitejs/plugin-vue": "^6.0.1",
+    "typescript": "^5.9.3",
     "vite": "^7.1.7"
   }
 }

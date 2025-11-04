@@ -11,6 +11,7 @@ import { clerkMiddleware, requireAuth } from './middleware/clerkAuth.js';
 import multer from 'multer';
 import sharp from 'sharp';
 import fs from 'fs';
+import { ObjectId } from 'mongodb';
 
 
 // .env zuverlässig relativ zu dieser Datei laden (unabhängig vom CWD)
@@ -48,31 +49,44 @@ fs.mkdirSync(uploadsDir, { recursive: true });
 fs.mkdirSync(uploadsDirWorkouts, { recursive: true });
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
-// Hilfsfunktion für Bildspeicherung
-async function processAndStoreImage(fileBuffer, baseName) {
-  const outPath = path.join(uploadsDir, `${baseName}.jpg`);
-  const thumbPath = path.join(uploadsDir, `${baseName}_thumb.jpg`);
-  let wroteMain = false;
+// Bildverarbeitung in Speicher (Buffer) für GridFS
+async function processImageBuffers(fileBuffer) {
+  // Hauptbild
+  let mainBuffer = fileBuffer
   try {
-    const img = sharp(fileBuffer, { failOnError: false });
-    await img.rotate().resize({ width: 1280, height: 1280, fit: 'inside', withoutEnlargement: true })
+    mainBuffer = await sharp(fileBuffer, { failOnError: false })
+      .rotate()
+      .resize({ width: 1280, height: 1280, fit: 'inside', withoutEnlargement: true })
       .jpeg({ quality: 82, chromaSubsampling: '4:4:4' })
-      .toFile(outPath);
-    wroteMain = true;
+      .toBuffer()
   } catch {}
-  if (!wroteMain) {
-    fs.writeFileSync(outPath, fileBuffer);
-  }
+  // Thumbnail
+  let thumbBuffer = fileBuffer
   try {
-    const img2 = sharp(fileBuffer, { failOnError: false });
-    await img2.rotate().resize({ width: 256, height: 256, fit: 'cover' })
+    thumbBuffer = await sharp(fileBuffer, { failOnError: false })
+      .rotate()
+      .resize({ width: 256, height: 256, fit: 'cover' })
       .jpeg({ quality: 78 })
-      .toFile(thumbPath);
-  } catch { try { fs.copyFileSync(outPath, thumbPath); } catch {} }
-  return {
-    imageUrl: `/uploads/exercises/${baseName}.jpg`,
-    thumbnailUrl: `/uploads/exercises/${baseName}_thumb.jpg`
-  };
+      .toBuffer()
+  } catch {}
+  return { mainBuffer, thumbBuffer }
+}
+
+function getExerciseBucket() {
+  const db = mongoose.connection?.db
+  if (!db) throw new Error('DB connection not ready')
+  // GridFS Bucket-Name: exerciseImages
+  return new mongoose.mongo.GridFSBucket(db, { bucketName: 'exerciseImages' })
+}
+
+async function saveToGridFS(buffer, filename, metadata) {
+  const bucket = getExerciseBucket()
+  return await new Promise((resolve, reject) => {
+    const uploadStream = bucket.openUploadStream(filename, { contentType: 'image/jpeg', metadata })
+    uploadStream.on('error', reject)
+    uploadStream.on('finish', () => resolve(uploadStream.id))
+    uploadStream.end(buffer)
+  })
 }
 
 // Bildspeicherung für Workouts
@@ -109,9 +123,16 @@ app.post('/api/exercises/:id/image', upload.single('image'), async (req, res) =>
     const ex = await Exercise.findById(req.params.id);
     if (!ex) return res.status(404).json({ error: 'Exercise not found' });
     if (!req.file) return res.status(400).json({ error: 'Kein Bild hochgeladen' });
-    const { imageUrl, thumbnailUrl } = await processAndStoreImage(req.file.buffer, String(ex._id));
-    ex.imageUrl = imageUrl;
-    ex.thumbnailUrl = thumbnailUrl;
+    const { mainBuffer, thumbBuffer } = await processImageBuffers(req.file.buffer)
+    // Bestehende GridFS-Dateien löschen, falls vorhanden
+    if (ex.imageFileId) { try { getExerciseBucket().delete(new ObjectId(ex.imageFileId)) } catch {} }
+    if (ex.thumbFileId) { try { getExerciseBucket().delete(new ObjectId(ex.thumbFileId)) } catch {} }
+    const mainId = await saveToGridFS(mainBuffer, `${ex._id}.jpg`, { kind: 'main', exerciseId: String(ex._id) })
+    const thumbId = await saveToGridFS(thumbBuffer, `${ex._id}_thumb.jpg`, { kind: 'thumb', exerciseId: String(ex._id) })
+    ex.imageFileId = mainId
+    ex.thumbFileId = thumbId
+    ex.imageUrl = `/api/exercises/${ex._id}/image`
+    ex.thumbnailUrl = `/api/exercises/${ex._id}/thumbnail`
     await ex.save();
     res.json({ success: true, exercise: ex });
   } catch (err) {
@@ -127,9 +148,15 @@ app.post('/api/exercises/image/:id', upload.single('image'), async (req, res) =>
     const ex = await Exercise.findById(req.params.id);
     if (!ex) return res.status(404).json({ error: 'Exercise not found' });
     if (!req.file) return res.status(400).json({ error: 'Kein Bild hochgeladen' });
-    const { imageUrl, thumbnailUrl } = await processAndStoreImage(req.file.buffer, String(ex._id));
-    ex.imageUrl = imageUrl;
-    ex.thumbnailUrl = thumbnailUrl;
+    const { mainBuffer, thumbBuffer } = await processImageBuffers(req.file.buffer)
+    if (ex.imageFileId) { try { getExerciseBucket().delete(new ObjectId(ex.imageFileId)) } catch {} }
+    if (ex.thumbFileId) { try { getExerciseBucket().delete(new ObjectId(ex.thumbFileId)) } catch {} }
+    const mainId = await saveToGridFS(mainBuffer, `${ex._id}.jpg`, { kind: 'main', exerciseId: String(ex._id) })
+    const thumbId = await saveToGridFS(thumbBuffer, `${ex._id}_thumb.jpg`, { kind: 'thumb', exerciseId: String(ex._id) })
+    ex.imageFileId = mainId
+    ex.thumbFileId = thumbId
+    ex.imageUrl = `/api/exercises/${ex._id}/image`
+    ex.thumbnailUrl = `/api/exercises/${ex._id}/thumbnail`
     await ex.save();
     res.json({ success: true, exercise: ex });
   } catch (err) {
@@ -217,10 +244,15 @@ app.put('/api/exercises/:id/photo', express.json({ limit: '12mb' }), async (req,
     const { default: Exercise } = await import('./models/Exercise.js');
     const ex = await Exercise.findById(req.params.id);
     if (!ex) return res.status(404).json({ error: 'Exercise not found' });
-
-    const { imageUrl, thumbnailUrl } = await processAndStoreImage(buffer, String(ex._id));
-    ex.imageUrl = imageUrl;
-    ex.thumbnailUrl = thumbnailUrl;
+    const { mainBuffer, thumbBuffer } = await processImageBuffers(buffer)
+    if (ex.imageFileId) { try { getExerciseBucket().delete(new ObjectId(ex.imageFileId)) } catch {} }
+    if (ex.thumbFileId) { try { getExerciseBucket().delete(new ObjectId(ex.thumbFileId)) } catch {} }
+    const mainId = await saveToGridFS(mainBuffer, `${ex._id}.jpg`, { kind: 'main', exerciseId: String(ex._id) })
+    const thumbId = await saveToGridFS(thumbBuffer, `${ex._id}_thumb.jpg`, { kind: 'thumb', exerciseId: String(ex._id) })
+    ex.imageFileId = mainId
+    ex.thumbFileId = thumbId
+    ex.imageUrl = `/api/exercises/${ex._id}/image`
+    ex.thumbnailUrl = `/api/exercises/${ex._id}/thumbnail`
     await ex.save();
     res.json({ success: true, exercise: ex });
   } catch (err) {
@@ -228,6 +260,39 @@ app.put('/api/exercises/:id/photo', express.json({ limit: '12mb' }), async (req,
     res.status(500).json({ error: err.message });
   }
 });
+
+// GET Bild aus GridFS streamen
+app.get('/api/exercises/:id/image', async (req, res) => {
+  try {
+    const { default: Exercise } = await import('./models/Exercise.js');
+    const ex = await Exercise.findById(req.params.id);
+    if (!ex || !ex.imageFileId) return res.status(404).send('Not found')
+    res.set('Content-Type', 'image/jpeg')
+    res.set('Cache-Control', 'public, max-age=604800, immutable')
+    getExerciseBucket().openDownloadStream(new ObjectId(ex.imageFileId)).on('error', (e) => {
+      console.warn('Download error (image):', e)
+      if (!res.headersSent) res.status(404).end()
+    }).pipe(res)
+  } catch (err) {
+    res.status(500).send('Server error')
+  }
+})
+
+app.get('/api/exercises/:id/thumbnail', async (req, res) => {
+  try {
+    const { default: Exercise } = await import('./models/Exercise.js');
+    const ex = await Exercise.findById(req.params.id);
+    if (!ex || !ex.thumbFileId) return res.status(404).send('Not found')
+    res.set('Content-Type', 'image/jpeg')
+    res.set('Cache-Control', 'public, max-age=604800, immutable')
+    getExerciseBucket().openDownloadStream(new ObjectId(ex.thumbFileId)).on('error', (e) => {
+      console.warn('Download error (thumb):', e)
+      if (!res.headersSent) res.status(404).end()
+    }).pipe(res)
+  } catch (err) {
+    res.status(500).send('Server error')
+  }
+})
 
 
 // MongoDB verbinden (nur wenn MONGO_URI gesetzt ist)

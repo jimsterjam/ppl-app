@@ -5,6 +5,8 @@ import sharp from 'sharp';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import mongoose from 'mongoose';
+import { ObjectId } from 'mongodb';
 import { requireAuth } from "../middleware/clerkAuth.js";
 
 const router = express.Router();
@@ -158,14 +160,21 @@ router.delete('/:id/image', /*requireAuth(),*/ async (req, res) => {
   try {
     const ex = await Exercise.findById(req.params.id);
     if (!ex) return res.status(404).json({ error: 'Exercise not found' });
-    const files = [ex.imageUrl, ex.thumbnailUrl]
-      .filter(Boolean)
-      .map(u => path.join(__dirname, '..', 'public', u.replace(/^\//, '')));
-    for (const f of files) {
-      try { fs.unlinkSync(f); } catch {}
+    const db = mongoose.connection?.db
+    if (db) {
+      const bucket = new mongoose.mongo.GridFSBucket(db, { bucketName: 'exerciseImages' })
+      if (ex.imageFileId) { try { await bucket.delete(new ObjectId(ex.imageFileId)) } catch {} }
+      if (ex.thumbFileId) { try { await bucket.delete(new ObjectId(ex.thumbFileId)) } catch {} }
     }
+    // Fallback: Alte Dateien vom Filesystem entfernen, falls noch vorhanden
+    const toDelete = [ex.imageUrl, ex.thumbnailUrl]
+      .filter(Boolean)
+      .map(u => path.join(__dirname, '..', 'public', u.replace(/^\//, '')))
+    for (const f of toDelete) { try { fs.unlinkSync(f) } catch {} }
     ex.imageUrl = undefined;
     ex.thumbnailUrl = undefined;
+    ex.imageFileId = undefined;
+    ex.thumbFileId = undefined;
     await ex.save();
     res.json({ success: true });
   } catch (err) {

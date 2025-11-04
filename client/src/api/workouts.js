@@ -1,12 +1,11 @@
 import axios from "axios";
+import { apiUrl } from "./http";
 
-// Relative URL; Dev geht über Vite-Proxy auf 3001
-const API_URL = "/api/workouts";
+// Web: relativ über /api; Mobile (Capacitor): VITE_API_BASE + /api
+const API_URL = apiUrl('workouts');
 
 // Axios-Instance für Workouts
-const api = axios.create({
-  baseURL: API_URL
-});
+const api = axios.create({ baseURL: API_URL });
 
 // Alle Workouts abrufen
 export async function fetchWorkouts(token = null) {

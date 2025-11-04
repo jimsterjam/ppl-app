@@ -1,7 +1,8 @@
 import axios from "axios";
+import { apiUrl } from "./http";
 
-// Immer relative URL verwenden; im Dev leitet der Vite-Proxy auf 3001
-const API_URL = `/api/exercises`;
+// Web: relativ über /api; Mobile (Capacitor): VITE_API_BASE + /api
+const API_URL = apiUrl('exercises');
 if (typeof window !== 'undefined') {
   // eslint-disable-next-line no-console
   console.info('[ExercisesAPI] baseURL =', API_URL);

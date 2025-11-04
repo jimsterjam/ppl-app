@@ -49,7 +49,9 @@ const exerciseSchema = new mongoose.Schema({
 // Medien-Felder (Optional): Pfade/URLs zu Bild und Thumbnail
 exerciseSchema.add({
   imageUrl: { type: String },
-  thumbnailUrl: { type: String }
+  thumbnailUrl: { type: String },
+  imageFileId: { type: mongoose.Schema.Types.ObjectId },
+  thumbFileId: { type: mongoose.Schema.Types.ObjectId }
 });
 
 const Exercise = mongoose.model("Exercise", exerciseSchema);

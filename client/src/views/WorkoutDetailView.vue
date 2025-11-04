@@ -2,6 +2,9 @@
   <div class="workout-detail">
     <HeaderBar title="Workout" />
 
+    <!-- Kleiner Timer (startet automatisch bei frisch erstelltem Workout) -->
+  <WorkoutTimer :auto-start="route.query.created === '1'" @stop="onTimerStop" />
+
     <div class="content">
       <div v-if="loading" class="loading">Lade Workout...</div>
 
@@ -149,6 +152,7 @@ import { useUserStore } from '@/stores/userStore'
 import HeaderBar from '@/components/HeaderBar.vue'
 import BottomNav from '@/components/BottomNav.vue'
 import AppModal from '@/components/AppModal.vue'
+import WorkoutTimer from '@/components/WorkoutTimer.vue'
 import { useToastStore } from '@/stores/toastStore'
 
 const route = useRoute()
@@ -413,6 +417,23 @@ function goDashboard() {
 
 function confirmLeave() {
   router.push('/dashboard')
+}
+
+async function onTimerStop(ms) {
+  try {
+    const id = route.params.id
+    if (!workout.value || !id) return
+    const mins = Math.max(0, Math.round(ms / 60000))
+    // Bei sehr kurzen Zeiten nicht speichern
+    if (!Number.isFinite(mins)) return
+    let token = await getAuthToken({ clerk, auth }).catch(() => null)
+    if (!token) token = await getAuthToken({ clerk, auth, options: { skipCache: true } }).catch(() => null)
+    await store.updateWorkout(id, { duration: mins }, token)
+    // Lokalen Zustand aktualisieren, falls nötig
+    if (workout.value) workout.value.duration = mins
+  } catch (err) {
+    console.warn('Timer-Dauer speichern fehlgeschlagen:', err)
+  }
 }
 
 function toggleReorder() {
