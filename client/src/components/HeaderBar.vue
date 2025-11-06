@@ -1,5 +1,5 @@
 <template>
-  <header class="header-bar">
+  <header class="header-bar glass">
     <div class="header-content">
       <h1>{{ title }}</h1>
       <div class="header-actions">
@@ -8,7 +8,7 @@
           <SignedOut>
             <SignInButton class="sign-in-btn">
               <template #default>
-                <button class="auth-button">Anmelden</button>
+                <button class="auth-button">{{ $t('auth.signIn') }}</button>
               </template>
             </SignInButton>
           </SignedOut>
@@ -41,14 +41,17 @@ defineProps({
 
 <style scoped>
 .header-bar {
-  background: var(--surface);
+  background: color-mix(in srgb, var(--surface) 40%, transparent);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom: 1px solid color-mix(in srgb, var(--card-border) 20%, transparent);
+  box-shadow: 0 2px 16px color-mix(in srgb, black 6%, transparent);
   color: var(--fg);
-  padding: 16px 20px;
-  padding-top: calc(16px + env(safe-area-inset-top));
-  border-bottom: 1px solid var(--card-border);
+  padding: 12px 20px;
+  padding-top: calc(12px + env(safe-area-inset-top));
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 900;
 }
 
 .header-content {
@@ -72,9 +75,10 @@ defineProps({
 
 .header-bar h1 {
   margin: 0;
-  font-size: 1.25rem;
-  font-weight: 600;
+  font-size: 1.15rem;
+  font-weight: 700;
   color: var(--fg);
+  letter-spacing: -0.01em;
 }
 
 .auth-section {
@@ -83,20 +87,22 @@ defineProps({
 }
 
 .auth-button {
-  background: var(--surface);
-  border: 1px solid var(--card-border);
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid color-mix(in srgb, var(--card-border) 30%, transparent);
   color: var(--fg);
-  padding: 8px 16px;
-  border-radius: 8px;
-  font-size: 0.9rem;
-  font-weight: 500;
+  padding: 7px 14px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .auth-button:hover {
-  background: rgba(127,127,127,0.08);
-  border-color: var(--card-border);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  border-color: color-mix(in srgb, var(--card-border) 40%, transparent);
   transform: translateY(-1px);
 }
 
@@ -106,42 +112,45 @@ defineProps({
 }
 
 :deep(.user-button-trigger) {
-  border: 1px solid var(--card-border);
-  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--card-border) 30%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   transition: all 0.2s ease;
 }
 
 :deep(.user-button-trigger:hover) {
-  border-color: var(--card-border);
-  background: rgba(127,127,127,0.08);
+  border-color: color-mix(in srgb, var(--card-border) 40%, transparent);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
 }
 
 /* Tablet Styles */
 @media (min-width: 768px) {
   .header-bar {
-    padding: 20px 24px;
-    padding-top: calc(20px + env(safe-area-inset-top));
+    padding: 14px 24px;
+    padding-top: calc(14px + env(safe-area-inset-top));
   }
   
   .header-bar h1 {
-    font-size: 1.5rem;
+    font-size: 1.35rem;
   }
   
   .auth-button {
-    padding: 10px 20px;
-    font-size: 1rem;
+    padding: 8px 16px;
+    font-size: 0.9rem;
   }
 }
 
 /* Desktop Styles */
 @media (min-width: 1024px) {
   .header-bar {
-    padding: 24px 32px;
-    padding-top: calc(24px + env(safe-area-inset-top));
+    padding: 16px 32px;
+    padding-top: calc(16px + env(safe-area-inset-top));
   }
   
   .header-bar h1 {
-    font-size: 1.75rem;
+    font-size: 1.5rem;
   }
 }
 </style>

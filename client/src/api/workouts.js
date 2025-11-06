@@ -93,3 +93,12 @@ export async function fetchWorkoutStats(token = null) {
   return res.data ?? null;
 }
 
+// ALLE Workouts des Users löschen (Danger Zone)
+export async function deleteAllWorkouts(token = null) {
+  const config = {};
+  if (token) {
+    config.headers = { Authorization: `Bearer ${token}` };
+  }
+  const res = await api.delete("", config); // DELETE /api/workouts
+  return res.data;
+}

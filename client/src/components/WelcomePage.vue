@@ -3,6 +3,7 @@ import { useClerk, useUser } from '@clerk/vue'
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import MotivationWidget from '@/components/MotivationWidget.vue'
+import { useI18n } from 'vue-i18n'
 
 // Optionaler Callback vom Wrapper (aktuell nicht genutzt, behalten für Abwärtskompat.)
 defineProps({
@@ -13,6 +14,7 @@ const clerk = useClerk()
 const { isSignedIn } = useUser()
 const router = useRouter()
 const route = useRoute()
+const { t } = useI18n()
 
 // Motivation-Overlay Steuerung (ohne Tages-Limit: bei jedem Login anzeigen)
 const showMotivation = ref(false)
@@ -78,9 +80,9 @@ watch(
     <div class="welcome-page">
         <!-- Nicht eingeloggt: Sign-In -->
         <div v-if="!isSignedIn" class="sign-in-container">
-            <h2>Willkommen bei der Bro Split App!</h2>
-            <p>Bitte melden Sie sich an, um fortzufahren.</p>
-            <button class="sign-in-btn" @click="clerk.openSignIn()">Anmelden</button>
+            <h2>{{ t('welcome.title') }}</h2>
+            <p>{{ t('welcome.signInPrompt') }}</p>
+            <button class="sign-in-btn" @click="clerk.openSignIn()">{{ t('auth.signIn') }}</button>
         </div>
 
         <!-- Eingeloggt: Motivation-Overlay -->
@@ -88,14 +90,14 @@ watch(
             <div v-if="showMotivation" class="motivation-overlay">
                 <div class="motivation-card">
                     <MotivationWidget />
-                    <button class="skip-btn" @click="skipNow">Überspringen</button>
+                    <button class="skip-btn" @click="skipNow">{{ t('welcome.skip') }}</button>
                 </div>
             </div>
 
             <!-- Fallback: kleiner Loader, während der Overlay-Start initialisiert -->
             <div v-else class="loading-container">
-                <h2>Weiterleitung...</h2>
-                <p>Sie werden zum Dashboard weitergeleitet.</p>
+                <h2>{{ t('welcome.redirectingTitle') }}</h2>
+                <p>{{ t('welcome.redirectingMsg') }}</p>
                 <div class="spinner"></div>
             </div>
         </div>

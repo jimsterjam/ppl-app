@@ -1,5 +1,5 @@
 <template>
-  <nav class="app-nav" role="navigation" aria-label="Hauptnavigation">
+  <nav class="app-nav glass" :class="{ 'ios-device': isIOS }" role="navigation" :aria-label="$t('nav.ariaMain')">
     <ul class="nav-list">
       <li v-for="link in links" :key="link.path">
         <button
@@ -17,12 +17,24 @@
 </template>
 
 <script setup>
+import { useI18n } from 'vue-i18n'
+import { ref, onMounted } from 'vue'
+
+const { t } = useI18n()
+const isIOS = ref(false)
+
+onMounted(() => {
+  // Detect iOS/iPhone Simulator
+  isIOS.value = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+})
+
 const links = [
-  { label: "Home", path: "/dashboard", icon: "🏠" },
-  { label: "Stats", path: "/stats", icon: "📊" },
-  { label: "Übungen", path: "/exercises", icon: "💪" },
-  { label: "Plan", path: "/workout-builder", icon: "🧭" },
-  { label: "Settings", path: "/settings", icon: "⚙️" }
+  { get label() { return t('nav.home') }, path: "/dashboard", icon: "🏠" }, // Alternative: 🏃‍♂️ 🎯 📱
+  { get label() { return t('nav.stats') }, path: "/stats", icon: "�" }, // Besser als 📊
+  { get label() { return t('nav.exercises') }, path: "/exercises", icon: "🏋️‍♂️" }, // Besser als 💪
+  { get label() { return t('nav.faqs') }, path: "/faqs", icon: "❓" }, // Alternative: 💬 📚 🛟
+  { get label() { return t('nav.settings') }, path: "/settings", icon: "⚙️" } // Alternative: 🔧 👤 ⭐
 ];
 </script>
 
@@ -34,24 +46,47 @@ const links = [
   left: 0;
   right: 0;
   width: 100%;
-  background: var(--surface);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border-top: 1px solid var(--card-border);
+  background: color-mix(in srgb, var(--surface) 40%, transparent);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-top: 1px solid color-mix(in srgb, var(--card-border) 20%, transparent);
+  box-shadow: 0 -2px 16px color-mix(in srgb, black 6%, transparent);
   z-index: 1000;
+  /* Sehr kompakte Höhe */
+  min-height: calc(50px + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
 }
-.nav-list { display: flex; justify-content: space-around; list-style: none; padding: 8px 0; padding-bottom: calc(8px + env(safe-area-inset-bottom)); margin: 0; }
-.nav-btn { background: none; border: none; color: var(--fg); opacity: 0.85; display: flex; flex-direction: column; align-items: center; font-size: 0.75rem; padding: 8px 12px; cursor: pointer; transition: all 0.2s ease; border-radius: 10px; min-height: 60px; min-width: 56px; -webkit-tap-highlight-color: transparent; }
-.nav-btn:hover, .nav-btn:active, .nav-btn.active { color: var(--accent-color); background: var(--accent-soft); }
-.icon { font-size: 1.4rem; margin-bottom: 4px; line-height: 1; }
-.label { font-size: 0.7rem; font-weight: 600; line-height: 1; }
+
+.nav-list { 
+  display: flex; 
+  justify-content: space-around; 
+  list-style: none; 
+  padding: 4px 0; 
+  margin: 0; 
+  min-height: 50px;
+  box-sizing: border-box;
+}
+.nav-btn { background: none; border: none; color: var(--fg); opacity: 0.7; display: flex; flex-direction: column; align-items: center; font-size: 0.7rem; padding: 4px 8px; cursor: pointer; transition: all 0.2s ease; border-radius: 8px; min-height: 46px; min-width: 46px; -webkit-tap-highlight-color: transparent; }
+.nav-btn:hover, .nav-btn:active, .nav-btn.active { color: var(--accent-color); opacity: 1; background: color-mix(in srgb, var(--accent-color) 8%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.icon { font-size: 1.2rem; margin-bottom: 2px; line-height: 1; }
+.label { font-size: 0.6rem; font-weight: 600; line-height: 1; }
+
+/* iOS-spezifische Fixes - Vereinfacht */
+@supports (-webkit-touch-callout: none) {
+  .app-nav {
+    padding-bottom: max(env(safe-area-inset-bottom), 4px);
+  }
+}
 
 /* Tablet Feintuning */
 @media (min-width: 768px) {
-  .nav-list { padding: 12px 0; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
-  .nav-btn { padding: 10px 16px; font-size: 0.8rem; min-height: 70px; min-width: 64px; }
-  .icon { font-size: 1.5rem; margin-bottom: 6px; }
-  .label { font-size: 0.75rem; }
+  .app-nav {
+    min-height: calc(56px + env(safe-area-inset-bottom));
+  }
+  .nav-list { padding: 6px 0; min-height: 56px; }
+  .nav-btn { padding: 6px 12px; font-size: 0.75rem; min-height: 52px; min-width: 54px; }
+  .icon { font-size: 1.3rem; margin-bottom: 3px; }
+  .label { font-size: 0.65rem; }
 }
 
 /* Desktop: Linke Sidebar statt Bottom-Bar */
@@ -64,8 +99,8 @@ const links = [
     width: 240px;
     height: 100vh;
     padding: 16px 12px;
-    background: var(--surface);
-    border-right: 1px solid var(--card-border);
+    background: transparent;
+    border-right: 1px solid transparent;
     border-top: none;
     z-index: 1000;
   }

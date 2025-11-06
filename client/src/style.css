@@ -66,11 +66,60 @@ body {
 
 #app { width: 100%; min-height: 100vh; background: var(--bg); color: var(--fg); position: relative; }
 
+/* Glass utilities */
+.glass {
+  background: color-mix(in oklab, var(--fg) 6%, transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.15);
+  backdrop-filter: blur(14px) saturate(1.15);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  box-shadow: 0 10px 30px color-mix(in oklab, #000000 18%, transparent);
+  border-radius: 16px;
+}
+
+.glass-strong {
+  background: color-mix(in oklab, var(--fg) 10%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  backdrop-filter: blur(18px) saturate(1.2);
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  box-shadow: 0 12px 36px color-mix(in oklab, #000000 22%, transparent);
+  border-radius: 18px;
+}
+
+/* Light theme tuning for glass surfaces */
+[data-theme="light"] .glass {
+  background: color-mix(in oklab, #ffffff 68%, transparent);
+  border: 1px solid rgba(0, 0, 0, 0.10);
+  box-shadow: 0 10px 24px color-mix(in oklab, #000000 12%, transparent);
+}
+[data-theme="light"] .glass-strong {
+  background: color-mix(in oklab, #ffffff 80%, transparent);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  box-shadow: 0 12px 28px color-mix(in oklab, #000000 16%, transparent);
+}
+
+@supports not ((backdrop-filter: blur(10px))) {
+  .glass, .glass-strong {
+    background: var(--surface);
+    border: 1px solid var(--card-border);
+    box-shadow: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass, .glass-strong {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: var(--surface);
+    border: 1px solid var(--card-border);
+    box-shadow: none;
+  }
+}
+
 /* Globale Spinner-Styles (vermeidet Duplikate in Komponenten) */
 .spinner {
   width: 36px;
   height: 36px;
-  border: 3px solid color-mix(in oklab, var(--accent-color) 30%, transparent);
+  border: 3px solid rgba(0, 0, 0, 0.1);
   border-top: 3px solid var(--accent-color);
   border-radius: 50%;
   animation: spin 1s linear infinite;

@@ -3,6 +3,13 @@
 // - In Capacitor (iOS/Android) sollte VITE_API_BASE gesetzt sein (z. B. https://api.meinedomain.tld)
 //   Dann wird daraus: https://api.meinedomain.tld/api/<resource>
 
+import axios from 'axios';
+
+export const http = axios.create({
+  baseURL: (import.meta.env?.VITE_API_BASE || '') ? `${import.meta.env.VITE_API_BASE.replace(/\/$/, '')}/api` : '/api',
+  withCredentials: true
+});
+
 export function apiUrl(resource) {
   const base = (import.meta.env?.VITE_API_BASE || '').replace(/\/$/, '')
   const prefix = base ? `${base}/api` : '/api'

@@ -6,38 +6,38 @@
   <WorkoutTimer :auto-start="route.query.created === '1'" @stop="onTimerStop" />
 
     <div class="content">
-      <div v-if="loading" class="loading">Lade Workout...</div>
+  <div v-if="loading" class="loading">{{ t('workoutDetail.loading') }}</div>
 
       <div v-else-if="error" class="error">
-        <p>Fehler beim Laden des Workouts.</p>
+        <p>{{ t('workoutDetail.loadError') }}</p>
         <small>{{ error }}</small>
       </div>
 
       <div v-else-if="!workout" class="empty">
-        <p>Kein Workout gefunden.</p>
+        <p>{{ t('workoutDetail.notFound') }}</p>
       </div>
 
       <div v-else class="workout">
         <div v-if="draftBanner" class="banner warning">
-          Lokaler Entwurf – bitte anmelden, um dauerhaft zu speichern.
+          {{ t('workoutDetail.localDraft') }}
           <button class="dismiss" @click="draftBanner=false">✕</button>
         </div>
         <h2 class="title">{{ workout.name }}</h2>
         <p class="meta">
           <span class="badge">{{ workout.type?.toUpperCase() }}</span>
           <span>{{ formatDate(workout.date) }}</span>
-          <span v-if="workout.completed" class="completed">✓ Abgeschlossen</span>
+          <span v-if="workout.completed" class="completed">✓ {{ t('workoutDetail.completed') }}</span>
         </p>
 
-  <div id="exercises" ref="exListRef" class="ex-list">
+  <div id="exercises" ref="exListRef" class="ex-list glass">
           <div class="ex-list-header">
-            <h3>Übungen</h3>
+            <h3>{{ t('workoutDetail.exercises') }}</h3>
             <button class="reorder-toggle" :aria-pressed="isReordering" @click="toggleReorder">
-              {{ isReordering ? 'Fertig' : 'Reihenfolge bearbeiten' }}
+              {{ isReordering ? t('workoutDetail.done') : t('workoutDetail.editOrder') }}
             </button>
           </div>
-          <div v-if="isDirty" class="banner dirty">Ungespeicherte Änderungen</div>
-          <p v-if="isReordering" class="reorder-hint">Ziehen und ablegen, um die Reihenfolge zu ändern.</p>
+          <div v-if="isDirty" class="banner dirty">{{ t('workoutDetail.unsaved') }}</div>
+          <p v-if="isReordering" class="reorder-hint">{{ t('workoutDetail.reorderHint') }}</p>
           <div
             v-for="(ex, i) in workout.exercises || []"
             :key="ex.exerciseId || i"
@@ -48,26 +48,26 @@
             @dragover.prevent="onDragOver(i)"
             @drop.prevent="onDrop(i)"
           >
-            <button v-if="isReordering" class="drag-handle" title="Ziehen zum Umordnen">⋮⋮</button>
+            <button v-if="isReordering" class="drag-handle" :title="t('workoutDetail.dragToReorder')">⋮⋮</button>
             <div class="ex-header">
               <strong>{{ ex.name }}</strong>
               <small>{{ ex.muscleGroup }}</small>
             </div>
             <div class="ex-media">
-              <img :src="getExerciseImage(ex)" alt="Übungsbild" class="ex-thumb" @click="onExerciseImageClick(ex)" @error="onImgError" />
+              <img :src="getExerciseImage(ex)" :alt="t('common.image')" class="ex-thumb" @click="onExerciseImageClick(ex)" @error="onImgError" />
               <div class="img-actions" v-if="ex.imageUrl || ex.thumbnailUrl">
-                <button class="link" @click.prevent="replaceExerciseImage(ex)">Ersetzen</button>
+                <button class="link" @click.prevent="replaceExerciseImage(ex)">{{ t('common.replace') }}</button>
                 <span class="sep">•</span>
-                <button class="link danger" @click.prevent="openRemoveModal(ex)">Entfernen</button>
+                <button class="link danger" @click.prevent="openRemoveModal(ex)">{{ t('common.remove') }}</button>
               </div>
-              <small class="media-hint">Tippe auf das Bild, um es zu {{ ex.imageUrl || ex.thumbnailUrl ? 'vergrößern' : 'hinzufügen' }}.</small>
+              <small class="media-hint">{{ t('workoutDetail.tapImage', { action: ex.imageUrl || ex.thumbnailUrl ? t('workoutDetail.enlarge') : t('workoutDetail.add') }) }}</small>
             </div>
             <div class="ex-sets">
               <div class="set-row header">
-                <span class="col set">Satz</span>
-                <span class="col reps">Reps</span>
-                <span class="col weight">Gewicht</span>
-                <span class="col actions">Aktion</span>
+                <span class="col set">{{ t('workoutDetail.set') }}</span>
+                <span class="col reps">{{ t('workoutDetail.reps') }}</span>
+                <span class="col weight">{{ t('workoutDetail.weight') }}</span>
+                <span class="col actions">{{ t('workoutDetail.actions') }}</span>
               </div>
               <div
                 v-for="(row, rIdx) in (ex.setDetails || [])"
@@ -85,24 +85,24 @@
                   </div>
                 </span>
                 <span class="col actions">
-                  <button class="remove-row-btn" title="Satz entfernen" @click="removeSetRow(i, rIdx)">−</button>
+                  <button class="remove-row-btn" :title="t('workoutDetail.removeSet')" @click="removeSetRow(i, rIdx)">−</button>
                 </span>
               </div>
               <div class="row-actions">
-                <button class="add-row-btn" title="Satz hinzufügen" @click="addSetRow(i)">＋</button>
+                <button class="add-row-btn" :title="t('workoutDetail.addSet')" @click="addSetRow(i)">＋</button>
               </div>
             </div>
           </div>
           <div class="actions">
             <button class="primary" :disabled="saving" @click="saveWorkout">
-              {{ saving ? 'Speichere…' : 'Speichern' }}
+              {{ saving ? t('workoutDetail.saving') : t('workoutDetail.save') }}
             </button>
             <small v-if="saveMsg" class="save-msg" :class="{ error: saveError }">{{ saveMsg }}</small>
           </div>
         </div>
 
         <div class="actions">
-          <button class="primary" @click="goDashboard">Abbrechen</button>
+          <button class="primary" @click="goDashboard">{{ t('workoutDetail.cancel') }}</button>
         </div>
       </div>
     </div>
@@ -111,7 +111,7 @@
     
     <!-- Vollbild-Bildvorschau -->
     <div v-if="preview.open" class="img-overlay" @click="closePreview">
-      <img :src="preview.url" alt="Vorschau" class="img-large" />
+      <img :src="preview.url" alt="Preview" class="img-large" />
     </div>
     
     <!-- Unsichtbarer File-Input für Uploads -->
@@ -120,10 +120,10 @@
     <!-- Bestätigungsmodal bei ungespeicherten Änderungen -->
     <AppModal
       v-model="showLeaveModal"
-      title="Änderungen verwerfen?"
-      message="Du hast ungespeicherte Änderungen. Wirklich zum Dashboard zurückkehren?"
-      confirm-text="Verwerfen und zurück"
-      cancel-text="Weiter bearbeiten"
+      :title="t('workoutDetail.cancel')"
+      :message="t('workoutDetail.leaveConfirm')"
+      :confirm-text="t('workoutDetail.leaveConfirmBack')"
+      :cancel-text="t('common.cancel')"
       type="warning"
       @confirm="confirmLeave"
     />
@@ -131,10 +131,10 @@
     <!-- Bestätigungsmodal für Foto-Entfernen -->
     <AppModal
       v-model="showRemoveModal"
-      title="Foto entfernen?"
-      message="Möchtest du das Foto wirklich entfernen?"
-      confirm-text="Entfernen"
-      cancel-text="Abbrechen"
+      :title="t('workoutDetail.removePhotoTitle')"
+      :message="t('workoutDetail.removePhotoMsg')"
+      :confirm-text="t('common.remove')"
+      :cancel-text="t('common.cancel')"
       type="warning"
       @confirm="confirmRemoveImage"
     />
@@ -154,11 +154,14 @@ import BottomNav from '@/components/BottomNav.vue'
 import AppModal from '@/components/AppModal.vue'
 import WorkoutTimer from '@/components/WorkoutTimer.vue'
 import { useToastStore } from '@/stores/toastStore'
+import { useI18n } from 'vue-i18n'
+import { logger } from '@/utils/logger'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuth()
 const clerk = useClerk()
+const { t, locale } = useI18n()
 
 const store = useUserStore()
 const toast = useToastStore()
@@ -186,7 +189,8 @@ function formatDate(dateStr) {
   if (!dateStr) return ''
   try {
     const d = new Date(dateStr)
-    return d.toLocaleString('de-DE')
+    const loc = (locale?.value || 'en').toLowerCase().startsWith('de') ? 'de-DE' : 'en-US'
+    return d.toLocaleString(loc)
   } catch {
     return String(dateStr)
   }
@@ -221,7 +225,7 @@ async function loadWorkout() {
     if (route.query.draft === '1') draftBanner.value = true
     // Nur Toast bei frisch erstellt (kein Banner, um Layout-Jitter zu vermeiden)
     if (route.query.created === '1') {
-      toast.show('Workout erstellt.', { type: 'success', duration: 3000 })
+      toast.show(t('dashboard.successCreated'), { type: 'success', duration: 3000 })
     }
     // Draft-Fall: lokal aus dem Store
     if (String(id).startsWith('draft-')) {
@@ -238,7 +242,7 @@ async function loadWorkout() {
     await enrichExerciseImages()
     initialSnapshot = snapshotCore(workout.value)
   } catch (e) {
-    console.error('Workout laden fehlgeschlagen:', e)
+    logger.error('Workout laden fehlgeschlagen:', e)
     error.value = e?.message || 'Unbekannter Fehler'
   } finally {
     loading.value = false
@@ -304,7 +308,7 @@ async function onUploadSelected(e) {
     if (!target?.exerciseId) {
       const ok = await ensureExerciseId(target)
       if (!ok || !target.exerciseId) {
-        console.warn('Kein exerciseId für Upload ermittelbar – Upload abgebrochen')
+        logger.warn('Kein exerciseId für Upload ermittelbar – Upload abgebrochen')
         return
       }
     }
@@ -314,11 +318,11 @@ async function onUploadSelected(e) {
       const bust = `?t=${Date.now()}`
       target.imageUrl = (updated.imageUrl || '') + bust
       target.thumbnailUrl = (updated.thumbnailUrl || '') + bust
-      toast.show('Foto hochgeladen.', { type: 'success', duration: 3000, position: 'top' })
+  toast.show(t('workoutDetail.toastUploaded'), { type: 'success', duration: 3000, position: 'top' })
     }
   } catch (err) {
-    console.warn('Bild-Upload fehlgeschlagen:', err)
-    toast.show('Upload fehlgeschlagen.', { type: 'error', duration: 3000 })
+  logger.warn('Bild-Upload fehlgeschlagen:', err)
+  toast.show(t('workoutDetail.uploadFailed'), { type: 'error', duration: 3000 })
   } finally {
     uploadTarget.value = null
   }
@@ -351,7 +355,7 @@ async function confirmRemoveImage() {
     if (!ex.exerciseId) {
       const okId = await ensureExerciseId(ex)
       if (!okId || !ex.exerciseId) {
-        toast.show('Bild konnte nicht entfernt werden (fehlende Übungs-ID).', { type: 'error', duration: 3000 })
+  toast.show(t('workoutDetail.removeFailedNoId'), { type: 'error', duration: 3000 })
         return
       }
     }
@@ -359,12 +363,12 @@ async function confirmRemoveImage() {
     // Lokalen Zustand bereinigen
     ex.imageUrl = undefined
     ex.thumbnailUrl = undefined
-    toast.show('Foto entfernt.', { type: 'success', duration: 2500 })
+  toast.show(t('workoutDetail.toastRemoved'), { type: 'success', duration: 2500 })
     showRemoveModal.value = false
     removeTarget.value = null
   } catch (err) {
-    console.warn('Bild entfernen fehlgeschlagen:', err)
-    toast.show('Entfernen fehlgeschlagen.', { type: 'error', duration: 3000 })
+  logger.warn('Bild entfernen fehlgeschlagen:', err)
+  toast.show(t('workoutDetail.toastRemoveFailed'), { type: 'error', duration: 3000 })
   } finally {
     // Falls Modal offen blieb (Fehler), bleibt es offen; Nutzer kann erneut versuchen oder abbrechen
   }
@@ -432,7 +436,7 @@ async function onTimerStop(ms) {
     // Lokalen Zustand aktualisieren, falls nötig
     if (workout.value) workout.value.duration = mins
   } catch (err) {
-    console.warn('Timer-Dauer speichern fehlgeschlagen:', err)
+    logger.warn('Timer-Dauer speichern fehlgeschlagen:', err)
   }
 }
 
@@ -509,7 +513,7 @@ async function saveWorkout() {
     initialSnapshot = snapshotCore({ ...w, ...normalized })
     router.push('/dashboard')
   } catch (e) {
-    console.error('Speichern fehlgeschlagen:', e)
+    logger.error('Speichern fehlgeschlagen:', e)
     error.value = e?.message || 'Speichern fehlgeschlagen'
     saveMsg.value = 'Speichern fehlgeschlagen.'
     saveError.value = true
@@ -585,7 +589,7 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnloadHan
 .meta { display: flex; gap: 12px; color: var(--muted); margin-bottom: 16px; align-items: center; }
 .badge { background: var(--surface); color: var(--fg); padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; border: 1px solid var(--card-border); }
 .completed { color: #4ade80; font-weight: 600; }
-.ex-list { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 16px; }
+.ex-list { background: transparent; border: 1px solid transparent; border-radius: 12px; padding: 16px; }
 .ex-list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .reorder-toggle { background: var(--surface); color: var(--fg); border: 1px solid var(--card-border); border-radius: 8px; padding: 8px 10px; cursor: pointer; }
 .reorder-hint { color: var(--muted); margin: 4px 0 8px; font-size: 0.9rem; }

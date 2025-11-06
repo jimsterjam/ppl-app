@@ -14,9 +14,18 @@
 </template>
 
 <script setup>
-defineProps({
+import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const props = defineProps({
   active: { type: Number, default: 1 },
-  steps: { type: Array, default: () => ['Typ', 'Übungen', 'Review'] }
+  steps: { type: Array, default: () => [] }
+})
+const { t } = useI18n()
+const steps = computed(() => {
+  return props.steps && props.steps.length
+    ? props.steps
+    : [t('builder.stepType'), t('builder.stepExercises'), t('builder.stepReview')]
 })
 </script>
 
