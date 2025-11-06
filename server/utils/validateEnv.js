@@ -17,17 +17,17 @@ const REQUIRED_VARS = [
   {
     name: 'MONGO_URI',
     description: 'MongoDB Connection String',
-    example: 'mongodb+srv://user:pass@cluster.mongodb.net/dbname'
+    example: 'mongodb+srv://USERNAME:PASSWORD@CLUSTER.mongodb.net/DATABASE'
   },
   {
     name: 'CLERK_PUBLISHABLE_KEY',
     description: 'Clerk Publishable Key für Authentication',
-    example: 'pk_test_...'
+    example: 'pk_test_XXXXXXXXXX'
   },
   {
     name: 'CLERK_SECRET_KEY',
     description: 'Clerk Secret Key für Backend-Validierung',
-    example: 'sk_test_...'
+    example: 'sk_test_XXXXXXXXXX'
   }
 ]
 
@@ -39,7 +39,7 @@ const OPTIONAL_VARS = [
     name: 'OPENAI_API_KEY',
     description: 'OpenAI API Key für AI Workout Coach',
     fallback: 'Demo-Modus mit statischen Übungen',
-    example: 'sk-...'
+    example: 'sk-proj-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'
   },
   {
     name: 'PORT',
