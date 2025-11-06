@@ -15,6 +15,18 @@ export const useToastStore = defineStore('toast', {
       }
       return id
     },
+    success(text, options = {}) {
+      return this.show(text, { ...options, type: 'success' })
+    },
+    error(text, options = {}) {
+      return this.show(text, { ...options, type: 'error' })
+    },
+    info(text, options = {}) {
+      return this.show(text, { ...options, type: 'info' })
+    },
+    warning(text, options = {}) {
+      return this.show(text, { ...options, type: 'warning' })
+    },
     dismiss(id) {
       this.messages = this.messages.filter(m => m.id !== id)
     },

@@ -78,6 +78,17 @@ const workoutSchema = new mongoose.Schema({
   timestamps: true
 });
 
+// 🚀 Database Indexes für Performance-Optimierung
+// Häufige Query-Patterns:
+// 1. GET /workouts → Alle Workouts eines Users, sortiert nach Datum
+// 2. Dashboard Stats → Aggregation nach userId + type
+// 3. Recent Workouts → userId + date DESC mit Limit
+
+workoutSchema.index({ userId: 1, date: -1 })       // User-Workouts sortiert nach Datum (neueste zuerst)
+workoutSchema.index({ userId: 1, type: 1 })        // Filter nach Workout-Typ (Push/Pull/Legs)
+workoutSchema.index({ userId: 1, createdAt: -1 })  // Alternative mit timestamps
+workoutSchema.index({ date: 1 })                   // Globale Datumssuche (Admin)
+
 // Pre-Save: sichere Kanonisierung vor dem Persistieren
 workoutSchema.pre('save', function(next) {
   const firstCat = Array.isArray(this.exercises) && this.exercises[0]?.category

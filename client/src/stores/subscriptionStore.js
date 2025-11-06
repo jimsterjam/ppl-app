@@ -1,0 +1,277 @@
+/**
+ * 💳 Subscription Store für Freemium/Premium Model
+ * 
+ * @description
+ * Verwaltet Subscription-Status und Feature-Limits:
+ * - Free Plan: 3 Workouts/Woche, 6 Übungen/Workout
+ * - Pro Plan: Unlimited Workouts, AI Coach, Advanced Stats
+ * - Elite Plan: Alles + Personal Coaching, Priority Support
+ * 
+ * @features
+ * - Feature-Gating (hasFeature Checks)
+ * - Usage Tracking (Workouts diese Woche/Monat)
+ * - Upgrade-Flow mit Demo-Mode Fallback
+ * - localStorage Persistence für Offline
+ * 
+ * @example
+ * ```javascript
+ * import { useSubscriptionStore } from '@/stores/subscriptionStore'
+ * 
+ * const subscription = useSubscriptionStore()
+ * 
+ * // Check if user can create workout
+ * if (!subscription.canCreateWorkout) {
+ *   // Show upgrade modal
+ * }
+ * 
+ * // Upgrade to Pro
+ * await subscription.upgradeSubscription('pro', paymentMethod)
+ * ```
+ * 
+ * @version 1.0.0
+ * @since 2025-11-06
+ */
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import { getAuthToken } from '@/utils/authToken'
+
+export const useSubscriptionStore = defineStore('subscription', () => {
+  const subscription = ref({
+    plan: 'free', // 'free', 'pro', 'elite'
+    status: 'active',
+    expiresAt: null,
+    features: []
+  })
+  
+  const usage = ref({
+    workoutsThisWeek: 0,
+    workoutsThisMonth: 0,
+    totalWorkouts: 0,
+    lastWorkoutDate: null
+  })
+  
+  const limits = ref({
+    free: {
+      maxWorkoutsPerWeek: 3,
+      maxExercisesPerWorkout: 6,
+      maxFriends: 5,
+      hasAICoach: false,
+      hasAdvancedStats: false,
+      hasWorkoutSharing: false,
+      hasCustomTemplates: false
+    },
+    pro: {
+      maxWorkoutsPerWeek: -1, // unlimited
+      maxExercisesPerWorkout: -1,
+      maxFriends: 50,
+      hasAICoach: true,
+      hasAdvancedStats: true,
+      hasWorkoutSharing: true,
+      hasCustomTemplates: true
+    },
+    elite: {
+      maxWorkoutsPerWeek: -1,
+      maxExercisesPerWorkout: -1,
+      maxFriends: -1, // unlimited
+      hasAICoach: true,
+      hasAdvancedStats: true,
+      hasWorkoutSharing: true,
+      hasCustomTemplates: true,
+      hasPersonalCoaching: true,
+      hasPrioritySupport: true
+    }
+  })
+  
+  // Subscription Status checken
+  const checkSubscription = async () => {
+    try {
+      const response = await fetch('/api/subscription/status', {
+        headers: {
+          'Authorization': `Bearer ${await getAuthToken()}`
+        }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        subscription.value = data.subscription
+        usage.value = data.usage
+        return data
+      } else {
+        // Fallback: Aus localStorage laden
+        const savedSubscription = localStorage.getItem('bro_split_subscription')
+        if (savedSubscription) {
+          subscription.value = JSON.parse(savedSubscription)
+          console.log('🧪 Demo Mode: Loaded subscription from localStorage:', subscription.value.plan)
+        }
+      }
+    } catch (error) {
+      console.error('Check subscription error:', error)
+      // Fallback: Aus localStorage laden
+      const savedSubscription = localStorage.getItem('bro_split_subscription')
+      if (savedSubscription) {
+        subscription.value = JSON.parse(savedSubscription)
+        console.log('🧪 Demo Mode: Loaded subscription from localStorage:', subscription.value.plan)
+      }
+    }
+  }
+  
+  // Demo-Reset Funktion für Testing
+  const resetToFree = () => {
+    subscription.value = {
+      plan: 'free',
+      status: 'active',
+      expiresAt: null,
+      features: []
+    }
+    localStorage.removeItem('bro_split_subscription')
+    console.log('🧪 Demo Mode: Reset to free plan')
+  }
+  
+  // Upgrade zu Pro/Elite
+  const upgradeSubscription = async (planType, paymentMethod) => {
+    console.log('🧪 SubscriptionStore: Starting upgrade to', planType)
+    
+    try {
+      // Kurzer Timeout für Demo-Modus
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 2000) // 2s timeout
+      
+      console.log('🧪 SubscriptionStore: Making API request...')
+      const response = await fetch('/api/subscription/upgrade', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${await getAuthToken()}`
+        },
+        body: JSON.stringify({
+          plan: planType,
+          paymentMethod
+        }),
+        signal: controller.signal
+      })
+      
+      clearTimeout(timeoutId)
+      
+      if (response.ok) {
+        const data = await response.json()
+        subscription.value = data.subscription
+        console.log('🧪 SubscriptionStore: Real API upgrade successful')
+        return data
+      } else {
+        console.log('🧪 SubscriptionStore: API returned error, falling back to demo mode')
+        throw new Error(`API returned ${response.status}`)
+      }
+    } catch (error) {
+      console.log('🧪 SubscriptionStore: Error caught, switching to demo mode:', error.message)
+      
+      // Fallback für Demo-Modus bei Netzwerkfehlern oder Timeout
+      console.log('🧪 Demo Mode: Simulating upgrade to', planType)
+      subscription.value = {
+        plan: planType,
+        status: 'active',
+        expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+        features: limits.value[planType]
+      }
+      
+      localStorage.setItem('bro_split_subscription', JSON.stringify(subscription.value))
+      console.log('🧪 Demo Mode: Upgrade completed and saved to localStorage')
+      return { subscription: subscription.value, success: true, demo: true }
+    }
+  }
+  
+  // Usage tracking
+  const trackWorkoutCreated = () => {
+    usage.value.workoutsThisWeek++
+    usage.value.workoutsThisMonth++
+    usage.value.totalWorkouts++
+    usage.value.lastWorkoutDate = new Date().toISOString()
+  }
+  
+  // Feature-Checks
+  const canCreateWorkout = computed(() => {
+    const currentLimits = limits.value[subscription.value.plan]
+    if (currentLimits.maxWorkoutsPerWeek === -1) return true
+    return usage.value.workoutsThisWeek < currentLimits.maxWorkoutsPerWeek
+  })
+  
+  const canAddExercise = computed(() => (currentExerciseCount) => {
+    const currentLimits = limits.value[subscription.value.plan]
+    if (currentLimits.maxExercisesPerWorkout === -1) return true
+    return currentExerciseCount < currentLimits.maxExercisesPerWorkout
+  })
+  
+  const hasFeature = computed(() => (featureName) => {
+    const currentLimits = limits.value[subscription.value.plan]
+    return currentLimits[featureName] || false
+  })
+  
+  const isPremium = computed(() => {
+    return subscription.value.plan !== 'free'
+  })
+  
+  const isElite = computed(() => {
+    return subscription.value.plan === 'elite'
+  })
+  
+  const workoutsRemaining = computed(() => {
+    const currentLimits = limits.value[subscription.value.plan]
+    if (currentLimits.maxWorkoutsPerWeek === -1) return Infinity
+    return Math.max(0, currentLimits.maxWorkoutsPerWeek - usage.value.workoutsThisWeek)
+  })
+  
+  const shouldShowUpgrade = computed(() => {
+    if (subscription.value.plan !== 'free') return false
+    return usage.value.workoutsThisWeek >= limits.value.free.maxWorkoutsPerWeek - 1
+  })
+  
+  // Pricing
+  const pricing = ref({
+    pro: {
+      monthly: 4.99,
+      yearly: 49.99,
+      features: [
+        'Unlimited Workouts',
+        'AI Coach Recommendations',
+        'Advanced Stats & Analytics',
+        'Workout Sharing',
+        'Custom Templates',
+        'Up to 50 Friends'
+      ]
+    },
+    elite: {
+      monthly: 9.99,
+      yearly: 99.99,
+      features: [
+        'Everything in Pro',
+        'Unlimited Friends',
+        'Personal Coaching Insights',
+        'Priority Support',
+        'Early Access to Features',
+        'Export Data'
+      ]
+    }
+  })
+  
+  return {
+    // State
+    subscription,
+    usage,
+    limits,
+    pricing,
+    
+    // Actions
+    checkSubscription,
+    upgradeSubscription,
+    trackWorkoutCreated,
+    resetToFree,
+    
+    // Computed
+    canCreateWorkout,
+    canAddExercise,
+    hasFeature,
+    isPremium,
+    isElite,
+    workoutsRemaining,
+    shouldShowUpgrade
+  }
+})

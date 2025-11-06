@@ -5,7 +5,7 @@
         <button 
           class="refresh-btn" 
           :disabled="store.isWorkoutsLoading"
-          title="Daten aktualisieren"
+          :title="$t('dashboard.refreshTitle')"
           @click="refreshData"
         >
           <span :class="{ 'spinning': store.isWorkoutsLoading }">🔄</span>
@@ -16,22 +16,22 @@
     <!-- Clerk Loading State -->
     <div v-if="!isClerkReady" class="loading-section">
       <div class="spinner"></div>
-      <p>Initialisiere Dashboard...</p>
+      <p>{{ $t('dashboard.init') }}</p>
     </div>
 
     <!-- App Loading State -->
     <div v-else-if="store.isWorkoutsLoading" class="loading-section">
       <div class="spinner"></div>
-      <p>Lade deine Workouts...</p>
+      <p>{{ $t('dashboard.loading') }}</p>
     </div>
 
     <!-- Error State -->
     <EmptyState 
       v-else-if="store.hasError"
       icon="⚠️"
-      title="Verbindungsfehler"
+      :title="$t('dashboard.connectionErrorTitle')"
       :message="store.error"
-      action-text="Erneut versuchen"
+      :action-text="$t('dashboard.retry')"
       @action="retryLoadWorkouts"
     />
 
@@ -39,9 +39,9 @@
     <EmptyState 
       v-else-if="store.workouts.length === 0"
       icon="💪"
-      title="Noch keine Workouts"
-      message="Starte dein erstes Training und verfolge deinen Fortschritt!"
-      action-text="Erstes Workout starten"
+      :title="$t('dashboard.noWorkoutsTitle')"
+      :message="$t('dashboard.noWorkoutsMsg')"
+      :action-text="$t('dashboard.startFirst')"
       @action="() => startWorkout(nextType)"
     />
 
@@ -51,8 +51,8 @@
       <div v-if="workoutCreated" class="success-message">
         <div class="success-content">
           <span class="success-icon">✅</span>
-          <h3>Workout erstellt!</h3>
-          <p>{{ selectedWorkoutType.charAt(0).toUpperCase() + selectedWorkoutType.slice(1) }} Day Workout wurde erfolgreich erstellt.</p>
+          <h3>{{ $t('dashboard.successCreated') }}</h3>
+          <p>{{ selectedWorkoutType.charAt(0).toUpperCase() + selectedWorkoutType.slice(1) }} Day {{ $t('dashboard.successCreated') }}</p>
         </div>
       </div>
 
@@ -63,14 +63,35 @@
       <QuickOverview :workouts="store.workouts" />
 
       <section class="today">
-        <div class="next-card">
+        <div class="next-card glass">
           <div class="next-header">
-            <h3>Nächstes Workout</h3>
-            <span v-if="lastLabel" class="muted">Zuletzt: {{ lastLabel }}</span>
+            <h3>{{ $t('dashboard.nextWorkout') }}</h3>
+            <span v-if="lastLabel" class="muted">{{ $t('dashboard.last') }}: {{ lastLabel }}</span>
           </div>
           <p class="next-title">{{ nextLabel }}</p>
-          <button :disabled="workoutCreated" @click="startWorkout(nextType)">
-            {{ workoutCreated ? 'Workout erstellt!' : `Starten (${nextLabel})` }}
+          
+          <!-- Draft-Hinweis -->
+          <div v-if="hasDraft" class="draft-notice">
+            <span class="draft-icon">📝</span>
+            <span>{{ $t('dashboard.draftAvailable') }}</span>
+          </div>
+          
+          <!-- Haupt-Button -->
+          <button 
+            :disabled="workoutCreated" 
+            @click="startWorkout(hasDraft ? draftType : nextType)"
+            :class="{ 'draft-button': hasDraft }"
+          >
+            {{ startButtonText }}
+          </button>
+          
+          <!-- Sekundär-Button bei Draft: Neu beginnen -->
+          <button 
+            v-if="hasDraft && !workoutCreated"
+            @click="startNewWorkout"
+            class="secondary-btn"
+          >
+            {{ $t('dashboard.startNew') }}
           </button>
         </div>
       </section>
@@ -92,6 +113,7 @@
 
 <script setup>
 import { computed, ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useUser, useAuth, useClerk } from '@clerk/vue'
 import { getAuthToken } from '@/utils/authToken'
@@ -103,8 +125,10 @@ import BottomNav from "../components/BottomNav.vue";
 import EmptyState from "../components/EmptyState.vue";
 import QuickOverview from "../components/QuickOverview.vue";
 import RecentWorkouts from "../components/RecentWorkouts.vue";
+import { logger } from '@/utils/logger'
 
 const store = useUserStore();
+const { t: $t } = useI18n()
 const router = useRouter();
 const clerk = useClerk();
 const auth = useAuth();
@@ -117,7 +141,7 @@ const toast = useToastStore()
 // Fokus-Handler als stabile Referenz definieren (wird in onMounted registriert)
 const handleFocus = () => {
   if (isClerkReady.value && isSignedIn.value) {
-    console.log('🔄 Fenster fokussiert - aktualisiere Workouts...');
+    logger.debug('🔄 Fenster fokussiert - aktualisiere Workouts...');
     loadWorkoutsData(true);
   }
 };
@@ -129,18 +153,18 @@ onUnmounted(() => {
 
 // Warte auf Clerk Initialisierung
 onMounted(async () => {
-  console.log('🔧 DashboardView - onMounted, warte auf Clerk...');
+  logger.debug('🔧 DashboardView - onMounted, warte auf Clerk...');
 
   await nextTick();
 
   const markReadyAndLoad = async () => {
     if (isClerkReady.value) return; // mehrfach Aufruf vermeiden
     isClerkReady.value = true;
-    console.log('✅ DashboardView - Clerk ready, isSignedIn:', isSignedIn.value);
+    logger.debug('✅ DashboardView - Clerk ready, isSignedIn:', isSignedIn.value);
 
     if (!isSignedIn.value) return; // AuthLayout übernimmt Redirect
 
-    console.log('🔄 DashboardView - Angemeldet, lade Daten...');
+    logger.debug('🔄 DashboardView - Angemeldet, lade Daten...');
     await loadWorkoutsData();
   };
 
@@ -162,7 +186,7 @@ onMounted(async () => {
   // Lausche auf Navigation zurück zum Dashboard
   router.afterEach((to, from) => {
     if (to.path === '/' && from.path !== '/') {
-      console.log('🔄 Zurück zum Dashboard - aktualisiere Workouts...');
+      logger.debug('🔄 Zurück zum Dashboard - aktualisiere Workouts...');
       loadWorkoutsData(true); // Force refresh
     }
   });
@@ -175,20 +199,20 @@ onMounted(async () => {
 async function loadWorkoutsData(force = false) {
   try {
     const token = await getAuthToken({ clerk, auth });
-    console.log('📥 DashboardView - Lade Workouts mit Token:', !!token, force ? '(forced)' : '(cached allowed)');
+    logger.debug('📥 DashboardView - Lade Workouts mit Token:', !!token, force ? '(forced)' : '(cached allowed)');
     await store.loadWorkouts(token, { force });
   } catch (error) {
-    console.warn('⚠️ DashboardView - Fehler beim Laden der Workouts mit Token, versuche ohne:', error);
+    logger.warn('⚠️ DashboardView - Fehler beim Laden der Workouts mit Token, versuche ohne:', error);
     await store.loadWorkouts(null, { force });
   }
 }
 
 // Manueller Refresh
 async function refreshData() {
-  console.log('🔄 Manueller Daten-Refresh...');
+  logger.debug('🔄 Manueller Daten-Refresh...');
   await loadWorkoutsData(true);
   // Subtiles Feedback statt großem Banner
-  toast.show('Aktualisiert', { type: 'success', duration: 1500 })
+  toast.show($t('common.updated'), { type: 'success', duration: 1500 })
 }
 
 // Überwache Auth-Änderungen nur nach Clerk-Initialisierung
@@ -234,29 +258,82 @@ const lastLabel = computed(() => {
 
 const nextLabel = computed(() => typeLabel(nextType.value))
 
+// Draft-Erkennung aus SessionStorage
+const DRAFT_STORAGE_KEY = 'workout_builder_draft'
+const hasDraft = computed(() => {
+  try {
+    const draft = sessionStorage.getItem(DRAFT_STORAGE_KEY)
+    if (draft) {
+      const parsed = JSON.parse(draft)
+      return parsed.selectedExercises && parsed.selectedExercises.length > 0
+    }
+  } catch (e) {
+    return false
+  }
+  return false
+})
+
+const draftType = computed(() => {
+  try {
+    const draft = sessionStorage.getItem(DRAFT_STORAGE_KEY)
+    if (draft) {
+      const parsed = JSON.parse(draft)
+      return parsed.selectedType || nextType.value
+    }
+  } catch (e) {
+    return nextType.value
+  }
+  return nextType.value
+})
+
+// Button-Text basierend auf Draft-Status
+const startButtonText = computed(() => {
+  if (workoutCreated.value) return $t('dashboard.successCreated')
+  if (hasDraft.value) {
+    return `${typeLabel(draftType.value)} ${$t('dashboard.continue')}`
+  }
+  return `${$t('dashboard.start')} (${nextLabel.value})`
+})
+
 const greeting = computed(() => {
-  if (!isClerkReady.value) return 'Initialisiere...'
-  if (store.isWorkoutsLoading) return 'Lade Dashboard...'
+  if (!isClerkReady.value) return $t('dashboard.init')
+  if (store.isWorkoutsLoading) return $t('dashboard.loading')
   if (store.hasError) return 'Dashboard'
-  if (store.workouts.length === 0) return 'Willkommen!'
-  return `Nächstes: ${nextLabel.value}`
+  if (store.workouts.length === 0) return $t('dashboard.welcome')
+  return `${$t('dashboard.next')}: ${nextLabel.value}`
 })
 
 async function startWorkout(type) {
-  console.log('🚀 DashboardView - Navigiere zum Workout Builder...')
+  logger.debug('🚀 DashboardView - Navigiere zum Workout Builder...')
   
   // Navigiere zum WorkoutBuilder, damit der User selbst entscheiden kann
   const query = type ? { type } : {}
   await router.push({ path: '/workout-builder', query });
 }
 
+async function startNewWorkout() {
+  logger.debug('🆕 DashboardView - Starte neues Workout, lösche Draft...')
+  
+  // Draft löschen
+  try {
+    sessionStorage.removeItem('workout_builder_draft')
+    logger.debug('🗑️ Draft gelöscht')
+  } catch (e) {
+    logger.warn('⚠️ Fehler beim Löschen des Drafts:', e)
+  }
+  
+  // Navigiere zum WorkoutBuilder mit nächstem Typ
+  await startWorkout(nextType.value)
+}
+
+
 async function retryLoadWorkouts() {
   try {
     const token = await getAuthToken({ clerk, auth });
-    console.log('🔄 DashboardView - Retry loading workouts with token:', !!token);
+    logger.debug('🔄 DashboardView - Retry loading workouts with token:', !!token);
     store.loadWorkouts(token, { force: true });
   } catch (error) {
-    console.warn('⚠️ DashboardView - Fehler beim Retry:', error);
+    logger.warn('⚠️ DashboardView - Fehler beim Retry:', error);
     store.loadWorkouts(null, { force: true }); // Fallback ohne Token
   }
 }
@@ -270,8 +347,7 @@ async function retryLoadWorkouts() {
   min-height: 100vh;
   background: var(--bg);
   color: var(--fg);
-  padding-bottom: 80px; /* Platz für BottomNav */
-  overflow-x: hidden;
+  padding-bottom: 70px; /* Platz für BottomNav */
 }
 
 .refresh-btn {
@@ -414,8 +490,8 @@ async function retryLoadWorkouts() {
 .today button:disabled:hover { transform: none; }
 
 .next-card { 
-  background: var(--card-bg); 
-  border: 1px solid var(--card-border); 
+  background: transparent; 
+  border: 1px solid transparent; 
   border-radius: 12px; 
   padding: 16px; 
   margin: 16px; 
@@ -432,6 +508,53 @@ async function retryLoadWorkouts() {
   font-size: 1.15rem; 
   font-weight: 600; 
   margin: 6px 0 0; 
+}
+
+.draft-notice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: color-mix(in srgb, var(--accent-color) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent-color) 25%, transparent);
+  border-radius: 8px;
+  margin: 12px 0;
+  font-size: 0.85rem;
+  color: var(--accent-color);
+  font-weight: 500;
+}
+
+.draft-icon {
+  font-size: 1.1rem;
+}
+
+.draft-button {
+  background: linear-gradient(135deg, var(--accent-color), color-mix(in srgb, var(--accent-color) 85%, var(--success-color))) !important;
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--accent-color) 30%, transparent) !important;
+}
+
+.secondary-btn {
+  width: 100%;
+  padding: 10px 20px;
+  margin-top: 8px;
+  background: transparent;
+  border: 1px solid var(--card-border);
+  color: var(--fg);
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.secondary-btn:hover {
+  background: color-mix(in srgb, var(--fg) 5%, transparent);
+  border-color: color-mix(in srgb, var(--fg) 30%, transparent);
+  transform: translateY(-1px);
+}
+
+.secondary-btn:active {
+  transform: translateY(0);
 }
 
 .muted { 

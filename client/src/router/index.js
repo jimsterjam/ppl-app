@@ -7,6 +7,8 @@ import ExercisesView from '../views/ExercisesView.vue'
 import SettingsView from '../views/SettingsView.vue'
 import WorkoutBuilder from '../components/WorkoutBuilder.vue'
 import WorkoutDetailView from '../views/WorkoutDetailView.vue'
+import FaqsView from '../views/FaqsView.vue'
+import FeaturesTestView from '../views/FeaturesTestView.vue'
 
 const routes = [
   {
@@ -25,8 +27,14 @@ const routes = [
       { path: 'exercises', name: 'exercises', component: ExercisesView },
       { path: 'settings', name: 'settings', component: SettingsView },
       { path: 'workout-builder', name: 'workout-builder', component: WorkoutBuilder },
+      { path: 'faqs', name: 'faqs', component: FaqsView },
+      { path: 'features-test', name: 'features-test', component: FeaturesTestView },
       { path: 'workouts/:id', name: 'workout-detail', component: WorkoutDetailView }
     ]
+  },
+  {
+    path: '/info',
+    redirect: '/faqs'
   },
   {
     path: '/plan',

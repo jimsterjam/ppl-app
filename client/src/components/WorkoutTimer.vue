@@ -13,16 +13,16 @@
         <span v-if="running">⏸️</span>
         <span v-else>▶️</span>
       </button>
-      <span class="time" :aria-live="running ? 'polite' : 'off'">{{ formatted }}</span>
-      <button class="btn small" title="Zurücksetzen" @click.stop="reset">↺</button>
-      <button class="btn small" title="Minimieren" @click.stop="minimize">▁</button>
-      <button class="btn small" title="Schließen" @click.stop="close">✕</button>
+  <span class="time" :aria-live="running ? 'polite' : 'off'">{{ formatted }}</span>
+  <button class="btn small" :title="$t('timer.reset')" @click.stop="reset">↺</button>
+  <button class="btn small" :title="$t('timer.minimize')" @click.stop="minimize">▁</button>
+  <button class="btn small" :title="$t('timer.close')" @click.stop="close">✕</button>
     </template>
     <template v-else>
       <div
         class="analog"
-        :style="{ '--size': analogSize + 'px' }"
-        title="Tippen zum Maximieren"
+  :style="{ '--size': analogSize + 'px' }"
+  :title="$t('timer.restoreHint')"
         role="button"
         tabindex="0"
         @click.stop="restore"

@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import mongoose from 'mongoose';
 import { ObjectId } from 'mongodb';
 import { requireAuth } from "../middleware/clerkAuth.js";
+import { logger } from '../utils/logger.js';
 
 const router = express.Router();
 
@@ -28,34 +29,141 @@ const upload = multer({
   }
 });
 
-// Debug: Logge eingehende Requests auf diesem Router (kann später entfernt werden)
-router.use((req, _res, next) => {
-  console.log(`[exercises] ${req.method} ${req.url}`);
-  next();
-});
-
-// Alle Übungen abrufen
+// Alle Übungen abrufen (aus Datenbank + fallback zur statischen Liste)
 router.get("/", async (req, res) => {
-  console.log("GET /api/exercises aufgerufen", req.headers);
   try {
-    const { category, muscleGroup, equipment } = req.query;
+    const { category, muscleGroup, equipment, source, includeStatic } = req.query;
     let filter = {};
     if (category) filter.category = category;
     if (muscleGroup) filter.muscleGroups = { $in: [muscleGroup] };
     if (equipment) filter.equipment = equipment;
+    if (source) filter.source = source;
 
-    const exercises = await Exercise.find(filter).sort({ name: 1 });
-    res.json(exercises);
+    // Lade Übungen aus der Datenbank
+    const dbExercises = await Exercise.find(filter).sort({ name: 1 });
+    
+    // Optional: Statische Übungen als Fallback hinzufügen (für Rückwärtskompatibilität)
+    let allExercises = [...dbExercises];
+    
+    // Wenn keine DB-Übungen gefunden oder explizit angefordert, füge statische hinzu
+    if (dbExercises.length === 0 || includeStatic === 'true') {
+      // Import der statischen Übungen
+      const staticExercises = await import('../data/exercises.js').then(m => m.default);
+      
+      // Formatiere statische Übungen für Konsistenz
+      const formattedStaticExercises = staticExercises
+        .filter(exercise => {
+          if (category && exercise.category !== category) return false;
+          if (muscleGroup && exercise.muscleGroup !== muscleGroup) return false;
+          if (equipment && exercise.equipment !== equipment) return false;
+          return true;
+        })
+        .map(exercise => ({
+          _id: `static_${exercise.name.toLowerCase().replace(/\s+/g, '_')}`,
+          name: exercise.name,
+          names: {
+            de: exercise.name,
+            en: exercise.name // Statische sind bereits deutsch
+          },
+          category: exercise.category,
+          muscleGroups: [exercise.muscleGroup],
+          equipment: exercise.equipment,
+          difficulty: 'Anfänger',
+          source: 'static',
+          isStatic: true,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }));
+      
+      // Füge nur statische hinzu, die nicht bereits in der DB existieren
+      const dbNames = new Set(dbExercises.flatMap(ex => [
+        ex.name,
+        ex.names?.de,
+        ex.names?.en
+      ].filter(Boolean)));
+      
+      const uniqueStaticExercises = formattedStaticExercises.filter(staticEx => 
+        !dbNames.has(staticEx.name)
+      );
+      
+      allExercises = [...dbExercises, ...uniqueStaticExercises];
+    }
+    
+    // Sortiere final nach Namen
+    allExercises.sort((a, b) => a.name.localeCompare(b.name));
+    
+    res.json(allExercises);
   } catch (err) {
-    console.error(err);
+    logger.error('❌ GET /exercises error:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// Bild hochladen/ersetzen (bewusst vor :id-Route definiert)
-router.post('/:id/image', /*requireAuth(),*/ upload.single('image'), async (req, res) => {
+// Neue Übung erstellen
+router.post("/", requireAuth(), async (req, res) => {
   try {
-    console.log('POST /api/exercises/:id/image', req.params.id, req.headers['content-type']);
+    const { userId } = req.auth();
+    
+    const {
+      name,
+      names,
+      category,
+      muscleGroups,
+      equipment,
+      difficulty,
+      instructions,
+      tips
+    } = req.body;
+
+    // Prüfe, ob Übung bereits existiert
+    const existingExercise = await Exercise.findOne({
+      $or: [
+        { name: name },
+        { 'names.de': names?.de },
+        { 'names.en': names?.en }
+      ]
+    });
+
+    if (existingExercise) {
+      return res.status(400).json({ 
+        error: 'Übung mit diesem Namen existiert bereits',
+        existingExercise: existingExercise 
+      });
+    }
+
+    // Erstelle neue Übung
+    const newExercise = new Exercise({
+      name: name,
+      names: names || { de: name, en: name },
+      category: category,
+      muscleGroups: muscleGroups || [],
+      equipment: equipment || 'Körpergewicht',
+      difficulty: difficulty || 'Anfänger',
+      instructions: instructions || '',
+      tips: tips || '',
+      source: 'user_created',
+      addedBy: userId
+    });
+
+    await newExercise.save();
+    
+    logger.debug(`✅ Neue Übung erstellt: ${newExercise.name} by User ${userId}`);
+    
+    res.status(201).json({
+      message: 'Übung erfolgreich erstellt',
+      exercise: newExercise
+    });
+
+  } catch (err) {
+    logger.error('❌ POST /exercises error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Bild hochladen/ersetzen
+router.post('/:id/image', requireAuth(), upload.single('image'), async (req, res) => {
+  try {
+    logger.debug('POST /api/exercises/:id/image', req.params.id);
     const ex = await Exercise.findById(req.params.id);
     if (!ex) return res.status(404).json({ error: 'Exercise not found' });
 
@@ -67,79 +175,74 @@ router.post('/:id/image', /*requireAuth(),*/ upload.single('image'), async (req,
     const outPath = path.join(uploadsDir, baseName);
     const thumbPath = path.join(uploadsDir, thumbName);
 
-    // Verarbeitung mit sharp: konvertiere zu JPEG, max 1280px, moderates Quality
-    let wroteMain = false;
+    // Hauptbild verarbeitung
     try {
       const img = sharp(req.file.buffer, { failOnError: false });
-      await img.rotate().resize({ width: 1280, height: 1280, fit: 'inside', withoutEnlargement: true })
-        .jpeg({ quality: 82, chromaSubsampling: '4:4:4' })
-        .toFile(outPath);
-      wroteMain = true;
-    } catch {}
-    if (!wroteMain) {
+      await img.rotate().resize({ 
+        width: 1280, 
+        height: 1280, 
+        fit: 'inside', 
+        withoutEnlargement: true 
+      })
+      .jpeg({ quality: 82, chromaSubsampling: '4:4:4' })
+      .toFile(outPath);
+    } catch {
       // Fallback: Schreibe Original-Buffer
       fs.writeFileSync(outPath, req.file.buffer);
     }
 
-    // Thumbnail 256px (best effort)
+    // Thumbnail erstellen
     try {
       const img2 = sharp(req.file.buffer, { failOnError: false });
       await img2.rotate().resize({ width: 256, height: 256, fit: 'cover' })
         .jpeg({ quality: 78 })
         .toFile(thumbPath);
     } catch {
-      // Fallback: skaliertes Thumbnail aus Hauptdatei weglassen
+      // Fallback: Kopiere Hauptbild
       try { fs.copyFileSync(outPath, thumbPath); } catch {}
     }
 
-    // URLs (werden als statische Dateien über /uploads bedient)
+    // URLs aktualisieren
     ex.imageUrl = `/uploads/exercises/${baseName}`;
     ex.thumbnailUrl = `/uploads/exercises/${thumbName}`;
     await ex.save();
 
     res.json({ success: true, exercise: ex });
   } catch (err) {
-    console.error('Upload error:', err);
+    logger.error('Upload error:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// Alias: /image/:id (falls Proxy/Router matching Probleme hat)
-router.post('/image/:id', /*requireAuth(),*/ upload.single('image'), async (req, res) => {
+// Kategorie-Route explizit
+router.get('/category/:category', async (req, res) => {
   try {
-    console.log('POST /api/exercises/image/:id', req.params.id, req.headers['content-type']);
-    const ex = await Exercise.findById(req.params.id);
-    if (!ex) return res.status(404).json({ error: 'Exercise not found' });
-    if (!req.file) return res.status(400).json({ error: 'Kein Bild hochgeladen' });
-    const baseName = `${ex._id}.jpg`;
-    const thumbName = `${ex._id}_thumb.jpg`;
-    const outPath = path.join(uploadsDir, baseName);
-    const thumbPath = path.join(uploadsDir, thumbName);
-    let wroteMain = false;
-    try {
-      const img = sharp(req.file.buffer, { failOnError: false });
-      await img.rotate().resize({ width: 1280, height: 1280, fit: 'inside', withoutEnlargement: true })
-        .jpeg({ quality: 82, chromaSubsampling: '4:4:4' })
-        .toFile(outPath);
-      wroteMain = true;
-    } catch {}
-    if (!wroteMain) {
-      fs.writeFileSync(outPath, req.file.buffer);
+    const { category } = req.params;
+    // Finde alle Übungen mit passender Kategorie
+    const exercises = await Exercise.find({ category });
+    // Optional: Fallback zu statischen Übungen
+    let allExercises = [...exercises];
+    if (exercises.length === 0) {
+      const staticExercises = await import('../data/exercises.js').then(m => m.default);
+      const filteredStatic = staticExercises.filter(ex => ex.category === category).map(ex => ({
+        _id: `static_${ex.name.toLowerCase().replace(/\s+/g, '_')}`,
+        name: ex.name,
+        names: { de: ex.name, en: ex.name },
+        category: ex.category,
+        muscleGroups: [ex.muscleGroup],
+        equipment: ex.equipment,
+        difficulty: 'Anfänger',
+        source: 'static',
+        isStatic: true,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }));
+      allExercises = [...filteredStatic];
     }
-    try {
-      const img2 = sharp(req.file.buffer, { failOnError: false });
-      await img2.rotate().resize({ width: 256, height: 256, fit: 'cover' })
-        .jpeg({ quality: 78 })
-        .toFile(thumbPath);
-    } catch {
-      try { fs.copyFileSync(outPath, thumbPath); } catch {}
-    }
-    ex.imageUrl = `/uploads/exercises/${baseName}`;
-    ex.thumbnailUrl = `/uploads/exercises/${thumbName}`;
-    await ex.save();
-    res.json({ success: true, exercise: ex });
+    allExercises.sort((a, b) => a.name.localeCompare(b.name));
+    res.json(allExercises);
   } catch (err) {
-    console.error('Upload error (alias):', err);
+    logger.error('❌ GET /exercises/category/:category error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -155,32 +258,93 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// Bild löschen (optional)
-router.delete('/:id/image', /*requireAuth(),*/ async (req, res) => {
+// Bild löschen
+router.delete('/:id/image', requireAuth(), async (req, res) => {
   try {
     const ex = await Exercise.findById(req.params.id);
     if (!ex) return res.status(404).json({ error: 'Exercise not found' });
-    const db = mongoose.connection?.db
-    if (db) {
-      const bucket = new mongoose.mongo.GridFSBucket(db, { bucketName: 'exerciseImages' })
-      if (ex.imageFileId) { try { await bucket.delete(new ObjectId(ex.imageFileId)) } catch {} }
-      if (ex.thumbFileId) { try { await bucket.delete(new ObjectId(ex.thumbFileId)) } catch {} }
-    }
-    // Fallback: Alte Dateien vom Filesystem entfernen, falls noch vorhanden
-    const toDelete = [ex.imageUrl, ex.thumbnailUrl]
+    
+    // Lokale Dateien entfernen
+    const filesToDelete = [ex.imageUrl, ex.thumbnailUrl]
       .filter(Boolean)
-      .map(u => path.join(__dirname, '..', 'public', u.replace(/^\//, '')))
-    for (const f of toDelete) { try { fs.unlinkSync(f) } catch {} }
+      .map(url => path.join(__dirname, '..', 'public', url.replace(/^\//, '')));
+    
+    for (const filePath of filesToDelete) {
+      try { 
+        fs.unlinkSync(filePath); 
+      } catch (err) {
+        logger.debug(`File ${filePath} not found or already deleted`);
+      }
+    }
+    
+    // URLs aus Datenbank entfernen
     ex.imageUrl = undefined;
     ex.thumbnailUrl = undefined;
     ex.imageFileId = undefined;
     ex.thumbFileId = undefined;
     await ex.save();
+    
     res.json({ success: true });
   } catch (err) {
+    logger.error('Delete image error:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
+// 🔧 Admin: Alle Übungen löschen und neu befüllen (für Testing)
+router.post('/admin/reset-all', async (req, res) => {
+  try {
+    logger.debug('🧹 Admin: Lösche alle Übungen aus der Datenbank...');
+    
+    // Lösche alle Übungen
+    const deleteResult = await Exercise.deleteMany({});
+    logger.debug(`✅ Gelöscht: ${deleteResult.deletedCount} Übungen`);
+    
+    // Importiere statische Übungen als Fallback
+    const staticExercises = await import('../data/exercises.js').then(m => m.default);
+    logger.debug(`📋 Statische Übungen verfügbar: ${staticExercises.length}`);
+    
+    // Erstelle neue Übungen aus statischen Daten
+    const newExercises = [];
+    for (const staticEx of staticExercises) {
+      try {
+        const newEx = new Exercise({
+          name: staticEx.name,
+          names: {
+            de: staticEx.name,
+            en: staticEx.name
+          },
+          category: staticEx.category,
+          muscleGroups: [staticEx.muscleGroup],
+          equipment: staticEx.equipment,
+          difficulty: 'Anfänger',
+          instructions: staticEx.instructions || '',
+          tips: staticEx.tips || '',
+          source: 'static_reset',
+          createdAt: new Date(),
+          updatedAt: new Date()
+        });
+        
+        await newEx.save();
+        newExercises.push(newEx);
+        logger.debug(`✅ Neue Übung hinzugefügt: ${newEx.name}`);
+      } catch (err) {
+        logger.warn(`⚠️ Fehler beim Hinzufügen von ${staticEx.name}:`, err.message);
+      }
+    }
+    
+    logger.debug(`✅ Fertig: ${newExercises.length} Übungen neu hinzugefügt`);
+    
+    res.json({
+      message: 'Datenbank erfolgreich zurückgesetzt',
+      deletedCount: deleteResult.deletedCount,
+      addedCount: newExercises.length,
+      exercises: newExercises.map(ex => ({ _id: ex._id, name: ex.name, category: ex.category }))
+    });
+  } catch (err) {
+    logger.error('❌ Admin Reset Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 export default router;

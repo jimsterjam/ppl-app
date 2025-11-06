@@ -1,29 +1,28 @@
 <template>
   <div class="settings-view">
-    <HeaderBar title="Einstellungen" />
+    <HeaderBar :title="$t('settings.title')" />
     
     <div class="settings-content">
-      <h2>App-Einstellungen</h2>
+      <h2>{{ $t('settings.app') }}</h2>
 
       <section class="card">
-        <h3>Theme</h3>
-        <p class="hint">Schalte zwischen hellem und dunklem Erscheinungsbild um.</p>
+        <h3>{{ $t('settings.theme') }}</h3>
+        <p class="hint">{{ $t('settings.themeHint') }}</p>
         <div class="theme-options">
           <label class="opt">
             <input type="radio" name="theme" value="light" :checked="theme === 'light'" @change="set('light')" />
-            <span>Hell</span>
+            <span>{{ $t('settings.light') }}</span>
           </label>
           <label class="opt">
             <input type="radio" name="theme" value="dark" :checked="theme === 'dark'" @change="set('dark')" />
-            <span>Dunkel</span>
+            <span>{{ $t('settings.dark') }}</span>
           </label>
-          <button class="toggle" @click="toggle">Umschalten</button>
         </div>
       </section>
 
       <section class="card">
-        <h3>Wochenziel</h3>
-        <p class="hint">Lege fest, wie viele Workouts du pro Woche schaffen möchtest.</p>
+        <h3>{{ $t('settings.weeklyGoal') }}</h3>
+        <p class="hint">{{ $t('settings.weeklyGoalHint') }}</p>
         <div class="goal-row">
           <input
             type="range"
@@ -37,11 +36,99 @@
             <input type="number" min="1" max="14" :value="weeklyGoal" @input="onInput($event)"/>
             <button class="step" @click="inc">+</button>
           </div>
-          <span class="goal-badge">{{ weeklyGoal }} pro Woche</span>
+          <span class="goal-badge">{{ weeklyGoal }} {{ $t('settings.perWeek') }}</span>
         </div>
       </section>
 
+      <section class="card">
+        <h3>{{ $t('settings.language') }}</h3>
+        <div class="theme-options">
+          <label class="opt">
+            <input type="radio" name="lang" value="de" :checked="lang === 'de'" @change="setLang('de')" />
+            <span>{{ $t('settings.german') }}</span>
+          </label>
+          <label class="opt">
+            <input type="radio" name="lang" value="en" :checked="lang === 'en'" @change="setLang('en')" />
+            <span>{{ $t('settings.english') }}</span>
+          </label>
+        </div>
+      </section>
+
+      <!-- Development Tools Section -->
+      <section v-if="isDevelopment" class="card dev-tools">
+        <h3>🧪 Developer Tools</h3>
+        <p class="hint">Features testing and debugging tools</p>
+        <button class="dev-btn" @click="goToFeatureTest">
+          🚀 Open Features Test Dashboard
+        </button>
+      </section>
+
+      <section class="card danger-zone">
+        <h3>{{ $t('settings.dangerZone') }}</h3>
+        <p class="hint">{{ $t('settings.dangerZoneHint') }}</p>
+        <button class="danger-btn" @click="showDeleteConfirm = true" :disabled="isDeleting">
+          <span v-if="isDeleting">🔄</span>
+          <span v-else>🗑️</span>
+          {{ isDeleting ? $t('settings.deleting') : $t('settings.deleteAllData') }}
+        </button>
+      </section>
       
+    </div>
+
+    <!-- Bestätigungs-Dialog -->
+    <div v-if="showDeleteConfirm" class="modal-overlay" @click.self="!isDeleting && (showDeleteConfirm = false)">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>⚠️ {{ $t('settings.confirmDelete') }}</h3>
+          <button v-if="!isDeleting" class="close-btn" @click="showDeleteConfirm = false">×</button>
+        </div>
+        
+        <div class="modal-body">
+          <p class="warning-text">{{ $t('settings.confirmDeleteMsg') }}</p>
+          
+          <div class="warning-list">
+            <div class="warning-item">
+              <span class="warning-icon">🗄️</span>
+              <span>{{ $t('settings.deleteWarning1') }}</span>
+            </div>
+            <div class="warning-item">
+              <span class="warning-icon">📊</span>
+              <span>{{ $t('settings.deleteWarning2') }}</span>
+            </div>
+            <div class="warning-item">
+              <span class="warning-icon">⚙️</span>
+              <span>{{ $t('settings.deleteWarning3') }}</span>
+            </div>
+          </div>
+          
+          <div class="confirm-input">
+            <label>{{ $t('settings.typeToConfirm') }}</label>
+            <input 
+              v-model="confirmText" 
+              type="text" 
+              :placeholder="$t('settings.deletePlaceholder')"
+              :disabled="isDeleting"
+              @keyup.enter="confirmDelete"
+              autocomplete="off"
+            />
+          </div>
+        </div>
+        
+        <div class="modal-actions">
+          <button class="cancel-btn" @click="showDeleteConfirm = false" :disabled="isDeleting">
+            {{ $t('common.cancel') }}
+          </button>
+          <button 
+            class="confirm-danger-btn" 
+            :disabled="confirmText.toLowerCase() !== $t('settings.deletePlaceholder').toLowerCase() || isDeleting"
+            @click="confirmDelete"
+          >
+            <span v-if="isDeleting">🔄</span>
+            <span v-else>🗑️</span>
+            {{ isDeleting ? $t('settings.deleting') : $t('settings.deleteForever') }}
+          </button>
+        </div>
+      </div>
     </div>
 
     <BottomNav />
@@ -54,11 +141,19 @@ import BottomNav from '../components/BottomNav.vue'
 import { storeToRefs } from 'pinia'
 import { useThemeStore } from '@/stores/themeStore'
 import { useSettingsStore } from '@/stores/settingsStore'
+import { useUserStore } from '@/stores/userStore'
+import { useToastStore } from '@/stores/toastStore'
+import { useI18n } from 'vue-i18n'
+import { computed, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { useAuth, useClerk } from '@clerk/vue'
+import { getAuthToken } from '@/utils/authToken'
+import { deleteAllWorkouts } from '@/api/workouts'
+import { logger } from '@/utils/logger'
 
 const themeStore = useThemeStore()
 const { theme } = storeToRefs(themeStore)
 const set = (t) => themeStore.setTheme(t)
-const toggle = () => themeStore.toggle()
 
 // Wochenziel
 const settings = useSettingsStore()
@@ -68,6 +163,125 @@ function onInput(e) { setGoal(e.target.value) }
 function onRange(e) { setGoal(e.target.value) }
 function inc() { setGoal((weeklyGoal.value || 4) + 1) }
 function dec() { setGoal((weeklyGoal.value || 4) - 1) }
+
+// Sprache
+const { locale, t: $t } = useI18n()
+const lang = computed(() => locale.value)
+function setLang(l) {
+  locale.value = l
+  settings.setLanguage(l)
+}
+
+// Development mode detection
+const isDevelopment = computed(() => {
+  return import.meta.env.DEV || localStorage.getItem('enableDevTools') === 'true'
+})
+
+// Navigation to features test
+const goToFeatureTest = () => {
+  router.push('/features-test')
+}
+
+// Alle Daten löschen
+const userStore = useUserStore()
+const toast = useToastStore()
+const router = useRouter()
+const clerk = useClerk()
+const auth = useAuth()
+const showDeleteConfirm = ref(false)
+const confirmText = ref('')
+const isDeleting = ref(false)
+
+async function confirmDelete() {
+  logger.debug('🔴 confirmDelete aufgerufen!')
+  logger.debug('Eingabe:', confirmText.value)
+  logger.debug('Erwartet:', $t('settings.deletePlaceholder'))
+  logger.debug('Vergleich:', confirmText.value.toLowerCase(), '===', $t('settings.deletePlaceholder').toLowerCase())
+  
+  if (confirmText.value.toLowerCase() !== $t('settings.deletePlaceholder').toLowerCase()) {
+    logger.debug('❌ Validierung fehlgeschlagen - Funktion beendet')
+    return
+  }
+  
+  logger.debug('✅ Validierung erfolgreich - starte Löschung')
+  
+  if (isDeleting.value) {
+    logger.debug('❌ Bereits am Löschen - Funktion beendet')
+    return
+  }
+  isDeleting.value = true
+  
+  try {
+    logger.debug('🔄 Starte Löschvorgang...')
+    
+    // 1. MongoDB: Alle Workouts des Users löschen
+    try {
+      logger.debug('🔑 Hole Auth-Token...')
+      const token = await getAuthToken({ clerk, auth })
+      logger.debug('🔑 Token erhalten:', !!token, token ? `${token.substring(0,20)}...` : 'null')
+      
+      if (token) {
+        logger.debug('🗑️ Lösche alle Workouts aus MongoDB...')
+        const result = await deleteAllWorkouts(token)
+        logger.debug('✅ MongoDB-Workouts gelöscht:', result)
+      } else {
+        logger.warn('⚠️ Kein Auth-Token - MongoDB-Löschung übersprungen')
+      }
+    } catch (error) {
+      logger.error('❌ MongoDB-Löschung fehlgeschlagen:', error)
+      // Fortfahren mit lokaler Löschung
+    }
+    
+    logger.debug('🧹 Lösche lokale Daten...')
+    
+    // 2. Frontend Store: Alle Workouts aus dem Store löschen
+    logger.debug('Store vor Löschung:', userStore.workouts.length, 'Workouts')
+    userStore.$patch({ workouts: [], stats: null, workoutsLoaded: false, workoutsLoadedAt: 0 })
+    logger.debug('Store nach Löschung:', userStore.workouts.length, 'Workouts')
+    logger.debug('Store nach Löschung:', userStore.workouts.length, 'Workouts')
+    
+    // 3. LocalStorage komplett löschen
+    logger.debug('🧹 Lösche LocalStorage...')
+    localStorage.clear()
+    
+    // 4. SessionStorage löschen (inkl. Drafts)
+    logger.debug('🧹 Lösche SessionStorage...')
+    sessionStorage.clear()
+    
+    logger.debug('✅ Löschvorgang abgeschlossen')
+    
+    // 5. Dialog schließen
+    showDeleteConfirm.value = false
+    confirmText.value = ''
+    
+    // 6. Feedback geben
+    toast.show($t('settings.deleteSuccess'), { type: 'success', duration: 3000 })
+    
+    // 7. Zum Dashboard navigieren
+    logger.debug('🏠 Navigiere zum Dashboard...')
+    await router.push('/')
+    
+    // 8. Store refresh für sofortiges UI-Update
+    logger.debug('🔄 Force refresh der Workout-Daten...')
+    try {
+      await userStore.loadWorkouts(null, { force: true })
+      logger.debug('✅ Workouts neu geladen')
+    } catch (e) {
+      logger.warn('⚠️ Neu-Laden fehlgeschlagen:', e)
+    }
+  } catch (error) {
+    logger.error('❌ Fehler beim Löschen der Daten:', error)
+    logger.error('Fehler Details:', error.message, error.stack)
+    toast.show($t('settings.deleteError'), { type: 'error' })
+    
+    // Trotzdem Dialog schließen
+    showDeleteConfirm.value = false
+    confirmText.value = ''
+  } finally {
+    isDeleting.value = false
+    logger.debug('🏁 Löschvorgang beendet (finally)')
+  }
+}
 
 // Toast-Settings entfernt – Toaster ist fest oben
 </script>
@@ -81,7 +295,7 @@ function dec() { setGoal((weeklyGoal.value || 4) - 1) }
 
 .settings-content {
   padding: 20px;
-  padding-bottom: 80px; /* Platz für BottomNav */
+  padding-bottom: 70px; /* Platz für BottomNav */
 }
 
 .card {
@@ -102,6 +316,250 @@ function dec() { setGoal((weeklyGoal.value || 4) - 1) }
 .goal-input input { width: 72px; text-align: center; border: none; padding: 10px; background: var(--surface); color: var(--fg); }
 .goal-input .step { background: var(--surface); color: var(--fg); border: none; padding: 10px 12px; cursor: pointer; }
 .goal-badge { background: var(--surface); border: 1px solid var(--card-border); padding: 6px 10px; border-radius: 999px; color: var(--muted); font-size: 0.9rem; }
+
+/* Danger Zone */
+.danger-zone {
+  border: 1px solid color-mix(in srgb, var(--error-color) 30%, transparent);
+  background: color-mix(in srgb, var(--error-color) 5%, var(--card-bg));
+}
+
+.danger-zone h3 {
+  color: var(--error-color);
+  margin-bottom: 8px;
+}
+
+.danger-btn {
+  width: 100%;
+  background: transparent;
+  border: 2px solid var(--error-color);
+  color: var(--error-color);
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 12px;
+  transition: all 0.2s ease;
+}
+
+.danger-btn:hover {
+  background: color-mix(in srgb, var(--error-color) 10%, transparent);
+  transform: translateY(-1px);
+}
+
+.danger-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.danger-btn:disabled:hover {
+  transform: none;
+  background: transparent;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+}
+
+.modal-content {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  max-width: 500px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 24px 0;
+  margin-bottom: 16px;
+}
+
+.modal-header h3 {
+  color: var(--error-color);
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.close-btn:hover {
+  background: var(--surface);
+  color: var(--fg);
+}
+
+.modal-body {
+  padding: 0 24px 24px;
+}
+
+.warning-text {
+  color: var(--muted);
+  margin-bottom: 20px;
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.warning-list {
+  margin-bottom: 24px;
+  border: 1px solid color-mix(in srgb, var(--error-color) 30%, transparent);
+  border-radius: 8px;
+  padding: 16px;
+  background: color-mix(in srgb, var(--error-color) 5%, transparent);
+}
+
+.warning-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+  color: var(--fg);
+}
+
+.warning-item:last-child {
+  margin-bottom: 0;
+}
+
+.warning-icon {
+  font-size: 1.1rem;
+  width: 20px;
+  text-align: center;
+}
+
+.confirm-input {
+  margin-bottom: 24px;
+}
+
+.confirm-input label {
+  display: block;
+  color: var(--fg);
+  font-weight: 500;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+}
+
+.confirm-input input {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid var(--card-border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--fg);
+  font-size: 1rem;
+  transition: border-color 0.2s ease;
+}
+
+.confirm-input input:focus {
+  outline: none;
+  border-color: var(--error-color);
+}
+
+.confirm-input input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.cancel-btn {
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  color: var(--fg);
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cancel-btn:hover {
+  background: color-mix(in srgb, var(--fg) 10%, var(--surface));
+}
+
+.confirm-danger-btn {
+  background: var(--error-color);
+  border: none;
+  color: white;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.confirm-danger-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--error-color) 85%, black);
+  transform: translateY(-1px);
+}
+
+.confirm-danger-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Developer Tools */
+.dev-tools {
+  border: 2px solid #22c55e;
+  background: color-mix(in srgb, #22c55e 5%, transparent);
+}
+
+.dev-tools h3 {
+  color: #22c55e;
+}
+
+.dev-btn {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: white;
+  border: none;
+  padding: 16px 24px;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.dev-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(34, 197, 94, 0.3);
+}
 
 /* Toast Einstellungen entfernt */
 </style>

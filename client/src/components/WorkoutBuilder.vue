@@ -3,9 +3,9 @@
     <!-- Glaubenssatz / Affirmation vor dem Plan -->
     <AppModal
       v-model="showBelief"
-      :title="'Kurzer Impuls'"
+      :title="t('builder.impulseTitle')"
       :message="beliefText"
-      confirm-text="Weiter"
+      :confirm-text="t('builder.continue')"
       :show-cancel="false"
       :persistent="true"
       type="info"
@@ -13,8 +13,8 @@
     />
     <!-- Oben immer sichtbarer Zurück-Button -->
     <div class="builder-topbar">
-      <button class="back-top-btn" title="Zurück zum Dashboard" @click="goDashboard">← Zurück</button>
-      <h2>Workout erstellen</h2>
+  <button class="back-top-btn" :title="t('builder.backToDashboardTitle')" @click="goDashboard">{{ t('builder.backToDashboard') }}</button>
+  <h2>{{ t('builder.createTitle') }}</h2>
     </div>
 
     <!-- Step Indicator -->
@@ -23,18 +23,17 @@
 
     <!-- Auth-Gate: Ohne Login keine Builder-UI -->
     <div v-if="!isSignedIn" class="auth-gate">
-      <p class="auth-gate-text">Du musst angemeldet sein, um ein Workout zu erstellen.</p>
-      <p class="auth-hint">Bitte melde dich auf der Welcome-Seite an.</p>
+      <p class="auth-gate-text">{{ t('builder.authGate') }}</p>
     </div>
     
     <!-- Workout-Typ Auswahl (Dropdown) -->
     <div v-else class="type-select">
-      <label for="wb-type" class="type-label">Typ</label>
+  <label for="wb-type" class="type-label">{{ t('builder.stepType') }}</label>
 
       <!-- Mobile: gleiches Design wie Übungen (Button + Bottom-Sheet) -->
       <div v-if="isMobile" class="mobile-ex-picker">
         <button class="open-picker-btn" @click="showTypePicker = true">
-          {{ currentTypeLabel ? `Typ: ${currentTypeLabel}` : 'Typ auswählen' }}
+          {{ currentTypeLabel ? `${t('builder.stepType')}: ${currentTypeLabel}` : t('builder.selectType') }}
         </button>
       </div>
 
@@ -48,7 +47,7 @@
     <div v-if="isMobile && showTypePicker" class="picker-overlay" @click.self="showTypePicker = false">
       <div class="picker-sheet">
         <div class="picker-header">
-          <h4>Workout-Typ auswählen</h4>
+          <h4>{{ t('builder.pickWorkoutType') }}</h4>
           <button class="close-picker" @click="showTypePicker = false">✕</button>
         </div>
         <div class="picker-list">
@@ -65,18 +64,18 @@
           </div>
         </div>
         <div class="picker-actions">
-          <button class="done-btn" @click="showTypePicker = false">Fertig</button>
+          <button class="done-btn" @click="showTypePicker = false">{{ t('builder.done') }}</button>
         </div>
       </div>
     </div>
 
     <!-- Übungen für gewählten Typ -->
     <div v-if="isSignedIn" class="exercises-section">
-      <h3>Verfügbare {{ currentTypeLabel }} Übungen</h3>
+  <h3>{{ t('builder.availableExercises', { type: currentTypeLabel }) }}</h3>
 
       <!-- Mobile: Öffne Dropdown -->
       <div v-if="isMobile" class="mobile-ex-picker">
-        <button class="open-picker-btn" @click="showMobilePicker = true">Übungen auswählen</button>
+  <button class="open-picker-btn" @click="showMobilePicker = true">{{ t('builder.pickExercises') }}</button>
       </div>
 
       <template v-if="!isMobile">
@@ -86,14 +85,20 @@
           v-model="search"
           class="search-input"
           type="search"
-          placeholder="Übung suchen…"
-          aria-label="Übung suchen"
+          :placeholder="t('builder.searchPlaceholder')"
+          :aria-label="t('builder.searchPlaceholder')"
         />
       </div>
 
       <!-- Skeleton während Loading -->
       <div v-if="loading" class="exercises-grid">
         <div v-for="n in 6" :key="n" class="exercise-item sk"></div>
+      </div>
+
+      <!-- Keine Übungen -->
+      <div v-else-if="!loading && filteredExercises.length === 0" class="empty-state">
+        <p>😅 Keine Übungen für diese Kategorie verfügbar</p>
+        <p class="hint">exercises.value.length: {{ exercises.length }} | loading: {{ loading }}</p>
       </div>
 
       <!-- Liste -->
@@ -106,11 +111,11 @@
           @click="toggleExercise(exercise)"
         >
           <div class="ex-row">
-            <img :src="getExerciseImage(exercise)" alt="Bild der Übung" class="thumb" @error="onImgError($event, exercise)" />
+            <img :src="getExerciseImage(exercise)" :alt="t('common.image')" class="thumb" @error="onImgError($event, exercise)" />
             <div class="meta">
-              <h4 class="title">{{ exercise.name }}</h4>
+              <h4 class="title">{{ getTranslatedExerciseName(exercise.name) }}</h4>
               <p class="sub">{{ exercise.muscleGroup }}</p>
-              <p class="sub small">{{ exercise.equipment || 'Körpergewicht' }}</p>
+              <p class="sub small">{{ exercise.equipment || t('exercises.bodyweight') }}</p>
             </div>
           </div>
         </div>
@@ -121,7 +126,7 @@
       <div v-if="isMobile && showMobilePicker" class="picker-overlay" @click.self="showMobilePicker = false">
         <div class="picker-sheet">
           <div class="picker-header">
-            <h4>Übungen auswählen</h4>
+            <h4>{{ t('builder.selectExercises') }}</h4>
             <button class="close-picker" @click="showMobilePicker = false">✕</button>
           </div>
           <div class="search-row in-sheet">
@@ -129,8 +134,8 @@
               v-model="search"
               class="search-input"
               type="search"
-              placeholder="Übung suchen…"
-              aria-label="Übung suchen"
+              :placeholder="t('builder.searchPlaceholder')"
+              :aria-label="t('builder.searchPlaceholder')"
             />
           </div>
           <div class="picker-list" :aria-busy="loading">
@@ -146,27 +151,27 @@
                 @click="toggleExercise(exercise)"
               >
                 <div class="ex-row">
-                  <img :src="getExerciseImage(exercise)" alt="Bild der Übung" class="thumb" @error="onImgError($event, exercise)" />
+                  <img :src="getExerciseImage(exercise)" :alt="t('common.image')" class="thumb" @error="onImgError($event, exercise)" />
                   <div class="meta">
                     <h4 class="title">{{ exercise.name }}</h4>
                     <p class="sub">{{ exercise.muscleGroup }}</p>
-                    <p class="sub small">{{ exercise.equipment || 'Körpergewicht' }}</p>
+                    <p class="sub small">{{ exercise.equipment || t('exercises.bodyweight') }}</p>
                   </div>
                 </div>
               </div>
             </div>
           </div>
           <div class="picker-actions">
-            <button class="done-btn" @click="showMobilePicker = false">Fertig</button>
+            <button class="done-btn" @click="showMobilePicker = false">{{ t('builder.done') }}</button>
           </div>
         </div>
       </div>
 
       <!-- Ausgewählte Übungen -->
       <div v-if="selectedExercises.length > 0" id="workout-plan" ref="planRef" class="selected-exercises">
-        <h3>Workout Plan ({{ selectedExercises.length }} Übungen)</h3>
+  <h3>{{ t('builder.planTitle', { count: selectedExercises.length }) }}</h3>
 
-        <p class="reorder-hint">Tipp: Ziehe die Griffe, um die Reihenfolge zu ändern.</p>
+  <p class="reorder-hint">{{ t('workoutDetail.reorderHint') }}</p>
 
         <div
           v-for="(exercise, index) in selectedExercises"
@@ -177,9 +182,9 @@
           @dragover.prevent="onDragOver(index)"
           @drop.prevent="onDrop(index)"
         >
-          <button class="drag-handle" aria-label="Reihenfolge ändern" title="Ziehen zum Umordnen">⋮⋮</button>
+          <button class="drag-handle" :aria-label="t('workoutDetail.dragToReorder')" :title="t('workoutDetail.dragToReorder')">⋮⋮</button>
           <div class="sel-row">
-            <img :src="getExerciseImage(exercise)" alt="Bild der Übung" class="thumb small" @error="onImgError($event, exercise)" />
+            <img :src="getExerciseImage(exercise)" :alt="t('common.image')" class="thumb small" @error="onImgError($event, exercise)" />
             <span class="ex-name">{{ exercise.name }}</span>
           </div>
           <!-- Mini-Plan pro Übung: Sätze/Reps/Gewicht -->
@@ -188,24 +193,24 @@
               <div v-for="(set, sIdx) in exercise.setDetails" :key="sIdx" class="set-row">
                 <span class="set-label">#{{ sIdx + 1 }}</span>
                 <label class="set-field">
-                  <span>Wdh</span>
+                  <span>{{ t('common.reps') }}</span>
                   <input type="number" min="1" max="50" :value="set.reps || 10" @input="updateSet(index, sIdx, 'reps', $event.target.value)" />
                 </label>
                 <label class="set-field">
                   <span>kg</span>
                   <input type="number" min="0" max="999" step="0.5" :value="set.weight || 0" @input="updateSet(index, sIdx, 'weight', $event.target.value)" />
                 </label>
-                <button class="remove-set" title="Satz entfernen" @click="removeSet(index, sIdx)">×</button>
+                <button class="remove-set" :title="t('builder.removeSet')" @click="removeSet(index, sIdx)">×</button>
               </div>
             </div>
             
             
           </div>
           <div class="row-actions">
-            <button class="remove-btn" title="Übung entfernen" @click="removeExercise(index)">×</button>
+            <button class="remove-btn" :title="t('builder.removeExercise')" @click="removeExercise(index)">×</button>
           </div>
         </div>
-        <p v-if="!isSignedIn" class="auth-hint">Bitte melde dich an, um ein Workout zu erstellen.</p>
+        <p v-if="!isSignedIn" class="auth-hint">{{ t('builder.authGate') }}</p>
         <p v-if="errorMsg" class="error-hint">{{ errorMsg }}</p>
       </div>
     </div>
@@ -217,30 +222,43 @@
       <button 
         class="create-btn" 
         :disabled="!isSignedIn || creating || selectedExercises.length === 0" 
-        :title="!isSignedIn ? 'Bitte zuerst anmelden' : (selectedExercises.length === 0 ? 'Wähle Übungen aus' : 'Workout erstellen')"
+        :title="!isSignedIn ? t('builder.signInFirst') : (selectedExercises.length === 0 ? t('builder.pickFirst') : t('builder.createCta'))"
         @click="createWorkout"
       >
-        {{ creating ? 'Erstelle…' : `Erstellen (${selectedExercises.length})` }}
+        {{ creating ? t('builder.creating') : `${t('builder.create')} (${selectedExercises.length})` }}
       </button>
     </div>
 
     <!-- App Navigation unten -->
     <BottomNav />
+
+    <!-- Upgrade Modal -->
+    <UpgradeModal 
+      v-model:show="showUpgradeModal"
+      :limit-type="upgradeLimitType"
+      @close="showUpgradeModal = false"
+      @continue-free="showUpgradeModal = false"
+      @upgraded="handleUpgradeSuccess"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch, onMounted, nextTick, onUnmounted } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useAuth, useUser, useClerk } from '@clerk/vue'
 import { getAuthToken } from '@/utils/authToken'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
+import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import axios from 'axios'
 import { fetchWorkout } from '@/api/workouts'
 import StepIndicator from './StepIndicator.vue'
 import BottomNav from '@/components/BottomNav.vue'
 import AppModal from '@/components/AppModal.vue'
+import UpgradeModal from '@/components/UpgradeModal.vue'
 import { useToastStore } from '@/stores/toastStore'
+import { logger } from '@/utils/logger'
 
 // Props
 const props = defineProps({
@@ -260,7 +278,13 @@ const clerk = useClerk()
 const router = useRouter()
 const route = useRoute()
 const store = useUserStore()
+const subscriptionStore = useSubscriptionStore()
 const toast = useToastStore()
+const { t, locale } = useI18n()
+
+// Subscription state
+const showUpgradeModal = ref(false)
+const upgradeLimitType = ref('')
 
 // State
 const allowedTypes = ["push","pull","legs"]
@@ -277,6 +301,55 @@ const errorMsg = ref('')
 const search = ref('')
 const draggingIndex = ref(null)
 const planRef = ref(null)
+
+// SessionStorage Key für Draft-Speicherung
+const DRAFT_STORAGE_KEY = 'workout_builder_draft'
+
+// Draft aus SessionStorage laden
+function loadDraft() {
+  try {
+    const draft = sessionStorage.getItem(DRAFT_STORAGE_KEY)
+    if (draft) {
+      const parsed = JSON.parse(draft)
+      if (parsed.selectedType && parsed.selectedExercises) {
+        selectedType.value = parsed.selectedType
+        selectedExercises.value = parsed.selectedExercises
+        logger.debug('✅ WorkoutBuilder - Draft wiederhergestellt:', parsed.selectedExercises.length, 'Übungen')
+        return true
+      }
+    }
+  } catch (e) {
+    logger.warn('⚠️ WorkoutBuilder - Fehler beim Laden des Drafts:', e)
+  }
+  return false
+}
+
+// Draft in SessionStorage speichern
+function saveDraft() {
+  try {
+    if (selectedExercises.value.length > 0) {
+      const draft = {
+        selectedType: selectedType.value,
+        selectedExercises: selectedExercises.value,
+        timestamp: Date.now()
+      }
+      sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft))
+      logger.debug('💾 WorkoutBuilder - Draft gespeichert:', selectedExercises.value.length, 'Übungen')
+    }
+  } catch (e) {
+    logger.warn('⚠️ WorkoutBuilder - Fehler beim Speichern des Drafts:', e)
+  }
+}
+
+// Draft löschen (nach erfolgreichem Erstellen)
+function clearDraft() {
+  try {
+    sessionStorage.removeItem(DRAFT_STORAGE_KEY)
+    logger.debug('🗑️ WorkoutBuilder - Draft gelöscht')
+  } catch (e) {
+    logger.warn('⚠️ WorkoutBuilder - Fehler beim Löschen des Drafts:', e)
+  }
+}
 const didPlanScroll = ref(false)
 const viewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1024)
 const isMobile = computed(() => viewportWidth.value <= 480)
@@ -285,20 +358,59 @@ const showTypePicker = ref(false)
 const showBelief = ref(true)
 const beliefText = ref('')
 
+// Quick Boost Modal: pro Tag nur einmal anzeigen
+const BELIEF_KEY = 'wb_belief_last_shown'
+function todayKey() {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 onMounted(() => {
+  // Load subscription status
+  subscriptionStore.checkSubscription()
+  
+  // Lade Draft falls vorhanden
+  const hasDraft = loadDraft()
+  if (hasDraft) {
+    toast.show(t('builder.draftRestored') || 'Workout-Entwurf wiederhergestellt', { 
+      type: 'info', 
+      duration: 3000 
+    })
+  }
+  
   const onResize = () => { viewportWidth.value = window.innerWidth }
   window.addEventListener('resize', onResize)
   // Store handler referenz für Cleanup
   resizeHandler.value = onResize
   // Init Affirmation
-  const beliefs = [
+  const beliefsDe = [
     'Jede Wiederholung bringt dich deinem Ziel näher.',
-    'Konstanz schlägt Intensität – heute zählts.',
+    'Konstanz schlägt Intensität – heute zählt’s.',
     'Kleiner Schritt, große Wirkung: jetzt starten.',
     'Du bist stärker als deine Ausreden.',
     'Fortschritt, nicht Perfektion.'
   ]
+  const beliefsEn = [
+    'Each rep gets you closer to your goal.',
+    'Consistency beats intensity — today counts.',
+    'Small step, big impact: start now.',
+    'You’re stronger than your excuses.',
+    'Progress, not perfection.'
+  ]
+  const beliefs = String(locale.value).startsWith('de') ? beliefsDe : beliefsEn
   beliefText.value = beliefs[Math.floor(Math.random() * beliefs.length)]
+
+  // Sichtbarkeit anhand LocalStorage steuern (nur einmal täglich)
+  try {
+    const last = localStorage.getItem(BELIEF_KEY)
+    showBelief.value = last !== todayKey()
+  } catch {
+    // Fallback: wenn Storage nicht verfügbar, Anzeige erlauben
+    showBelief.value = true
+  }
 })
 onUnmounted(() => {
   if (resizeHandler.value) window.removeEventListener('resize', resizeHandler.value)
@@ -330,6 +442,143 @@ function scrollToPlan() {
     }, 120)
   }
   requestAnimationFrame(doScroll)
+}
+
+// Prefill aus AI-Suggestion
+async function prefillFromAISuggestion() {
+  logger.debug('🔍 WorkoutBuilder - prefillFromAISuggestion aufgerufen')
+  logger.debug('🔍 route.state:', route.state)
+  logger.debug('🔍 route.state?.workout:', route.state?.workout)
+  
+  // Versuche zuerst route.state, dann localStorage
+  let aiWorkout = route.state?.workout
+  
+  if (!aiWorkout) {
+    logger.debug('⚠️ WorkoutBuilder - Kein Workout in route.state, versuche localStorage...')
+    try {
+      const stored = localStorage.getItem('ai_workout_to_builder')
+      if (stored) {
+        aiWorkout = JSON.parse(stored)
+        logger.debug('✅ WorkoutBuilder - AI Workout aus localStorage geladen')
+        logger.debug('📦 WorkoutBuilder - Workout hat', aiWorkout.exercises?.length, 'Übungen')
+        localStorage.removeItem('ai_workout_to_builder') // Nach dem Laden löschen
+      } else {
+        logger.debug('⚠️ WorkoutBuilder - localStorage ist leer')
+      }
+    } catch (e) {
+      logger.warn('⚠️ WorkoutBuilder - localStorage Parse Error:', e.message)
+    }
+  }
+  
+  if (!aiWorkout) {
+    logger.debug('❌ WorkoutBuilder - Keine AI-Suggestion in route.state oder localStorage')
+    return
+  }
+  
+  logger.debug('🤖 WorkoutBuilder - Lade AI-Suggestion:', aiWorkout)
+  
+  try {
+    // Typ setzen
+    const t = (aiWorkout.type || aiWorkout.focus || 'push').toLowerCase()
+    logger.debug('🔍 WorkoutBuilder - Workout-Typ:', t)
+    
+    if (['push','pull','legs','fullbody'].includes(t)) {
+      selectedType.value = t
+      logger.debug('✅ WorkoutBuilder - Typ gesetzt auf:', selectedType.value)
+    }
+    
+    // Verbinde AI-Übungen mit Datenbank-Übungen
+    const aiExercises = Array.isArray(aiWorkout.exercises) ? aiWorkout.exercises : []
+    logger.debug('� WorkoutBuilder - AI-Übungen erhalten:', aiExercises.length)
+    logger.debug('🔍 WorkoutBuilder - AI-Übungen Details:', aiExercises.map(ex => ({ 
+      name: ex.name, 
+      _id: ex._id, 
+      sets: ex.sets, 
+      reps: ex.reps 
+    })))
+    
+    // Strategie 1: Nutze _id vom Backend (am zuverlässigsten)
+    const ordered = []
+    const idsToUse = []
+    
+    for (const aiEx of aiExercises) {
+      logger.debug('🔍 WorkoutBuilder - Verarbeite AI-Übung:', aiEx.name, 'ID:', aiEx._id)
+      
+      // Wenn AI _id enthält, nutze diese direkt
+      if (aiEx._id) {
+        logger.debug('✅ WorkoutBuilder - Nutze _id vom Backend:', aiEx._id)
+        idsToUse.push(aiEx._id)
+      }
+    }
+    
+    logger.debug('🔄 WorkoutBuilder - Lade Übungen für Typ:', selectedType.value)
+    await loadExercises()
+    logger.debug('✅ WorkoutBuilder - Datenbank-Übungen geladen:', exercises.value.length)
+    logger.debug('✅ WorkoutBuilder - Gefilterte Kategorien:', exercises.value.map(ex => ({ 
+      name: ex.name, 
+      _id: ex._id, 
+      category: ex.category 
+    })))
+    
+    // Matched Übungen nach _id oder Name
+    for (const aiEx of aiExercises) {
+      logger.debug('🔍 WorkoutBuilder - Suche nach AI-Übung:', aiEx.name, 'ID:', aiEx._id)
+      
+      let match = null
+      
+      // Versuch 1: Direkt nach _id suchen
+      if (aiEx._id) {
+        match = exercises.value.find(ex => ex._id === aiEx._id)
+        if (match) {
+          logger.debug('✅ WorkoutBuilder - Gefunden via _id:', match.name)
+        }
+      }
+      
+      // Versuch 2: Nach Namen suchen (Fallback)
+      if (!match) {
+        match = exercises.value.find(ex => {
+          const dbName = (ex.name || '').toLowerCase().trim()
+          const aiName = (aiEx.name || '').toLowerCase().trim()
+          const match = dbName === aiName
+          if (match) logger.debug('✅ WorkoutBuilder - Gefunden via Name-Match:', dbName, '===', aiName)
+          return match
+        })
+      }
+      
+      if (match && !ordered.some(x => x._id === match._id)) {
+        // Füge AI-Metadaten hinzu (Sets, Reps, etc.)
+        const enriched = {
+          ...match,
+          suggestedSets: aiEx.sets || 3,
+          suggestedReps: aiEx.reps || 10,
+          suggestedWeight: aiEx.weight || 0
+        }
+        ordered.push(enriched)
+        logger.debug('✅ WorkoutBuilder - AI-Übung in Plan aufgenommen:', aiEx.name, '→', match.name)
+      } else if (!match) {
+        logger.warn('⚠️ WorkoutBuilder - AI-Übung nicht in DB gefunden:', aiEx.name)
+      } else {
+        logger.debug('ℹ️ WorkoutBuilder - AI-Übung bereits im Plan:', aiEx.name)
+      }
+    }
+    
+    selectedExercises.value = ordered
+    logger.debug('✅ WorkoutBuilder - AI-Suggestion vollständig geladen')
+    logger.debug('📊 WorkoutBuilder - selectedExercises:', selectedExercises.value.length, 'Übungen')
+    logger.debug('📊 WorkoutBuilder - selectedExercises Details:', selectedExercises.value.map(ex => ({ 
+      name: ex.name, 
+      _id: ex._id, 
+      category: ex.category 
+    })))
+    
+    await nextTick()
+    if (!didPlanScroll.value && selectedExercises.value.length > 0) {
+      scrollToPlan()
+      didPlanScroll.value = true
+    }
+  } catch (e) {
+    logger.error('❌ WorkoutBuilder - AI-Prefill fehlgeschlagen:', e)
+  }
 }
 
 // Prefill aus "repeat"-Query: Vorheriges Workout laden und Übungen vorwählen
@@ -368,15 +617,24 @@ async function prefillFromRepeatIfAny() {
       didPlanScroll.value = true
     }
   } catch (e) {
-    console.warn('⚠️ Prefill (repeat) fehlgeschlagen:', e)
+    logger.warn('⚠️ Prefill (repeat) fehlgeschlagen:', e)
   }
 }
 
-onMounted(() => { prefillFromRepeatIfAny() })
+onMounted(async () => { 
+  // Priorisiere AI-Suggestion, dann Repeat
+  await prefillFromAISuggestion()
+  if (selectedExercises.value.length === 0) {
+    await prefillFromRepeatIfAny()
+  }
+})
 
 // Beim ersten Hinzufügen scrollen
 let lastLen = 0
 watch(() => selectedExercises.value.length, async (len) => {
+  // Auto-save Draft bei Änderungen
+  saveDraft()
+  
   if (didPlanScroll.value) { lastLen = len; return }
   if (lastLen === 0 && len > 0) {
     await nextTick()
@@ -384,6 +642,11 @@ watch(() => selectedExercises.value.length, async (len) => {
     didPlanScroll.value = true
   }
   lastLen = len
+})
+
+// Auto-save auch bei Typ-Änderung
+watch(selectedType, () => {
+  saveDraft()
 })
 
 // Workout Types
@@ -453,9 +716,9 @@ async function selectWorkoutType(type) {
 
 async function loadExercises() {
   loading.value = true
-  console.log('🔄 WorkoutBuilder - Lade Übungen für Typ:', selectedType.value)
+  logger.debug('🔄 WorkoutBuilder - Lade Übungen für Typ:', selectedType.value)
   if (!isSignedIn.value) {
-    console.warn('⚠️ WorkoutBuilder - Nicht angemeldet, lade keine Übungen')
+    logger.warn('⚠️ WorkoutBuilder - Nicht angemeldet, lade keine Übungen')
     exercises.value = []
     loading.value = false
     return
@@ -469,71 +732,49 @@ async function loadExercises() {
   const token = await getAuthToken({ clerk, auth })
         if (token) {
           headers.Authorization = `Bearer ${token}`
-          console.log('🔑 WorkoutBuilder - Token verfügbar')
+          logger.debug('🔑 WorkoutBuilder - Token verfügbar')
         } else {
-          console.warn('⚠️ WorkoutBuilder - Kein Token erhalten')
+          logger.warn('⚠️ WorkoutBuilder - Kein Token erhalten')
         }
       } catch (tokenError) {
-        console.warn('⚠️ WorkoutBuilder - Token konnte nicht abgerufen werden:', tokenError)
+        logger.warn('⚠️ WorkoutBuilder - Token konnte nicht abgerufen werden:', tokenError)
       }
     } else {
-      console.warn('⚠️ WorkoutBuilder - Nutzer nicht angemeldet')
+      logger.warn('⚠️ WorkoutBuilder - Nutzer nicht angemeldet')
     }
 
   // Relative URL; Vite-Proxy leitet in Dev auf 3001 weiter
   const apiUrl = '/api/exercises'
-    console.log('🌐 WorkoutBuilder - API-Anfrage an:', apiUrl)
+    logger.debug('🌐 WorkoutBuilder - API-Anfrage an:', apiUrl)
 
     // Versuche zuerst API-Call ohne Authentifizierung für Debugging
-    console.log('🔄 WorkoutBuilder - Teste API ohne Authentifizierung...')
+    logger.debug('🔄 WorkoutBuilder - Teste API ohne Authentifizierung...')
+    let responseData = null
+    
     try {
       const testResponse = await axios.get(apiUrl, { timeout: 5000 })
-      console.log('✅ WorkoutBuilder - API ohne Auth funktioniert, Übungen:', testResponse.data?.length)
-      
-      // Verwende die Daten ohne Authentifizierung
-      let allExercises = testResponse.data || []
-      let filteredExercises = []
-      
-      // Mappe interne Typen zu Backend-Kategorien
-      const categoryMap = {
-        'push': 'Push',
-        'pull': 'Pull', 
-        'legs': 'Legs'
-      }
-      
-      const targetCategory = categoryMap[selectedType.value]
-      console.log('🎯 WorkoutBuilder - Filtere für Kategorie:', targetCategory)
-      
-      if (targetCategory && allExercises.length > 0) {
-        filteredExercises = allExercises.filter(exercise => 
-          exercise.category === targetCategory
-        )
-        console.log('✅ WorkoutBuilder - Gefilterte Übungen:', filteredExercises.length, 'von', allExercises.length)
-      } else {
-        filteredExercises = allExercises
-        console.log('⚠️ WorkoutBuilder - Keine Filterung, alle Übungen:', filteredExercises.length)
-      }
-      
-      exercises.value = filteredExercises
-      console.log('✅ WorkoutBuilder - Übungen erfolgreich geladen!')
-      return // Erfolgreich geladen, exit function
-      
+      logger.debug('✅ WorkoutBuilder - API ohne Auth funktioniert, Übungen:', testResponse.data?.length)
+      responseData = testResponse.data
     } catch (testError) {
-      console.warn('⚠️ WorkoutBuilder - API ohne Auth fehlgeschlagen:', testError.message)
+      logger.warn('⚠️ WorkoutBuilder - API ohne Auth fehlgeschlagen:', testError.message)
+      
+      // Fallback: Versuche mit Authentifizierung
+      logger.debug('🔄 WorkoutBuilder - Versuche API mit Authentifizierung...')
+      try {
+        const response = await axios.get(apiUrl, {
+          headers,
+          timeout: 10000 // 10 Sekunden Timeout
+        })
+        logger.debug('📦 WorkoutBuilder - API mit Auth erfolgreich, Übungen:', response.data?.length)
+        responseData = response.data
+      } catch (authError) {
+        logger.error('❌ WorkoutBuilder - Beide API-Versuche fehlgeschlagen:', authError.message)
+        throw authError // Werfe Fehler für äußeres catch-Block
+      }
     }
 
-    // Fallback: Versuche mit Authentifizierung
-    console.log('🔄 WorkoutBuilder - Versuche API mit Authentifizierung...')
-    const response = await axios.get(apiUrl, {
-      headers,
-      timeout: 10000 // 10 Sekunden Timeout
-    })
-    
-    console.log('📦 WorkoutBuilder - API Response Status:', response.status)
-    console.log('📦 WorkoutBuilder - API Response Data Length:', response.data?.length)
-    
-    // Filtere die Übungen clientseitig basierend auf selectedType
-    let allExercises = response.data || []
+    // Jetzt filtern wir die erfolg geladenan Daten
+    let allExercises = responseData || []
     let filteredExercises = []
     
     // Mappe interne Typen zu Backend-Kategorien
@@ -544,23 +785,25 @@ async function loadExercises() {
     }
     
     const targetCategory = categoryMap[selectedType.value]
-    console.log('🎯 WorkoutBuilder - Filtere für Kategorie:', targetCategory)
+    logger.debug('🎯 WorkoutBuilder - Filtere für Kategorie:', targetCategory)
     
     if (targetCategory && allExercises.length > 0) {
       filteredExercises = allExercises.filter(exercise => 
         exercise.category === targetCategory
       )
-      console.log('✅ WorkoutBuilder - Gefilterte Übungen:', filteredExercises.length, 'von', allExercises.length)
+      logger.debug('✅ WorkoutBuilder - Gefilterte Übungen:', filteredExercises.length, 'von', allExercises.length)
     } else {
       filteredExercises = allExercises
-      console.log('⚠️ WorkoutBuilder - Keine Filterung, alle Übungen:', filteredExercises.length)
+      logger.debug('⚠️ WorkoutBuilder - Keine Filterung, alle Übungen:', filteredExercises.length)
     }
     
     exercises.value = filteredExercises
-    console.log('✅ WorkoutBuilder - Übungen vom Backend geladen und gefiltert:', filteredExercises.length, 'von', allExercises.length)
+    logger.debug('✅ WorkoutBuilder - Übungen erfolgreich geladen!')
+    logger.debug('📊 WorkoutBuilder - exercises.value jetzt:', exercises.value.length, 'Items')
+    logger.debug('📊 WorkoutBuilder - Erste 5 Übungen:', exercises.value.slice(0, 5).map(e => e.name))
     
   } catch (error) {
-    console.error('❌ WorkoutBuilder - API-Fehler Details:', {
+    logger.error('❌ WorkoutBuilder - API-Fehler Details:', {
       message: error.message,
       status: error.response?.status,
       statusText: error.response?.statusText,
@@ -574,8 +817,8 @@ async function loadExercises() {
     
     // Fallback zu lokalen Übungen
     exercises.value = fallbackExercises[selectedType.value] || []
-    console.log('⚠️ WorkoutBuilder - Verwende Fallback-Übungen:', exercises.value.length, 'für Typ:', selectedType.value)
-    console.log('⚠️ WorkoutBuilder - Verwende Fallback-Übungen:', exercises.value.length)
+    logger.debug('⚠️ WorkoutBuilder - Verwende Fallback-Übungen:', exercises.value.length, 'für Typ:', selectedType.value)
+    logger.debug('⚠️ WorkoutBuilder - Verwende Fallback-Übungen:', exercises.value.length)
   } finally {
     loading.value = false
   }
@@ -587,6 +830,13 @@ function toggleExercise(exercise) {
   if (index > -1) {
     selectedExercises.value.splice(index, 1)
   } else {
+    // Check exercise limit for free users
+    if (!subscriptionStore.canAddExercise(selectedExercises.value.length)) {
+      upgradeLimitType.value = 'exercises'
+      showUpgradeModal.value = true
+      return
+    }
+    
     selectedExercises.value.push({
       ...exercise
     })
@@ -622,14 +872,23 @@ function onDrop(index) {
 async function createWorkout() {
   try {
     errorMsg.value = ''
+    
     if (!isSignedIn.value) {
-      console.warn('⛔️ Nicht angemeldet – Erstellen abgebrochen')
-      errorMsg.value = 'Nicht angemeldet. Bitte melde dich an.'
+      logger.warn('⛔️ Nicht angemeldet – Erstellen abgebrochen')
+      errorMsg.value = t('builder.signInFirst')
       return
     }
+    
+    // Check workout limit for free users
+    if (!subscriptionStore.canCreateWorkout) {
+      upgradeLimitType.value = 'workouts'
+      showUpgradeModal.value = true
+      return
+    }
+    
     creating.value = true
     const workoutData = {
-      name: `${currentTypeLabel.value} - ${new Date().toLocaleDateString('de-DE')}`,
+  name: `${currentTypeLabel.value} - ${new Date().toLocaleDateString(String(locale.value).startsWith('de') ? 'de-DE' : 'en-US')}`,
       type: selectedType.value,
       // Nur Übungen ohne Satz-Details speichern; Details werden erst später im Detail bearbeitet
       exercises: selectedExercises.value.map(ex => ({
@@ -653,8 +912,8 @@ async function createWorkout() {
   token = await getAuthToken({ clerk, auth, options: { skipCache: true } }).catch(() => null)
     }
     if (!token) {
-      errorMsg.value = 'Sitzung noch nicht bereit. Bitte kurz warten und erneut versuchen.'
-      console.warn('⚠️ Kein Token verfügbar – Abbruch')
+      errorMsg.value = t('builder.sessionNotReady')
+      logger.warn('⚠️ Kein Token verfügbar – Abbruch')
       return
     }
     // Workout über Store erstellen (inkl. Fehlerbehandlung)
@@ -664,6 +923,12 @@ async function createWorkout() {
 
     // Event für Parent-Komponente
     emit('workout-created', created)
+
+    // Track workout creation for subscription usage
+    subscriptionStore.trackWorkoutCreated()
+
+    // Draft löschen nach erfolgreichem Erstellen
+    clearDraft()
 
     // Navigiere zur Detailseite (Draft-IDs werden unterstützt)
   const newId = created?._id || null
@@ -678,15 +943,15 @@ async function createWorkout() {
       await router.push('/dashboard')
     }
     
-    console.log('✅ Workout erfolgreich erstellt:', newId || workoutData)
+    logger.debug('✅ Workout erfolgreich erstellt:', newId || workoutData)
   } catch (error) {
-    console.error('❌ Fehler beim Erstellen des Workouts:', error)
+    logger.error('❌ Fehler beim Erstellen des Workouts:', error)
     if (error?.code === 'AUTH_REQUIRED' || error?.code === 'UNAUTHORIZED') {
-      errorMsg.value = 'Nicht angemeldet oder nicht autorisiert. Bitte melde dich an.'
+      errorMsg.value = t('builder.signInFirst')
     } else if (error?.response?.status === 401 || error?.response?.status === 403) {
-      errorMsg.value = 'Nicht autorisiert (401/403). Bitte neu anmelden.'
+      errorMsg.value = t('builder.signInFirst')
     } else {
-      errorMsg.value = 'Erstellen fehlgeschlagen. Bitte später erneut versuchen.'
+      errorMsg.value = t('builder.createFailed')
     }
   } finally {
     creating.value = false
@@ -740,6 +1005,16 @@ function goDashboard() {
 
 function continuePlan() {
   showBelief.value = false
+  // Heutiges Datum als "gesehen" speichern
+  try { localStorage.setItem(BELIEF_KEY, todayKey()) } catch {}
+}
+
+// Handle successful upgrade
+function handleUpgradeSuccess() {
+  // Refresh subscription status
+  subscriptionStore.checkSubscription()
+  showUpgradeModal.value = false
+  toast.success(t('upgrade.upgradeSuccess'))
 }
 
 function pickType(val) {

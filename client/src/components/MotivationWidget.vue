@@ -9,7 +9,7 @@
     </div>
     <button 
       class="refresh-btn" 
-      title="Neues Zitat"
+      :title="t('motivation.newQuote')"
       @click="getNewQuote"
     >
       🔄
@@ -19,13 +19,16 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+const { t, locale } = useI18n()
 
 const currentQuote = ref({
   text: 'Die größte Herausforderung ist nicht die im Gym, sondern die auf dem Weg dorthin.',
   author: 'Unbekannt'
 })
 
-const motivationQuotes = [
+const motivationQuotesDe = [
   {
     text: 'Die größte Herausforderung ist nicht die im Gym, sondern die auf dem Weg dorthin.',
     author: 'Unbekannt'
@@ -108,17 +111,41 @@ const motivationQuotes = [
   }
 ]
 
+const motivationQuotesEn = [
+  { text: 'The biggest challenge isn’t in the gym, it’s getting there.', author: 'Unknown' },
+  { text: 'Success begins with the decision to try.', author: 'John C. Maxwell' },
+  { text: 'You’ll never regret a workout, but you’ll regret skipping it.', author: 'Unknown' },
+  { text: 'A year from now you may wish you had started today.', author: 'Karen Lamb' },
+  { text: 'Strength does not come from physical capacity. It comes from an indomitable will.', author: 'Mahatma Gandhi' },
+  { text: 'The pain you feel today is the strength you feel tomorrow.', author: 'Unknown' },
+  { text: 'Champions aren’t made in gyms. Champions are made from something they have deep inside them — a desire, a dream, a vision.', author: 'Muhammad Ali' },
+  { text: 'If it were easy, everyone would do it.', author: 'Unknown' },
+  { text: 'The only person you are destined to become is the person you decide to be.', author: 'Unknown' },
+  { text: 'Discipline is the bridge between goals and accomplishment.', author: 'Jim Rohn' },
+  { text: 'Do something today that your future self will thank you for.', author: 'Sean Patrick Flanery' },
+  { text: 'The body achieves what the mind believes.', author: 'Unknown' },
+  { text: 'Motivation gets you going. Habit keeps you going.', author: 'Jim Ryun' },
+  { text: 'You don’t have to be great to start, but you have to start to be great.', author: 'Zig Ziglar' },
+  { text: 'The difference between the impossible and the possible lies in a person’s determination.', author: 'Tommy Lasorda' },
+  { text: 'Every expert was once a beginner.', author: 'Helen Hayes' },
+  { text: 'Never give up! Failure and rejection are only the first step to succeeding.', author: 'Jim Valvano' },
+  { text: 'The most difficult thing is the decision to act, the rest is merely tenacity.', author: 'Amelia Earhart' },
+  { text: 'Be stronger than your excuses.', author: 'Unknown' },
+  { text: 'A smart person learns from the mistakes of others; a wise one from his own; the wisest makes none.', author: 'Unknown' }
+]
+
 function getNewQuote() {
-  const currentIndex = motivationQuotes.findIndex(
+  const list = String(locale.value).startsWith('de') ? motivationQuotesDe : motivationQuotesEn
+  const currentIndex = list.findIndex(
     q => q.text === currentQuote.value.text && q.author === currentQuote.value.author
   )
   
   let newIndex
   do {
-    newIndex = Math.floor(Math.random() * motivationQuotes.length)
-  } while (newIndex === currentIndex && motivationQuotes.length > 1)
+    newIndex = Math.floor(Math.random() * list.length)
+  } while (newIndex === currentIndex && list.length > 1)
   
-  currentQuote.value = motivationQuotes[newIndex]
+  currentQuote.value = list[newIndex]
 }
 
 onMounted(() => {

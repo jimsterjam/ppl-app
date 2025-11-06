@@ -2,6 +2,9 @@ import { defineStore } from 'pinia'
 
 export const useSettingsStore = defineStore('settings', {
   state: () => ({
+    language: (() => {
+      try { return localStorage.getItem('app-lang') || null } catch { return null }
+    })(),
     weeklyGoal: (() => {
       const envDefault = Number.parseInt(import.meta.env.VITE_DEFAULT_WEEKLY_GOAL || '', 10)
       const fallback = Number.isFinite(envDefault) && envDefault > 0 ? envDefault : 4
@@ -10,6 +13,10 @@ export const useSettingsStore = defineStore('settings', {
     })()
   }),
   actions: {
+    setLanguage(locale) {
+      this.language = locale
+      try { localStorage.setItem('app-lang', locale) } catch {}
+    },
     setWeeklyGoal(val) {
       const v = Number.parseInt(val, 10)
       // Clamp auf sinnvollen Bereich

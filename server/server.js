@@ -7,17 +7,23 @@ import path from "path";
 import { fileURLToPath } from "url";
 import workoutRoutes from "./routes/workouts.js";
 import exerciseRoutes from "./routes/exercises.js";
+import subscriptionRoutes from "./routes/subscription.js";
 import { clerkMiddleware, requireAuth } from './middleware/clerkAuth.js';
 import multer from 'multer';
 import sharp from 'sharp';
 import fs from 'fs';
 import { ObjectId } from 'mongodb';
+import { validateEnv } from './utils/validateEnv.js';
+import { logger } from './utils/logger.js';
 
 
 // .env zuverlässig relativ zu dieser Datei laden (unabhängig vom CWD)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, ".env") });
+
+// Validiere Umgebungsvariablen (beendet Server bei fehlenden kritischen Vars)
+validateEnv();
 
 const app = express();
 
@@ -136,7 +142,7 @@ app.post('/api/exercises/:id/image', upload.single('image'), async (req, res) =>
     await ex.save();
     res.json({ success: true, exercise: ex });
   } catch (err) {
-    console.error('Direct upload error:', err);
+    logger.error('Direct upload error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -160,7 +166,7 @@ app.post('/api/exercises/image/:id', upload.single('image'), async (req, res) =>
     await ex.save();
     res.json({ success: true, exercise: ex });
   } catch (err) {
-    console.error('Direct upload (alias) error:', err);
+    logger.error('Direct upload (alias) error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -178,7 +184,7 @@ app.post('/api/workouts/:id/image', requireAuth(), upload.single('image'), async
     await workout.save();
     res.json({ success: true, workout });
   } catch (err) {
-    console.error('Workout upload error:', err);
+    logger.error('Workout upload error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -196,7 +202,7 @@ app.post('/api/workouts/image/:id', requireAuth(), upload.single('image'), async
     await workout.save();
     res.json({ success: true, workout });
   } catch (err) {
-    console.error('Workout upload (alias) error:', err);
+    logger.error('Workout upload (alias) error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -222,7 +228,7 @@ app.put('/api/workouts/:id/photo', requireAuth(), express.json({ limit: '12mb' }
     await workout.save();
     res.json({ success: true, workout });
   } catch (err) {
-    console.error('Workout JSON upload error:', err);
+    logger.error('Workout JSON upload error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -256,7 +262,7 @@ app.put('/api/exercises/:id/photo', express.json({ limit: '12mb' }), async (req,
     await ex.save();
     res.json({ success: true, exercise: ex });
   } catch (err) {
-    console.error('JSON photo upload error:', err);
+    logger.error('JSON photo upload error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -270,7 +276,7 @@ app.get('/api/exercises/:id/image', async (req, res) => {
     res.set('Content-Type', 'image/jpeg')
     res.set('Cache-Control', 'public, max-age=604800, immutable')
     getExerciseBucket().openDownloadStream(new ObjectId(ex.imageFileId)).on('error', (e) => {
-      console.warn('Download error (image):', e)
+      logger.warn('Download error (image):', e)
       if (!res.headersSent) res.status(404).end()
     }).pipe(res)
   } catch (err) {
@@ -286,7 +292,7 @@ app.get('/api/exercises/:id/thumbnail', async (req, res) => {
     res.set('Content-Type', 'image/jpeg')
     res.set('Cache-Control', 'public, max-age=604800, immutable')
     getExerciseBucket().openDownloadStream(new ObjectId(ex.thumbFileId)).on('error', (e) => {
-      console.warn('Download error (thumb):', e)
+      logger.warn('Download error (thumb):', e)
       if (!res.headersSent) res.status(404).end()
     }).pipe(res)
   } catch (err) {
@@ -303,18 +309,18 @@ if (process.env.MONGO_URI) {
       serverSelectionTimeoutMS: 5000,
       maxPoolSize: 10
     })
-    .then(() => console.log("MongoDB verbunden"))
-    .catch(err => console.error("DB Fehler:", err));
+    .then(() => logger.info("MongoDB verbunden"))
+    .catch(err => logger.error("DB Fehler:", err));
 
   // Connection Event-Logging & Reconnect-Monitoring
   const conn = mongoose.connection;
-  conn.on('connected', () => console.log('🟢 MongoDB connected'));
-  conn.on('disconnected', () => console.warn('🟠 MongoDB disconnected'));
+  conn.on('connected', () => logger.info('🟢 MongoDB connected'));
+  conn.on('disconnected', () => logger.warn('🟠 MongoDB disconnected'));
   // 'reconnected' wird vom Treiber emittiert
-  conn.on('reconnected', () => console.log('🟢 MongoDB reconnected'));
-  conn.on('error', (err) => console.error('🔴 MongoDB error:', err));
+  conn.on('reconnected', () => logger.info('🟢 MongoDB reconnected'));
+  conn.on('error', (err) => logger.error('🔴 MongoDB error:', err));
 } else {
-  console.warn("Hinweis: MONGO_URI ist nicht gesetzt – DB-Verbindung wird übersprungen.");
+  logger.warn("Hinweis: MONGO_URI ist nicht gesetzt – DB-Verbindung wird übersprungen.");
 }
 
 // Test-Route
@@ -339,6 +345,7 @@ app.get("/api/test", (req, res) => {
 // Routen einbinden: Workouts-Router enthält bereits requireAuth pro Route
 app.use("/api/workouts", workoutRoutes);
 app.use("/api/exercises", exerciseRoutes);
+app.use("/api/subscription", subscriptionRoutes);
 
 // Health Endpoint: erleichtert Diagnose (Client/Monitoring)
 app.get('/api/health', (req, res) => {
@@ -357,11 +364,11 @@ app.use((err, req, res, _next) => {
     return res.status(401).json({ error: "Unauthenticated" });
   }
   if (err) {
-    console.error("Unhandled error:", err);
+    logger.error("Unhandled error:", err);
   }
   res.status(500).json({ error: "Internal Server Error" });
 });
 
 // Server starten
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`Server läuft auf Port ${PORT}`));
+app.listen(PORT, () => logger.info(`🚀 Server läuft auf Port ${PORT}`));

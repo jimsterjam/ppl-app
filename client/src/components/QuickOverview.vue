@@ -1,6 +1,6 @@
 <template>
-  <div class="quick-overview">
-    <h3>Deine Woche</h3>
+  <div class="quick-overview glass">
+    <h3>{{ t('quick.title') }}</h3>
     
     <!-- 7-Tage Mini Chart -->
     <div class="week-chart">
@@ -10,7 +10,7 @@
           :key="index"
           class="day-bar"
           :class="{ 'has-workout': day.hasWorkout, 'is-today': day.isToday }"
-          :title="`${day.label}: ${day.hasWorkout ? day.workoutType || 'Workout' : 'Kein Training'}`"
+          :title="`${day.label}: ${day.hasWorkout ? (day.workoutType || t('quick.workout')) : t('quick.noTraining')}`"
         >
           <div class="bar" :style="{ height: day.hasWorkout ? '100%' : '10%' }"></div>
           <span class="day-label">{{ day.shortLabel }}</span>
@@ -20,22 +20,22 @@
 
     <!-- Stats Grid -->
     <div class="stats-grid">
-      <div class="stat-card weekly-goal">
+      <div class="stat-card weekly-goal glass">
         <div class="stat-icon">🎯</div>
         <div class="stat-info">
           <span class="stat-number">{{ thisWeekCount }}/{{ weeklyGoal }}</span>
-          <span class="stat-label">Wochenziel</span>
+          <span class="stat-label">{{ t('quick.weeklyGoal') }}</span>
           <div class="progress">
             <div class="progress-bar" :style="{ width: weekProgress + '%' }"></div>
           </div>
         </div>
       </div>
 
-      <div v-if="daysSinceLastWorkout >= 0" class="stat-card next-workout">
+      <div v-if="daysSinceLastWorkout >= 0" class="stat-card next-workout glass">
         <div class="stat-icon">⏰</div>
         <div class="stat-info">
           <span class="stat-number">{{ lastWorkoutLabel }}</span>
-          <span class="stat-label">Letztes Training</span>
+          <span class="stat-label">{{ t('quick.lastWorkout') }}</span>
         </div>
       </div>
     </div>
@@ -44,6 +44,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/settingsStore'
 
 const props = defineProps({
@@ -52,6 +53,7 @@ const props = defineProps({
     default: () => []
   }
 })
+const { t, tm } = useI18n()
 
 // 7-Tage Daten für Mini-Chart
 const weekData = computed(() => {
@@ -73,12 +75,12 @@ const weekData = computed(() => {
       return workoutDate.getTime() === dayStart
     })
     
-    const dayNames = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa']
+  const dayNames = tm('quick.dayNames') || ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa']
     
     days.push({
       date,
-      label: isToday ? 'Heute' : dayNames[date.getDay()],
-      shortLabel: isToday ? 'H' : dayNames[date.getDay()].charAt(0),
+      label: isToday ? t('quick.today') : dayNames[date.getDay()],
+      shortLabel: isToday ? t('quick.today').charAt(0) : dayNames[date.getDay()].charAt(0),
       hasWorkout: !!dayWorkout,
       workoutType: dayWorkout?.type,
       isToday
@@ -139,20 +141,9 @@ const lastWorkoutLabel = computed(() => {
 </script>
 
 <style scoped>
-.quick-overview {
-  background: #1c1c1e;
-  border-radius: 12px;
-  padding: 16px;
-  margin: 16px;
-  border: 1px solid #333;
-}
+.quick-overview { background: transparent; border-radius: 12px; padding: 16px; margin: 16px; border: 1px solid transparent; }
 
-.quick-overview h3 {
-  margin: 0 0 16px 0;
-  color: #fff;
-  font-size: 1.1rem;
-  font-weight: 600;
-}
+.quick-overview h3 { margin: 0 0 16px 0; color: var(--fg); font-size: 1.1rem; font-weight: 600; }
 
 .week-chart {
   margin-bottom: 16px;
@@ -176,40 +167,23 @@ const lastWorkoutLabel = computed(() => {
   cursor: pointer;
 }
 
-.bar {
-  width: 100%;
-  max-width: 28px;
-  background: #333;
-  border-radius: 4px 4px 0 0;
-  transition: all 0.3s ease;
-  min-height: 4px;
-}
+.bar { width: 100%; max-width: 28px; background: var(--card-border); border-radius: 4px 4px 0 0; transition: all 0.3s ease; min-height: 4px; }
 
 .day-bar.has-workout .bar {
   background: linear-gradient(to top, #ff4d4d, #ff6b6b);
   box-shadow: 0 0 8px rgba(255, 77, 77, 0.3);
 }
 
-.day-bar.is-today .bar {
-  border: 2px solid #fff;
-}
+.day-bar.is-today .bar { border: 2px solid var(--fg); }
 
 .day-bar.is-today.has-workout .bar {
   background: linear-gradient(to top, #4dabf7, #74c0fc);
   box-shadow: 0 0 12px rgba(77, 171, 247, 0.4);
 }
 
-.day-label {
-  font-size: 0.75rem;
-  color: #999;
-  margin-top: 4px;
-  font-weight: 500;
-}
+.day-label { font-size: 0.75rem; color: var(--muted); margin-top: 4px; font-weight: 500; }
 
-.day-bar.is-today .day-label {
-  color: #fff;
-  font-weight: 600;
-}
+.day-bar.is-today .day-label { color: var(--fg); font-weight: 600; }
 
 .stats-grid {
   display: grid;
@@ -217,21 +191,9 @@ const lastWorkoutLabel = computed(() => {
   gap: 12px;
 }
 
-.stat-card {
-  background: #2a2a2d;
-  border-radius: 8px;
-  padding: 12px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border: 1px solid #333;
-  transition: all 0.2s ease;
-}
+.stat-card { background: transparent; border-radius: 12px; padding: 12px; display: flex; align-items: center; gap: 10px; border: 1px solid transparent; transition: all 0.2s ease; }
 
-.stat-card:hover {
-  background: #323236;
-  border-color: #444;
-}
+.stat-card:hover { background: color-mix(in oklab, var(--fg) 4%, transparent); border-color: var(--card-border); }
 
 .stat-icon {
   font-size: 1.2rem;
@@ -244,21 +206,9 @@ const lastWorkoutLabel = computed(() => {
   min-width: 0;
 }
 
-.stat-number {
-  font-size: 1.1rem;
-  font-weight: 700;
-  color: #fff;
-  line-height: 1;
-}
+.stat-number { font-size: 1.1rem; font-weight: 700; color: var(--fg); line-height: 1; }
 
-.stat-label {
-  font-size: 0.75rem;
-  color: #999;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  line-height: 1;
-  margin-top: 2px;
-}
+.stat-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; line-height: 1; margin-top: 2px; }
 
 .streak .stat-number {
   color: #ff6b47;
@@ -273,8 +223,8 @@ const lastWorkoutLabel = computed(() => {
 }
 
 .weekly-goal .stat-number { color: #4dabf7; }
-.progress { margin-top: 6px; height: 6px; background: #3a3a3d; border-radius: 999px; overflow: hidden; border: 1px solid #333; }
-.progress-bar { height: 100%; background: linear-gradient(90deg, #4dabf7, #74c0fc); width: 0%; transition: width 0.3s ease; }
+.progress { margin-top: 6px; height: 6px; background: var(--surface); border-radius: 999px; overflow: hidden; border: 1px solid var(--card-border); }
+.progress-bar { height: 100%; background: linear-gradient(90deg, color-mix(in oklab, var(--accent-color) 40%, #4dabf7), #74c0fc); width: 0%; transition: width 0.3s ease; }
 
 @media (max-width: 480px) {
   .quick-overview {

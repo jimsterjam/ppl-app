@@ -1,13 +1,13 @@
 <template>
-  <div class="recent-workouts">
+  <div class="recent-workouts glass">
     <div class="header">
-      <h3>Letzte Workouts</h3>
-      <router-link to="/stats" class="view-all">Alle anzeigen</router-link>
+      <h3>{{ t('recent.title') }}</h3>
+      <router-link to="/stats" class="view-all">{{ t('recent.viewAll') }}</router-link>
     </div>
     
     <div v-if="recentWorkouts.length === 0" class="empty-state">
       <div class="empty-icon">💪</div>
-      <p>Noch keine Workouts vorhanden</p>
+      <p>{{ t('recent.emptyTitle') }}</p>
     </div>
     
     <div v-else class="workouts-list">
@@ -17,7 +17,7 @@
         class="workout-item"
       >
         <div 
-          class="workout-card"
+          class="workout-card glass"
           :class="{ 'expanded': expandedWorkout === workout._id }"
           @click="toggleWorkoutDetails(workout)"
         >
@@ -27,7 +27,7 @@
               <p class="workout-meta">
                 {{ formatDate(workout.date) }} • {{ formatDuration(workout.duration) }}
                 <span v-if="workout.exercises?.length" class="exercise-count">
-                  • {{ workout.exercises.length }} Übungen
+                  • {{ workout.exercises.length }} {{ t('recent.exercises') }}
                 </span>
               </p>
             </div>
@@ -42,14 +42,14 @@
           <div class="workout-actions">
             <button 
               class="action-btn repeat"
-              title="Workout wiederholen"
+              :title="t('recent.repeatTitle')"
               @click.stop="repeatWorkout(workout)"
             >
               🔄
             </button>
             <button 
               class="action-btn edit"
-              title="Workout bearbeiten"
+              :title="t('recent.editTitle')"
               @click.stop="editWorkout(workout)"
             >
               ✏️
@@ -57,7 +57,7 @@
             <button 
               class="action-btn expand"
               :class="{ 'expanded': expandedWorkout === workout._id }"
-              title="Details anzeigen"
+              :title="t('recent.detailsTitle')"
             >
               {{ expandedWorkout === workout._id ? '▲' : '▼' }}
             </button>
@@ -67,18 +67,18 @@
         <!-- Expandable Details -->
         <div 
           v-if="expandedWorkout === workout._id" 
-          class="workout-details"
+          class="workout-details glass"
         >
           <div v-if="workout.exercises?.length" class="exercises-list">
-            <h5>Übungen:</h5>
+            <h5>{{ t('recent.exercises') }}:</h5>
             <div class="exercises-detailed">
               <div 
                 v-for="exercise in workout.exercises.slice(0, 4)" 
                 :key="exercise._id || exercise.name"
-                class="exercise-detailed"
+                class="exercise-detailed glass"
               >
                 <div class="exercise-header">
-                  <span class="exercise-name">{{ exercise.name }}</span>
+                  <span class="exercise-name">{{ getTranslatedExerciseName(exercise.name) }}</span>
                   <span class="exercise-summary">{{ getExerciseSummary(exercise) }}</span>
                 </div>
                 
@@ -92,38 +92,38 @@
                     >
                       <span class="set-number">{{ setIndex + 1 }}.</span>
                       <span class="set-details">
-                        <span v-if="set.reps" class="reps">{{ set.reps }} Wdh</span>
+                        <span v-if="set.reps" class="reps">{{ set.reps }} {{ t('common.reps') }}</span>
                         <span v-if="set.weight" class="weight">{{ set.weight }}kg</span>
-                        <span v-if="!set.reps && !set.weight" class="no-data">Keine Daten</span>
+                        <span v-if="!set.reps && !set.weight" class="no-data">{{ t('recent.noData') }}</span>
                       </span>
                     </div>
                   </div>
                   
                   <div v-else-if="!exercise.setDetails?.length && (exercise.sets || exercise.reps || exercise.weight)" class="sets-legacy">
                     <div class="legacy-info">
-                      <span v-if="exercise.sets && exercise.sets > 1" class="legacy-sets">{{ exercise.sets }} Sätze</span>
-                      <span v-else-if="exercise.sets === 1" class="legacy-sets">1 Satz</span>
-                      <span v-if="exercise.reps" class="legacy-reps">{{ exercise.reps }} Wdh</span>
+                      <span v-if="exercise.sets && exercise.sets > 1" class="legacy-sets">{{ exercise.sets }} {{ t('common.sets') }}</span>
+                      <span v-else-if="exercise.sets === 1" class="legacy-sets">1 {{ t('recent.set') }}</span>
+                      <span v-if="exercise.reps" class="legacy-reps">{{ exercise.reps }} {{ t('common.reps') }}</span>
                       <span v-if="exercise.weight" class="legacy-weight">{{ exercise.weight }}kg</span>
                     </div>
                     <div class="legacy-note">
-                      Älteres Format - Editiere das Workout für Details pro Satz
+                      {{ t('recent.legacyNote') }}
                     </div>
                   </div>
                   
                   <div v-else class="sets-placeholder">
-                    Keine Set-Daten verfügbar
+                    {{ t('recent.noSetData') }}
                   </div>
                 </div>
               </div>
               
               <div v-if="workout.exercises.length > 4" class="more-exercises-detailed">
-                <span class="more-text">+{{ workout.exercises.length - 4 }} weitere Übungen</span>
+                <span class="more-text">+{{ workout.exercises.length - 4 }} {{ t('recent.moreExercises') }}</span>
                 <button 
                   class="show-all-btn"
                   @click.stop="showAllExercises = !showAllExercises"
                 >
-                  {{ showAllExercises ? 'Weniger' : 'Alle anzeigen' }}
+                  {{ showAllExercises ? t('recent.showLess') : t('recent.showAll') }}
                 </button>
               </div>
               
@@ -132,10 +132,10 @@
                 <div 
                   v-for="exercise in workout.exercises.slice(4)" 
                   :key="exercise._id || exercise.name"
-                  class="exercise-detailed"
+                  class="exercise-detailed glass"
                 >
                   <div class="exercise-header">
-                    <span class="exercise-name">{{ exercise.name }}</span>
+                    <span class="exercise-name">{{ getTranslatedExerciseName(exercise.name) }}</span>
                     <span class="exercise-summary">{{ getExerciseSummary(exercise) }}</span>
                   </div>
                   
@@ -147,23 +147,23 @@
                     >
                       <span class="set-number">{{ setIndex + 1 }}.</span>
                       <span class="set-details">
-                        <span v-if="set.reps" class="reps">{{ set.reps }} Wdh</span>
+                        <span v-if="set.reps" class="reps">{{ set.reps }} {{ t('common.reps') }}</span>
                         <span v-if="set.weight" class="weight">{{ set.weight }}kg</span>
-                        <span v-if="!set.reps && !set.weight" class="no-data">Keine Daten</span>
+                        <span v-if="!set.reps && !set.weight" class="no-data">{{ t('recent.noData') }}</span>
                       </span>
                     </div>
                   </div>
                   
                   <div v-else-if="exercise.sets || exercise.reps || exercise.weight" class="sets-legacy">
                     <div class="legacy-info">
-                      <span v-if="exercise.sets" class="legacy-sets">{{ exercise.sets }} Sätze</span>
-                      <span v-if="exercise.reps" class="legacy-reps">{{ exercise.reps }} Wdh</span>
+                      <span v-if="exercise.sets" class="legacy-sets">{{ exercise.sets }} {{ t('common.sets') }}</span>
+                      <span v-if="exercise.reps" class="legacy-reps">{{ exercise.reps }} {{ t('common.reps') }}</span>
                       <span v-if="exercise.weight" class="legacy-weight">{{ exercise.weight }}kg</span>
                     </div>
                   </div>
                   
                   <div v-else class="sets-placeholder">
-                    Keine Set-Daten verfügbar
+                    {{ t('recent.noSetData') }}
                   </div>
                 </div>
               </div>
@@ -171,18 +171,18 @@
           </div>
           
           <div v-if="workout.notes" class="workout-notes">
-            <h5>Notizen:</h5>
+            <h5>{{ t('recent.notes') }}:</h5>
             <p>{{ workout.notes }}</p>
           </div>
           
           <div class="workout-stats">
             <div class="stat-item">
-              <span class="stat-label">Erstellt:</span>
+              <span class="stat-label">{{ t('recent.created') }}:</span>
               <span class="stat-value">{{ formatDateTime(workout.createdAt) }}</span>
             </div>
             <div v-if="workout.completed" class="stat-item">
-              <span class="stat-label">Status:</span>
-              <span class="stat-value completed">✅ Abgeschlossen</span>
+              <span class="stat-label">{{ t('recent.status') }}:</span>
+              <span class="stat-value completed">✅ {{ t('recent.completed') }}</span>
             </div>
           </div>
         </div>
@@ -193,7 +193,10 @@
 
 <script setup>
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import { useExerciseTranslation } from '@/utils/exerciseTranslation'
+import { logger } from '@/utils/logger'
 
 const props = defineProps({
   workouts: {
@@ -203,6 +206,8 @@ const props = defineProps({
 })
 
 const router = useRouter()
+const { t, locale } = useI18n()
+const { getTranslatedExerciseName } = useExerciseTranslation()
 const expandedWorkout = ref(null)
 const showAllExercises = ref(false)
 
@@ -237,7 +242,7 @@ function getTypeIcon(type) {
 }
 
 function formatDate(dateStr) {
-  if (!dateStr) return 'Unbekannt'
+  if (!dateStr) return t('common.unknown')
   
   const date = new Date(dateStr)
   const today = new Date()
@@ -250,26 +255,18 @@ function formatDate(dateStr) {
   const yesterdayOnly = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate())
   
   if (dateOnly.getTime() === todayOnly.getTime()) {
-    return 'Heute'
+    return t('common.today')
   } else if (dateOnly.getTime() === yesterdayOnly.getTime()) {
-    return 'Gestern'
+    return t('common.yesterday')
   } else {
-    const diffTime = todayOnly - dateOnly
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    
-    if (diffDays <= 7) {
-      return `vor ${diffDays} Tag${diffDays > 1 ? 'en' : ''}`
-    } else {
-      return date.toLocaleDateString('de-DE', { 
-        day: '2-digit', 
-        month: '2-digit' 
-      })
-    }
+    // Standard: zeige lokales Datum (ohne Jahr) für kompakten Überblick
+    const loc = String(locale.value).startsWith('de') ? 'de-DE' : 'en-US'
+    return date.toLocaleDateString(loc, { day: '2-digit', month: '2-digit' })
   }
 }
 
 function formatDuration(duration) {
-  if (!duration || duration === 0) return 'Dauer unbekannt'
+  if (!duration || duration === 0) return t('recent.unknownDuration')
   
   const hours = Math.floor(duration / 60)
   const minutes = duration % 60
@@ -282,10 +279,11 @@ function formatDuration(duration) {
 }
 
 function formatDateTime(dateStr) {
-  if (!dateStr) return 'Unbekannt'
+  if (!dateStr) return t('common.unknown')
   
   const date = new Date(dateStr)
-  return date.toLocaleDateString('de-DE', { 
+  const loc = String(locale.value).startsWith('de') ? 'de-DE' : 'en-US'
+  return date.toLocaleDateString(loc, { 
     day: '2-digit', 
     month: '2-digit',
     year: 'numeric',
@@ -300,7 +298,7 @@ function getExerciseSummary(exercise) {
     const hasWeights = exercise.setDetails.some(set => set.weight)
     const hasReps = exercise.setDetails.some(set => set.reps)
     
-    let summary = `${totalSets} Sätze`
+  let summary = `${totalSets} ${t('common.sets')}`
     
     if (hasWeights && hasReps) {
       // Zeige Gewichts- und Rep-Range
@@ -321,9 +319,9 @@ function getExerciseSummary(exercise) {
         const minReps = Math.min(...reps)
         const maxReps = Math.max(...reps)
         if (minReps === maxReps) {
-          summary += ` • ${minReps} Wdh`
+          summary += ` • ${minReps} ${t('common.reps')}`
         } else {
-          summary += ` • ${minReps}-${maxReps} Wdh`
+          summary += ` • ${minReps}-${maxReps} ${t('common.reps')}`
         }
       }
     } else if (hasWeights) {
@@ -349,13 +347,13 @@ function getExerciseSummary(exercise) {
     return summary
   } else if (exercise.sets || exercise.reps || exercise.weight) {
     // Legacy-Format: Nutze die alten Felder
-    let summary = []
+  let summary = []
     
     if (exercise.sets) {
-      summary.push(`${exercise.sets} Sätze`)
+  summary.push(`${exercise.sets} ${t('common.sets')}`)
     }
     if (exercise.reps) {
-      summary.push(`${exercise.reps} Wdh`)
+  summary.push(`${exercise.reps} ${t('common.reps')}`)
     }
     if (exercise.weight) {
       summary.push(`${exercise.weight}kg`)
@@ -363,7 +361,7 @@ function getExerciseSummary(exercise) {
     
     return summary.join(' • ')
   }
-  return 'Keine Daten'
+  return t('recent.noData')
 }
 
 function toggleWorkoutDetails(workout) {
@@ -377,7 +375,7 @@ function toggleWorkoutDetails(workout) {
 }
 
 function viewWorkout(workout) {
-  console.log('👀 Navigiere zur Workout-Ansicht:', workout._id);
+  logger.debug('👀 Navigiere zur Workout-Ansicht:', workout._id);
   router.push(`/workouts/${workout._id}`);
 }
 
@@ -393,19 +391,13 @@ function repeatWorkout(workout) {
 }
 
 function editWorkout(workout) {
-  console.log('📝 Navigiere zur Workout-Bearbeitung:', workout._id);
+  logger.debug('📝 Navigiere zur Workout-Bearbeitung:', workout._id);
   router.push(`/workouts/${workout._id}`);
 }
 </script>
 
 <style scoped>
-.recent-workouts {
-  background: #1c1c1e;
-  border-radius: 12px;
-  padding: 16px;
-  margin: 16px;
-  border: 1px solid #333;
-}
+.recent-workouts { background: transparent; border-radius: 12px; padding: 16px; margin: 16px; border: 1px solid transparent; }
 
 .header {
   display: flex;
@@ -414,29 +406,12 @@ function editWorkout(workout) {
   margin-bottom: 16px;
 }
 
-.header h3 {
-  margin: 0;
-  color: #fff;
-  font-size: 1.1rem;
-  font-weight: 600;
-}
+.header h3 { margin: 0; color: var(--fg); font-size: 1.1rem; font-weight: 600; }
 
-.view-all {
-  color: #4dabf7;
-  text-decoration: none;
-  font-size: 0.9rem;
-  font-weight: 500;
-}
+.view-all { color: color-mix(in oklab, var(--accent-color) 70%, #4dabf7); text-decoration: none; font-size: 0.9rem; font-weight: 500; }
+.view-all:hover { color: color-mix(in oklab, var(--accent-color) 70%, #74c0fc); }
 
-.view-all:hover {
-  color: #74c0fc;
-}
-
-.empty-state {
-  text-align: center;
-  padding: 24px 16px;
-  color: #999;
-}
+.empty-state { text-align: center; padding: 24px 16px; color: var(--muted); }
 
 .empty-icon {
   font-size: 2rem;
@@ -455,30 +430,11 @@ function editWorkout(workout) {
   transition: all 0.3s ease;
 }
 
-.workout-card {
-  background: #2a2a2d;
-  border-radius: 8px;
-  padding: 12px;
-  border: 1px solid #333;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
+.workout-card { background: transparent; border-radius: 12px; padding: 12px; border: 1px solid transparent; cursor: pointer; transition: all 0.2s ease; display: flex; justify-content: space-between; align-items: center; }
 
-.workout-card:hover {
-  background: #323236;
-  border-color: #444;
-  transform: translateY(-1px);
-}
+.workout-card:hover { background: color-mix(in oklab, var(--fg) 4%, transparent); border-color: var(--card-border); transform: translateY(-1px); }
 
-.workout-card.expanded {
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
-  background: #323236;
-  border-color: #4dabf7;
-}
+.workout-card.expanded { border-bottom-left-radius: 0; border-bottom-right-radius: 0; background: color-mix(in oklab, var(--fg) 6%, transparent); border-color: color-mix(in oklab, var(--accent-color) 40%, var(--card-border)); }
 
 .workout-main {
   display: flex;
@@ -493,44 +449,17 @@ function editWorkout(workout) {
   min-width: 0;
 }
 
-.workout-title {
-  margin: 0 0 4px 0;
-  color: #fff;
-  font-size: 0.95rem;
-  font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+.workout-title { margin: 0 0 4px 0; color: var(--fg); font-size: 0.95rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.workout-meta {
-  margin: 0;
-  color: #999;
-  font-size: 0.8rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
+.workout-meta { margin: 0; color: var(--muted); font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-.exercise-count {
-  color: #4dabf7;
-}
+.exercise-count { color: color-mix(in oklab, var(--accent-color) 70%, #4dabf7); }
 
 .workout-type {
   flex-shrink: 0;
 }
 
-.type-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  font-size: 1rem;
-  background: #333;
-  border: 1px solid #444;
-}
+.type-badge { display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; font-size: 1rem; background: var(--surface); border: 1px solid var(--card-border); }
 
 .type-badge.push {
   background: rgba(255, 77, 77, 0.2);
@@ -554,61 +483,13 @@ function editWorkout(workout) {
   margin-left: 12px;
 }
 
-.action-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border: none;
-  border-radius: 6px;
-  background: #333;
-  color: #fff;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-size: 0.9rem;
-}
-
-.action-btn:hover {
-  background: #444;
-  transform: scale(1.05);
-}
-
-.action-btn.repeat:hover {
-  background: rgba(77, 171, 247, 0.3);
-}
-
-.action-btn.view:hover {
-  background: rgba(129, 140, 248, 0.3);
-}
-
-.action-btn.edit:hover {
-  background: rgba(255, 193, 7, 0.3);
-}
-
-.action-btn.expand {
-  font-size: 0.8rem;
-  font-weight: bold;
-}
-
-.action-btn.expand:hover {
-  background: rgba(81, 207, 102, 0.3);
-}
-
-.action-btn.expand.expanded {
-  background: #4dabf7;
-  color: #000;
-}
+.action-btn { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 1px solid var(--card-border); border-radius: 8px; background: var(--surface); color: var(--fg); cursor: pointer; transition: all 0.2s ease; font-size: 0.9rem; }
+.action-btn:hover { background: var(--accent-soft); transform: scale(1.05); }
+.action-btn.expand { font-size: 0.8rem; font-weight: bold; }
+.action-btn.expand.expanded { background: var(--accent); color: var(--accent-contrast); border-color: transparent; }
 
 /* Expandable Details */
-.workout-details {
-  background: #1c1c1e;
-  border: 1px solid #4dabf7;
-  border-top: none;
-  border-radius: 0 0 8px 8px;
-  padding: 16px;
-  animation: slideDown 0.3s ease-out;
-}
+.workout-details { background: transparent; border: 1px solid var(--card-border); border-top: none; border-radius: 0 0 12px 12px; padding: 16px; animation: slideDown 0.3s ease-out; }
 
 @keyframes slideDown {
   from {
@@ -625,12 +506,7 @@ function editWorkout(workout) {
   }
 }
 
-.workout-details h5 {
-  margin: 0 0 8px 0;
-  color: #4dabf7;
-  font-size: 0.9rem;
-  font-weight: 600;
-}
+.workout-details h5 { margin: 0 0 8px 0; color: color-mix(in oklab, var(--accent-color) 70%, #4dabf7); font-size: 0.9rem; font-weight: 600; }
 
 .exercises-list {
   margin-bottom: 16px;
@@ -642,34 +518,13 @@ function editWorkout(workout) {
   gap: 12px;
 }
 
-.exercise-detailed {
-  background: #2a2a2d;
-  border-radius: 8px;
-  padding: 12px;
-  border: 1px solid #333;
-}
+.exercise-detailed { background: transparent; border-radius: 12px; padding: 12px; border: 1px solid transparent; }
 
-.exercise-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid #333;
-}
+.exercise-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--card-border); }
 
-.exercise-name {
-  font-size: 0.9rem;
-  color: #fff;
-  font-weight: 600;
-  flex: 1;
-}
+.exercise-name { font-size: 0.9rem; color: var(--fg); font-weight: 600; flex: 1; }
 
-.exercise-summary {
-  font-size: 0.8rem;
-  color: #4dabf7;
-  font-weight: 500;
-}
+.exercise-summary { font-size: 0.8rem; color: color-mix(in oklab, var(--accent-color) 70%, #4dabf7); font-weight: 500; }
 
 .sets-list {
   display: grid;
@@ -677,22 +532,9 @@ function editWorkout(workout) {
   gap: 6px;
 }
 
-.set-item {
-  background: #1c1c1e;
-  border-radius: 6px;
-  padding: 8px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border: 1px solid #333;
-}
+.set-item { background: var(--surface); border-radius: 8px; padding: 8px; display: flex; align-items: center; gap: 8px; border: 1px solid var(--card-border); }
 
-.set-number {
-  font-size: 0.75rem;
-  color: #999;
-  font-weight: 600;
-  min-width: 16px;
-}
+.set-number { font-size: 0.75rem; color: var(--muted); font-weight: 600; min-width: 16px; }
 
 .set-details {
   display: flex;
@@ -711,28 +553,11 @@ function editWorkout(workout) {
   font-weight: 500;
 }
 
-.no-data {
-  color: #666;
-  font-style: italic;
-}
+.no-data { color: var(--muted); font-style: italic; }
 
-.sets-placeholder {
-  color: #999;
-  font-size: 0.8rem;
-  font-style: italic;
-  padding: 8px;
-  text-align: center;
-  background: #1c1c1e;
-  border-radius: 6px;
-  border: 1px solid #333;
-}
+.sets-placeholder { color: var(--muted); font-size: 0.8rem; font-style: italic; padding: 8px; text-align: center; background: var(--surface); border-radius: 8px; border: 1px solid var(--card-border); }
 
-.sets-legacy {
-  background: #1c1c1e;
-  border-radius: 6px;
-  padding: 8px;
-  border: 1px solid #333;
-}
+.sets-legacy { background: var(--surface); border-radius: 8px; padding: 8px; border: 1px solid var(--card-border); }
 
 .legacy-info {
   display: flex;
@@ -765,38 +590,12 @@ function editWorkout(workout) {
   font-size: 0.85rem;
 }
 
-.more-exercises-detailed {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px;
-  background: #333;
-  border-radius: 8px;
-  margin-top: 8px;
-}
+.more-exercises-detailed { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: var(--surface); border-radius: 8px; margin-top: 8px; border: 1px solid var(--card-border); }
 
-.more-text {
-  color: #999;
-  font-size: 0.85rem;
-  font-style: italic;
-}
+.more-text { color: var(--muted); font-size: 0.85rem; font-style: italic; }
 
-.show-all-btn {
-  background: #4dabf7;
-  color: #000;
-  border: none;
-  border-radius: 6px;
-  padding: 6px 12px;
-  font-size: 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.show-all-btn:hover {
-  background: #74c0fc;
-  transform: scale(1.05);
-}
+.show-all-btn { background: var(--accent); color: var(--accent-contrast); border: none; border-radius: 8px; padding: 6px 12px; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
+.show-all-btn:hover { transform: scale(1.05); }
 
 .additional-exercises {
   display: flex;
@@ -811,15 +610,7 @@ function editWorkout(workout) {
   margin-bottom: 16px;
 }
 
-.workout-notes p {
-  margin: 0;
-  color: #ccc;
-  font-size: 0.85rem;
-  line-height: 1.4;
-  background: #2a2a2d;
-  border-radius: 6px;
-  padding: 8px;
-}
+.workout-notes p { margin: 0; color: var(--muted); font-size: 0.85rem; line-height: 1.4; background: var(--surface); border-radius: 8px; padding: 8px; }
 
 .workout-stats {
   display: flex;
@@ -833,18 +624,9 @@ function editWorkout(workout) {
   gap: 2px;
 }
 
-.stat-label {
-  font-size: 0.75rem;
-  color: #999;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
+.stat-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
 
-.stat-value {
-  font-size: 0.85rem;
-  color: #fff;
-  font-weight: 500;
-}
+.stat-value { font-size: 0.85rem; color: var(--fg); font-weight: 500; }
 
 .stat-value.completed {
   color: #51cf66;
