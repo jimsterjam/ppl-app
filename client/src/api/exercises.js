@@ -1,5 +1,13 @@
 import axios from "axios";
 import { apiUrl } from "./http";
+import { 
+  cacheExercises, 
+  getAllExercisesOffline,
+  saveExerciseOffline,
+  getExerciseOffline,
+  isOnline
+} from "@/utils/offlineStorage";
+import { logger } from "@/utils/logger";
 
 // Web: relativ über /api; Mobile (Capacitor): VITE_API_BASE + /api
 const API_URL = apiUrl('exercises');
@@ -13,20 +21,56 @@ const api = axios.create({ baseURL: API_URL });
 
 // Alle Übungen abrufen – optional mit einfachen Query-Filtern
 export async function fetchExercises(filters = {}) {
-  const params = new URLSearchParams();
-  if (filters.category) params.append('category', filters.category);
-  if (filters.muscleGroup) params.append('muscleGroup', filters.muscleGroup);
-  if (filters.equipment) params.append('equipment', filters.equipment);
+  try {
+    const params = new URLSearchParams();
+    if (filters.category) params.append('category', filters.category);
+    if (filters.muscleGroup) params.append('muscleGroup', filters.muscleGroup);
+    if (filters.equipment) params.append('equipment', filters.equipment);
 
-  const query = params.toString();
-  const res = await api.get(query ? `/?${query}` : '/');
-  return res.data;
+    const query = params.toString();
+    const res = await api.get(query ? `/?${query}` : '/');
+    
+    // Bei erfolgreichem Response: Cache für Offline
+    if (Array.isArray(res.data) && res.data.length > 0) {
+      await cacheExercises(res.data);
+      logger.debug('💾 Exercises API - Cached:', res.data.length, 'exercises');
+    }
+    
+    return res.data;
+  } catch (error) {
+    // Bei Netzwerkfehlern: Fallback zu Offline-Daten
+    if (!error.response || !isOnline()) {
+      logger.warn('📡 Exercises API - Offline, lade aus Cache');
+      const cached = await getAllExercisesOffline(filters);
+      logger.debug('📦 Exercises API - Offline Cache:', cached.length, 'exercises');
+      return cached;
+    }
+    throw error;
+  }
 }
 
 // Einzelne Übung abrufen (nur nutzen, wenn Backend diese Route unterstützt)
 export async function fetchExercise(exerciseId) {
-  const res = await api.get(`/${exerciseId}`);
-  return res.data;
+  try {
+    const res = await api.get(`/${exerciseId}`);
+    
+    // Cache für Offline
+    if (res.data) {
+      await saveExerciseOffline(res.data);
+    }
+    
+    return res.data;
+  } catch (error) {
+    // Bei Netzwerkfehlern: Fallback zu Offline-Daten
+    if (!error.response || !isOnline()) {
+      logger.warn('📡 Exercises API - Offline, lade Exercise aus Cache:', exerciseId);
+      const cached = await getExerciseOffline(exerciseId);
+      if (cached) {
+        return cached;
+      }
+    }
+    throw error;
+  }
 }
 
 // Bild uploaden/ersetzen

@@ -129,12 +129,39 @@ export async function createWorkout(workoutData, token = null) {
 
 // Workout aktualisieren
 export async function updateWorkout(workoutId, workoutData, token = null) {
+  // Wenn Offline: Speichere lokal und füge zur Sync Queue hinzu
+  if (!isOnline()) {
+    logger.warn('📡 Workouts API - Offline, aktualisiere Workout lokal');
+    
+    const offlineWorkout = {
+      ...workoutData,
+      _id: workoutId,
+      _offlineUpdated: true,
+      updatedAt: new Date().toISOString()
+    };
+    
+    // Update lokal
+    await saveWorkoutOffline(offlineWorkout);
+    
+    // Füge zur Sync Queue hinzu
+    await queueAction('update', 'workout', offlineWorkout);
+    
+    logger.debug('💾 Workouts API - Workout offline aktualisiert:', workoutId);
+    return offlineWorkout;
+  }
+  
   try {
     const config = {};
     if (token) {
       config.headers = { Authorization: `Bearer ${token}` };
     }
     const res = await api.put(`/${workoutId}`, workoutData, config);
+    
+    // Cache für Offline
+    if (res.data) {
+      await saveWorkoutOffline(res.data);
+    }
+    
     return res.data;
   } catch (error) {
     throw handleAPIError(error, 'Workout aktualisieren');
@@ -143,6 +170,31 @@ export async function updateWorkout(workoutId, workoutData, token = null) {
 
 // Workout als abgeschlossen markieren
 export async function completeWorkout(workoutId, completedAt = null, token = null) {
+  // Wenn Offline: Speichere lokal und füge zur Sync Queue hinzu
+  if (!isOnline()) {
+    logger.warn('📡 Workouts API - Offline, markiere Workout als completed lokal');
+    
+    // Hole aktuelles Workout aus Cache
+    const currentWorkout = await getWorkoutOffline(workoutId);
+    
+    const offlineWorkout = {
+      ...(currentWorkout || {}),
+      _id: workoutId,
+      completed: true,
+      completedAt: completedAt || new Date().toISOString(),
+      _offlineUpdated: true
+    };
+    
+    // Update lokal
+    await saveWorkoutOffline(offlineWorkout);
+    
+    // Füge zur Sync Queue hinzu
+    await queueAction('update', 'workout', offlineWorkout);
+    
+    logger.debug('💾 Workouts API - Workout offline als completed markiert:', workoutId);
+    return offlineWorkout;
+  }
+  
   try {
     const config = {};
     if (token) {
@@ -151,6 +203,12 @@ export async function completeWorkout(workoutId, completedAt = null, token = nul
     const payload = { completed: true };
     if (completedAt) payload.completedAt = completedAt;
     const res = await api.put(`/${workoutId}`, payload, config);
+    
+    // Cache für Offline
+    if (res.data) {
+      await saveWorkoutOffline(res.data);
+    }
+    
     return res.data;
   } catch (error) {
     throw handleAPIError(error, 'Workout abschließen');
@@ -159,12 +217,30 @@ export async function completeWorkout(workoutId, completedAt = null, token = nul
 
 // Workout löschen
 export async function deleteWorkout(workoutId, token = null) {
+  // Wenn Offline: Lösche lokal und füge zur Sync Queue hinzu
+  if (!isOnline()) {
+    logger.warn('📡 Workouts API - Offline, lösche Workout lokal');
+    
+    // Lösche lokal
+    await deleteWorkoutOffline(workoutId);
+    
+    // Füge zur Sync Queue hinzu
+    await queueAction('delete', 'workout', { _id: workoutId });
+    
+    logger.debug('🗑️ Workouts API - Workout offline gelöscht:', workoutId);
+    return { success: true, _id: workoutId };
+  }
+  
   try {
     const config = {};
     if (token) {
       config.headers = { Authorization: `Bearer ${token}` };
     }
     const res = await api.delete(`/${workoutId}`, config);
+    
+    // Lösche auch aus Cache
+    await deleteWorkoutOffline(workoutId);
+    
     return res.data;
   } catch (error) {
     throw handleAPIError(error, 'Workout löschen');
