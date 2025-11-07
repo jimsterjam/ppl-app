@@ -14,7 +14,7 @@
       
       <!-- Sync Button -->
       <button 
-        v-if="isOffline && pendingCount > 0"
+        v-if="pendingCount > 0"
         class="sync-button"
         @click="triggerSync"
         :disabled="syncing"
@@ -75,7 +75,7 @@ async function updatePendingCount() {
 }
 
 async function triggerSync() {
-  if (syncing.value || isOffline.value) return
+  if (syncing.value) return
   
   syncing.value = true
   logger.debug('🔄 Offline Indicator - Manueller Sync gestartet')
@@ -116,6 +116,17 @@ onMounted(async () => {
   // Event Listeners
   window.addEventListener('online', handleOnline)
   window.addEventListener('offline', handleOffline)
+  
+  // Wenn wir online sind und Pending Actions haben, versuche auto zu synchronisieren
+  if (!isOffline.value && pendingCount.value > 0 && !isSyncInProgress()) {
+    logger.debug('🔄 Offline Indicator - Auto-Sync beim Start (online & pending)')
+    setTimeout(() => {
+      // doppelter Schutz, falls sich Status ändert
+      if (!isOffline.value && pendingCount.value > 0 && !isSyncInProgress()) {
+        triggerSync()
+      }
+    }, 600)
+  }
   
   // Update Pending Count regelmäßig
   const interval = setInterval(updatePendingCount, 10000) // Alle 10 Sekunden
