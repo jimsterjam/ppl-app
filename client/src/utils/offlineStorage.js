@@ -13,8 +13,16 @@ import { logger } from './logger'
 // Dexie Database Instance
 export const db = new Dexie('PPLAppDB')
 
-// Database Schema (Version 1)
+// Database Schema (Version 1 - Initial)
 db.version(1).stores({
+  workouts: '_id, userId, date, type, completed, createdAt',
+  exercises: '_id, category, name, muscleGroup',
+  syncQueue: '++id, action, entityType, timestamp, retryCount',
+  metadata: 'key'
+})
+
+// Database Schema (Version 2 - synced als Index hinzugefügt für countPendingActions)
+db.version(2).stores({
   // Workouts: Hauptdaten
   workouts: '_id, userId, date, type, completed, createdAt',
   
@@ -22,7 +30,8 @@ db.version(1).stores({
   exercises: '_id, category, name, muscleGroup',
   
   // Sync Queue: Offline-Änderungen die synchronisiert werden müssen
-  syncQueue: '++id, action, entityType, timestamp, synced, retryCount',
+  // synced wird als Index benötigt für countPendingActions()
+  syncQueue: '++id, synced, action, entityType, timestamp, retryCount',
   
   // Metadata: App-Status (z.B. letzter Sync)
   metadata: 'key'
