@@ -272,7 +272,16 @@ function getExerciseImage(ex) {
 
 function onImgError(evt) {
   const img = evt?.target
-  if (img) { img.onerror = null; img.src = '/exercises/camera.svg' }
+  if (!img) return
+  
+  // Verhindere Endlosschleife: Wenn src schon camera.svg ist, nicht nochmal setzen
+  if (img.src.includes('camera.svg')) {
+    img.onerror = null
+    return
+  }
+  
+  img.onerror = null
+  img.src = '/exercises/camera.svg'
 }
 
 function onExerciseImageClick(ex) {

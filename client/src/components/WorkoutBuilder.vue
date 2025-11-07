@@ -717,6 +717,12 @@ async function selectWorkoutType(type) {
 }
 
 async function loadExercises() {
+  // Verhindere parallele Aufrufe (Guard gegen Endlosschleife)
+  if (loading.value) {
+    logger.debug('⏭️ WorkoutBuilder - Überspringe loadExercises (bereits am Laden)')
+    return
+  }
+  
   loading.value = true
   logger.debug('🔄 WorkoutBuilder - Lade Übungen für Typ:', selectedType.value)
   if (!isSignedIn.value) {
@@ -991,13 +997,14 @@ watch(() => props.initialType, (newType) => {
 }, { immediate: true })
 
 // Lade Übungen automatisch, sobald der User angemeldet ist
-watch(isSignedIn, async (signedIn) => {
-  if (signedIn) {
+watch(isSignedIn, async (signedIn, oldSignedIn) => {
+  // Nur laden wenn sich der Status ÄNDERT (nicht bei initialem Mount)
+  if (signedIn && signedIn !== oldSignedIn) {
     await loadExercises()
-  } else {
+  } else if (!signedIn) {
     exercises.value = []
   }
-}, { immediate: true })
+})
 
 // Login-Redirect wird zentral über AuthLayout/Welcome gehandhabt
 
@@ -1053,6 +1060,13 @@ function getExerciseImage(ex) {
 function onImgError(evt, ex) {
   const img = evt?.target
   if (!img) return
+  
+  // Verhindere Endlosschleife: Wenn src schon camera.svg ist, nicht nochmal setzen
+  if (img.src.includes('camera.svg')) {
+    img.onerror = null
+    return
+  }
+  
   img.onerror = null
   img.src = '/exercises/camera.svg'
 }

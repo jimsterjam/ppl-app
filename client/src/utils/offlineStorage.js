@@ -13,27 +13,12 @@ import { logger } from './logger'
 // Dexie Database Instance
 export const db = new Dexie('PPLAppDB')
 
-// Database Schema (Version 1 - Initial)
+// Database Schema (Version 1)
+// Nutzt .filter() statt .where('synced') für Queries, daher kein Index auf synced nötig
 db.version(1).stores({
   workouts: '_id, userId, date, type, completed, createdAt',
   exercises: '_id, category, name, muscleGroup',
   syncQueue: '++id, action, entityType, timestamp, retryCount',
-  metadata: 'key'
-})
-
-// Database Schema (Version 2 - synced als Index hinzugefügt für countPendingActions)
-db.version(2).stores({
-  // Workouts: Hauptdaten
-  workouts: '_id, userId, date, type, completed, createdAt',
-  
-  // Exercises: Katalog
-  exercises: '_id, category, name, muscleGroup',
-  
-  // Sync Queue: Offline-Änderungen die synchronisiert werden müssen
-  // synced wird als Index benötigt für countPendingActions()
-  syncQueue: '++id, synced, action, entityType, timestamp, retryCount',
-  
-  // Metadata: App-Status (z.B. letzter Sync)
   metadata: 'key'
 })
 
@@ -264,10 +249,11 @@ export async function queueAction(action, entityType, data) {
  */
 export async function getPendingSyncActions() {
   try {
-    const pending = await db.syncQueue
-      .where('synced')
-      .equals(false)
-      .sortBy('timestamp')
+    // .filter() statt .where() weil synced möglicherweise keinen Index hat
+    const all = await db.syncQueue.toArray()
+    const pending = all
+      .filter(action => !action.synced)
+      .sort((a, b) => a.timestamp - b.timestamp)
     
     logger.debug('📋 Sync Queue - Pending Actions:', pending.length)
     return pending
@@ -322,13 +308,16 @@ export async function incrementRetryCount(id, error) {
  */
 export async function clearSyncedActions() {
   try {
-    const count = await db.syncQueue
-      .where('synced')
-      .equals(true)
-      .delete()
+    // .filter() statt .where() weil synced möglicherweise keinen Index hat
+    const all = await db.syncQueue.toArray()
+    const syncedIds = all
+      .filter(action => action.synced === true)
+      .map(action => action.id)
     
-    logger.debug('🧹 Sync Queue - Synced Actions gelöscht:', count)
-    return count
+    await db.syncQueue.bulkDelete(syncedIds)
+    
+    logger.debug('🧹 Sync Queue - Synced Actions gelöscht:', syncedIds.length)
+    return syncedIds.length
   } catch (error) {
     logger.error('❌ Sync Queue - Fehler beim Cleanup:', error)
     return 0
@@ -341,10 +330,10 @@ export async function clearSyncedActions() {
  */
 export async function countPendingActions() {
   try {
-    const count = await db.syncQueue
-      .where('synced')
-      .equals(false)
-      .count()
+    // .filter() statt .where() weil synced möglicherweise keinen Index hat
+    // (funktioniert auch mit Version 1 Schema ohne synced Index)
+    const actions = await db.syncQueue.toArray()
+    const count = actions.filter(action => !action.synced).length
     
     return count
   } catch (error) {
@@ -422,10 +411,14 @@ export async function clearAllOfflineData() {
  */
 export async function getStorageStats() {
   try {
+    // .filter() für pendingSync weil synced möglicherweise keinen Index hat
+    const allSyncActions = await db.syncQueue.toArray()
+    const pendingCount = allSyncActions.filter(action => !action.synced).length
+    
     const stats = {
       workouts: await db.workouts.count(),
       exercises: await db.exercises.count(),
-      pendingSync: await db.syncQueue.where('synced').equals(false).count(),
+      pendingSync: pendingCount,
       totalSync: await db.syncQueue.count(),
       lastSync: await getMetadata('lastSyncTimestamp')
     }
