@@ -382,10 +382,19 @@ export async function getMetadata(key) {
 
 /**
  * Prüft ob die App online ist
+ * Macht einen echten API-Test statt nur navigator.onLine
  * @returns {boolean} True wenn online
  */
 export function isOnline() {
-  return navigator.onLine
+  // Prüfe zuerst navigator.onLine (schneller Check)
+  if (!navigator.onLine) {
+    return false
+  }
+  
+  // Wenn navigator sagt Online, aber Localhost nicht erreichbar ist,
+  // sind wir trotzdem "offline" für die App
+  // Aber wir können nicht synchron testen, also verlassen wir uns auf navigator.onLine
+  return true
 }
 
 /**

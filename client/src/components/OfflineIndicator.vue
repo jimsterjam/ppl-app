@@ -103,10 +103,12 @@ function handleOffline() {
 }
 
 // Lifecycle
-onMounted(() => {
-  // Initial Check
+onMounted(async () => {
+  // Initial Check - wichtig: navigator.onLine prüfen
   isOffline.value = !navigator.onLine
-  updatePendingCount()
+  
+  // Update Pending Count (warten auf Result)
+  await updatePendingCount()
   
   // Zeige Indicator nur wenn Offline oder Pending Changes
   showIndicator.value = isOffline.value || pendingCount.value > 0
@@ -127,7 +129,8 @@ onMounted(() => {
   
   logger.debug('✅ Offline Indicator - Initialized', {
     isOffline: isOffline.value,
-    pendingCount: pendingCount.value
+    pendingCount: pendingCount.value,
+    navigatorOnLine: navigator.onLine
   })
 })
 </script>
