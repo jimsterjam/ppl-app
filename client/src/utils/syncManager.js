@@ -17,8 +17,6 @@ import {
 } from './offlineStorage'
 import { logger } from './logger'
 import { createWorkout, updateWorkout, deleteWorkout } from '@/api/workouts'
-import { getAuthToken } from './authToken'
-import { useAuth, useClerk } from '@clerk/vue'
 import { useToastStore } from '@/stores/toastStore'
 
 // Max Retry Attempts für fehlgeschlagene Syncs
@@ -63,14 +61,23 @@ export async function processSyncQueue() {
     let failedCount = 0
     
     // Token holen für API Calls
-    const auth = useAuth()
-    const clerk = useClerk()
-    const token = await getAuthToken({ clerk, auth }).catch(() => null)
+    // Verwende window.__clerk für direkten SDK Zugriff (ohne Vue Hooks)
+    let token = null
+    try {
+      if (window.__clerk && window.__clerk.session) {
+        token = await window.__clerk.session.getToken()
+        logger.debug('✅ Sync Manager - Token von Clerk SDK geholt')
+      } else {
+        logger.warn('⚠️ Sync Manager - Clerk Session nicht verfügbar')
+      }
+    } catch (error) {
+      logger.error('❌ Sync Manager - Token-Fehler:', error)
+    }
     
     if (!token) {
-      logger.warn('⚠️ Sync Manager - Kein Auth Token, breche ab')
+      logger.warn('⚠️ Sync Manager - Kein Auth Token, überspringe Sync')
       syncInProgress = false
-      return { success: 0, failed: pending.length, total: pending.length, noAuth: true }
+      return { success: 0, failed: 0, total: pending.length, noAuth: true }
     }
     
     // Verarbeite jede Action sequentiell
