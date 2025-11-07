@@ -1,6 +1,16 @@
 import axios from "axios";
 import { apiUrl } from "./http";
 import { handleAPIError, withErrorHandling } from "./errorHandler";
+import { 
+  cacheWorkouts, 
+  getAllWorkoutsOffline, 
+  saveWorkoutOffline,
+  getWorkoutOffline,
+  deleteWorkoutOffline,
+  queueAction,
+  isOnline
+} from "@/utils/offlineStorage";
+import { logger } from "@/utils/logger";
 
 // Web: relativ über /api; Mobile (Capacitor): VITE_API_BASE + /api
 const API_URL = apiUrl('workouts');
@@ -24,13 +34,23 @@ export async function fetchWorkouts(token = null) {
 
     if (!res) return [];
     if (res.status === 404 || res.status === 204 || res.status === 500) return [];
+    
+    // Bei erfolgreichem Response: Cache für Offline
+    if (Array.isArray(res.data) && res.data.length > 0) {
+      await cacheWorkouts(res.data);
+      logger.debug('💾 Workouts API - Cached:', res.data.length, 'workouts');
+    }
+    
     if (Array.isArray(res.data)) return res.data;
     // Falls Backend unerwartet kein Array liefert, sichere Rückgabe
     return [];
   } catch (error) {
-    // Bei Netzwerkfehlern: Leeres Array zurückgeben statt Error werfen
-    if (!error.response) {
-      return [];
+    // Bei Netzwerkfehlern: Fallback zu Offline-Daten
+    if (!error.response || !isOnline()) {
+      logger.warn('📡 Workouts API - Offline, lade aus Cache');
+      const cached = await getAllWorkoutsOffline();
+      logger.debug('📦 Workouts API - Offline Cache:', cached.length, 'workouts');
+      return cached;
     }
     throw handleAPIError(error, 'Workouts laden', { showToast: false });
   }
@@ -44,20 +64,63 @@ export async function fetchWorkout(workoutId, token = null) {
       config.headers = { Authorization: `Bearer ${token}` };
     }
     const res = await api.get(`/${workoutId}`, config);
+    
+    // Cache für Offline
+    if (res.data) {
+      await saveWorkoutOffline(res.data);
+    }
+    
     return res.data;
   } catch (error) {
+    // Bei Netzwerkfehlern: Fallback zu Offline-Daten
+    if (!error.response || !isOnline()) {
+      logger.warn('📡 Workouts API - Offline, lade Workout aus Cache:', workoutId);
+      const cached = await getWorkoutOffline(workoutId);
+      if (cached) {
+        return cached;
+      }
+    }
     throw handleAPIError(error, 'Workout laden');
   }
 }
 
 // Neues Workout erstellen
 export async function createWorkout(workoutData, token = null) {
+  // Wenn Offline: Speichere lokal und füge zur Sync Queue hinzu
+  if (!isOnline()) {
+    logger.warn('📡 Workouts API - Offline, erstelle Workout lokal');
+    
+    // Generiere temporäre ID
+    const tempId = `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const offlineWorkout = {
+      ...workoutData,
+      _id: tempId,
+      _offlineCreated: true,
+      createdAt: new Date().toISOString()
+    };
+    
+    // Speichere lokal
+    await saveWorkoutOffline(offlineWorkout);
+    
+    // Füge zur Sync Queue hinzu
+    await queueAction('create', 'workout', offlineWorkout);
+    
+    logger.debug('💾 Workouts API - Workout offline erstellt:', tempId);
+    return offlineWorkout;
+  }
+  
   try {
     const config = {};
     if (token) {
       config.headers = { Authorization: `Bearer ${token}` };
     }
     const res = await api.post("", workoutData, config);
+    
+    // Cache für Offline
+    if (res.data) {
+      await saveWorkoutOffline(res.data);
+    }
+    
     return res.data; // Erwartet das frisch erstellte Workout mit _id
   } catch (error) {
     throw handleAPIError(error, 'Workout erstellen');
