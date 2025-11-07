@@ -17,6 +17,7 @@ import {
 } from './offlineStorage'
 import { logger } from './logger'
 import { createWorkout, updateWorkout, deleteWorkout } from '@/api/workouts'
+import { getAuthToken } from './authToken'
 import { useToastStore } from '@/stores/toastStore'
 
 // Max Retry Attempts für fehlgeschlagene Syncs
@@ -60,21 +61,32 @@ export async function processSyncQueue() {
     let successCount = 0
     let failedCount = 0
     
-    // Token holen für API Calls
-    // Verwende window.__clerk für direkten SDK Zugriff (ohne Vue Hooks)
+    // Token holen für API Calls (robuste Helper-Funktion mit Fallbacks)
     let token = null
     try {
-      if (window.__clerk && window.__clerk.session) {
-        token = await window.__clerk.session.getToken()
-        logger.debug('✅ Sync Manager - Token von Clerk SDK geholt')
+      token = await getAuthToken()
+      if (token && token !== 'demo-token-for-testing') {
+        logger.debug('✅ Sync Manager - Auth Token erhalten')
       } else {
-        logger.warn('⚠️ Sync Manager - Clerk Session nicht verfügbar')
+        logger.warn('⚠️ Sync Manager - Kein gültiges Auth Token (Demo/Fallback)')
       }
     } catch (error) {
       logger.error('❌ Sync Manager - Token-Fehler:', error)
     }
-    
-    if (!token) {
+
+    // Zweiter Versuch nach kurzem Delay (z. B. wenn Clerk noch initialisiert)
+    if (!token || token === 'demo-token-for-testing') {
+      await new Promise(r => setTimeout(r, 600))
+      try {
+        const retryToken = await getAuthToken()
+        if (retryToken && retryToken !== 'demo-token-for-testing') {
+          token = retryToken
+          logger.debug('✅ Sync Manager - Token beim 2. Versuch erhalten')
+        }
+      } catch {}
+    }
+
+    if (!token || token === 'demo-token-for-testing') {
       logger.warn('⚠️ Sync Manager - Kein Auth Token, überspringe Sync')
       syncInProgress = false
       return { success: 0, failed: 0, total: pending.length, noAuth: true }
@@ -255,6 +267,8 @@ export async function triggerManualSync() {
   
   if (result.offline) {
     toast.error('Keine Verbindung - bitte später versuchen', { duration: 3000 })
+  } else if (result.noAuth) {
+    toast.error('Nicht eingeloggt – bitte anmelden, um zu synchronisieren', { duration: 4000 })
   } else if (result.total === 0) {
     toast.success('Alles synchronisiert ✓', { duration: 2000 })
   }
