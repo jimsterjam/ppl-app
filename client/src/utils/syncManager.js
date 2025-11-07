@@ -179,8 +179,19 @@ async function syncAction(item, token) {
 async function syncWorkoutAction(action, data, token) {
   switch (action) {
     case 'create':
-      await createWorkout(data, token)
-      logger.debug('✅ Sync - Workout erstellt:', data._id)
+      // Bei offline erstellten Workouts: Entferne temporäre _id
+      // (MongoDB generiert eine neue echte ObjectId)
+      const createData = { ...data }
+      if (createData._id && typeof createData._id === 'string' && createData._id.startsWith('offline_')) {
+        logger.debug('🔄 Sync - Entferne temporäre offline _id:', createData._id)
+        delete createData._id
+      }
+      
+      const createdWorkout = await createWorkout(createData, token)
+      logger.debug('✅ Sync - Workout erstellt mit neuer _id:', createdWorkout._id)
+      
+      // TODO: Optional - Update lokales Workout mit echter _id
+      // await saveWorkoutOffline({ ...createData, _id: createdWorkout._id })
       break
       
     case 'update':
