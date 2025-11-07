@@ -259,6 +259,7 @@ import AppModal from '@/components/AppModal.vue'
 import UpgradeModal from '@/components/UpgradeModal.vue'
 import { useToastStore } from '@/stores/toastStore'
 import { logger } from '@/utils/logger'
+import { prefillExercises, matchExerciseByIdOrName } from '@/utils/workoutHelpers'
 
 // Props
 const props = defineProps({
@@ -585,6 +586,7 @@ async function prefillFromAISuggestion() {
 async function prefillFromRepeatIfAny() {
   const repeatId = (route.query.repeat || '').toString()
   if (!repeatId) return
+  
   try {
     // Workout aus Store oder API holen
     let base = store.workouts.find(w => w._id === repeatId) || null
@@ -601,16 +603,16 @@ async function prefillFromRepeatIfAny() {
     }
     await loadExercises()
 
-    // Übungen aus dem Basis-Workout in der gleichen Reihenfolge übernehmen
-    const ordered = []
-    const baseList = Array.isArray(base.exercises) ? base.exercises : []
-    for (const be of baseList) {
-      const match = exercises.value.find(ex => (be.exerciseId && ex._id === be.exerciseId) || (!be.exerciseId && be.name && ex.name === be.name))
-      if (match && !ordered.some(x => x._id === match._id)) {
-        ordered.push(match)
-      }
-    }
-    selectedExercises.value = ordered
+    // Nutze prefillExercises Helper
+    const baseExercises = Array.isArray(base.exercises) ? base.exercises : []
+    const matched = prefillExercises(baseExercises, exercises.value, {
+      skipDuplicates: true,
+      existingExercises: []
+    })
+    
+    selectedExercises.value = matched
+    logger.debug('✅ WorkoutBuilder - Repeat Workout geladen:', matched.length, 'Übungen')
+    
     await nextTick()
     if (!didPlanScroll.value && selectedExercises.value.length > 0) {
       scrollToPlan()
