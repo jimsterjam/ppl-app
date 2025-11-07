@@ -190,34 +190,55 @@ async function syncWorkoutAction(action, data, token) {
  * Startet Auto-Sync wenn Online
  * Registriert Event Listener für 'online' Event
  */
-export function setupAutoSync() {
+export async function setupAutoSync() {
   // Event Listener für Online Status
   window.addEventListener('online', async () => {
     logger.debug('📡 Sync Manager - Network reconnected, starte Auto-Sync')
-    
+
     // Toast Notification
     const toast = useToastStore()
     toast.info('Verbindung wiederhergestellt, synchronisiere...', {
       duration: 2000
     })
-    
+
     // Warte kurz damit der Browser sich stabilisiert
     await new Promise(resolve => setTimeout(resolve, 1000))
-    
+
     // Starte Sync
     await processSyncQueue()
   })
-  
+
   window.addEventListener('offline', () => {
     logger.warn('📡 Sync Manager - Network lost, Offline Mode')
-    
+
     const toast = useToastStore()
     toast.warning('Keine Verbindung - Offline Mode aktiv', {
       duration: 3000
     })
   })
-  
+
   logger.debug('✅ Sync Manager - Auto-Sync aktiviert')
+
+  // Initialer Sync beim App-Start, falls bereits online & Pending Actions vorhanden
+  if (isOnline()) {
+    try {
+      const pending = await getPendingSyncActions()
+      if (pending.length > 0) {
+        logger.debug('📡 Sync Manager - Initial pending Actions beim Start:', pending.length)
+        // Kleiner Delay, damit Clerk Session geladen werden kann
+        setTimeout(() => {
+          // Nur starten wenn kein anderer Sync läuft
+          if (!isSyncInProgress()) {
+            processSyncQueue()
+          } else {
+            logger.debug('⏳ Sync Manager - Initial Sync übersprungen, da bereits aktiv')
+          }
+        }, 500)
+      }
+    } catch (error) {
+      logger.error('❌ Sync Manager - Initial Sync Fehler:', error)
+    }
+  }
 }
 
 /**

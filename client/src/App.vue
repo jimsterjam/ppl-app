@@ -7,9 +7,9 @@ import { setupAutoSync } from './utils/syncManager'
 import { logger } from './utils/logger'
 
 // Setup Offline Support
-onMounted(() => {
-  setupAutoSync()
-  logger.debug('✅ App - Offline Support aktiviert')
+onMounted(async () => {
+  await setupAutoSync()
+  logger.debug('✅ App - Offline Support aktiviert (inkl. Initial Sync)')
 })
 </script>
 
