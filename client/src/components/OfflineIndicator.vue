@@ -90,13 +90,21 @@ async function triggerSync() {
   try {
     const result = await triggerManualSync()
     
-    // Warte kurz bevor wir den syncing state zurücksetzen
-    await new Promise(resolve => setTimeout(resolve, 500))
+    logger.debug('✅ Offline Indicator - Sync abgeschlossen, warte auf DB Cleanup', result)
     
-    // Update pending count
+    // Warte länger damit clearSyncedActions() abgeschlossen ist
+    await new Promise(resolve => setTimeout(resolve, 1000))
+    
+    // Update pending count NACH dem Cleanup
     await updatePendingCount()
     
-    logger.debug('✅ Offline Indicator - Sync abgeschlossen', {
+    // Nochmal update nach weiterer Verzögerung (falls DB noch schreibt)
+    setTimeout(async () => {
+      await updatePendingCount()
+      logger.debug('📊 Offline Indicator - Final Pending Count:', pendingCount.value)
+    }, 500)
+    
+    logger.debug('✅ Offline Indicator - Sync komplett', {
       pendingCount: pendingCount.value,
       result
     })
@@ -117,10 +125,16 @@ async function handleOnline() {
   
   // Wenn pending changes vorhanden, trigger Auto-Sync
   if (pendingCount.value > 0 && !isSyncInProgress()) {
-    logger.debug('🔄 Offline Indicator - Auto-Sync nach Online-Event')
-    setTimeout(() => {
+    logger.debug('🔄 Offline Indicator - Auto-Sync nach Online-Event, Pending:', pendingCount.value)
+    setTimeout(async () => {
       if (!isOffline.value && pendingCount.value > 0 && !isSyncInProgress()) {
-        triggerSync()
+        await triggerSync()
+        
+        // Nochmal count updaten nach Sync
+        setTimeout(async () => {
+          await updatePendingCount()
+          logger.debug('📊 Offline Indicator - Post-Sync Count:', pendingCount.value)
+        }, 1500)
       }
     }, 1000)
   }

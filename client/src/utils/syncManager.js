@@ -185,13 +185,27 @@ async function syncAction(item, token) {
 async function syncWorkoutAction(action, data, token) {
   switch (action) {
     case 'create':
-      // Bei offline erstellten Workouts: Entferne temporäre _id
+      // Bei offline erstellten Workouts: Entferne temporäre _id UND offline flags
       // (MongoDB generiert eine neue echte ObjectId)
       const createData = { ...data }
+      
+      // Entferne offline-spezifische Felder
       if (createData._id && typeof createData._id === 'string' && createData._id.startsWith('offline_')) {
         logger.debug('🔄 Sync - Entferne temporäre offline _id:', createData._id)
         delete createData._id
       }
+      
+      // Entferne offline Marker Flags
+      delete createData._offlineCreated
+      delete createData._offlineUpdated
+      delete createData._failedOnline
+      delete createData._syncedAt
+      
+      logger.debug('🔄 Sync - Bereinigte Daten für API:', {
+        hasId: !!createData._id,
+        name: createData.name,
+        type: createData.type
+      })
       
       const createdWorkout = await createWorkout(createData, token)
       logger.debug('✅ Sync - Workout erstellt mit neuer _id:', createdWorkout._id)
@@ -201,8 +215,24 @@ async function syncWorkoutAction(action, data, token) {
       break
       
     case 'update':
-      await updateWorkout(data._id, data, token)
-      logger.debug('✅ Sync - Workout aktualisiert:', data._id)
+      // Bereinige Update-Daten
+      const updateData = { ...data }
+      delete updateData._offlineCreated
+      delete updateData._offlineUpdated
+      delete updateData._failedOnline
+      delete updateData._syncedAt
+      
+      // Bei offline erstellten Workouts die jetzt geupdated werden sollen:
+      // Diese sollten eigentlich als 'create' in der Queue sein, aber falls nicht:
+      if (data._id && typeof data._id === 'string' && data._id.startsWith('offline_')) {
+        logger.warn('⚠️ Sync - Update mit offline_id gefunden, konvertiere zu Create')
+        delete updateData._id
+        const createdWorkout = await createWorkout(updateData, token)
+        logger.debug('✅ Sync - Workout als Create erstellt:', createdWorkout._id)
+      } else {
+        await updateWorkout(data._id, updateData, token)
+        logger.debug('✅ Sync - Workout aktualisiert:', data._id)
+      }
       break
       
     case 'delete':
