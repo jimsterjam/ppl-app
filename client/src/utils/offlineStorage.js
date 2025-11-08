@@ -230,11 +230,17 @@ export async function getAllExercisesOffline(filters = {}) {
     let query = db.exercises.toCollection()
     
     if (filters.category) {
-      query = query.filter(ex => ex.category === filters.category)
+      // Case-insensitive Filterung für bessere Kompatibilität
+      const targetCategory = filters.category.toLowerCase()
+      query = query.filter(ex => {
+        const exCategory = (ex.category || '').toLowerCase()
+        return exCategory === targetCategory
+      })
+      logger.debug('🔍 Offline Storage - Filtere nach Kategorie:', filters.category)
     }
     
     const exercises = await query.toArray()
-    logger.debug('📦 Offline Storage - Exercises geladen:', exercises.length)
+    logger.debug('📦 Offline Storage - Exercises geladen:', exercises.length, filters.category ? `(filtered: ${filters.category})` : '')
     return exercises
   } catch (error) {
     logger.error('❌ Offline Storage - Fehler beim Laden aller Exercises:', error)
