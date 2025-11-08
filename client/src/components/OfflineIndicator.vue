@@ -88,10 +88,21 @@ async function triggerSync() {
   logger.debug('🔄 Offline Indicator - Manueller Sync gestartet')
   
   try {
-    await triggerManualSync()
+    const result = await triggerManualSync()
+    
+    // Warte kurz bevor wir den syncing state zurücksetzen
+    await new Promise(resolve => setTimeout(resolve, 500))
+    
+    // Update pending count
     await updatePendingCount()
+    
+    logger.debug('✅ Offline Indicator - Sync abgeschlossen', {
+      pendingCount: pendingCount.value,
+      result
+    })
   } catch (error) {
     logger.error('❌ Offline Indicator - Sync fehlgeschlagen:', error)
+    await updatePendingCount()
   } finally {
     syncing.value = false
   }
@@ -144,8 +155,12 @@ onMounted(async () => {
     }, 600)
   }
   
-  // Update Pending Count regelmäßig
-  const interval = setInterval(updatePendingCount, 10000) // Alle 10 Sekunden
+  // Update Pending Count regelmäßig (nur wenn nicht am Syncen)
+  const interval = setInterval(() => {
+    if (!syncing.value) {
+      updatePendingCount()
+    }
+  }, 10000) // Alle 10 Sekunden
   
   // Cleanup
   onUnmounted(() => {

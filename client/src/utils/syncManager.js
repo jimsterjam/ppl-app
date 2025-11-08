@@ -139,8 +139,14 @@ export async function processSyncQueue() {
       })
     }
     
+    // Setze syncInProgress NACH den Toasts zurück
+    // damit der Indicator Zeit hat auf die neue pendingCount zu reagieren
     syncInProgress = false
-    return { success: successCount, failed: failedCount, total: pending.length }
+    
+    // Gebe Ergebnis zurück
+    const result = { success: successCount, failed: failedCount, total: pending.length }
+    logger.debug('📊 Sync Manager - Result:', result)
+    return result
     
   } catch (error) {
     logger.error('❌ Sync Manager - Sync Error:', error)
