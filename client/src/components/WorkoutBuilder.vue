@@ -21,7 +21,7 @@
     <StepIndicator :active="activeStep" />
 
 
-    <!-- Auth-Gate: Ohne Login keine Builder-UI -->
+    <!-- Auth-Gate: User muss eingeloggt sein -->
     <div v-if="!isSignedIn" class="auth-gate">
       <p class="auth-gate-text">{{ t('builder.authGate') }}</p>
     </div>
@@ -726,6 +726,7 @@ async function loadExercises() {
   
   loading.value = true
   logger.debug('🔄 WorkoutBuilder - Lade Übungen für Typ:', selectedType.value)
+  
   if (!isSignedIn.value) {
     logger.warn('⚠️ WorkoutBuilder - Nicht angemeldet, lade keine Übungen')
     exercises.value = []
@@ -829,6 +830,7 @@ async function createWorkout() {
   try {
     errorMsg.value = ''
     
+    // User MUSS eingeloggt sein (online oder offline mit cached Session)
     if (!isSignedIn.value) {
       logger.warn('⛔️ Nicht angemeldet – Erstellen abgebrochen')
       errorMsg.value = t('builder.signInFirst')
@@ -861,18 +863,23 @@ async function createWorkout() {
       completed: false
     }
 
-    // Token holen (Preflight)
-    let token = await getAuthToken({ clerk, auth }).catch(() => null)
-    if (!token) {
-      // Zweiter Versuch ohne Cache
-  token = await getAuthToken({ clerk, auth, options: { skipCache: true } }).catch(() => null)
+    // Token holen (auch offline möglich aus Clerk Session Cache)
+    let token = null
+    try {
+      token = await getAuthToken({ clerk, auth }).catch(() => null)
+      if (!token) {
+        // Zweiter Versuch ohne Cache
+        token = await getAuthToken({ clerk, auth, options: { skipCache: true } }).catch(() => null)
+      }
+      if (!token) {
+        // Offline: Token kann nicht abgerufen werden → Store handled das
+        logger.warn('⚠️ Kein Token verfügbar (offline oder Session expired)')
+      }
+    } catch (tokenError) {
+      logger.warn('⚠️ Token-Abruf fehlgeschlagen:', tokenError.message)
     }
-    if (!token) {
-      errorMsg.value = t('builder.sessionNotReady')
-      logger.warn('⚠️ Kein Token verfügbar – Abbruch')
-      return
-    }
-    // Workout über Store erstellen (inkl. Fehlerbehandlung)
+    
+    // Workout über Store erstellen (inkl. Offline-Handling)
   const created = await store.createWorkout(workoutData, token)
 
     // Kein Workout-Cover-Upload im Erstell-Flow
