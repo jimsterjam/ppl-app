@@ -36,9 +36,16 @@ import { logger } from '@/utils/logger'
 const isOffline = ref(!navigator.onLine)
 const pendingCount = ref(0)
 const syncing = ref(false)
-const showIndicator = ref(false)
 
 // Computed
+const showIndicator = computed(() => {
+  // Zeige Indicator wenn:
+  // 1. Offline ODER
+  // 2. Online mit pending changes ODER
+  // 3. Gerade am Synchronisieren
+  return isOffline.value || pendingCount.value > 0 || syncing.value
+})
+
 const indicatorClass = computed(() => ({
   'offline': isOffline.value,
   'online': !isOffline.value && pendingCount.value > 0,
@@ -90,16 +97,28 @@ async function triggerSync() {
   }
 }
 
-function handleOnline() {
+async function handleOnline() {
   logger.debug('📡 Offline Indicator - Online')
   isOffline.value = false
-  updatePendingCount()
+  
+  // Update pending count nach online
+  await updatePendingCount()
+  
+  // Wenn pending changes vorhanden, trigger Auto-Sync
+  if (pendingCount.value > 0 && !isSyncInProgress()) {
+    logger.debug('🔄 Offline Indicator - Auto-Sync nach Online-Event')
+    setTimeout(() => {
+      if (!isOffline.value && pendingCount.value > 0 && !isSyncInProgress()) {
+        triggerSync()
+      }
+    }, 1000)
+  }
 }
 
 function handleOffline() {
   logger.warn('📡 Offline Indicator - Offline')
   isOffline.value = true
-  showIndicator.value = true
+  updatePendingCount()
 }
 
 // Lifecycle
@@ -109,9 +128,6 @@ onMounted(async () => {
   
   // Update Pending Count (warten auf Result)
   await updatePendingCount()
-  
-  // Zeige Indicator nur wenn Offline oder Pending Changes
-  showIndicator.value = isOffline.value || pendingCount.value > 0
   
   // Event Listeners
   window.addEventListener('online', handleOnline)
