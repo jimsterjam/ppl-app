@@ -253,6 +253,7 @@ import { useUserStore } from '@/stores/userStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import axios from 'axios'
 import { fetchWorkout } from '@/api/workouts'
+import { fetchExercises } from '@/api/exercises'
 import StepIndicator from './StepIndicator.vue'
 import BottomNav from '@/components/BottomNav.vue'
 import AppModal from '@/components/AppModal.vue'
@@ -733,57 +734,8 @@ async function loadExercises() {
   }
   
   try {
-    let headers = {}
-    // Token hinzufügen falls verfügbar
-    if (isSignedIn.value) {
-      try {
-  const token = await getAuthToken({ clerk, auth })
-        if (token) {
-          headers.Authorization = `Bearer ${token}`
-          logger.debug('🔑 WorkoutBuilder - Token verfügbar')
-        } else {
-          logger.warn('⚠️ WorkoutBuilder - Kein Token erhalten')
-        }
-      } catch (tokenError) {
-        logger.warn('⚠️ WorkoutBuilder - Token konnte nicht abgerufen werden:', tokenError)
-      }
-    } else {
-      logger.warn('⚠️ WorkoutBuilder - Nutzer nicht angemeldet')
-    }
-
-  // Relative URL; Vite-Proxy leitet in Dev auf 3001 weiter
-  const apiUrl = '/api/exercises'
-    logger.debug('🌐 WorkoutBuilder - API-Anfrage an:', apiUrl)
-
-    // Versuche zuerst API-Call ohne Authentifizierung für Debugging
-    logger.debug('🔄 WorkoutBuilder - Teste API ohne Authentifizierung...')
-    let responseData = null
-    
-    try {
-      const testResponse = await axios.get(apiUrl, { timeout: 5000 })
-      logger.debug('✅ WorkoutBuilder - API ohne Auth funktioniert, Übungen:', testResponse.data?.length)
-      responseData = testResponse.data
-    } catch (testError) {
-      logger.warn('⚠️ WorkoutBuilder - API ohne Auth fehlgeschlagen:', testError.message)
-      
-      // Fallback: Versuche mit Authentifizierung
-      logger.debug('🔄 WorkoutBuilder - Versuche API mit Authentifizierung...')
-      try {
-        const response = await axios.get(apiUrl, {
-          headers,
-          timeout: 10000 // 10 Sekunden Timeout
-        })
-        logger.debug('📦 WorkoutBuilder - API mit Auth erfolgreich, Übungen:', response.data?.length)
-        responseData = response.data
-      } catch (authError) {
-        logger.error('❌ WorkoutBuilder - Beide API-Versuche fehlgeschlagen:', authError.message)
-        throw authError // Werfe Fehler für äußeres catch-Block
-      }
-    }
-
-    // Jetzt filtern wir die erfolg geladenan Daten
-    let allExercises = responseData || []
-    let filteredExercises = []
+    // Nutze die exercises.js API mit eingebautem Offline-Fallback
+    logger.debug('🔄 WorkoutBuilder - Lade Übungen via API (mit Offline-Support)...')
     
     // Mappe interne Typen zu Backend-Kategorien
     const categoryMap = {
@@ -795,20 +747,16 @@ async function loadExercises() {
     const targetCategory = categoryMap[selectedType.value]
     logger.debug('🎯 WorkoutBuilder - Filtere für Kategorie:', targetCategory)
     
-    if (targetCategory && allExercises.length > 0) {
-      filteredExercises = allExercises.filter(exercise => 
-        exercise.category === targetCategory
-      )
-      logger.debug('✅ WorkoutBuilder - Gefilterte Übungen:', filteredExercises.length, 'von', allExercises.length)
-    } else {
-      filteredExercises = allExercises
-      logger.debug('⚠️ WorkoutBuilder - Keine Filterung, alle Übungen:', filteredExercises.length)
-    }
+    // Nutze fetchExercises mit category filter (unterstützt Offline-Cache)
+    const allExercises = await fetchExercises({ category: targetCategory })
     
-    exercises.value = filteredExercises
-    logger.debug('✅ WorkoutBuilder - Übungen erfolgreich geladen!')
+    logger.debug('✅ WorkoutBuilder - Übungen erfolgreich geladen:', allExercises.length)
+    
+    exercises.value = allExercises
     logger.debug('📊 WorkoutBuilder - exercises.value jetzt:', exercises.value.length, 'Items')
-    logger.debug('📊 WorkoutBuilder - Erste 5 Übungen:', exercises.value.slice(0, 5).map(e => e.name))
+    if (exercises.value.length > 0) {
+      logger.debug('📊 WorkoutBuilder - Erste 5 Übungen:', exercises.value.slice(0, 5).map(e => e.name))
+    }
     
   } catch (error) {
     logger.error('❌ WorkoutBuilder - API-Fehler Details:', {
@@ -1061,14 +1009,18 @@ function onImgError(evt, ex) {
   const img = evt?.target
   if (!img) return
   
-  // Verhindere Endlosschleife: Wenn src schon camera.svg ist, nicht nochmal setzen
-  if (img.src.includes('camera.svg')) {
+  // Verhindere Endlosschleife: Wenn src schon camera.svg ist oder data-fallback gesetzt, nicht nochmal setzen
+  if (img.src.includes('camera.svg') || img.dataset.fallback === 'true') {
     img.onerror = null
     return
   }
   
+  // Markiere als Fallback und setze camera.svg
+  img.dataset.fallback = 'true'
   img.onerror = null
   img.src = '/exercises/camera.svg'
+  
+  logger.debug('🖼️ WorkoutBuilder - Fallback zu camera.svg für:', ex?.name || 'unbekannt')
 }
 
 // (Cover-Image Hilfsfunktionen entfernt)
