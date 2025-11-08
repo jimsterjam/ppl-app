@@ -32,20 +32,63 @@ db.open().catch(err => {
 // ============================================================================
 
 /**
+ * Sanitize object für IndexedDB (entfernt nicht-klonierbare Properties)
+ * @param {any} obj - Zu bereinigendes Objekt
+ * @returns {any} Bereinigtes Objekt
+ */
+function sanitizeForIndexedDB(obj) {
+  if (obj === null || obj === undefined) return obj
+  
+  // Primitive Typen direkt zurückgeben
+  if (typeof obj !== 'object') return obj
+  
+  // Arrays rekursiv bereinigen
+  if (Array.isArray(obj)) {
+    return obj.map(item => sanitizeForIndexedDB(item))
+  }
+  
+  // Date-Objekte als ISO String speichern
+  if (obj instanceof Date) {
+    return obj.toISOString()
+  }
+  
+  // Plain Object: Nur eigene enumerable Properties übernehmen
+  const sanitized = {}
+  for (const key in obj) {
+    if (obj.hasOwnProperty(key)) {
+      const value = obj[key]
+      
+      // Skip Funktionen und Symbole
+      if (typeof value === 'function' || typeof value === 'symbol') {
+        continue
+      }
+      
+      // Rekursiv für verschachtelte Objekte
+      sanitized[key] = sanitizeForIndexedDB(value)
+    }
+  }
+  
+  return sanitized
+}
+
+/**
  * Speichert ein Workout lokal
  * @param {Object} workout - Workout Objekt
  * @returns {Promise<string>} Workout ID
  */
 export async function saveWorkoutOffline(workout) {
   try {
+    // Sanitize workout vor dem Speichern (entfernt Vue Proxies, Funktionen, etc.)
+    const cleanWorkout = sanitizeForIndexedDB(workout)
+    
     await db.workouts.put({
-      ...workout,
+      ...cleanWorkout,
       _syncedAt: Date.now() // Timestamp für Cache-Invalidierung
     })
-    logger.debug('💾 Offline Storage - Workout gespeichert:', workout._id)
-    return workout._id
+    logger.debug('💾 Offline Storage - Workout gespeichert:', cleanWorkout._id)
+    return cleanWorkout._id
   } catch (error) {
-    logger.error('❌ Offline Storage - Fehler beim Speichern:', error)
+    logger.error('❌ Offline Storage - Fehler beim Speichern:', error, workout)
     throw error
   }
 }
@@ -120,7 +163,10 @@ export async function deleteWorkoutOffline(id) {
  */
 export async function cacheWorkouts(workouts) {
   try {
-    const workoutsWithTimestamp = workouts.map(w => ({
+    // Sanitize alle Workouts
+    const cleanWorkouts = workouts.map(w => sanitizeForIndexedDB(w))
+    
+    const workoutsWithTimestamp = cleanWorkouts.map(w => ({
       ...w,
       _syncedAt: Date.now()
     }))
@@ -144,12 +190,15 @@ export async function cacheWorkouts(workouts) {
  */
 export async function saveExerciseOffline(exercise) {
   try {
+    // Sanitize exercise vor dem Speichern
+    const cleanExercise = sanitizeForIndexedDB(exercise)
+    
     await db.exercises.put({
-      ...exercise,
+      ...cleanExercise,
       _syncedAt: Date.now()
     })
-    logger.debug('💾 Offline Storage - Exercise gespeichert:', exercise._id)
-    return exercise._id
+    logger.debug('💾 Offline Storage - Exercise gespeichert:', cleanExercise._id)
+    return cleanExercise._id
   } catch (error) {
     logger.error('❌ Offline Storage - Fehler beim Speichern Exercise:', error)
     throw error
@@ -200,7 +249,10 @@ export async function getAllExercisesOffline(filters = {}) {
  */
 export async function cacheExercises(exercises) {
   try {
-    const exercisesWithTimestamp = exercises.map(ex => ({
+    // Sanitize alle Exercises
+    const cleanExercises = exercises.map(ex => sanitizeForIndexedDB(ex))
+    
+    const exercisesWithTimestamp = cleanExercises.map(ex => ({
       ...ex,
       _syncedAt: Date.now()
     }))
@@ -226,10 +278,13 @@ export async function cacheExercises(exercises) {
  */
 export async function queueAction(action, entityType, data) {
   try {
+    // Sanitize data vor dem Speichern (entfernt Vue Proxies, Funktionen, etc.)
+    const cleanData = sanitizeForIndexedDB(data)
+    
     const id = await db.syncQueue.add({
       action,
       entityType,
-      data,
+      data: cleanData,
       timestamp: Date.now(),
       synced: false,
       retryCount: 0,
@@ -238,7 +293,7 @@ export async function queueAction(action, entityType, data) {
     logger.debug('📝 Sync Queue - Action hinzugefügt:', action, entityType, id)
     return id
   } catch (error) {
-    logger.error('❌ Sync Queue - Fehler beim Hinzufügen:', error)
+    logger.error('❌ Sync Queue - Fehler beim Hinzufügen:', error, data)
     throw error
   }
 }
