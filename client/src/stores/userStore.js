@@ -128,43 +128,32 @@ export const useUserStore = defineStore("user", {
     async createWorkout(workoutData, token = null) {
       try {
         console.log('💾 Creating new workout:', workoutData);
-        // Auth erzwingen: Ohne Token kein Erstellen
-        if (!token) {
-          console.warn('⛔️ Cannot create workout without auth token');
-          const err = new Error('AUTH_REQUIRED');
-          err.code = 'AUTH_REQUIRED';
-          throw err;
-        }
+        
+        // Wenn kein Token: Direkt offline erstellen (workouts.js handled das)
+        // Die createWorkout API-Funktion hat bereits Offline-Fallback eingebaut
         const newWorkout = await createWorkout(workoutData, token);
-        // Erwartet Backend-Response mit _id
+        
+        // Erwartet Backend-Response mit _id ODER offline_id
         if (newWorkout && newWorkout._id) {
           this.workouts.push(newWorkout);
+          console.log('✅ Workout created:', newWorkout._id);
         } else {
-          console.warn('⚠️ Backend did not return created workout with _id, creating draft locally');
-          const draft = { ...workoutData, _id: `draft-${Date.now()}`, isDraft: true };
-          this.workouts.push(draft);
-          console.log('✅ Workout draft created (no _id from backend)');
-          return draft;
+          console.warn('⚠️ Kein Workout zurückerhalten');
         }
-        console.log('✅ Workout created successfully:', newWorkout);
+        
         return newWorkout;
       } catch (error) {
         console.error('❌ Error creating workout:', error);
-        // Bei expliziter Nicht-Autorisierung KEIN Draft erstellen, sondern nach oben melden
+        
+        // Bei expliziter Auth-Fehlern: nach oben melden
         const status = error?.response?.status;
         if (status === 401 || status === 403 || error?.code === 'UNAUTHORIZED') {
           const err = new Error('UNAUTHORIZED');
           err.code = 'UNAUTHORIZED';
           throw err;
         }
-        // Bei anderen Backend-Fehlern trotz Token: optionaler Draft-Fallback nur wenn explizit erlaubt
-        if (token && import.meta.env.VITE_ALLOW_DRAFT_FALLBACK === '1') {
-          const draft = { ...workoutData, _id: `draft-${Date.now()}`, isDraft: true };
-          this.workouts.push(draft);
-          console.log('✅ Created local draft due to backend error');
-          return draft;
-        }
-        // Ohne Token: Fehler weiterreichen
+        
+        // Alle anderen Fehler weiterreichen
         throw error;
       }
     },
