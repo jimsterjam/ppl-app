@@ -261,6 +261,7 @@ import UpgradeModal from '@/components/UpgradeModal.vue'
 import { useToastStore } from '@/stores/toastStore'
 import { logger } from '@/utils/logger'
 import { prefillExercises, matchExerciseByIdOrName } from '@/utils/workoutHelpers'
+import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 
 // Props
 const props = defineProps({
@@ -283,6 +284,7 @@ const store = useUserStore()
 const subscriptionStore = useSubscriptionStore()
 const toast = useToastStore()
 const { t, locale } = useI18n()
+const { getTranslatedExerciseName } = useExerciseTranslation()
 
 // Subscription state
 const showUpgradeModal = ref(false)
