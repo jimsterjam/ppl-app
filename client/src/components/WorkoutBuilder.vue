@@ -867,16 +867,22 @@ async function createWorkout() {
     let token = null
     try {
       token = await getAuthToken({ clerk, auth }).catch(() => null)
+      
       if (!token) {
-        // Zweiter Versuch ohne Cache
+        // Zweiter Versuch ohne Cache (mit Timeout)
+        await new Promise(resolve => setTimeout(resolve, 300))
         token = await getAuthToken({ clerk, auth, options: { skipCache: true } }).catch(() => null)
       }
+      
       if (!token) {
-        // Offline: Token kann nicht abgerufen werden → Store handled das
-        logger.warn('⚠️ Kein Token verfügbar (offline oder Session expired)')
+        // Kein Token verfügbar (offline, Session expired, oder Clerk noch nicht ready)
+        logger.warn('⚠️ WorkoutBuilder - Kein Token verfügbar, Workout wird offline gespeichert')
+      } else {
+        logger.debug('✅ WorkoutBuilder - Token erfolgreich abgerufen')
       }
     } catch (tokenError) {
-      logger.warn('⚠️ Token-Abruf fehlgeschlagen:', tokenError.message)
+      logger.warn('⚠️ WorkoutBuilder - Token-Abruf fehlgeschlagen:', tokenError.message)
+      token = null
     }
     
     // Workout über Store erstellen (inkl. Offline-Handling)

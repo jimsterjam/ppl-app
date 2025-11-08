@@ -65,28 +65,28 @@ export async function processSyncQueue() {
     let token = null
     try {
       token = await getAuthToken()
-      if (token && token !== 'demo-token-for-testing') {
+      if (token) {
         logger.debug('✅ Sync Manager - Auth Token erhalten')
       } else {
-        logger.warn('⚠️ Sync Manager - Kein gültiges Auth Token (Demo/Fallback)')
+        logger.warn('⚠️ Sync Manager - Kein gültiges Auth Token')
       }
     } catch (error) {
       logger.error('❌ Sync Manager - Token-Fehler:', error)
     }
 
     // Zweiter Versuch nach kurzem Delay (z. B. wenn Clerk noch initialisiert)
-    if (!token || token === 'demo-token-for-testing') {
+    if (!token) {
       await new Promise(r => setTimeout(r, 600))
       try {
         const retryToken = await getAuthToken()
-        if (retryToken && retryToken !== 'demo-token-for-testing') {
+        if (retryToken) {
           token = retryToken
           logger.debug('✅ Sync Manager - Token beim 2. Versuch erhalten')
         }
       } catch {}
     }
 
-    if (!token || token === 'demo-token-for-testing') {
+    if (!token) {
       logger.warn('⚠️ Sync Manager - Kein Auth Token, überspringe Sync')
       syncInProgress = false
       return { success: 0, failed: 0, total: pending.length, noAuth: true }
