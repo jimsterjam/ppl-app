@@ -236,7 +236,6 @@ export async function getAllExercisesOffline(filters = {}) {
         const exCategory = (ex.category || '').toLowerCase()
         return exCategory === targetCategory
       })
-      logger.debug('🔍 Offline Storage - Filtere nach Kategorie:', filters.category)
     }
     
     const exercises = await query.toArray()

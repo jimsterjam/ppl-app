@@ -62,9 +62,6 @@
           </div>
           <p v-if="exercise.description" class="description">{{ exercise.description }}</p>
           <p class="equip"><strong>{{ t('exercises.equipment') }}:</strong> {{ exercise.equipment || t('exercises.bodyweight') }}</p>
-
-          <!-- Bildaktionen jetzt direkt am Thumbnail: Klick = hinzufügen/ändern, Overlay = entfernen -->
-
         </div>
       </div>
     </div>
@@ -75,19 +72,20 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import axios from 'axios'
 import { useClerk, useUser } from '@clerk/vue'
 import HeaderBar from '../components/HeaderBar.vue'
 import BottomNav from '../components/BottomNav.vue'
-import { deleteExerciseImage, uploadExerciseImage } from '@/api/exercises'
+import { deleteExerciseImage, uploadExerciseImage, fetchExercises } from '@/api/exercises'
 import { useToastStore } from '@/stores/toastStore'
 import { useI18n } from 'vue-i18n'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 import { logger } from '@/utils/logger'
+import { getAuthToken } from '@/utils/authToken'
+import { db } from '@/utils/offlineStorage'
 
 const { isSignedIn } = useUser()
 const clerk = useClerk()
-const { t, locale } = useI18n()
+const { t } = useI18n()
 const { getTranslatedExerciseName } = useExerciseTranslation()
 
 const exercises = ref([])
@@ -96,52 +94,26 @@ const selectedCategory = ref('')
 const selectedMuscleGroup = ref('')
 const fileInput = ref(null)
 const targetExerciseId = ref('')
-const bust = ref({}) // Cache-Busting pro Übung nach Upload
+const bust = ref({})
 const toast = useToastStore()
 
-// Relative URL; in Dev routed über Vite-Proxy auf 3001
-const API_URL = '/api/exercises'
-
-// 🔄 Übungen laden
+// 🔄 Übungen laden mit Offline-Support
 async function loadExercises() {
   loading.value = true
   try {
-    logger.debug('🔄 Lade MongoDB-Übungen von:', API_URL)
+    logger.debug('🔄 Lade Exercises (mit Offline-Support)')
 
-    const headers = {}
-    if (isSignedIn.value && clerk.session) {
-      try {
-        const token = await clerk.session.getToken()
-        if (token) headers.Authorization = `Bearer ${token}`
-      } catch (err) {
-        logger.warn('⚠️ Konnte kein Token abrufen:', err)
-      }
-    }
+    // Nutze fetchExercises API mit automatischem Offline-Fallback
+    const filters = {}
+    if (selectedCategory.value) filters.category = selectedCategory.value
+    if (selectedMuscleGroup.value) filters.muscleGroup = selectedMuscleGroup.value
 
-    const res = await axios.get(API_URL, { headers, timeout: 10000 })
-    let allExercises = res.data || []
-
-    // Filter: Kategorie
-    let filteredExercises = allExercises
-    if (selectedCategory.value) {
-      filteredExercises = filteredExercises.filter(
-        e => e.category === selectedCategory.value
-      )
-      logger.debug(`🎯 Gefiltert für Kategorie ${selectedCategory.value}:`, filteredExercises.length)
-    }
-
-    // Filter: Muskelgruppe
-    if (selectedMuscleGroup.value) {
-      filteredExercises = filteredExercises.filter(
-        e => e.muscleGroup === selectedMuscleGroup.value
-      )
-      logger.debug(`🎯 Gefiltert für Muskelgruppe ${selectedMuscleGroup.value}:`, filteredExercises.length)
-    }
-
-    exercises.value = filteredExercises
-    logger.debug(`✅ ${filteredExercises.length} Übungen erfolgreich geladen!`)
+    const allExercises = await fetchExercises(filters)
+    exercises.value = allExercises || []
+    
+    logger.debug(`✅ ${exercises.value.length} Übungen geladen (Filter:`, filters, ')')
   } catch (err) {
-    logger.error('❌ Fehler beim Laden der MongoDB-Übungen:', err.message)
+    logger.error('❌ Fehler beim Laden der Übungen:', err.message)
     exercises.value = []
   } finally {
     loading.value = false
@@ -179,8 +151,9 @@ function resetFilters() {
   loadExercises()
 }
 
-// 🔁 Initiale Ladung
-onMounted(() => loadAllExercises())
+onMounted(() => {
+  loadAllExercises()
+})
 
 function ensureFileInput() {
   if (fileInput.value) return
@@ -211,18 +184,50 @@ async function onFileSelected(e) {
     const rawFile = files[0]
     const resized = await resizeImageFile(rawFile, 1280, 0.85).catch(() => rawFile)
 
-    // Auth-Token (optional)
-    let token = null
-    if (isSignedIn.value && clerk.session) {
-      try { token = await clerk.session.getToken() } catch {}
+    // OFFLINE: Speichere Foto lokal als Base64 in IndexedDB
+    if (!navigator.onLine) {
+      const dataUrl = await fileToDataURL(resized)
+      
+      // Finde Exercise in Cache und aktualisiere mit lokalem Foto
+      const exercise = await db.exercises.get(targetExerciseId.value)
+      if (exercise) {
+        exercise.imageUrl = dataUrl
+        exercise._pendingImageSync = true // Markiere für späteren Upload
+        exercise._offlineImageData = dataUrl // Speichere für Sync
+        await db.exercises.put(exercise)
+        
+        logger.debug('📸 Offline: Foto lokal gespeichert für Exercise:', targetExerciseId.value)
+        bust.value = { ...bust.value, [targetExerciseId.value]: Date.now() }
+        await loadExercises()
+        toast.show('📸 Foto offline gespeichert - wird später hochgeladen', { 
+          type: 'info', 
+          duration: 3000, 
+          position: 'top' 
+        })
+      }
+      return
     }
 
-    // Einheitlicher Upload mit Fallbacks (Multipart → Alias → JSON)
+    // ONLINE: Direkter Upload zum Backend
+    let token = null
+    if (isSignedIn.value) {
+      try { 
+        token = await getAuthToken({ clerk }) 
+      } catch (err) {
+        logger.warn('⚠️ Token-Abruf fehlgeschlagen:', err.message)
+      }
+    }
+
     await uploadExerciseImage(targetExerciseId.value, resized, token)
-    // Cache-Busting für genau diese Übung
     bust.value = { ...bust.value, [targetExerciseId.value]: Date.now() }
     await loadExercises()
-  toast.show(t('exercises.toastUploaded'), { type: 'success', duration: 3000, position: 'top' })
+    toast.show(t('exercises.toastUploaded'), { type: 'success', duration: 3000, position: 'top' })
+  } catch (err) {
+    logger.error('❌ Fehler beim Foto-Upload:', err)
+    toast.show(t('exercises.toastUploadFailed') || 'Foto-Upload fehlgeschlagen', { 
+      type: 'error', 
+      duration: 3000 
+    })
   } finally {
     if (fileInput.value) fileInput.value.value = ''
     targetExerciseId.value = ''
@@ -231,16 +236,40 @@ async function onFileSelected(e) {
 
 async function removeImage(exercise) {
   if (!exercise?._id) return
+  
+  // OFFLINE: Entferne Foto nur lokal aus Cache
+  if (!navigator.onLine) {
+    try {
+      const cachedExercise = await db.exercises.get(exercise._id)
+      if (cachedExercise) {
+        cachedExercise.imageUrl = null
+        cachedExercise._pendingImageSync = false
+        cachedExercise._offlineImageData = null
+        await db.exercises.put(cachedExercise)
+        
+        logger.debug('🗑️ Offline: Foto lokal entfernt für Exercise:', exercise._id)
+        bust.value = { ...bust.value, [exercise._id]: Date.now() }
+        await loadExercises()
+        toast.show('🗑️ Foto offline entfernt', { type: 'info', duration: 3000 })
+      }
+    } catch (err) {
+      logger.error('❌ Fehler beim lokalen Entfernen:', err)
+      toast.show('Foto konnte nicht entfernt werden', { type: 'error', duration: 3000 })
+    }
+    return
+  }
+  
+  // ONLINE: Backend-Delete
   let token = null
-  if (isSignedIn.value && clerk.session) {
-    try { token = await clerk.session.getToken() } catch {}
+  if (isSignedIn.value) {
+    try { token = await getAuthToken({ clerk }) } catch {}
   }
   try {
     await deleteExerciseImage(exercise._id, token)
     await loadExercises()
-  toast.show(t('exercises.toastRemoved'), { type: 'success', duration: 3000 })
+    toast.show(t('exercises.toastRemoved'), { type: 'success', duration: 3000 })
   } catch (e) {
-  toast.show(t('exercises.toastRemoveFailed'), { type: 'error', duration: 3000 })
+    toast.show(t('exercises.toastRemoveFailed'), { type: 'error', duration: 3000 })
   }
 }
 
@@ -272,24 +301,13 @@ function resizeImageFile(file, maxSize = 1280, quality = 0.85) {
   })
 }
 
-function blobToDataURL(blob) {
+function fileToDataURL(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve(reader.result)
     reader.onerror = reject
-    reader.readAsDataURL(blob)
+    reader.readAsDataURL(file)
   })
-}
-
-// Bildlogik analog ExerciseList / WorkoutBuilder
-function categoryToImage(category) {
-  const map = {
-    push: '/exercises/push.svg',
-    pull: '/exercises/pull.svg',
-    legs: '/exercises/legs.svg'
-  }
-  const key = String(category || '').toLowerCase()
-  return map[key] || '/exercises/camera.svg'
 }
 
 function getExerciseImage(ex) {
@@ -443,11 +461,6 @@ function onImgError(evt, ex) {
 .exercise-card h3 { margin: 0 0 8px 0; color: var(--accent-color); font-size: 1.1rem; }
 
 .exercise-card p { margin: 4px 0; font-size: 0.9rem; color: var(--muted); }
-
-.img-actions { display: flex; gap: 8px; margin-top: 10px; }
-.img-btn { padding: 8px 12px; border-radius: 10px; border: 1px solid var(--card-border); background: var(--surface); color: var(--fg); cursor: pointer; font-weight: 600; }
-.img-btn:hover { background: var(--accent-soft); }
-.img-btn.danger { border-color: var(--danger-color); color: var(--danger-color); }
 
 .description { color: var(--muted) !important; font-style: italic; }
 

@@ -22,12 +22,14 @@
           {{ t('workoutDetail.localDraft') }}
           <button class="dismiss" @click="draftBanner=false">✕</button>
         </div>
-        <h2 class="title">{{ workout.name }}</h2>
-        <p class="meta">
-          <span class="badge">{{ workout.type?.toUpperCase() }}</span>
-          <span>{{ formatDate(workout.date) }}</span>
-          <span v-if="workout.completed" class="completed">✓ {{ t('workoutDetail.completed') }}</span>
-        </p>
+        <div class="workout-header">
+          <h2>{{ workout.name }}</h2>
+          <div class="meta">
+            <span class="badge">{{ workout.type?.toUpperCase() }}</span>
+            <span>{{ formatDate(workout.date) }}</span>
+            <span v-if="workout.completed" class="completed">✓</span>
+          </div>
+        </div>
 
   <div id="exercises" ref="exListRef" class="ex-list glass">
           <div class="ex-list-header">
@@ -49,18 +51,17 @@
             @drop.prevent="onDrop(i)"
           >
             <button v-if="isReordering" class="drag-handle" :title="t('workoutDetail.dragToReorder')">⋮⋮</button>
-            <div class="ex-header">
-              <strong>{{ ex.name }}</strong>
-              <small>{{ ex.muscleGroup }}</small>
-            </div>
-            <div class="ex-media">
-              <img :src="getExerciseImage(ex)" :alt="t('common.image')" class="ex-thumb" @click="onExerciseImageClick(ex)" @error="onImgError" />
-              <div class="img-actions" v-if="ex.imageUrl || ex.thumbnailUrl">
-                <button class="link" @click.prevent="replaceExerciseImage(ex)">{{ t('common.replace') }}</button>
-                <span class="sep">•</span>
-                <button class="link danger" @click.prevent="openRemoveModal(ex)">{{ t('common.remove') }}</button>
+            <div class="ex-info">
+              <img :src="getExerciseImage(ex)" :alt="ex.name" class="ex-thumb" @click="onExerciseImageClick(ex)" @error="onImgError" />
+              <div class="ex-text">
+                <strong>{{ ex.name }}</strong>
+                <small>{{ ex.muscleGroup }}</small>
+                <div v-if="ex.imageUrl || ex.thumbnailUrl" class="img-actions">
+                  <button class="link" @click.prevent="replaceExerciseImage(ex)">{{ t('common.replace') }}</button>
+                  <span>•</span>
+                  <button class="link danger" @click.prevent="openRemoveModal(ex)">{{ t('common.remove') }}</button>
+                </div>
               </div>
-              <small class="media-hint">{{ t('workoutDetail.tapImage', { action: ex.imageUrl || ex.thumbnailUrl ? t('workoutDetail.enlarge') : t('workoutDetail.add') }) }}</small>
             </div>
             <div class="ex-sets">
               <div class="set-row header">
@@ -594,50 +595,48 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnloadHan
 .workout-detail { min-height: 100vh; background: var(--bg); color: var(--fg); padding-bottom: 80px; }
 .content { padding: 16px; }
 .loading, .empty, .error { text-align: center; color: var(--muted); padding: 40px 0; }
-.title { margin: 0 0 8px 0; }
-.meta { display: flex; gap: 12px; color: var(--muted); margin-bottom: 16px; align-items: center; }
-.badge { background: var(--surface); color: var(--fg); padding: 4px 8px; border-radius: 6px; font-size: 0.75rem; border: 1px solid var(--card-border); }
-.completed { color: #4ade80; font-weight: 600; }
-.ex-list { background: transparent; border: 1px solid transparent; border-radius: 12px; padding: 16px; }
-.ex-list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.reorder-toggle { background: var(--surface); color: var(--fg); border: 1px solid var(--card-border); border-radius: 8px; padding: 8px 10px; cursor: pointer; }
-.reorder-hint { color: var(--muted); margin: 4px 0 8px; font-size: 0.9rem; }
-.ex-item { padding: 12px 0; border-bottom: 1px solid var(--card-border); }
+.workout-header { margin-bottom: 16px; }
+.workout-header h2 { margin: 0 0 8px 0; font-size: 1.5rem; }
+.meta { display: flex; gap: 8px; color: var(--muted); align-items: center; font-size: 0.9rem; }
+.badge { background: var(--surface); padding: 3px 8px; border-radius: 6px; font-size: 0.7rem; border: 1px solid var(--card-border); }
+.completed { color: #4ade80; }
+.ex-list { background: transparent; border: 1px solid transparent; border-radius: 12px; padding: 12px; }
+.ex-list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.ex-list-header h3 { margin: 0; font-size: 1.1rem; }
+.reorder-toggle { background: var(--surface); color: var(--fg); border: 1px solid var(--card-border); border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 0.85rem; }
+.reorder-hint { color: var(--muted); margin: 0 0 8px; font-size: 0.85rem; }
+.ex-item { padding: 10px 0; border-bottom: 1px solid var(--card-border); }
 .ex-item:last-child { border-bottom: none; }
 .ex-item.reordering { cursor: move; }
-.drag-handle { background: transparent; border: none; color: var(--muted); cursor: grab; font-size: 18px; margin-right: 8px; }
-.ex-header { display: flex; justify-content: space-between; color: var(--fg); }
-.ex-header small { color: var(--muted); }
-.ex-details { display: flex; gap: 12px; color: var(--muted); margin-top: 6px; }
-.ex-sets { margin-top: 8px; }
-.set-row { display: grid; grid-template-columns: 60px 1fr 1fr 80px; gap: 12px; align-items: center; padding: 6px 0; }
-.set-row.header { color: var(--muted); font-size: 0.8rem; padding-top: 0; }
-.set-row .col input { width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--card-border); background: var(--surface); color: var(--fg); text-align: center; }
+.drag-handle { background: transparent; border: none; color: var(--muted); cursor: grab; font-size: 16px; margin-right: 4px; padding: 0; }
+.ex-sets { margin-top: 6px; }
+.set-row { display: grid; grid-template-columns: 50px 1fr 1fr 60px; gap: 8px; align-items: center; padding: 4px 0; }
+.set-row.header { color: var(--muted); font-size: 0.75rem; padding-top: 0; }
+.set-row .col input { width: 100%; padding: 5px 6px; border-radius: 6px; border: 1px solid var(--card-border); background: var(--surface); color: var(--fg); text-align: center; font-size: 0.9rem; }
 .weight-input { position: relative; }
-.weight-input .unit { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 0.8rem; pointer-events: none; }
-.add-row-btn { background: var(--accent); color: var(--accent-contrast); border: none; border-radius: 8px; padding: 6px 10px; cursor: pointer; }
-.remove-row-btn { background: var(--danger-color); color: #fff; border: none; border-radius: 6px; width: 32px; height: 32px; cursor: pointer; }
-.actions { margin-top: 16px; display: flex; gap: 8px; }
-.primary { width: 100%; padding: 14px; border-radius: 12px; border: none; cursor: pointer; background: var(--accent); color: var(--accent-contrast); font-weight: 600; }
-.complete { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid #4ade80; cursor: pointer; background: rgba(74, 222, 128, 0.1); color: #4ade80; font-weight: 600; }
-.banner { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-radius: 8px; margin-bottom: 12px; font-size: 0.9rem; }
-.banner.success { background: color-mix(in oklab, var(--success-color) 20%, transparent); border: 1px solid color-mix(in oklab, var(--success-color) 50%, transparent); color: var(--fg); }
+.weight-input .unit { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 0.75rem; pointer-events: none; }
+.row-actions { padding: 4px 0; }
+.add-row-btn { background: var(--accent); color: var(--accent-contrast); border: none; border-radius: 6px; padding: 5px 10px; cursor: pointer; font-size: 0.9rem; }
+.remove-row-btn { background: var(--danger-color); color: #fff; border: none; border-radius: 4px; width: 28px; height: 28px; cursor: pointer; font-size: 1rem; }
+.actions { margin-top: 12px; display: flex; gap: 8px; }
+.primary { width: 100%; padding: 12px; border-radius: 10px; border: none; cursor: pointer; background: var(--accent); color: var(--accent-contrast); font-weight: 600; }
+.banner { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-radius: 6px; margin-bottom: 10px; font-size: 0.85rem; }
 .banner.warning { background: color-mix(in oklab, var(--warning-color) 20%, transparent); border: 1px solid color-mix(in oklab, var(--warning-color) 50%, transparent); color: var(--fg); }
-.banner.dirty { background: rgba(244,114,182,0.12); border: 1px solid rgba(244,114,182,0.4); color: #fbcfe8; margin-bottom: 8px; }
-.banner .dismiss { background: transparent; border: none; color: inherit; cursor: pointer; font-size: 1rem; }
-.save-msg { display: block; margin-top: 8px; color: var(--success-color); }
+.banner.dirty { background: rgba(244,114,182,0.12); border: 1px solid rgba(244,114,182,0.4); color: #fbcfe8; margin-bottom: 6px; }
+.banner .dismiss { background: transparent; border: none; color: inherit; cursor: pointer; font-size: 0.9rem; padding: 0; }
+.save-msg { display: block; margin-top: 6px; color: var(--success-color); font-size: 0.85rem; }
 .save-msg.error { color: var(--danger-color); }
 
-/* Bildbereich je Übung */
-.ex-media { display: flex; align-items: center; gap: 12px; margin: 8px 0; }
-.ex-thumb { width: 72px; height: 72px; object-fit: contain; background: #0b1220; border: 1px solid var(--card-border); border-radius: 10px; padding: 6px; cursor: pointer; }
-.media-hint { color: var(--muted); font-size: 0.8rem; }
-
-/* Actions unter dem Bild */
-.img-actions { display: flex; align-items: center; gap: 8px; }
-.img-actions .link { background: transparent; border: none; color: var(--accent); cursor: pointer; padding: 0; font-size: 0.85rem; }
+/* Exercise Info (Bild + Text kompakt) */
+.ex-info { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+.ex-thumb { width: 56px; height: 56px; flex-shrink: 0; object-fit: contain; background: #0b1220; border: 1px solid var(--card-border); border-radius: 8px; padding: 4px; cursor: pointer; }
+.ex-text { flex: 1; min-width: 0; }
+.ex-text strong { display: block; color: var(--fg); font-size: 0.95rem; }
+.ex-text small { display: block; color: var(--muted); font-size: 0.8rem; margin-top: 2px; }
+.img-actions { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 0.8rem; }
+.img-actions .link { background: transparent; border: none; color: var(--accent); cursor: pointer; padding: 0; }
 .img-actions .link.danger { color: var(--danger-color); }
-.img-actions .sep { color: var(--muted); }
+.img-actions span { color: var(--muted); }
 
 /* Overlay für Großansicht */
 .img-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000; }

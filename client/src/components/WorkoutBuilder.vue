@@ -72,6 +72,18 @@
     <!-- Übungen für gewählten Typ -->
     <div v-if="isSignedIn" class="exercises-section">
   <h3>{{ t('builder.availableExercises', { type: currentTypeLabel }) }}</h3>
+  
+  <!-- Sticky CTA -->
+    <div v-if="isSignedIn" class="sticky-cta">
+      <button 
+        class="create-btn" 
+        :disabled="!isSignedIn || creating || selectedExercises.length === 0" 
+        :title="!isSignedIn ? t('builder.signInFirst') : (selectedExercises.length === 0 ? t('builder.pickFirst') : t('builder.createCta'))"
+        @click="createWorkout"
+      >
+        {{ creating ? t('builder.creating') : `${t('builder.create')} (${selectedExercises.length})` }}
+      </button>
+    </div>
 
       <!-- Mobile: Öffne Dropdown -->
       <div v-if="isMobile" class="mobile-ex-picker">
@@ -216,18 +228,6 @@
     </div>
 
     <!-- Loading State außerhalb nicht nötig, da innerhalb der exercises-section bereits Skeleton/Loading angezeigt wird -->
-
-    <!-- Sticky Bottom CTA -->
-    <div v-if="isSignedIn" class="sticky-cta">
-      <button 
-        class="create-btn" 
-        :disabled="!isSignedIn || creating || selectedExercises.length === 0" 
-        :title="!isSignedIn ? t('builder.signInFirst') : (selectedExercises.length === 0 ? t('builder.pickFirst') : t('builder.createCta'))"
-        @click="createWorkout"
-      >
-        {{ creating ? t('builder.creating') : `${t('builder.create')} (${selectedExercises.length})` }}
-      </button>
-    </div>
 
     <!-- App Navigation unten -->
     <BottomNav />
@@ -617,7 +617,7 @@ async function prefillFromRepeatIfAny() {
     logger.debug('✅ WorkoutBuilder - Repeat Workout geladen:', matched.length, 'Übungen')
     
     await nextTick()
-    if (!didPlanScroll.value && selectedExercises.value.length > 0) {
+    if (!didPlanScroll.value && selectedExercises.value.length > 4) {
       scrollToPlan()
       didPlanScroll.value = true
     }
@@ -632,21 +632,6 @@ onMounted(async () => {
   if (selectedExercises.value.length === 0) {
     await prefillFromRepeatIfAny()
   }
-})
-
-// Beim ersten Hinzufügen scrollen
-let lastLen = 0
-watch(() => selectedExercises.value.length, async (len) => {
-  // Auto-save Draft bei Änderungen
-  saveDraft()
-  
-  if (didPlanScroll.value) { lastLen = len; return }
-  if (lastLen === 0 && len > 0) {
-    await nextTick()
-    scrollToPlan()
-    didPlanScroll.value = true
-  }
-  lastLen = len
 })
 
 // Auto-save auch bei Typ-Änderung
