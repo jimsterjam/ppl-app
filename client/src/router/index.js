@@ -10,6 +10,8 @@ import WorkoutDetailView from '../views/WorkoutDetailView.vue'
 import FaqsView from '../views/FaqsView.vue'
 import FeaturesTestView from '../views/FeaturesTestView.vue'
 
+import LegalNoticeView from '../views/LegalNoticeView.vue'
+
 const routes = [
   {
     path: '/',
@@ -35,6 +37,12 @@ const routes = [
   {
     path: '/info',
     redirect: '/faqs'
+  },
+  {
+    path: '/legal',
+    name: 'legal',
+    component: LegalNoticeView,
+    meta: { requiresAuth: false }
   },
   {
     path: '/plan',

@@ -30,11 +30,12 @@ onMounted(() => {
 })
 
 const links = [
-  { get label() { return t('nav.home') }, path: "/dashboard", icon: "🏠" }, // Alternative: 🏃‍♂️ 🎯 📱
-  { get label() { return t('nav.stats') }, path: "/stats", icon: "�" }, // Besser als 📊
-  { get label() { return t('nav.exercises') }, path: "/exercises", icon: "🏋️‍♂️" }, // Besser als 💪
-  { get label() { return t('nav.faqs') }, path: "/faqs", icon: "❓" }, // Alternative: 💬 📚 🛟
-  { get label() { return t('nav.settings') }, path: "/settings", icon: "⚙️" } // Alternative: 🔧 👤 ⭐
+  { get label() { return t('nav.home') }, path: "/dashboard", icon: "🏠" },
+  { get label() { return t('nav.stats') }, path: "/stats", icon: "📊" },
+  { get label() { return t('nav.exercises') }, path: "/exercises", icon: "🏋️‍♂️" },
+  { get label() { return t('nav.faqs') }, path: "/faqs", icon: "❓" },
+  { get label() { return t('nav.settings') }, path: "/settings", icon: "⚙️" },
+  { get label() { return t('nav.legal') }, path: "/legal", icon: "ℹ️" }
 ];
 </script>
 

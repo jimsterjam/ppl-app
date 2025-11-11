@@ -3,6 +3,7 @@ import { onMounted } from 'vue'
 import { RouterView } from 'vue-router'
 import ToastHost from './components/ToastHost.vue'
 import OfflineIndicator from './components/OfflineIndicator.vue'
+import BottomNav from './components/BottomNav.vue'
 import { setupAutoSync } from './utils/syncManager'
 import { initializeDefaultExercises } from './utils/offlineStorage'
 import { logger } from './utils/logger'
@@ -23,6 +24,7 @@ onMounted(async () => {
     <RouterView />
     <ToastHost />
     <OfflineIndicator />
+    <BottomNav />
   </div>
 </template>
 

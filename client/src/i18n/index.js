@@ -48,6 +48,7 @@ export const messages = {
       plan: 'Plan',
       faqs: "FAQ's",
       settings: 'Einstellungen',
+      legal: 'Rechtliches',
       ariaMain: 'Hauptnavigation'
     },
     dashboard: {
@@ -382,7 +383,38 @@ export const messages = {
         earlyAccess: 'Early Access',
         exportData: 'Daten exportieren'
       }
-    }
+    },
+    legal: {
+      title: 'Impressum',
+      section1Title: 'Angaben gemäß § 5 TMG:',
+      section1Address: 'Max Mustermann\nMusterstraße 1\n12345 Musterstadt\nDeutschland',
+      section1Mail: 'E-Mail: kontakt@bro-split-app.de',
+      section1ResponsibleTitle: 'Verantwortlich für den Inhalt nach § 55 Abs. 2 RStV:',
+      section1Responsible: 'Max Mustermann\nMusterstraße 1\n12345 Musterstadt',
+      copyrightTitle: 'Urheberrecht / Copyright',
+      copyrightNotice: '© 2025 Bro Split App. Alle Rechte vorbehalten.',
+      copyrightLaw: 'Die Inhalte und Werke in dieser App unterliegen dem deutschen Urheberrecht. Vervielfältigung, Bearbeitung, Verbreitung und jede Art der Verwertung außerhalb der Grenzen des Urheberrechtes bedürfen der schriftlichen Zustimmung des jeweiligen Autors bzw. Erstellers.',
+      disclaimerTitle: 'Haftungsausschluss',
+      disclaimer1: 'Die Nutzung dieser App erfolgt auf eigene Gefahr. Die bereitgestellten Trainingspläne, Übungen und Empfehlungen dienen ausschließlich allgemeinen Fitness- und Informationszwecken und ersetzen keine ärztliche Untersuchung, Diagnose oder Behandlung.',
+      disclaimer2: 'Personen mit gesundheitlichen Einschränkungen, Verletzungen oder Beschwerden sollten vor der Nutzung der App einen Arzt oder qualifizierten Trainer konsultieren. Die Betreiber übernehmen keine Haftung für Verletzungen, Schäden oder Folgeschäden, die aus der Nutzung der App oder der Befolgung der enthaltenen Trainingshinweise entstehen.',
+      userHintsTitle: 'Hinweise für Nutzer',
+      userHint1: 'Die App richtet sich an gesunde, sporttaugliche Personen.',
+      userHint2: 'Vor Trainingsbeginn wird ein ärztlicher Gesundheitscheck empfohlen.',
+      userHint3: 'Bei Schmerzen oder Unwohlsein ist das Training sofort abzubrechen.',
+      userHint4: 'Die Nutzung der App ist für Minderjährige nur mit Zustimmung der Erziehungsberechtigten gestattet.',
+      privacyTitle: 'Datenschutzerklärung',
+      privacy1: '1. Verantwortlicher',
+      privacy1Text: 'Verantwortlich für die Datenverarbeitung im Sinne der Datenschutz-Grundverordnung (DSGVO) ist:\nMax Mustermann\nMusterstraße 1\n12345 Musterstadt\nE-Mail: kontakt@bro-split-app.de',
+      privacy2: '2. Erhebung und Verarbeitung personenbezogener Daten',
+      privacy2Text: 'Die App verarbeitet personenbezogene Daten nur, soweit dies zur Bereitstellung, Nutzung oder Verbesserung der App erforderlich ist (z. B. Trainingsdaten, App-Statistiken, Fehlerberichte). Eine Weitergabe an Dritte erfolgt ausschließlich, wenn dies technisch notwendig ist (z. B. Apple iCloud, Hosting-Anbieter) oder eine gesetzliche Verpflichtung besteht.',
+      privacy3: '3. Zugriffsdaten & Nutzungsanalyse',
+      privacy3Text: 'Zur Verbesserung der App können anonyme Nutzungsdaten (z. B. verwendete Funktionen, Geräteinformationen) ausgewertet werden. Eine personenbezogene Auswertung findet nicht statt.',
+      privacy4: '4. Rechte der Nutzer',
+      privacy4Text: 'Nutzer haben das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung und Datenübertragbarkeit ihrer personenbezogenen Daten. Anfragen können per E-Mail an kontakt@bro-split-app.de gestellt werden.',
+      privacy5: '5. Änderungen',
+      privacy5Text: 'Diese Datenschutzerklärung kann bei Bedarf angepasst werden, um rechtliche oder technische Änderungen zu berücksichtigen.',
+      lastUpdate: 'Letzte Aktualisierung: 11. November 2025'
+    },
   },
   en: {
     common: {
@@ -420,6 +452,7 @@ export const messages = {
       plan: 'Plan',
       faqs: "FAQ's",
       settings: 'Settings',
+      legal: 'Legal',
       ariaMain: 'Main navigation'
     },
     dashboard: {
@@ -751,7 +784,38 @@ export const messages = {
         earlyAccess: 'Early Access',
         exportData: 'Export Data'
       }
-    }
+    },
+    legal: {
+      title: 'Legal Notice',
+      section1Title: 'Information according to § 5 TMG:',
+      section1Address: 'Max Mustermann\nMusterstraße 1\n12345 Musterstadt\nGermany',
+      section1Mail: 'E-mail: kontakt@bro-split-app.de',
+      section1ResponsibleTitle: 'Responsible for content according to § 55 Abs. 2 RStV:',
+      section1Responsible: 'Max Mustermann\nMusterstraße 1\n12345 Musterstadt',
+      copyrightTitle: 'Copyright',
+      copyrightNotice: '© 2025 Bro Split App. All rights reserved.',
+      copyrightLaw: 'The content and works in this app are subject to German copyright law. Duplication, processing, distribution and any kind of exploitation outside the limits of copyright require the written consent of the respective author or creator.',
+      disclaimerTitle: 'Disclaimer',
+      disclaimer1: 'Use of this app is at your own risk. The provided training plans, exercises and recommendations are for general fitness and informational purposes only and do not replace medical examination, diagnosis or treatment.',
+      disclaimer2: 'Persons with health restrictions, injuries or complaints should consult a doctor or qualified trainer before using the app. The operators accept no liability for injuries, damages or consequential damages resulting from the use of the app or following the training instructions contained therein.',
+      userHintsTitle: 'User Guidance',
+      userHint1: 'The app is intended for healthy, physically fit persons.',
+      userHint2: 'A medical health check is recommended before starting training.',
+      userHint3: 'If you experience pain or discomfort, stop training immediately.',
+      userHint4: 'Use of the app by minors is only permitted with the consent of their legal guardians.',
+      privacyTitle: 'Privacy Policy',
+      privacy1: '1. Controller',
+      privacy1Text: 'The controller for data processing within the meaning of the GDPR is:\nMax Mustermann\nMusterstraße 1\n12345 Musterstadt\nE-mail: kontakt@bro-split-app.de',
+      privacy2: '2. Collection and processing of personal data',
+      privacy2Text: 'The app processes personal data only to the extent necessary to provide, use or improve the app (e.g. training data, app statistics, error reports). Data is only passed on to third parties if this is technically necessary (e.g. Apple iCloud, hosting provider) or if there is a legal obligation.',
+      privacy3: '3. Access data & usage analysis',
+      privacy3Text: 'To improve the app, anonymous usage data (e.g. used features, device information) may be evaluated. No personal evaluation takes place.',
+      privacy4: '4. User rights',
+      privacy4Text: 'Users have the right to information, correction, deletion, restriction of processing and data portability of their personal data. Requests can be sent by e-mail to kontakt@bro-split-app.de.',
+      privacy5: '5. Changes',
+      privacy5Text: 'This privacy policy may be adapted as necessary to take account of legal or technical changes.',
+      lastUpdate: 'Last update: 11 November 2025'
+    },
   }
 }
 
