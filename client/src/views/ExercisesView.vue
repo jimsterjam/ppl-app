@@ -7,10 +7,27 @@
 
       <!-- Schnellfilter -->
       <div class="quick-buttons">
-  <button class="push-btn" @click="loadPushExercises">{{ t('exercises.filters.pushDay') }}</button>
-  <button class="pull-btn" @click="loadPullExercises">{{ t('exercises.filters.pullDay') }}</button>
-  <button class="leg-btn" @click="loadLegExercises">{{ t('exercises.filters.legDay') }}</button>
-  <button class="all-btn" @click="loadAllExercises">{{ t('exercises.filters.all') }}</button>
+        <button class="push-btn" :class="selectedCategory === 'Push' ? 'active' : ''" @click="loadPushExercises">{{ t('exercises.filters.pushDay') }}</button>
+        <button class="pull-btn" :class="selectedCategory === 'Pull' ? 'active' : ''" @click="loadPullExercises">{{ t('exercises.filters.pullDay') }}</button>
+        <button class="leg-btn" :class="selectedCategory === 'Legs' ? 'active' : ''" @click="loadLegExercises">{{ t('exercises.filters.legDay') }}</button>
+        <button class="all-btn" :class="!selectedCategory && !selectedEquipment ? 'active' : ''" @click="loadAllExercises">{{ t('exercises.filters.all') }}</button>
+      </div>
+      <!-- Equipment-Filter (klein) -->
+  <div class="equipment-filter-row">
+          <button
+            class="px-2 py-1 rounded text-xs font-semibold text-white" style="min-width:120px"
+            :class="selectedEquipment === 'bodyweight' ? 'bg-blue-500' : 'bg-gray-400 hover:bg-gray-500'"
+            @click="setEquipment('bodyweight')"
+          >
+            {{ t('exercises.filters.bodyweight') }}
+          </button>
+          <button
+            class="px-2 py-1 rounded text-xs font-semibold text-white" style="min-width:120px"
+            :class="selectedEquipment === 'gym' ? 'bg-blue-500' : 'bg-gray-400 hover:bg-gray-500'"
+            @click="setEquipment('gym')"
+          >
+            {{ t('exercises.filters.gym') }}
+          </button>
       </div>
 
       <!-- Aktiver Filterstatus -->
@@ -24,12 +41,12 @@
   <div v-if="loading" class="loading">{{ t('exercises.loading') }}</div>
 
       <!-- Keine Ergebnisse -->
-      <div v-else-if="exercises.length === 0" class="no-exercises">
+  <div v-else-if="(exercises && exercises.length === 0)" class="no-exercises">
         {{ t('exercises.none') }}
       </div>
 
       <!-- Übungsliste (mit Thumbnail) -->
-      <div v-else class="exercises-list">
+  <div v-else-if="exercises && exercises.length" class="exercises-list">
   <div v-for="exercise in exercises" :key="exercise._id" class="exercise-card glass">
           <div class="thumb-row">
             <div class="thumb-wrapper">
@@ -56,62 +73,115 @@
               </button>
             </div>
             <div class="meta">
-              <h3 class="title">{{ getTranslatedExerciseName(exercise.name) }}</h3>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <h3 class="title" style="margin-bottom:0;">{{ getTranslatedExerciseName(exercise.name) }}</h3>
+                <button class="info-btn" :aria-label="t('exercises.info')" @click="showInfo(exercise)">
+                  <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="9" stroke="#888" stroke-width="2"/><rect x="9" y="8" width="2" height="6" rx="1" fill="#888"/><rect x="9" y="5" width="2" height="2" rx="1" fill="#888"/></svg>
+                </button>
+              </div>
               <p class="sub">{{ exercise.category }} · {{ exercise.muscleGroup }}</p>
             </div>
           </div>
-          <p v-if="exercise.description" class="description">{{ exercise.description }}</p>
           <p class="equip"><strong>{{ t('exercises.equipment') }}:</strong> {{ exercise.equipment || t('exercises.bodyweight') }}</p>
         </div>
       </div>
-    </div>
+      <!-- Info Overlay (außerhalb der v-for) -->
+      <div v-if="infoExercise" class="info-overlay" @click.self="closeInfo">
+        <div class="info-content">
+          <h3>{{ getTranslatedExerciseName(infoExercise.name) }}</h3>
+          <p>{{ getTranslatedDescription(infoExercise) }}</p>
+          <button class="close-btn" @click="closeInfo">OK</button>
+        </div>
+      </div>
+
+
 
     <BottomNav />
   </div>
+</div>
 </template>
 
 <script setup>
+
 import { ref, onMounted } from 'vue'
-import { useClerk, useUser } from '@clerk/vue'
-import HeaderBar from '../components/HeaderBar.vue'
-import BottomNav from '../components/BottomNav.vue'
-import { deleteExerciseImage, uploadExerciseImage, fetchExercises } from '@/api/exercises'
-import { useToastStore } from '@/stores/toastStore'
 import { useI18n } from 'vue-i18n'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
+import { useToastStore } from '@/stores/toastStore'
 import { logger } from '@/utils/logger'
-import { getAuthToken } from '@/utils/authToken'
-import { db } from '@/utils/offlineStorage'
+import { useUser, useClerk, useAuth } from '@clerk/vue'
+// import { fetchExercises, uploadExerciseImage, deleteExerciseImage } from '@/api/exercises'
+
+import HeaderBar from '@/components/HeaderBar.vue'
+import BottomNav from '@/components/BottomNav.vue'
+// Komponenten explizit registrieren (für <script setup> reicht der Import)
+
+// Reaktive Variablen für das Template
+const selectedCategory = ref('')
+const selectedEquipment = ref('')
+const selectedMuscleGroup = ref('')
+const loading = ref(false)
+const exercises = ref([])
+const infoExercise = ref(null)
+const fileInput = ref(null)
+// Info-Overlay Methoden
+function showInfo(exercise) {
+  infoExercise.value = exercise
+}
+function closeInfo() {
+  infoExercise.value = null
+}
+function getTranslatedDescription(exercise) {
+  if (!exercise) return ''
+  if (t && t.locale && t.locale.value === 'en') {
+    return exercise.description_en || exercise.description || ''
+  }
+  return exercise.description || exercise.description_en || ''
+}
+const targetExerciseId = ref('')
+const bust = ref({})
 
 const { isSignedIn } = useUser()
 const clerk = useClerk()
+const auth = useAuth()
 const { t } = useI18n()
 const { getTranslatedExerciseName } = useExerciseTranslation()
 
-const exercises = ref([])
-const loading = ref(false)
-const selectedCategory = ref('')
-const selectedMuscleGroup = ref('')
-const fileInput = ref(null)
-const targetExerciseId = ref('')
-const bust = ref({})
+
 const toast = useToastStore()
 
-// 🔄 Übungen laden mit Offline-Support
+// 🔄 Übungen direkt aus default-exercises.json laden (offlinefähig)
 async function loadExercises() {
   loading.value = true
   try {
-    logger.debug('🔄 Lade Exercises (mit Offline-Support)')
-
-    // Nutze fetchExercises API mit automatischem Offline-Fallback
-    const filters = {}
-    if (selectedCategory.value) filters.category = selectedCategory.value
-    if (selectedMuscleGroup.value) filters.muscleGroup = selectedMuscleGroup.value
-
-    const allExercises = await fetchExercises(filters)
-    exercises.value = allExercises || []
-    
-    logger.debug(`✅ ${exercises.value.length} Übungen geladen (Filter:`, filters, ')')
+    logger.debug('🔄 Lade Exercises aus default-exercises.json')
+    const response = await fetch('/data/default-exercises.json')
+    let allExercises = await response.json()
+    // Filter anwenden
+    if (selectedCategory.value) {
+      allExercises = allExercises.filter(ex => ex.category === selectedCategory.value)
+    }
+    if (selectedMuscleGroup.value) {
+      allExercises = allExercises.filter(ex => ex.muscleGroup === selectedMuscleGroup.value)
+    }
+    if (selectedEquipment.value === 'bodyweight') {
+      allExercises = allExercises.filter(ex => (
+        ex.equipment === 'Körpergewicht' ||
+        ex.equipment === 'Bodyweight' ||
+        ex.equipment_en === 'Bodyweight' ||
+        ex.equipment_en === 'Körpergewicht'
+      ))
+    } else if (selectedEquipment.value === 'gym') {
+      allExercises = allExercises.filter(ex => !(
+        ex.equipment === 'Körpergewicht' ||
+        ex.equipment === 'Bodyweight' ||
+        ex.equipment_en === 'Bodyweight' ||
+        ex.equipment_en === 'Körpergewicht'
+      ))
+    }
+    // Füge _id hinzu, falls nicht vorhanden (für v-for key)
+    allExercises = allExercises.map((ex, idx) => ({ _id: ex._id || idx, ...ex }))
+    exercises.value = allExercises
+    logger.debug(`✅ ${exercises.value.length} Übungen geladen (Filter:`, selectedCategory.value, selectedMuscleGroup.value, selectedEquipment.value, ')')
   } catch (err) {
     logger.error('❌ Fehler beim Laden der Übungen:', err.message)
     exercises.value = []
@@ -121,8 +191,10 @@ async function loadExercises() {
 }
 
 // 🔘 Filterfunktionen
+
 function loadAllExercises() {
   selectedCategory.value = ''
+  selectedEquipment.value = ''
   selectedMuscleGroup.value = ''
   loadExercises()
 }
@@ -145,9 +217,16 @@ function loadLegExercises() {
   loadExercises()
 }
 
+
 function resetFilters() {
   selectedCategory.value = ''
+  selectedEquipment.value = ''
   selectedMuscleGroup.value = ''
+  loadExercises()
+}
+
+function setEquipment(equip) {
+  selectedEquipment.value = equip
   loadExercises()
 }
 
@@ -209,13 +288,18 @@ async function onFileSelected(e) {
     }
 
     // ONLINE: Direkter Upload zum Backend
+
     let token = null
-    if (isSignedIn.value) {
-      try { 
-        token = await getAuthToken({ clerk }) 
+    // Warte auf Clerk-Initialisierung und Login
+    logger.debug('Clerk loaded:', window.Clerk?.loaded, 'isSignedIn:', isSignedIn.value)
+    if (window.Clerk?.loaded && isSignedIn.value) {
+      try {
+        token = await getAuthToken({ clerk, auth })
       } catch (err) {
         logger.warn('⚠️ Token-Abruf fehlgeschlagen:', err.message)
       }
+    } else {
+      logger.warn('⚠️ Clerk noch nicht bereit oder User nicht eingeloggt')
     }
 
     await uploadExerciseImage(targetExerciseId.value, resized, token)
@@ -261,8 +345,11 @@ async function removeImage(exercise) {
   
   // ONLINE: Backend-Delete
   let token = null
-  if (isSignedIn.value) {
-    try { token = await getAuthToken({ clerk }) } catch {}
+  logger.debug('Clerk loaded:', window.Clerk?.loaded, 'isSignedIn:', isSignedIn.value)
+  if (window.Clerk?.loaded && isSignedIn.value) {
+    try { token = await getAuthToken({ clerk, auth }) } catch {}
+  } else {
+    logger.warn('⚠️ Clerk noch nicht bereit oder User nicht eingeloggt')
   }
   try {
     await deleteExerciseImage(exercise._id, token)
@@ -331,6 +418,69 @@ function onImgError(evt, ex) {
   img.src = '/exercises/camera.svg'
 }
 </script>
+<style scoped>
+.info-btn {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  margin-left: 2px;
+  cursor: pointer;
+  vertical-align: middle;
+  border-radius: 50%;
+  transition: background 0.15s;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.info-btn:hover {
+  background: #e5e7eb;
+}
+.info-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.35);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.info-content {
+  background: var(--card-bg, #fff);
+  color: var(--fg, #222);
+  border-radius: 14px;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+  padding: 28px 22px 18px 22px;
+  max-width: 340px;
+  width: 90vw;
+  text-align: center;
+  position: relative;
+}
+.info-content h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  font-size: 1.15rem;
+}
+.info-content p {
+  font-size: 1rem;
+  margin-bottom: 18px;
+}
+.close-btn {
+  background: #2563EB;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 18px;
+  font-size: 1rem;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.15s;
+}
+.close-btn:hover {
+  background: #1D4ED8;
+}
+</style>
 
 <style scoped>
 .exercises-view {
@@ -514,6 +664,21 @@ function onImgError(evt, ex) {
 .sub { color: var(--muted); font-size: 0.9rem; }
 .equip, .id { color: var(--muted); font-size: 0.85rem; }
 
+/* Equipment-Filter Buttons: gleichmäßig verteilt */
+.equipment-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 1rem;
+  /* margin-left: 0.25rem; */
+  justify-content: space-evenly;
+}
+
+.equipment-filter-row button {
+  min-width: 120px;
+  max-width: 140px;
+}
+
 /* Mobile: Thumbnail rechts und größer */
 @media (max-width: 480px) {
   .thumb-row { flex-direction: row-reverse; justify-content: space-between; }
@@ -521,3 +686,5 @@ function onImgError(evt, ex) {
   .meta { flex: 1 1 auto; }
 }
 </style>
+
+

@@ -34,6 +34,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getAuthToken } from '@/utils/authToken'
+import { useClerk, useAuth } from '@clerk/vue'
 
 export const useSubscriptionStore = defineStore('subscription', () => {
   const subscription = ref({
@@ -84,10 +85,12 @@ export const useSubscriptionStore = defineStore('subscription', () => {
   
   // Subscription Status checken
   const checkSubscription = async () => {
+    const clerk = useClerk()
+    const auth = useAuth()
     try {
       const response = await fetch('/api/subscription/status', {
         headers: {
-          'Authorization': `Bearer ${await getAuthToken()}`
+          'Authorization': `Bearer ${await getAuthToken({ clerk, auth })}`
         }
       })
       
@@ -137,11 +140,13 @@ export const useSubscriptionStore = defineStore('subscription', () => {
       const timeoutId = setTimeout(() => controller.abort(), 2000) // 2s timeout
       
       console.log('🧪 SubscriptionStore: Making API request...')
+      const clerk = useClerk()
+      const auth = useAuth()
       const response = await fetch('/api/subscription/upgrade', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await getAuthToken()}`
+          'Authorization': `Bearer ${await getAuthToken({ clerk, auth })}`
         },
         body: JSON.stringify({
           plan: planType,

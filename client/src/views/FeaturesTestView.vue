@@ -220,16 +220,28 @@ import { logger } from '@/utils/logger'
 // Composables
 const { t } = useI18n()
 
-function getTranslatedMuscleGroup(muscleGroup) {
+// Dynamisches Mapping aus default-exercises.json
+import exercisesData from '@/../public/data/default-exercises.json'
+
+function getTranslatedMuscleGroup(muscleGroup, lang = 'de') {
   if (!muscleGroup) return ''
-  // muscleGroupNames entfernt, Übersetzungen kommen aus default-exercises.json
-  return map[muscleGroup] || muscleGroup
+  // Suche nach erster Übung mit passender Muskelgruppe
+  const found = exercisesData.find(ex =>
+    (lang === 'de' ? ex.muscleGroup : ex.muscleGroup_en) === muscleGroup
+    || (lang === 'de' ? ex.muscleGroup_en : ex.muscleGroup) === muscleGroup
+  )
+  if (!found) return muscleGroup
+  return lang === 'de' ? found.muscleGroup : found.muscleGroup_en
 }
 
-function getTranslatedEquipment(equipment) {
+function getTranslatedEquipment(equipment, lang = 'de') {
   if (!equipment) return ''
-  // equipmentNames entfernt, Übersetzungen kommen aus default-exercises.json
-  return map[equipment] || equipment
+  const found = exercisesData.find(ex =>
+    (lang === 'de' ? ex.equipment : ex.equipment_en) === equipment
+    || (lang === 'de' ? ex.equipment_en : ex.equipment) === equipment
+  )
+  if (!found) return equipment
+  return lang === 'de' ? found.equipment : found.equipment_en
 }
 const router = useRouter()
 const aiStore = useAICoachStore()

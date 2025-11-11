@@ -1,6 +1,6 @@
 // seedExercises.js
 import { MongoClient } from 'mongodb';
-import exercises from 'app/client/data/exercises.js'; // Stelle sicher: exercises.js exportiert `export default exercises`
+import exercises from './data/exercises.js';
 import dotenv from 'dotenv';
 
 dotenv.config();

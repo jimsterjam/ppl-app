@@ -25,9 +25,9 @@ export async function getAuthToken({ clerk, auth, options } = {}) {
   const template = import.meta.env.VITE_CLERK_JWT_TEMPLATE
   const opts = template ? { ...(options || {}), template } : (options || {})
   
-  // Timeout für Clerk Token-Abruf (reduziert auf 2s)
+  // Timeout für Clerk Token-Abruf (erhöht auf 4s)
   const timeout = new Promise((_, reject) => 
-    setTimeout(() => reject(new Error('Auth timeout')), 2000)
+    setTimeout(() => reject(new Error('Auth timeout')), 4000)
   )
   
   try {

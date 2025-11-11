@@ -147,46 +147,41 @@ function handleOffline() {
 }
 
 // Lifecycle
-onMounted(async () => {
-  // Initial Check - wichtig: navigator.onLine prüfen
-  isOffline.value = !navigator.onLine
-  
-  // Update Pending Count (warten auf Result)
-  await updatePendingCount()
-  
-  // Event Listeners
+onMounted(() => {
+  // Event Listeners und Cleanup-Hook sofort registrieren (vor await!)
   window.addEventListener('online', handleOnline)
   window.addEventListener('offline', handleOffline)
-  
-  // Wenn wir online sind und Pending Actions haben, versuche auto zu synchronisieren
-  if (!isOffline.value && pendingCount.value > 0 && !isSyncInProgress()) {
-    logger.debug('🔄 Offline Indicator - Auto-Sync beim Start (online & pending)')
-    setTimeout(() => {
-      // doppelter Schutz, falls sich Status ändert
-      if (!isOffline.value && pendingCount.value > 0 && !isSyncInProgress()) {
-        triggerSync()
-      }
-    }, 600)
-  }
-  
-  // Update Pending Count regelmäßig (nur wenn nicht am Syncen)
-  const interval = setInterval(() => {
+  let interval = setInterval(() => {
     if (!syncing.value) {
       updatePendingCount()
     }
-  }, 10000) // Alle 10 Sekunden
-  
-  // Cleanup
+  }, 10000)
   onUnmounted(() => {
     window.removeEventListener('online', handleOnline)
     window.removeEventListener('offline', handleOffline)
     clearInterval(interval)
   })
-  
-  logger.debug('✅ Offline Indicator - Initialized', {
-    isOffline: isOffline.value,
-    pendingCount: pendingCount.value,
-    navigatorOnLine: navigator.onLine
+
+  // Initial Check - wichtig: navigator.onLine prüfen
+  isOffline.value = !navigator.onLine
+
+  // Update Pending Count (warten auf Result)
+  updatePendingCount().then(() => {
+    // Wenn wir online sind und Pending Actions haben, versuche auto zu synchronisieren
+    if (!isOffline.value && pendingCount.value > 0 && !isSyncInProgress()) {
+      logger.debug('🔄 Offline Indicator - Auto-Sync beim Start (online & pending)')
+      setTimeout(() => {
+        // doppelter Schutz, falls sich Status ändert
+        if (!isOffline.value && pendingCount.value > 0 && !isSyncInProgress()) {
+          triggerSync()
+        }
+      }, 600)
+    }
+    logger.debug('✅ Offline Indicator - Initialized', {
+      isOffline: isOffline.value,
+      pendingCount: pendingCount.value,
+      navigatorOnLine: navigator.onLine
+    })
   })
 })
 </script>

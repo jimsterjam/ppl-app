@@ -24,8 +24,11 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getAuthToken } from '@/utils/authToken'
+import { useClerk, useAuth } from '@clerk/vue'
 
 export const useSocialStore = defineStore('social', () => {
+  const clerk = useClerk()
+  const auth = useAuth()
   const friends = ref([])
   const sharedWorkouts = ref([])
   const challenges = ref([])
@@ -38,7 +41,7 @@ export const useSocialStore = defineStore('social', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await getAuthToken()}`
+          'Authorization': `Bearer ${await getAuthToken({ clerk, auth })}`
         },
         body: JSON.stringify({
           workoutId,
@@ -63,7 +66,7 @@ export const useSocialStore = defineStore('social', () => {
     try {
       const response = await fetch('/api/social/friends-feed', {
         headers: {
-          'Authorization': `Bearer ${await getAuthToken()}`
+          'Authorization': `Bearer ${await getAuthToken({ clerk, auth })}`
         }
       })
       
@@ -83,7 +86,7 @@ export const useSocialStore = defineStore('social', () => {
       const response = await fetch(`/api/social/like/${sharedWorkoutId}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${await getAuthToken()}`
+          'Authorization': `Bearer ${await getAuthToken({ clerk, auth })}`
         }
       })
       
@@ -107,7 +110,7 @@ export const useSocialStore = defineStore('social', () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await getAuthToken()}`
+          'Authorization': `Bearer ${await getAuthToken({ clerk, auth })}`
         },
         body: JSON.stringify(challengeData)
       })
@@ -128,7 +131,7 @@ export const useSocialStore = defineStore('social', () => {
     try {
       const response = await fetch(`/api/social/leaderboard?period=${period}`, {
         headers: {
-          'Authorization': `Bearer ${await getAuthToken()}`
+          'Authorization': `Bearer ${await getAuthToken({ clerk, auth })}`
         }
       })
       

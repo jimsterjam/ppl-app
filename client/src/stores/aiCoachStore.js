@@ -1,6 +1,17 @@
 /**
  * AI Coach Store für intelligente Workout-Empfehlungen
  */
+// Prompt-Template für den Workout-Generator (Push–Pull–Beine)
+export const workoutPromptTemplate = `
+Du bist ein KI-gestützter Fitness-Coach. Generiere einen vollständigen, effektiven 3-Tage-Trainingsplan nach dem Push–Pull–Beine-Prinzip für eine Woche. Gib für jeden Tag die Übungen, Sätze, Wiederholungen und eine kurze Begründung an. Berücksichtige Trainingsstand, Ziel (Muskelaufbau), verfügbare Ausrüstung und individuelle Wünsche, falls angegeben.
+
+Format:
+Tag: [Push/Pull/Beine]
+Übungen:
+- Übung 1: [Name], [Sätze] Sätze x [Wdh.], [kurze Begründung]
+- ...
+Hinweise: [kurze, motivierende Tipps]
+`
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getAuthToken } from '@/utils/authToken'
@@ -84,15 +95,38 @@ export const useAICoachStore = defineStore('aiCoach', () => {
       console.log('🧪 AI Coach: API failed, using demo data:', error.message)
       error.value = error.message
       
-      const demoSuggestion = {
-        recommendedType: 'Push',
-        reason: 'Demo: Based on your recent workouts, it\'s time for push movements.',
-        exercises: ['Push-ups', 'Dips', 'Shoulder Press', 'Tricep Extensions'],
-        confidence: 0.75,
-        timestamp: new Date().toISOString(),
-        demo: true
-      }
-      
+      // Mehrere Demo-Workouts für Fallback
+      const demoSuggestions = [
+        {
+          recommendedType: 'Push',
+          reason: 'Demo: Zeit für Push-Übungen!',
+          exercises: ['Push-ups', 'Dips', 'Shoulder Press', 'Tricep Extensions'],
+          confidence: 0.75
+        },
+        {
+          recommendedType: 'Pull',
+          reason: 'Demo: Fokus auf Rücken und Bizeps!',
+          exercises: ['Pull-ups', 'Barbell Row', 'Face Pulls', 'Biceps Curls'],
+          confidence: 0.72
+        },
+        {
+          recommendedType: 'Legs',
+          reason: 'Demo: Zeit für Beine!',
+          exercises: ['Squats', 'Lunges', 'Leg Press', 'Calf Raises'],
+          confidence: 0.78
+        },
+        {
+          recommendedType: 'Full Body',
+          reason: 'Demo: Ganzkörper-Workout für Abwechslung!',
+          exercises: ['Push-ups', 'Pull-ups', 'Squats', 'Plank'],
+          confidence: 0.7
+        }
+      ]
+      // Zufällige Auswahl
+      const demoSuggestion = demoSuggestions[Math.floor(Math.random() * demoSuggestions.length)]
+      demoSuggestion.timestamp = new Date().toISOString()
+      demoSuggestion.demo = true
+
       recommendations.value.unshift(demoSuggestion)
       lastRecommendation.value = {
         workoutName: demoSuggestion.recommendedType,
@@ -335,13 +369,16 @@ export const useAICoachStore = defineStore('aiCoach', () => {
     userConsent,
     lastRecommendation,
     aiStatus,
-    
+
+    // Prompt-Template
+    workoutPromptTemplate,
+
     // Computed
     hasConsent,
     canUseAI,
     getPersonalizedAdaptations,
     prioritizedInsights,
-    
+
     // Actions
     generateWorkoutSuggestion,
     analyzeProgress,
