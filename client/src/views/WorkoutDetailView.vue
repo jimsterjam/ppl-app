@@ -52,17 +52,40 @@
           >
             <button v-if="isReordering" class="drag-handle" :title="t('workoutDetail.dragToReorder')">⋮⋮</button>
             <div class="ex-info">
-              <img :src="getExerciseImage(ex)" :alt="ex.name" class="ex-thumb" @click="onExerciseImageClick(ex)" @error="onImgError" />
+              <img :src="getExerciseImage(ex)" :alt="getTranslatedExerciseName(ex.name)" class="ex-thumb" @click="onExerciseImageClick(ex)" @error="onImgError" />
               <div class="ex-text">
-                <strong>{{ ex.name }}</strong>
-                <small>{{ ex.muscleGroup }}</small>
+                <strong>{{ getTranslatedExerciseName(ex.name) }}</strong>
+                <small>{{ getTranslatedMuscleGroup ? getTranslatedMuscleGroup(ex.muscleGroup) : ex.muscleGroup }}</small>
                 <div v-if="ex.imageUrl || ex.thumbnailUrl" class="img-actions">
                   <button class="link" @click.prevent="replaceExerciseImage(ex)">{{ t('common.replace') }}</button>
                   <span>•</span>
                   <button class="link danger" @click.prevent="openRemoveModal(ex)">{{ t('common.remove') }}</button>
                 </div>
+                <!-- Notiz-Button und Feld -->
+                <div style="margin-top: 6px;">
+                  <!-- Notiz-Button: Label passt sich an, je nach Zustand -->
+                  <button class="link" @click="toggleNote(i)">
+                    📝
+                    {{ getNote(i)
+                      ? (showNote[i] ? 'ändern' : 'anzeigen')
+                      : 'hinzufügen' }}
+                  </button>
+                  <!-- Löschen-Button nur sichtbar, wenn Notiz existiert -->
+                  <button
+                    class="link danger"
+                    v-if="getNote(i)"
+                    @click="deleteNote(i)"
+                    style="margin-left:8px;"
+                  >
+                    🗑️ löschen
+                  </button>
+                </div>
+                <div v-if="showNote && showNote[i]" style="margin-top: 4px;">
+                  <textarea :value="getNote(i)" @input="setNote(i, $event.target.value)" rows="2" style="width:100%;resize:vertical" placeholder="Notiz zu dieser Übung..." />
+                </div>
               </div>
             </div>
+
             <div class="ex-sets">
               <div class="set-row header">
                 <span class="col set">{{ t('workoutDetail.set') }}</span>
@@ -144,6 +167,7 @@
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch, nextTick, reactive } from 'vue'
+import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuth, useClerk } from '@clerk/vue'
 import { getAuthToken } from '@/utils/authToken'
@@ -162,7 +186,15 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuth()
 const clerk = useClerk()
+
 const { t, locale } = useI18n()
+const { getTranslatedExerciseName } = useExerciseTranslation()
+// Optional: eigene Übersetzungsfunktion für Muskelgruppen
+const getTranslatedMuscleGroup = (mg) => {
+  // TODO: Mapping für Muskelgruppen analog zu Übungen, falls gewünscht
+  // Beispiel: return t(`exercises.muscleGroups.${mg}`, mg)
+  return mg
+}
 
 const store = useUserStore()
 const toast = useToastStore()
@@ -185,6 +217,33 @@ const removeTarget = ref(null)
 const uploadInput = ref(null)
 const uploadTarget = ref(null)
 const preview = reactive({ open: false, url: '' })
+
+// Notiz-Logik
+const showNote = ref([])
+const exerciseNotes = ref([])
+
+// Initialisiere Notiz-Arrays, wenn Workout geladen wird
+watch(workout, (w) => {
+  if (w && Array.isArray(w.exercises)) {
+    showNote.value = w.exercises.map(ex => !!ex.note)
+    exerciseNotes.value = w.exercises.map(ex => typeof ex.note === 'string' ? ex.note : '')
+  }
+})
+
+const toggleNote = (idx) => {
+  showNote.value[idx] = !showNote.value[idx]
+}
+const getNote = (idx) => {
+  return (exerciseNotes.value && typeof exerciseNotes.value[idx] !== 'undefined') ? exerciseNotes.value[idx] : ''
+}
+const setNote = (idx, val) => {
+  if (exerciseNotes.value) exerciseNotes.value[idx] = val
+}
+
+function deleteNote(idx) {
+  if (exerciseNotes.value) exerciseNotes.value[idx] = ''
+  if (showNote.value) showNote.value[idx] = false
+}
 
 function formatDate(dateStr) {
   if (!dateStr) return ''
@@ -228,8 +287,8 @@ async function loadWorkout() {
     if (route.query.created === '1') {
       toast.show(t('dashboard.successCreated'), { type: 'success', duration: 3000 })
     }
-    // Draft-Fall: lokal aus dem Store
-    if (String(id).startsWith('draft-')) {
+    // Draft-Fall oder Offline-Fall: lokal aus dem Store
+    if (String(id).startsWith('draft-') || String(id).startsWith('offline_')) {
       workout.value = store.workouts.find(w => w._id === id) || null
       ensureSetDetailsStructure()
       await enrichExerciseImages()
@@ -493,13 +552,14 @@ async function saveWorkout() {
       type: w.type,
       date: w.date,
       completed: w.completed,
-      exercises: (w.exercises || []).map(ex => ({
+      exercises: (w.exercises || []).map((ex, idx) => ({
         exerciseId: ex.exerciseId,
         name: ex.name,
         muscleGroup: ex.muscleGroup,
         reps: ex.setDetails?.[0]?.reps ?? ex.reps ?? 10,
         weight: ex.setDetails?.[0]?.weight ?? ex.weight ?? 0,
-        setDetails: ex.setDetails || []
+        setDetails: ex.setDetails || [],
+        note: (exerciseNotes.value && typeof exerciseNotes.value[idx] !== 'undefined') ? exerciseNotes.value[idx] : ''
       }))
     }
 

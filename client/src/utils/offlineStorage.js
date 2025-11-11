@@ -270,6 +270,49 @@ export async function cacheExercises(exercises) {
   }
 }
 
+/**
+ * Initialisiert die Datenbank mit Standard-Übungen (falls leer)
+ * Wird beim ersten App-Start aufgerufen
+ * @returns {Promise<boolean>} True wenn Übungen geladen wurden
+ */
+export async function initializeDefaultExercises() {
+  try {
+    // Prüfe ob schon Übungen vorhanden sind
+    const count = await db.exercises.count()
+    if (count > 0) {
+      logger.debug('✅ Exercises bereits vorhanden:', count)
+      return false
+    }
+    
+    logger.info('📥 Lade Standard-Übungen...')
+    
+    // Lade Standard-Übungen aus JSON-Datei
+    const response = await fetch('/data/default-exercises.json')
+    if (!response.ok) {
+      throw new Error('Default exercises nicht verfügbar')
+    }
+    
+    const exercises = await response.json()
+    
+    // Generiere IDs für die Übungen
+    const exercisesWithIds = exercises.map((ex, idx) => ({
+      _id: `default_${idx + 1}`,
+      ...ex,
+      _isDefault: true,
+      _syncedAt: Date.now()
+    }))
+    
+    // Speichere in IndexedDB
+    await db.exercises.bulkAdd(exercisesWithIds)
+    
+    logger.info(`✅ ${exercisesWithIds.length} Standard-Übungen geladen!`)
+    return true
+  } catch (error) {
+    logger.error('❌ Fehler beim Laden der Standard-Übungen:', error)
+    return false
+  }
+}
+
 // ============================================================================
 // SYNC QUEUE - Offline Changes
 // ============================================================================

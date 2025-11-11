@@ -24,6 +24,16 @@ html {
   --danger-color: #ef4444;
   --warning-color: #f59e0b;
   --success-color: #22c55e;
+  
+  /* Legacy variables for backward compatibility */
+  --bg-primary: #0b0b0c;
+  --bg-secondary: #1c1c1e;
+  --text-primary: #ffffff;
+  --text-secondary: #9aa0a6;
+  --border-color: #2a2a2d;
+  --primary-color: #ff4d4d;
+  --primary-hover: #ff3333;
+  --secondary-color: #ff3333;
 }
 
 [data-theme="light"] {
@@ -41,6 +51,16 @@ html {
   --danger-color: #dc2626;
   --warning-color: #d97706;
   --success-color: #16a34a;
+  
+  /* Legacy variables for backward compatibility */
+  --bg-primary: #f7f7f8;
+  --bg-secondary: #ffffff;
+  --text-primary: #0b0b0c;
+  --text-secondary: #4b5563;
+  --border-color: #e5e7eb;
+  --primary-color: #ef4444;
+  --primary-hover: #dc2626;
+  --secondary-color: #f97316;
 }
 
 [data-theme="dark"] {

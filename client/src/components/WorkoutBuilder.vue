@@ -126,8 +126,8 @@
             <img :src="getExerciseImage(exercise)" :alt="t('common.image')" class="thumb" @error="onImgError($event, exercise)" />
             <div class="meta">
               <h4 class="title">{{ getTranslatedExerciseName(exercise.name) }}</h4>
-              <p class="sub">{{ exercise.muscleGroup }}</p>
-              <p class="sub small">{{ exercise.equipment || t('exercises.bodyweight') }}</p>
+              <p class="sub">{{ getTranslatedMuscleGroup(exercise.muscleGroup) }}</p>
+              <p class="sub small">{{ getTranslatedEquipment(exercise.equipment) || t('exercises.bodyweight') }}</p>
             </div>
           </div>
         </div>
@@ -165,9 +165,9 @@
                 <div class="ex-row">
                   <img :src="getExerciseImage(exercise)" :alt="t('common.image')" class="thumb" @error="onImgError($event, exercise)" />
                   <div class="meta">
-                    <h4 class="title">{{ exercise.name }}</h4>
-                    <p class="sub">{{ exercise.muscleGroup }}</p>
-                    <p class="sub small">{{ exercise.equipment || t('exercises.bodyweight') }}</p>
+                    <h4 class="title">{{ getTranslatedExerciseName(exercise.name) }}</h4>
+                    <p class="sub">{{ getTranslatedMuscleGroup(exercise.muscleGroup) }}</p>
+                    <p class="sub small">{{ getTranslatedEquipment(exercise.equipment) || t('exercises.bodyweight') }}</p>
                   </div>
                 </div>
               </div>
@@ -197,7 +197,19 @@
           <button class="drag-handle" :aria-label="t('workoutDetail.dragToReorder')" :title="t('workoutDetail.dragToReorder')">⋮⋮</button>
           <div class="sel-row">
             <img :src="getExerciseImage(exercise)" :alt="t('common.image')" class="thumb small" @error="onImgError($event, exercise)" />
-            <span class="ex-name">{{ exercise.name }}</span>
+            <div class="ex-info-col">
+              <span class="ex-name">{{ getTranslatedExerciseName(exercise.name) }}</span>
+              <div class="exercise-note-input" style="margin:2px 0 6px 0;">
+                <input
+                  type="text"
+                  v-model="exercise.note"
+                  :placeholder="t('builder.notePlaceholder') !== 'builder.notePlaceholder' ? t('builder.notePlaceholder') : 'Notiz (optional)'"
+                  maxlength="150"
+                  style="width:100%; font-size:0.92em; color:var(--muted); background:var(--bg2); border:1px solid var(--border); border-radius:4px; padding:2px 6px; margin-bottom:2px;"
+                />
+                <span v-if="exercise.note" style="font-size:0.85em; color:var(--muted);">📝 {{ exercise.note.length }}/150</span>
+              </div>
+            </div>
           </div>
           <!-- Mini-Plan pro Übung: Sätze/Reps/Gewicht -->
           <div class="sets-editor">
@@ -285,6 +297,24 @@ const subscriptionStore = useSubscriptionStore()
 const toast = useToastStore()
 const { t, locale } = useI18n()
 const { getTranslatedExerciseName } = useExerciseTranslation()
+// Hilfsfunktionen für Muskelgruppe und Equipment (nutzen default-exercises.json)
+const { getAllTranslations } = useExerciseTranslation()
+function getTranslatedMuscleGroup(muscleGroup) {
+  if (!muscleGroup) return ''
+  const all = getAllTranslations()
+  const found = all.find(e => e.muscleGroup === muscleGroup || e.muscleGroup_en === muscleGroup)
+  const lang = locale.value.startsWith('de') ? 'de' : 'en'
+  if (lang === 'de') return found ? found.muscleGroup : muscleGroup
+  return found ? found.muscleGroup_en : muscleGroup
+}
+function getTranslatedEquipment(equipment) {
+  if (!equipment) return ''
+  const all = getAllTranslations()
+  const found = all.find(e => e.equipment === equipment || e.equipment_en === equipment)
+  const lang = locale.value.startsWith('de') ? 'de' : 'en'
+  if (lang === 'de') return found ? found.equipment : equipment
+  return found ? found.equipment_en : equipment
+}
 
 // Subscription state
 const showUpgradeModal = ref(false)
@@ -507,29 +537,21 @@ async function prefillFromAISuggestion() {
     
     for (const aiEx of aiExercises) {
       logger.debug('🔍 WorkoutBuilder - Verarbeite AI-Übung:', aiEx.name, 'ID:', aiEx._id)
-      
       // Wenn AI _id enthält, nutze diese direkt
       if (aiEx._id) {
         logger.debug('✅ WorkoutBuilder - Nutze _id vom Backend:', aiEx._id)
         idsToUse.push(aiEx._id)
       }
     }
-    
     logger.debug('🔄 WorkoutBuilder - Lade Übungen für Typ:', selectedType.value)
     await loadExercises()
     logger.debug('✅ WorkoutBuilder - Datenbank-Übungen geladen:', exercises.value.length)
-    logger.debug('✅ WorkoutBuilder - Gefilterte Kategorien:', exercises.value.map(ex => ({ 
-      name: ex.name, 
-      _id: ex._id, 
-      category: ex.category 
-    })))
-    
-    // Matched Übungen nach _id oder Name
+    logger.debug('✅ WorkoutBuilder - Gefilterte Kategorien:', exercises.value.map(ex => ({ name: ex.name, _id: ex._id, category: ex.category })))
+
+    // Matched Übungen nach _id oder Name, Fallback: AI-Objekt als Platzhalter
     for (const aiEx of aiExercises) {
       logger.debug('🔍 WorkoutBuilder - Suche nach AI-Übung:', aiEx.name, 'ID:', aiEx._id)
-      
       let match = null
-      
       // Versuch 1: Direkt nach _id suchen
       if (aiEx._id) {
         match = exercises.value.find(ex => ex._id === aiEx._id)
@@ -537,7 +559,6 @@ async function prefillFromAISuggestion() {
           logger.debug('✅ WorkoutBuilder - Gefunden via _id:', match.name)
         }
       }
-      
       // Versuch 2: Nach Namen suchen (Fallback)
       if (!match) {
         match = exercises.value.find(ex => {
@@ -548,9 +569,8 @@ async function prefillFromAISuggestion() {
           return match
         })
       }
-      
+      // Fallback: Wenn kein Match, nutze AI-Objekt als Platzhalter
       if (match && !ordered.some(x => x._id === match._id)) {
-        // Füge AI-Metadaten hinzu (Sets, Reps, etc.)
         const enriched = {
           ...match,
           suggestedSets: aiEx.sets || 3,
@@ -560,13 +580,25 @@ async function prefillFromAISuggestion() {
         ordered.push(enriched)
         logger.debug('✅ WorkoutBuilder - AI-Übung in Plan aufgenommen:', aiEx.name, '→', match.name)
       } else if (!match) {
-        logger.warn('⚠️ WorkoutBuilder - AI-Übung nicht in DB gefunden:', aiEx.name)
+        // Fallback: AI-Objekt als Platzhalter
+        const fallback = {
+          ...aiEx,
+          _id: aiEx._id || `ai_${aiEx.name?.replace(/\s+/g, '_') || Math.random().toString(36).slice(2)}`,
+          name: aiEx.name || 'Unbenannte Übung',
+          category: selectedType.value,
+          muscleGroup: aiEx.muscleGroup || '',
+          equipment: aiEx.equipment || '',
+          suggestedSets: aiEx.sets || 3,
+          suggestedReps: aiEx.reps || 10,
+          suggestedWeight: aiEx.weight || 0
+        }
+        ordered.push(fallback)
+        logger.warn('⚠️ WorkoutBuilder - AI-Übung nicht in DB gefunden, als Platzhalter übernommen:', aiEx.name)
       } else {
         logger.debug('ℹ️ WorkoutBuilder - AI-Übung bereits im Plan:', aiEx.name)
       }
     }
-    
-    selectedExercises.value = ordered
+  selectedExercises.value = [...ordered]
     logger.debug('✅ WorkoutBuilder - AI-Suggestion vollständig geladen')
     logger.debug('📊 WorkoutBuilder - selectedExercises:', selectedExercises.value.length, 'Übungen')
     logger.debug('📊 WorkoutBuilder - selectedExercises Details:', selectedExercises.value.map(ex => ({ 
@@ -606,15 +638,12 @@ async function prefillFromRepeatIfAny() {
     }
     await loadExercises()
 
-    // Nutze prefillExercises Helper
+    // Übernehme die Übungen exakt wie im Original-Workout
     const baseExercises = Array.isArray(base.exercises) ? base.exercises : []
-    const matched = prefillExercises(baseExercises, exercises.value, {
-      skipDuplicates: true,
-      existingExercises: []
-    })
-    
-    selectedExercises.value = matched
-    logger.debug('✅ WorkoutBuilder - Repeat Workout geladen:', matched.length, 'Übungen')
+    // Prüfe, ob alle Übungen noch in der DB existieren (optional)
+    // Wenn nicht, kann ein Fallback erfolgen, aber Standard: Übernehme alle Felder wie gespeichert
+    selectedExercises.value = baseExercises.map(ex => ({ ...ex }))
+    logger.debug('✅ WorkoutBuilder - Repeat Workout geladen (exakt übernommen):', baseExercises.length, 'Übungen')
     
     await nextTick()
     if (!didPlanScroll.value && selectedExercises.value.length > 4) {
@@ -627,10 +656,10 @@ async function prefillFromRepeatIfAny() {
 }
 
 onMounted(async () => { 
-  // Priorisiere AI-Suggestion, dann Repeat
-  await prefillFromAISuggestion()
+  // Priorisiere Repeat, dann AI-Suggestion
+  await prefillFromRepeatIfAny()
   if (selectedExercises.value.length === 0) {
-    await prefillFromRepeatIfAny()
+    await prefillFromAISuggestion()
   }
 })
 
@@ -833,14 +862,15 @@ async function createWorkout() {
     
     creating.value = true
     const workoutData = {
-  name: `${currentTypeLabel.value} - ${new Date().toLocaleDateString(String(locale.value).startsWith('de') ? 'de-DE' : 'en-US')}`,
+      name: `${currentTypeLabel.value} - ${new Date().toLocaleDateString(String(locale.value).startsWith('de') ? 'de-DE' : 'en-US')}`,
       type: selectedType.value,
-      // Nur Übungen ohne Satz-Details speichern; Details werden erst später im Detail bearbeitet
       exercises: selectedExercises.value.map(ex => ({
-        exerciseId: ex._id,
         name: ex.name,
-        muscleGroup: ex.muscleGroup,
+        sets: Array.isArray(ex.setDetails) ? ex.setDetails.length : (ex.sets || 3),
+        reps: Array.isArray(ex.setDetails) && ex.setDetails[0] ? Number(ex.setDetails[0].reps) || 10 : (ex.reps || 10),
+        weight: Array.isArray(ex.setDetails) && ex.setDetails[0] ? Number(ex.setDetails[0].weight) || 0 : (ex.weight || 0),
         category: ex.category,
+        note: typeof ex.note === 'string' ? ex.note : '',
         setDetails: Array.isArray(ex.setDetails) ? ex.setDetails.map(s => ({
           reps: Number(s.reps) || 10,
           weight: Number(s.weight) || 0

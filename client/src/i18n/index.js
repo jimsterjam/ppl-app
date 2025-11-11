@@ -103,13 +103,16 @@ export const messages = {
       minimize: 'Minimieren',
       close: 'Schließen'
     },
-    exercises: {
+  exercises: {
       title: 'Übungen',
       allTitle: 'Übersicht aller Übungen:',
       loading: 'Lade MongoDB-Übungen...',
       none: 'Keine Übungen aus MongoDB gefunden. Backend prüfen!',
       equipment: 'Equipment',
-      bodyweight: 'Körpergewicht',
+      bodyweight: 'Bodyweight',
+      // Mapping für Equipment-Übersetzungen
+      // Mapping für Muskelgruppen-Übersetzungen
+        // equipmentNames und muscleGroupNames entfernt, da Übersetzungen aus default-exercises.json kommen
       addOrChangePhoto: 'Foto hinzufügen/ändern',
       removePhoto: 'Foto entfernen',
       toastUploaded: 'Foto hochgeladen.',

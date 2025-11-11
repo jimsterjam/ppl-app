@@ -53,6 +53,8 @@ const workoutSchema = new mongoose.Schema({
     weight: Number,
     // optional zur Ableitung
     category: String,
+    // Notiz pro Übung (allgemein)
+    note: String,
     // Detaillierte Set-Informationen (modernes Format)
     setDetails: [{
       reps: Number,

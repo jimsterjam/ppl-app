@@ -81,6 +81,9 @@
                   <span class="exercise-name">{{ getTranslatedExerciseName(exercise.name) }}</span>
                   <span class="exercise-summary">{{ getExerciseSummary(exercise) }}</span>
                 </div>
+                <div v-if="exercise.note" class="exercise-note" style="margin:2px 0 6px 0; color:var(--muted); font-size:0.92em;">
+                  📝 {{ exercise.note }}
+                </div>
                 
                 <!-- Sets Display -->
                 <div class="sets-display">

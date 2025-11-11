@@ -51,12 +51,12 @@
         <div class="thumb-row">
           <img :src="getExerciseImage(ex)" :alt="t('common.image')" class="thumb" @error="onImgError($event, ex)" />
           <div class="meta">
-            <h2 class="title">{{ ex.name }}</h2>
-            <p class="sub">{{ ex.category }} · {{ ex.muscleGroup || (ex.muscleGroups?.[0] || '') }}</p>
+            <h2 class="title">{{ getTranslatedExerciseName(ex.name_en) }}</h2>
+              <p class="sub">{{ ex.category }} · {{ getTranslatedMuscleGroup(ex.muscleGroup || (ex.muscleGroups?.[0] || '')) }}</p>
           </div>
         </div>
         <p class="desc">{{ ex.description }}</p>
-  <p class="equip">{{ t('exercises.equipment') }}: {{ ex.equipment }}</p>
+    <p class="equip">{{ t('exercises.equipment') }}: {{ getTranslatedEquipment(ex.equipment) }}</p>
       </div>
     </div>
 
@@ -79,6 +79,28 @@ const exercises = ref([]);
 const loading = ref(false);
 const selectedCategory = ref('');
 const selectedMuscleGroup = ref('');
+
+const { getTranslatedExerciseName, getAllTranslations } = useExerciseTranslation()
+
+function getTranslatedMuscleGroup(muscleGroup) {
+  if (!muscleGroup) return ''
+  const all = getAllTranslations()
+  // Suche nach passendem Eintrag (deutsch oder englisch)
+  const found = all.find(e => e.muscleGroup === muscleGroup || e.muscleGroup_en === muscleGroup)
+  const lang = (navigator.language || 'de').startsWith('de') ? 'de' : 'en'
+  if (lang === 'de') return found ? found.muscleGroup : muscleGroup
+  return found ? found.muscleGroup_en : muscleGroup
+}
+
+function getTranslatedEquipment(equipment) {
+  if (!equipment) return ''
+  const all = getAllTranslations()
+  // Suche nach passendem Eintrag (deutsch oder englisch)
+  const found = all.find(e => e.equipment === equipment || e.equipment_en === equipment)
+  const lang = (navigator.language || 'de').startsWith('de') ? 'de' : 'en'
+  if (lang === 'de') return found ? found.equipment : equipment
+  return found ? found.equipment_en : equipment
+}
 
 // Muskelgruppen (Dropdown)
 const muscleGroups = [
@@ -192,7 +214,6 @@ function onImgError(evt, ex) {
 .sub { color: #64748b; font-size: 0.875rem; }
 .desc { margin-top: 6px; color: #334155; }
 .equip { font-size: 0.75rem; color: #94a3b8; margin-top: 2px; }
-
 /* Mobile: Thumbnail rechts und größer */
 @media (max-width: 480px) {
   .thumb-row { flex-direction: row-reverse; justify-content: space-between; }

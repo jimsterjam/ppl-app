@@ -247,6 +247,15 @@ router.get("/:id", requireAuth(), async (req, res) => {
 router.post("/", requireAuth(), async (req, res) => {
   try {
     const { userId } = req.auth();
+    // Debug: Logge die Notizen der Übungen, falls vorhanden
+    if (Array.isArray(req.body.exercises)) {
+      console.log('📝 Notizen der Übungen beim POST /workouts:');
+      req.body.exercises.forEach((ex, idx) => {
+        if (ex.note) {
+          console.log(`  Übung ${idx + 1}: ${ex.name || ''} | Notiz: ${ex.note}`);
+        }
+      });
+    }
     const workout = await Workout.create({
       ...req.body,
       userId
@@ -444,7 +453,7 @@ router.post("/ai-suggestion", async (req, res) => {
     }
 
     // Fallback: Demo-Suggestion
-    const demoSuggestion = generateDemoSuggestion(req.body);
+  const demoSuggestion = await generateDemoSuggestion(req.body);
     
     // Schnelle Validierung: Batch lookup statt Individual findOne
     if (demoSuggestion.exercises?.length > 0) {
@@ -622,7 +631,6 @@ function createWorkoutPrompt(context) {
   Erfahrungslevel: ${context.experienceLevel || 'unbekannt'}
   Verfügbare Zeit: ${context.timeAvailable || '45'} Minuten
   Fokus: ${context.focus || 'Ganzkörper'}
-  Verfügbare Geräte: ${context.equipment || 'Freihantel'}
   Letzte Workouts: ${context.recentWorkouts || 'keine Daten'}
   Verletzungen: ${context.injuries || 'keine'}
   
@@ -633,7 +641,7 @@ function createWorkoutPrompt(context) {
   Bitte erstelle ein sicheres, effektives und ABWECHSLUNGSREICHES Workout.`;
 }
 
-function generateDemoSuggestion(context) {
+async function generateDemoSuggestion(context) {
   const timestamp = Date.now();
   const randomVariation = Math.floor(Math.random() * 3); // 0, 1, oder 2
   const focus = context.focus || 'push';
@@ -743,12 +751,41 @@ function generateDemoSuggestion(context) {
   const availableVariations = workoutVariations[focus] || workoutVariations.push;
   const selectedWorkout = availableVariations[randomVariation];
   
-  // Gebe einfach die Demo-Vorschläge direkt zurück (ohne Anpassungen damit Namen passen)
+  // Mappe Exercise-Namen zu Datenbank-IDs (asynchron, daher async function nötig)
+  const exercisesWithIds = await Promise.all(
+    selectedWorkout.exercises.map(async (ex) => {
+      try {
+        // Suche Übung in Datenbank nach Namen
+        const dbExercise = await Exercise.findOne({ 
+          name: { $regex: new RegExp(`^${ex.name}$`, 'i') }
+        }).lean();
+        
+        return {
+          ...ex,
+          _id: dbExercise?._id?.toString() || `default_${ex.name.replace(/\s+/g, '_')}`,
+          exerciseId: dbExercise?._id?.toString(),
+          muscleGroup: dbExercise?.muscleGroups?.[0] || 'Unknown',
+          category: focus,
+          equipment: dbExercise?.equipment || 'Unknown'
+        };
+      } catch (err) {
+        logger.warn(`⚠️ Fehler beim Matchen von "${ex.name}":`, err.message);
+        return {
+          ...ex,
+          _id: `default_${ex.name.replace(/\s+/g, '_')}`,
+          muscleGroup: 'Unknown',
+          category: focus
+        };
+      }
+    })
+  );
+  
+  // Gebe angereicherte Demo-Vorschläge zurück
   return {
     type: focus,
     focus: focus,
     workoutName: selectedWorkout.workoutName,
-    exercises: selectedWorkout.exercises,
+    exercises: exercisesWithIds,
     estimatedDuration: context.timeAvailable || 45,
     difficulty: level,
     metadata: {

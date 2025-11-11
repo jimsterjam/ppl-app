@@ -125,20 +125,7 @@
               </select>
             </div>
             
-              <!-- Equipment -->
-            <div class="config-item">
-              <label class="config-label">🏋️ Verfügbare Ausrüstung</label>
-              <div class="equipment-grid">
-                <label v-for="(equipment, idx) in availableEquipment" :key="`eq-${idx}`" class="equipment-checkbox">
-                  <input 
-                    type="checkbox" 
-                    :value="equipment.id" 
-                    v-model="workoutConfig.equipment"
-                  />
-                  <span class="equipment-label">{{ equipment.icon }} {{ equipment.name }}</span>
-                </label>
-              </div>
-            </div>            <!-- AI Request Button -->
+            <!-- AI Request Button -->
             <div class="config-actions">
               <button 
                 @click="requestAIWorkout" 
@@ -154,7 +141,7 @@
         </div>
 
         <!-- AI Recommendation Result -->
-        <div class="test-card" v-if="aiRecommendation">
+        <div ref="aiResultCard" class="test-card" v-if="aiRecommendation">
           <h4>🤖 AI Empfehlung</h4>
           
           <div class="ai-result">
@@ -189,7 +176,11 @@
                 <div class="exercise-list">
                   <div v-for="(exercise, idx) in aiRecommendation.exercises" :key="`ex-${idx}-${exercise._id || exercise.name}`" class="exercise-item">
                     <span class="exercise-name">{{ exercise.name }}</span>
-                    <span class="exercise-details">{{ exercise.sets }}x{{ exercise.reps }}</span>
+                    <span class="exercise-details">
+                      {{ exercise.sets }}x{{ exercise.reps }}
+                      <template v-if="exercise.muscleGroup">· {{ getTranslatedMuscleGroup(exercise.muscleGroup) }}</template>
+                      <template v-if="exercise.equipment">· {{ getTranslatedEquipment(exercise.equipment) }}</template>
+                    </span>
                   </div>
                 </div>
               </div>
@@ -215,11 +206,12 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { useAICoachStore } from '@/stores/aiCoachStore'
 import { useToastStore } from '@/stores/toastStore'
+import { useUserStore } from '@/stores/userStore'
 import HeaderBar from '@/components/HeaderBar.vue'
 import AIDisclaimerModal from '@/components/AIDisclaimerModal.vue'
 import { http } from '@/api/http'
@@ -227,6 +219,18 @@ import { logger } from '@/utils/logger'
 
 // Composables
 const { t } = useI18n()
+
+function getTranslatedMuscleGroup(muscleGroup) {
+  if (!muscleGroup) return ''
+  // muscleGroupNames entfernt, Übersetzungen kommen aus default-exercises.json
+  return map[muscleGroup] || muscleGroup
+}
+
+function getTranslatedEquipment(equipment) {
+  if (!equipment) return ''
+  // equipmentNames entfernt, Übersetzungen kommen aus default-exercises.json
+  return map[equipment] || equipment
+}
 const router = useRouter()
 const aiStore = useAICoachStore()
 const toast = useToastStore()
@@ -235,24 +239,14 @@ const toast = useToastStore()
 const showAIDisclaimer = ref(false)
 const aiProcessing = ref(false)
 const aiRecommendation = ref(null)
+const aiResultCard = ref(null) // Ref für das Ergebnis-Card
 
 const workoutConfig = ref({
   timeAvailable: 45,
   experienceLevel: 'intermediate',
   intensity: 3,
-  focus: 'push',
-  equipment: ['bodyweight']
+  focus: 'push'
 })
-
-const availableEquipment = ref([
-  { id: 'dumbbells', name: 'Kurzhanteln', icon: '🏋️' },
-  { id: 'barbell', name: 'Langhantel', icon: '🥇' },
-  { id: 'pull_up_bar', name: 'Klimmzugstange', icon: '🤸' },
-  { id: 'bench', name: 'Bank', icon: '🪑' },
-  { id: 'cable_machine', name: 'Kabelzug', icon: '🔗' },
-  { id: 'machine', name: 'Maschinen', icon: '⚙️' },
-  { id: 'bodyweight', name: 'Körpergewicht', icon: '🧘' }
-])
 
 // Methods
 const onAIConsentAccept = () => {
@@ -278,8 +272,7 @@ const revokeAIConsent = () => {
     timeAvailable: 45,
     experienceLevel: 'intermediate',
     intensity: 3,
-    focus: 'push',
-    equipment: ['bodyweight']
+    focus: 'push'
   }
   toast.show('AI Consent widerrufen', 'warning')
 }
@@ -306,6 +299,12 @@ const requestAIWorkout = async () => {
     const response = await http.post('/workouts/ai-suggestion', workoutConfig.value)
     aiRecommendation.value = response.data
     toast.show('AI Workout generiert! 🤖', 'success')
+    
+    // Scrolle automatisch zum Ergebnis
+    await nextTick()
+    if (aiResultCard.value) {
+      aiResultCard.value.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
   } catch (error) {
     logger.error('AI Workout Request failed:', error)
     toast.show('Fehler beim Generieren des Workouts', 'error')
@@ -315,28 +314,57 @@ const requestAIWorkout = async () => {
   }
 }
 
-const startWorkoutNow = () => {
+const startWorkoutNow = async () => {
   if (!aiRecommendation.value) return
   
-  const workout = {
-    name: aiRecommendation.value.workoutName,
-    exercises: aiRecommendation.value.exercises,
-    estimatedDuration: aiRecommendation.value.estimatedDuration,
-    type: workoutConfig.value.focus,
-    metadata: {
-      source: 'ai_generated',
-      generatedAt: new Date().toISOString()
+  try {
+    const workout = {
+      name: aiRecommendation.value.workoutName,
+      exercises: aiRecommendation.value.exercises.map(ex => ({
+        exerciseId: ex.exerciseId || ex._id,
+        name: ex.name,
+        muscleGroup: ex.muscleGroup || '',
+        category: ex.category || workoutConfig.value.focus,
+        sets: ex.sets || 3,
+        reps: ex.reps || 10,
+        setDetails: Array.from({ length: ex.sets || 3 }, () => ({
+          reps: ex.reps || 10,
+          weight: 0,
+          completed: false
+        }))
+      })),
+      type: workoutConfig.value.focus,
+      date: new Date().toISOString(),
+      completed: false,
+      notes: '',
+      metadata: {
+        source: 'ai_generated',
+        generatedAt: new Date().toISOString()
+      }
     }
+    
+    // Speichere das Workout im Store und navigiere zur Detail-Seite
+    const userStore = useUserStore()
+    const savedWorkout = await userStore.createWorkout(workout)
+    
+    if (!savedWorkout || !savedWorkout._id) {
+      logger.error('❌ Workout konnte nicht gespeichert werden')
+      toast.show('Fehler beim Speichern des Workouts', 'error')
+      return
+    }
+    
+    logger.debug('✅ Workout gespeichert mit ID:', savedWorkout._id)
+    
+    toast.show('Workout gestartet! 💪', 'success')
+    
+    router.push({
+      path: `/workouts/${savedWorkout._id}`,
+      query: { created: '1' }
+    })
+  } catch (error) {
+    logger.error('Failed to start workout:', error)
+    toast.show('Fehler beim Starten des Workouts', 'error')
   }
-  
-  router.push({
-    path: '/workout-detail',
-    query: { 
-      template: 'ai',
-      type: workoutConfig.value.focus
-    },
-    state: { workout }
-  })
 }
 
 const saveToBuilder = () => {
@@ -435,8 +463,7 @@ const resetConfig = () => {
     timeAvailable: 45,
     experienceLevel: 'intermediate',
     intensity: 3,
-    focus: 'push',
-    equipment: ['bodyweight']
+    focus: 'push'
   }
   aiRecommendation.value = null
 }
@@ -672,52 +699,6 @@ onMounted(() => {
   margin-top: 4px;
 }
 
-.equipment-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
-}
-
-.equipment-checkbox {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
-}
-
-.equipment-checkbox:hover {
-  border-color: var(--primary-color);
-  background: var(--bg-secondary);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
-
-.equipment-checkbox input[type="checkbox"] {
-  cursor: pointer;
-  width: 18px;
-  height: 18px;
-  accent-color: var(--primary-color);
-}
-
-.equipment-label {
-  cursor: pointer;
-  flex: 1;
-}
-
-.equipment-checkbox input[type="checkbox"] {
-  margin: 0;
-}
-
-.equipment-label {
-  font-size: 14px;
-  color: var(--text-primary);
-}
-
 .config-actions {
   margin-top: 20px;
 }
@@ -725,24 +706,27 @@ onMounted(() => {
 .ai-request-btn {
   width: 100%;
   padding: 15px;
-  background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-  color: white;
+  background: var(--accent);
+  color: var(--accent-contrast);
   border: none;
   border-radius: 10px;
   font-size: 16px;
   font-weight: bold;
   cursor: pointer;
-  transition: transform 0.2s;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
 .ai-request-btn:hover:not(:disabled) {
+  background: var(--accent-hover);
   transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.2);
 }
 
 .ai-request-btn:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
 }
 
 .ai-result {

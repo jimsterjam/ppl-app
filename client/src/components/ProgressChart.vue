@@ -8,7 +8,7 @@
         <select v-model="selectedExercise" @change="updateChart">
           <option value="">{{ t('charts.selectExercise') }}</option>
           <option v-for="exercise in availableExercises" :key="exercise" :value="exercise">
-            {{ exercise }}
+            {{ getTranslatedExerciseName(exercise) }}
           </option>
         </select>
       </div>
@@ -26,7 +26,7 @@
       <!-- Chart Header -->
       <div class="chart-header">
         <div class="chart-title">
-          <span>📈 {{ selectedExercise }}</span>
+          <span>📈 {{ getTranslatedExerciseName(selectedExercise) }}</span>
         </div>
         <div class="chart-value">
           {{ progressStats.currentWeight }}kg
@@ -143,6 +143,7 @@
 <script setup>
 import { ref, onMounted, watch, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 
 const props = defineProps({
   workouts: {
@@ -150,6 +151,7 @@ const props = defineProps({
     default: () => []
   }
 })
+const { getTranslatedExerciseName } = useExerciseTranslation()
 
 const selectedExercise = ref('')
 const selectedTimeRange = ref('3months')

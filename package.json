@@ -1,7 +1,6 @@
 {
   "name": "bro-split-app",
   "version": "1.0.0",
-  "type": "module",
   "scripts": {
     "server": "cd server && npx nodemon server.js",
     "server:prod": "cd server && node server.js",

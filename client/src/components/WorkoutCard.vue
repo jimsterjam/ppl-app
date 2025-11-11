@@ -7,7 +7,7 @@
 
     <ul class="exercise-list">
       <li v-for="(ex, i) in (workout.exercises || [])" :key="i">
-        <strong>{{ ex.name }}</strong>
+        <strong>{{ getTranslatedExerciseName(ex.name) }}</strong>
         <span>{{ (ex.sets ?? (ex.setDetails?.length || 0)) }}×{{ (ex.reps ?? ex.setDetails?.[0]?.reps ?? 0) }}</span>
       </li>
     </ul>
@@ -18,10 +18,12 @@
 
 <script setup>
 import { computed } from 'vue'
+import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 
 const props = defineProps({
   workout: { type: Object, required: true }
 });
+const { getTranslatedExerciseName } = useExerciseTranslation()
 
 // Declare emitted events for linting/auto-complete
 defineEmits(['start'])

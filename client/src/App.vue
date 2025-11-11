@@ -4,10 +4,15 @@ import { RouterView } from 'vue-router'
 import ToastHost from './components/ToastHost.vue'
 import OfflineIndicator from './components/OfflineIndicator.vue'
 import { setupAutoSync } from './utils/syncManager'
+import { initializeDefaultExercises } from './utils/offlineStorage'
 import { logger } from './utils/logger'
 
 // Setup Offline Support
 onMounted(async () => {
+  // Lade Standard-Übungen beim ersten Start
+  await initializeDefaultExercises()
+  
+  // Setup Auto-Sync
   await setupAutoSync()
   logger.debug('✅ App - Offline Support aktiviert (inkl. Initial Sync)')
 })

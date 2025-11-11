@@ -1,4 +1,4 @@
-export default [
+[
   {"name":"Bankdrücken","name_en":"Bench Press","category":"Push","muscleGroup":"Brust","muscleGroup_en":"Chest","equipment":"Langhantel","equipment_en":"Barbell"},
   {"name":"Schrägbankdrücken","name_en":"Incline Bench Press","category":"Push","muscleGroup":"Brust","muscleGroup_en":"Chest","equipment":"Langhantel","equipment_en":"Barbell"},
   {"name":"Kurzhantel-Fliegende","name_en":"Dumbbell Flyes","category":"Push","muscleGroup":"Brust","muscleGroup_en":"Chest","equipment":"Hanteln","equipment_en":"Dumbbells"},
