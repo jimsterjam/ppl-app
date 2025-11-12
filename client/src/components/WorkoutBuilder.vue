@@ -257,6 +257,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, nextTick, onUnmounted } from 'vue'
+import { saveWorkoutOffline, getWorkoutOffline } from '@/utils/offlineStorage'
 import { useI18n } from 'vue-i18n'
 import { useAuth, useUser, useClerk } from '@clerk/vue'
 import { getAuthToken } from '@/utils/authToken'
@@ -340,7 +341,20 @@ const planRef = ref(null)
 const DRAFT_STORAGE_KEY = 'workout_builder_draft'
 
 // Draft aus SessionStorage laden
-function loadDraft() {
+async function loadDraft() {
+  // 1. Versuche aus IndexedDB (offline)
+  try {
+    const draft = await getWorkoutOffline('draft')
+    if (draft && draft.exercises && draft.type) {
+      selectedType.value = draft.type
+      selectedExercises.value = draft.exercises
+      logger.debug('✅ WorkoutBuilder - Draft aus IndexedDB wiederhergestellt:', draft.exercises.length, 'Übungen')
+      return true
+    }
+  } catch (e) {
+    logger.warn('⚠️ WorkoutBuilder - Fehler beim Laden des Drafts aus IndexedDB:', e)
+  }
+  // 2. Fallback: SessionStorage
   try {
     const draft = sessionStorage.getItem(DRAFT_STORAGE_KEY)
     if (draft) {
@@ -348,27 +362,30 @@ function loadDraft() {
       if (parsed.selectedType && parsed.selectedExercises) {
         selectedType.value = parsed.selectedType
         selectedExercises.value = parsed.selectedExercises
-        logger.debug('✅ WorkoutBuilder - Draft wiederhergestellt:', parsed.selectedExercises.length, 'Übungen')
+        logger.debug('✅ WorkoutBuilder - Draft aus sessionStorage wiederhergestellt:', parsed.selectedExercises.length, 'Übungen')
         return true
       }
     }
   } catch (e) {
-    logger.warn('⚠️ WorkoutBuilder - Fehler beim Laden des Drafts:', e)
+    logger.warn('⚠️ WorkoutBuilder - Fehler beim Laden des Drafts aus sessionStorage:', e)
   }
   return false
 }
 
 // Draft in SessionStorage speichern
-function saveDraft() {
+async function saveDraft() {
   try {
     if (selectedExercises.value.length > 0) {
       const draft = {
-        selectedType: selectedType.value,
-        selectedExercises: selectedExercises.value,
-        timestamp: Date.now()
+        _id: 'draft',
+        type: selectedType.value,
+        exercises: selectedExercises.value,
+        isDraft: true,
+        updatedAt: Date.now(),
       }
-      sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draft))
-      logger.debug('💾 WorkoutBuilder - Draft gespeichert:', selectedExercises.value.length, 'Übungen')
+      sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({ selectedType: selectedType.value, selectedExercises: selectedExercises.value, timestamp: Date.now() }))
+      await saveWorkoutOffline(draft)
+      logger.debug('💾 WorkoutBuilder - Draft gespeichert (sessionStorage & IndexedDB):', selectedExercises.value.length, 'Übungen')
     }
   } catch (e) {
     logger.warn('⚠️ WorkoutBuilder - Fehler beim Speichern des Drafts:', e)
@@ -402,19 +419,19 @@ function todayKey() {
   return `${y}-${m}-${day}`
 }
 
-onMounted(() => {
+onMounted(async () => {
   // Load subscription status
   subscriptionStore.checkSubscription()
-  
-  // Lade Draft falls vorhanden
-  const hasDraft = loadDraft()
+
+  // Lade Draft falls vorhanden (async!)
+  const hasDraft = await loadDraft()
   if (hasDraft) {
-    toast.show(t('builder.draftRestored') || 'Workout-Entwurf wiederhergestellt', { 
-      type: 'info', 
-      duration: 3000 
+    toast.show(t('builder.draftRestored') || 'Workout-Entwurf wiederhergestellt', {
+      type: 'info',
+      duration: 3000
     })
   }
-  
+
   const onResize = () => { viewportWidth.value = window.innerWidth }
   window.addEventListener('resize', onResize)
   // Store handler referenz für Cleanup
@@ -724,6 +741,7 @@ const filteredExercises = computed(() => {
 function onTypeChange() {
   // Re-use bestehende Logik
   selectWorkoutType(selectedType.value)
+  saveDraft()
 }
 async function selectWorkoutType(type) {
   selectedType.value = type
@@ -814,6 +832,7 @@ function toggleExercise(exercise) {
       ...exercise
     })
   }
+  saveDraft()
 }
 
 function isSelected(exercise) {
@@ -948,6 +967,7 @@ function removeSet(exIdx, setIdx) {
   const ex = selectedExercises.value[exIdx]
   if (!ex?.setDetails) return
   ex.setDetails.splice(setIdx, 1)
+  saveDraft()
 }
 
 function updateSet(exIdx, setIdx, field, val) {
@@ -956,6 +976,7 @@ function updateSet(exIdx, setIdx, field, val) {
   const num = Number(val)
   if (field === 'reps') ex.setDetails[setIdx].reps = isFinite(num) ? num : ex.setDetails[setIdx].reps
   if (field === 'weight') ex.setDetails[setIdx].weight = isFinite(num) ? num : ex.setDetails[setIdx].weight
+  saveDraft()
 }
 
 // Preset-Reps entfernt

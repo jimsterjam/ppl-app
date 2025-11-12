@@ -2,8 +2,10 @@
  * Utility-Funktionen für die Übersetzung von Übungsnamen
  * zwischen Deutsch und Englisch mit i18n-System Integration
  */
-import { ref, computed, watchEffect } from 'vue'
+
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import defaultExercises from '@/data/default-exercises.json'
 
 /**
  * Composable für Übungsübersetzungen
@@ -11,24 +13,8 @@ import { useI18n } from 'vue-i18n'
  */
 export function useExerciseTranslation() {
   const { locale } = useI18n()
-  const exercisesData = ref([])
-
-  // Lade die JSON nur einmal (Client-seitig)
-  async function loadExercisesData() {
-    if (exercisesData.value.length > 0) return
-    try {
-      const res = await fetch('/data/default-exercises.json')
-      exercisesData.value = await res.json()
-    } catch (e) {
-      // eslint-disable-next-line no-console
-      console.error('Fehler beim Laden der default-exercises.json:', e)
-    }
-  }
-
-  // Sofort laden
-  if (typeof window !== 'undefined') {
-    loadExercisesData()
-  }
+  // Immer synchron und offlinefähig
+  const exercisesData = ref(Array.isArray(defaultExercises) ? defaultExercises : (defaultExercises?.default || []))
 
   // Übersetzungsfunktion, die aus der JSON sucht
   function normalize(str) {

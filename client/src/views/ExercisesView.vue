@@ -150,12 +150,12 @@ const { getTranslatedExerciseName } = useExerciseTranslation()
 const toast = useToastStore()
 
 // 🔄 Übungen direkt aus default-exercises.json laden (offlinefähig)
-async function loadExercises() {
+import defaultExercises from '@/data/default-exercises.json'
+function loadExercises() {
   loading.value = true
   try {
     logger.debug('🔄 Lade Exercises aus default-exercises.json')
-    const response = await fetch('/data/default-exercises.json')
-    let allExercises = await response.json()
+    let allExercises = Array.isArray(defaultExercises) ? defaultExercises : (defaultExercises?.default || [])
     // Filter anwenden
     if (selectedCategory.value) {
       allExercises = allExercises.filter(ex => ex.category === selectedCategory.value)

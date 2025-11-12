@@ -221,7 +221,7 @@ import { logger } from '@/utils/logger'
 const { t } = useI18n()
 
 // Dynamisches Mapping aus default-exercises.json
-import exercisesData from '@/../public/data/default-exercises.json'
+import exercisesData from '@/data/default-exercises.json'
 
 function getTranslatedMuscleGroup(muscleGroup, lang = 'de') {
   if (!muscleGroup) return ''

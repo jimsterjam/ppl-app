@@ -1,6 +1,6 @@
 <template>
   <div class="dashboard">
-    <HeaderBar :title="greeting">
+  <HeaderBar :title="greeting || $t('dashboard.title')">
       <template #actions>
         <button 
           class="refresh-btn" 
@@ -74,6 +74,10 @@
           <div v-if="hasDraft" class="draft-notice">
             <span class="draft-icon">📝</span>
             <span>{{ $t('dashboard.draftAvailable') }}</span>
+            <!-- Zeitstempel des letzten Speicherns -->
+            <div v-if="draftTimestamp" class="draft-timestamp">
+              {{ $t('dashboard.lastSaved') }}: {{ draftTimestamp.toLocaleString() }}
+            </div>
           </div>
           
           <!-- Haupt-Button -->
@@ -126,17 +130,29 @@ import EmptyState from "../components/EmptyState.vue";
 import QuickOverview from "../components/QuickOverview.vue";
 import RecentWorkouts from "../components/RecentWorkouts.vue";
 import { logger } from '@/utils/logger'
+import { getWorkoutOffline } from '@/utils/offlineStorage'
 
 const store = useUserStore();
 const { t: $t } = useI18n()
 const router = useRouter();
 const clerk = useClerk();
 const auth = useAuth();
-const { isSignedIn } = useUser();
+const { isSignedIn, user } = useUser();
 const selectedWorkoutType = ref('push')
 const isClerkReady = ref(false)
 const workoutCreated = ref(false) // Für visuelles Feedback
 const toast = useToastStore()
+
+// Begrüßung (greeting) computed property
+const greeting = computed(() => {
+  const hour = new Date().getHours();
+  let greet = '';
+  if (hour < 11) greet = $t('dashboard.greetingMorning');
+  else if (hour < 18) greet = $t('dashboard.greetingDay');
+  else greet = $t('dashboard.greetingEvening');
+  const name = user?.value?.firstName || '';
+  return name ? `${greet}, ${name}` : greet;
+});
 
 // Fokus-Handler als stabile Referenz definieren (wird in onMounted registriert)
 const handleFocus = () => {
@@ -260,72 +276,53 @@ const nextLabel = computed(() => typeLabel(nextType.value))
 
 // Draft-Erkennung aus SessionStorage
 const DRAFT_STORAGE_KEY = 'workout_builder_draft'
-const hasDraft = computed(() => {
-  try {
-    const draft = sessionStorage.getItem(DRAFT_STORAGE_KEY)
-    if (draft) {
-      const parsed = JSON.parse(draft)
-      return parsed.selectedExercises && parsed.selectedExercises.length > 0
-    }
-  } catch (e) {
-    return false
+const hasDraft = ref(false)
+const draftType = ref('push')
+const draftTimestamp = ref(null)
+
+// Prüfe auf Draft-Workout in IndexedDB
+async function checkForDraft() {
+  const draft = await getWorkoutOffline('draft')
+  if (draft && draft.exercises && draft.type && draft.exercises.length > 0) {
+    hasDraft.value = true
+    draftType.value = draft.type
+    draftTimestamp.value = draft.updatedAt ? new Date(draft.updatedAt) : null
+  } else {
+    hasDraft.value = false
+    draftTimestamp.value = null
   }
-  return false
+}
+
+onMounted(() => {
+  checkForDraft()
 })
 
-const draftType = computed(() => {
-  try {
-    const draft = sessionStorage.getItem(DRAFT_STORAGE_KEY)
-    if (draft) {
-      const parsed = JSON.parse(draft)
-      return parsed.selectedType || nextType.value
-    }
-  } catch (e) {
-    return nextType.value
-  }
-  return nextType.value
-})
-
-// Button-Text basierend auf Draft-Status
+// Button-Text dynamisch
 const startButtonText = computed(() => {
-  if (workoutCreated.value) return $t('dashboard.successCreated')
-  if (hasDraft.value) {
-    return `${typeLabel(draftType.value)} ${$t('dashboard.continue')}`
-  }
-  return `${$t('dashboard.start')} (${nextLabel.value})`
+  if (hasDraft.value) return $t('dashboard.resumeDraft')
+  return $t('dashboard.startNext')
 })
 
-const greeting = computed(() => {
-  if (!isClerkReady.value) return $t('dashboard.init')
-  if (store.isWorkoutsLoading) return $t('dashboard.loading')
-  if (store.hasError) return 'Dashboard'
-  if (store.workouts.length === 0) return $t('dashboard.welcome')
-  return `${$t('dashboard.next')}: ${nextLabel.value}`
-})
-
-async function startWorkout(type) {
-  logger.debug('🚀 DashboardView - Navigiere zum Workout Builder...')
-  
-  // Navigiere zum WorkoutBuilder, damit der User selbst entscheiden kann
-  const query = type ? { type } : {}
-  await router.push({ path: '/workout-builder', query });
-}
-
+// Start neues Workout (altes Draft verwerfen)
 async function startNewWorkout() {
-  logger.debug('🆕 DashboardView - Starte neues Workout, lösche Draft...')
-  
-  // Draft löschen
-  try {
-    sessionStorage.removeItem('workout_builder_draft')
-    logger.debug('🗑️ Draft gelöscht')
-  } catch (e) {
-    logger.warn('⚠️ Fehler beim Löschen des Drafts:', e)
-  }
-  
-  // Navigiere zum WorkoutBuilder mit nächstem Typ
-  await startWorkout(nextType.value)
+  // Draft aus DB löschen
+  const db = (await import('@/utils/offlineStorage')).db
+  await db.workouts.delete('draft')
+  hasDraft.value = false
+  // Starte neuen Flow
+  startWorkout(nextType.value)
 }
 
+// Draft-Resume: Navigiere in den Builder mit Resume-Flag
+async function startWorkout(type) {
+  if (hasDraft.value) {
+    // Resume: Navigiere zum Builder, der lädt das Draft automatisch
+    await router.push({ name: 'workout-builder', query: { resume: '1' } })
+  } else {
+    // Normaler Start: Typ übergeben
+    await router.push({ name: 'workout-builder', query: { type } })
+  }
+}
 
 async function retryLoadWorkouts() {
   try {
@@ -580,6 +577,12 @@ async function retryLoadWorkouts() {
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
+}
+
+.draft-timestamp {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-top: 4px;
 }
 </style>
 

@@ -51,7 +51,7 @@ export const messages = {
       legal: 'Rechtliches',
       ariaMain: 'Hauptnavigation'
     },
-    dashboard: {
+  dashboard: {
       refreshTitle: 'Daten aktualisieren',
       init: 'Initialisiere Dashboard...',
       loading: 'Lade deine Workouts...',
@@ -60,7 +60,7 @@ export const messages = {
       noWorkoutsTitle: 'Noch keine Workouts',
       noWorkoutsMsg: "Lies die FAQ's oder starte direkt dein erstes Training und verfolge deinen Fortschritt!'",
       startFirst: 'Erstes Workout starten',
-      successCreated: 'Workout erstellt!',
+      successCreated: 'Workout gestartet!',
       nextWorkout: 'Nächstes Workout',
       last: 'Zuletzt',
       start: 'Starten',
@@ -68,7 +68,10 @@ export const messages = {
       draftAvailable: 'Entwurf vorhanden',
       startNew: 'Neu beginnen',
       welcome: 'Willkommen!',
-      next: 'Nächstes'
+  next: 'Nächstes',
+  startNext: 'Starte nächstes Workout',
+  lastSaved: 'Zuletzt gespeichert',
+  resumeDraft: 'Letztes Workout fortsetzen?'
     },
     settings: {
       title: 'Einstellungen',
@@ -260,9 +263,9 @@ export const messages = {
       signInFirst: 'Bitte zuerst anmelden',
       pickFirst: 'Wähle Übungen aus',
       searchPlaceholder: 'Übung suchen…',
-      createCta: 'Workout erstellen',
+      createCta: 'Workout starten',
       creating: 'Erstelle…',
-      create: 'Erstellen',
+      create: 'Starten',
       sessionNotReady: 'Sitzung noch nicht bereit. Bitte kurz warten und erneut versuchen.',
       createFailed: 'Erstellen fehlgeschlagen. Bitte später erneut versuchen.',
       stepType: 'Typ',
@@ -457,7 +460,7 @@ export const messages = {
       legal: 'Legal',
       ariaMain: 'Main navigation'
     },
-    dashboard: {
+  dashboard: {
       refreshTitle: 'Refresh data',
       init: 'Initializing dashboard...',
       loading: 'Loading your workouts...',
@@ -466,7 +469,7 @@ export const messages = {
       noWorkoutsTitle: 'No workouts yet',
       noWorkoutsMsg: 'Start your first workout and track your progress!',
       startFirst: 'Start first workout',
-      successCreated: 'Workout created!',
+      successCreated: 'Workout started!',
       nextWorkout: 'Next workout',
       last: 'Last',
       start: 'Start',
@@ -474,7 +477,10 @@ export const messages = {
       draftAvailable: 'Draft available',
       startNew: 'Start new',
       welcome: 'Welcome!',
-      next: 'Next'
+  next: 'Next',
+  startNext: 'Start next workout',
+  lastSaved: 'Last saved',
+  resumeDraft: 'Resume last Workout?'
     },
     settings: {
       title: 'Settings',
@@ -663,9 +669,9 @@ export const messages = {
       signInFirst: 'Please sign in first',
       pickFirst: 'Pick exercises',
       searchPlaceholder: 'Search exercise…',
-      createCta: 'Create workout',
+      createCta: 'Start workout',
       creating: 'Creating…',
-      create: 'Create',
+      create: 'Start',
       sessionNotReady: 'Session not ready yet. Please wait a moment and try again.',
       createFailed: 'Creation failed. Please try again later.',
       stepType: 'Type',
