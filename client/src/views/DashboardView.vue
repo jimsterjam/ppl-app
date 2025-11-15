@@ -130,7 +130,7 @@ import EmptyState from "../components/EmptyState.vue";
 import QuickOverview from "../components/QuickOverview.vue";
 import RecentWorkouts from "../components/RecentWorkouts.vue";
 import { logger } from '@/utils/logger'
-import { getWorkoutOffline } from '@/utils/offlineStorage'
+import { getWorkoutOffline, db } from '@/utils/offlineStorage'
 
 const store = useUserStore();
 const { t: $t } = useI18n()
@@ -306,7 +306,6 @@ const startButtonText = computed(() => {
 // Start neues Workout (altes Draft verwerfen)
 async function startNewWorkout() {
   // Draft aus DB löschen
-  const db = (await import('@/utils/offlineStorage')).db
   await db.workouts.delete('draft')
   hasDraft.value = false
   // Starte neuen Flow

@@ -280,6 +280,7 @@ import WorkoutTimer from '@/components/WorkoutTimer.vue'
 import { useToastStore } from '@/stores/toastStore'
 import { useI18n } from 'vue-i18n'
 import { logger } from '@/utils/logger'
+import { saveWorkoutOffline, getWorkoutOffline, db } from '@/utils/offlineStorage'
 
 // SessionStorage Key für schnellen Detail-Draft-Fallback
 const DETAIL_DRAFT_KEY = 'workout_detail_draft'
@@ -351,7 +352,6 @@ const triggerAutoSave = debounce(async () => {
 
   try {
     if (id === 'draft') {
-      const { saveWorkoutOffline } = await import('@/utils/offlineStorage')
       await saveWorkoutOffline({ ...w, _id: 'draft', isDraft: true, updatedAt: Date.now() })
       saveMsg.value = 'Auto-gespeichert (Entwurf lokal).'
       saveError.value = false
@@ -451,7 +451,6 @@ async function loadWorkout() {
     }
 
     if (id === 'draft') {
-      const { getWorkoutOffline } = await import('@/utils/offlineStorage')
       const draft = await getWorkoutOffline('draft')
       if (draft && draft.exercises && draft.type) {
         const allExercises = await fetchExercises({})
@@ -655,19 +654,7 @@ async function ensureExerciseId(ex) {
   }
 }
 
-// Einfacher Aufruf in der Browserkonsole (Vite dev)
-(async () => {
-  const m = await import('/src/utils/offlineStorage.js');
-  const queue = await m.db.syncQueue.toArray();
-  console.log('SyncQueue items:', queue);
-
-  const item = (await import('/src/utils/offlineStorage.js')).db.syncQueue.toArray().then(a=>a.find(i=>!i.synced));
-  console.log('Pending item:', await item);
-
-  const s = await import('/src/utils/syncManager.js');
-  const result = await s.triggerManualSync();
-  console.log('ManualSync result:', result);
-})()
+// Dev helper removed: use console calls or import manually in dev when needed
 
 function scrollToExercises() {
   const el = exListRef.value || document.getElementById('exercises')
