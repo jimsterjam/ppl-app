@@ -75,7 +75,6 @@ const exerciseSchema = new mongoose.Schema({
 // 3. Batch queries mit $in operator → Compound Index
 
 exerciseSchema.index({ category: 1 })              // Filter nach Kategorie (Push/Pull/Legs)
-exerciseSchema.index({ name: 1 })                  // Einzelne Übung suchen
 exerciseSchema.index({ category: 1, name: 1 })     // Compound Index für gefilterte Suche
 exerciseSchema.index({ 'names.en': 1 })            // AI-Mapping via englischer Name
 exerciseSchema.index({ source: 1 })                // Filter nach Quelle (ai_generated, etc.)
@@ -89,6 +88,6 @@ exerciseSchema.add({
   thumbFileId: { type: mongoose.Schema.Types.ObjectId }
 });
 
-const Exercise = mongoose.model("Exercise", exerciseSchema);
 
+const Exercise = mongoose.models.Exercise || mongoose.model("Exercise", exerciseSchema);
 export default Exercise;
