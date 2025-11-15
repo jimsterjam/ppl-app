@@ -34,7 +34,9 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getAuthToken } from '@/utils/authToken'
-import { useClerk, useAuth } from '@clerk/vue'
+// Avoid calling useClerk/useAuth here: Pinia stores run outside a component setup
+// context and calling useClerk() may throw. We will rely on getAuthToken()
+// which falls back to window.Clerk or cached tokens.
 
 export const useSubscriptionStore = defineStore('subscription', () => {
   const subscription = ref({
@@ -85,13 +87,12 @@ export const useSubscriptionStore = defineStore('subscription', () => {
   
   // Subscription Status checken
   const checkSubscription = async () => {
-    const clerk = useClerk()
-    const auth = useAuth()
     try {
+      // Do not call useClerk/useAuth here (would call inject() outside setup).
+      // Instead request a token via getAuthToken() which uses window.Clerk or cached token.
+      const token = await getAuthToken()
       const response = await fetch('/api/subscription/status', {
-        headers: {
-          'Authorization': `Bearer ${await getAuthToken({ clerk, auth })}`
-        }
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       })
       
       if (response.ok) {
@@ -140,13 +141,12 @@ export const useSubscriptionStore = defineStore('subscription', () => {
       const timeoutId = setTimeout(() => controller.abort(), 2000) // 2s timeout
       
       console.log('🧪 SubscriptionStore: Making API request...')
-      const clerk = useClerk()
-      const auth = useAuth()
+      const token = await getAuthToken()
       const response = await fetch('/api/subscription/upgrade', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await getAuthToken({ clerk, auth })}`
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify({
           plan: planType,

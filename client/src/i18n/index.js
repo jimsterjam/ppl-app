@@ -52,6 +52,10 @@ export const messages = {
       ariaMain: 'Hauptnavigation'
     },
   dashboard: {
+      title: 'Dashboard',
+      greetingMorning: 'Guten Morgen',
+      greetingDay: 'Guten Tag',
+      greetingEvening: 'Guten Abend',
       refreshTitle: 'Daten aktualisieren',
       init: 'Initialisiere Dashboard...',
       loading: 'Lade deine Workouts...',
@@ -461,6 +465,10 @@ export const messages = {
       ariaMain: 'Main navigation'
     },
   dashboard: {
+      title: 'Dashboard',
+      greetingMorning: 'Good morning',
+      greetingDay: 'Good day',
+      greetingEvening: 'Good evening',
       refreshTitle: 'Refresh data',
       init: 'Initializing dashboard...',
       loading: 'Loading your workouts...',

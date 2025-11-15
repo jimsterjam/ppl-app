@@ -316,7 +316,13 @@ async function startNewWorkout() {
 // Draft-Resume: Navigiere in den Builder mit Resume-Flag
 async function startWorkout(type) {
   if (hasDraft.value) {
-    // Resume: Navigiere zum Builder, der lädt das Draft automatisch
+    // Draft aus IndexedDB laden und zur Detailansicht weiterleiten
+    const draft = await getWorkoutOffline('draft')
+    if (draft) {
+      await router.push({ name: 'workout-detail', params: { id: 'draft' }, query: { draft: '1' } })
+      return
+    }
+    // Fallback: Wenn kein Draft-Objekt, öffne Builder
     await router.push({ name: 'workout-builder', query: { resume: '1' } })
   } else {
     // Normaler Start: Typ übergeben

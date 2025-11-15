@@ -22,7 +22,10 @@
 
 
     <!-- Auth-Gate: User muss eingeloggt sein -->
-    <div v-if="!isSignedIn" class="auth-gate">
+    <div v-if="!isLoaded || loadingUser" class="auth-gate">
+      <p class="auth-gate-text">{{ t('builder.authLoading') }}</p>
+    </div>
+    <div v-else-if="!isSignedIn" class="auth-gate">
       <p class="auth-gate-text">{{ t('builder.authGate') }}</p>
     </div>
     
@@ -288,7 +291,9 @@ const props = defineProps({
 const emit = defineEmits(['workout-created'])
 
 // Composables
-const { isSignedIn } = useUser()
+const { isSignedIn, isLoaded } = useUser()
+const loadingUser = ref(true)
+watch(isLoaded, (val) => { loadingUser.value = !val }, { immediate: true })
 const auth = useAuth()
 const clerk = useClerk()
 const router = useRouter()
@@ -342,13 +347,41 @@ const DRAFT_STORAGE_KEY = 'workout_builder_draft'
 
 // Draft aus SessionStorage laden
 async function loadDraft() {
+  console.log('💡 loadDraft called')
   // 1. Versuche aus IndexedDB (offline)
   try {
     const draft = await getWorkoutOffline('draft')
     if (draft && draft.exercises && draft.type) {
+      // Debug: Draft anzeigen
+      console.log('📦 [DEBUG] Draft geladen (IndexedDB):', JSON.stringify(draft, null, 2))
       selectedType.value = draft.type
-      selectedExercises.value = draft.exercises
-      logger.debug('✅ WorkoutBuilder - Draft aus IndexedDB wiederhergestellt:', draft.exercises.length, 'Übungen')
+      // Hole aktuelle Exercises aus DB/API für den Typ
+      await loadExercises()
+      // Merge: Draft-Übungen mit DB-Übungen (per _id oder Name)
+      const merged = draft.exercises.map(draftEx => {
+        // Suche DB-Exercise per _id oder Name
+        let dbEx = exercises.value.find(e => e._id === draftEx._id)
+        if (!dbEx) {
+          dbEx = exercises.value.find(e => (e.name || '').toLowerCase() === (draftEx.name || '').toLowerCase())
+        }
+        if (dbEx) {
+          // Übernehme alle Felder aus DB, aber setDetails/note aus Draft
+          return {
+            ...dbEx,
+            setDetails: Array.isArray(draftEx.setDetails) ? draftEx.setDetails.map(s => ({ reps: s.reps, weight: s.weight })) : [],
+            note: draftEx.note || ''
+          }
+        } else {
+          // Fallback: Draft-Objekt wie bisher
+          return {
+            ...draftEx,
+            setDetails: Array.isArray(draftEx.setDetails) ? draftEx.setDetails.map(s => ({ reps: s.reps, weight: s.weight })) : [],
+            note: draftEx.note || ''
+          }
+        }
+      })
+      selectedExercises.value = merged
+      logger.debug('✅ WorkoutBuilder - Draft aus IndexedDB wiederhergestellt (mit DB-Merge):', merged.length, 'Übungen')
       return true
     }
   } catch (e) {
@@ -359,6 +392,8 @@ async function loadDraft() {
     const draft = sessionStorage.getItem(DRAFT_STORAGE_KEY)
     if (draft) {
       const parsed = JSON.parse(draft)
+      // Debug: Draft anzeigen
+      console.log('📦 [DEBUG] Draft geladen (sessionStorage):', JSON.stringify(parsed, null, 2))
       if (parsed.selectedType && parsed.selectedExercises) {
         selectedType.value = parsed.selectedType
         selectedExercises.value = parsed.selectedExercises
@@ -374,18 +409,29 @@ async function loadDraft() {
 
 // Draft in SessionStorage speichern
 async function saveDraft() {
+  console.log('💡 saveDraft called')
   try {
     if (selectedExercises.value.length > 0) {
+      // Deep copy und setDetails/Notiz sicherstellen, KEINE Fallbacks mehr
+      const exercisesForDraft = selectedExercises.value.map(ex => ({
+        ...ex,
+        setDetails: Array.isArray(ex.setDetails)
+          ? ex.setDetails.map(s => ({ reps: s.reps, weight: s.weight }))
+          : [],
+        note: ex.note || ''
+      }))
       const draft = {
         _id: 'draft',
         type: selectedType.value,
-        exercises: selectedExercises.value,
+        exercises: exercisesForDraft,
         isDraft: true,
         updatedAt: Date.now(),
       }
-      sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({ selectedType: selectedType.value, selectedExercises: selectedExercises.value, timestamp: Date.now() }))
+      sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({ selectedType: selectedType.value, selectedExercises: exercisesForDraft, timestamp: Date.now() }))
       await saveWorkoutOffline(draft)
-      logger.debug('💾 WorkoutBuilder - Draft gespeichert (sessionStorage & IndexedDB):', selectedExercises.value.length, 'Übungen')
+      logger.debug('💾 WorkoutBuilder - Draft gespeichert (sessionStorage & IndexedDB):', exercisesForDraft.length, 'Übungen')
+      // Debug: Draft anzeigen
+      console.log('💾 [DEBUG] Draft gespeichert:', JSON.stringify(draft, null, 2))
     }
   } catch (e) {
     logger.warn('⚠️ WorkoutBuilder - Fehler beim Speichern des Drafts:', e)
@@ -397,8 +443,30 @@ function clearDraft() {
   try {
     sessionStorage.removeItem(DRAFT_STORAGE_KEY)
     logger.debug('🗑️ WorkoutBuilder - Draft gelöscht')
+    console.log('🗑️ [DEBUG] Draft cleared from sessionStorage')
   } catch (e) {
     logger.warn('⚠️ WorkoutBuilder - Fehler beim Löschen des Drafts:', e)
+  }
+}
+
+// Synchronous snapshot for unload - sessionStorage as a fast fallback
+function handleBeforeUnload(e) {
+  try {
+    if (selectedExercises.value && selectedExercises.value.length > 0) {
+      const exercisesForDraft = selectedExercises.value.map(ex => ({
+        ...ex,
+        setDetails: Array.isArray(ex.setDetails)
+          ? ex.setDetails.map(s => ({ reps: s.reps, weight: s.weight }))
+          : [],
+        note: ex.note || ''
+      }))
+      const snapshot = { selectedType: selectedType.value, selectedExercises: exercisesForDraft, timestamp: Date.now() }
+      try { sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(snapshot)) } catch {}
+      // Visible debug message in beforeunload (may not appear in some browsers)
+      console.log('🚪 [DEBUG] beforeunload snapshot saved to sessionStorage:', snapshot)
+    }
+  } catch (err) {
+    console.warn('⚠️ WorkoutBuilder - beforeunload snapshot failed:', err)
   }
 }
 const didPlanScroll = ref(false)
@@ -420,22 +488,32 @@ function todayKey() {
 }
 
 onMounted(async () => {
+  console.log('🏁 WorkoutBuilder mounted')
   // Load subscription status
   subscriptionStore.checkSubscription()
 
-  // Lade Draft falls vorhanden (async!)
+  // 1. Draft laden (hat Priorität!)
   const hasDraft = await loadDraft()
   if (hasDraft) {
     toast.show(t('builder.draftRestored') || 'Workout-Entwurf wiederhergestellt', {
       type: 'info',
       duration: 3000
     })
+  } else {
+    // 2. Prefill aus Repeat oder AI-Suggestion, falls KEIN Draft vorhanden
+    await prefillFromRepeatIfAny()
+    if (selectedExercises.value.length === 0) {
+      await prefillFromAISuggestion()
+    }
   }
 
+  // Resize-Handler
   const onResize = () => { viewportWidth.value = window.innerWidth }
   window.addEventListener('resize', onResize)
-  // Store handler referenz für Cleanup
   resizeHandler.value = onResize
+  // beforeunload snapshot to ensure at least sessionStorage has the latest plan
+  window.addEventListener('beforeunload', handleBeforeUnload)
+
   // Init Affirmation
   const beliefsDe = [
     'Jede Wiederholung bringt dich deinem Ziel näher.',
@@ -459,12 +537,12 @@ onMounted(async () => {
     const last = localStorage.getItem(BELIEF_KEY)
     showBelief.value = last !== todayKey()
   } catch {
-    // Fallback: wenn Storage nicht verfügbar, Anzeige erlauben
     showBelief.value = true
   }
 })
 onUnmounted(() => {
   if (resizeHandler.value) window.removeEventListener('resize', resizeHandler.value)
+  try { window.removeEventListener('beforeunload', handleBeforeUnload) } catch {}
 })
 
 const resizeHandler = ref(null)
@@ -672,13 +750,7 @@ async function prefillFromRepeatIfAny() {
   }
 }
 
-onMounted(async () => { 
-  // Priorisiere Repeat, dann AI-Suggestion
-  await prefillFromRepeatIfAny()
-  if (selectedExercises.value.length === 0) {
-    await prefillFromAISuggestion()
-  }
-})
+
 
 // Auto-save auch bei Typ-Änderung
 watch(selectedType, () => {
@@ -820,6 +892,7 @@ function toggleExercise(exercise) {
   
   if (index > -1) {
     selectedExercises.value.splice(index, 1)
+    console.log('➖ [DEBUG] toggleExercise - removed:', exercise._id, exercise.name)
   } else {
     // Check exercise limit for free users
     if (!subscriptionStore.canAddExercise(selectedExercises.value.length)) {
@@ -831,6 +904,7 @@ function toggleExercise(exercise) {
     selectedExercises.value.push({
       ...exercise
     })
+    console.log('➕ [DEBUG] toggleExercise - added:', exercise._id, exercise.name)
   }
   saveDraft()
 }
@@ -900,6 +974,8 @@ async function createWorkout() {
     }
 
     // Token holen (auch offline möglich aus Clerk Session Cache)
+  // Debug: Show final payload that will be sent / saved
+  try { console.log('📤 [DEBUG] createWorkout - payload:', JSON.stringify(workoutData, null, 2)) } catch (e) { console.log('📤 [DEBUG] createWorkout - payload (stringify failed)') }
     let token = null
     try {
       token = await getAuthToken({ clerk, auth }).catch(() => null)
@@ -967,6 +1043,7 @@ function removeSet(exIdx, setIdx) {
   const ex = selectedExercises.value[exIdx]
   if (!ex?.setDetails) return
   ex.setDetails.splice(setIdx, 1)
+  console.log('🗑️ [DEBUG] removeSet - exIdx:', exIdx, 'setIdx:', setIdx, 'remainingSets:', ex.setDetails.length)
   saveDraft()
 }
 
@@ -976,6 +1053,7 @@ function updateSet(exIdx, setIdx, field, val) {
   const num = Number(val)
   if (field === 'reps') ex.setDetails[setIdx].reps = isFinite(num) ? num : ex.setDetails[setIdx].reps
   if (field === 'weight') ex.setDetails[setIdx].weight = isFinite(num) ? num : ex.setDetails[setIdx].weight
+  console.log('✏️ [DEBUG] updateSet - exIdx:', exIdx, 'setIdx:', setIdx, 'field:', field, 'value:', val, 'currentSet:', ex.setDetails[setIdx])
   saveDraft()
 }
 

@@ -80,10 +80,19 @@ export async function saveWorkoutOffline(workout) {
   try {
     // Sanitize workout vor dem Speichern (entfernt Vue Proxies, Funktionen, etc.)
     const cleanWorkout = sanitizeForIndexedDB(workout)
-    
+    // Draft-Workouts niemals in die Sync-Queue aufnehmen
+    if (cleanWorkout._id === 'draft') {
+      await db.workouts.put({
+        ...cleanWorkout,
+        _syncedAt: Date.now()
+      })
+      logger.debug('💾 Offline Storage - Draft gespeichert (kein Sync!):', cleanWorkout._id)
+      return cleanWorkout._id
+    }
+    // Normale Workouts wie gehabt speichern
     await db.workouts.put({
       ...cleanWorkout,
-      _syncedAt: Date.now() // Timestamp für Cache-Invalidierung
+      _syncedAt: Date.now()
     })
     logger.debug('💾 Offline Storage - Workout gespeichert:', cleanWorkout._id)
     return cleanWorkout._id
@@ -328,7 +337,11 @@ export async function queueAction(action, entityType, data) {
   try {
     // Sanitize data vor dem Speichern (entfernt Vue Proxies, Funktionen, etc.)
     const cleanData = sanitizeForIndexedDB(data)
-    
+    // Draft-Workouts niemals in die Sync-Queue aufnehmen
+    if (entityType === 'workout' && cleanData._id === 'draft') {
+      logger.debug('📝 Sync Queue - Draft-Workout NICHT zur Queue hinzugefügt')
+      return null
+    }
     const id = await db.syncQueue.add({
       action,
       entityType,

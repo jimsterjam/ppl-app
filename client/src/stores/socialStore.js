@@ -24,11 +24,10 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getAuthToken } from '@/utils/authToken'
-import { useClerk, useAuth } from '@clerk/vue'
+// Avoid useClerk/useAuth in stores (would call inject() outside setup).
 
 export const useSocialStore = defineStore('social', () => {
-  const clerk = useClerk()
-  const auth = useAuth()
+  // Do not call useClerk/useAuth here. Use getAuthToken() when needed.
   const friends = ref([])
   const sharedWorkouts = ref([])
   const challenges = ref([])
@@ -39,10 +38,10 @@ export const useSocialStore = defineStore('social', () => {
     try {
       const response = await fetch('/api/social/share-workout', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await getAuthToken({ clerk, auth })}`
-        },
+        headers: (async () => {
+          const token = await getAuthToken()
+          return token ? { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` } : { 'Content-Type': 'application/json' }
+        })(),
         body: JSON.stringify({
           workoutId,
           message,
@@ -64,10 +63,9 @@ export const useSocialStore = defineStore('social', () => {
   // Freunde-Feed laden
   const loadFriendsFeed = async () => {
     try {
+      const token = await getAuthToken()
       const response = await fetch('/api/social/friends-feed', {
-        headers: {
-          'Authorization': `Bearer ${await getAuthToken({ clerk, auth })}`
-        }
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       })
       
       if (response.ok) {
@@ -83,11 +81,10 @@ export const useSocialStore = defineStore('social', () => {
   // Workout liken
   const likeWorkout = async (sharedWorkoutId) => {
     try {
+      const token = await getAuthToken()
       const response = await fetch(`/api/social/like/${sharedWorkoutId}`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${await getAuthToken({ clerk, auth })}`
-        }
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       })
       
       if (response.ok) {
@@ -106,11 +103,12 @@ export const useSocialStore = defineStore('social', () => {
   // Weekly Challenge erstellen
   const createChallenge = async (challengeData) => {
     try {
+      const token = await getAuthToken()
       const response = await fetch('/api/social/challenges', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${await getAuthToken({ clerk, auth })}`
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
         },
         body: JSON.stringify(challengeData)
       })
@@ -129,10 +127,9 @@ export const useSocialStore = defineStore('social', () => {
   // Leaderboard für Freunde (basierend auf Volume, Frequency, etc.)
   const loadLeaderboard = async (period = 'week') => {
     try {
+      const token = await getAuthToken()
       const response = await fetch(`/api/social/leaderboard?period=${period}`, {
-        headers: {
-          'Authorization': `Bearer ${await getAuthToken({ clerk, auth })}`
-        }
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       })
       
       if (response.ok) {
