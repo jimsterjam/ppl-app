@@ -2,13 +2,13 @@
   "name": "server",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "cd /Users/testadmin/Documents/bro-split-app/server && node server.js",
-    "dev": "cd /Users/testadmin/Documents/bro-split-app/server && nodemon server.js",
-    "seed": "cd /Users/testadmin/Documents/bro-split-app/server && node seedExercises.js",
-    "normalize:workouts": "cd /Users/testadmin/Documents/bro-split-app/server && node scripts/normalizeWorkouts.js"
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "seed": "node seedExercises.js",
+    "normalize:workouts": "node scripts/normalizeWorkouts.js"
   },
   "keywords": [],
   "author": "",
