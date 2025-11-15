@@ -1,5 +1,6 @@
 {
   "version": 2,
+  "outputDirectory": "client/dist",
   "builds": [
     {
       "src": "client/package.json",
@@ -8,6 +9,7 @@
     }
   ],
   "routes": [
+    { "src": "^/api/(.*)$", "dest": "/api/$1" },
     { "src": "^/(.*)$", "dest": "/index.html" }
   ]
 }
