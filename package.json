@@ -12,7 +12,8 @@
     "start:client": "cd client && npm run dev",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "format": "prettier -w ."
+    "format": "prettier -w .",
+    "build": "echo 'No build step'"
   },
   "devDependencies": {
     "@eslint/js": "^9.38.0",
