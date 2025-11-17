@@ -1,0 +1,5 @@
+app_identifier("com.pplapp.mobile") # replace with your bundle id if different
+apple_id("your-apple-id@example.com") # your Apple ID
+
+# Optional: specify the Team ID if you belong to an Org
+# team_id("TEAMID1234")

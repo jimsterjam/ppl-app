@@ -1,0 +1,37 @@
+# Render manifest for ppl-app
+# - Static Site: client (build -> client/dist)
+# - Web Service: server (Node.js)
+
+staticSites:
+  - type: static
+    name: ppl-app-client
+    repo: https://github.com/jimsterjam/ppl-app.git
+    branch: main
+    buildCommand: cd client && npm ci && npm run build
+    publishPath: client/dist
+
+services:
+  - type: web
+    name: ppl-app-server
+    runtime: node
+    repo: https://github.com/jimsterjam/ppl-app.git
+    branch: main
+    buildCommand: cd server && npm ci
+    startCommand: cd server && npm run start
+    plan: free
+    envVars:
+      - key: MONGO_URI
+        sync: false
+        value: ""
+      - key: CLERK_PUBLISHABLE_KEY
+        sync: false
+        value: ""
+      - key: CLERK_SECRET_KEY
+        sync: false
+        value: ""
+      - key: OPENAI_API_KEY
+        sync: false
+        value: ""
+      - key: NODE_ENV
+        sync: false
+        value: production
