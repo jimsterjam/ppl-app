@@ -86,36 +86,22 @@ export const useSubscriptionStore = defineStore('subscription', () => {
   })
   
   // Subscription Status checken
+  // Offline/Demo: Nur aus localStorage laden
   const checkSubscription = async () => {
-    try {
-      // Do not call useClerk/useAuth here (would call inject() outside setup).
-      // Instead request a token via getAuthToken() which uses window.Clerk or cached token.
-      const token = await getAuthToken()
-      const response = await fetch('/api/subscription/status', {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-      })
-      
-      if (response.ok) {
-        const data = await response.json()
-        subscription.value = data.subscription
-        usage.value = data.usage
-        return data
-      } else {
-        // Fallback: Aus localStorage laden
-        const savedSubscription = localStorage.getItem('bro_split_subscription')
-        if (savedSubscription) {
-          subscription.value = JSON.parse(savedSubscription)
-          console.log('🧪 Demo Mode: Loaded subscription from localStorage:', subscription.value.plan)
-        }
+    const savedSubscription = localStorage.getItem('bro_split_subscription')
+    if (savedSubscription) {
+      subscription.value = JSON.parse(savedSubscription)
+      console.log('🧪 Demo Mode: Loaded subscription from localStorage:', subscription.value.plan)
+    } else {
+      // Default: free
+      subscription.value = {
+        plan: 'free',
+        status: 'active',
+        expiresAt: null,
+        features: []
       }
-    } catch (error) {
-      console.error('Check subscription error:', error)
-      // Fallback: Aus localStorage laden
-      const savedSubscription = localStorage.getItem('bro_split_subscription')
-      if (savedSubscription) {
-        subscription.value = JSON.parse(savedSubscription)
-        console.log('🧪 Demo Mode: Loaded subscription from localStorage:', subscription.value.plan)
-      }
+      localStorage.setItem('bro_split_subscription', JSON.stringify(subscription.value))
+      console.log('🧪 Demo Mode: Set default free plan in localStorage')
     }
   }
   
@@ -132,56 +118,18 @@ export const useSubscriptionStore = defineStore('subscription', () => {
   }
   
   // Upgrade zu Pro/Elite
+  // Offline/Demo: Upgrade nur lokal simulieren
   const upgradeSubscription = async (planType, paymentMethod) => {
-    console.log('🧪 SubscriptionStore: Starting upgrade to', planType)
-    
-    try {
-      // Kurzer Timeout für Demo-Modus
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 2000) // 2s timeout
-      
-      console.log('🧪 SubscriptionStore: Making API request...')
-      const token = await getAuthToken()
-      const response = await fetch('/api/subscription/upgrade', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({
-          plan: planType,
-          paymentMethod
-        }),
-        signal: controller.signal
-      })
-      
-      clearTimeout(timeoutId)
-      
-      if (response.ok) {
-        const data = await response.json()
-        subscription.value = data.subscription
-        console.log('🧪 SubscriptionStore: Real API upgrade successful')
-        return data
-      } else {
-        console.log('🧪 SubscriptionStore: API returned error, falling back to demo mode')
-        throw new Error(`API returned ${response.status}`)
-      }
-    } catch (error) {
-      console.log('🧪 SubscriptionStore: Error caught, switching to demo mode:', error.message)
-      
-      // Fallback für Demo-Modus bei Netzwerkfehlern oder Timeout
-      console.log('🧪 Demo Mode: Simulating upgrade to', planType)
-      subscription.value = {
-        plan: planType,
-        status: 'active',
-        expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-        features: limits.value[planType]
-      }
-      
-      localStorage.setItem('bro_split_subscription', JSON.stringify(subscription.value))
-      console.log('🧪 Demo Mode: Upgrade completed and saved to localStorage')
-      return { subscription: subscription.value, success: true, demo: true }
+    console.log('🧪 Demo Mode: Simulating upgrade to', planType)
+    subscription.value = {
+      plan: planType,
+      status: 'active',
+      expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+      features: limits.value[planType]
     }
+    localStorage.setItem('bro_split_subscription', JSON.stringify(subscription.value))
+    console.log('🧪 Demo Mode: Upgrade completed and saved to localStorage')
+    return { subscription: subscription.value, success: true, demo: true }
   }
   
   // Usage tracking

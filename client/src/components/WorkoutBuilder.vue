@@ -260,7 +260,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, nextTick, onUnmounted } from 'vue'
-import { saveWorkoutOffline, getWorkoutOffline } from '@/utils/offlineStorage'
+import { saveWorkoutOffline } from '@/utils/offlineStorage'
 import { useI18n } from 'vue-i18n'
 import { useAuth, useUser, useClerk } from '@clerk/vue'
 import { getAuthToken } from '@/utils/authToken'

@@ -115,20 +115,29 @@ const muscleGroups = [
   'Waden'
 ];
 
-// Lädt Übungen aus MongoDB
+// Lädt Übungen aus localStorage (Offline/Demo)
 async function loadExercises() {
   loading.value = true;
-  const params = new URLSearchParams();
-  if (selectedCategory.value) params.append('category', selectedCategory.value);
-  if (selectedMuscleGroup.value) params.append('muscleGroup', selectedMuscleGroup.value);
-
   try {
-  // Relative URL; in Dev via Vite-Proxy -> 3001
-  const res = await fetch(`/api/exercises?${params.toString()}`);
-    if (!res.ok) throw new Error(`HTTP Fehler ${res.status}`);
-    exercises.value = await res.json();
+    const data = localStorage.getItem('bro_split_exercises')
+    if (data) {
+      let allExercises = JSON.parse(data)
+      // Filter nach Kategorie und Muskelgruppe
+      if (selectedCategory.value) {
+        allExercises = allExercises.filter(ex => ex.category === selectedCategory.value)
+      }
+      if (selectedMuscleGroup.value) {
+        allExercises = allExercises.filter(ex => ex.muscleGroup === selectedMuscleGroup.value || (ex.muscleGroups && ex.muscleGroups.includes(selectedMuscleGroup.value)))
+      }
+      exercises.value = allExercises
+      console.log(`✅ [Demo] Loaded ${exercises.value.length} Übungen aus localStorage`)
+    } else {
+      exercises.value = []
+      console.log('⚠️ [Demo] Keine Übungen in localStorage gefunden')
+    }
   } catch (err) {
-    logger.error('Fehler beim Laden der Übungen:', err);
+    logger.error('[Demo] Fehler beim Laden der Übungen:', err)
+    exercises.value = []
   } finally {
     loading.value = false;
   }

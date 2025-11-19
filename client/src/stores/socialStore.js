@@ -33,113 +33,61 @@ export const useSocialStore = defineStore('social', () => {
   const challenges = ref([])
   const leaderboard = ref([])
   
-  // Workout teilen
+  // Offline/Demo: Workout teilen lokal simulieren
   const shareWorkout = async (workoutId, message = '') => {
-    try {
-      const response = await fetch('/api/social/share-workout', {
-        method: 'POST',
-        headers: (async () => {
-          const token = await getAuthToken()
-          return token ? { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` } : { 'Content-Type': 'application/json' }
-        })(),
-        body: JSON.stringify({
-          workoutId,
-          message,
-          visibility: 'friends' // oder 'public'
-        })
-      })
-      
-      if (response.ok) {
-        const sharedWorkout = await response.json()
-        sharedWorkouts.value.unshift(sharedWorkout)
-        return sharedWorkout
-      }
-    } catch (error) {
-      console.error('Share workout error:', error)
-      throw error
+    const sharedWorkout = {
+      _id: `${workoutId}-${Date.now()}`,
+      workoutId,
+      message,
+      visibility: 'friends',
+      createdAt: new Date().toISOString(),
+      likes: 0,
+      isLiked: false
     }
+    sharedWorkouts.value.unshift(sharedWorkout)
+    localStorage.setItem('bro_split_shared_workouts', JSON.stringify(sharedWorkouts.value))
+    return sharedWorkout
   }
   
-  // Freunde-Feed laden
+  // Offline/Demo: Freunde-Feed aus localStorage laden
   const loadFriendsFeed = async () => {
-    try {
-      const token = await getAuthToken()
-      const response = await fetch('/api/social/friends-feed', {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-      })
-      
-      if (response.ok) {
-        const feed = await response.json()
-        sharedWorkouts.value = feed
-        return feed
-      }
-    } catch (error) {
-      console.error('Load friends feed error:', error)
-    }
+    const feed = JSON.parse(localStorage.getItem('bro_split_shared_workouts') || '[]')
+    sharedWorkouts.value = feed
+    return feed
   }
   
-  // Workout liken
+  // Offline/Demo: Workout liken lokal simulieren
   const likeWorkout = async (sharedWorkoutId) => {
-    try {
-      const token = await getAuthToken()
-      const response = await fetch(`/api/social/like/${sharedWorkoutId}`, {
-        method: 'POST',
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-      })
-      
-      if (response.ok) {
-        // Update lokal
-        const workout = sharedWorkouts.value.find(w => w._id === sharedWorkoutId)
-        if (workout) {
-          workout.likes = (workout.likes || 0) + 1
-          workout.isLiked = true
-        }
-      }
-    } catch (error) {
-      console.error('Like workout error:', error)
+    const workout = sharedWorkouts.value.find(w => w._id === sharedWorkoutId)
+    if (workout) {
+      workout.likes = (workout.likes || 0) + 1
+      workout.isLiked = true
+      localStorage.setItem('bro_split_shared_workouts', JSON.stringify(sharedWorkouts.value))
     }
   }
   
-  // Weekly Challenge erstellen
+  // Offline/Demo: Challenge lokal erstellen
   const createChallenge = async (challengeData) => {
-    try {
-      const token = await getAuthToken()
-      const response = await fetch('/api/social/challenges', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify(challengeData)
-      })
-      
-      if (response.ok) {
-        const challenge = await response.json()
-        challenges.value.unshift(challenge)
-        return challenge
-      }
-    } catch (error) {
-      console.error('Create challenge error:', error)
-      throw error
+    const challenge = {
+      ...challengeData,
+      _id: `challenge-${Date.now()}`,
+      createdAt: new Date().toISOString()
     }
+    challenges.value.unshift(challenge)
+    localStorage.setItem('bro_split_challenges', JSON.stringify(challenges.value))
+    return challenge
   }
   
-  // Leaderboard für Freunde (basierend auf Volume, Frequency, etc.)
+  // Offline/Demo: Leaderboard lokal simulieren
   const loadLeaderboard = async (period = 'week') => {
-    try {
-      const token = await getAuthToken()
-      const response = await fetch(`/api/social/leaderboard?period=${period}`, {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
-      })
-      
-      if (response.ok) {
-        const data = await response.json()
-        leaderboard.value = data
-        return data
-      }
-    } catch (error) {
-      console.error('Load leaderboard error:', error)
-    }
+    // Demo-Daten für Leaderboard
+    const demoLeaderboard = [
+      { name: 'Du', isCurrentUser: true, volume: 12000, rank: 1 },
+      { name: 'Anna', isCurrentUser: false, volume: 11000, rank: 2 },
+      { name: 'Ben', isCurrentUser: false, volume: 9500, rank: 3 }
+    ]
+    leaderboard.value = demoLeaderboard
+    return demoLeaderboard
   }
   
   // Computed Properties

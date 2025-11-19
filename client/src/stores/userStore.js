@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { fetchWorkouts, fetchWorkoutStats, createWorkout, updateWorkout as apiUpdateWorkout, completeWorkout as apiCompleteWorkout } from "../api/workouts";
+
 
 export const useUserStore = defineStore("user", {
   state: () => ({
@@ -60,137 +60,107 @@ export const useUserStore = defineStore("user", {
 
   actions: {
     async loadWorkouts(token = null, options = {}) {
-      const envTtl = Number.parseInt(import.meta.env.VITE_WORKOUTS_CACHE_TTL_MS || '', 10);
-      const defaultTtl = Number.isFinite(envTtl) ? envTtl : 120_000; // 2 Minuten Standard-TTL
-      const { force = false, maxAgeMs = defaultTtl } = options;
+      // Offline/Demo: Workouts aus localStorage laden
       this.error = null;
-
-      // Caching-Guard: Wenn bereits frisch geladen und nicht erzwungen, nicht erneut laden
-      const now = Date.now();
-      if (!force && this.workoutsLoaded && (now - this.workoutsLoadedAt) < maxAgeMs) {
-        // Sicherstellen, dass kein globales Loading angezeigt wird
-        this.loadingWorkouts = false;
-        return this.workouts;
-      }
-
       this.loadingWorkouts = true;
-      
       try {
-        console.log('📡 Loading workouts from backend with token:', !!token);
-        if (!token) {
-          console.warn('⚠️ Kein Auth-Token für Workouts-GET. UI zeigt leeren Zustand.');
-        }
-        const result = await fetchWorkouts(token);
-        if (Array.isArray(result)) {
-          this.workouts = result;
-          console.log(`✅ Loaded ${result.length} workouts`);
-          this.workoutsLoaded = true;
-          this.workoutsLoadedAt = Date.now();
+        const data = localStorage.getItem('bro_split_workouts')
+        if (data) {
+          this.workouts = JSON.parse(data)
+          this.workoutsLoaded = true
+          this.workoutsLoadedAt = Date.now()
+          console.log(`✅ [Demo] Loaded ${this.workouts.length} workouts from localStorage`)
         } else {
-          // Defensive: falls Backend kein Array liefert
-          this.workouts = [];
-          console.warn('⚠️ Backend did not return an array for workouts, defaulting to empty list');
+          this.workouts = []
+          this.workoutsLoaded = true
+          this.workoutsLoadedAt = Date.now()
+          console.log('⚠️ [Demo] No workouts in localStorage, empty list')
         }
+        return this.workouts
       } catch (error) {
-        // Falls es doch eine Exception gibt, logge, aber lasse die UI nicht crashen
-        console.error('❌ Error loading workouts (handled):', error);
-        // Du kannst hier optional eine freundlichere Fehlermeldung setzen
-        this.error = null; // Kein harter Error-State in der UI
-        
-        // KEINE Fallback-Daten - User soll echte Situation sehen
-        this.workouts = [];
-        console.log('⚠️ No fallback data - showing empty state');
+        console.error('❌ [Demo] Error loading workouts from localStorage:', error)
+        this.error = null
+        this.workouts = []
       } finally {
-        this.loadingWorkouts = false;
+        this.loadingWorkouts = false
       }
     },
 
     async loadStats(token = null) {
-      this.loadingStats = true;
-      this.error = null;
-      
+      // Offline/Demo: Stats aus localStorage laden
+      this.loadingStats = true
+      this.error = null
       try {
-        console.log('📊 Loading stats from backend with token:', !!token);
-        const stats = await fetchWorkoutStats(token);
-        this.stats = stats; // kann null sein, UI soll nicht crashen
-        console.log('✅ Stats loaded (nullable):', this.stats);
+        const data = localStorage.getItem('bro_split_stats')
+        if (data) {
+          this.stats = JSON.parse(data)
+          console.log('✅ [Demo] Stats loaded from localStorage:', this.stats)
+        } else {
+          this.stats = null
+          console.log('⚠️ [Demo] No stats in localStorage')
+        }
       } catch (error) {
-        console.error('❌ Error loading stats (handled):', error);
-        // Kein harter Fehler in der UI setzen
-        this.error = null;
-        this.stats = null;
-        console.log('⚠️ Stats unavailable, keeping UI stable');
+        console.error('❌ [Demo] Error loading stats from localStorage:', error)
+        this.stats = null
       } finally {
-        this.loadingStats = false;
+        this.loadingStats = false
       }
     },
 
     async createWorkout(workoutData, token = null) {
+      // Offline/Demo: Workout lokal erstellen
       try {
-        console.log('💾 Creating new workout:', workoutData);
-        
-        // Wenn kein Token: Direkt offline erstellen (workouts.js handled das)
-        // Die createWorkout API-Funktion hat bereits Offline-Fallback eingebaut
-        const newWorkout = await createWorkout(workoutData, token);
-        
-        // Erwartet Backend-Response mit _id ODER offline_id
-        if (newWorkout && newWorkout._id) {
-          this.workouts.push(newWorkout);
-          console.log('✅ Workout created:', newWorkout._id);
-        } else {
-          console.warn('⚠️ Kein Workout zurückerhalten');
+        const newWorkout = {
+          ...workoutData,
+          _id: `offline_${Date.now()}`,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
         }
-        
-        return newWorkout;
+        this.workouts.push(newWorkout)
+        localStorage.setItem('bro_split_workouts', JSON.stringify(this.workouts))
+        console.log('✅ [Demo] Workout created offline:', newWorkout._id)
+        return newWorkout
       } catch (error) {
-        console.error('❌ Error creating workout:', error);
-        
-        // Bei expliziter Auth-Fehlern: nach oben melden
-        const status = error?.response?.status;
-        if (status === 401 || status === 403 || error?.code === 'UNAUTHORIZED') {
-          const err = new Error('UNAUTHORIZED');
-          err.code = 'UNAUTHORIZED';
-          throw err;
-        }
-        
-        // Alle anderen Fehler weiterreichen
-        throw error;
+        console.error('❌ [Demo] Error creating workout:', error)
+        throw error
       }
     },
 
     async updateWorkout(id, updates, token = null) {
+      // Offline/Demo: Workout lokal updaten
       try {
-        console.log('✏️ Updating workout:', id, updates);
-        const updated = await apiUpdateWorkout(id, updates, token);
-        // Update im lokalen State
-        const idx = this.workouts.findIndex(w => w._id === id);
+        const idx = this.workouts.findIndex(w => w._id === id)
         if (idx !== -1) {
-          this.workouts[idx] = { ...this.workouts[idx], ...updated };
+          this.workouts[idx] = { ...this.workouts[idx], ...updates, updatedAt: new Date().toISOString() }
+          localStorage.setItem('bro_split_workouts', JSON.stringify(this.workouts))
+          console.log('✅ [Demo] Workout updated offline:', id)
+          return this.workouts[idx]
         }
-        return updated;
+        return null
       } catch (error) {
-        console.error('❌ Error updating workout:', error);
-        throw error;
+        console.error('❌ [Demo] Error updating workout:', error)
+        throw error
       }
     },
 
     async markWorkoutCompleted(id, token = null) {
+      // Offline/Demo: Workout lokal als abgeschlossen markieren
       try {
-        console.log('✅ Mark workout completed:', id);
-        const updated = await apiCompleteWorkout(id, new Date().toISOString(), token);
-        const idx = this.workouts.findIndex(w => w._id === id);
+        const idx = this.workouts.findIndex(w => w._id === id)
         if (idx !== -1) {
           this.workouts[idx] = {
             ...this.workouts[idx],
-            ...updated,
             completed: true,
-            completedAt: updated?.completedAt || new Date().toISOString()
-          };
+            completedAt: new Date().toISOString()
+          }
+          localStorage.setItem('bro_split_workouts', JSON.stringify(this.workouts))
+          console.log('✅ [Demo] Workout marked completed offline:', id)
+          return this.workouts[idx]
         }
-        return updated;
+        return null
       } catch (error) {
-        console.error('❌ Error completing workout:', error);
-        throw error;
+        console.error('❌ [Demo] Error completing workout:', error)
+        throw error
       }
     },
 
