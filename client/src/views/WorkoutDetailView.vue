@@ -281,7 +281,7 @@ import WorkoutTimer from '@/components/WorkoutTimer.vue'
 import { useToastStore } from '@/stores/toastStore'
 import { useI18n } from 'vue-i18n'
 import { logger } from '@/utils/logger'
-import { saveWorkoutOffline, getWorkoutOffline, db } from '@/utils/offlineStorage'
+// Doppelt, daher entfernt
 
 // SessionStorage Key für schnellen Detail-Draft-Fallback
 const DETAIL_DRAFT_KEY = 'workout_detail_draft'
