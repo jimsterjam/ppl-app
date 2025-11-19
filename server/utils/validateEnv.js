@@ -19,11 +19,7 @@ const REQUIRED_VARS = [
     description: 'MongoDB Connection String',
     example: 'mongodb+srv://USERNAME:PASSWORD@CLUSTER.mongodb.net/DATABASE'
   },
-  {
-    name: 'CLERK_PUBLISHABLE_KEY',
-    description: 'Clerk Publishable Key für Authentication',
-    example: 'pk_test_XXXXXXXXXX'
-  },
+  
   {
     name: 'CLERK_SECRET_KEY',
     description: 'Clerk Secret Key für Backend-Validierung',
@@ -40,6 +36,12 @@ const OPTIONAL_VARS = [
     description: 'OpenAI API Key für AI Workout Coach',
     fallback: 'Demo-Modus mit statischen Übungen',
     example: 'sk-proj-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'
+  },
+  {
+    name: 'CLERK_PUBLISHABLE_KEY',
+    description: 'Clerk Publishable Key (public) - erforderlich nur für Client; Server kann ihn optional lesen',
+    fallback: 'Kann im Client/Static Site gesetzt werden',
+    example: 'pk_test_XXXXXXXXXX'
   },
   {
     name: 'PORT',

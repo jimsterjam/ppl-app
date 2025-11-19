@@ -270,8 +270,9 @@ import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuth, useClerk } from '@clerk/vue'
 import { getAuthToken } from '@/utils/authToken'
-import { fetchWorkout } from '@/api/workouts'
-import { fetchExercise, fetchExercises, uploadExerciseImage, deleteExerciseImage } from '@/api/exercises'
+import { getWorkoutOffline, getExerciseOffline, getAllExercisesOffline, saveWorkoutOffline, db } from '@/utils/offlineStorage'
+// import { fetchWorkout } from '@/api/workouts'
+// import { fetchExercise, fetchExercises, uploadExerciseImage, deleteExerciseImage } from '@/api/exercises'
 import { useUserStore } from '@/stores/userStore'
 import HeaderBar from '@/components/HeaderBar.vue'
 import BottomNav from '@/components/BottomNav.vue'
@@ -450,10 +451,11 @@ async function loadWorkout() {
       toast.show(t('dashboard.successCreated'), { type: 'success', duration: 3000 })
     }
 
+    // Draft-Workouts immer lokal laden
     if (id === 'draft') {
       const draft = await getWorkoutOffline('draft')
       if (draft && draft.exercises && draft.type) {
-        const allExercises = await fetchExercises({})
+        const allExercises = await getAllExercisesOffline({})
         const merged = draft.exercises.map(draftEx => {
           let dbEx = allExercises.find(e => e._id === draftEx._id)
           if (!dbEx) {
@@ -488,17 +490,17 @@ async function loadWorkout() {
       return
     }
 
+    // Offline-IDs (lokal gespeicherte Workouts)
     if (String(id).startsWith('draft-') || String(id).startsWith('offline_')) {
-      workout.value = store.workouts.find(w => w._id === id) || null
+      workout.value = store.workouts.find(w => w._id === id) || (await getWorkoutOffline(id)) || null
       ensureSetDetailsStructure()
       await enrichExerciseImages()
       initialSnapshot = snapshotCore(workout.value)
       return
     }
 
-    const token = await getAuthToken({ clerk, auth }).catch(() => null)
-    const data = await fetchWorkout(id, token)
-    workout.value = data || null
+    // Normale Workouts: immer offline laden
+    workout.value = await getWorkoutOffline(id)
     ensureSetDetailsStructure()
     await enrichExerciseImages()
     initialSnapshot = snapshotCore(workout.value)
@@ -517,7 +519,7 @@ async function enrichExerciseImages() {
       const ex = list[idx]
       if (!ex.exerciseId) continue
       try {
-        const full = await fetchExercise(ex.exerciseId)
+        const full = await getExerciseOffline(ex.exerciseId)
         if (full?.imageUrl || full?.thumbnailUrl) {
           ex.imageUrl = full.imageUrl
           ex.thumbnailUrl = full.thumbnailUrl
