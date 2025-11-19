@@ -267,9 +267,7 @@ import { getAuthToken } from '@/utils/authToken'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
-import axios from 'axios'
-import { fetchWorkout } from '@/api/workouts'
-import { fetchExercises } from '@/api/exercises'
+import { getWorkoutOffline, getAllExercisesOffline } from '@/utils/offlineStorage'
 import StepIndicator from './StepIndicator.vue'
 import BottomNav from '@/components/BottomNav.vue'
 import AppModal from '@/components/AppModal.vue'
@@ -722,7 +720,7 @@ async function prefillFromRepeatIfAny() {
     let base = store.workouts.find(w => w._id === repeatId) || null
     if (!base) {
       const token = await getAuthToken({ clerk, auth }).catch(() => null)
-      base = await fetchWorkout(repeatId, token).catch(() => null)
+      base = await getWorkoutOffline(repeatId)
     }
     if (!base) return
 
@@ -854,8 +852,8 @@ async function loadExercises() {
     const targetCategory = categoryMap[selectedType.value]
     logger.debug('🎯 WorkoutBuilder - Filtere für Kategorie:', targetCategory)
     
-    // Nutze fetchExercises mit category filter (unterstützt Offline-Cache)
-    const allExercises = await fetchExercises({ category: targetCategory })
+    // Nutze getAllExercisesOffline mit category filter (rein offline)
+    const allExercises = await getAllExercisesOffline({ category: targetCategory })
     
     logger.debug('✅ WorkoutBuilder - Übungen erfolgreich geladen:', allExercises.length)
     
