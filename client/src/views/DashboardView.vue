@@ -274,15 +274,21 @@ const lastLabel = computed(() => {
 
 const nextLabel = computed(() => typeLabel(nextType.value))
 
-// Draft-Erkennung aus SessionStorage
-const DRAFT_STORAGE_KEY = 'workout_builder_draft'
+// Draft-Erkennung userId-spezifisch
+import { useUserStore } from '@/stores/userStore'
+const userStore = useUserStore()
+function getDraftStorageKey() {
+  const userId = userStore?.user?.id || userStore?.user?._id || 'guest'
+  return `workout_builder_draft_${userId}`
+}
 const hasDraft = ref(false)
 const draftType = ref('push')
 const draftTimestamp = ref(null)
 
-// Prüfe auf Draft-Workout in IndexedDB
+// Prüfe auf Draft-Workout in IndexedDB (userId-spezifisch)
 async function checkForDraft() {
-  const draft = await getWorkoutOffline('draft')
+  const DRAFT_STORAGE_KEY = getDraftStorageKey()
+  const draft = await getWorkoutOffline(DRAFT_STORAGE_KEY)
   if (draft && draft.exercises && draft.type && draft.exercises.length > 0) {
     hasDraft.value = true
     draftType.value = draft.type
@@ -319,11 +325,12 @@ async function startNewWorkout() {
   startWorkout(nextType.value)
 }
 
-// Draft-Resume: Navigiere in den Builder mit Resume-Flag
+// Draft-Resume: Navigiere in den Builder mit Resume-Flag (userId-spezifisch)
 async function startWorkout(type) {
   if (hasDraft.value) {
+    const DRAFT_STORAGE_KEY = getDraftStorageKey()
     // Draft aus IndexedDB laden und zur Detailansicht weiterleiten
-    const draft = await getWorkoutOffline('draft')
+    const draft = await getWorkoutOffline(DRAFT_STORAGE_KEY)
     if (draft) {
       const draftType = draft.type || type || 'push';
       await router.push({ name: 'workout-detail', params: { id: 'draft' }, query: { draft: '1', type: draftType } })

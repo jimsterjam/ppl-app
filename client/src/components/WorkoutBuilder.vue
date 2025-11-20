@@ -1,3 +1,30 @@
+// Entferne alle fremden Drafts aus SessionStorage und IndexedDB beim Nutzerwechsel
+async function clearOtherUserDrafts() {
+  const myKey = getDraftStorageKey()
+  // SessionStorage: alle Keys durchgehen
+  for (let i = 0; i < sessionStorage.length; i++) {
+    const key = sessionStorage.key(i)
+    if (key && key.startsWith('workout_builder_draft_') && key !== myKey) {
+      sessionStorage.removeItem(key)
+    }
+  }
+  // IndexedDB: alle Drafts mit anderem Key löschen
+  try {
+    const { db } = await import('@/utils/offlineStorage')
+    const allDrafts = await db.workouts.toArray()
+    for (const draft of allDrafts) {
+      if (draft._id && draft._id.startsWith('workout_builder_draft_') && draft._id !== myKey) {
+        await db.workouts.delete(draft._id)
+      }
+    }
+  } catch (e) { /* ignore */ }
+}
+
+// Beim Mounten: Fremde Drafts entfernen
+import { onMounted } from 'vue'
+onMounted(() => {
+  clearOtherUserDrafts()
+})
 <template>
   <div class="workout-builder">
     <!-- Glaubenssatz / Affirmation vor dem Plan -->
@@ -340,37 +367,37 @@ const search = ref('')
 const draggingIndex = ref(null)
 const planRef = ref(null)
 
-// SessionStorage Key für Draft-Speicherung
-const DRAFT_STORAGE_KEY = 'workout_builder_draft'
+// Draft-Storage-Key dynamisch nach userId
+import { useUserStore } from '@/stores/userStore'
+const userStore = useUserStore()
+function getDraftStorageKey() {
+  const userId = userStore?.user?.id || userStore?.user?._id || 'guest'
+  return `workout_builder_draft_${userId}`
+}
 
-// Draft aus SessionStorage laden
+// Draft aus SessionStorage laden (userId-spezifisch)
 async function loadDraft() {
   console.log('💡 loadDraft called')
-  // 1. Versuche aus IndexedDB (offline)
+  const DRAFT_STORAGE_KEY = getDraftStorageKey()
+  // 1. Versuche aus IndexedDB (offline, userId-spezifisch)
   try {
-    const draft = await getWorkoutOffline('draft')
+    const draft = await getWorkoutOffline(DRAFT_STORAGE_KEY)
     if (draft && draft.exercises && draft.type) {
-      // Debug: Draft anzeigen
       console.log('📦 [DEBUG] Draft geladen (IndexedDB):', JSON.stringify(draft, null, 2))
       selectedType.value = draft.type
-      // Hole aktuelle Exercises aus DB/API für den Typ
       await loadExercises()
-      // Merge: Draft-Übungen mit DB-Übungen (per _id oder Name)
       const merged = draft.exercises.map(draftEx => {
-        // Suche DB-Exercise per _id oder Name
         let dbEx = exercises.value.find(e => e._id === draftEx._id)
         if (!dbEx) {
           dbEx = exercises.value.find(e => (e.name || '').toLowerCase() === (draftEx.name || '').toLowerCase())
         }
         if (dbEx) {
-          // Übernehme alle Felder aus DB, aber setDetails/note aus Draft
           return {
             ...dbEx,
             setDetails: Array.isArray(draftEx.setDetails) ? draftEx.setDetails.map(s => ({ reps: s.reps, weight: s.weight })) : [],
             note: draftEx.note || ''
           }
         } else {
-          // Fallback: Draft-Objekt wie bisher
           return {
             ...draftEx,
             setDetails: Array.isArray(draftEx.setDetails) ? draftEx.setDetails.map(s => ({ reps: s.reps, weight: s.weight })) : [],
@@ -385,12 +412,11 @@ async function loadDraft() {
   } catch (e) {
     logger.warn('⚠️ WorkoutBuilder - Fehler beim Laden des Drafts aus IndexedDB:', e)
   }
-  // 2. Fallback: SessionStorage
+  // 2. Fallback: SessionStorage (userId-spezifisch)
   try {
     const draft = sessionStorage.getItem(DRAFT_STORAGE_KEY)
     if (draft) {
       const parsed = JSON.parse(draft)
-      // Debug: Draft anzeigen
       console.log('📦 [DEBUG] Draft geladen (sessionStorage):', JSON.stringify(parsed, null, 2))
       if (parsed.selectedType && parsed.selectedExercises) {
         selectedType.value = parsed.selectedType
@@ -405,12 +431,12 @@ async function loadDraft() {
   return false
 }
 
-// Draft in SessionStorage speichern
+// Draft in SessionStorage speichern (userId-spezifisch)
 async function saveDraft() {
   console.log('💡 saveDraft called')
+  const DRAFT_STORAGE_KEY = getDraftStorageKey()
   try {
     if (selectedExercises.value.length > 0) {
-      // Deep copy und setDetails/Notiz sicherstellen, KEINE Fallbacks mehr
       const exercisesForDraft = selectedExercises.value.map(ex => ({
         ...ex,
         setDetails: Array.isArray(ex.setDetails)
@@ -419,7 +445,7 @@ async function saveDraft() {
         note: ex.note || ''
       }))
       const draft = {
-        _id: 'draft',
+        _id: DRAFT_STORAGE_KEY,
         type: selectedType.value,
         exercises: exercisesForDraft,
         isDraft: true,
@@ -428,7 +454,6 @@ async function saveDraft() {
       sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({ selectedType: selectedType.value, selectedExercises: exercisesForDraft, timestamp: Date.now() }))
       await saveWorkoutOffline(draft)
       logger.debug('💾 WorkoutBuilder - Draft gespeichert (sessionStorage & IndexedDB):', exercisesForDraft.length, 'Übungen')
-      // Debug: Draft anzeigen
       console.log('💾 [DEBUG] Draft gespeichert:', JSON.stringify(draft, null, 2))
     }
   } catch (e) {
@@ -436,8 +461,9 @@ async function saveDraft() {
   }
 }
 
-// Draft löschen (nach erfolgreichem Erstellen)
+// Draft löschen (nach erfolgreichem Erstellen, userId-spezifisch)
 function clearDraft() {
+  const DRAFT_STORAGE_KEY = getDraftStorageKey()
   try {
     sessionStorage.removeItem(DRAFT_STORAGE_KEY)
     logger.debug('🗑️ WorkoutBuilder - Draft gelöscht')
@@ -447,8 +473,9 @@ function clearDraft() {
   }
 }
 
-// Synchronous snapshot for unload - sessionStorage as a fast fallback
+// Synchronous snapshot for unload - sessionStorage as a fast fallback (userId-spezifisch)
 function handleBeforeUnload(e) {
+  const DRAFT_STORAGE_KEY = getDraftStorageKey()
   try {
     if (selectedExercises.value && selectedExercises.value.length > 0) {
       const exercisesForDraft = selectedExercises.value.map(ex => ({
@@ -460,7 +487,6 @@ function handleBeforeUnload(e) {
       }))
       const snapshot = { selectedType: selectedType.value, selectedExercises: exercisesForDraft, timestamp: Date.now() }
       try { sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(snapshot)) } catch {}
-      // Visible debug message in beforeunload (may not appear in some browsers)
       console.log('🚪 [DEBUG] beforeunload snapshot saved to sessionStorage:', snapshot)
     }
   } catch (err) {

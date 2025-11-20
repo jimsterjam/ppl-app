@@ -365,8 +365,14 @@ import { useI18n } from 'vue-i18n'
 import { logger } from '@/utils/logger'
 // Doppelt, daher entfernt
 
-// SessionStorage Key für schnellen Detail-Draft-Fallback
-const DETAIL_DRAFT_KEY = 'workout_detail_draft'
+// SessionStorage Key für schnellen Detail-Draft-Fallback (userId-spezifisch)
+import { useUserStore } from '@/stores/userStore'
+const userStore = useUserStore()
+function getDetailDraftKey() {
+  const userId = userStore?.user?.id || userStore?.user?._id || 'guest'
+  return `workout_detail_draft_${userId}`
+}
+const DETAIL_DRAFT_KEY = getDetailDraftKey()
 
 const route = useRoute()
 const router = useRouter()
@@ -435,7 +441,8 @@ const triggerAutoSave = debounce(async () => {
 
   try {
     if (id === 'draft') {
-      await saveWorkoutOffline({ ...w, _id: 'draft', isDraft: true, updatedAt: Date.now() })
+      const draftKey = getDetailDraftKey()
+      await saveWorkoutOffline({ ...w, _id: draftKey, isDraft: true, updatedAt: Date.now() })
       saveMsg.value = 'Auto-gespeichert (Entwurf lokal).'
       saveError.value = false
       initialSnapshot = snapshotCore({ ...w })
@@ -535,7 +542,8 @@ async function loadWorkout() {
 
     // Draft-Workouts immer lokal laden
     if (id === 'draft') {
-      const draft = await getWorkoutOffline('draft')
+      const draftKey = getDetailDraftKey()
+      const draft = await getWorkoutOffline(draftKey)
       if (draft && draft.exercises && draft.type) {
         const allExercises = await getAllExercisesOffline({})
         const merged = draft.exercises.map(draftEx => {
