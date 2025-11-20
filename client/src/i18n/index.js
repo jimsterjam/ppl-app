@@ -36,7 +36,8 @@ export const messages = {
       duration: 'Dauer',
       today: 'Heute',
       unknownDuration: 'Dauer unbekannt',
-      more: 'weitere'
+      more: 'weitere',
+      select: 'Auswählen'
     },
     auth: {
       signIn: 'Anmelden'
@@ -223,6 +224,7 @@ export const messages = {
       tapImage: 'Tippe auf das Bild, um es zu {action}.',
       enlarge: 'vergrößern',
       add: 'hinzufügen',
+      addExercise: 'Übung hinzufügen',
       weight: 'Gewicht',
       removeSet: 'Satz entfernen',
       addSet: 'Satz hinzufügen',
@@ -449,7 +451,8 @@ export const messages = {
       duration: 'Duration',
       today: 'Today',
       unknownDuration: 'Unknown duration',
-      more: 'more'
+      more: 'more',
+      select: 'Select'
     },
     auth: {
       signIn: 'Sign in'
@@ -656,7 +659,8 @@ export const messages = {
       toastRemoved: 'Photo removed.',
       toastRemoveFailed: 'Remove failed.',
       saveFailed: 'Save failed.',
-      uploadFailed: 'Upload failed.'
+      uploadFailed: 'Upload failed.',
+      addExercise: 'Add Exercise'
     },
     builder: {
       backToDashboard: '← Back',

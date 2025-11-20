@@ -28,12 +28,41 @@
         </div>
 
         <div id="exercises" ref="exListRef" class="ex-list glass">
+
           <div class="ex-list-header">
             <h3>{{ t('workoutDetail.exercises') }}</h3>
-            <button class="reorder-toggle" :aria-pressed="isReordering" @click="toggleReorder">
-              {{ isReordering ? t('workoutDetail.done') : t('workoutDetail.editOrder') }}
-            </button>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <button class="primary" style="padding: 6px 12px; font-size: 0.95em;" @click="showAddExerciseModal = true">
+                + {{ t('workoutDetail.addExercise') }}
+              </button>
+              <button class="reorder-toggle" :aria-pressed="isReordering" @click="toggleReorder">
+                {{ isReordering ? t('workoutDetail.done') : t('workoutDetail.editOrder') }}
+              </button>
+            </div>
           </div>
+    <!-- Modal für Übungsauswahl -->
+    <AppModal
+      v-model="showAddExerciseModal"
+      :title="t('workoutDetail.addExercise')"
+      :show-cancel="true"
+      :confirm-text="t('common.add')"
+      :cancel-text="t('common.cancel')"
+      type="info"
+      @confirm="onAddExerciseConfirm"
+    >
+      <div style="max-height: 50vh; overflow-y: auto;">
+        <div v-if="exercisesLoading" style="text-align:center; padding: 16px;">Lade Übungen...</div>
+        <div v-else>
+          <div v-for="ex in allExercises" :key="ex._id" style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+            <img :src="getExerciseImage(ex)" alt="" style="width:40px;height:40px;object-fit:contain;border-radius:6px;border:1px solid #eee;" />
+            <span style="flex:1;">{{ getTranslatedExerciseName(ex.name) }}</span>
+            <div style="flex:0 0 auto; display: flex; justify-content: flex-end; width: auto;">
+              <button class="primary" style="min-width:unset; width:auto; padding:4px 12px; font-size:0.9em; white-space:nowrap;" @click="selectExerciseToAdd(ex)">{{ t('common.select') }}</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </AppModal>
 
           <div v-if="isDirty" class="banner dirty">{{ t('workoutDetail.unsaved') }}</div>
           <p v-if="isReordering" class="reorder-hint">{{ t('workoutDetail.reorderHint') }}</p>
@@ -264,6 +293,59 @@
 </template>
 
 <script setup>
+import { onMounted as vueOnMounted } from 'vue'
+// State für Übung hinzufügen
+const showAddExerciseModal = ref(false)
+const allExercises = ref([])
+const exercisesLoading = ref(false)
+let selectedExerciseToAdd = null
+// Übungen für Modal laden
+async function loadAllExercises() {
+  exercisesLoading.value = true
+  try {
+    // Versuche aus Store oder API zu laden (hier Demo: offline)
+    const list = await getAllExercisesOffline({})
+    allExercises.value = Array.isArray(list) ? list : []
+  } catch (e) {
+    allExercises.value = []
+  } finally {
+    exercisesLoading.value = false
+  }
+}
+
+watch(showAddExerciseModal, (val) => {
+  if (val) loadAllExercises()
+})
+
+function selectExerciseToAdd(ex) {
+  selectedExerciseToAdd = ex
+  onAddExerciseConfirm()
+}
+
+function onAddExerciseConfirm() {
+  if (!selectedExerciseToAdd) return
+  // Füge die Übung ans Workout an (mit Default-Sets)
+  if (!workout.value.exercises) workout.value.exercises = []
+  // Verhindere Duplikate (optional)
+  if (workout.value.exercises.some(e => e.exerciseId === selectedExerciseToAdd._id)) {
+    toast.show('Übung bereits hinzugefügt', { type: 'warning', duration: 2000 })
+    showAddExerciseModal.value = false
+    selectedExerciseToAdd = null
+    return
+  }
+  workout.value.exercises.push({
+    exerciseId: selectedExerciseToAdd._id,
+    name: selectedExerciseToAdd.name,
+    muscleGroup: selectedExerciseToAdd.muscleGroup,
+    setDetails: [{ reps: 10, weight: 0 }],
+    note: ''
+  })
+  showAddExerciseModal.value = false
+  selectedExerciseToAdd = null
+  ensureSetDetailsStructure()
+  try { triggerAutoSave() } catch {}
+  toast.show('Übung hinzugefügt', { type: 'success', duration: 1500 })
+}
 import { ref, onMounted, onBeforeUnmount, watch, nextTick, reactive } from 'vue'
 import NumberPicker from '@/components/NumberPicker.vue'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
@@ -953,6 +1035,7 @@ async function saveWorkout() {
       saveMsg.value = 'Gespeichert (Entwurf lokal).'
       saveError.value = false
       initialSnapshot = snapshotCore({ ...store.workouts[idx] })
+      try { await db.workouts.delete('draft') } catch {}
       router.push('/dashboard')
       return
     }
@@ -963,6 +1046,7 @@ async function saveWorkout() {
     saveMsg.value = 'Gespeichert.'
     saveError.value = false
     initialSnapshot = snapshotCore({ ...w, ...normalized })
+    try { await db.workouts.delete('draft') } catch {}
     router.push('/dashboard')
   } catch (e) {
     logger.error('Speichern fehlgeschlagen:', e)
@@ -992,6 +1076,10 @@ function onDrop(index) {
 onMounted(async () => {
   window.addEventListener('beforeunload', beforeUnloadHandler)
   await loadWorkout()
+  // Typ aus Query übernehmen, falls Draft geladen wird und Typ fehlt
+  if (route.params.id === 'draft' && workout.value && !workout.value.type && route.query.type) {
+    workout.value.type = route.query.type
+  }
   await nextTick()
   if (shouldAutoScroll()) {
     setTimeout(scrollToExercises, 50)

@@ -60,29 +60,23 @@ export const useUserStore = defineStore("user", {
 
   actions: {
     async loadWorkouts(token = null, options = {}) {
-      // Offline/Demo: Workouts aus localStorage laden
+      // Workouts per API vom Server laden
       this.error = null;
       this.loadingWorkouts = true;
       try {
-        const data = localStorage.getItem('bro_split_workouts')
-        if (data) {
-          this.workouts = JSON.parse(data)
-          this.workoutsLoaded = true
-          this.workoutsLoadedAt = Date.now()
-          console.log(`✅ [Demo] Loaded ${this.workouts.length} workouts from localStorage`)
-        } else {
-          this.workouts = []
-          this.workoutsLoaded = true
-          this.workoutsLoadedAt = Date.now()
-          console.log('⚠️ [Demo] No workouts in localStorage, empty list')
-        }
-        return this.workouts
+        const { fetchWorkouts } = await import('@/api/workouts');
+        const workouts = await fetchWorkouts(token);
+        this.workouts = Array.isArray(workouts) ? workouts : [];
+        this.workoutsLoaded = true;
+        this.workoutsLoadedAt = Date.now();
+        console.log(`✅ [API] Loaded ${this.workouts.length} workouts from server`);
+        return this.workouts;
       } catch (error) {
-        console.error('❌ [Demo] Error loading workouts from localStorage:', error)
-        this.error = null
-        this.workouts = []
+        console.error('❌ [API] Error loading workouts from server:', error);
+        this.error = error?.message || 'Fehler beim Laden der Workouts';
+        this.workouts = [];
       } finally {
-        this.loadingWorkouts = false
+        this.loadingWorkouts = false;
       }
     },
 
@@ -108,38 +102,72 @@ export const useUserStore = defineStore("user", {
     },
 
     async createWorkout(workoutData, token = null) {
-      // Offline/Demo: Workout lokal erstellen
+      // Workout per API erstellen
       try {
-        const newWorkout = {
-          ...workoutData,
-          _id: `offline_${Date.now()}`,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
+        const { createWorkout } = await import('@/api/workouts');
+        const newWorkout = await createWorkout(workoutData, token);
+        if (newWorkout) {
+          this.workouts.push(newWorkout);
+          console.log('✅ [API] Workout created:', newWorkout._id);
         }
-        this.workouts.push(newWorkout)
-        localStorage.setItem('bro_split_workouts', JSON.stringify(this.workouts))
-        console.log('✅ [Demo] Workout created offline:', newWorkout._id)
-        return newWorkout
+        return newWorkout;
       } catch (error) {
-        console.error('❌ [Demo] Error creating workout:', error)
-        throw error
+        console.error('❌ [API] Error creating workout:', error);
+        throw error;
       }
     },
 
     async updateWorkout(id, updates, token = null) {
-      // Offline/Demo: Workout lokal updaten
-      try {
-        const idx = this.workouts.findIndex(w => w._id === id)
-        if (idx !== -1) {
-          this.workouts[idx] = { ...this.workouts[idx], ...updates, updatedAt: new Date().toISOString() }
-          localStorage.setItem('bro_split_workouts', JSON.stringify(this.workouts))
-          console.log('✅ [Demo] Workout updated offline:', id)
-          return this.workouts[idx]
+      // Wenn kein gültiges ObjectId: als neues Workout anlegen (POST)
+      const isValidObjectId = typeof id === 'string' && /^[a-f\d]{24}$/i.test(id);
+      if (!isValidObjectId) {
+        try {
+          const { createWorkout } = await import('@/api/workouts');
+          // type aus vorhandenem Draft holen, falls nicht im updates-Objekt
+          let draftType = updates.type;
+          if (!draftType) {
+            const draft = this.workouts.find(w => w._id === id);
+            if (draft && draft.type) draftType = draft.type;
+          }
+          // Name automatisch nach Typ setzen, falls nicht vorhanden
+          let draftName = updates.name;
+          if (!draftName && draftType) {
+            if (draftType.toLowerCase() === 'push') draftName = 'Push Day';
+            else if (draftType.toLowerCase() === 'pull') draftName = 'Pull Day';
+            else if (draftType.toLowerCase() === 'legs') draftName = 'Leg Day';
+          }
+          const newWorkout = await createWorkout({ ...updates, type: draftType, name: draftName }, token);
+          // Entferne alle alten Drafts/temporären Workouts aus dem Store
+          this.workouts = this.workouts.filter(w => /^[a-f\d]{24}$/i.test(w._id));
+          // Füge das neue Workout hinzu
+          if (newWorkout) {
+            this.workouts.push(newWorkout);
+            console.log('✅ [API] Draft als neues Workout gespeichert und alte Drafts entfernt:', newWorkout._id);
+            // Lösche Draft aus Offline-DB, falls vorhanden
+            try {
+              const { db } = await import('@/utils/offlineStorage');
+              await db.workouts.delete('draft');
+            } catch (e) { /* ignore */ }
+          }
+          return newWorkout;
+        } catch (error) {
+          console.error('❌ [API] Error creating workout from draft:', error);
+          throw error;
         }
-        return null
+      }
+      // Andernfalls normales Update (PUT)
+      try {
+        const { updateWorkout } = await import('@/api/workouts');
+        const updatedWorkout = await updateWorkout(id, updates, token);
+        const idx = this.workouts.findIndex(w => w._id === id);
+        if (updatedWorkout && idx !== -1) {
+          this.workouts[idx] = { ...this.workouts[idx], ...updatedWorkout };
+          console.log('✅ [API] Workout updated:', id);
+        }
+        return updatedWorkout;
       } catch (error) {
-        console.error('❌ [Demo] Error updating workout:', error)
-        throw error
+        console.error('❌ [API] Error updating workout:', error);
+        throw error;
       }
     },
 

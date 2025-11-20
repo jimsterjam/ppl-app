@@ -383,14 +383,8 @@ function viewWorkout(workout) {
 }
 
 function repeatWorkout(workout) {
-  // Navigiere zum WorkoutBuilder mit den Daten des letzten Workouts
-  router.push({
-    path: '/workout-builder',
-    query: {
-      type: workout.type,
-      repeat: workout._id
-    }
-  })
+  // Navigiere zur Workout-Detailansicht des gewählten Workouts
+  router.push({ name: 'workout-detail', params: { id: workout._id } })
 }
 
 function editWorkout(workout) {

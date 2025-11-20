@@ -39,24 +39,5 @@ subscriptionStore.checkSubscription()
 
 app.mount('#app')
 
-// Dev: leite console.log/info über den zentralen Logger um, damit Debugging
-// konsistent ist und späteres Refactoring auf logger.* nicht zwingend nötig ist.
-if (import.meta.env.DEV) {
-  try {
-    // Nur überschreiben, wenn logger verfügbar
-    if (logger && typeof logger.debug === 'function') {
-      const originalLog = console.log.bind(console)
-      const originalInfo = console.info.bind(console)
-
-      console.log = (...args) => {
-        try { logger.debug(...args) } catch (e) { originalLog(...args) }
-      }
-      console.info = (...args) => {
-        try { logger.info(...args) } catch (e) { originalInfo(...args) }
-      }
-    }
-  } catch (e) {
-    // Fallback: nichts tun
-  }
-}
+// Debug-Logger-Umleitung entfernt, um Endlosschleifen zu vermeiden.
 

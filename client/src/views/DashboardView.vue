@@ -293,8 +293,15 @@ async function checkForDraft() {
   }
 }
 
+
 onMounted(() => {
   checkForDraft()
+  // Draft-Status auch nach Navigation zum Dashboard aktualisieren
+  router.afterEach((to, from) => {
+    if (to.name === 'dashboard') {
+      checkForDraft()
+    }
+  })
 })
 
 // Button-Text dynamisch
@@ -318,7 +325,8 @@ async function startWorkout(type) {
     // Draft aus IndexedDB laden und zur Detailansicht weiterleiten
     const draft = await getWorkoutOffline('draft')
     if (draft) {
-      await router.push({ name: 'workout-detail', params: { id: 'draft' }, query: { draft: '1' } })
+      const draftType = draft.type || type || 'push';
+      await router.push({ name: 'workout-detail', params: { id: 'draft' }, query: { draft: '1', type: draftType } })
       return
     }
     // Fallback: Wenn kein Draft-Objekt, öffne Builder
