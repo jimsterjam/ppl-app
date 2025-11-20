@@ -365,8 +365,6 @@ import { useI18n } from 'vue-i18n'
 import { logger } from '@/utils/logger'
 // Doppelt, daher entfernt
 
-// SessionStorage Key für schnellen Detail-Draft-Fallback (userId-spezifisch)
-import { useUserStore } from '@/stores/userStore'
 const userStore = useUserStore()
 function getDetailDraftKey() {
   const userId = userStore?.user?.id || userStore?.user?._id || 'guest'
@@ -384,7 +382,7 @@ const { getTranslatedExerciseName } = useExerciseTranslation()
 // Optional: eigene Übersetzungsfunktion für Muskelgruppen
 const getTranslatedMuscleGroup = (mg) => mg
 
-const store = useUserStore()
+const store = userStore
 const toast = useToastStore()
 const workout = ref(null)
 const loading = ref(false)
