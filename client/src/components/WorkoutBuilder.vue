@@ -1,4 +1,15 @@
-// Entferne alle fremden Drafts aus SessionStorage und IndexedDB beim Nutzerwechsel
+<script setup>
+import { onMounted } from 'vue'
+import { useUserStore } from '@/stores/userStore'
+// ...alle weiteren Importe wie bisher...
+
+const userStore = useUserStore()
+
+function getDraftStorageKey() {
+  const userId = userStore?.user?.id || userStore?.user?._id || 'guest'
+  return `workout_builder_draft_${userId}`
+}
+
 async function clearOtherUserDrafts() {
   const myKey = getDraftStorageKey()
   // SessionStorage: alle Keys durchgehen
@@ -20,11 +31,10 @@ async function clearOtherUserDrafts() {
   } catch (e) { /* ignore */ }
 }
 
-// Beim Mounten: Fremde Drafts entfernen
-import { onMounted } from 'vue'
 onMounted(() => {
   clearOtherUserDrafts()
 })
+</script>
 <template>
   <div class="workout-builder">
     <!-- Glaubenssatz / Affirmation vor dem Plan -->
