@@ -275,7 +275,7 @@ const lastLabel = computed(() => {
 const nextLabel = computed(() => typeLabel(nextType.value))
 
 // Draft-Erkennung userId-spezifisch
-import { useUserStore } from '@/stores/userStore'
+// import { useUserStore } from '@/stores/userStore'
 const userStore = useUserStore()
 function getDraftStorageKey() {
   const userId = userStore?.user?.id || userStore?.user?._id || 'guest'
