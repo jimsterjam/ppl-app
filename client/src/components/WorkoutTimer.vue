@@ -16,7 +16,6 @@
   <span class="time" :aria-live="running ? 'polite' : 'off'">{{ formatted }}</span>
   <button class="btn small" :title="$t('timer.reset')" @click.stop="reset">↺</button>
   <button class="btn small" :title="$t('timer.minimize')" @click.stop="minimize">▁</button>
-  <button class="btn small" :title="$t('timer.close')" @click.stop="close">✕</button>
     </template>
     <template v-else>
       <div
@@ -188,8 +187,12 @@ function setupMobileWatcher() {
   mq = window.matchMedia('(max-width: 480px)')
   const update = () => { isMobile.value = !!mq.matches }
   update()
-  if (mq.addEventListener) mq.addEventListener('change', update)
-  else if (mq.addListener) mq.addListener(update)
+  if (typeof mq.addEventListener === 'function') {
+    mq.addEventListener('change', update)
+  } else if (typeof mq.addListener === 'function') {
+    // Fallback für sehr alte Browser
+    mq.addListener(update)
+  }
 }
 function teardownMobileWatcher() {
   if (!mq) return

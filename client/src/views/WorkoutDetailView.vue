@@ -30,7 +30,7 @@
         <div id="exercises" ref="exListRef" class="ex-list glass">
 
           <div class="ex-list-header">
-            <h3>{{ t('workoutDetail.exercises') }}</h3>
+            <!-- <h3>{{ t('workoutDetail.exercises') }}</h3> -->
             <div style="display: flex; gap: 8px; align-items: center;">
               <button class="primary" style="padding: 6px 12px; font-size: 0.95em;" @click="showAddExerciseModal = true">
                 + {{ t('workoutDetail.addExercise') }}
@@ -95,7 +95,7 @@
                     📝
                     {{ getNote(i)
                       ? (showNote[i] ? 'ändern' : 'anzeigen')
-                      : 'hinzufügen' }}
+                      : 'Notiz hinzufügen' }}
                   </button>
 
                   <button
@@ -541,7 +541,20 @@ async function loadWorkout() {
     // Draft-Workouts immer lokal laden
     if (id === 'draft') {
       const draftKey = getDetailDraftKey()
-      const draft = await getWorkoutOffline(draftKey)
+      // 1. Versuche aus sessionStorage zu laden (Resume aus Dashboard)
+      let draft = null
+      const raw = sessionStorage.getItem(draftKey)
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw)
+          // Kompatibilität: alter sessionStorage-Draft kann {workout: ...} oder direkt das Objekt sein
+          draft = parsed.workout || parsed
+        } catch {}
+      }
+      // 2. Fallback: aus IndexedDB
+      if (!draft) {
+        draft = await getWorkoutOffline(draftKey)
+      }
       if (draft && draft.exercises && draft.type) {
         const allExercises = await getAllExercisesOffline({})
         const merged = draft.exercises.map(draftEx => {
@@ -1033,6 +1046,10 @@ async function saveWorkout() {
 
     try { console.log('📤 [DEBUG] saveWorkout - normalized payload:', JSON.stringify(normalized, null, 2)) } catch {}
 
+    // Nach dem Speichern: Draft aus sessionStorage entfernen
+    const userId = store?.user?.id || store?.user?._id || 'guest'
+    const detailDraftKey = `workout_detail_draft_${userId}`
+
     if (String(id).startsWith('draft-')) {
       const idx = store.workouts.findIndex(wi => wi._id === id)
       if (idx !== -1) {
@@ -1042,6 +1059,7 @@ async function saveWorkout() {
       saveError.value = false
       initialSnapshot = snapshotCore({ ...store.workouts[idx] })
       try { await db.workouts.delete('draft') } catch {}
+      try { sessionStorage.removeItem(detailDraftKey) } catch {}
       router.push('/dashboard')
       return
     }
@@ -1053,6 +1071,7 @@ async function saveWorkout() {
     saveError.value = false
     initialSnapshot = snapshotCore({ ...w, ...normalized })
     try { await db.workouts.delete('draft') } catch {}
+    try { sessionStorage.removeItem(detailDraftKey) } catch {}
     router.push('/dashboard')
   } catch (e) {
     logger.error('Speichern fehlgeschlagen:', e)
@@ -1104,10 +1123,15 @@ watch(() => workout.value?.exercises?.length || 0, async (len) => {
   }, 0)
 })
 
-// Dirty-Tracking gegen initialen Snapshot
+// Dirty-Tracking gegen initialen Snapshot & sofortiges Draft-Speichern
 watch(() => workout.value, (w) => {
   const current = snapshotCore(w || {})
   isDirty.value = !!initialSnapshot && current !== initialSnapshot
+  // Speichere Draft sofort in sessionStorage, damit Dashboard-Resume immer aktuell ist
+  try {
+    const snapshot = w ? { ...w, timestamp: Date.now() } : null
+    if (snapshot) sessionStorage.setItem(DETAIL_DRAFT_KEY, JSON.stringify(snapshot))
+  } catch {}
 }, { deep: true })
 
 // Warnung beim Schließen/Reload

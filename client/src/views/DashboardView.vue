@@ -274,32 +274,60 @@ const lastLabel = computed(() => {
 
 const nextLabel = computed(() => typeLabel(nextType.value))
 
-// Draft-Erkennung userId-spezifisch
-// import { useUserStore } from '@/stores/userStore'
-const userStore = useUserStore()
-function getDraftStorageKey() {
-  const userId = userStore?.user?.id || userStore?.user?._id || 'guest'
+
+// Draft- und Resume-Logik: Prüfe auf Builder- und Detail-Draft
+function getBuilderDraftKey() {
+  const userId = store?.user?.id || store?.user?._id || 'guest'
   return `workout_builder_draft_${userId}`
+}
+function getDetailDraftKey() {
+  const userId = store?.user?.id || store?.user?._id || 'guest'
+  return `workout_detail_draft_${userId}`
 }
 const hasDraft = ref(false)
 const draftType = ref('push')
 const draftTimestamp = ref(null)
+const lastDraftLocation = ref('builder') // 'builder' oder 'detail'
 
-// Prüfe auf Draft-Workout in IndexedDB (userId-spezifisch)
 async function checkForDraft() {
-  const DRAFT_STORAGE_KEY = getDraftStorageKey()
-  const draft = await getWorkoutOffline(DRAFT_STORAGE_KEY)
-  if (draft && draft.exercises && draft.type && draft.exercises.length > 0) {
-    hasDraft.value = true
-    draftType.value = draft.type
-    draftTimestamp.value = draft.updatedAt ? new Date(draft.updatedAt) : null
-  } else {
-    hasDraft.value = false
-    draftTimestamp.value = null
+  // 1. Prüfe Detail-Draft (WorkoutDetailView)
+  const detailKey = getDetailDraftKey()
+  let raw = sessionStorage.getItem(detailKey)
+  if (raw) {
+    try {
+      const draft = JSON.parse(raw)
+      if (draft && draft.exercises && draft.type && draft.exercises.length > 0 && !draft.completed) {
+        hasDraft.value = true
+        draftType.value = draft.type
+        lastDraftLocation.value = 'detail'
+        draftTimestamp.value = null
+        return
+      }
+    } catch {}
   }
+  // 2. Prüfe Builder-Draft
+  const builderKey = getBuilderDraftKey()
+  raw = sessionStorage.getItem(builderKey)
+  if (raw) {
+    try {
+      const draft = JSON.parse(raw)
+      if (draft && draft.exercises && draft.type && draft.exercises.length > 0) {
+        hasDraft.value = true
+        draftType.value = draft.type
+        lastDraftLocation.value = 'builder'
+        draftTimestamp.value = null
+        return
+      }
+    } catch {}
+  }
+  hasDraft.value = false
+  draftTimestamp.value = null
+  lastDraftLocation.value = 'builder'
 }
 
 
+
+let draftInterval = null
 onMounted(() => {
   checkForDraft()
   // Draft-Status auch nach Navigation zum Dashboard aktualisieren
@@ -308,6 +336,11 @@ onMounted(() => {
       checkForDraft()
     }
   })
+  // Draft-Status regelmäßig prüfen (z.B. alle 2s)
+  draftInterval = setInterval(checkForDraft, 2000)
+})
+onUnmounted(() => {
+  if (draftInterval) clearInterval(draftInterval)
 })
 
 // Button-Text dynamisch
@@ -328,16 +361,15 @@ async function startNewWorkout() {
 // Draft-Resume: Navigiere in den Builder mit Resume-Flag (userId-spezifisch)
 async function startWorkout(type) {
   if (hasDraft.value) {
-    const DRAFT_STORAGE_KEY = getDraftStorageKey()
-    // Draft aus IndexedDB laden und zur Detailansicht weiterleiten
-    const draft = await getWorkoutOffline(DRAFT_STORAGE_KEY)
-    if (draft) {
-      const draftType = draft.type || type || 'push';
-      await router.push({ name: 'workout-detail', params: { id: 'draft' }, query: { draft: '1', type: draftType } })
+    if (lastDraftLocation.value === 'detail') {
+      // Resume im WorkoutDetailView
+      await router.push({ name: 'workout-detail', params: { id: 'draft' }, query: { draft: '1', type: draftType.value } })
+      return
+    } else {
+      // Resume im Builder
+      await router.push({ name: 'workout-builder', query: { resume: '1', type: draftType.value } })
       return
     }
-    // Fallback: Wenn kein Draft-Objekt, öffne Builder
-    await router.push({ name: 'workout-builder', query: { resume: '1' } })
   } else {
     // Normaler Start: Typ übergeben
     await router.push({ name: 'workout-builder', query: { type } })

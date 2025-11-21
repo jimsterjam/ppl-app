@@ -157,20 +157,21 @@ export async function updateWorkout(workoutId, workoutData, token = null) {
   // Wenn explizit Offline: Speichere lokal und füge zur Sync Queue hinzu
   if (!isOnline()) {
     logger.warn('📡 Workouts API - Offline, aktualisiere Workout lokal');
-    
+    // Verhindere Fehler bei ungültigen IDs (z.B. draft, leer, undefined)
+    if (!workoutId || workoutId === 'draft' || String(workoutId).startsWith('draft')) {
+      logger.warn('⚠️ updateWorkout: Kein Offline-Save für temporäre oder leere ID:', workoutId)
+      return { ...workoutData, _id: workoutId, _offlineUpdated: true, updatedAt: new Date().toISOString() }
+    }
     const offlineWorkout = {
       ...workoutData,
       _id: workoutId,
       _offlineUpdated: true,
       updatedAt: new Date().toISOString()
     };
-    
     // Update lokal
     await saveWorkoutOffline(offlineWorkout);
-    
     // Füge zur Sync Queue hinzu
     await queueAction('update', 'workout', offlineWorkout);
-    
     logger.debug('💾 Workouts API - Workout offline aktualisiert:', workoutId);
     return offlineWorkout;
   }

@@ -1,4 +1,104 @@
+
+<style scoped>
+/* Set-Row: moderne, klare Darstellung */
+.set-row {
+	display: grid;
+	grid-template-columns: 36px 1fr 1fr 32px;
+	gap: 12px;
+	align-items: center;
+	background: var(--surface, #f8fafc);
+	border-radius: 8px;
+	padding: 8px 0 8px 8px;
+	margin-bottom: 6px;
+	box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+}
+.set-label {
+	color: var(--muted);
+	font-size: 0.85rem;
+	text-align: center;
+	font-weight: 600;
+}
+.set-field {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	background: transparent;
+	border-radius: 6px;
+	padding: 0 4px;
+}
+.set-field input {
+	width: 60px;
+	padding: 7px 6px;
+	border-radius: 6px;
+	border: 1px solid var(--card-border);
+	background: #fff;
+	color: var(--fg);
+	font-size: 1rem;
+	text-align: right;
+}
+.remove-set {
+	background: transparent;
+	border: none;
+	color: var(--danger-color);
+	font-size: 20px;
+	cursor: pointer;
+	border-radius: 50%;
+	width: 28px;
+	height: 28px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: background 0.15s;
+}
+.remove-set:hover {
+	background: #fee2e2;
+}
+@media (max-width: 600px) {
+	.set-row {
+		grid-template-columns: 28px 1fr 1fr 28px;
+		gap: 6px;
+		padding: 6px 0 6px 4px;
+	}
+	.set-field input {
+		width: 44px;
+		font-size: 0.98rem;
+	}
+}
+/* Section für Übungen optisch hervorheben */
+.exercises-section {
+	background: var(--card-bg, #fff);
+	border-radius: 16px;
+	box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+	padding: 24px 18px 18px 18px;
+	margin: 0 auto 28px auto;
+	max-width: 700px;
+	border: 1px solid var(--card-border, #e5e7eb);
+	display: flex;
+	flex-direction: column;
+	gap: 18px;
+}
+@media (max-width: 600px) {
+	.exercises-section {
+		padding: 14px 4vw 12px 4vw;
+		max-width: 98vw;
+	}
+}
+</style>
+
 <script setup>
+
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
+import { useI18n } from 'vue-i18n';
+import { useUserStore } from '@/stores/userStore';
+import { useUser } from '@clerk/vue';
+import { useSubscriptionStore } from '@/stores/subscriptionStore';
+import { useToastStore } from '@/stores/toastStore';
+import AppModal from '@/components/AppModal.vue';
+import StepIndicator from '@/components/StepIndicator.vue';
+import BottomNav from '@/components/BottomNav.vue';
+import UpgradeModal from '@/components/UpgradeModal.vue';
+import { getAllExercisesOffline } from '@/utils/offlineStorage';
 
 
 // --- State & Stores ---
@@ -6,11 +106,17 @@
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const { user } = useUser()
+// Synchronisiere Clerk-User mit Pinia-Store
+watch(user, (val) => {
+	if (val) userStore.user = val
+	else userStore.user = null
+}, { immediate: true })
 const subscriptionStore = useSubscriptionStore()
-const toast = useToast()
+const toast = useToastStore()
 const { t, locale } = useI18n()
-const isLoaded = computed(() => userStore.isLoaded)
-const isSignedIn = computed(() => userStore.isSignedIn)
+const isLoaded = computed(() => !userStore.loading)
+const isSignedIn = computed(() => !!userStore.user)
 const loadingUser = computed(() => userStore.loading)
 const userId = computed(() => userStore.user?.id || userStore.user?._id || 'guest')
 
@@ -29,6 +135,56 @@ const showTypePicker = ref(false)
 const showMobilePicker = ref(false)
 const draggingIndex = ref(null)
 const planRef = ref(null)
+// Equipment-Filter (dynamisch)
+import allExercisesData from '@/data/default-exercises.json'
+const showEquipmentFilter = ref(false)
+const selectedEquipment = ref('')
+// Alle Equipment-Typen aus den Exercises extrahieren
+const allEquipmentTypes = computed(() => {
+	const set = new Set()
+	allExercisesData.forEach(e => {
+		if (e.equipment) set.add(e.equipment)
+	})
+	return Array.from(set)
+})
+// Mapping für Übersetzungen
+const equipmentTranslation = (equip) => {
+	// Standardisierte Keys für i18n
+	const keyMap = {
+		'Körpergewicht': 'bodyweight',
+		'Langhantel': 'barbell',
+		'Hanteln': 'dumbbell',
+		'Maschine': 'machine',
+		'Kabelzug': 'cable',
+		'Band': 'band',
+		'Kettlebell': 'kettlebell',
+		'Medizinball': 'medicineball',
+		'Sandbag': 'sandbag',
+		'Eigengewicht': 'bodyweight',
+		'Bodyweight': 'bodyweight',
+		'Barbell': 'barbell',
+		'Dumbbells': 'dumbbell',
+		'Dumbbell': 'dumbbell',
+		'Cable': 'cable',
+		'Machine': 'machine',
+		'Band': 'band',
+		'Kettlebell': 'kettlebell',
+		'Medicineball': 'medicineball',
+		'Sandbag': 'sandbag',
+	}
+	const key = keyMap[equip] || equip.toLowerCase()
+	// Fallback: Zeige deutschen Namen, falls keine Übersetzung vorhanden
+	const translated = t(`exercises.equipment.${key}`)
+	if (translated && !translated.startsWith('exercises.equipment.')) return translated
+	// Fallback: Zeige englischen Namen aus default-exercises.json, falls vorhanden
+	const found = allExercisesData.find(e => e.equipment === equip)
+	if (found && found.equipment_en) return found.equipment_en
+	return equip
+}
+function setEquipment(equip) {
+	selectedEquipment.value = equip
+	loadExercises()
+}
 
 // --- Draft-Logik ---
 function getDraftStorageKey() {
@@ -70,9 +226,9 @@ async function clearOtherUserDrafts() {
 
 // --- Workout Types ---
 const workoutTypes = [
-	{ value: 'push', label: t('builder.pushDay') || 'Push Day' },
-	{ value: 'pull', label: t('builder.pullDay') || 'Pull Day' },
-	{ value: 'legs', label: t('builder.legsDay') || 'Leg Day' }
+	{ value: 'push', label: t('builder.pushDay') && t('builder.pushDay') !== 'builder.pushDay' ? t('builder.pushDay') : 'Push Day' },
+	{ value: 'pull', label: t('builder.pullDay') && t('builder.pullDay') !== 'builder.pullDay' ? t('builder.pullDay') : 'Pull Day' },
+	{ value: 'legs', label: t('builder.legsDay') && t('builder.legsDay') !== 'builder.legsDay' ? t('builder.legsDay') : 'Leg Day' }
 ]
 const currentTypeLabel = computed(() => {
 	const type = workoutTypes.find(t => t.value === selectedType.value)
@@ -83,7 +239,9 @@ const currentTypeLabel = computed(() => {
 const viewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1024)
 const isMobile = computed(() => viewportWidth.value <= 480)
 onMounted(() => {
-	window.addEventListener('resize', () => { viewportWidth.value = window.innerWidth })
+  const onResize = () => { viewportWidth.value = window.innerWidth }
+  window.addEventListener('resize', onResize)
+  onUnmounted(() => window.removeEventListener('resize', onResize))
 })
 
 // --- Belief/Affirmation ---
@@ -132,8 +290,21 @@ async function loadExercises() {
 			return
 		}
 		const categoryMap = { push: 'Push', pull: 'Pull', legs: 'Legs' }
-		const all = await getAllExercisesOffline({ category: categoryMap[selectedType.value] })
-		exercises.value = all
+		let all = await getAllExercisesOffline({ category: categoryMap[selectedType.value] })
+		if (selectedEquipment.value) {
+			all = all.filter(e => (e.equipment || '').toLowerCase() === selectedEquipment.value.toLowerCase())
+		}
+		// Doppelte Übungen nach Name+Equipment entfernen
+		const seen = new Set()
+		const unique = []
+		for (const ex of all) {
+			const key = `${ex.name?.toLowerCase() || ''}__${ex.equipment?.toLowerCase() || ''}`
+			if (!seen.has(key)) {
+				seen.add(key)
+				unique.push(ex)
+			}
+		}
+		exercises.value = unique
 	} catch {
 		exercises.value = []
 	} finally {
@@ -267,7 +438,9 @@ watch(selectedExercises, saveDraft, { deep: true })
 			<select v-else id="wb-type" v-model="selectedType" class="type-dropdown" @change="loadExercises">
 				<option v-for="type in workoutTypes" :key="type.value" :value="type.value">{{ type.label }}</option>
 			</select>
+
 		</div>
+
 		<div v-if="isMobile && showTypePicker" class="picker-overlay" @click.self="showTypePicker = false">
 			<div class="picker-sheet">
 				<div class="picker-header">
@@ -314,37 +487,48 @@ watch(selectedExercises, saveDraft, { deep: true })
 					</div>
 				</div>
 			</template>
-			<div v-if="isMobile && showMobilePicker" class="picker-overlay" @click.self="showMobilePicker = false">
-				<div class="picker-sheet">
-					<div class="picker-header">
-						<h4>{{ t('builder.selectExercises') }}</h4>
-						<button class="close-picker" @click="showMobilePicker = false">✕</button>
-					</div>
-					<div class="search-row in-sheet">
-						<input v-model="search" class="search-input" type="search" :placeholder="t('builder.searchPlaceholder')" />
-					</div>
-					<div class="picker-list" :aria-busy="loading">
-						<div v-if="loading" class="exercises-grid">
-							<div v-for="n in 6" :key="n" class="exercise-item sk"></div>
-						</div>
-						<div v-else class="exercises-grid">
-							<div v-for="exercise in filteredExercises" :key="exercise._id" :class="{ selected: isSelected(exercise) }" class="exercise-item" @click="toggleExercise(exercise)">
-								<div class="ex-row">
-									<span class="title">{{ exercise.name }}</span>
-									<span class="sub">{{ exercise.muscleGroup }}</span>
-									<span class="sub small">{{ exercise.equipment || t('exercises.bodyweight') }}</span>
-								</div>
-							</div>
-						</div>
-					</div>
-					<div class="picker-actions">
-						<button class="done-btn" @click="showMobilePicker = false">{{ t('builder.done') }}</button>
-					</div>
-				</div>
-			</div>
+			   <div v-if="isMobile && showMobilePicker" class="picker-overlay" @click.self="showMobilePicker = false">
+				   <div class="picker-sheet">
+					   <div class="picker-header">
+						   <h4>{{ t('builder.selectExercises') }}</h4>
+						   <button class="close-picker" @click="showMobilePicker = false">✕</button>
+					   </div>
+									 <!-- Equipment-Filter als zentriertes Dropdown im Overlay -->
+									 <div style="margin-bottom: 10px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 8px;">
+										 <label for="equipment-filter-select" style="font-weight:600;">
+											 {{ t('builder.filterEquipment') !== 'builder.filterEquipment' ? t('builder.filterEquipment') : 'Equipment filtern' }}
+										 </label>
+										 <select id="equipment-filter-select" v-model="selectedEquipment" @change="setEquipment($event.target.value)" style="padding:7px 12px; border-radius:8px; border:1px solid #e5e7eb; min-width:140px;">
+											 <option :value="''">{{ t('exercises.filters.all') || 'Alle' }}</option>
+											 <option v-for="equip in allEquipmentTypes" :key="equip" :value="equip">{{ equipmentTranslation(equip) }}</option>
+										 </select>
+									 </div>
+					   <div class="search-row in-sheet">
+						   <input v-model="search" class="search-input" type="search" :placeholder="t('builder.searchPlaceholder')" />
+					   </div>
+					   <div class="picker-list" :aria-busy="loading">
+						   <div v-if="loading" class="exercises-grid">
+							   <div v-for="n in 6" :key="n" class="exercise-item sk"></div>
+						   </div>
+						   <div v-else class="exercises-grid">
+							   <div v-for="exercise in filteredExercises" :key="exercise._id" :class="{ selected: isSelected(exercise) }" class="exercise-item" @click="toggleExercise(exercise)">
+								   <div class="ex-row">
+									   <span class="title">{{ exercise.name }}</span>
+									   <span class="sub">{{ exercise.muscleGroup }}</span>
+									   <span class="sub small">{{ exercise.equipment || t('exercises.bodyweight') }}</span>
+								   </div>
+							   </div>
+						   </div>
+					   </div>
+					   <div class="picker-actions">
+						   <button class="done-btn" @click="showMobilePicker = false">{{ t('builder.done') }}</button>
+					   </div>
+				   </div>
+			   </div>
 			<div v-if="selectedExercises.length > 0" id="workout-plan" ref="planRef" class="selected-exercises">
 				<h3>{{ t('builder.planTitle', { count: selectedExercises.length }) }}</h3>
-				<div v-for="(exercise, index) in selectedExercises" :key="exercise._id" class="selected-exercise" draggable="true" @dragstart="onDragStart(index)" @drop.prevent="onDrop(index)">
+				<div v-for="(exercise, index) in selectedExercises" :key="exercise._id" class="selected-exercise" draggable="true" @dragstart="onDragStart(index)" @dragover.prevent
+="onDrop(index)">
 					<div class="sel-row">
 						<span class="ex-name">{{ exercise.name }}</span>
 						<input type="text" v-model="exercise.note" :placeholder="t('builder.notePlaceholder')" maxlength="150" />
@@ -378,40 +562,161 @@ watch(selectedExercises, saveDraft, { deep: true })
 </template>
 
 <style scoped>
-.workout-builder { padding: 20px; padding-bottom: 80px; color: var(--fg); background: var(--bg); }
-.builder-topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: 12px; padding: 12px 0 16px 0; background: var(--bg); }
-.back-top-btn { padding: 8px 12px; border-radius: 10px; border: 2px solid var(--accent-color); background: transparent; color: var(--fg); cursor: pointer; }
+
+/* --- ExercisesView-ähnliches Layout für WorkoutBuilder --- */
+.workout-builder {
+	min-height: 100vh;
+	background: var(--bg);
+	color: var(--fg);
+	padding: 20px;
+	padding-bottom: 80px;
+}
+.builder-topbar {
+	position: sticky;
+	top: 0;
+	z-index: 10;
+	display: flex;
+	align-items: center;
+	gap: 12px;
+	padding: 12px 0 16px 0;
+	background: var(--bg);
+}
+.back-top-btn {
+	padding: 8px 12px;
+	border-radius: 10px;
+	border: 2px solid var(--accent-color);
+	background: transparent;
+	color: var(--fg);
+	cursor: pointer;
+	font-weight: 600;
+	transition: background 0.15s;
+}
 .back-top-btn:hover { background: var(--accent-soft); }
-.type-select { display: grid; grid-template-columns: 60px 1fr; align-items: center; gap: 12px; margin-bottom: 16px; }
-.type-label { color: var(--muted); font-size: 0.9rem; }
-.type-dropdown { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--card-border); background: var(--surface); color: var(--fg); }
-.type-list { display: grid; gap: 8px; }
-.type-item { width: 100%; text-align: left; padding: 12px; border-radius: 10px; border: 1px solid var(--card-border); background: var(--surface); color: var(--fg); cursor: pointer; }
-.type-item[aria-pressed="true"] { border-color: var(--accent-color); background: var(--accent-soft); }
-.exercises-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 24px; }
+
+/* Typ- und Filter-Buttons wie in ExercisesView */
+.quick-buttons, .type-list {
+	display: flex;
+	gap: 12px;
+	flex-wrap: wrap;
+	margin-bottom: 20px;
+}
+.quick-buttons button, .type-item {
+	flex: 1;
+	padding: 12px 20px;
+	border-radius: 12px;
+	border: none;
+	font-weight: 600;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	min-height: 44px;
+	background: #374151;
+	color: white;
+}
+.push-btn, .type-item.push { background: #DC2626; }
+.pull-btn, .type-item.pull { background: #2563EB; }
+.leg-btn, .type-item.legs { background: #16A34A; }
+.all-btn { background: #374151; }
+.quick-buttons button.active, .type-item[aria-pressed="true"] {
+	box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+	outline: 2px solid var(--accent-color);
+	background: var(--accent-color);
+	color: var(--accent-contrast, #fff);
+}
+
+/* Grid/Karten für Übungen */
+.exercises-grid, .exercises-list {
+	display: grid;
+	gap: 16px;
+	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	margin-bottom: 24px;
+}
+.exercise-item, .exercise-card {
+	background: var(--card-bg, #fff);
+	border-radius: 12px;
+	padding: 16px;
+	border: 1px solid var(--card-border, #e5e7eb);
+	box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+	cursor: pointer;
+	transition: all 0.2s;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.exercise-item.selected {
+	border-color: var(--accent-color);
+	background: var(--accent-soft);
+}
+.exercise-item .title, .exercise-card .title {
+	font-weight: bold;
+	color: var(--accent-color);
+	font-size: 1.1rem;
+}
+.exercise-item .sub, .exercise-card .sub {
+	color: var(--muted);
+	font-size: 0.9rem;
+}
+.exercise-item .equip, .exercise-card .equip {
+	color: var(--muted);
+	font-size: 0.85rem;
+}
+.exercise-item.sk { height: 84px; background: var(--surface); border: 1px solid var(--card-border); }
+
+/* Info-Overlay-Design */
+.info-overlay {
+	position: fixed;
+	top: 0; left: 0; right: 0; bottom: 0;
+	background: rgba(0,0,0,0.35);
+	z-index: 1000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+.info-content {
+	background: var(--card-bg, #fff);
+	color: var(--fg, #222);
+	border-radius: 14px;
+	box-shadow: 0 4px 24px rgba(0,0,0,0.18);
+	padding: 28px 22px 18px 22px;
+	max-width: 340px;
+	width: 90vw;
+	text-align: center;
+	position: relative;
+}
+.info-content h3 {
+	margin-top: 0;
+	margin-bottom: 10px;
+	font-size: 1.15rem;
+}
+.info-content p {
+	font-size: 1rem;
+	margin-bottom: 18px;
+}
+.close-btn {
+	background: #2563EB;
+	color: #fff;
+	border: none;
+	border-radius: 8px;
+	padding: 7px 18px;
+	font-size: 1rem;
+	cursor: pointer;
+	font-weight: 600;
+	transition: background 0.15s;
+}
+.close-btn:hover { background: #1D4ED8; }
+
+/* Sonstiges */
 .search-row { margin: 8px 0 16px; }
 .search-input { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--card-border); background: var(--surface); color: var(--fg); }
-.exercise-item { padding: 16px; background: var(--card-bg); border-radius: 12px; border: 2px solid transparent; cursor: pointer; transition: all 0.2s ease; }
-.exercise-item.sk { height: 84px; background: var(--surface); border: 1px solid var(--card-border); }
-.exercise-item.selected { border-color: var(--accent-color); background: var(--accent-soft); }
-.exercise-item .title { font-weight: bold; }
-.exercise-item .sub { color: var(--muted); font-size: 0.85rem; }
-.selected-exercises { background: var(--card-bg); border-radius: 12px; padding: 20px; margin-top: 24px; border: 1px solid var(--card-border); }
-.selected-exercise { display: grid; grid-template-columns: 1fr 1fr 36px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--card-border); }
-.selected-exercise:last-child { border-bottom: none; }
-.row-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
-.remove-btn { background: var(--danger-color); color: #fff; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-weight: bold; }
-.sets-editor { grid-column: 1 / span 2; margin-top: 8px; }
-.set-list { display: grid; gap: 6px; }
-.set-row { display: grid; grid-template-columns: 36px 1fr 1fr 28px; gap: 8px; align-items: center; }
-.set-label { color: var(--muted); font-size: 0.85rem; text-align: center; }
-.set-field { display: flex; align-items: center; gap: 6px; }
-.set-field span { color: var(--muted); font-size: 0.85rem; }
-.set-field input { width: 100%; padding: 8px; border-radius: 8px; border: 1px solid var(--card-border); background: var(--surface); color: var(--fg); }
-.remove-set { background: transparent; border: none; color: var(--danger-color); font-size: 18px; cursor: pointer; }
-.sel-row { display: flex; align-items: center; gap: 12px; }
-.ex-name { color: var(--fg); font-weight: bold; }
-.sticky-cta { position: sticky; bottom: 0; left: 0; right: 0; background: var(--surface); backdrop-filter: blur(6px); padding: 12px 0 8px; }
+.sticky-cta {
+	position: sticky;
+	bottom: 0; left: 0; right: 0;
+	background: var(--surface);
+	backdrop-filter: blur(6px);
+	padding: 12px 0 8px;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+}
 .mobile-ex-picker { margin: 8px 0 12px; }
 .open-picker-btn { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--card-border); background: var(--surface); color: var(--fg); font-weight: 600; }
 .picker-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: flex-start; z-index: 50; }
@@ -420,11 +725,48 @@ watch(selectedExercises, saveDraft, { deep: true })
 .picker-header h4 { margin: 0; }
 .close-picker { background: transparent; border: none; color: var(--fg); font-size: 1.1rem; cursor: pointer; }
 .picker-list { padding: 12px 16px; overflow: auto; }
+.ex-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* Name links, rest rechts */
+  gap: 8px;
+}
+.ex-row .sub.small {
+  margin-left: auto;
+}
 .search-row.in-sheet { margin: 12px 16px; }
 .picker-actions { padding: 12px 16px 16px; border-top: 1px solid var(--card-border); }
 .done-btn { width: 100%; padding: 12px; border: none; border-radius: 10px; background: var(--accent); color: var(--accent-contrast); font-weight: 600; }
+
+/* Create-Button wie Push-Button */
+.create-btn {
+	min-width: 180px;
+	padding: 14px 28px;
+	border-radius: 12px;
+	border: none;
+	font-weight: 700;
+	font-size: 1.1rem;
+	background: #DC2626;
+	color: #fff;
+	box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+	cursor: pointer;
+	transition: background 0.18s, transform 0.12s;
+	display: block;
+	margin: 0 auto;
+}
+.create-btn:disabled {
+	background: #fca5a5;
+	color: #fff;
+	cursor: not-allowed;
+	opacity: 0.7;
+}
+.create-btn:hover:not(:disabled) {
+	background: #B91C1C;
+	transform: translateY(-1px) scale(1.03);
+}
 @media (min-width: 481px) { .mobile-ex-picker, .picker-overlay { display: none; } }
 .auth-gate { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
 .auth-gate-text { color: #fbbf24; margin: 0 0 12px 0; }
 .error-hint { margin-top: 8px; color: var(--danger-color); font-size: 0.95rem; }
 </style>
+

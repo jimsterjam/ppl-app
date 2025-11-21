@@ -12,16 +12,36 @@
           <span class="label">{{ link.label }}</span>
         </button>
       </li>
+      <li v-if="activeWorkout">
+        <button
+          class="nav-btn workout-btn"
+          :class="{ active: $route.path.startsWith('/workouts') }"
+          :aria-current="$route.path.startsWith('/workouts') ? 'page' : undefined"
+          @click="$router.push(`/workouts/${activeWorkout._id}`)"
+          title="Zum laufenden Workout"
+        >
+          <span class="icon" aria-hidden="true">⏱️</span>
+          <span class="label">Workout</span>
+        </button>
+      </li>
     </ul>
   </nav>
 </template>
 
 <script setup>
+onMounted(() => {
+  // Detect iOS/iPhone Simulator
+  isIOS.value = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+})
 import { useI18n } from 'vue-i18n'
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
+import { useUserStore } from '@/stores/userStore'
 
 const { t } = useI18n()
 const isIOS = ref(false)
+const store = useUserStore()
+const activeWorkout = computed(() => store.workouts.find(w => !w.completed && !w.isDraft))
 
 onMounted(() => {
   // Detect iOS/iPhone Simulator
@@ -34,8 +54,7 @@ const links = [
   { get label() { return t('nav.stats') }, path: "/stats", icon: "📊" },
   { get label() { return t('nav.exercises') }, path: "/exercises", icon: "🏋️‍♂️" },
   { get label() { return t('nav.faqs') }, path: "/faqs", icon: "❓" },
-  { get label() { return t('nav.settings') }, path: "/settings", icon: "⚙️" },
-  { get label() { return t('nav.legal') }, path: "/legal", icon: "ℹ️" }
+  { get label() { return t('nav.settings') }, path: "/settings", icon: "⚙️" }
 ];
 </script>
 
@@ -71,6 +90,16 @@ const links = [
 .nav-btn:hover, .nav-btn:active, .nav-btn.active { color: var(--accent-color); opacity: 1; background: color-mix(in srgb, var(--accent-color) 8%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 .icon { font-size: 1.2rem; margin-bottom: 2px; line-height: 1; }
 .label { font-size: 0.6rem; font-weight: 600; line-height: 1; }
+
+.workout-btn {
+  color: var(--success-color);
+  font-weight: bold;
+  animation: workout-pulse 1.5s infinite alternate;
+}
+@keyframes workout-pulse {
+  0% { box-shadow: 0 0 0 0 var(--success-color, #4ade80); }
+  100% { box-shadow: 0 0 8px 2px var(--success-color, #4ade80); }
+}
 
 /* iOS-spezifische Fixes - Vereinfacht */
 @supports (-webkit-touch-callout: none) {
