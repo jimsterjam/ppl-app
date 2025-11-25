@@ -106,9 +106,9 @@ import { getAllExercisesOffline } from '@/utils/offlineStorage';
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
-const { auth, getCurrentUser, onAuthStateChanged } = useFirebaseAuth()
+const { auth, getCurrentUser, onAuthStateChanged, getIdToken } = useFirebaseAuth()
 const firebaseUser = ref(null)
-onAuthStateChanged(auth, (user) => {
+onAuthStateChanged((user) => {
   firebaseUser.value = user
   userStore.user = user ? { id: user.uid, email: user.email, displayName: user.displayName } : null
 })
@@ -361,7 +361,6 @@ function removeSet(exIdx, setIdx) {
 }
 
 // --- Create Workout ---
-console.log(token);
 async function createWorkout() {
 	errorMsg.value = ''
 	if (!isSignedIn.value) {

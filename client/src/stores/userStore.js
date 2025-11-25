@@ -109,6 +109,7 @@ export const useUserStore = defineStore("user", {
     async createWorkout(workoutData, token = null) {
       // Workout per API erstellen
       try {
+        console.log('DEBUG: createWorkout token:', token, 'data:', workoutData);
         const { createWorkout } = await import('@/api/workouts');
         const newWorkout = await createWorkout(workoutData, token);
         if (newWorkout) {

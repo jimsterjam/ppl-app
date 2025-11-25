@@ -112,6 +112,8 @@ import { useFirebaseAuth } from '@/utils/firebaseAuth'
 // import { fetchExercises, uploadExerciseImage, deleteExerciseImage } from '@/api/exercises'
 
 // Komponenten explizit registrieren (für <script setup> reicht der Import)
+import HeaderBar from '@/components/HeaderBar.vue'
+import BottomNav from '@/components/BottomNav.vue'
 
 // Reaktive Variablen für das Template
 const selectedCategory = ref('')

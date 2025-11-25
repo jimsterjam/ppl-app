@@ -1,7 +1,7 @@
 // client/src/utils/firebaseAuth.js
 // Firebase Auth Helper für Vue
 import { initializeApp } from 'firebase/app';
-import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged as firebaseOnAuthStateChanged } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -18,7 +18,7 @@ export function useFirebaseAuth() {
     auth,
     signIn: () => signInWithPopup(auth, new GoogleAuthProvider()),
     signOut: () => signOut(auth),
-    onAuthStateChanged: (cb) => onAuthStateChanged(auth, cb),
+    onAuthStateChanged: (cb) => firebaseOnAuthStateChanged(auth, cb),
     getCurrentUser: () => auth.currentUser,
     getIdToken: async () => {
       const user = auth.currentUser;

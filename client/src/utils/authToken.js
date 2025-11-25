@@ -1,98 +1,53 @@
 import { logger } from './logger'
+import { useFirebaseAuth } from './firebaseAuth'
 
-// Token-Cache um wiederholte Clerk-Aufrufe zu vermeiden
+// Token-Cache um wiederholte Firebase-Aufrufe zu vermeiden
 let cachedToken = null
 let cacheExpiry = 0
 const CACHE_DURATION = 5 * 60 * 1000 // 5 Minuten
 const OFFLINE_BACKOFF = 30 * 1000 // 30 Sekunden Pause bei Offline-Fehler
 let lastOfflineError = 0
 
-// Gemeinsamer Helper zum Abrufen eines Clerk JWT Tokens
-// Optional kann clerk/Auth (von @clerk/vue) übergeben werden, andernfalls wird window.Clerk verwendet.
-export async function getAuthToken({ clerk, auth, options } = {}) {
+// Gemeinsamer Helper zum Abrufen eines Firebase JWT Tokens
+export async function getAuthToken({ options } = {}) {
   // Wenn offline und kürzlich fehlgeschlagen, nicht erneut versuchen
   if (!navigator.onLine || (Date.now() - lastOfflineError < OFFLINE_BACKOFF)) {
     logger.debug('⚠️ AuthToken: Offline oder kürzlicher Fehler - überspringe Abruf')
     return cachedToken || null
   }
-  
+
   // Cached Token zurückgeben wenn noch gültig
   if (cachedToken && Date.now() < cacheExpiry) {
     logger.debug('✅ AuthToken: Verwende gecachten Token')
     return cachedToken
   }
-  
-  const template = import.meta.env.VITE_CLERK_JWT_TEMPLATE
-  const opts = template ? { ...(options || {}), template } : (options || {})
-  
-  // Timeout für Clerk Token-Abruf (erhöht auf 4s)
-  const timeout = new Promise((_, reject) => 
+
+  // Timeout für Firebase Token-Abruf (erhöht auf 4s)
+  const timeout = new Promise((_, reject) =>
     setTimeout(() => reject(new Error('Auth timeout')), 4000)
   )
-  
+
   try {
     let token = null
-    
-    // 1) useClerk Session (wenn übergeben)
+
+    // Firebase Token holen
     try {
-      const maybe = clerk?.session?.getToken
-      if (typeof maybe === 'function') {
-        const t = await Promise.race([maybe(opts), timeout])
-        if (t && t !== 'demo-token-for-testing') {
-          token = t
-          logger.debug('✅ AuthToken: Token via clerk.session erhalten')
-        }
+      const { getIdToken } = useFirebaseAuth()
+      const t = await Promise.race([getIdToken(), timeout])
+      if (t) {
+        token = t
+        logger.debug('✅ AuthToken: Token via Firebase erhalten')
       }
     } catch (err) {
       // Bei Netzwerkfehler, markiere Offline-Status
-      if (err.message?.includes('ERR_INTERNET_DISCONNECTED') || err.message?.includes('Network')) {
+      if (err.message?.includes('ERR_INTERNET_DISCONNECTED') || err.message?.includes('Network') || err.message?.includes('timeout')) {
         lastOfflineError = Date.now()
         logger.debug('🔌 AuthToken: Offline erkannt - pausiere Token-Abrufe')
       } else {
-        logger.debug('⚠️ AuthToken: clerk.session.getToken fehlgeschlagen:', err.message)
+        logger.debug('⚠️ AuthToken: Firebase getIdToken fehlgeschlagen:', err.message)
       }
     }
-    
-    // 2) window.Clerk Fallback (nur wenn noch kein Token)
-    if (!token) {
-      try {
-        const maybe = window?.Clerk?.session?.getToken
-        if (typeof maybe === 'function') {
-          const t = await Promise.race([maybe(opts), timeout])
-          if (t && t !== 'demo-token-for-testing') {
-            token = t
-            logger.debug('✅ AuthToken: Token via window.Clerk erhalten')
-          }
-        }
-      } catch (err) {
-        if (err.message?.includes('ERR_INTERNET_DISCONNECTED') || err.message?.includes('Network')) {
-          lastOfflineError = Date.now()
-        } else {
-          logger.debug('⚠️ AuthToken: window.Clerk.getToken fehlgeschlagen:', err.message)
-        }
-      }
-    }
-    
-    // 3) useAuth Fallback (nur wenn noch kein Token)
-    if (!token) {
-      try {
-        const maybe = auth?.getToken
-        if (typeof maybe === 'function') {
-          const t = await Promise.race([maybe(opts), timeout])
-          if (t && t !== 'demo-token-for-testing') {
-            token = t
-            logger.debug('✅ AuthToken: Token via auth.getToken erhalten')
-          }
-        }
-      } catch (err) {
-        if (err.message?.includes('ERR_INTERNET_DISCONNECTED') || err.message?.includes('Network')) {
-          lastOfflineError = Date.now()
-        } else {
-          logger.debug('⚠️ AuthToken: auth.getToken fehlgeschlagen:', err.message)
-        }
-      }
-    }
-    
+
     // Token cachen wenn erfolgreich
     if (token) {
       cachedToken = token
@@ -100,7 +55,7 @@ export async function getAuthToken({ clerk, auth, options } = {}) {
       logger.debug('💾 AuthToken: Token gecacht für 5 Minuten')
       return token
     }
-    
+
     // Kein Token verfügbar (offline oder nicht eingeloggt)
     logger.debug('⚠️ AuthToken: Kein gültiger Token verfügbar')
     return cachedToken || null // Gib alten Cache zurück falls vorhanden

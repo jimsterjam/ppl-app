@@ -158,13 +158,23 @@ const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1)
 // Load workouts
 async function loadWorkoutsData(force = false) {
   try {
-    const token = await getIdToken()
-    logger.debug('📥 DashboardView - Lade Workouts', force ? '(forced)' : '(cached allowed)', 'Token:', token)
-    await store.loadWorkouts(token, { force })
+    const token = await getIdToken();
+    const currentUser = getCurrentUser ? getCurrentUser() : null;
+    console.log('DEBUG: getIdToken() result:', token, 'currentUser:', currentUser);
+    if (token && currentUser) {
+      logger.debug('📥 DashboardView - Lade Workouts', force ? '(forced)' : '(cached allowed)', 'Token:', token)
+      await store.loadWorkouts(token, { force })
+    } else {
+      logger.warn('⚠️ Workouts werden nicht geladen, da kein Token/User vorhanden ist.');
+    }
   } catch (error) {
     logger.warn('⚠️ Fehler beim Laden der Workouts mit Token:', error)
     await store.loadWorkouts(null, { force })
   }
+}
+
+function retryLoadWorkouts() {
+  loadWorkoutsData(true);
 }
 
 // Refresh Data
@@ -177,9 +187,11 @@ async function refreshData() {
 // Start Workout
 function startWorkout(type) {
   const safeType = typeof type === 'string' && type.length > 0 ? type : 'push';
-  store.startWorkout(safeType);
+  router.push({ name: 'workout-builder', query: { type: safeType } });
 }
-function startNewWorkout() { store.startNewWorkout() }
+function startNewWorkout() {
+  router.push({ name: 'workout-builder' });
+}
 
 // Mounted: Auth & Refresh
 onMounted(() => {
