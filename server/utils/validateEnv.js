@@ -20,11 +20,7 @@ const REQUIRED_VARS = [
     example: 'mongodb+srv://USERNAME:PASSWORD@CLUSTER.mongodb.net/DATABASE'
   },
   
-  {
-    name: 'CLERK_SECRET_KEY',
-    description: 'Clerk Secret Key für Backend-Validierung',
-    example: 'sk_test_XXXXXXXXXX'
-  }
+  // Clerk-Variablen entfernt
 ]
 
 /**
@@ -37,12 +33,7 @@ const OPTIONAL_VARS = [
     fallback: 'Demo-Modus mit statischen Übungen',
     example: 'sk-proj-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'
   },
-  {
-    name: 'CLERK_PUBLISHABLE_KEY',
-    description: 'Clerk Publishable Key (public) - erforderlich nur für Client; Server kann ihn optional lesen',
-    fallback: 'Kann im Client/Static Site gesetzt werden',
-    example: 'pk_test_XXXXXXXXXX'
-  },
+  // Clerk-Variablen entfernt
   {
     name: 'PORT',
     description: 'Server Port',
@@ -76,17 +67,7 @@ const validateFormat = (varName, value) => {
       }
       break
     
-    case 'CLERK_PUBLISHABLE_KEY':
-      if (!value.startsWith('pk_')) {
-        return 'Muss mit pk_ beginnen'
-      }
-      break
-    
-    case 'CLERK_SECRET_KEY':
-      if (!value.startsWith('sk_')) {
-        return 'Muss mit sk_ beginnen'
-      }
-      break
+    // Clerk-Variablen entfernt
     
     case 'OPENAI_API_KEY':
       if (!value.startsWith('sk-')) {
@@ -205,7 +186,7 @@ export const validateEnv = () => {
   logger.info(`   Environment: ${process.env.NODE_ENV || 'development'}`)
   logger.info(`   Port: ${process.env.PORT || '3001'}`)
   logger.info(`   Database: ${process.env.MONGO_URI ? '✅ Konfiguriert' : '❌ Fehlt'}`)
-  logger.info(`   Auth: ${process.env.CLERK_SECRET_KEY ? '✅ Konfiguriert' : '❌ Fehlt'}`)
+  // Clerk-Status entfernt
   logger.info(`   AI: ${process.env.OPENAI_API_KEY ? '✅ OpenAI' : '⚠️  Demo-Modus'}`)
   logger.info('')
 }
@@ -227,7 +208,7 @@ export const logEnvVariables = () => {
   
   logger.debug('📋 Environment Variables:')
   Object.keys(process.env)
-    .filter(key => key.startsWith('MONGO') || key.startsWith('CLERK') || key.startsWith('OPENAI') || key === 'NODE_ENV' || key === 'PORT')
+    .filter(key => key.startsWith('MONGO') || key.startsWith('OPENAI') || key === 'NODE_ENV' || key === 'PORT')
     .forEach(key => {
       logger.debug(`   ${key}: ${maskSensitive(key, process.env[key] || '')}`)
     })

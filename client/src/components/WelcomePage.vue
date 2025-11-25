@@ -1,6 +1,7 @@
 <script setup>
-import { useClerk, useUser } from '@clerk/vue'
 import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { useFirebaseAuth } from '@/utils/firebaseAuth'
+// import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import MotivationWidget from '@/components/MotivationWidget.vue'
 import { useI18n } from 'vue-i18n'
@@ -10,8 +11,8 @@ defineProps({
     handleChangeDisplay: { type: Function, default: null }
 })
 
-const clerk = useClerk()
-const { isSignedIn } = useUser()
+const { auth, signIn, getCurrentUser, onAuthStateChanged } = useFirebaseAuth()
+const isSignedIn = ref(false)
 const router = useRouter()
 const route = useRoute()
 const { t } = useI18n()
@@ -63,17 +64,13 @@ function maybeProceed() {
 }
 
 onMounted(() => {
-    maybeProceed()
-})
-
-watch(
-    () => isSignedIn.value,
-    (signedIn) => {
-        if (signedIn) {
-            maybeProceed()
+    onAuthStateChanged((user) => {
+        isSignedIn.value = !!user
+        if (isSignedIn.value) {
+            startMotivationFlow()
         }
-    }
-)
+    })
+})
 </script>
 
 <template>
@@ -82,7 +79,7 @@ watch(
         <div v-if="!isSignedIn" class="sign-in-container">
             <h2>{{ t('welcome.title') }}</h2>
             <p>{{ t('welcome.signInPrompt') }}</p>
-            <button class="sign-in-btn" @click="clerk.openSignIn()">{{ t('auth.signIn') }}</button>
+            <button class="sign-in-btn" @click="signIn">{{ t('auth.signIn') }} (Google)</button>
         </div>
 
         <!-- Eingeloggt: Motivation-Overlay -->

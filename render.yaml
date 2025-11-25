@@ -23,12 +23,7 @@ services:
       - key: MONGO_URI
         sync: false
         value: ""
-      - key: CLERK_PUBLISHABLE_KEY
-        sync: false
-        value: ""
-      - key: CLERK_SECRET_KEY
-        sync: false
-        value: ""
+      # Clerk-Variablen entfernt
       - key: OPENAI_API_KEY
         sync: false
         value: ""

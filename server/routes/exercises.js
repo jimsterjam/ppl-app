@@ -7,7 +7,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import mongoose from 'mongoose';
 import { ObjectId } from 'mongodb';
-import { requireAuth } from "../middleware/clerkAuth.js";
+import { firebaseAuthMiddleware } from '../middleware/firebaseAuth.js';
+// Clerk-Import entfernt
 import { logger } from '../utils/logger.js';
 
 const router = express.Router();
@@ -100,7 +101,7 @@ router.get("/", async (req, res) => {
 });
 
 // Neue Übung erstellen
-router.post("/", requireAuth(), async (req, res) => {
+router.post("/", firebaseAuthMiddleware, async (req, res) => {
   try {
     const { userId } = req.auth();
     
@@ -161,7 +162,7 @@ router.post("/", requireAuth(), async (req, res) => {
 });
 
 // Bild hochladen/ersetzen
-router.post('/:id/image', requireAuth(), upload.single('image'), async (req, res) => {
+router.post('/:id/image', firebaseAuthMiddleware, upload.single('image'), async (req, res) => {
   try {
     logger.debug('POST /api/exercises/:id/image', req.params.id);
     const ex = await Exercise.findById(req.params.id);
@@ -259,7 +260,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Bild löschen
-router.delete('/:id/image', requireAuth(), async (req, res) => {
+router.delete('/:id/image', firebaseAuthMiddleware, async (req, res) => {
   try {
     const ex = await Exercise.findById(req.params.id);
     if (!ex) return res.status(404).json({ error: 'Exercise not found' });

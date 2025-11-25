@@ -155,10 +155,7 @@ import { useToastStore } from '@/stores/toastStore'
 import { useI18n } from 'vue-i18n'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useAuth, useClerk } from '@clerk/vue'
-import { getAuthToken } from '@/utils/authToken'
-import { deleteAllWorkouts } from '@/api/workouts'
-import { logger } from '@/utils/logger'
+import { useFirebaseAuth } from '@/utils/firebaseAuth'
 
 const themeStore = useThemeStore()
 const { theme } = storeToRefs(themeStore)
@@ -195,8 +192,7 @@ const goToFeatureTest = () => {
 const userStore = useUserStore()
 const toast = useToastStore()
 const router = useRouter()
-const clerk = useClerk()
-const auth = useAuth()
+const { getIdToken } = useFirebaseAuth()
 const showDeleteConfirm = ref(false)
 const confirmText = ref('')
 const isDeleting = ref(false)
@@ -206,29 +202,29 @@ async function confirmDelete() {
   logger.debug('Eingabe:', confirmText.value)
   logger.debug('Erwartet:', $t('settings.deletePlaceholder'))
   logger.debug('Vergleich:', confirmText.value.toLowerCase(), '===', $t('settings.deletePlaceholder').toLowerCase())
-  
+
   if (confirmText.value.toLowerCase() !== $t('settings.deletePlaceholder').toLowerCase()) {
     logger.debug('❌ Validierung fehlgeschlagen - Funktion beendet')
     return
   }
-  
+
   logger.debug('✅ Validierung erfolgreich - starte Löschung')
-  
+
   if (isDeleting.value) {
     logger.debug('❌ Bereits am Löschen - Funktion beendet')
     return
   }
   isDeleting.value = true
-  
+
   try {
     logger.debug('🔄 Starte Löschvorgang...')
-    
+
     // 1. MongoDB: Alle Workouts des Users löschen
     try {
       logger.debug('🔑 Hole Auth-Token...')
-      const token = await getAuthToken({ clerk, auth })
+      const token = await getIdToken().catch(() => null)
       logger.debug('🔑 Token erhalten:', !!token, token ? `${token.substring(0,20)}...` : 'null')
-      
+
       if (token) {
         logger.debug('🗑️ Lösche alle Workouts aus MongoDB...')
         const result = await deleteAllWorkouts(token)
@@ -240,36 +236,36 @@ async function confirmDelete() {
       logger.error('❌ MongoDB-Löschung fehlgeschlagen:', error)
       // Fortfahren mit lokaler Löschung
     }
-    
+
     logger.debug('🧹 Lösche lokale Daten...')
-    
+
     // 2. Frontend Store: Alle Workouts aus dem Store löschen
     logger.debug('Store vor Löschung:', userStore.workouts.length, 'Workouts')
     userStore.$patch({ workouts: [], stats: null, workoutsLoaded: false, workoutsLoadedAt: 0 })
     logger.debug('Store nach Löschung:', userStore.workouts.length, 'Workouts')
     logger.debug('Store nach Löschung:', userStore.workouts.length, 'Workouts')
-    
+
     // 3. LocalStorage komplett löschen
     logger.debug('🧹 Lösche LocalStorage...')
     localStorage.clear()
-    
+
     // 4. SessionStorage löschen (inkl. Drafts)
     logger.debug('🧹 Lösche SessionStorage...')
     sessionStorage.clear()
-    
+
     logger.debug('✅ Löschvorgang abgeschlossen')
-    
+
     // 5. Dialog schließen
     showDeleteConfirm.value = false
     confirmText.value = ''
-    
+
     // 6. Feedback geben
     toast.show($t('settings.deleteSuccess'), { type: 'success', duration: 3000 })
-    
+
     // 7. Zum Dashboard navigieren
     logger.debug('🏠 Navigiere zum Dashboard...')
     await router.push('/')
-    
+
     // 8. Store refresh für sofortiges UI-Update
     logger.debug('🔄 Force refresh der Workout-Daten...')
     try {
@@ -282,7 +278,7 @@ async function confirmDelete() {
     logger.error('❌ Fehler beim Löschen der Daten:', error)
     logger.error('Fehler Details:', error.message, error.stack)
     toast.show($t('settings.deleteError'), { type: 'error' })
-    
+
     // Trotzdem Dialog schließen
     showDeleteConfirm.value = false
     confirmText.value = ''

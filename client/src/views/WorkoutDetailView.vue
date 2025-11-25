@@ -350,8 +350,7 @@ import { ref, onMounted, onBeforeUnmount, watch, nextTick, reactive } from 'vue'
 import NumberPicker from '@/components/NumberPicker.vue'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 import { useRoute, useRouter } from 'vue-router'
-import { useAuth, useClerk } from '@clerk/vue'
-import { getAuthToken } from '@/utils/authToken'
+import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { getWorkoutOffline, getExerciseOffline, getAllExercisesOffline, saveWorkoutOffline, db } from '@/utils/offlineStorage'
 // import { fetchWorkout } from '@/api/workouts'
 // import { fetchExercise, fetchExercises, uploadExerciseImage, deleteExerciseImage } from '@/api/exercises'
@@ -374,8 +373,7 @@ const DETAIL_DRAFT_KEY = getDetailDraftKey()
 
 const route = useRoute()
 const router = useRouter()
-const auth = useAuth()
-const clerk = useClerk()
+const { getIdToken } = useFirebaseAuth()
 
 const { t, locale } = useI18n()
 const { getTranslatedExerciseName } = useExerciseTranslation()
@@ -454,8 +452,7 @@ const triggerAutoSave = debounce(async () => {
       saveError.value = false
       initialSnapshot = snapshotCore({ ...store.workouts[idx] })
     } else {
-      let token = await getAuthToken({ clerk, auth }).catch(() => null)
-      if (!token) token = await getAuthToken({ clerk, auth, options: { skipCache: true } }).catch(() => null)
+      let token = await getIdToken().catch(() => null)
       await store.updateWorkout(route.params.id, w, token)
       saveMsg.value = 'Auto-gespeichert.'
       saveError.value = false
@@ -669,8 +666,7 @@ async function onUploadSelected(e) {
   const file = files[0]
   try { e.target.value = '' } catch {}
   try {
-    let token = await getAuthToken({ clerk, auth }).catch(() => null)
-    if (!token) token = await getAuthToken({ clerk, auth, options: { skipCache: true } }).catch(() => null)
+    let token = await getIdToken().catch(() => null)
     const target = uploadTarget.value
     if (!target?.exerciseId) {
       const ok = await ensureExerciseId(target)
@@ -715,8 +711,7 @@ async function confirmRemoveImage() {
   try {
     const ex = removeTarget.value
     if (!ex) return
-    let token = await getAuthToken({ clerk, auth }).catch(() => null)
-    if (!token) token = await getAuthToken({ clerk, auth, options: { skipCache: true } }).catch(() => null)
+    let token = await getIdToken().catch(() => null)
     if (!ex.exerciseId) {
       const okId = await ensureExerciseId(ex)
       if (!okId || !ex.exerciseId) {
@@ -817,8 +812,7 @@ async function onTimerStop(ms) {
     if (!workout.value || !id) return
     const mins = Math.max(0, Math.round(ms / 60000))
     if (!Number.isFinite(mins)) return
-    let token = await getAuthToken({ clerk, auth }).catch(() => null)
-    if (!token) token = await getAuthToken({ clerk, auth, options: { skipCache: true } }).catch(() => null)
+    let token = await getIdToken().catch(() => null)
     await store.updateWorkout(id, { duration: mins }, token)
     if (workout.value) workout.value.duration = mins
   } catch (err) {
@@ -1064,8 +1058,7 @@ async function saveWorkout() {
       return
     }
 
-    let token = await getAuthToken({ clerk, auth }).catch(() => null)
-    if (!token) token = await getAuthToken({ clerk, auth, options: { skipCache: true } }).catch(() => null)
+    let token = await getIdToken().catch(() => null)
     await store.updateWorkout(id, normalized, token)
     saveMsg.value = 'Gespeichert.'
     saveError.value = false

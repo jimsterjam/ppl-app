@@ -21,7 +21,7 @@
  * @since 2025-11-06
  */
 import express from 'express'
-import { requireAuth } from '../middleware/clerkAuth.js'
+import { firebaseAuthMiddleware } from '../middleware/firebaseAuth.js';
 
 const router = express.Router()
 
@@ -32,9 +32,9 @@ const router = express.Router()
  * @protected Requires Authentication
  * @returns {Object} { subscription, usage }
  */
-router.get('/status', requireAuth, async (req, res) => {
+router.get('/status', firebaseAuthMiddleware, async (req, res) => {
   try {
-    const userId = req.auth.userId
+    const userId = req.auth?.userId
     
     // In realer App: Aus Datenbank laden
     // Hier: Mock für Demo
@@ -69,9 +69,9 @@ router.get('/status', requireAuth, async (req, res) => {
 })
 
 // Upgrade zu Pro/Elite
-router.post('/upgrade', requireAuth, async (req, res) => {
+router.post('/upgrade', firebaseAuthMiddleware, async (req, res) => {
   try {
-    const userId = req.auth.userId
+    const userId = req.auth?.userId
     const { plan, paymentMethod } = req.body
     
     // Validate plan
@@ -116,9 +116,9 @@ router.post('/upgrade', requireAuth, async (req, res) => {
 })
 
 // AI Coach Recommendations
-router.post('/ai/workout-suggestion', requireAuth, async (req, res) => {
+router.post('/ai/workout-suggestion', firebaseAuthMiddleware, async (req, res) => {
   try {
-    const userId = req.auth.userId
+    const userId = req.auth?.userId
     
     // Check if user has AI Coach feature
     // const hasAI = await checkSubscriptionFeature(userId, 'ai_coach')
@@ -146,9 +146,9 @@ router.post('/ai/workout-suggestion', requireAuth, async (req, res) => {
 })
 
 // Progress Analysis
-router.get('/ai/analyze-progress', requireAuth, async (req, res) => {
+router.get('/ai/analyze-progress', firebaseAuthMiddleware, async (req, res) => {
   try {
-    const userId = req.auth.userId
+    const userId = req.auth?.userId
     
     // Analyse der letzten 4 Wochen
     const insights = [
@@ -189,9 +189,9 @@ router.get('/ai/analyze-progress', requireAuth, async (req, res) => {
 })
 
 // Social Features: Workout teilen
-router.post('/social/share-workout', requireAuth, async (req, res) => {
+router.post('/social/share-workout', firebaseAuthMiddleware, async (req, res) => {
   try {
-    const userId = req.auth.userId
+    const userId = req.auth?.userId
     const { workoutId, message, visibility } = req.body
     
     // Check sharing feature
@@ -219,9 +219,9 @@ router.post('/social/share-workout', requireAuth, async (req, res) => {
 })
 
 // Friends Feed
-router.get('/social/friends-feed', requireAuth, async (req, res) => {
+router.get('/social/friends-feed', firebaseAuthMiddleware, async (req, res) => {
   try {
-    const userId = req.auth.userId
+    const userId = req.auth?.userId
     
     // Mock Feed
     const feed = [

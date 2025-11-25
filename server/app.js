@@ -9,7 +9,7 @@ import { fileURLToPath } from "url";
 import workoutRoutes from "./routes/workouts.js";
 import exerciseRoutes from "./routes/exercises.js";
 import subscriptionRoutes from "./routes/subscription.js";
-import { clerkMiddleware, requireAuth } from './middleware/clerkAuth.js';
+// Clerk-Import entfernt
 
 // Utilities
 import { validateEnv } from './utils/validateEnv.js';

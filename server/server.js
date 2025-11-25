@@ -8,7 +8,8 @@ import { fileURLToPath } from "url";
 import workoutRoutes from "./routes/workouts.js";
 import exerciseRoutes from "./routes/exercises.js";
 import subscriptionRoutes from "./routes/subscription.js";
-import { clerkMiddleware, requireAuth } from './middleware/clerkAuth.js';
+// Clerk-Import entfernt
+import { firebaseAuthMiddleware } from './middleware/firebaseAuth.js';
 import multer from 'multer';
 import sharp from 'sharp';
 import fs from 'fs';
@@ -27,7 +28,7 @@ validateEnv();
 
 const app = express();
 
-app.use(clerkMiddleware());
+// Clerk-Middleware entfernt
 
 // CORS konfigurieren
 // CORS: erlaube Vite-Dev-Server Ports 5173/5174 (Proxy) und fehlende Origin (Server-zu-Server)
@@ -172,7 +173,7 @@ app.post('/api/exercises/image/:id', upload.single('image'), async (req, res) =>
 });
 
 // Workout-Cover: POST /api/workouts/:id/image (auth erforderlich)
-app.post('/api/workouts/:id/image', requireAuth(), upload.single('image'), async (req, res) => {
+app.post('/api/workouts/:id/image', firebaseAuthMiddleware, upload.single('image'), async (req, res) => {
   try {
     const { default: Workout } = await import('./models/Workout.js');
     const workout = await Workout.findById(req.params.id);
@@ -190,7 +191,7 @@ app.post('/api/workouts/:id/image', requireAuth(), upload.single('image'), async
 });
 
 // Alias: POST /api/workouts/image/:id
-app.post('/api/workouts/image/:id', requireAuth(), upload.single('image'), async (req, res) => {
+app.post('/api/workouts/image/:id', firebaseAuthMiddleware, upload.single('image'), async (req, res) => {
   try {
     const { default: Workout } = await import('./models/Workout.js');
     const workout = await Workout.findById(req.params.id);
@@ -208,7 +209,7 @@ app.post('/api/workouts/image/:id', requireAuth(), upload.single('image'), async
 });
 
 // JSON-Fallback: PUT /api/workouts/:id/photo
-app.put('/api/workouts/:id/photo', requireAuth(), express.json({ limit: '12mb' }), async (req, res) => {
+app.put('/api/workouts/:id/photo', firebaseAuthMiddleware, express.json({ limit: '12mb' }), async (req, res) => {
   try {
     const { imageData } = req.body || {};
     if (!imageData || typeof imageData !== 'string') {

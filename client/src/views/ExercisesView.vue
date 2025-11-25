@@ -103,16 +103,14 @@
 
 <script setup>
 
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 import { useToastStore } from '@/stores/toastStore'
 import { logger } from '@/utils/logger'
-import { useUser, useClerk, useAuth } from '@clerk/vue'
+import { useFirebaseAuth } from '@/utils/firebaseAuth'
 // import { fetchExercises, uploadExerciseImage, deleteExerciseImage } from '@/api/exercises'
 
-import HeaderBar from '@/components/HeaderBar.vue'
-import BottomNav from '@/components/BottomNav.vue'
 // Komponenten explizit registrieren (für <script setup> reicht der Import)
 
 // Reaktive Variablen für das Template
@@ -140,9 +138,12 @@ function getTranslatedDescription(exercise) {
 const targetExerciseId = ref('')
 const bust = ref({})
 
-const { isSignedIn } = useUser()
-const clerk = useClerk()
-const auth = useAuth()
+const { onAuthStateChanged } = useFirebaseAuth()
+const firebaseUser = ref(null)
+const isSignedIn = computed(() => !!firebaseUser.value)
+onAuthStateChanged((user) => {
+  firebaseUser.value = user
+})
 const { t } = useI18n()
 const { getTranslatedExerciseName } = useExerciseTranslation()
 

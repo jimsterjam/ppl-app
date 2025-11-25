@@ -59,6 +59,11 @@ export const useUserStore = defineStore("user", {
   },
 
   actions: {
+        async startWorkout(type, token = null) {
+          // Wrapper für createWorkout mit minimalen Daten
+          const workoutData = { type, name: `${type.charAt(0).toUpperCase() + type.slice(1)} Day` };
+          return await this.createWorkout(workoutData, token);
+        },
     async loadWorkouts(token = null, options = {}) {
       // Workouts per API vom Server laden
       this.error = null;

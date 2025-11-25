@@ -1,7 +1,7 @@
 <template>
   <div>
-    <!-- Splash/Loader bis Clerk bereit ist -->
-    <div v-if="!clerkReady" class="auth-splash">
+    <!-- Splash/Loader bis Firebase bereit ist -->
+    <div v-if="!firebaseReady" class="auth-splash">
       <div class="spinner" />
       <p>Initialisiere...</p>
     </div>
@@ -20,51 +20,26 @@
 <script setup>
 import { ref, onMounted, watch, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { useUser } from '@clerk/vue'
+import { useFirebaseAuth } from '../utils/firebaseAuth'
 
 const router = useRouter()
 const route = useRoute()
-const { isSignedIn } = useUser()
+const { onAuthStateChanged, getCurrentUser } = useFirebaseAuth()
 
-const clerkReady = ref(false)
-
-function markClerkReady() {
-  if (!clerkReady.value) clerkReady.value = true
-}
+const firebaseReady = ref(false)
+const signedIn = ref(false)
 
 onMounted(() => {
-  // Sofort, wenn bereits geladen
-  if (window?.Clerk?.loaded) {
-    markClerkReady()
-  } else {
-    // Auf Event warten
-    const handler = () => {
-      window.removeEventListener('clerk:loaded', handler)
-      markClerkReady()
+  // Firebase Auth State beobachten
+  onAuthStateChanged((user) => {
+    signedIn.value = !!user
+    if (!firebaseReady.value) firebaseReady.value = true
+    // Weiterleitung, falls nicht eingeloggt
+    if (firebaseReady.value && !signedIn.value) {
+      const target = route.fullPath
+      router.replace({ name: 'welcome', query: target && target !== '/' ? { redirect: target } : {} })
     }
-    window.addEventListener('clerk:loaded', handler)
-    // Fallback Timeout
-    setTimeout(() => {
-      if (!clerkReady.value) markClerkReady()
-    }, 1500)
-  }
-})
-
-// Nutze zusätzlich Clerk Core Status, um Timing-Rennen zu vermeiden
-const signedInCore = computed(() => !!window?.Clerk?.session)
-const signedIn = computed(() => isSignedIn.value || signedInCore.value)
-
-// Weiterleitungslogik, sobald Clerk bereit ist
-watch(clerkReady, (ready) => {
-  if (!ready) return
-  const coreAuthed = !!window?.Clerk?.session
-  if (coreAuthed || isSignedIn.value) {
-    // Eingeloggt: WelcomePage übernimmt Motivation/Redirect
-    return
-  }
-  // Sicher ausgeloggt -> Welcome mit Redirect-Ziel
-  const target = route.fullPath
-  router.replace({ name: 'welcome', query: target && target !== '/' ? { redirect: target } : {} })
+  })
 })
 </script>
 

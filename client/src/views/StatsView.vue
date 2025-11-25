@@ -83,21 +83,21 @@
   </div>
 </template>
 
-<script setup>
-import { ref, onMounted, computed } from 'vue'
-import { useAuth, useClerk } from '@clerk/vue'
-import { getAuthToken } from '@/utils/authToken'
-import { useUserStore } from '@/stores/userStore'
-import { useSettingsStore } from '@/stores/settingsStore'
-import HeaderBar from '../components/HeaderBar.vue'
-import BottomNav from '../components/BottomNav.vue'
-import WorkoutTypeChart from '../components/WorkoutTypeChart.vue'
-import ProgressChart from '../components/ProgressChart.vue'
-import { useI18n } from 'vue-i18n'
-import { logger } from '@/utils/logger'
 
-const auth = useAuth()
-const clerk = useClerk()
+<script setup>
+import { useFirebaseAuth } from '@/utils/firebaseAuth'
+import { useUserStore } from '@/stores/userStore'
+import { useI18n } from 'vue-i18n'
+import { ref, computed, onMounted } from 'vue'
+import { useSettingsStore } from '@/stores/settingsStore'
+import HeaderBar from '@/components/HeaderBar.vue'
+import WorkoutTypeChart from '@/components/WorkoutTypeChart.vue'
+import ProgressChart from '@/components/ProgressChart.vue'
+import BottomNav from '@/components/BottomNav.vue'
+
+
+const { getIdToken, onAuthStateChanged } = useFirebaseAuth()
+
 const store = useUserStore()
 const { t } = useI18n()
 
@@ -251,7 +251,7 @@ function getBestMonth() {
 async function loadData() {
   try {
     loading.value = true
-  const token = await getAuthToken({ clerk, auth }).catch(() => null)
+    const token = await getIdToken().catch(() => null)
     await store.loadWorkouts(token)
     workouts.value = store.workouts
   } catch (error) {
@@ -262,7 +262,13 @@ async function loadData() {
 }
 
 onMounted(() => {
-  loadData()
+  onAuthStateChanged(async (user) => {
+    if (user) {
+      await loadData()
+    } else {
+      workouts.value = []
+    }
+  })
 })
 </script>
 

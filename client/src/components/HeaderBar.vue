@@ -5,23 +5,11 @@
       <div class="header-actions">
         <slot name="actions"></slot>
         <div class="auth-section">
-          <SignedOut>
-            <SignInButton class="sign-in-btn">
-              <template #default>
-                <button class="auth-button">{{ $t('auth.signIn') }}</button>
-              </template>
-            </SignInButton>
-          </SignedOut>
-          <SignedIn>
-            <UserButton 
-              :appearance="{
-                elements: {
-                  userButtonBox: 'user-button-custom',
-                  userButtonTrigger: 'user-button-trigger'
-                }
-              }"
-            />
-          </SignedIn>
+          <button v-if="!signedIn" class="auth-button" @click="signIn">{{ $t('auth.signIn') }}</button>
+          <div v-else class="user-info">
+            <span class="user-name">{{ userName }}</span>
+            <button class="auth-button" @click="signOut">{{ $t('auth.signOut') }}</button>
+          </div>
         </div>
       </div>
     </div>
@@ -29,13 +17,23 @@
 </template>
 
 <script setup>
-import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/vue'
+import { ref, computed } from 'vue'
+import { useFirebaseAuth } from '../utils/firebaseAuth'
 
 defineProps({
   title: {
     type: String,
     required: true
   }
+})
+
+const { signIn, signOut, onAuthStateChanged, getCurrentUser } = useFirebaseAuth()
+const signedIn = ref(false)
+const userName = ref('')
+
+onAuthStateChanged((user) => {
+  signedIn.value = !!user
+  userName.value = user?.displayName || user?.email || ''
 })
 </script>
 

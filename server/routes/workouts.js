@@ -1,6 +1,7 @@
 import express from "express";
 import Workout from "../models/Workout.js";
-import { requireAuth } from "../middleware/clerkAuth.js";
+import { firebaseAuthMiddleware } from '../middleware/firebaseAuth.js';
+// Clerk-Import entfernt
 import { OpenAI } from 'openai';
 import exercises from '../data/exercises.js';
 import Exercise from '../models/Exercise.js';
@@ -213,9 +214,9 @@ async function initializeOpenAI() {
 }
 
 // Alle Workouts für den eingeloggten User holen
-router.get("/", requireAuth(), async (req, res) => {
+router.get("/", firebaseAuthMiddleware, async (req, res) => {
   try {
-    const { userId } = req.auth();
+    const { userId } = req.auth;
     const workouts = await Workout.find({ userId })
       .sort({ date: -1 }); // Neueste zuerst
     res.json(workouts);
@@ -225,9 +226,9 @@ router.get("/", requireAuth(), async (req, res) => {
 });
 
 // Einzelnes Workout anhand ID holen
-router.get("/:id", requireAuth(), async (req, res) => {
+router.get("/:id", firebaseAuthMiddleware, async (req, res) => {
   try {
-    const { userId } = req.auth();
+    const { userId } = req.auth;
     const workout = await Workout.findOne({ 
       _id: req.params.id, 
       userId 
@@ -244,9 +245,9 @@ router.get("/:id", requireAuth(), async (req, res) => {
 });
 
 // Neues Workout anlegen
-router.post("/", requireAuth(), async (req, res) => {
+router.post("/", firebaseAuthMiddleware, async (req, res) => {
   try {
-    const { userId } = req.auth();
+    const { userId } = req.auth;
     // Debug: Logge die Notizen der Übungen, falls vorhanden
     if (Array.isArray(req.body.exercises)) {
       console.log('📝 Notizen der Übungen beim POST /workouts:');
@@ -267,9 +268,9 @@ router.post("/", requireAuth(), async (req, res) => {
 });
 
 // Workout aktualisieren
-router.put("/:id", requireAuth(), async (req, res) => {
+router.put("/:id", firebaseAuthMiddleware, async (req, res) => {
   try {
-    const { userId } = req.auth();
+    const { userId } = req.auth;
     const workout = await Workout.findOneAndUpdate(
       { _id: req.params.id, userId },
       req.body,
@@ -287,9 +288,9 @@ router.put("/:id", requireAuth(), async (req, res) => {
 });
 
 // Workout löschen
-router.delete("/:id", requireAuth(), async (req, res) => {
+router.delete("/:id", firebaseAuthMiddleware, async (req, res) => {
   try {
-    const { userId } = req.auth();
+    const { userId } = req.auth;
     const workout = await Workout.findOneAndDelete({ 
       _id: req.params.id, 
       userId 
@@ -306,9 +307,9 @@ router.delete("/:id", requireAuth(), async (req, res) => {
 });
 
 // Workout-Statistiken für den User
-router.get("/stats/overview", requireAuth(), async (req, res) => {
+router.get("/stats/overview", firebaseAuthMiddleware, async (req, res) => {
   try {
-    const { userId } = req.auth();
+    const { userId } = req.auth;
     
     // Gesamt-Statistiken
     const totalWorkouts = await Workout.countDocuments({ userId });
@@ -338,9 +339,9 @@ router.get("/stats/overview", requireAuth(), async (req, res) => {
 });
 
 // ALLE Workouts des Users aus MongoDB löschen (Danger Zone)
-router.delete("/", requireAuth(), async (req, res) => {
+router.delete("/", firebaseAuthMiddleware, async (req, res) => {
   try {
-    const { userId } = req.auth();
+    const { userId } = req.auth;
     
     // Zähle Workouts vor dem Löschen
     const count = await Workout.countDocuments({ userId });
@@ -504,10 +505,10 @@ router.post("/ai-suggestion", async (req, res) => {
 });
 
 // 📊 AI FEEDBACK sammeln (Vereinfacht)
-router.post("/ai-feedback", requireAuth(), async (req, res) => {
+router.post("/ai-feedback", firebaseAuthMiddleware, async (req, res) => {
   try {
     const { recommendationId, rating, used, completed, difficulty, comments, injury } = req.body;
-    const { userId } = req.auth();
+    const { userId } = req.auth;
     
     // Feedback loggen (in Production: in DB speichern)
     const feedbackData = {
@@ -545,7 +546,7 @@ router.post("/ai-feedback", requireAuth(), async (req, res) => {
 });
 
 // 🔍 AI QUALITY MONITORING (Vereinfacht)
-router.get("/ai-quality", requireAuth(), async (req, res) => {
+router.get("/ai-quality", firebaseAuthMiddleware, async (req, res) => {
   try {
     // Einfacher Status-Report
     const qualityReport = {

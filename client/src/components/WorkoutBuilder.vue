@@ -91,7 +91,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useUserStore } from '@/stores/userStore';
-import { useUser } from '@clerk/vue';
+import { useFirebaseAuth } from '@/utils/firebaseAuth';
 import { useSubscriptionStore } from '@/stores/subscriptionStore';
 import { useToastStore } from '@/stores/toastStore';
 import AppModal from '@/components/AppModal.vue';
@@ -106,19 +106,19 @@ import { getAllExercisesOffline } from '@/utils/offlineStorage';
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
-const { user } = useUser()
-// Synchronisiere Clerk-User mit Pinia-Store
-watch(user, (val) => {
-	if (val) userStore.user = val
-	else userStore.user = null
-}, { immediate: true })
+const { auth, getCurrentUser, onAuthStateChanged } = useFirebaseAuth()
+const firebaseUser = ref(null)
+onAuthStateChanged(auth, (user) => {
+  firebaseUser.value = user
+  userStore.user = user ? { id: user.uid, email: user.email, displayName: user.displayName } : null
+})
 const subscriptionStore = useSubscriptionStore()
 const toast = useToastStore()
 const { t, locale } = useI18n()
 const isLoaded = computed(() => !userStore.loading)
-const isSignedIn = computed(() => !!userStore.user)
+const isSignedIn = computed(() => !!firebaseUser.value)
 const loadingUser = computed(() => userStore.loading)
-const userId = computed(() => userStore.user?.id || userStore.user?._id || 'guest')
+const userId = computed(() => firebaseUser.value?.uid || 'guest')
 
 const selectedType = ref('push')
 const selectedExercises = ref([])
@@ -361,6 +361,7 @@ function removeSet(exIdx, setIdx) {
 }
 
 // --- Create Workout ---
+console.log(token);
 async function createWorkout() {
 	errorMsg.value = ''
 	if (!isSignedIn.value) {
@@ -389,7 +390,8 @@ async function createWorkout() {
 			date: new Date().toISOString(),
 			completed: false
 		}
-		const created = await userStore.createWorkout(workoutData)
+		const token = await getIdToken()
+		const created = await userStore.createWorkout(workoutData, token)
 		clearDraft()
 		await router.push({ name: 'workout-detail', params: { id: created?._id } })
 		toast.success(t('builder.created'))
