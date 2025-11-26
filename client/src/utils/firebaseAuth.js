@@ -5,12 +5,13 @@ import {
   signInWithEmailAndPassword,
   signInWithPopup,
   signInWithRedirect,
-  getRedirectResult,
   GoogleAuthProvider,
   OAuthProvider,
   signOut,
-  onAuthStateChanged as firebaseOnAuthStateChanged
+  onAuthStateChanged as firebaseOnAuthStateChanged,
+  signInWithCredential
 } from 'firebase/auth';
+import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
 
 // Plattformspezifische Firebase-Konfiguration
 const getFirebaseConfig = () => {
@@ -25,7 +26,7 @@ const getFirebaseConfig = () => {
       storageBucket: "ppl-workout-01.firebasestorage.app",
       messagingSenderId: "440924652132",
       appId: "1:440924652132:ios:60da56556afd2e4a219571", // iOS App ID
-      iosClientId: "440924652132-h60bcdrh3nu22nf72pagohfgg7cslq8r.apps.googleusercontent.com"
+      iosClientId: "109118119734-ltjcuc3c0fa8qft2j20lr28adak7scbd.apps.googleusercontent.com"
     };
   } else {
     // Web-Konfiguration aus .env
@@ -67,16 +68,26 @@ export function useFirebaseAuth() {
       }
     },
 
-    /** Google Login (automatisch Popup oder Redirect je nach Umgebung) */
+    /** Google Login (nativ für Capacitor, Popup für Web) */
     signInWithGoogle: async () => {
       try {
-        // Prüfe, ob wir in Capacitor sind (dann Redirect verwenden)
+        // Prüfe, ob wir in Capacitor sind
         const isCapacitor = !!(window.Capacitor || window.capacitor);
         
         if (isCapacitor) {
-          console.log('[FirebaseAuth] Using redirect for Capacitor');
-          await signInWithRedirect(auth, googleProvider);
-          return null; // Bei Redirect bekommen wir das Ergebnis später
+          console.log('[FirebaseAuth] Using native Google Auth for Capacitor');
+          
+          // Native Google Auth verwenden
+          const googleUser = await GoogleAuth.signIn();
+          console.log('[FirebaseAuth] Native Google Auth successful:', googleUser);
+          
+          // Firebase Credential erstellen und anmelden
+          const credential = GoogleAuthProvider.credential(googleUser.authentication.idToken);
+          const userCredential = await signInWithCredential(auth, credential);
+          
+          const token = await userCredential.user.getIdToken();
+          console.log('[FirebaseAuth] Firebase sign in successful, token:', token);
+          return token;
         } else {
           console.log('[FirebaseAuth] Using popup for browser');
           const userCredential = await signInWithPopup(auth, googleProvider);
@@ -98,17 +109,6 @@ export function useFirebaseAuth() {
     /** Apple Login via Redirect (Popup funktioniert in WebView nicht zuverlässig) */
     signInWithAppleRedirect: async () => {
       await signInWithRedirect(auth, appleProvider);
-    },
-
-    /** Resultat nach Redirect prüfen (App-Start) */
-    getRedirectResultToken: async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result?.user) return await result.user.getIdToken();
-      } catch (err) {
-        console.error('[FirebaseAuth] Redirect result error:', err);
-      }
-      return null;
     },
 
     /** Logout */

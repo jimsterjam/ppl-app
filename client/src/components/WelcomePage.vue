@@ -11,7 +11,7 @@ defineProps({
     handleChangeDisplay: { type: Function, default: null }
 })
 
-const { auth, signIn, getCurrentUser, onAuthStateChanged } = useFirebaseAuth()
+const { auth, signInWithGoogle, getCurrentUser, onAuthStateChanged } = useFirebaseAuth()
 const isSignedIn = ref(false)
 const router = useRouter()
 const route = useRoute()
@@ -63,7 +63,8 @@ function maybeProceed() {
     startMotivationFlow()
 }
 
-onMounted(() => {
+onMounted(async () => {
+    // Kein Redirect-Handling mehr nötig bei nativem Google Auth
     onAuthStateChanged((user) => {
         isSignedIn.value = !!user
         if (isSignedIn.value) {
@@ -79,7 +80,7 @@ onMounted(() => {
         <div v-if="!isSignedIn" class="sign-in-container">
             <h2>{{ t('welcome.title') }}</h2>
             <p>{{ t('welcome.signInPrompt') }}</p>
-            <button class="sign-in-btn" @click="signIn">{{ t('auth.signIn') }} (Google)</button>
+            <button class="sign-in-btn" @click="signInWithGoogle">{{ t('auth.signIn') }} (Google)</button>
         </div>
 
         <!-- Eingeloggt: Motivation-Overlay -->
