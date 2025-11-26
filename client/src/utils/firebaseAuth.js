@@ -71,22 +71,43 @@ export function useFirebaseAuth() {
     /** Google Login (nativ für Capacitor, Popup für Web) */
     signInWithGoogle: async () => {
       try {
+        console.log('[FirebaseAuth] Starting Google sign-in process...');
+        
         // Prüfe, ob wir in Capacitor sind
         const isCapacitor = !!(window.Capacitor || window.capacitor);
+        console.log('[FirebaseAuth] Environment check - isCapacitor:', isCapacitor);
+        console.log('[FirebaseAuth] Capacitor object:', window.Capacitor);
+        console.log('[FirebaseAuth] capacitor object:', window.capacitor);
         
         if (isCapacitor) {
           console.log('[FirebaseAuth] Using native Google Auth for Capacitor');
           
+          // Prüfe, ob GoogleAuth verfügbar ist
+          if (!GoogleAuth) {
+            throw new Error('GoogleAuth plugin not available');
+          }
+          console.log('[FirebaseAuth] GoogleAuth plugin found:', GoogleAuth);
+          
           // Native Google Auth verwenden
+          console.log('[FirebaseAuth] Calling GoogleAuth.signIn()...');
           const googleUser = await GoogleAuth.signIn();
           console.log('[FirebaseAuth] Native Google Auth successful:', googleUser);
           
+          // Prüfe, ob wir ein ID Token haben
+          if (!googleUser?.authentication?.idToken) {
+            throw new Error('No ID token received from Google Auth');
+          }
+          console.log('[FirebaseAuth] ID Token received, creating Firebase credential...');
+          
           // Firebase Credential erstellen und anmelden
           const credential = GoogleAuthProvider.credential(googleUser.authentication.idToken);
+          console.log('[FirebaseAuth] Firebase credential created:', credential);
+          
           const userCredential = await signInWithCredential(auth, credential);
+          console.log('[FirebaseAuth] Firebase sign in successful:', userCredential);
           
           const token = await userCredential.user.getIdToken();
-          console.log('[FirebaseAuth] Firebase sign in successful, token:', token);
+          console.log('[FirebaseAuth] ID Token retrieved:', token);
           return token;
         } else {
           console.log('[FirebaseAuth] Using popup for browser');
@@ -97,6 +118,11 @@ export function useFirebaseAuth() {
         }
       } catch (err) {
         console.error('[FirebaseAuth] Google login failed:', err);
+        console.error('[FirebaseAuth] Error details:', {
+          message: err.message,
+          code: err.code,
+          stack: err.stack
+        });
         throw err;
       }
     },
