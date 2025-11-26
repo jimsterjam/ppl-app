@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>PPL App</string>
+        <string>pushpulllegs</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -43,6 +43,18 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.pushpulllegs.com</string>
+				<string>com.googleusercontent.apps.440924652132-h60bcdrh3nu22nf72pagohfgg7cslq8r</string>
+			</array>
+		</dict>
+	</array>
+	<key>GIDClientID</key>
+	<string>440924652132-h60bcdrh3nu22nf72pagohfgg7cslq8r.apps.googleusercontent.com</string>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
 </dict>
