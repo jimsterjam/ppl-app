@@ -11,7 +11,9 @@ import {
   onAuthStateChanged as firebaseOnAuthStateChanged,
   signInWithCredential
 } from 'firebase/auth';
-import { GoogleAuth } from '@codetrix-studio/capacitor-google-auth';
+
+// GoogleAuth Plugin wird dynamisch geladen (nur in Capacitor)
+let GoogleAuth = null;
 
 // Plattformspezifische Firebase-Konfiguration
 const getFirebaseConfig = () => {
@@ -76,44 +78,57 @@ export function useFirebaseAuth() {
         // Prüfe, ob wir in Capacitor sind
         const isCapacitor = !!(window.Capacitor || window.capacitor);
         console.log('[FirebaseAuth] Environment check - isCapacitor:', isCapacitor);
-        console.log('[FirebaseAuth] Capacitor object:', window.Capacitor);
-        console.log('[FirebaseAuth] capacitor object:', window.capacitor);
         
         if (isCapacitor) {
           console.log('[FirebaseAuth] Using native Google Auth for Capacitor');
           
-          // Prüfe, ob GoogleAuth verfügbar ist
+          // Dynamisch laden, falls noch nicht geschehen
           if (!GoogleAuth) {
-            throw new Error('GoogleAuth plugin not available');
+            try {
+              const { GoogleAuth: CapacitorGoogleAuth } = await import('@codetrix-studio/capacitor-google-auth');
+              GoogleAuth = CapacitorGoogleAuth;
+              console.log('[FirebaseAuth] GoogleAuth plugin loaded dynamically');
+            } catch (importError) {
+              console.error('[FirebaseAuth] Failed to load GoogleAuth plugin:', importError);
+              throw new Error('GoogleAuth plugin not available in Capacitor environment');
+            }
           }
-          console.log('[FirebaseAuth] GoogleAuth plugin found:', GoogleAuth);
           
-          // Native Google Auth verwenden
-          console.log('[FirebaseAuth] Calling GoogleAuth.signIn()...');
-          const googleUser = await GoogleAuth.signIn();
-          console.log('[FirebaseAuth] Native Google Auth successful:', googleUser);
-          
-          // Prüfe, ob wir ein ID Token haben
-          if (!googleUser?.authentication?.idToken) {
-            throw new Error('No ID token received from Google Auth');
+          try {
+            // Native Google Auth verwenden
+            console.log('[FirebaseAuth] Calling GoogleAuth.signIn()...');
+            const googleUser = await GoogleAuth.signIn();
+            console.log('[FirebaseAuth] Native Google Auth successful:', googleUser);
+            
+            // Prüfe, ob wir ein ID Token haben
+            if (!googleUser?.authentication?.idToken) {
+              throw new Error('No ID token received from Google Auth');
+            }
+            console.log('[FirebaseAuth] ID Token received, creating Firebase credential...');
+            
+            // Firebase Credential erstellen und anmelden
+            const credential = GoogleAuthProvider.credential(googleUser.authentication.idToken);
+            console.log('[FirebaseAuth] Firebase credential created');
+            
+            const userCredential = await signInWithCredential(auth, credential);
+            console.log('[FirebaseAuth] Firebase sign in successful');
+            
+            const token = await userCredential.user.getIdToken();
+            console.log('[FirebaseAuth] ID Token retrieved successfully');
+            return token;
+          } catch (pluginError) {
+            console.error('[FirebaseAuth] Plugin error, falling back to Firebase popup:', pluginError);
+            // Fallback zu Firebase Popup
+            const userCredential = await signInWithPopup(auth, googleProvider);
+            const token = await userCredential.user.getIdToken();
+            console.log('[FirebaseAuth] Fallback Firebase popup successful');
+            return token;
           }
-          console.log('[FirebaseAuth] ID Token received, creating Firebase credential...');
-          
-          // Firebase Credential erstellen und anmelden
-          const credential = GoogleAuthProvider.credential(googleUser.authentication.idToken);
-          console.log('[FirebaseAuth] Firebase credential created:', credential);
-          
-          const userCredential = await signInWithCredential(auth, credential);
-          console.log('[FirebaseAuth] Firebase sign in successful:', userCredential);
-          
-          const token = await userCredential.user.getIdToken();
-          console.log('[FirebaseAuth] ID Token retrieved:', token);
-          return token;
         } else {
-          console.log('[FirebaseAuth] Using popup for browser');
+          console.log('[FirebaseAuth] Using Firebase popup for web browser');
           const userCredential = await signInWithPopup(auth, googleProvider);
           const token = await userCredential.user.getIdToken();
-          console.log('[FirebaseAuth] Google login successful, token:', token);
+          console.log('[FirebaseAuth] Web Firebase login successful');
           return token;
         }
       } catch (err) {
@@ -121,6 +136,7 @@ export function useFirebaseAuth() {
         console.error('[FirebaseAuth] Error details:', {
           message: err.message,
           code: err.code,
+          name: err.name,
           stack: err.stack
         });
         throw err;

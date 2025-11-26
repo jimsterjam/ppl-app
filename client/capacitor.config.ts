@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'pushpulllegs',
   webDir: 'dist',
   server: {
-    url: 'http://localhost:5173',
+    url: 'http://localhost:3001',
     cleartext: true
   },
   ios: {
