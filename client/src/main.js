@@ -2,7 +2,6 @@ import { createApp } from 'vue'
 import './style.css'
 import App from './App.vue'
 import { createPinia } from 'pinia'
-import { useFirebaseAuth } from './utils/firebaseAuth'
 import router from './router'
 import { useThemeStore } from './stores/themeStore'
 import { useSubscriptionStore } from './stores/subscriptionStore'
@@ -21,6 +20,7 @@ const i18n = createI18nInstance()
 
 // Firebase wird in utils/firebaseAuth initialisiert
 
+// Kein Redirect-Handling mehr nötig bei nativem Google Auth
 
 app.use(pinia)
 app.use(router)
