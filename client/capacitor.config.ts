@@ -1,15 +1,16 @@
-import type { CapacitorConfig } from '@capacitor/cli'
+import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.pplapp.mobile',
-  appName: 'PPL App',
+  appId: 'com.pushpulllegs.com',
+  appName: 'pushpulllegs',
   webDir: 'dist',
-  bundledWebRuntime: false,
   server: {
-    // Für Live-Reload im Simulator kannst du temporär eine Dev-URL setzen:
-    // url: 'http://localhost:5173',
-    // cleartext: true,
+    url: 'http://localhost:5173',
+    cleartext: true
+  },
+  ios: {
+    scheme: 'com.pushpulllegs.com'
   }
-}
+};
 
-export default config
+export default config;
