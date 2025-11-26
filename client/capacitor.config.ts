@@ -9,7 +9,13 @@ const config: CapacitorConfig = {
     cleartext: true
   },
   ios: {
-    scheme: 'com.pushpulllegs.com'
+    scheme: 'com.pushpulllegs.com',
+    allowsLinkPreview: false
+  },
+  plugins: {
+    CapacitorHttp: {
+      enabled: true
+    }
   }
 };
 
