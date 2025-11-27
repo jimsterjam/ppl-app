@@ -4,6 +4,7 @@ import {
   getAuth,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
   GoogleAuthProvider,
   OAuthProvider,
   signOut,
@@ -11,104 +12,59 @@ import {
   signInWithCredential
 } from 'firebase/auth';
 
-// Konstanten für bessere Wartbarkeit
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-const LOG_PREFIX = '[FirebaseAuth]';
-
-// Dynamisch geladenes Plugin
+// GoogleAuth Plugin wird dynamisch geladen (nur in Capacitor)
 let GoogleAuth = null;
 
 // Plattformspezifische Firebase-Konfiguration
 const getFirebaseConfig = () => {
-  const isRunningInCapacitor = !!(window.Capacitor || window.capacitor);
+  const isCapacitor = !!(window.Capacitor || window.capacitor);
   
-  if (isRunningInCapacitor) {
+  // Versuche, aus .env zu laden (funktioniert in Web und meist in Capacitor)
+  const envConfig = {
+    apiKey: import.meta.env?.VITE_FIREBASE_API_KEY,
+    authDomain: import.meta.env?.VITE_FIREBASE_AUTH_DOMAIN,
+    projectId: import.meta.env?.VITE_FIREBASE_PROJECT_ID,
+    storageBucket: import.meta.env?.VITE_FIREBASE_STORAGE_BUCKET,
+    messagingSenderId: import.meta.env?.VITE_FIREBASE_MESSAGING_SENDER_ID,
+    appId: import.meta.env?.VITE_FIREBASE_APP_ID,
+    iosClientId: import.meta.env?.VITE_IOS_CLIENT_ID
+  };
+
+  // Fallback für Capacitor, falls .env nicht verfügbar
+  if (isCapacitor && !envConfig.apiKey) {
+    console.warn('[FirebaseAuth] .env nicht verfügbar in Capacitor, verwende Fallback-Konfiguration');
     return {
-      apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-      projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-      storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-      messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-      appId: import.meta.env.VITE_FIREBASE_APP_ID,
-      iosClientId: GOOGLE_CLIENT_ID
-    };
-  } else {
-    return {
-      apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-      authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
-      projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-      storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
-      messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
-      appId: import.meta.env.VITE_FIREBASE_APP_ID,
+      apiKey: "AIzaSyAz_3hQdbMqxv3NiQS2O00euxsPnLSAdU0",
+      authDomain: "ppl-workout-01.firebaseapp.com",
+      projectId: "ppl-workout-01",
+      storageBucket: "ppl-workout-01.firebasestorage.app",
+      messagingSenderId: "440924652132",
+      appId: "1:440924652132:ios:60da56556afd2e4a219571",
+      iosClientId: "109118119734-ltjcuc3c0fa8qft2j20lr28adak7scbd.apps.googleusercontent.com"
     };
   }
+
+  // Für Web oder wenn .env verfügbar
+  return {
+    apiKey: envConfig.apiKey || "AIzaSyAz_3hQdbMqxv3NiQS2O00euxsPnLSAdU0",
+    authDomain: envConfig.authDomain || "ppl-workout-01.firebaseapp.com",
+    projectId: envConfig.projectId || "ppl-workout-01",
+    storageBucket: envConfig.storageBucket || "ppl-workout-01.firebasestorage.app",
+    messagingSenderId: envConfig.messagingSenderId || "440924652132",
+    appId: envConfig.appId || "1:440924652132:ios:60da56556afd2e4a219571",
+    iosClientId: isCapacitor ? (envConfig.iosClientId || "109118119734-ltjcuc3c0fa8qft2j20lr28adak7scbd.apps.googleusercontent.com") : undefined
+  };
 };
 
 const firebaseConfig = getFirebaseConfig();
+
+// Firebase App initialisieren
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
+
+// Provider
 const googleProvider = new GoogleAuthProvider();
 const appleProvider = new OAuthProvider('apple.com');
-
-// Hilfsfunktionen
-const log = (message, level = 'log') => {
-  console[level](`${LOG_PREFIX} ${message}`);
-};
-
-const handleAuthError = (error, context) => {
-  log(`Error in ${context}: ${error.message}`, 'error');
-  log(`Details: ${JSON.stringify({ code: error.code, name: error.name })}`, 'error');
-  throw error;
-};
-
-const createFirebaseCredential = async (idToken) => {
-  if (!idToken) throw new Error('No ID token provided');
-  const credential = GoogleAuthProvider.credential(idToken);
-  const userCredential = await signInWithCredential(auth, credential);
-  return await userCredential.user.getIdToken();
-};
-
-const loadGoogleAuthPlugin = async () => {
-  if (GoogleAuth) return GoogleAuth;
-  try {
-    const { GoogleAuth: CapacitorGoogleAuth } = await import('@codetrix-studio/capacitor-google-auth');
-    GoogleAuth = CapacitorGoogleAuth;
-    log('GoogleAuth plugin loaded dynamically');
-    return GoogleAuth;
-  } catch (error) {
-    throw new Error('GoogleAuth plugin not available in Capacitor environment');
-  }
-};
-
-const initializeGoogleAuth = async () => {
-  await GoogleAuth.initialize({
-    clientId: GOOGLE_CLIENT_ID,
-    scopes: ['profile', 'email'],
-    grantOfflineAccess: true
-  });
-  log('GoogleAuth initialized successfully');
-};
-
-const performCapacitorAuth = async () => {
-  const plugin = await loadGoogleAuthPlugin();
-  await initializeGoogleAuth();
-  
-  log('Calling GoogleAuth.signIn()...');
-  const googleUser = await plugin.signIn();
-  
-  if (!googleUser?.authentication?.idToken) {
-    throw new Error('No ID token received from Google Auth');
-  }
-  
-  log('ID Token received, creating Firebase credential...');
-  return await createFirebaseCredential(googleUser.authentication.idToken);
-};
-
-const performWebAuth = async () => {
-  log('Using Firebase popup for web browser');
-  const userCredential = await signInWithPopup(auth, googleProvider);
-  return await userCredential.user.getIdToken();
-};
 
 export function useFirebaseAuth() {
   return {
@@ -119,37 +75,93 @@ export function useFirebaseAuth() {
       try {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const token = await userCredential.user.getIdToken();
-        log(`Email login successful, token: ${token}`);
+        console.log('[FirebaseAuth] Email login successful, token:', token);
         return token;
-      } catch (error) {
-        handleAuthError(error, 'Email login');
+      } catch (err) {
+        console.error('[FirebaseAuth] Email login failed:', err);
+        throw err;
       }
     },
 
     /** Google Login (nativ für Capacitor, Popup für Web) */
     signInWithGoogle: async () => {
       try {
-        log('Starting Google sign-in process...');
-        const isRunningInCapacitor = !!(window.Capacitor || window.capacitor);
-        log(`Environment check - isCapacitor: ${isRunningInCapacitor}`);
+        console.log('[FirebaseAuth] Starting Google sign-in process...');
         
-        if (isRunningInCapacitor) {
-          log('Using native Google Auth for Capacitor');
-          return await performCapacitorAuth();
-        } else {
-          return await performWebAuth();
-        }
-      } catch (error) {
-        // Fallback zu Web-Popup nur bei Plugin-Fehlern in Capacitor
-        if (error.message.includes('GoogleAuth plugin')) {
-          log('Plugin error, falling back to Firebase popup', 'warn');
-          try {
-            return await performWebAuth();
-          } catch (fallbackError) {
-            handleAuthError(fallbackError, 'Fallback Google login');
+        // Prüfe, ob wir in Capacitor sind
+        const isCapacitor = !!(window.Capacitor || window.capacitor);
+        console.log('[FirebaseAuth] Environment check - isCapacitor:', isCapacitor);
+        
+        if (isCapacitor) {
+          console.log('[FirebaseAuth] Using native Google Auth for Capacitor');
+          
+          // Dynamisch laden, falls noch nicht geschehen
+          if (!GoogleAuth) {
+            try {
+              const { GoogleAuth: CapacitorGoogleAuth } = await import('@codetrix-studio/capacitor-google-auth');
+              GoogleAuth = CapacitorGoogleAuth;
+              console.log('[FirebaseAuth] GoogleAuth plugin loaded dynamically');
+            } catch (importError) {
+              console.error('[FirebaseAuth] Failed to load GoogleAuth plugin:', importError);
+              throw new Error('GoogleAuth plugin not available in Capacitor environment');
+            }
           }
+          
+          try {
+            // Initialize Google Auth first
+            console.log('[FirebaseAuth] Initializing GoogleAuth plugin...');
+            await GoogleAuth.initialize({
+              clientId: '109118119734-a1ruf512sojeho0vkgrkjmutp2v2j03g.apps.googleusercontent.com', // Correct iOS/Web Client ID
+              scopes: ['profile', 'email'],
+              grantOfflineAccess: true
+            });
+            console.log('[FirebaseAuth] GoogleAuth initialized successfully');
+            
+            // Native Google Auth verwenden
+            console.log('[FirebaseAuth] Calling GoogleAuth.signIn()...');
+            const googleUser = await GoogleAuth.signIn();
+            console.log('[FirebaseAuth] Native Google Auth successful:', googleUser);
+            
+            // Prüfe, ob wir ein ID Token haben
+            if (!googleUser?.authentication?.idToken) {
+              throw new Error('No ID token received from Google Auth');
+            }
+            console.log('[FirebaseAuth] ID Token received, creating Firebase credential...');
+            
+            // Firebase Credential erstellen und anmelden
+            const credential = GoogleAuthProvider.credential(googleUser.authentication.idToken);
+            console.log('[FirebaseAuth] Firebase credential created');
+            
+            const userCredential = await signInWithCredential(auth, credential);
+            console.log('[FirebaseAuth] Firebase sign in successful');
+            
+            const token = await userCredential.user.getIdToken();
+            console.log('[FirebaseAuth] ID Token retrieved successfully');
+            return token;
+          } catch (pluginError) {
+            console.error('[FirebaseAuth] Plugin error, falling back to Firebase popup:', pluginError);
+            // Fallback zu Firebase Popup
+            const userCredential = await signInWithPopup(auth, googleProvider);
+            const token = await userCredential.user.getIdToken();
+            console.log('[FirebaseAuth] Fallback Firebase popup successful');
+            return token;
+          }
+        } else {
+          console.log('[FirebaseAuth] Using Firebase popup for web browser');
+          const userCredential = await signInWithPopup(auth, googleProvider);
+          const token = await userCredential.user.getIdToken();
+          console.log('[FirebaseAuth] Web Firebase login successful');
+          return token;
         }
-        handleAuthError(error, 'Google login');
+      } catch (err) {
+        console.error('[FirebaseAuth] Google login failed:', err);
+        console.error('[FirebaseAuth] Error details:', {
+          message: err.message,
+          code: err.code,
+          name: err.name,
+          stack: err.stack
+        });
+        throw err;
       }
     },
 
@@ -167,9 +179,10 @@ export function useFirebaseAuth() {
     signOut: async () => {
       try {
         await signOut(auth);
-        log('Signed out successfully');
-      } catch (error) {
-        handleAuthError(error, 'Logout');
+        console.log('[FirebaseAuth] Signed out successfully');
+      } catch (err) {
+        console.error('[FirebaseAuth] Logout failed:', err);
+        throw err;
       }
     },
 
@@ -186,7 +199,7 @@ export function useFirebaseAuth() {
       const user = auth.currentUser;
       if (user) {
         const token = await user.getIdToken();
-        log(`ID Token retrieved: ${token}`);
+        console.log('[FirebaseAuth] ID Token retrieved:', token);
         return token;
       }
       return null;
