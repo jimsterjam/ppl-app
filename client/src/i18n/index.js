@@ -40,7 +40,8 @@ export const messages = {
       select: 'Auswählen'
     },
     auth: {
-      signIn: 'Anmelden'
+      signIn: 'Anmelden',
+      signOut: 'Abmelden'
     },
     nav: {
       home: 'Home',
@@ -455,7 +456,8 @@ export const messages = {
       select: 'Select'
     },
     auth: {
-      signIn: 'Sign in'
+      signIn: 'Sign in',
+      signOut: 'Sign out'
     },
     nav: {
       home: 'Home',

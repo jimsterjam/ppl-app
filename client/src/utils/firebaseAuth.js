@@ -95,6 +95,15 @@ export function useFirebaseAuth() {
           }
           
           try {
+            // Initialize Google Auth first
+            console.log('[FirebaseAuth] Initializing GoogleAuth plugin...');
+            await GoogleAuth.initialize({
+              clientId: '109118119734-a1ruf512sojeho0vkgrkjmutp2v2j03g.apps.googleusercontent.com', // Correct iOS/Web Client ID
+              scopes: ['profile', 'email'],
+              grantOfflineAccess: true
+            });
+            console.log('[FirebaseAuth] GoogleAuth initialized successfully');
+            
             // Native Google Auth verwenden
             console.log('[FirebaseAuth] Calling GoogleAuth.signIn()...');
             const googleUser = await GoogleAuth.signIn();

@@ -129,7 +129,7 @@ const store = useUserStore()
 const toast = useToastStore()
 const { t: $t } = useI18n()
 const router = useRouter()
-const { getIdToken, onAuthStateChanged } = useFirebaseAuth()
+const { getIdToken, onAuthStateChanged, getCurrentUser } = useFirebaseAuth()
 
 const user = ref(null)
 const isSignedIn = ref(false)
@@ -242,7 +242,7 @@ onMounted(() => {
 .today button:disabled:hover { transform: none; }
 
 .draft-button {
-  background: linear-gradient(135deg, var(--accent-color), color-mix(in srgb, var(--accent-color) 85%, var(--success-color))) !important;
+  background: yellow;
   box-shadow: 0 4px 12px color-mix(in srgb, var(--accent-color) 30%, transparent) !important;
 }
 

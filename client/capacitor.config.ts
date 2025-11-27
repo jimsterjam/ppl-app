@@ -5,12 +5,13 @@ const config: CapacitorConfig = {
   appName: 'pushpulllegs',
   webDir: 'dist',
   server: {
-    url: 'http://localhost:3001',
+    url: 'http://localhost:5173',
     cleartext: true
   },
   ios: {
     scheme: 'com.pushpulllegs.com',
-    allowsLinkPreview: false
+    allowsLinkPreview: false,
+    loggingBehavior: 'debug', // oder 'production'
   },
   plugins: {
     CapacitorHttp: {
@@ -18,8 +19,8 @@ const config: CapacitorConfig = {
     },
     GoogleAuth: {
       scopes: ['profile', 'email'],
-      serverClientId: '440924652132-h60bcdrh3nu22nf72pagohfgg7cslq8r.apps.googleusercontent.com',
-      clientId: '440924652132-h60bcdrh3nu22nf72pagohfgg7cslq8r.apps.googleusercontent.com',
+      serverClientId: '109118119734-73sv2hb5cjnqdifvgar84t27et1bvvid.apps.googleusercontent.com',
+      clientId: '109118119734-a1ruf512sojeho0vkgrkjmutp2v2j03g.apps.googleusercontent.com',
       forceCodeForRefreshToken: true,
     },
   }

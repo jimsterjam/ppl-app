@@ -26,6 +26,9 @@
     "prettier": "^3.6.2"
   },
   "dependencies": {
+    "@capacitor/cli": "^7.4.4",
+    "@capacitor/core": "^7.4.4",
+    "@capacitor/ios": "^7.4.4",
     "firebase-admin": "^13.6.0"
   }
 }

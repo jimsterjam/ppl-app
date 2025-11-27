@@ -5,7 +5,7 @@
       <div class="header-actions">
         <slot name="actions"></slot>
         <div class="auth-section">
-          <button v-if="!signedIn" class="auth-button" @click="signIn">{{ $t('auth.signIn') }}</button>
+          <button v-if="!signedIn" class="auth-button" @click="signInWithGoogle">{{ $t('auth.signIn') }}</button>
           <div v-else class="user-info">
             <span class="user-name">{{ userName }}</span>
             <button class="auth-button" @click="signOut">{{ $t('auth.signOut') }}</button>
@@ -27,7 +27,7 @@ defineProps({
   }
 })
 
-const { signIn, signOut, onAuthStateChanged, getCurrentUser } = useFirebaseAuth()
+const { signInWithGoogle, signOut, onAuthStateChanged, getCurrentUser } = useFirebaseAuth()
 const signedIn = ref(false)
 const userName = ref('')
 
