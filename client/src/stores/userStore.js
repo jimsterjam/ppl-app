@@ -31,9 +31,11 @@ export const useUserStore = defineStore("user", {
     
     todaysWorkout: (state) => {
       const today = new Date().toISOString().split('T')[0];
-      return state.workouts.find(w => 
-        (w?.date || '').startsWith(today) && !w.completed && !w.isDraft
+      const workout = state.workouts.find(w => 
+        (w?.date || '').startsWith(today) && (w.completed === false || w.completed === undefined) && !w.isDraft
       );
+      console.log('🧠 [userStore] todaysWorkout:', workout ? { _id: workout._id, name: workout.name, completed: workout.completed, isDraft: workout.isDraft } : null);
+      return workout;
     },
 
     // Letztes gespeichertes Workout (kein Draft), nach updatedAt oder date
@@ -55,10 +57,23 @@ export const useUserStore = defineStore("user", {
     // Für kompatible Nutzung im Dashboard
     isLoading: (state) => state.loadingWorkouts,
     isWorkoutsLoading: (state) => state.loadingWorkouts,
-    isStatsLoading: (state) => state.loadingStats
-  },
+    isStatsLoading: (state) => state.loadingStats,
 
+    hasDraft: (state) => {
+      const has = state.workouts.some(w => w.isDraft);
+      console.log('🧠 [userStore] hasDraft:', has, 'drafts:', state.workouts.filter(w => w.isDraft).map(w => ({ _id: w._id, name: w.name })));
+      return has;
+    },
+
+    draftType: (state) => state.workouts.find(w => w.isDraft)?.type,
+
+    draftTimestamp: (state) => {
+      const draft = state.workouts.find(w => w.isDraft);
+      return draft ? new Date(draft.updatedAt || draft.date) : null;
+    }
+  },
   actions: {
+
         async startWorkout(type, token = null) {
           // Wrapper für createWorkout mit minimalen Daten
           const workoutData = { type, name: `${type.charAt(0).toUpperCase() + type.slice(1)} Day` };
@@ -72,9 +87,31 @@ export const useUserStore = defineStore("user", {
         const { fetchWorkouts } = await import('@/api/workouts');
         const workouts = await fetchWorkouts(token);
         this.workouts = Array.isArray(workouts) ? workouts : [];
+        // Setze completed: false für Workouts ohne completed Feld (Migration)
+        this.workouts = this.workouts.map(w => ({
+          ...w,
+          completed: w.completed !== undefined ? w.completed : false
+        }));
         this.workoutsLoaded = true;
         this.workoutsLoadedAt = Date.now();
-        console.log(`✅ [API] Loaded ${this.workouts.length} workouts from server`);
+        console.log(`✅ [API] Loaded ${this.workouts.length} workouts from server:`, this.workouts.map(w => ({ _id: w._id, name: w.name, completed: w.completed, isDraft: w.isDraft })));
+
+        // Lokale Drafts laden und hinzufügen
+        try {
+          const { getWorkoutOffline } = await import('@/utils/offlineStorage');
+          const localDraft = await getWorkoutOffline('draft');
+          if (localDraft) {
+            // Stelle sicher, dass isDraft gesetzt ist
+            localDraft.isDraft = true;
+            this.workouts.push(localDraft);
+            console.log('✅ [Offline] Draft geladen und hinzugefügt:', { _id: localDraft._id, name: localDraft.name });
+          } else {
+            console.log('ℹ️ [Offline] Kein lokaler Draft gefunden');
+          }
+        } catch (e) {
+          console.warn('⚠️ Fehler beim Laden des lokalen Drafts:', e);
+        }
+
         return this.workouts;
       } catch (error) {
         console.error('❌ [API] Error loading workouts from server:', error);
@@ -107,11 +144,12 @@ export const useUserStore = defineStore("user", {
     },
 
     async createWorkout(workoutData, token = null) {
-      // Workout per API erstellen
+      console.log('🏗️ [userStore] createWorkout called:', workoutData, 'token:', !!token);
       try {
         console.log('DEBUG: createWorkout token:', token, 'data:', workoutData);
         const { createWorkout } = await import('@/api/workouts');
         const newWorkout = await createWorkout(workoutData, token);
+        console.log('🏗️ [userStore] API returned:', newWorkout);
         if (newWorkout) {
           this.workouts.push(newWorkout);
           console.log('✅ [API] Workout created:', newWorkout._id);
@@ -124,9 +162,11 @@ export const useUserStore = defineStore("user", {
     },
 
     async updateWorkout(id, updates, token = null) {
+      console.log('📡 [userStore] updateWorkout called:', id, updates);
       // Wenn kein gültiges ObjectId: als neues Workout anlegen (POST)
       const isValidObjectId = typeof id === 'string' && /^[a-f\d]{24}$/i.test(id);
       if (!isValidObjectId) {
+        console.log('📡 [userStore] Invalid ObjectId, creating new workout');
         try {
           const { createWorkout } = await import('@/api/workouts');
           // type aus vorhandenem Draft holen, falls nicht im updates-Objekt
@@ -148,7 +188,7 @@ export const useUserStore = defineStore("user", {
           // Füge das neue Workout hinzu
           if (newWorkout) {
             this.workouts.push(newWorkout);
-            console.log('✅ [API] Draft als neues Workout gespeichert und alte Drafts entfernt:', newWorkout._id);
+            console.log('✅ [userStore] New workout created:', newWorkout._id, 'completed:', newWorkout.completed);
             // Lösche Draft aus Offline-DB, falls vorhanden
             try {
               const { db } = await import('@/utils/offlineStorage');
@@ -157,7 +197,7 @@ export const useUserStore = defineStore("user", {
           }
           return newWorkout;
         } catch (error) {
-          console.error('❌ [API] Error creating workout from draft:', error);
+          console.error('❌ [userStore] Error creating workout from draft:', error);
           throw error;
         }
       }
@@ -168,11 +208,14 @@ export const useUserStore = defineStore("user", {
         const idx = this.workouts.findIndex(w => w._id === id);
         if (updatedWorkout && idx !== -1) {
           this.workouts[idx] = { ...this.workouts[idx], ...updatedWorkout };
-          console.log('✅ [API] Workout updated:', id);
+          // Sicherstellen, dass completed gesetzt wird, falls der Server es nicht zurückgibt
+          if (updates.completed !== undefined) {
+            this.workouts[idx].completed = updates.completed;
+          }
         }
         return updatedWorkout;
       } catch (error) {
-        console.error('❌ [API] Error updating workout:', error);
+        console.error('❌ [userStore] Error updating workout:', error);
         throw error;
       }
     },

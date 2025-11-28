@@ -75,7 +75,7 @@
           <!-- Main Button -->
           <button 
             :disabled="workoutCreated" 
-            @click="startWorkout(hasDraft ? draftType : nextType)"
+            @click="startWorkout(hasDraft ? draftId : nextType)"
             :class="{ 'draft-button': hasDraft }"
           >
             {{ startButtonText }}
@@ -110,7 +110,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onActivated } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
@@ -138,11 +138,20 @@ const workoutCreated = ref(false)
 
 const nextLabel = computed(() => store.nextWorkoutLabel)
 const lastLabel = computed(() => store.lastWorkoutLabel)
-const hasDraft = computed(() => store.hasDraft)
+const hasDraft = computed(() => {
+  const hd = store.hasDraft
+  console.log('📋 [Dashboard] hasDraft:', hd, 'draftType:', store.draftType, 'draftTimestamp:', store.draftTimestamp)
+  return hd
+})
 const draftType = computed(() => store.draftType)
 const draftTimestamp = computed(() => store.draftTimestamp)
+const draftId = computed(() => store.workouts.find(w => w.isDraft)?._id)
 
-const startButtonText = computed(() => hasDraft.value ? $t('dashboard.resumeDraft') : $t('dashboard.startNext'))
+const startButtonText = computed(() => {
+  const text = hasDraft.value ? $t('dashboard.resumeDraft') : $t('dashboard.startNext')
+  console.log('Dashboard startButtonText:', text, 'hasDraft:', hasDraft.value)
+  return text
+})
 
 // Greeting Computed
 const greeting = computed(() => {
@@ -157,13 +166,15 @@ const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1)
 
 // Load workouts
 async function loadWorkoutsData(force = false) {
+  console.log('📥 [Dashboard] loadWorkoutsData aufgerufen, force:', force);
   try {
     const token = await getIdToken();
     const currentUser = getCurrentUser ? getCurrentUser() : null;
-    console.log('DEBUG: getIdToken() result:', token, 'currentUser:', currentUser);
+    console.log('🔑 [Dashboard] Token vorhanden:', !!token, 'User:', !!currentUser);
     if (token && currentUser) {
       logger.debug('📥 DashboardView - Lade Workouts', force ? '(forced)' : '(cached allowed)', 'Token:', token)
       await store.loadWorkouts(token, { force })
+      console.log('✅ [Dashboard] Workouts geladen');
     } else {
       logger.warn('⚠️ Workouts werden nicht geladen, da kein Token/User vorhanden ist.');
     }
@@ -185,9 +196,16 @@ async function refreshData() {
 }
 
 // Start Workout
-function startWorkout(type) {
-  const safeType = typeof type === 'string' && type.length > 0 ? type : 'push';
-  router.push({ name: 'workout-builder', query: { type: safeType } });
+function startWorkout(typeOrId) {
+  console.log('🏁 [Dashboard] startWorkout called with:', typeOrId, 'hasDraft:', hasDraft.value, 'draftId:', draftId.value);
+  if (hasDraft.value) {
+    console.log('🏁 [Dashboard] Navigating to workout-detail:', draftId.value);
+    router.push({ name: 'workout-detail', params: { id: draftId.value } });
+  } else {
+    const safeType = typeof typeOrId === 'string' && typeOrId.length > 0 ? typeOrId : 'push';
+    console.log('🏁 [Dashboard] Navigating to workout-builder with type:', safeType);
+    router.push({ name: 'workout-builder', query: { type: safeType } });
+  }
 }
 function startNewWorkout() {
   router.push({ name: 'workout-builder' });
@@ -206,10 +224,24 @@ onMounted(() => {
   })
 
   router.afterEach((to, from) => {
-    if (to.path === '/' && from.path !== '/') loadWorkoutsData(true)
+    console.log('🧭 [Dashboard] router.afterEach:', to.path, from.path);
+    if (to.name === 'dashboard' && from.name !== 'dashboard') {
+      console.log('🔄 [Dashboard] Navigiert zu Dashboard, lade Workouts neu');
+      loadWorkoutsData(true);
+    }
   })
 
   window.addEventListener('focus', () => { if (isSignedIn.value) loadWorkoutsData(true) })
+})
+
+onActivated(async () => {
+  console.log('🔄 [Dashboard] onActivated triggered');
+  if (isSignedIn.value) {
+    logger.debug('📥 DashboardView - Route aktiviert, lade Workouts neu')
+    await loadWorkoutsData(true)
+  } else {
+    console.log('🚫 [Dashboard] onActivated: Nicht eingeloggt');
+  }
 })
 </script>
 

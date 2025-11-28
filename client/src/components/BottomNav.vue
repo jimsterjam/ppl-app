@@ -36,12 +36,17 @@ onMounted(() => {
 })
 import { useI18n } from 'vue-i18n'
 import { ref, onMounted, computed } from 'vue'
+import { useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
 
 const { t } = useI18n()
 const isIOS = ref(false)
 const store = useUserStore()
-const activeWorkout = computed(() => store.workouts.find(w => !w.completed && !w.isDraft))
+const route = useRoute()
+const activeWorkout = computed(() => {
+  const workout = store.hasDraft ? store.workouts.find(w => w.isDraft) : null
+  return workout
+})
 
 onMounted(() => {
   // Detect iOS/iPhone Simulator

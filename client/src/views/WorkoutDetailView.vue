@@ -1026,7 +1026,7 @@ async function saveWorkout() {
       name: w.name,
       type: w.type,
       date: w.date,
-      completed: w.completed,
+      completed: true,
       exercises: (w.exercises || []).map((ex, idx) => ({
         exerciseId: ex.exerciseId,
         name: ex.name,
@@ -1037,8 +1037,6 @@ async function saveWorkout() {
         note: (exerciseNotes.value && typeof exerciseNotes.value[idx] !== 'undefined') ? exerciseNotes.value[idx] : ''
       }))
     }
-
-    try { console.log('📤 [DEBUG] saveWorkout - normalized payload:', JSON.stringify(normalized, null, 2)) } catch {}
 
     // Nach dem Speichern: Draft aus sessionStorage entfernen
     const userId = store?.user?.id || store?.user?._id || 'guest'
@@ -1063,11 +1061,10 @@ async function saveWorkout() {
     saveMsg.value = 'Gespeichert.'
     saveError.value = false
     initialSnapshot = snapshotCore({ ...w, ...normalized })
-    try { await db.workouts.delete('draft') } catch {}
-    try { sessionStorage.removeItem(detailDraftKey) } catch {}
+    try { await db.workouts.delete('draft'); } catch {}
+    try { sessionStorage.removeItem(detailDraftKey); } catch {}
     router.push('/dashboard')
   } catch (e) {
-    logger.error('Speichern fehlgeschlagen:', e)
     error.value = e?.message || 'Speichern fehlgeschlagen'
     saveMsg.value = 'Speichern fehlgeschlagen.'
     saveError.value = true

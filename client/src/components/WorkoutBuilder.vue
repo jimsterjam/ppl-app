@@ -99,6 +99,7 @@ import StepIndicator from '@/components/StepIndicator.vue';
 import BottomNav from '@/components/BottomNav.vue';
 import UpgradeModal from '@/components/UpgradeModal.vue';
 import { getAllExercisesOffline } from '@/utils/offlineStorage';
+import { saveWorkoutOffline, getWorkoutOffline } from '@/utils/offlineStorage';
 
 
 // --- State & Stores ---
@@ -109,8 +110,13 @@ const userStore = useUserStore()
 const { auth, getCurrentUser, onAuthStateChanged, getIdToken } = useFirebaseAuth()
 const firebaseUser = ref(null)
 onAuthStateChanged((user) => {
+  console.log('WorkoutBuilder onAuthStateChanged:', user)
   firebaseUser.value = user
   userStore.user = user ? { id: user.uid, email: user.email, displayName: user.displayName } : null
+  if (user) {
+    loadDraft()
+    loadExercises()
+  }
 })
 const subscriptionStore = useSubscriptionStore()
 const toast = useToastStore()
@@ -187,41 +193,26 @@ function setEquipment(equip) {
 }
 
 // --- Draft-Logik ---
-function getDraftStorageKey() {
-	return `workout_builder_draft_${userId.value}`
-}
 async function saveDraft() {
-	const key = getDraftStorageKey()
 	const draft = {
+		_id: 'draft',
 		type: selectedType.value,
-		exercises: selectedExercises.value
+		exercises: selectedExercises.value,
+		isDraft: true
 	}
-	sessionStorage.setItem(key, JSON.stringify(draft))
+	await saveWorkoutOffline(draft)
 }
 async function loadDraft() {
-	const key = getDraftStorageKey()
-	const raw = sessionStorage.getItem(key)
-	if (raw) {
-		try {
-			const draft = JSON.parse(raw)
-			if (draft?.type) selectedType.value = draft.type
-			if (Array.isArray(draft?.exercises)) selectedExercises.value = draft.exercises
-			return true
-		} catch {}
+	const draft = await getWorkoutOffline('draft')
+	if (draft) {
+		if (draft.type) selectedType.value = draft.type
+		if (Array.isArray(draft.exercises)) selectedExercises.value = draft.exercises
+		return true
 	}
 	return false
 }
 function clearDraft() {
-	sessionStorage.removeItem(getDraftStorageKey())
-}
-async function clearOtherUserDrafts() {
-	const myKey = getDraftStorageKey()
-	for (let i = 0; i < sessionStorage.length; i++) {
-		const key = sessionStorage.key(i)
-		if (key && key.startsWith('workout_builder_draft_') && key !== myKey) {
-			sessionStorage.removeItem(key)
-		}
-	}
+	// Optional: delete from IndexedDB
 }
 
 // --- Workout Types ---
@@ -255,7 +246,6 @@ function continuePlan() {
 	try { localStorage.setItem(BELIEF_KEY, todayKey()) } catch {}
 }
 onMounted(() => {
-	clearOtherUserDrafts()
 	// Affirmation
 	const beliefsDe = [
 		'Jede Wiederholung bringt dich deinem Ziel näher.',
@@ -277,8 +267,15 @@ onMounted(() => {
 		const last = localStorage.getItem(BELIEF_KEY)
 		showBelief.value = last !== todayKey()
 	} catch { showBelief.value = true }
-	loadDraft()
-	loadExercises()
+
+	// Prüfe Auth-Status sofort
+	const currentUser = getCurrentUser()
+	console.log('WorkoutBuilder onMounted getCurrentUser:', currentUser)
+	if (currentUser) {
+		firebaseUser.value = currentUser
+		loadDraft()
+		loadExercises()
+	}
 })
 
 // --- Exercises ---
