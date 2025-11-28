@@ -71,6 +71,10 @@ const workoutSchema = new mongoose.Schema({
     type: Number, // in Minuten
     default: 0
   },
+  completed: {
+    type: Boolean,
+    default: false
+  },
   notes: String
   ,
   // Optionales Workout-Coverbild
