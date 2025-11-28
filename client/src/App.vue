@@ -24,7 +24,6 @@ onMounted(async () => {
     <RouterView />
     <ToastHost />
     <OfflineIndicator />
-    <BottomNav />
   </div>
 </template>
 

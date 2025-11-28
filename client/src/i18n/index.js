@@ -41,7 +41,15 @@ export const messages = {
     },
     auth: {
       signIn: 'Anmelden',
-      signOut: 'Abmelden'
+      signOut: 'Abmelden',
+      email: 'E-Mail',
+      password: 'Passwort',
+      signUp: 'Registrieren',
+      haveAccount: 'Hast du schon ein Konto? Anmelden',
+      noAccount: 'Kein Konto? Registrieren',
+      or: 'oder',
+      loading: 'Lädt...',
+      forgotPassword: 'Passwort vergessen?'
     },
     nav: {
       home: 'Home',
@@ -457,7 +465,15 @@ export const messages = {
     },
     auth: {
       signIn: 'Sign in',
-      signOut: 'Sign out'
+      signOut: 'Sign out',
+      email: 'Email',
+      password: 'Password',
+      signUp: 'Sign up',
+      haveAccount: 'Already have an account? Sign in',
+      noAccount: 'No account? Sign up',
+      or: 'or',
+      loading: 'Loading...',
+      forgotPassword: 'Forgot password?'
     },
     nav: {
       home: 'Home',

@@ -14,6 +14,9 @@
       <div class="spinner" />
       <p>Weiterleitung...</p>
     </div>
+
+    <!-- BottomNav nur anzeigen, wenn eingeloggt -->
+    <BottomNav v-if="signedIn" />
   </div>
 </template>
 
@@ -21,6 +24,7 @@
 import { ref, onMounted, watch, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useFirebaseAuth } from '../utils/firebaseAuth'
+import BottomNav from '../components/BottomNav.vue'
 
 const router = useRouter()
 const route = useRoute()
