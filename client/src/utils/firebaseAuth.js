@@ -3,6 +3,8 @@ import { initializeApp } from 'firebase/app';
 import {
   getAuth,
   signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   signInWithPopup,
   signInWithRedirect,
   GoogleAuthProvider,
@@ -79,6 +81,30 @@ export function useFirebaseAuth() {
         return token;
       } catch (err) {
         console.error('[FirebaseAuth] Email login failed:', err);
+        throw err;
+      }
+    },
+
+    /** Email/Password Registrierung */
+    signUpWithEmail: async (email, password) => {
+      try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        const token = await userCredential.user.getIdToken();
+        console.log('[FirebaseAuth] Email signup successful, token:', token);
+        return token;
+      } catch (err) {
+        console.error('[FirebaseAuth] Email signup failed:', err);
+        throw err;
+      }
+    },
+
+    /** Passwort zurücksetzen */
+    resetPassword: async (email) => {
+      try {
+        await sendPasswordResetEmail(auth, email);
+        console.log('[FirebaseAuth] Password reset email sent to:', email);
+      } catch (err) {
+        console.error('[FirebaseAuth] Password reset failed:', err);
         throw err;
       }
     },
