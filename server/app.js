@@ -9,6 +9,7 @@ import { fileURLToPath } from "url";
 import workoutRoutes from "./routes/workouts.js";
 import exerciseRoutes from "./routes/exercises.js";
 import subscriptionRoutes from "./routes/subscription.js";
+import accountRoutes from "./routes/account.js";
 // Clerk-Import entfernt
 
 // Utilities
@@ -53,6 +54,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
 app.use("/api/workouts", workoutRoutes);
 app.use("/api/exercises", exerciseRoutes);
 app.use("/api/subscription", subscriptionRoutes);
+app.use("/api/account", accountRoutes);
 
 // Healthcheck
 app.get('/api/health', (req, res) => {

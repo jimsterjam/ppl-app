@@ -5,9 +5,12 @@ import cors from "cors";
 import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
+import { admin } from './utils/firebaseAdmin.js';
 import workoutRoutes from "./routes/workouts.js";
 import exerciseRoutes from "./routes/exercises.js";
 import subscriptionRoutes from "./routes/subscription.js";
+import accountRoutes from "./routes/account.js";
+import authRoutes from "./routes/auth.js";
 // Clerk-Import entfernt
 import { firebaseAuthMiddleware } from './middleware/firebaseAuth.js';
 import multer from 'multer';
@@ -31,12 +34,13 @@ const app = express();
 // Clerk-Middleware entfernt
 
 // CORS konfigurieren
-// CORS: erlaube Vite-Dev-Server Ports 5173/5174 (Proxy) und fehlende Origin (Server-zu-Server)
-const allowedOrigins = new Set(["http://localhost:5173", "http://localhost:5174"]);
+// CORS: erlaube Vite-Dev-Server Ports 5173/5174 (Proxy), Capacitor App auf 3001, capacitor://localhost und fehlende Origin (Server-zu-Server/native Apps)
+const allowedOrigins = new Set(["http://localhost:5173", "http://localhost:5174", "http://localhost:3001", "capacitor://localhost"]);
 app.use(cors({
   origin: (origin, cb) => {
-    if (!origin) return cb(null, true);
+    if (!origin) return cb(null, true); // Erlaube fehlende Origin (native Apps, Server-zu-Server)
     if (allowedOrigins.has(origin)) return cb(null, true);
+    console.log('CORS blocked origin:', origin); // Debug-Logging
     return cb(null, false);
   },
   methods: ["GET", "POST", "PUT", "DELETE"],
@@ -344,9 +348,11 @@ app.get("/api/test", (req, res) => {
 });
 
 // Routen einbinden: Workouts-Router enthält bereits requireAuth pro Route
+app.use("/api/auth", authRoutes);
 app.use("/api/workouts", workoutRoutes);
 app.use("/api/exercises", exerciseRoutes);
 app.use("/api/subscription", subscriptionRoutes);
+app.use("/api/account", accountRoutes);
 
 // Health Endpoint: erleichtert Diagnose (Client/Monitoring)
 app.get('/api/health', (req, res) => {
@@ -372,4 +378,12 @@ app.use((err, req, res, _next) => {
 
 // Server starten
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => logger.info(`🚀 Server läuft auf Port ${PORT}`));
+app.listen(PORT, () => {
+  logger.info(`🚀 Server läuft auf Port ${PORT}`);
+  try {
+    const opts = admin?.apps?.[0]?.options || {};
+    logger.info(`[firebaseAdmin] Initialized for projectId: ${opts.projectId ?? 'unknown'}`);
+  } catch (e) {
+    logger.warn('[firebaseAdmin] Could not log projectId at startup:', e?.message || e);
+  }
+});

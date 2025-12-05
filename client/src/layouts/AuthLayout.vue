@@ -21,30 +21,27 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, computed } from 'vue'
+import { computed, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { useFirebaseAuth } from '../utils/firebaseAuth'
 import BottomNav from '../components/BottomNav.vue'
+import { useAuthStore } from '@/stores/authStore'
 
 const router = useRouter()
 const route = useRoute()
-const { onAuthStateChanged, getCurrentUser } = useFirebaseAuth()
+const authStore = useAuthStore()
 
-const firebaseReady = ref(false)
-const signedIn = ref(false)
+const firebaseReady = computed(() => authStore.initialized)
+const signedIn = computed(() => authStore.isAuthenticated)
 
-onMounted(() => {
-  // Firebase Auth State beobachten
-  onAuthStateChanged((user) => {
-    signedIn.value = !!user
-    if (!firebaseReady.value) firebaseReady.value = true
-    // Weiterleitung, falls nicht eingeloggt
-    if (firebaseReady.value && !signedIn.value) {
-      const target = route.fullPath
-      router.replace({ name: 'welcome', query: target && target !== '/' ? { redirect: target } : {} })
-    }
-  })
-})
+watch(
+  () => ({ ready: firebaseReady.value, authed: signedIn.value }),
+  ({ ready, authed }) => {
+    if (!ready || authed || route.name === 'welcome') return
+    const target = route.fullPath
+    router.replace({ name: 'welcome', query: target && target !== '/' ? { redirect: target } : {} })
+  },
+  { immediate: true }
+)
 </script>
 
 <style scoped>

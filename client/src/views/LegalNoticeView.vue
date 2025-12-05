@@ -40,10 +40,24 @@
       {{ $t('legal.lastUpdate') }}
     </p>
   </div>
+
+  <!-- BottomNav nur anzeigen, wenn eingeloggt -->
+  <BottomNav v-if="signedIn" />
 </template>
 
 <script setup>
-// keine Logik erforderlich
+import { ref, onMounted } from 'vue'
+import { useFirebaseAuth } from '../utils/firebaseAuth'
+import BottomNav from '../components/BottomNav.vue'
+
+const { onAuthStateChanged } = useFirebaseAuth()
+const signedIn = ref(false)
+
+onMounted(() => {
+  onAuthStateChanged((user) => {
+    signedIn.value = !!user
+  })
+})
 </script>
 
 <style scoped>
@@ -51,6 +65,7 @@
   max-width: 720px;
   margin: 0 auto;
   padding: 32px 16px;
+  padding-bottom: 100px; /* Platz für BottomNav */
   background: var(--card-bg);
   border-radius: 16px;
   color: var(--fg);

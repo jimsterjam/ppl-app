@@ -1,209 +1,390 @@
 // client/src/utils/firebaseAuth.js
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApp, getApps } from 'firebase/app';
 import {
   getAuth,
+  initializeAuth,
+  setPersistence,
+  browserLocalPersistence,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
-  signInWithPopup,
   signInWithRedirect,
   GoogleAuthProvider,
   OAuthProvider,
   signOut,
   onAuthStateChanged as firebaseOnAuthStateChanged,
-  signInWithCredential
+  getRedirectResult,
+  signInWithCustomToken
 } from 'firebase/auth';
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
+import { GoogleAuth } from '@southdevs/capacitor-google-auth';
+import { http, apiUrl } from '@/api/http';
 
-// GoogleAuth Plugin wird dynamisch geladen (nur in Capacitor)
-let GoogleAuth = null;
+// -------- CONFIG (ENV) --------
+const iosClientId = import.meta.env?.VITE_IOS_CLIENT_ID || '';
+const serverClientId = import.meta.env?.VITE_GOOGLE_SERVER_CLIENT_ID || '';
+const defaultScopes = ['profile', 'email'];
+let googleAuthInitPromise = null;
 
-// Plattformspezifische Firebase-Konfiguration
+// -------- HELPERS --------
+const isNativePlatform = () => {
+  const platform = Capacitor?.getPlatform?.() ?? Capacitor?.platform;
+  return !!platform && platform !== 'web';
+};
+
+const isCapacitorRuntime = () => {
+  if (isNativePlatform()) return true;
+  return !!(window?.Capacitor || window?.capacitor);
+};
+
+// Wait until Firebase authState reflects a user (or timeout)
+const waitForAuthState = (timeoutMs = 5000) =>
+  new Promise((resolve) => {
+    const auth = getAuth();
+    if (auth.currentUser) return resolve(auth.currentUser);
+    let resolved = false;
+    const unbind = firebaseOnAuthStateChanged(auth, (u) => {
+      if (!resolved) {
+        resolved = true;
+        unbind();
+        resolve(u);
+      }
+    });
+    setTimeout(() => {
+      if (!resolved) {
+        resolved = true;
+        unbind();
+        resolve(null);
+      }
+    }, timeoutMs);
+  });
+
+// -------- FIREBASE CONFIG (safe) --------
 const getFirebaseConfig = () => {
-  const isCapacitor = !!(window.Capacitor || window.capacitor);
-  
-  // Versuche, aus .env zu laden (funktioniert in Web und meist in Capacitor)
+  const nativeRuntime = isNativePlatform();
   const envConfig = {
-    apiKey: import.meta.env?.VITE_FIREBASE_API_KEY,
-    authDomain: import.meta.env?.VITE_FIREBASE_AUTH_DOMAIN,
-    projectId: import.meta.env?.VITE_FIREBASE_PROJECT_ID,
-    storageBucket: import.meta.env?.VITE_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: import.meta.env?.VITE_FIREBASE_MESSAGING_SENDER_ID,
-    appId: import.meta.env?.VITE_FIREBASE_APP_ID,
-    iosClientId: import.meta.env?.VITE_IOS_CLIENT_ID
+    apiKey: import.meta.env?.VITE_FIREBASE_API_KEY || '',
+    authDomain: import.meta.env?.VITE_FIREBASE_AUTH_DOMAIN || '',
+    projectId: import.meta.env?.VITE_FIREBASE_PROJECT_ID || '',
+    storageBucket: import.meta.env?.VITE_FIREBASE_STORAGE_BUCKET || '',
+    messagingSenderId: import.meta.env?.VITE_FIREBASE_MESSAGING_SENDER_ID || '',
+    appId: import.meta.env?.VITE_FIREBASE_APP_ID || '',
+    iosClientId: import.meta.env?.VITE_IOS_CLIENT_ID || ''
   };
 
-  // Fallback für Capacitor, falls .env nicht verfügbar
-  if (isCapacitor && !envConfig.apiKey) {
-    console.warn('[FirebaseAuth] .env nicht verfügbar in Capacitor, verwende Fallback-Konfiguration');
-    return {
-      apiKey: "AIzaSyAz_3hQdbMqxv3NiQS2O00euxsPnLSAdU0",
-      authDomain: "ppl-workout-01.firebaseapp.com",
-      projectId: "ppl-workout-01",
-      storageBucket: "ppl-workout-01.firebasestorage.app",
-      messagingSenderId: "440924652132",
-      appId: "1:440924652132:ios:60da56556afd2e4a219571",
-      iosClientId: "109118119734-ltjcuc3c0fa8qft2j20lr28adak7scbd.apps.googleusercontent.com"
-    };
-  }
+  // If running native and env not loaded, you may want to embed fallback values
+  // But leaving empty strings is safer than broken syntax.
+  const authDomain = nativeRuntime
+    ? // Use custom scheme or project authDomain if available
+      envConfig.authDomain || undefined
+    : envConfig.authDomain || undefined;
 
-  // Für Web oder wenn .env verfügbar
   return {
-    apiKey: envConfig.apiKey || "AIzaSyAz_3hQdbMqxv3NiQS2O00euxsPnLSAdU0",
-    authDomain: envConfig.authDomain || "ppl-workout-01.firebaseapp.com",
-    projectId: envConfig.projectId || "ppl-workout-01",
-    storageBucket: envConfig.storageBucket || "ppl-workout-01.firebasestorage.app",
-    messagingSenderId: envConfig.messagingSenderId || "440924652132",
-    appId: envConfig.appId || "1:440924652132:ios:60da56556afd2e4a219571",
-    iosClientId: isCapacitor ? (envConfig.iosClientId || "109118119734-ltjcuc3c0fa8qft2j20lr28adak7scbd.apps.googleusercontent.com") : undefined
+    apiKey: envConfig.apiKey || '',
+    authDomain,
+    projectId: envConfig.projectId || '',
+    storageBucket: envConfig.storageBucket || '',
+    messagingSenderId: envConfig.messagingSenderId || '',
+    appId: envConfig.appId || ''
+    // iosClientId not part of firebase config object; used separately
   };
 };
 
 const firebaseConfig = getFirebaseConfig();
 
-// Firebase App initialisieren
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+// -------- INITIALIZE FIREBASE --------
+// Robust gegen Mehrfach-Imports/HMR: nur ein App-Instance
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+// Verwende initializeAuth mit expliziter Persistence im nativen Runtime
+let auth;
+if (isNativePlatform()) {
+  auth = initializeAuth(app, { persistence: browserLocalPersistence });
+} else {
+  auth = getAuth(app);
+}
 
-// Provider
+// Debug: Prüfe, ob fetch/Headers nativ sind (wichtiger Hinweis für Firebase-Interna)
+// Minimal runtime info (keine ausführlichen Netzwerk-Diagnostics im Produktionsbetrieb)
+(() => { try { console.log('[FirebaseAuth] Runtime:', { native: isNativePlatform() }); } catch {} })();
+
+// Signal, wann Persistence gesetzt ist (wichtig für WKWebView)
+let persistenceReady = Promise.resolve();
+
+// For Capacitor native runtimes: use browserLocalPersistence (IndexedDB sometimes broken in WKWebView)
+if (isNativePlatform()) {
+  persistenceReady = setPersistence(auth, browserLocalPersistence).catch(() => {});
+}
+
+// -------- PROVIDERS --------
 const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 const appleProvider = new OAuthProvider('apple.com');
 
+// -------- TOKEN EXCHANGE WITH BACKEND --------
+const exchangeNativeGoogleToken = async (result) => {
+  const payload = {
+    idToken: result?.authentication?.idToken,
+    accessToken: result?.authentication?.accessToken,
+    serverAuthCode: result?.serverAuthCode,
+    email: result?.email,
+    googleId: result?.id
+  };
+
+  if (!payload.idToken) {
+    throw new Error('Missing Google ID token');
+  }
+
+  try {
+    console.log('[FirebaseAuth] 🔄 Exchanging native Google tokens with backend');
+
+    // On native runtimes, prefer CapacitorHttp to avoid WKWebView proxy/ATS edge cases
+    if (isNativePlatform() && typeof CapacitorHttp?.request === 'function') {
+      const url = apiUrl('auth/google-native');
+      const resp = await CapacitorHttp.request({
+        method: 'POST',
+        url,
+        headers: { 'Content-Type': 'application/json' },
+        data: payload
+      });
+      const data = resp?.data;
+      if (!data?.customToken) {
+        console.error('[FirebaseAuth] Backend did not return a custom token', data);
+        throw new Error('No custom token from backend');
+      }
+      return data;
+    }
+
+    // Fallback: Axios (web or if CapacitorHttp is unavailable)
+    const { data } = await http.post('auth/google-native', payload);
+    if (!data?.customToken) {
+      console.error('[FirebaseAuth] Backend did not return a custom token', data);
+      throw new Error('No custom token from backend');
+    }
+    return data;
+  } catch (err) {
+    console.error('[FirebaseAuth] ❌ Token exchange failed:', err);
+    throw err;
+  }
+};
+
+// -------- EXPORTED HOOK --------
 export function useFirebaseAuth() {
   return {
     auth,
 
-    /** Email/Password Login */
+    // ... email methods kept unchanged
     signInWithEmail: async (email, password) => {
       try {
         const userCredential = await signInWithEmailAndPassword(auth, email, password);
         const token = await userCredential.user.getIdToken();
-        console.log('[FirebaseAuth] Email login successful, token:', token);
         return token;
       } catch (err) {
-        console.error('[FirebaseAuth] Email login failed:', err);
         throw err;
       }
     },
 
-    /** Email/Password Registrierung */
     signUpWithEmail: async (email, password) => {
       try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         const token = await userCredential.user.getIdToken();
-        console.log('[FirebaseAuth] Email signup successful, token:', token);
         return token;
       } catch (err) {
-        console.error('[FirebaseAuth] Email signup failed:', err);
         throw err;
       }
     },
 
-    /** Passwort zurücksetzen */
     resetPassword: async (email) => {
       try {
         await sendPasswordResetEmail(auth, email);
-        console.log('[FirebaseAuth] Password reset email sent to:', email);
       } catch (err) {
-        console.error('[FirebaseAuth] Password reset failed:', err);
         throw err;
       }
     },
 
-    /** Google Login (nativ für Capacitor, Popup für Web) */
+    // -------- MAIN: Google sign-in (native path -> exchange -> signInWithCustomToken) --------
     signInWithGoogle: async () => {
       try {
-        console.log('[FirebaseAuth] Starting Google sign-in process...');
-        
-        // Prüfe, ob wir in Capacitor sind
-        const isCapacitor = !!(window.Capacitor || window.capacitor);
-        console.log('[FirebaseAuth] Environment check - isCapacitor:', isCapacitor);
-        
-        if (isCapacitor) {
-          console.log('[FirebaseAuth] Using native Google Auth for Capacitor');
-          
-          // Dynamisch laden, falls noch nicht geschehen
-          if (!GoogleAuth) {
-            try {
-              const { GoogleAuth: CapacitorGoogleAuth } = await import('@codetrix-studio/capacitor-google-auth');
-              GoogleAuth = CapacitorGoogleAuth;
-              console.log('[FirebaseAuth] GoogleAuth plugin loaded dynamically');
-            } catch (importError) {
-              console.error('[FirebaseAuth] Failed to load GoogleAuth plugin:', importError);
-              throw new Error('GoogleAuth plugin not available in Capacitor environment');
-            }
+        console.log('[FirebaseAuth] 🚀 Starting Google sign-in process...');
+        const native = isNativePlatform();
+        const capacRuntime = isCapacitorRuntime();
+        console.log('[FirebaseAuth] 📱 Environment check - native:', native, 'capacitor runtime:', capacRuntime);
+
+        // NATIVE FLOW using capacitor plugin
+        if (native && typeof GoogleAuth?.signIn === 'function') {
+          console.log('[FirebaseAuth] 📲 Using Capacitor Google Auth plugin');
+
+          // initialize plugin once, avoid race conditions
+          if (!googleAuthInitPromise && typeof GoogleAuth?.initialize === 'function') {
+            googleAuthInitPromise = (async () => {
+              try {
+                await GoogleAuth.initialize({
+                  clientId: iosClientId,
+                  serverClientId,
+                  scopes: defaultScopes,
+                  forceCodeForRefreshToken: true
+                });
+                console.log('[FirebaseAuth] ✅ Capacitor GoogleAuth initialized');
+              } catch (err) {
+                console.error('[FirebaseAuth] ❌ GoogleAuth initialization failed:', err);
+                googleAuthInitPromise = null;
+                throw err;
+              }
+            })();
           }
-          
+
+          if (googleAuthInitPromise) {
+            await googleAuthInitPromise;
+          }
+
+          // sign in natively
+          const result = await GoogleAuth.signIn({
+            clientId: iosClientId,
+            serverClientId,
+            scopes: defaultScopes
+          });
+
+          console.log('[FirebaseAuth] ✅ Google Auth result received');
+
+          if (!result?.authentication?.idToken) {
+            throw new Error('No Google ID token received from Capacitor Google Auth');
+          }
+
+          // exchange native token at backend for firebase custom token
+          const exchange = await exchangeNativeGoogleToken(result);
+          console.log('[FirebaseAuth] 🔐 Received custom Firebase token from backend');
+
+          // Ensure persistence fully ready (await it properly)
           try {
-            // Initialize Google Auth first
-            console.log('[FirebaseAuth] Initializing GoogleAuth plugin...');
-            await GoogleAuth.initialize({
-              clientId: '109118119734-a1ruf512sojeho0vkgrkjmutp2v2j03g.apps.googleusercontent.com', // Correct iOS/Web Client ID
-              scopes: ['profile', 'email'],
-              grantOfflineAccess: true
-            });
-            console.log('[FirebaseAuth] GoogleAuth initialized successfully');
-            
-            // Native Google Auth verwenden
-            console.log('[FirebaseAuth] Calling GoogleAuth.signIn()...');
-            const googleUser = await GoogleAuth.signIn();
-            console.log('[FirebaseAuth] Native Google Auth successful:', googleUser);
-            
-            // Prüfe, ob wir ein ID Token haben
-            if (!googleUser?.authentication?.idToken) {
-              throw new Error('No ID token received from Google Auth');
-            }
-            console.log('[FirebaseAuth] ID Token received, creating Firebase credential...');
-            
-            // Firebase Credential erstellen und anmelden
-            const credential = GoogleAuthProvider.credential(googleUser.authentication.idToken);
-            console.log('[FirebaseAuth] Firebase credential created');
-            
-            const userCredential = await signInWithCredential(auth, credential);
-            console.log('[FirebaseAuth] Firebase sign in successful');
-            
-            const token = await userCredential.user.getIdToken();
-            console.log('[FirebaseAuth] ID Token retrieved successfully');
-            return token;
-          } catch (pluginError) {
-            console.error('[FirebaseAuth] Plugin error, falling back to Firebase popup:', pluginError);
-            // Fallback zu Firebase Popup
-            const userCredential = await signInWithPopup(auth, googleProvider);
-            const token = await userCredential.user.getIdToken();
-            console.log('[FirebaseAuth] Fallback Firebase popup successful');
-            return token;
+            await Promise.race([
+              persistenceReady,
+              new Promise((res) => setTimeout(res, 5000))
+            ]);
+          } catch (e) {
+            console.warn('[FirebaseAuth] ⚠️ persistenceReady failed or timed out, continuing anyway', e?.message || e);
           }
-        } else {
-          console.log('[FirebaseAuth] Using Firebase popup for web browser');
-          const userCredential = await signInWithPopup(auth, googleProvider);
-          const token = await userCredential.user.getIdToken();
-          console.log('[FirebaseAuth] Web Firebase login successful');
-          return token;
+
+          // Helper: optional timeout wrapper (disabled for native to avoid premature rejection)
+                    const withTimeout = (p, ms) =>
+                      isNativePlatform()
+                        ? p
+                        : new Promise((resolve, reject) => {
+                            const t = setTimeout(() => reject(new Error('customToken sign-in timeout')), ms);
+                            p.then((v) => { clearTimeout(t); resolve(v); }).catch((e) => { clearTimeout(t); reject(e); });
+                          });
+
+          // Try primary sign-in (longer timeout)
+          let userCredential = null;
+          try {
+            // Auf Native kein künstlicher Timeout, um WKWebView-Latenzen zu tolerieren
+            userCredential = await withTimeout(signInWithCustomToken(auth, exchange.customToken), 30000);
+            console.log('[FirebaseAuth] ✅ signInWithCustomToken succeeded');
+
+          } catch (err) {
+            console.warn('[FirebaseAuth] signInWithCustomToken failed:', err?.message || err);
+          }
+
+          // If primary didn't set current user, do a small retry loop with backoff
+          const ensureAuthState = async () => {
+            if (auth.currentUser) return auth.currentUser;
+            // if userCredential exists, try reload
+            try {
+              if (userCredential?.user?.reload) {
+                await userCredential.user.reload();
+              }
+            } catch (reloadErr) {
+              console.warn('[FirebaseAuth] reload() after signIn failed:', reloadErr?.message || reloadErr);
+            }
+
+            // wait for auth state event for up to 8s
+            const maybe = await waitForAuthState(8000);
+            if (maybe) return maybe;
+
+            // exponential backoff retries calling signInWithCustomToken again (in background) up to 3 times
+            let backoff = 300;
+            for (let attempt = 1; attempt <= 3; attempt++) {
+              try {
+                await signInWithCustomToken(auth, exchange.customToken);
+                const after = await waitForAuthState(5000);
+                if (after) return after;
+              } catch {}
+              await new Promise((r) => setTimeout(r, backoff));
+              backoff *= 2;
+            }
+
+            return null;
+          };
+
+          const finalUser = await ensureAuthState();
+
+          if (!finalUser) {
+            console.warn('[FirebaseAuth] ❗️ After retries, auth.currentUser still null. Returning pending state.');
+            // Keep UI deferred — caller should detect pending or null user and handle appropriately
+            return { user: null, token: null, pending: true };
+          }
+
+          // Final token and success
+          const token = await finalUser.getIdToken();
+          console.log('[FirebaseAuth] 🎉 Capacitor Google login successful via custom token (final user):', finalUser.uid);
+          return { user: finalUser, token };
+        }
+
+        // If running native but plugin missing -> explicit error (so you can handle it)
+        if (native) {
+          console.error('[FirebaseAuth] ❌ GoogleAuth plugin not available on native platform');
+          throw new Error('Capacitor GoogleAuth plugin unavailable');
+        }
+
+        // WEB flow (popup)
+        {
+          console.log('[FirebaseAuth] 🌐 Web Google login via popup is disabled in this build');
+          throw new Error('Web Google popup flow disabled');
         }
       } catch (err) {
-        console.error('[FirebaseAuth] Google login failed:', err);
-        console.error('[FirebaseAuth] Error details:', {
-          message: err.message,
-          code: err.code,
-          name: err.name,
-          stack: err.stack
+        console.error('[FirebaseAuth] 💥 Google login failed:', err);
+        console.error('[FirebaseAuth] 📋 Error details:', {
+          message: err?.message,
+          code: err?.code,
+          name: err?.name,
+          stack: err?.stack
         });
         throw err;
       }
     },
 
-    /** Google Login via Redirect (für Capacitor-WebView) */
+    // redirect helpers (unchanged)
     signInWithGoogleRedirect: async () => {
       await signInWithRedirect(auth, googleProvider);
     },
 
-    /** Apple Login via Redirect (Popup funktioniert in WebView nicht zuverlässig) */
+    handleRedirectResult: async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result && result.user) {
+          const token = await result.user.getIdToken();
+          console.log('[FirebaseAuth] 🔁 Redirect result handled, user signed in, token:', token);
+          return token;
+        }
+        return null;
+      } catch (err) {
+        console.error('[FirebaseAuth] ❌ Handling redirect result failed:', err);
+        throw err;
+      }
+    },
+
     signInWithAppleRedirect: async () => {
       await signInWithRedirect(auth, appleProvider);
     },
 
-    /** Logout */
     signOut: async () => {
       try {
+        if (isNativePlatform() && typeof GoogleAuth?.signOut === 'function') {
+          try {
+            await GoogleAuth.signOut();
+            console.log('[FirebaseAuth] Capacitor Google Auth sign out');
+          } catch (err) {
+            console.warn('[FirebaseAuth] Capacitor Google Auth sign out failed:', err);
+          }
+        }
         await signOut(auth);
         console.log('[FirebaseAuth] Signed out successfully');
       } catch (err) {
@@ -212,23 +393,32 @@ export function useFirebaseAuth() {
       }
     },
 
-    /** Auth State Listener */
     onAuthStateChanged: (callback) => {
       firebaseOnAuthStateChanged(auth, callback);
     },
 
-    /** Aktueller User */
     getCurrentUser: () => auth.currentUser,
 
-    /** ID Token für Server */
     getIdToken: async () => {
-      const user = auth.currentUser;
-      if (user) {
-        const token = await user.getIdToken();
-        console.log('[FirebaseAuth] ID Token retrieved:', token);
-        return token;
+      let user = auth.currentUser;
+      if (!user) {
+        // wait briefly for auth state to settle (e.g., after custom token sign-in in WKWebView)
+        user = await waitForAuthState(6000);
       }
+      if (user) {
+        try {
+          const token = await user.getIdToken();
+          console.log('[FirebaseAuth] ID Token retrieved (wait-aware):', !!token);
+          return token;
+        } catch (e) {
+          console.warn('[FirebaseAuth] getIdToken failed once, retrying shortly...', e?.message || e);
+          // tiny backoff retry
+          await new Promise((r) => setTimeout(r, 300));
+          return user.getIdToken().catch(() => null);
+        }
+      }
+      console.warn('[FirebaseAuth] getIdToken: no current user after wait');
       return null;
-    },
+    }
   };
 }

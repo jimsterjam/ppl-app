@@ -1,14 +1,5 @@
 // server/middleware/firebaseAuth.js
-import admin from 'firebase-admin';
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
-const serviceAccount = require('../serviceAccount.json');
-
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount)
-  });
-}
+import { admin } from '../utils/firebaseAdmin.js';
 
 export function firebaseAuthMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;

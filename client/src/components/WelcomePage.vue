@@ -1,6 +1,7 @@
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
+import { useAuthStore } from '@/stores/authStore'
 // import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import MotivationWidget from '@/components/MotivationWidget.vue'
@@ -11,11 +12,12 @@ defineProps({
     handleChangeDisplay: { type: Function, default: null }
 })
 
-const { auth, signInWithGoogle, signInWithAppleRedirect, signInWithEmail, signUpWithEmail, resetPassword, getCurrentUser, onAuthStateChanged } = useFirebaseAuth()
-const isSignedIn = ref(false)
+const { signInWithGoogle, signInWithAppleRedirect, signInWithEmail, signUpWithEmail, resetPassword, getCurrentUser, getIdToken } = useFirebaseAuth()
 const router = useRouter()
 const route = useRoute()
 const { t } = useI18n()
+const authStore = useAuthStore()
+const isSignedIn = computed(() => authStore.isAuthenticated)
 
 // Auth Form
 const email = ref('')
@@ -34,10 +36,19 @@ function getRedirectTarget() {
 }
 
 function goNow() {
-    router.replace(getRedirectTarget())
+    const target = getRedirectTarget()
+    console.log('[WelcomePage] Redirecting now to:', target, 'current route before:', router.currentRoute?.value?.fullPath)
+    router.replace(target)
+        .then(() => {
+            console.log('[WelcomePage] Redirect completed via goNow. Current route:', router.currentRoute?.value?.fullPath)
+        })
+        .catch((err) => {
+            console.error('[WelcomePage] Redirect via goNow failed:', err)
+        })
 }
 
 function startMotivationFlow() {
+    console.log('[WelcomePage] startMotivationFlow triggered (route:', router.currentRoute?.value?.fullPath, ')')
     showMotivation.value = true
     // Sicherheits-Reset, falls bereits ein Timer existiert
     if (redirectTimer) {
@@ -50,6 +61,7 @@ function startMotivationFlow() {
 }
 
 function skipNow() {
+    console.log('[WelcomePage] skipNow invoked')
     if (redirectTimer) {
         clearTimeout(redirectTimer)
         redirectTimer = null
@@ -67,6 +79,7 @@ onBeforeUnmount(() => {
 function maybeProceed() {
     if (!isSignedIn.value) return
     // Immer Motivation anzeigen
+    console.log('[WelcomePage] maybeProceed -> user is signed in, starting flow (route:', router.currentRoute?.value?.fullPath, ')')
     startMotivationFlow()
 }
 
@@ -104,15 +117,58 @@ async function handlePasswordReset() {
     }
 }
 
-onMounted(async () => {
-    // Kein Redirect-Handling mehr nötig bei nativem Google Auth
-    onAuthStateChanged((user) => {
-        isSignedIn.value = !!user
-        if (isSignedIn.value) {
-            startMotivationFlow()
+async function handleGoogleLogin() {
+    authError.value = ''
+    authLoading.value = true
+    try {
+        console.log('[WelcomePage] Google login start')
+        const result = await signInWithGoogle()
+        // Kein direktes Setzen des Stores mehr – nur echter Firebase-Status zählt
+        const token = await getIdToken()
+        const user = getCurrentUser()
+        console.log('[WelcomePage] Post-login check (should rely on auth listener):', { hasUser: !!user, hasToken: !!token, pending: !!result?.pending })
+        // Falls bereits jetzt verfügbar, übernimmt der globale Listener dennoch das Setzen
+        // Wir triggern hier nur eine Navigation, wenn wirklich token vorhanden ist
+        if (user && token) {
+            const target = getRedirectTarget()
+            showMotivation.value = false
+            try { document.activeElement?.blur() } catch {}
+            await new Promise((res) => setTimeout(res, 0))
+            console.log('[WelcomePage] Navigating after confirmed token to:', target)
+            await router.replace(target)
+        } else {
+            // Andernfalls warten wir auf den globalen onAuthStateChanged-Flow
+            console.log('[WelcomePage] Waiting for auth state; no immediate navigation')
         }
-    })
-})
+    } catch (err) {
+        console.error('[WelcomePage] Google login failed:', err)
+        authError.value = err.message || 'Google Login fehlgeschlagen'
+    } finally {
+        console.log('[WelcomePage] Google login finished, resetting loading state')
+        authLoading.value = false
+    }
+}
+
+// Deaktiviere Motivation-Overlay im nativen Flow; Navigation erfolgt direkt im Login-Handler
+watch(isSignedIn, async (loggedIn) => {
+    console.log('[WelcomePage] watch isSignedIn ->', loggedIn, 'route:', router.currentRoute?.value?.fullPath)
+    if (!loggedIn) {
+        showMotivation.value = false
+        return
+    }
+    // Nur navigieren, wenn auch wirklich ein Token verfügbar ist
+    const token = await getIdToken().catch(() => null)
+    if (token) {
+        const target = getRedirectTarget()
+        showMotivation.value = false
+        try { document.activeElement?.blur() } catch {}
+        await new Promise((res) => setTimeout(res, 0))
+        console.log('[WelcomePage] Auth confirmed via watcher; navigating to:', target)
+        router.replace(target)
+    } else {
+        console.log('[WelcomePage] isSignedIn true but no token yet; holding')
+    }
+}, { immediate: true })
 </script>
 
 <template>
@@ -172,7 +228,7 @@ onMounted(async () => {
                 <span>{{ t('auth.or') }}</span>
             </div>
             <div class="social-buttons">
-                <button class="google-btn" @click="signInWithGoogle" :disabled="authLoading">
+                <button class="google-btn" @click="handleGoogleLogin" :disabled="authLoading">
                     <svg class="google-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                         <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>

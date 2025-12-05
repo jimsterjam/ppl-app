@@ -1,3 +1,20 @@
+## Auth/Capacitor iOS – Stable Update (2025-12-05)
+- fix(ios-auth): Firebase Web SDK stabilisiert auf iOS (WKWebView)
+  - Verwende `initializeAuth(app, { persistence: browserLocalPersistence })` für native Capacitor-Runtime.
+  - Entferne künstliche Timeouts beim `signInWithCustomToken` im nativen Pfad.
+  - Reduziere Debug-Logs, behalte essentielle Warnungen/Fehler.
+- Config-Angleichung
+  - `VITE_FIREBASE_APP_ID` ist Web-Format (`:web:`) und projektkonsistent (`ppl-workout-01`).
+  - Storage Bucket korrigiert auf `ppl-workout-01.appspot.com`.
+  - Backend `firebase-admin` initialisiert explizit mit `projectId` und loggt diese beim Serverstart.
+- Tests/Verifikation
+  - iOS: Native Google-Login → Backend Custom Token → Firebase-Sign-In erfolgreich; `auth.currentUser` gesetzt.
+  - Router/Store hart verdrahtet: Navigation nur mit echtem Token/User.
+- Release Hinweise
+  - Client Sync: `npm run build && npx cap sync ios && npx cap open ios`.
+  - Server Start: `npm run dev` (Projekt-ID-Log sichtbar).
+  - Bei zukünftigen iOS-Versionen optionaler Fallback: `indexedDBLocalPersistence` testen, derzeit nicht nötig.
+
 # 🎉 Problem gelöst: Stabile Dev-Umgebung mit Auto-Restart
 
 ## ✅ Was wurde implementiert
