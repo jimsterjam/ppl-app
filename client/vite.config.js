@@ -27,10 +27,28 @@ export default defineConfig({
     }
   },
   build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('/vue/')) return 'vue';
+            if (id.includes('vue-router')) return 'router';
+            if (id.includes('pinia')) return 'pinia';
+            if (id.includes('firebase')) return 'firebase';
+            if (id.includes('chart.js')) return 'charts';
+            if (id.includes('dayjs')) return 'date';
+            if (id.includes('lodash')) return 'lodash';
+            // default vendor chunk
+            return 'vendor';
+          }
+          return undefined;
+        }
+      }
+    },
     terserOptions: {
       compress: {
-        drop_console: true,
-        drop_debugger: true
+        // drop_console: true,
+        // drop_debugger: true
       }
     }
   }

@@ -10,8 +10,9 @@
  * Debug und Info werden komplett entfernt (Tree-shaking in Build).
  */
 
-const isDev = import.meta.env.MODE === 'development'
-const isProd = import.meta.env.MODE === 'production'
+const forceLogs = import.meta.env?.VITE_FORCE_LOGS === '1'
+const isDev = forceLogs || import.meta.env.MODE === 'development'
+const isProd = !forceLogs && import.meta.env.MODE === 'production'
 
 /**
  * Formatiert Timestamps für Logs

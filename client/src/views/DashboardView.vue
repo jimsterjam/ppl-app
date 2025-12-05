@@ -110,7 +110,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onActivated } from 'vue'
+import { ref, computed, onMounted, onActivated, onUnmounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
@@ -211,6 +211,11 @@ function startNewWorkout() {
   router.push({ name: 'workout-builder' });
 }
 
+// keep a single afterEach registration to avoid duplicates
+let afterEachRegistered = false
+let removeAfterEachHook = null
+const onWindowFocus = () => { if (isSignedIn.value) loadWorkoutsData(true) }
+
 // Mounted: Auth & Refresh
 onMounted(() => {
   onAuthStateChanged(async (firebaseUser) => {
@@ -223,15 +228,32 @@ onMounted(() => {
     }
   })
 
-  router.afterEach((to, from) => {
-    console.log('🧭 [Dashboard] router.afterEach:', to.path, from.path);
-    if (to.name === 'dashboard' && from.name !== 'dashboard') {
-      console.log('🔄 [Dashboard] Navigiert zu Dashboard, lade Workouts neu');
-      loadWorkoutsData(true);
+  if (!afterEachRegistered) {
+    const unregister = router.afterEach((to, from) => {
+      console.log('🧭 [Dashboard] router.afterEach:', to.path, from.path);
+      if (to.name === 'dashboard' && from.name !== 'dashboard') {
+        console.log('🔄 [Dashboard] Navigiert zu Dashboard, lade Workouts neu');
+        loadWorkoutsData(true);
+      }
+    })
+    afterEachRegistered = true
+    if (typeof unregister === 'function') {
+      removeAfterEachHook = unregister
     }
-  })
+  }
 
-  window.addEventListener('focus', () => { if (isSignedIn.value) loadWorkoutsData(true) })
+  window.addEventListener('focus', onWindowFocus)
+})
+
+onUnmounted(() => {
+  // remove window listener
+  window.removeEventListener('focus', onWindowFocus)
+  // if router provides an unregister fn, call it and allow re-registration later
+  if (typeof removeAfterEachHook === 'function') {
+    try { removeAfterEachHook() } catch {}
+    removeAfterEachHook = null
+    afterEachRegistered = false
+  }
 })
 
 onActivated(async () => {

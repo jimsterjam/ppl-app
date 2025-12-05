@@ -113,7 +113,20 @@ export const messages = {
       deleteError: 'Fehler beim Löschen der Daten',
       deleteWarning1: 'Alle Workouts werden permanent gelöscht',
       deleteWarning2: 'Statistiken und Fortschritte gehen verloren',
-      deleteWarning3: 'Einstellungen werden zurückgesetzt'
+      deleteWarning3: 'Einstellungen werden zurückgesetzt',
+      deleteAccount: 'Account löschen',
+      confirmDeleteAccount: 'Account löschen?',
+      confirmDeleteAccountMsg: 'Diese Aktion kann nicht rückgängig gemacht werden. Dein Account und alle Daten werden permanent gelöscht.',
+      typeToConfirmAccount: 'Gib "ACCOUNT LÖSCHEN" ein um zu bestätigen:',
+      deleteAccountPlaceholder: 'ACCOUNT LÖSCHEN',
+      deleteAccountForever: 'Account unwiderruflich löschen',
+      deletingAccount: 'Lösche Account...',
+      deleteAccountSuccess: 'Account wurde gelöscht',
+      deleteAccountError: 'Fehler beim Löschen des Accounts',
+      deleteAccountWarning1: 'Alle Workouts werden permanent gelöscht',
+      deleteAccountWarning2: 'Statistiken und Fortschritte gehen verloren',
+      deleteAccountWarning3: 'Einstellungen werden zurückgesetzt',
+      deleteAccountWarning4: 'Der Account kann nicht wiederhergestellt werden'
     },
     timer: {
       restoreHint: 'Tippen zum Maximieren',
@@ -345,7 +358,7 @@ export const messages = {
       unknownDuration: 'Dauer unbekannt'
     },
     welcome: {
-      title: 'Willkommen bei der Bro Split App!',
+      title: 'Willkommen zu\nPush-Pull-Legs!',
       signInPrompt: 'Bitte melde dich an, um fortzufahren.',
       redirectingTitle: 'Weiterleitung...',
       redirectingMsg: 'Du wirst zum Dashboard weitergeleitet.',
@@ -537,7 +550,20 @@ export const messages = {
       deleteError: 'Error deleting data',
       deleteWarning1: 'All workouts will be permanently deleted',
       deleteWarning2: 'Statistics and progress will be lost',
-      deleteWarning3: 'Settings will be reset'
+      deleteWarning3: 'Settings will be reset',
+      deleteAccount: 'Delete account',
+      confirmDeleteAccount: 'Delete account?',
+      confirmDeleteAccountMsg: 'This action cannot be undone. Your account and all data will be permanently deleted.',
+      typeToConfirmAccount: 'Type "DELETE ACCOUNT" to confirm:',
+      deleteAccountPlaceholder: 'DELETE ACCOUNT',
+      deleteAccountForever: 'Delete account forever',
+      deletingAccount: 'Deleting account...',
+      deleteAccountSuccess: 'Account has been deleted',
+      deleteAccountError: 'Error deleting account',
+      deleteAccountWarning1: 'All workouts will be permanently deleted',
+      deleteAccountWarning2: 'Statistics and progress will be lost',
+      deleteAccountWarning3: 'Settings will be reset',
+      deleteAccountWarning4: 'The account cannot be restored'
     },
     timer: {
       restoreHint: 'Tap to maximize',

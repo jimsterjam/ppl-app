@@ -229,11 +229,11 @@ const currentTypeLabel = computed(() => {
 // --- Responsive ---
 const viewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1024)
 const isMobile = computed(() => viewportWidth.value <= 480)
+const onResize = () => { viewportWidth.value = window.innerWidth }
 onMounted(() => {
-  const onResize = () => { viewportWidth.value = window.innerWidth }
-  window.addEventListener('resize', onResize)
-  onUnmounted(() => window.removeEventListener('resize', onResize))
+	window.addEventListener('resize', onResize)
 })
+onUnmounted(() => window.removeEventListener('resize', onResize))
 
 // --- Belief/Affirmation ---
 const BELIEF_KEY = 'wb_belief_last_shown'
@@ -246,6 +246,11 @@ function continuePlan() {
 	try { localStorage.setItem(BELIEF_KEY, todayKey()) } catch {}
 }
 onMounted(() => {
+	// Übernehme Typ aus Query, falls vorhanden
+	const qType = String(route.query?.type || '').toLowerCase()
+	if (qType && ['push','pull','legs'].includes(qType)) {
+		selectedType.value = qType
+	}
 	// Affirmation
 	const beliefsDe = [
 		'Jede Wiederholung bringt dich deinem Ziel näher.',
@@ -386,7 +391,16 @@ async function createWorkout() {
 			date: new Date().toISOString(),
 			completed: false
 		}
-		const token = await getIdToken()
+		let token = await getIdToken()
+		if (!token) {
+			// kurze Wartezeit, falls Auth-State noch nachzieht (WKWebView)
+			await new Promise(r => setTimeout(r, 400))
+			token = await getIdToken()
+		}
+		if (!token) {
+			errorMsg.value = t('builder.authLoading')
+			return
+		}
 		const created = await userStore.createWorkout(workoutData, token)
 		clearDraft()
 		await router.push({ name: 'workout-detail', params: { id: created?._id } })

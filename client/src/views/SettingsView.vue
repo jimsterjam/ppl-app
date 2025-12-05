@@ -81,6 +81,16 @@
           {{ isDeleting ? $t('settings.deleting') : $t('settings.deleteAllData') }}
         </button>
       </section>
+
+      <section class="card danger-zone account-danger">
+        <h3>{{ $t('settings.dangerZone') }} - Account</h3>
+        <p class="hint">{{ $t('settings.dangerZoneHint') }}</p>
+        <button class="danger-btn account-delete-btn" @click="showDeleteAccountConfirm = true" :disabled="isDeletingAccount">
+          <span v-if="isDeletingAccount">🔄</span>
+          <span v-else>🗑️</span>
+          {{ isDeletingAccount ? $t('settings.deletingAccount') : $t('settings.deleteAccount') }}
+        </button>
+      </section>
       
     </div>
 
@@ -140,6 +150,66 @@
       </div>
     </div>
 
+    <!-- Account-Lösch-Dialog -->
+    <div v-if="showDeleteAccountConfirm" class="modal-overlay" @click.self="!isDeletingAccount && (showDeleteAccountConfirm = false)">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>⚠️ {{ $t('settings.confirmDeleteAccount') }}</h3>
+          <button v-if="!isDeletingAccount" class="close-btn" @click="showDeleteAccountConfirm = false">×</button>
+        </div>
+        
+        <div class="modal-body">
+          <p class="warning-text">{{ $t('settings.confirmDeleteAccountMsg') }}</p>
+          
+          <div class="warning-list">
+            <div class="warning-item">
+              <span class="warning-icon">🗄️</span>
+              <span>{{ $t('settings.deleteAccountWarning1') }}</span>
+            </div>
+            <div class="warning-item">
+              <span class="warning-icon">📊</span>
+              <span>{{ $t('settings.deleteAccountWarning2') }}</span>
+            </div>
+            <div class="warning-item">
+              <span class="warning-icon">⚙️</span>
+              <span>{{ $t('settings.deleteAccountWarning3') }}</span>
+            </div>
+            <div class="warning-item">
+              <span class="warning-icon">🚫</span>
+              <span>{{ $t('settings.deleteAccountWarning4') }}</span>
+            </div>
+          </div>
+          
+          <div class="confirm-input">
+            <label>{{ $t('settings.typeToConfirmAccount') }}</label>
+            <input 
+              v-model="confirmAccountText" 
+              type="text" 
+              :placeholder="$t('settings.deleteAccountPlaceholder')"
+              :disabled="isDeletingAccount"
+              @keyup.enter="confirmDeleteAccount"
+              autocomplete="off"
+            />
+          </div>
+        </div>
+        
+        <div class="modal-actions">
+          <button class="cancel-btn" @click="showDeleteAccountConfirm = false" :disabled="isDeletingAccount">
+            {{ $t('common.cancel') }}
+          </button>
+          <button 
+            class="confirm-danger-btn" 
+            :disabled="confirmAccountText.toLowerCase() !== $t('settings.deleteAccountPlaceholder').toLowerCase() || isDeletingAccount"
+            @click="confirmDeleteAccount"
+          >
+            <span v-if="isDeletingAccount">🔄</span>
+            <span v-else>🗑️</span>
+            {{ isDeletingAccount ? $t('settings.deletingAccount') : $t('settings.deleteAccountForever') }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <BottomNav />
   </div>
 </template>
@@ -156,6 +226,7 @@ import { useI18n } from 'vue-i18n'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
+import { logger } from '@/utils/logger'
 
 const themeStore = useThemeStore()
 const { theme } = storeToRefs(themeStore)
@@ -196,6 +267,10 @@ const { getIdToken } = useFirebaseAuth()
 const showDeleteConfirm = ref(false)
 const confirmText = ref('')
 const isDeleting = ref(false)
+
+const showDeleteAccountConfirm = ref(false)
+const confirmAccountText = ref('')
+const isDeletingAccount = ref(false)
 
 async function confirmDelete() {
   logger.debug('🔴 confirmDelete aufgerufen!')
@@ -288,6 +363,61 @@ async function confirmDelete() {
   }
 }
 
+async function confirmDeleteAccount() {
+  if (confirmAccountText.value.toLowerCase() !== $t('settings.deleteAccountPlaceholder').toLowerCase()) {
+    return
+  }
+
+  if (isDeletingAccount.value) return
+  isDeletingAccount.value = true
+
+  try {
+    const token = await getIdToken()
+    if (!token) {
+      throw new Error('No auth token')
+    }
+
+    const response = await fetch('/api/account/delete', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        confirmation: 'ACCOUNT LÖSCHEN'
+      })
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || 'Failed to delete account')
+    }
+
+    // Success
+    toast.show($t('settings.deleteAccountSuccess'), { type: 'success', duration: 3000 })
+
+    // Vollständiges Cleanup: Firebase Session beenden und LocalStorage leeren
+    await useFirebaseAuth().signOut()
+    
+    // LocalStorage komplett leeren (OAuth Tokens, etc.)
+    localStorage.clear()
+    sessionStorage.clear()
+    
+    // Small delay to ensure cleanup is complete
+    setTimeout(() => {
+      router.push({ name: 'welcome' })
+    }, 100)
+
+  } catch (error) {
+    console.error('Account deletion failed:', error)
+    toast.show($t('settings.deleteAccountError'), { type: 'error' })
+  } finally {
+    isDeletingAccount.value = false
+    showDeleteAccountConfirm.value = false
+    confirmAccountText.value = ''
+  }
+}
+
 // Toast-Settings entfernt – Toaster ist fest oben
 </script>
 
@@ -331,6 +461,35 @@ async function confirmDelete() {
 .danger-zone h3 {
   color: var(--error-color);
   margin-bottom: 8px;
+}
+
+.account-danger {
+  margin-top: 20px;
+}
+
+.account-delete-btn {
+  background: linear-gradient(135deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 80%, black) 100%);
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 12px;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.account-delete-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.account-delete-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .danger-btn {
