@@ -358,6 +358,10 @@ export function useFirebaseAuth() {
 
     handleRedirectResult: async () => {
       try {
+        // On native Capacitor runtimes we don't use web redirects; skip gracefully
+        if (isNativePlatform()) {
+          return null;
+        }
         const result = await getRedirectResult(auth);
         if (result && result.user) {
           const token = await result.user.getIdToken();
@@ -366,6 +370,12 @@ export function useFirebaseAuth() {
         }
         return null;
       } catch (err) {
+        // Benign when no redirect has occurred or environment doesn't support it
+        const code = err?.code || err?.message || '';
+        if (code === 'auth/argument-error' || code === 'auth/no-auth-event') {
+          console.warn('[FirebaseAuth] Redirect result not available (benign):', code);
+          return null;
+        }
         console.error('[FirebaseAuth] ❌ Handling redirect result failed:', err);
         throw err;
       }

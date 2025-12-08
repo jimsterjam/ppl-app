@@ -1,6 +1,6 @@
 <template>
-  <!-- Single top toaster: alle Nachrichten oben anzeigen -->
-  <div class="toast-host top" aria-live="polite" aria-atomic="true" v-if="messages.length">
+  <!-- Single bottom toaster: alle Nachrichten unten anzeigen -->
+  <div class="toast-host bottom" aria-live="polite" aria-atomic="true" v-if="messages.length">
     <transition-group name="toast" tag="div">
       <div v-for="m in messages" :key="m.id" class="toast" :class="m.type">
         <span class="icon">{{ 
@@ -27,20 +27,21 @@ const { t } = useI18n()
 </script>
 
 <style scoped>
-.toast-host {
-  position: fixed;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  z-index: 9999;
-  pointer-events: none;
-}
-.toast-host.top { top: 16px; }
-.toast-host.bottom { display: none; }
-.toast-enter-from, .toast-leave-to { opacity: 0; transform: translateY(8px); }
-.toast-enter-active, .toast-leave-active { transition: all .2s ease; }
+  .toast-host {
+    position: fixed;
+    left: 50%;
+    transform: translate(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 9999;
+    pointer-events: none;
+  }
+  .toast-host.top { display: none; }
+  .toast-host.bottom { bottom: var(--safe-bottom); }
+  /* Animation: von unten ins Bild */
+  .toast-enter-from, .toast-leave-to { opacity: 0; transform: translateY(8px); }
+  .toast-enter-active, .toast-leave-active { transition: all .2s ease; }
 .toast { 
   pointer-events: auto; 
   display: flex; 

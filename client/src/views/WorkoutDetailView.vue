@@ -50,17 +50,23 @@
       type="info"
       @confirm="onAddExerciseConfirm"
     >
-      <div style="max-height: 50vh; overflow-y: auto;">
-        <div v-if="exercisesLoading" style="text-align:center; padding: 16px;">Lade Übungen...</div>
-        <div v-else>
-          <div v-for="ex in allExercises" :key="ex._id" style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-            <img :src="getExerciseImage(ex)" alt="" style="width:40px;height:40px;object-fit:contain;border-radius:6px;border:1px solid #eee;" />
-            <span style="flex:1;">{{ getTranslatedExerciseName(ex.name) }}</span>
-            <div style="flex:0 0 auto; display: flex; justify-content: flex-end; width: auto;">
-              <button class="primary" style="min-width:unset; width:auto; padding:4px 12px; font-size:0.9em; white-space:nowrap;" @click="selectExerciseToAdd(ex)">{{ t('common.select') }}</button>
-            </div>
-          </div>
-        </div>
+      <div class="picker-container">
+        <ExercisePicker
+          :exercises="allExercises"
+          :loading="exercisesLoading"
+          :showHeader="false"
+          :showClose="false"
+          :showSearch="true"
+          :showDone="true"
+          :title="t('workoutDetail.addExercise')"
+          :searchPlaceholder="t('exercises.searchPlaceholder') || 'Suchen…'"
+          :bodyweightLabel="t('exercises.bodyweight')"
+          :doneLabel="t('common.done')"
+          :translateName="getTranslatedExerciseName"
+          :translateMuscle="getTranslatedMuscleGroup"
+          @select="selectExerciseToAdd"
+          @done="showAddExerciseModal = false"
+        />
       </div>
     </AppModal>
 
@@ -300,12 +306,15 @@ const allExercises = ref([])
 const exercisesLoading = ref(false)
 let selectedExerciseToAdd = null
 // Übungen für Modal laden
+import { getMergedSortedExercises } from '@/utils/exerciseList'
 async function loadAllExercises() {
   exercisesLoading.value = true
   try {
-    // Versuche aus Store oder API zu laden (hier Demo: offline)
-    const list = await getAllExercisesOffline({})
-    allExercises.value = Array.isArray(list) ? list : []
+    const type = (workout.value?.type || '').toLowerCase()
+    const categoryMap = { push: 'Push', pull: 'Pull', legs: 'Legs' }
+    const category = categoryMap[type] || ''
+    const list = await getMergedSortedExercises({ category, locale: String(locale?.value || '') })
+    allExercises.value = list
   } catch (e) {
     allExercises.value = []
   } finally {
@@ -358,6 +367,7 @@ import { useUserStore } from '@/stores/userStore'
 import HeaderBar from '@/components/HeaderBar.vue'
 import BottomNav from '@/components/BottomNav.vue'
 import AppModal from '@/components/AppModal.vue'
+import ExercisePicker from '@/components/ExercisePicker.vue'
 import WorkoutTimer from '@/components/WorkoutTimer.vue'
 import { useToastStore } from '@/stores/toastStore'
 import { useI18n } from 'vue-i18n'
@@ -552,7 +562,11 @@ async function loadWorkout() {
       if (!draft) {
         draft = await getWorkoutOffline(draftKey)
       }
-      if (draft && draft.exercises && draft.type) {
+      // 3. Fallback: Legacy Draft unter statischem Schlüssel 'draft'
+      if (!draft) {
+        draft = await getWorkoutOffline('draft')
+      }
+      if (draft && draft.exercises && (draft.type || route.query.type)) {
         const allExercises = await getAllExercisesOffline({})
         const merged = draft.exercises.map(draftEx => {
           let dbEx = allExercises.find(e => e._id === draftEx._id)
@@ -578,9 +592,11 @@ async function loadWorkout() {
             }
           }
         })
-        workout.value = { ...draft, exercises: merged }
+        const type = draft.type || route.query.type || null
+        workout.value = { ...draft, type, exercises: merged }
       } else {
-        workout.value = draft
+        const type = draft?.type || route.query.type || null
+        workout.value = draft ? { ...draft, type } : { _id: 'draft', type, exercises: [] }
       }
       ensureSetDetailsStructure()
       await enrichExerciseImages()
@@ -1142,6 +1158,38 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnloadHan
 </script>
 
 <style scoped>
+.picker-container { max-height: 80vh; overflow: auto; }
+.picker-list { padding: 12px 16px; }
+.search-row.in-sheet { margin: 12px 16px; }
+.exercises-list { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.exercise-item { background: var(--card-bg, #fff); border-radius: 12px; padding: 16px; border: 1px solid var(--card-border, #e5e7eb); box-shadow: 0 2px 8px rgba(0,0,0,0.04); cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; gap: 6px; }
+.ex-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.exercise-item .title { font-weight: 700; color: var(--accent-color); font-size: 1.05rem; }
+.exercise-item .sub { color: var(--muted); font-size: 0.9rem; }
+.exercise-item .sub.small { font-size: 0.85rem; margin-left: auto; }
+.exercises-list {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  margin-bottom: 12px;
+}
+.exercise-item {
+  background: var(--card-bg, #fff);
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid var(--card-border, #e5e7eb);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.exercise-item .title { font-weight: 700; color: var(--accent-color); font-size: 1.05rem; }
+.exercise-item .sub { color: var(--muted); font-size: 0.9rem; }
+.exercise-item .sub.small { font-size: 0.85rem; margin-left: auto; }
+.picker-list { padding: 8px 4px; }
+.picker-loading { text-align: center; padding: 16px; color: var(--muted); }
 /* styles unchanged (same as provided) */
 .workout-detail { min-height: 100vh; background: var(--bg); color: var(--fg); padding-bottom: 80px; }
 .content { padding: 16px; }

@@ -422,6 +422,8 @@ function onImgError(evt, ex) {
 }
 </script>
 <style scoped>
+.exercises-view { min-height: 100vh; background: var(--bg); color: var(--fg); }
+.exercises-content { padding: 16px; }
 .info-btn {
   background: none;
   border: none;

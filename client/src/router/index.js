@@ -1,5 +1,8 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { Capacitor } from '@capacitor/core'
 import WelcomeView from '../views/WelcomeView.vue'
+// Funnel view (optional): redirects browser users to app stores
+import GetTheAppView from '../views/GetTheAppView.vue'
 import AuthLayout from '../layouts/AuthLayout.vue'
 import DashboardView from '../views/DashboardView.vue'
 import StatsView from '../views/StatsView.vue'
@@ -19,6 +22,12 @@ const routes = [
     path: '/',
     name: 'welcome',
     component: WelcomeView,
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/get-the-app',
+    name: 'get-the-app',
+    component: GetTheAppView,
     meta: { requiresAuth: false }
   },
   // Geschützte Routen unter AuthLayout, mit identischen (absoluten) Pfaden
@@ -57,6 +66,24 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes
+})
+
+// Optional funnel: only redirect in real browsers when enabled via env flag
+const isNativePlatform = () => {
+  try {
+    const platform = Capacitor?.getPlatform?.() ?? Capacitor?.platform
+    if (platform && platform !== 'web') return true
+    if (typeof location !== 'undefined' && location.protocol === 'capacitor:') return true
+  } catch {}
+  return false
+}
+
+router.beforeEach((to, from, next) => {
+  const funnelEnabled = import.meta.env?.VITE_ENABLE_WEB_FUNNEL === '1'
+  if (funnelEnabled && !isNativePlatform() && to.name !== 'get-the-app') {
+    return next({ name: 'get-the-app' })
+  }
+  next()
 })
 
 // Einfache Auth-Guards

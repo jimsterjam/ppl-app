@@ -86,6 +86,7 @@
 </style>
 
 <script setup>
+import ExercisePicker from '@/components/ExercisePicker.vue'
 
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
@@ -99,6 +100,7 @@ import StepIndicator from '@/components/StepIndicator.vue';
 import BottomNav from '@/components/BottomNav.vue';
 import UpgradeModal from '@/components/UpgradeModal.vue';
 import { getAllExercisesOffline } from '@/utils/offlineStorage';
+import { getMergedSortedExercises } from '@/utils/exerciseList';
 import { saveWorkoutOffline, getWorkoutOffline } from '@/utils/offlineStorage';
 
 
@@ -130,6 +132,7 @@ const selectedType = ref('push')
 const selectedExercises = ref([])
 const exercises = ref([])
 const loading = ref(false)
+const initialReady = ref(false)
 const search = ref('')
 const creating = ref(false)
 const errorMsg = ref('')
@@ -198,7 +201,9 @@ async function saveDraft() {
 		_id: 'draft',
 		type: selectedType.value,
 		exercises: selectedExercises.value,
-		isDraft: true
+		isDraft: true,
+		updatedAt: Date.now(),
+		name: (selectedType.value ? `${selectedType.value.charAt(0).toUpperCase() + selectedType.value.slice(1)} Day` : 'Workout Draft')
 	}
 	await saveWorkoutOffline(draft)
 }
@@ -245,7 +250,7 @@ function continuePlan() {
 	showBelief.value = false
 	try { localStorage.setItem(BELIEF_KEY, todayKey()) } catch {}
 }
-onMounted(() => {
+onMounted(async () => {
 	// Übernehme Typ aus Query, falls vorhanden
 	const qType = String(route.query?.type || '').toLowerCase()
 	if (qType && ['push','pull','legs'].includes(qType)) {
@@ -279,8 +284,11 @@ onMounted(() => {
 	if (currentUser) {
 		firebaseUser.value = currentUser
 		loadDraft()
-		loadExercises()
+		await loadExercises()
 	}
+	// Falls noch nicht eingeloggt, markieren wir die View als bereit,
+	// damit der Nutzer nicht eine leere Sektion sieht
+	initialReady.value = true
 })
 
 // --- Exercises ---
@@ -292,21 +300,8 @@ async function loadExercises() {
 			return
 		}
 		const categoryMap = { push: 'Push', pull: 'Pull', legs: 'Legs' }
-		let all = await getAllExercisesOffline({ category: categoryMap[selectedType.value] })
-		if (selectedEquipment.value) {
-			all = all.filter(e => (e.equipment || '').toLowerCase() === selectedEquipment.value.toLowerCase())
-		}
-		// Doppelte Übungen nach Name+Equipment entfernen
-		const seen = new Set()
-		const unique = []
-		for (const ex of all) {
-			const key = `${ex.name?.toLowerCase() || ''}__${ex.equipment?.toLowerCase() || ''}`
-			if (!seen.has(key)) {
-				seen.add(key)
-				unique.push(ex)
-			}
-		}
-		exercises.value = unique
+		const list = await getMergedSortedExercises({ category: categoryMap[selectedType.value], equipment: selectedEquipment.value, locale: String(locale.value) })
+		exercises.value = list
 	} catch {
 		exercises.value = []
 	} finally {
@@ -315,12 +310,13 @@ async function loadExercises() {
 }
 const filteredExercises = computed(() => {
 	const term = search.value.trim().toLowerCase()
-	if (!term) return exercises.value
-	return exercises.value.filter(e =>
-		e.name?.toLowerCase().includes(term) ||
-		e.muscleGroup?.toLowerCase().includes(term) ||
-		e.equipment?.toLowerCase().includes(term)
+	const base = !term ? exercises.value : exercises.value.filter(e =>
+		(e.displayName || e.name || '').toLowerCase().includes(term) ||
+		(e.muscleGroup || '').toLowerCase().includes(term) ||
+		(e.equipment || '').toLowerCase().includes(term)
 	)
+	// preserve base ordering (already sorted by displayName in util)
+	return base
 })
 
 function toggleExercise(exercise) {
@@ -440,7 +436,7 @@ watch(selectedExercises, saveDraft, { deep: true })
 		<div v-else-if="!isSignedIn" class="auth-gate">
 			<p class="auth-gate-text">{{ t('builder.authGate') }}</p>
 		</div>
-		<div v-else class="type-select">
+		<div v-else-if="initialReady" class="type-select">
 			<label for="wb-type" class="type-label">{{ t('builder.stepType') }}</label>
 			<div v-if="isMobile" class="mobile-ex-picker">
 				<button class="open-picker-btn" @click="showTypePicker = true">
@@ -483,16 +479,16 @@ watch(selectedExercises, saveDraft, { deep: true })
 				<div class="search-row">
 					<input v-model="search" class="search-input" type="search" :placeholder="t('builder.searchPlaceholder')" />
 				</div>
-				<div v-if="loading" class="exercises-grid">
+				<div v-if="loading && initialReady" class="exercises-grid">
 					<div v-for="n in 6" :key="n" class="exercise-item sk"></div>
 				</div>
-				<div v-else-if="!loading && filteredExercises.length === 0" class="empty-state">
+				<div v-else-if="!loading && filteredExercises.length === 0 && initialReady" class="empty-state">
 					<p>😅 Keine Übungen für diese Kategorie verfügbar</p>
 				</div>
 				<div v-else class="exercises-grid">
 					<div v-for="exercise in filteredExercises" :key="exercise._id" :class="{ selected: isSelected(exercise) }" class="exercise-item" @click="toggleExercise(exercise)">
 						<div class="ex-row">
-							<span class="title">{{ exercise.name }}</span>
+							<span class="title">{{ exercise.displayName || exercise.name }}</span>
 							<span class="sub">{{ exercise.muscleGroup }}</span>
 							<span class="sub small">{{ exercise.equipment || t('exercises.bodyweight') }}</span>
 						</div>
@@ -518,19 +514,19 @@ watch(selectedExercises, saveDraft, { deep: true })
 					   <div class="search-row in-sheet">
 						   <input v-model="search" class="search-input" type="search" :placeholder="t('builder.searchPlaceholder')" />
 					   </div>
-					   <div class="picker-list" :aria-busy="loading">
+			   		   <div class="picker-list" :aria-busy="loading">
 						   <div v-if="loading" class="exercises-grid">
 							   <div v-for="n in 6" :key="n" class="exercise-item sk"></div>
 						   </div>
-						   <div v-else class="exercises-grid">
-							   <div v-for="exercise in filteredExercises" :key="exercise._id" :class="{ selected: isSelected(exercise) }" class="exercise-item" @click="toggleExercise(exercise)">
-								   <div class="ex-row">
-									   <span class="title">{{ exercise.name }}</span>
-									   <span class="sub">{{ exercise.muscleGroup }}</span>
-									   <span class="sub small">{{ exercise.equipment || t('exercises.bodyweight') }}</span>
-								   </div>
-							   </div>
-						   </div>
+			   		   <div v-else class="exercises-grid">
+			   		   	<div v-for="exercise in filteredExercises" :key="exercise._id" :class="{ selected: isSelected(exercise) }" class="exercise-item" @click="toggleExercise(exercise)">
+			   		   		<div class="ex-row">
+			   		   			<span class="title">{{ exercise.displayName || exercise.name }}</span>
+			   		   			<span class="sub">{{ exercise.muscleGroup }}</span>
+			   		   			<span class="sub small">{{ exercise.equipment || t('exercises.bodyweight') }}</span>
+			   		   		</div>
+			   		   	</div>
+			   		   </div>
 					   </div>
 					   <div class="picker-actions">
 						   <button class="done-btn" @click="showMobilePicker = false">{{ t('builder.done') }}</button>
@@ -542,7 +538,7 @@ watch(selectedExercises, saveDraft, { deep: true })
 				<div v-for="(exercise, index) in selectedExercises" :key="exercise._id" class="selected-exercise" draggable="true" @dragstart="onDragStart(index)" @dragover.prevent
 ="onDrop(index)">
 					<div class="sel-row">
-						<span class="ex-name">{{ exercise.name }}</span>
+						<span class="ex-name">{{ exercise.displayName || exercise.name }}</span>
 						<input type="text" v-model="exercise.note" :placeholder="t('builder.notePlaceholder')" maxlength="150" />
 					</div>
 					<div class="sets-editor">
@@ -580,12 +576,14 @@ watch(selectedExercises, saveDraft, { deep: true })
 	min-height: 100vh;
 	background: var(--bg);
 	color: var(--fg);
-	padding: 20px;
+	/* Safe-Area oben berücksichtigen (iPhone Notch) */
+	padding: calc(20px + var(--safe-top, 0px)) 20px 80px 20px;
 	padding-bottom: 80px;
 }
 .builder-topbar {
 	position: sticky;
-	top: 0;
+	/* Unterhalb der Safe-Area einrasten */
+	top: var(--safe-top, 0px);
 	z-index: 10;
 	display: flex;
 	align-items: center;

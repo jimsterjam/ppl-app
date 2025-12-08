@@ -86,6 +86,56 @@ body {
 
 #app { width: 100%; min-height: 100vh; background: var(--bg); color: var(--fg); position: relative; }
 
+/* iOS safe-area utilities and overflow guards */
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --header-height: 56px;
+}
+
+.app-shell {
+  padding-top: calc(var(--safe-top) + var(--header-height));
+  padding-bottom: var(--safe-bottom);
+  max-width: 100%;
+}
+
+.header-fixed {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  height: calc(var(--safe-top) + var(--header-height));
+  padding-top: var(--safe-top);
+  display: flex;
+  align-items: center;
+  z-index: 1000;
+}
+
+.toast-host.top {
+  position: fixed;
+  top: var(--safe-top);
+  left: 0; right: 0;
+  z-index: 1100;
+  pointer-events: none;
+}
+
+.toast-host.bottom {
+  position: fixed;
+  bottom: var(--safe-bottom);
+  left: 0; right: 0;
+  z-index: 1100;
+  pointer-events: none;
+}
+
+.bottom-nav {
+  position: fixed;
+  left: 0; right: 0; bottom: 0;
+  padding-bottom: var(--safe-bottom);
+  z-index: 1000;
+}
+
+.main-content { max-width: 100%; overflow-x: hidden; }
+
+img, canvas, svg { max-width: 100%; height: auto; display: block; }
+
 /* Glass utilities */
 .glass {
   background: color-mix(in oklab, var(--fg) 6%, transparent);

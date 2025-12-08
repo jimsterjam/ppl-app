@@ -34,7 +34,8 @@ export const messages = {
       sets: 'Sätze',
       reps: 'Wdh.',
       duration: 'Dauer',
-      today: 'Heute',
+      
+      
       unknownDuration: 'Dauer unbekannt',
       more: 'weitere',
       select: 'Auswählen'

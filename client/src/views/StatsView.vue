@@ -94,6 +94,7 @@ import HeaderBar from '@/components/HeaderBar.vue'
 import WorkoutTypeChart from '@/components/WorkoutTypeChart.vue'
 import ProgressChart from '@/components/ProgressChart.vue'
 import BottomNav from '@/components/BottomNav.vue'
+import { logger } from '@/utils/logger'
 
 
 const { getIdToken, onAuthStateChanged } = useFirebaseAuth()

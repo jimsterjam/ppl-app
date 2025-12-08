@@ -207,8 +207,9 @@ function startWorkout(typeOrId) {
     router.push({ name: 'workout-builder', query: { type: safeType } });
   }
 }
-function startNewWorkout() {
-  router.push({ name: 'workout-builder' });
+async function startNewWorkout() {
+  await store.clearDraft()
+  router.push({ name: 'workout-builder' })
 }
 
 // keep a single afterEach registration to avoid duplicates

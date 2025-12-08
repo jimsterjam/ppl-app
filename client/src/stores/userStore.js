@@ -69,7 +69,10 @@ export const useUserStore = defineStore("user", {
 
     draftTimestamp: (state) => {
       const draft = state.workouts.find(w => w.isDraft);
-      return draft ? new Date(draft.updatedAt || draft.date) : null;
+      if (!draft) return null;
+      const ts = draft.updatedAt || draft.date || draft._syncedAt || draft.createdAt;
+      const d = typeof ts === 'number' ? new Date(ts) : new Date(ts);
+      return isNaN(d.getTime()) ? null : d;
     }
   },
   actions: {
@@ -238,6 +241,23 @@ export const useUserStore = defineStore("user", {
       } catch (error) {
         console.error('❌ [Demo] Error completing workout:', error)
         throw error
+      }
+    },
+
+    async clearDraft() {
+      try {
+        const { deleteWorkoutOffline } = await import('@/utils/offlineStorage')
+        await deleteWorkoutOffline('draft')
+      } catch (e) {
+        console.warn('⚠️ [userStore] Konnte Offline-Draft nicht löschen:', e)
+      }
+      try {
+        const before = this.workouts.length
+        this.workouts = this.workouts.filter(w => !w.isDraft)
+        const after = this.workouts.length
+        console.log('🧹 [userStore] Draft aus Store entfernt. Workouts:', before, '→', after)
+      } catch (e) {
+        // ignore
       }
     },
 
