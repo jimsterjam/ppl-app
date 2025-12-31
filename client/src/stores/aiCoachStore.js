@@ -15,6 +15,7 @@ Hinweise: [kurze, motivierende Tipps]
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { getAuthToken } from '@/utils/authToken'
+import { logger } from '@/utils/logger'
 
 export const useAICoachStore = defineStore('aiCoach', () => {
   const recommendations = ref([])
@@ -51,7 +52,7 @@ export const useAICoachStore = defineStore('aiCoach', () => {
   const generateWorkoutSuggestion = async (context = {}) => {
     isLoading.value = true
     error.value = null
-    console.log('🧠 Demo AI Coach: Generiere lokalen Vorschlag...')
+    logger.debug('🧠 Demo AI Coach: Generiere lokalen Vorschlag...')
     // Demo-Workouts
     const demoSuggestions = [
       {
@@ -95,7 +96,7 @@ export const useAICoachStore = defineStore('aiCoach', () => {
   
   // Offline/Demo: Analyse lokal simulieren
   const analyzeProgress = async () => {
-    console.log('🧠 Demo AI Coach: Analysiere Fortschritt lokal...')
+    logger.debug('🧠 Demo AI Coach: Analysiere Fortschritt lokal...')
     // Demo-Daten für Progress Analysis
     const demoInsights = [
       {
@@ -139,13 +140,13 @@ export const useAICoachStore = defineStore('aiCoach', () => {
     }
     insights.value = analysis.insights
     adaptations.value = analysis.adaptations
-    console.log('🧠 Demo AI Coach: Analyse abgeschlossen')
+    logger.debug('🧠 Demo AI Coach: Analyse abgeschlossen')
     return analysis
   }
   
   // Offline/Demo: Plateau Detection lokal simulieren
   const detectPlateau = async () => {
-    console.log('🧠 Demo AI Coach: Simuliere Plateau Detection...')
+    logger.debug('🧠 Demo AI Coach: Simuliere Plateau Detection...')
     // Demo-Daten für Plateau Detection
     const demoPlateauData = {
       hasPlateaus: Math.random() > 0.5,
@@ -178,7 +179,7 @@ export const useAICoachStore = defineStore('aiCoach', () => {
         exercises: demoPlateauData.affectedExercises
       })
     }
-    console.log('🧠 Demo AI Coach: Plateau Detection abgeschlossen, hasPlateaus:', demoPlateauData.hasPlateaus)
+    logger.debug('🧠 Demo AI Coach: Plateau Detection abgeschlossen, hasPlateaus:', demoPlateauData.hasPlateaus)
     return demoPlateauData
   }
   
@@ -228,7 +229,7 @@ export const useAICoachStore = defineStore('aiCoach', () => {
   }
   
   const submitFeedback = async (recommendationId, feedback) => {
-    console.log('📝 Feedback submitted:', { recommendationId, feedback })
+    logger.debug('📝 Feedback submitted:', { recommendationId, feedback })
     return true
   }
 

@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-        <string>pushpulllegs</string>
+	<string>pushpulllegs</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -51,7 +51,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>com.pushpulllegs.com</string>
-				<string>com.googleusercontent.apps.109118119734-a1ruf512sojeho0vkgrkjmutp2v2j03g</string>
+				<string>com.googleusercontent.apps.440924652132-h60bcdrh3nu22nf72pagohfgg7cslq8r</string>
 			</array>
 		</dict>
 	</array>
@@ -61,7 +61,6 @@
 	<true/>
 	<key>NSAppTransportSecurity</key>
 	<dict>
-		<!-- Erlaubt HTTP-Ladevorgänge innerhalb WKWebView/CTFramesetter (nur für Entwicklung im lokalen Netz) -->
 		<key>NSAllowsArbitraryLoadsInWebContent</key>
 		<true/>
 		<key>NSAllowsLocalNetworking</key>

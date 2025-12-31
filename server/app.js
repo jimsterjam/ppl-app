@@ -27,8 +27,7 @@ validateEnv();
 // Express App
 const app = express();
 
-// Clerk Middleware
-app.use(clerkMiddleware());
+// Clerk Middleware entfernt
 
 // CORS
 const allowedOrigins = new Set(["http://localhost:5173", "http://localhost:5174"]);

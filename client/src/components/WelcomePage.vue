@@ -1,11 +1,13 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
-import { useFirebaseAuth } from '@/utils/firebaseAuth'
+import { initFirebaseAuth, useFirebaseAuth } from '@/utils/firebaseAuth'
 import { useAuthStore } from '@/stores/authStore'
 // import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import MotivationWidget from '@/components/MotivationWidget.vue'
 import { useI18n } from 'vue-i18n'
+import { Capacitor } from '@capacitor/core'
+import { logger } from '@/utils/logger'
 
 // Optionaler Callback vom Wrapper (aktuell nicht genutzt, behalten für Abwärtskompat.)
 defineProps({
@@ -37,18 +39,18 @@ function getRedirectTarget() {
 
 function goNow() {
     const target = getRedirectTarget()
-    console.log('[WelcomePage] Redirecting now to:', target, 'current route before:', router.currentRoute?.value?.fullPath)
+    logger.debug('[WelcomePage] Redirecting now to:', target, 'current route before:', router.currentRoute?.value?.fullPath)
     router.replace(target)
         .then(() => {
-            console.log('[WelcomePage] Redirect completed via goNow. Current route:', router.currentRoute?.value?.fullPath)
+            logger.debug('[WelcomePage] Redirect completed via goNow. Current route:', router.currentRoute?.value?.fullPath)
         })
         .catch((err) => {
-            console.error('[WelcomePage] Redirect via goNow failed:', err)
+            logger.error('[WelcomePage] Redirect via goNow failed:', err)
         })
 }
 
 function startMotivationFlow() {
-    console.log('[WelcomePage] startMotivationFlow triggered (route:', router.currentRoute?.value?.fullPath, ')')
+    logger.debug('[WelcomePage] startMotivationFlow triggered (route:', router.currentRoute?.value?.fullPath, ')')
     showMotivation.value = true
     // Sicherheits-Reset, falls bereits ein Timer existiert
     if (redirectTimer) {
@@ -61,7 +63,7 @@ function startMotivationFlow() {
 }
 
 function skipNow() {
-    console.log('[WelcomePage] skipNow invoked')
+    logger.debug('[WelcomePage] skipNow invoked')
     if (redirectTimer) {
         clearTimeout(redirectTimer)
         redirectTimer = null
@@ -79,7 +81,7 @@ onBeforeUnmount(() => {
 function maybeProceed() {
     if (!isSignedIn.value) return
     // Immer Motivation anzeigen
-    console.log('[WelcomePage] maybeProceed -> user is signed in, starting flow (route:', router.currentRoute?.value?.fullPath, ')')
+    logger.debug('[WelcomePage] maybeProceed -> user is signed in, starting flow (route:', router.currentRoute?.value?.fullPath, ')')
     startMotivationFlow()
 }
 
@@ -121,12 +123,18 @@ async function handleGoogleLogin() {
     authError.value = ''
     authLoading.value = true
     try {
-        console.log('[WelcomePage] Google login start')
+        // Stelle sicher, dass Auth initialisiert ist (doppelt hält besser)
+        await initFirebaseAuth()
+
+        const platform = Capacitor?.getPlatform?.() ?? Capacitor?.platform ?? 'unknown'
+        const native = platform !== 'web'
+        logger.debug('[WelcomePage] Google login start', { platform, native })
+
         const result = await signInWithGoogle()
         // Kein direktes Setzen des Stores mehr – nur echter Firebase-Status zählt
         const token = await getIdToken()
         const user = getCurrentUser()
-        console.log('[WelcomePage] Post-login check (should rely on auth listener):', { hasUser: !!user, hasToken: !!token, pending: !!result?.pending })
+        logger.debug('[WelcomePage] Post-login check (should rely on auth listener):', { hasUser: !!user, hasToken: !!token, pending: !!result?.pending })
         // Falls bereits jetzt verfügbar, übernimmt der globale Listener dennoch das Setzen
         // Wir triggern hier nur eine Navigation, wenn wirklich token vorhanden ist
         if (user && token) {
@@ -134,24 +142,24 @@ async function handleGoogleLogin() {
             showMotivation.value = false
             try { document.activeElement?.blur() } catch {}
             await new Promise((res) => setTimeout(res, 0))
-            console.log('[WelcomePage] Navigating after confirmed token to:', target)
+            logger.debug('[WelcomePage] Navigating after confirmed token to:', target)
             await router.replace(target)
         } else {
             // Andernfalls warten wir auf den globalen onAuthStateChanged-Flow
-            console.log('[WelcomePage] Waiting for auth state; no immediate navigation')
+            logger.debug('[WelcomePage] Waiting for auth state; no immediate navigation')
         }
     } catch (err) {
-        console.error('[WelcomePage] Google login failed:', err)
+        logger.error('[WelcomePage] Google login failed:', err?.message || err, err)
         authError.value = err.message || 'Google Login fehlgeschlagen'
     } finally {
-        console.log('[WelcomePage] Google login finished, resetting loading state')
+        logger.debug('[WelcomePage] Google login finished, resetting loading state')
         authLoading.value = false
     }
 }
 
 // Deaktiviere Motivation-Overlay im nativen Flow; Navigation erfolgt direkt im Login-Handler
 watch(isSignedIn, async (loggedIn) => {
-    console.log('[WelcomePage] watch isSignedIn ->', loggedIn, 'route:', router.currentRoute?.value?.fullPath)
+    logger.debug('[WelcomePage] watch isSignedIn ->', loggedIn, 'route:', router.currentRoute?.value?.fullPath)
     if (!loggedIn) {
         showMotivation.value = false
         return
@@ -163,10 +171,10 @@ watch(isSignedIn, async (loggedIn) => {
         showMotivation.value = false
         try { document.activeElement?.blur() } catch {}
         await new Promise((res) => setTimeout(res, 0))
-        console.log('[WelcomePage] Auth confirmed via watcher; navigating to:', target)
+        logger.debug('[WelcomePage] Auth confirmed via watcher; navigating to:', target)
         router.replace(target)
     } else {
-        console.log('[WelcomePage] isSignedIn true but no token yet; holding')
+        logger.debug('[WelcomePage] isSignedIn true but no token yet; holding')
     }
 }, { immediate: true })
 </script>

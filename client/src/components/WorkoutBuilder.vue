@@ -102,6 +102,7 @@ import UpgradeModal from '@/components/UpgradeModal.vue';
 import { getAllExercisesOffline } from '@/utils/offlineStorage';
 import { getMergedSortedExercises } from '@/utils/exerciseList';
 import { saveWorkoutOffline, getWorkoutOffline } from '@/utils/offlineStorage';
+import { logger } from '@/utils/logger'
 
 
 // --- State & Stores ---
@@ -112,7 +113,7 @@ const userStore = useUserStore()
 const { auth, getCurrentUser, onAuthStateChanged, getIdToken } = useFirebaseAuth()
 const firebaseUser = ref(null)
 onAuthStateChanged((user) => {
-  console.log('WorkoutBuilder onAuthStateChanged:', user)
+	logger.debug('WorkoutBuilder onAuthStateChanged:', user)
   firebaseUser.value = user
   userStore.user = user ? { id: user.uid, email: user.email, displayName: user.displayName } : null
   if (user) {
@@ -280,7 +281,7 @@ onMounted(async () => {
 
 	// Prüfe Auth-Status sofort
 	const currentUser = getCurrentUser()
-	console.log('WorkoutBuilder onMounted getCurrentUser:', currentUser)
+	logger.debug('WorkoutBuilder onMounted getCurrentUser:', currentUser)
 	if (currentUser) {
 		firebaseUser.value = currentUser
 		loadDraft()

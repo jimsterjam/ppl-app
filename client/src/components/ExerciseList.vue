@@ -130,10 +130,10 @@ async function loadExercises() {
         allExercises = allExercises.filter(ex => ex.muscleGroup === selectedMuscleGroup.value || (ex.muscleGroups && ex.muscleGroups.includes(selectedMuscleGroup.value)))
       }
       exercises.value = allExercises
-      console.log(`✅ [Demo] Loaded ${exercises.value.length} Übungen aus localStorage`)
+      logger.debug(`✅ [Demo] Loaded ${exercises.value.length} Übungen aus localStorage`)
     } else {
       exercises.value = []
-      console.log('⚠️ [Demo] Keine Übungen in localStorage gefunden')
+      logger.debug('⚠️ [Demo] Keine Übungen in localStorage gefunden')
     }
   } catch (err) {
     logger.error('[Demo] Fehler beim Laden der Übungen:', err)

@@ -16,6 +16,7 @@ import FeaturesTestView from '../views/FeaturesTestView.vue'
 import LegalNoticeView from '../views/LegalNoticeView.vue'
 import { useAuthStore } from '@/stores/authStore'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
+import { logger } from '@/utils/logger'
 
 const routes = [
   {
@@ -94,7 +95,7 @@ router.beforeEach(async (to, from, next) => {
   if (!authStore.isAuthenticated) {
     const currentUser = getCurrentUser()
     if (currentUser) {
-      console.log('[router] restoring auth state from Firebase user')
+      logger.debug('[router] restoring auth state from Firebase user')
       const token = await getIdToken().catch(() => null)
       authStore.setUser({
         uid: currentUser.uid,
@@ -105,13 +106,13 @@ router.beforeEach(async (to, from, next) => {
     }
   }
 
-  console.log('[router] navigating to', to.fullPath, 'auth:', authStore.isAuthenticated, 'initialized:', authStore.initialized)
+  logger.debug('[router] navigating to', to.fullPath, 'auth:', authStore.isAuthenticated, 'initialized:', authStore.initialized)
 
   // Public routes bleiben immer zugänglich
   if (to.name === 'welcome' || to.meta.requiresAuth === false) {
     // Wenn bereits eingeloggt und auf /, direkt ins Dashboard
     if (to.name === 'welcome' && authStore.isAuthenticated) {
-      console.log('[router] already authenticated, redirecting from welcome to dashboard')
+      logger.debug('[router] already authenticated, redirecting from welcome to dashboard')
       return next({ name: 'dashboard' })
     }
     return next()
@@ -119,7 +120,7 @@ router.beforeEach(async (to, from, next) => {
 
   // Für alle anderen Routen: Auth erforderlich
   if (!authStore.isAuthenticated) {
-    console.log('[router] not authenticated, redirecting to welcome with redirect query')
+    logger.debug('[router] not authenticated, redirecting to welcome with redirect query')
     return next({ name: 'welcome', query: { redirect: to.fullPath } })
   }
 
@@ -130,7 +131,7 @@ router.beforeEach(async (to, from, next) => {
     token = await getIdToken()
   } catch { token = null }
   if (!realUser || !token) {
-    console.warn('[router] Auth store out of sync with Firebase (user/token missing). Forcing sign-out redirect.')
+    logger.warn('[router] Auth store out of sync with Firebase (user/token missing). Forcing sign-out redirect.')
     authStore.clearUser()
     return next({ name: 'welcome', query: { redirect: to.fullPath } })
   }

@@ -140,7 +140,6 @@ const nextLabel = computed(() => store.nextWorkoutLabel)
 const lastLabel = computed(() => store.lastWorkoutLabel)
 const hasDraft = computed(() => {
   const hd = store.hasDraft
-  console.log('📋 [Dashboard] hasDraft:', hd, 'draftType:', store.draftType, 'draftTimestamp:', store.draftTimestamp)
   return hd
 })
 const draftType = computed(() => store.draftType)
@@ -149,7 +148,6 @@ const draftId = computed(() => store.workouts.find(w => w.isDraft)?._id)
 
 const startButtonText = computed(() => {
   const text = hasDraft.value ? $t('dashboard.resumeDraft') : $t('dashboard.startNext')
-  console.log('Dashboard startButtonText:', text, 'hasDraft:', hasDraft.value)
   return text
 })
 
@@ -166,15 +164,14 @@ const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1)
 
 // Load workouts
 async function loadWorkoutsData(force = false) {
-  console.log('📥 [Dashboard] loadWorkoutsData aufgerufen, force:', force);
   try {
     const token = await getIdToken();
     const currentUser = getCurrentUser ? getCurrentUser() : null;
-    console.log('🔑 [Dashboard] Token vorhanden:', !!token, 'User:', !!currentUser);
+    logger.debug('🔑 [Dashboard] Token vorhanden:', !!token, 'User:', !!currentUser)
     if (token && currentUser) {
-      logger.debug('📥 DashboardView - Lade Workouts', force ? '(forced)' : '(cached allowed)', 'Token:', token)
+      logger.debug('📥 DashboardView - Lade Workouts', force ? '(forced)' : '(cached allowed)')
       await store.loadWorkouts(token, { force })
-      console.log('✅ [Dashboard] Workouts geladen');
+      logger.debug('✅ [Dashboard] Workouts geladen')
     } else {
       logger.warn('⚠️ Workouts werden nicht geladen, da kein Token/User vorhanden ist.');
     }
@@ -197,13 +194,12 @@ async function refreshData() {
 
 // Start Workout
 function startWorkout(typeOrId) {
-  console.log('🏁 [Dashboard] startWorkout called with:', typeOrId, 'hasDraft:', hasDraft.value, 'draftId:', draftId.value);
   if (hasDraft.value) {
-    console.log('🏁 [Dashboard] Navigating to workout-detail:', draftId.value);
+    logger.debug('🏁 [Dashboard] Navigating to workout-detail:', draftId.value)
     router.push({ name: 'workout-detail', params: { id: draftId.value } });
   } else {
     const safeType = typeof typeOrId === 'string' && typeOrId.length > 0 ? typeOrId : 'push';
-    console.log('🏁 [Dashboard] Navigating to workout-builder with type:', safeType);
+    logger.debug('🏁 [Dashboard] Navigating to workout-builder with type:', safeType)
     router.push({ name: 'workout-builder', query: { type: safeType } });
   }
 }
@@ -231,9 +227,9 @@ onMounted(() => {
 
   if (!afterEachRegistered) {
     const unregister = router.afterEach((to, from) => {
-      console.log('🧭 [Dashboard] router.afterEach:', to.path, from.path);
+      logger.debug('🧭 [Dashboard] router.afterEach:', to.path, from.path)
       if (to.name === 'dashboard' && from.name !== 'dashboard') {
-        console.log('🔄 [Dashboard] Navigiert zu Dashboard, lade Workouts neu');
+        logger.debug('🔄 [Dashboard] Navigiert zu Dashboard, lade Workouts neu')
         loadWorkoutsData(true);
       }
     })
@@ -258,12 +254,11 @@ onUnmounted(() => {
 })
 
 onActivated(async () => {
-  console.log('🔄 [Dashboard] onActivated triggered');
   if (isSignedIn.value) {
     logger.debug('📥 DashboardView - Route aktiviert, lade Workouts neu')
     await loadWorkoutsData(true)
   } else {
-    console.log('🚫 [Dashboard] onActivated: Nicht eingeloggt');
+    logger.debug('🚫 [Dashboard] onActivated: Nicht eingeloggt')
   }
 })
 </script>

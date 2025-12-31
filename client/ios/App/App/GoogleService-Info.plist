@@ -2,10 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>CFBundleIdentifier</key>
+	<string></string>
 	<key>CLIENT_ID</key>
-	<string>109118119734-a1ruf512sojeho0vkgrkjmutp2v2j03g.apps.googleusercontent.com</string>
+	<string>440924652132-h60bcdrh3nu22nf72pagohfgg7cslq8r.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.109118119734-a1ruf512sojeho0vkgrkjmutp2v2j03g</string>
+	<string>com.googleusercontent.apps.440924652132-h60bcdrh3nu22nf72pagohfgg7cslq8r</string>
 	<key>API_KEY</key>
 	<string>AIzaSyAz_3hQdbMqxv3NiQS2O00euxsPnLSAdU0</string>
 	<key>GCM_SENDER_ID</key>
@@ -19,16 +21,16 @@
 	<key>STORAGE_BUCKET</key>
 	<string>ppl-workout-01.firebasestorage.app</string>
 	<key>IS_ADS_ENABLED</key>
-	<false></false>
+	<false/>
 	<key>IS_ANALYTICS_ENABLED</key>
-	<false></false>
+	<false/>
 	<key>IS_APPINVITE_ENABLED</key>
-	<true></true>
+	<true/>
 	<key>IS_GCM_ENABLED</key>
-	<true></true>
+	<true/>
 	<key>IS_SIGNIN_ENABLED</key>
-	<true></true>
+	<true/>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:440924652132:ios:89e737be943130ed219571</string>
+	<string>1:440924652132:ios:60da56556afd2e4a219571</string>
 </dict>
 </plist>

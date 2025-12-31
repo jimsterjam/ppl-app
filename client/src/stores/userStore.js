@@ -1,4 +1,5 @@
 import { defineStore } from "pinia";
+import { logger } from '@/utils/logger'
 
 
 export const useUserStore = defineStore("user", {
@@ -34,7 +35,7 @@ export const useUserStore = defineStore("user", {
       const workout = state.workouts.find(w => 
         (w?.date || '').startsWith(today) && (w.completed === false || w.completed === undefined) && !w.isDraft
       );
-      console.log('🧠 [userStore] todaysWorkout:', workout ? { _id: workout._id, name: workout.name, completed: workout.completed, isDraft: workout.isDraft } : null);
+      logger.debug('🧠 [userStore] todaysWorkout:', workout ? { _id: workout._id, name: workout.name, completed: workout.completed, isDraft: workout.isDraft } : null)
       return workout;
     },
 
@@ -61,7 +62,7 @@ export const useUserStore = defineStore("user", {
 
     hasDraft: (state) => {
       const has = state.workouts.some(w => w.isDraft);
-      console.log('🧠 [userStore] hasDraft:', has, 'drafts:', state.workouts.filter(w => w.isDraft).map(w => ({ _id: w._id, name: w.name })));
+      logger.debug('🧠 [userStore] hasDraft:', has, 'drafts:', state.workouts.filter(w => w.isDraft).map(w => ({ _id: w._id, name: w.name })) )
       return has;
     },
 
@@ -97,27 +98,27 @@ export const useUserStore = defineStore("user", {
         }));
         this.workoutsLoaded = true;
         this.workoutsLoadedAt = Date.now();
-        console.log(`✅ [API] Loaded ${this.workouts.length} workouts from server:`, this.workouts.map(w => ({ _id: w._id, name: w.name, completed: w.completed, isDraft: w.isDraft })));
+        logger.debug(`✅ [API] Loaded ${this.workouts.length} workouts from server:`, this.workouts.map(w => ({ _id: w._id, name: w.name, completed: w.completed, isDraft: w.isDraft })));
 
         // Lokale Drafts laden und hinzufügen
         try {
           const { getWorkoutOffline } = await import('@/utils/offlineStorage');
           const localDraft = await getWorkoutOffline('draft');
-          if (localDraft) {
+            if (localDraft) {
             // Stelle sicher, dass isDraft gesetzt ist
             localDraft.isDraft = true;
             this.workouts.push(localDraft);
-            console.log('✅ [Offline] Draft geladen und hinzugefügt:', { _id: localDraft._id, name: localDraft.name });
+              logger.debug('✅ [Offline] Draft geladen und hinzugefügt:', { _id: localDraft._id, name: localDraft.name });
           } else {
-            console.log('ℹ️ [Offline] Kein lokaler Draft gefunden');
+            logger.debug('ℹ️ [Offline] Kein lokaler Draft gefunden');
           }
         } catch (e) {
-          console.warn('⚠️ Fehler beim Laden des lokalen Drafts:', e);
+          logger.warn('⚠️ Fehler beim Laden des lokalen Drafts:', e);
         }
 
         return this.workouts;
       } catch (error) {
-        console.error('❌ [API] Error loading workouts from server:', error);
+        logger.error('❌ [API] Error loading workouts from server:', error);
         this.error = error?.message || 'Fehler beim Laden der Workouts';
         this.workouts = [];
       } finally {
@@ -133,13 +134,13 @@ export const useUserStore = defineStore("user", {
         const data = localStorage.getItem('bro_split_stats')
         if (data) {
           this.stats = JSON.parse(data)
-          console.log('✅ [Demo] Stats loaded from localStorage:', this.stats)
+          logger.debug('✅ [Demo] Stats loaded from localStorage:', this.stats)
         } else {
           this.stats = null
-          console.log('⚠️ [Demo] No stats in localStorage')
+          logger.debug('⚠️ [Demo] No stats in localStorage')
         }
       } catch (error) {
-        console.error('❌ [Demo] Error loading stats from localStorage:', error)
+        logger.error('❌ [Demo] Error loading stats from localStorage:', error)
         this.stats = null
       } finally {
         this.loadingStats = false
@@ -147,29 +148,29 @@ export const useUserStore = defineStore("user", {
     },
 
     async createWorkout(workoutData, token = null) {
-      console.log('🏗️ [userStore] createWorkout called:', workoutData, 'token:', !!token);
+      logger.debug('🏗️ [userStore] createWorkout called:', workoutData, 'token:', !!token)
       try {
-        console.log('DEBUG: createWorkout token:', token, 'data:', workoutData);
+        logger.debug('DEBUG: createWorkout token:', token ? 'present' : 'null', 'data:', workoutData)
         const { createWorkout } = await import('@/api/workouts');
         const newWorkout = await createWorkout(workoutData, token);
-        console.log('🏗️ [userStore] API returned:', newWorkout);
+        logger.debug('🏗️ [userStore] API returned:', newWorkout)
         if (newWorkout) {
           this.workouts.push(newWorkout);
-          console.log('✅ [API] Workout created:', newWorkout._id);
+          logger.debug('✅ [API] Workout created:', newWorkout._id)
         }
         return newWorkout;
       } catch (error) {
-        console.error('❌ [API] Error creating workout:', error);
+        logger.error('❌ [API] Error creating workout:', error);
         throw error;
       }
     },
 
     async updateWorkout(id, updates, token = null) {
-      console.log('📡 [userStore] updateWorkout called:', id, updates);
+      logger.debug('📡 [userStore] updateWorkout called:', id, updates)
       // Wenn kein gültiges ObjectId: als neues Workout anlegen (POST)
       const isValidObjectId = typeof id === 'string' && /^[a-f\d]{24}$/i.test(id);
       if (!isValidObjectId) {
-        console.log('📡 [userStore] Invalid ObjectId, creating new workout');
+        logger.debug('📡 [userStore] Invalid ObjectId, creating new workout')
         try {
           const { createWorkout } = await import('@/api/workouts');
           // type aus vorhandenem Draft holen, falls nicht im updates-Objekt
@@ -189,9 +190,9 @@ export const useUserStore = defineStore("user", {
           // Entferne alle alten Drafts/temporären Workouts aus dem Store
           this.workouts = this.workouts.filter(w => /^[a-f\d]{24}$/i.test(w._id));
           // Füge das neue Workout hinzu
-          if (newWorkout) {
+            if (newWorkout) {
             this.workouts.push(newWorkout);
-            console.log('✅ [userStore] New workout created:', newWorkout._id, 'completed:', newWorkout.completed);
+            logger.debug('✅ [userStore] New workout created:', newWorkout._id, 'completed:', newWorkout.completed)
             // Lösche Draft aus Offline-DB, falls vorhanden
             try {
               const { db } = await import('@/utils/offlineStorage');
@@ -200,7 +201,7 @@ export const useUserStore = defineStore("user", {
           }
           return newWorkout;
         } catch (error) {
-          console.error('❌ [userStore] Error creating workout from draft:', error);
+          logger.error('❌ [userStore] Error creating workout from draft:', error);
           throw error;
         }
       }
@@ -218,7 +219,7 @@ export const useUserStore = defineStore("user", {
         }
         return updatedWorkout;
       } catch (error) {
-        console.error('❌ [userStore] Error updating workout:', error);
+        logger.error('❌ [userStore] Error updating workout:', error);
         throw error;
       }
     },
@@ -234,12 +235,12 @@ export const useUserStore = defineStore("user", {
             completedAt: new Date().toISOString()
           }
           localStorage.setItem('bro_split_workouts', JSON.stringify(this.workouts))
-          console.log('✅ [Demo] Workout marked completed offline:', id)
+          logger.debug('✅ [Demo] Workout marked completed offline:', id)
           return this.workouts[idx]
         }
         return null
       } catch (error) {
-        console.error('❌ [Demo] Error completing workout:', error)
+        logger.error('❌ [Demo] Error completing workout:', error)
         throw error
       }
     },
@@ -249,13 +250,13 @@ export const useUserStore = defineStore("user", {
         const { deleteWorkoutOffline } = await import('@/utils/offlineStorage')
         await deleteWorkoutOffline('draft')
       } catch (e) {
-        console.warn('⚠️ [userStore] Konnte Offline-Draft nicht löschen:', e)
+        logger.warn('⚠️ [userStore] Konnte Offline-Draft nicht löschen:', e)
       }
       try {
         const before = this.workouts.length
         this.workouts = this.workouts.filter(w => !w.isDraft)
         const after = this.workouts.length
-        console.log('🧹 [userStore] Draft aus Store entfernt. Workouts:', before, '→', after)
+        logger.debug('🧹 [userStore] Draft aus Store entfernt. Workouts:', before, '→', after)
       } catch (e) {
         // ignore
       }

@@ -36,6 +36,7 @@
 
 <script setup>
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { logger } from '@/utils/logger'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -84,8 +85,8 @@ watch(() => props.visible, async (v) => {
       }
     }
     nextTick(() => setTimeout(ensureMeasure, 30))
-  } catch (err) {
-    console.warn('picker visible watch error', err)
+      } catch (err) {
+    logger.warn('picker visible watch error', err)
   }
 })
 

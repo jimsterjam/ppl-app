@@ -174,9 +174,16 @@ export async function fetchWorkoutStats(token = null) {
 export async function deleteAllWorkouts(token = null) {
   try {
     const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
-    const res = await api.delete("", config);
-    return res.data;
+    const res = await api.delete("", { ...config, validateStatus: () => true });
+    // Graceful handling: wenn Server 200/204 liefert, Daten zurückgeben
+    if (res.status >= 200 && res.status < 300) {
+      return res.data || { deletedCount: 0 };
+    }
+    // Wenn DB nicht verbunden oder andere Serverantwort: nicht als Fehler werfen
+    return res.data || { deletedCount: 0 };
   } catch (error) {
-    throw handleAPIError(error, 'Alle Workouts löschen');
+    // Nicht hart abbrechen – Client-Cleanup läuft weiter
+    logger.warn('⚠️ Workouts API - Server-Delete fehlgeschlagen, fahre mit lokalem Cleanup fort');
+    return { deletedCount: 0 };
   }
 }

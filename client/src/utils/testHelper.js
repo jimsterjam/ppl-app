@@ -41,7 +41,7 @@ window.testApp = {
    */
   enableDevTools() {
     localStorage.setItem('enableDevTools', 'true')
-    console.log('✅ Developer Tools aktiviert! Gehe zu /settings')
+    logger.debug('✅ Developer Tools aktiviert! Gehe zu /settings')
   },
   
   /**
@@ -51,7 +51,7 @@ window.testApp = {
   resetSubscription() {
     localStorage.removeItem('subscription')
     sessionStorage.clear()
-    console.log('✅ Subscription zurückgesetzt!')
+    logger.debug('✅ Subscription zurückgesetzt!')
   },
   
   /**
@@ -65,7 +65,7 @@ window.testApp = {
     if ('indexedDB' in window) {
       indexedDB.deleteDatabase('fitness-app')
     }
-    console.log('✅ Alle App-Daten gelöscht!')
+    logger.debug('✅ Alle App-Daten gelöscht!')
   },
   
   /**
@@ -74,7 +74,7 @@ window.testApp = {
    */
   enableDebug() {
     localStorage.setItem('debug', 'subscription,ai,social,api')
-    console.log('✅ Debug-Modus aktiviert!')
+    logger.debug('✅ Debug-Modus aktiviert!')
   },
   
   /**
@@ -82,7 +82,7 @@ window.testApp = {
    * @returns {void}
    */
   help() {
-    console.log(`
+    logger.debug(`
 🧪 Test App Helper Functions:
 
 📱 Navigation:
@@ -112,7 +112,7 @@ window.testApp = {
  * Zeigt Hinweis in Browser-Konsole wenn auf localhost
  */
 if (window.location.hostname === 'localhost') {
-  console.log(`
+  logger.debug(`
 🚀 Fitness App - Development Mode
 
 Schnellzugriff:

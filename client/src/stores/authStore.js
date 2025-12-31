@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { logger } from '@/utils/logger'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -12,13 +13,13 @@ export const useAuthStore = defineStore('auth', {
   },
   actions: {
     setUser(user, idToken = null) {
-      console.log('[authStore] setUser called with user:', user?.uid)
+      logger.debug('[authStore] setUser called with user:', user?.uid)
       this.user = user
       this.idToken = idToken || this.idToken
       this.initialized = true
     },
     clearUser() {
-      console.log('[authStore] clearUser called')
+      logger.debug('[authStore] clearUser called')
       this.user = null
       this.idToken = null
       this.initialized = true

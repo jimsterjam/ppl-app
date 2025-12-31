@@ -12,8 +12,7 @@ import { logger } from "@/utils/logger";
 // Web: relativ über /api; Mobile (Capacitor): VITE_API_BASE + /api
 const API_URL = apiUrl('exercises');
 if (typeof window !== 'undefined') {
-  // eslint-disable-next-line no-console
-  console.info('[ExercisesAPI] baseURL =', API_URL);
+  logger.info('[ExercisesAPI] baseURL =', API_URL);
 }
 
 // Axios-Instance für Exercises

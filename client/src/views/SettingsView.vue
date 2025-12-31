@@ -225,8 +225,9 @@ import { useToastStore } from '@/stores/toastStore'
 import { useI18n } from 'vue-i18n'
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useFirebaseAuth } from '@/utils/firebaseAuth'
+import { initFirebaseAuth, useFirebaseAuth } from '@/utils/firebaseAuth'
 import { logger } from '@/utils/logger'
+import { deleteAllWorkouts } from '@/api/workouts'
 
 const themeStore = useThemeStore()
 const { theme } = storeToRefs(themeStore)
@@ -308,25 +309,46 @@ async function confirmDelete() {
         logger.warn('⚠️ Kein Auth-Token - MongoDB-Löschung übersprungen')
       }
     } catch (error) {
-      logger.error('❌ MongoDB-Löschung fehlgeschlagen:', error)
-      // Fortfahren mit lokaler Löschung
+      // Fortfahren mit lokaler Löschung – Fehler hier ist unkritisch
+      try {
+        const msg = error?.message || JSON.stringify(error) || String(error)
+        logger.warn('⚠️ MongoDB-Löschung nicht durchgeführt (fahre fort):', msg)
+      } catch {
+        logger.warn('⚠️ MongoDB-Löschung nicht durchgeführt (fahre fort)')
+      }
     }
 
-    logger.debug('🧹 Lösche lokale Daten...')
+    logger.debug('🧹 Lösche lokale Daten (gezielt, ohne Logout)...')
 
     // 2. Frontend Store: Alle Workouts aus dem Store löschen
     logger.debug('Store vor Löschung:', userStore.workouts.length, 'Workouts')
     userStore.$patch({ workouts: [], stats: null, workoutsLoaded: false, workoutsLoadedAt: 0 })
     logger.debug('Store nach Löschung:', userStore.workouts.length, 'Workouts')
     logger.debug('Store nach Löschung:', userStore.workouts.length, 'Workouts')
+    
+    // 3. LocalStorage: nur app-spezifische Daten löschen (ohne Auth/OAuth)
+    try {
+      logger.debug('🧹 Entferne App-Caches aus LocalStorage')
+      localStorage.removeItem('bro_split_workouts')
+      localStorage.removeItem('bro_split_stats')
+      localStorage.removeItem('wb_belief_last_shown')
+    } catch {}
 
-    // 3. LocalStorage komplett löschen
-    logger.debug('🧹 Lösche LocalStorage...')
-    localStorage.clear()
+    // 4. SessionStorage: gezielt Drafts/temporäres löschen
+    try {
+      logger.debug('🧹 Entferne Drafts aus SessionStorage')
+      const keys = Object.keys(sessionStorage)
+      keys.forEach(k => { if (k.includes('workout_detail_draft')) sessionStorage.removeItem(k) })
+    } catch {}
 
-    // 4. SessionStorage löschen (inkl. Drafts)
-    logger.debug('🧹 Lösche SessionStorage...')
-    sessionStorage.clear()
+    // 5. IndexedDB: lokale Workouts leeren
+    try {
+      const { db } = await import('@/utils/offlineStorage')
+      await db.workouts.clear()
+      logger.debug('🧹 IndexedDB Workouts geleert')
+    } catch (e) {
+      logger.warn('⚠️ Konnte IndexedDB Workouts nicht leeren:', e?.message || e)
+    }
 
     logger.debug('✅ Löschvorgang abgeschlossen')
 
@@ -337,17 +359,19 @@ async function confirmDelete() {
     // 6. Feedback geben
     toast.show($t('settings.deleteSuccess'), { type: 'success', duration: 3000 })
 
-    // 7. Zum Dashboard navigieren
-    logger.debug('🏠 Navigiere zum Dashboard...')
-    await router.push('/')
+    // 7. Auf aktueller Route bleiben (kein Logout/Redirect)
+    logger.debug('🏠 Bleibe auf Settings-View, kein Logout')
 
-    // 8. Store refresh für sofortiges UI-Update
+    // 8. Optional: Store refresh für sofortiges UI-Update
     logger.debug('🔄 Force refresh der Workout-Daten...')
     try {
-      await userStore.loadWorkouts(null, { force: true })
+      const token = await getIdToken().catch(() => null)
+      logger.debug('[Delete] token len', token?.length, token?.slice(0,20));
+      await userStore.loadWorkouts(token, { force: true })
       logger.debug('✅ Workouts neu geladen')
     } catch (e) {
-      logger.warn('⚠️ Neu-Laden fehlgeschlagen:', e)
+      // Bei Fehler: Store bleibt leer – UI ist bereits bereinigt
+      logger.warn('⚠️ Neu-Laden fehlgeschlagen, Store bleibt leer')
     }
   } catch (error) {
     logger.error('❌ Fehler beim Löschen der Daten:', error)
@@ -372,44 +396,53 @@ async function confirmDeleteAccount() {
   isDeletingAccount.value = true
 
   try {
-    const token = await getIdToken()
-    if (!token) {
-      throw new Error('No auth token')
+    // 1. Firebase Auth initialisieren
+    await initFirebaseAuth()
+    const { deleteCurrentAccount, getIdToken } = useFirebaseAuth()
+
+    // Hole wirklich das Token (nicht die Funktions-Referenz) und logge Länge + Prefix
+    const token = await getIdToken().catch(() => null)
+    logger.debug('[Debug] ID token len', token?.length, token?.slice(0, 20))
+
+    // Debug: aktuelles ID Token anzeigen
+    const debugToken = await getIdToken().catch(() => null)
+    logger.debug('[SettingsView] Delete account token:', debugToken)
+
+    // 2. Backend-Daten-Purge vor Account-Löschung
+    try {
+      const token = await getIdToken()
+      if (token) {
+        const purgeRes = await fetch('/api/account/purge', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        })
+        const purgeJson = await purgeRes.json().catch(() => ({}))
+        logger.debug('🧹 Account Purge:', purgeRes.status, purgeJson)
+      } else {
+        logger.warn('⚠️ Kein Token verfügbar – Purge übersprungen')
+      }
+    } catch (e) {
+      logger.warn('⚠️ Account Purge fehlgeschlagen, fahre fort')
     }
 
-    const response = await fetch('/api/account/delete', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-      },
-      body: JSON.stringify({
-        confirmation: 'ACCOUNT LÖSCHEN'
-      })
-    })
+    // 3. Firebase-Account löschen
+    await deleteCurrentAccount(confirmAccountText.value)
 
-    if (!response.ok) {
-      const error = await response.json()
-      throw new Error(error.error || 'Failed to delete account')
-    }
-
-    // Success
-    toast.show($t('settings.deleteAccountSuccess'), { type: 'success', duration: 3000 })
-
-    // Vollständiges Cleanup: Firebase Session beenden und LocalStorage leeren
-    await useFirebaseAuth().signOut()
-    
-    // LocalStorage komplett leeren (OAuth Tokens, etc.)
+    // 4. Frontend Cleanup
     localStorage.clear()
     sessionStorage.clear()
-    
-    // Small delay to ensure cleanup is complete
+    toast.show($t('settings.deleteAccountSuccess'), { type: 'success', duration: 3000 })
+
+    // 5. Nach Löschen zur Welcome-Seite navigieren
     setTimeout(() => {
       router.push({ name: 'welcome' })
     }, 100)
 
   } catch (error) {
-    console.error('Account deletion failed:', error)
+    logger.error('Account deletion failed:', error)
     toast.show($t('settings.deleteAccountError'), { type: 'error' })
   } finally {
     isDeletingAccount.value = false
@@ -417,6 +450,7 @@ async function confirmDeleteAccount() {
     confirmAccountText.value = ''
   }
 }
+
 
 // Toast-Settings entfernt – Toaster ist fest oben
 </script>

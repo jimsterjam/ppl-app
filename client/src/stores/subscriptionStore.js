@@ -33,6 +33,7 @@
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { logger } from '@/utils/logger'
 import { getAuthToken } from '@/utils/authToken'
 // Avoid calling useClerk/useAuth here: Pinia stores run outside a component setup
 // context and calling useClerk() may throw. We will rely on getAuthToken()
@@ -91,7 +92,7 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     const savedSubscription = localStorage.getItem('bro_split_subscription')
     if (savedSubscription) {
       subscription.value = JSON.parse(savedSubscription)
-      console.log('🧪 Demo Mode: Loaded subscription from localStorage:', subscription.value.plan)
+      logger.debug('🧪 Demo Mode: Loaded subscription from localStorage:', subscription.value.plan)
     } else {
       // Default: free
       subscription.value = {
@@ -101,7 +102,7 @@ export const useSubscriptionStore = defineStore('subscription', () => {
         features: []
       }
       localStorage.setItem('bro_split_subscription', JSON.stringify(subscription.value))
-      console.log('🧪 Demo Mode: Set default free plan in localStorage')
+      logger.debug('🧪 Demo Mode: Set default free plan in localStorage')
     }
   }
   
@@ -114,13 +115,13 @@ export const useSubscriptionStore = defineStore('subscription', () => {
       features: []
     }
     localStorage.removeItem('bro_split_subscription')
-    console.log('🧪 Demo Mode: Reset to free plan')
+    logger.debug('🧪 Demo Mode: Reset to free plan')
   }
   
   // Upgrade zu Pro/Elite
   // Offline/Demo: Upgrade nur lokal simulieren
   const upgradeSubscription = async (planType, paymentMethod) => {
-    console.log('🧪 Demo Mode: Simulating upgrade to', planType)
+    logger.debug('🧪 Demo Mode: Simulating upgrade to', planType)
     subscription.value = {
       plan: planType,
       status: 'active',
@@ -128,7 +129,7 @@ export const useSubscriptionStore = defineStore('subscription', () => {
       features: limits.value[planType]
     }
     localStorage.setItem('bro_split_subscription', JSON.stringify(subscription.value))
-    console.log('🧪 Demo Mode: Upgrade completed and saved to localStorage')
+    logger.debug('🧪 Demo Mode: Upgrade completed and saved to localStorage')
     return { subscription: subscription.value, success: true, demo: true }
   }
   

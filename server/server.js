@@ -29,6 +29,25 @@ dotenv.config({ path: path.join(__dirname, ".env") });
 // Validiere Umgebungsvariablen (beendet Server bei fehlenden kritischen Vars)
 validateEnv();
 
+// Global handlers für nicht gefangene Fehler (hilfreich beim Debugging in Dev)
+process.on('uncaughtException', (err) => {
+  try {
+    logger.critical('Uncaught Exception:', err.stack || err.message || err)
+  } catch (e) {
+    console.error('Uncaught Exception (and logger failed):', e)
+    console.error(err)
+  }
+});
+
+process.on('unhandledRejection', (reason, p) => {
+  try {
+    logger.critical('Unhandled Rejection at:', p, 'reason:', reason && (reason.stack || reason.message || reason))
+  } catch (e) {
+    console.error('Unhandled Rejection (and logger failed):', e)
+    console.error(reason)
+  }
+});
+
 const app = express();
 
 // Clerk-Middleware entfernt
@@ -372,6 +391,12 @@ app.use((err, req, res, _next) => {
   }
   if (err) {
     logger.error("Unhandled error:", err);
+    const body = { error: 'Internal Server Error' };
+    if (process.env.NODE_ENV !== 'production') {
+      body.message = err.message;
+      body.stack = err.stack;
+    }
+    return res.status(500).json(body);
   }
   res.status(500).json({ error: "Internal Server Error" });
 });

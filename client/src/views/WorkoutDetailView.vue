@@ -452,7 +452,7 @@ const triggerAutoSave = debounce(async () => {
       saveMsg.value = 'Auto-gespeichert (Entwurf lokal).'
       saveError.value = false
       initialSnapshot = snapshotCore({ ...w })
-      console.log('Draft gespeichert:', { ...w, _id: 'draft' })
+      logger.debug('Draft gespeichert (draft):', { ...w, _id: 'draft' })
     } else if (String(id).startsWith('draft-')) {
       const idx = store.workouts.findIndex(wi => wi._id === id)
       if (idx !== -1) {
@@ -493,14 +493,12 @@ const getNote = (idx) => {
 }
 const setNote = (idx, val) => {
   if (exerciseNotes.value) exerciseNotes.value[idx] = val
-  try { console.log('📝 [DEBUG] setNote - idx:', idx, 'value:', String(val).slice(0,120)) } catch {}
   try { triggerAutoSave() } catch {}
 }
 
 function deleteNote(idx) {
   if (exerciseNotes.value) exerciseNotes.value[idx] = ''
   if (showNote.value) showNote.value[idx] = false
-  try { console.log('🗑️ [DEBUG] deleteNote - idx:', idx) } catch {}
   try { triggerAutoSave() } catch {}
 }
 
@@ -854,7 +852,7 @@ function addSetRow(exIndex) {
   if (!Array.isArray(ex.setDetails)) ex.setDetails = []
   const last = ex.setDetails.at(-1)
   ex.setDetails.push({ reps: last?.reps || 10, weight: last?.weight || 0 })
-  try { console.log('➕ [DEBUG] addSetRow - exIndex:', exIndex, 'newLen:', ex.setDetails.length) } catch {}
+  logger.debug('addSetRow', 'exIndex:', exIndex, 'newLen:', ex.setDetails.length)
   try { triggerAutoSave() } catch {}
 }
 
@@ -865,7 +863,7 @@ function removeSetRow(exIndex, rowIndex) {
   if (ex.setDetails.length === 0) {
     ex.setDetails.push({ reps: ex.reps || 10, weight: ex.weight || 0 })
   }
-  try { console.log('🗑️ [DEBUG] removeSetRow - exIndex:', exIndex, 'rowIndex:', rowIndex, 'remaining:', ex.setDetails.length) } catch {}
+  logger.debug('removeSetRow', 'exIndex:', exIndex, 'rowIndex:', rowIndex, 'remaining:', ex.setDetails.length)
   try { triggerAutoSave() } catch {}
 }
 
@@ -885,7 +883,7 @@ function onNumberWheel(e, row, field, step = 1, min = -Infinity, max = Infinity)
     row[field] = next
     try { triggerAutoSave() } catch {}
   } catch (err) {
-    console.warn('onNumberWheel error', err)
+    logger.warn('onNumberWheel error', err)
   }
 }
 
@@ -946,7 +944,7 @@ function clampRowValue(row, field, min = -Infinity, max = Infinity, step = 1) {
     }
     row[field] = val
   } catch (err) {
-    console.warn('clampRowValue error', err)
+    logger.warn('clampRowValue error', err)
   }
 }
 
@@ -964,7 +962,7 @@ function adjustRowField(row, field, direction = 1, step = 1, min = -Infinity, ma
     row[field] = next
     try { triggerAutoSave() } catch {}
   } catch (err) {
-    console.warn('adjustRowField error', err)
+    logger.warn('adjustRowField error', err)
   }
 }
 
@@ -1006,7 +1004,7 @@ function startSpin(row, field, direction = 1, step = 1, min = -Infinity, max = I
         info.currentInterval = currentInterval
         _spinMap.set(row, { ...obj, [field]: info })
       } catch (err) {
-        console.warn('spin accel error', err)
+        logger.warn('spin accel error', err)
       }
     }, accelPeriod)
 
@@ -1015,7 +1013,7 @@ function startSpin(row, field, direction = 1, step = 1, min = -Infinity, max = I
     obj[field] = { intervalId, accelId, currentInterval }
     _spinMap.set(row, obj)
   } catch (err) {
-    console.warn('startSpin error', err)
+    logger.warn('startSpin error', err)
   }
 }
 
@@ -1029,7 +1027,7 @@ function stopSpin(row, field) {
     delete obj[field]
     _spinMap.set(row, obj)
   } catch (err) {
-    console.warn('stopSpin error', err)
+    logger.warn('stopSpin error', err)
   }
 }
 
@@ -1146,9 +1144,9 @@ function beforeUnloadHandler(e) {
   try {
     const snapshot = { workout: workout.value || null, timestamp: Date.now() }
     try { sessionStorage.setItem(DETAIL_DRAFT_KEY, JSON.stringify(snapshot)) } catch {}
-    console.log('🚪 [DEBUG] beforeunload snapshot saved to sessionStorage (detail):', snapshot)
+    logger.debug('beforeunload snapshot saved to sessionStorage (detail)')
   } catch (err) {
-    console.warn('⚠️ WorkoutDetail - beforeunload snapshot failed:', err)
+    logger.warn('⚠️ WorkoutDetail - beforeunload snapshot failed:', err)
   }
   e.preventDefault()
   e.returnValue = ''

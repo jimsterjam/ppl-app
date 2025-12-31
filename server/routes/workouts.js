@@ -343,6 +343,18 @@ router.delete("/", firebaseAuthMiddleware, async (req, res) => {
   try {
     const { userId } = req.auth;
     
+    // Defensive: Falls keine DB-Verbindung besteht, nicht mit 500 antworten
+    const readyState = req?.mongoose?.connection?.readyState ?? (await import('mongoose')).default.connection?.readyState;
+    // 1 = connected
+    if (readyState !== 1) {
+      logger.warn('🟠 Keine aktive MongoDB-Verbindung – überspringe Löschung', { readyState });
+      return res.json({
+        message: "DB derzeit nicht verbunden – keine Workouts gelöscht",
+        deletedCount: 0,
+        userId
+      });
+    }
+
     // Zähle Workouts vor dem Löschen
     const count = await Workout.countDocuments({ userId });
     

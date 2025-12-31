@@ -1,0 +1,22 @@
+
+> server@1.0.0 dev
+> nodemon server.js
+
+[33m[nodemon] 3.1.10[39m
+[33m[nodemon] to restart at any time, enter `rs`[39m
+[33m[nodemon] watching path(s): *.*[39m
+[33m[nodemon] watching extensions: js,mjs,cjs,json[39m
+[32m[nodemon] starting `node server.js`[39m
+[firebaseAdmin] Initialized for projectId: ppl-workout-01
+[dotenv@17.2.3] injecting env (11) from .env -- tip: 🗂️ backup and recover secrets: https://dotenvx.com/ops
+[2m[2025-12-28T10:21:30.684Z][0m [34m[INFO][0m 🔍 Validiere Umgebungsvariablen...
+[2m[2025-12-28T10:21:30.685Z][0m [34m[INFO][0m ✅ Umgebungsvariablen validiert
+[2m[2025-12-28T10:21:30.685Z][0m [34m[INFO][0m    Environment: development
+[2m[2025-12-28T10:21:30.685Z][0m [34m[INFO][0m    Port: 3001
+[2m[2025-12-28T10:21:30.685Z][0m [34m[INFO][0m    Database: ✅ Konfiguriert
+[2m[2025-12-28T10:21:30.685Z][0m [34m[INFO][0m    AI: ✅ OpenAI
+[2m[2025-12-28T10:21:30.685Z][0m [34m[INFO][0m 
+[2m[2025-12-28T10:21:30.693Z][0m [34m[INFO][0m 🚀 Server läuft auf Port 3001
+[2m[2025-12-28T10:21:30.693Z][0m [34m[INFO][0m [firebaseAdmin] Initialized for projectId: ppl-workout-01
+[2m[2025-12-28T10:21:31.060Z][0m [34m[INFO][0m 🟢 MongoDB connected
+[2m[2025-12-28T10:21:31.061Z][0m [34m[INFO][0m MongoDB verbunden
