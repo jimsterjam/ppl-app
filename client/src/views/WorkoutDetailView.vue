@@ -1,9 +1,6 @@
 <template>
-  <div class="workout-detail">
-    <HeaderBar title="Workout" />
-
-    <!-- Kleiner Timer (startet automatisch bei frisch erstelltem Workout) -->
-    <WorkoutTimer :auto-start="route.query.created === '1'" @stop="onTimerStop" />
+    <div class="workout-detail">
+      <HeaderBar title="Workout" />
 
     <div class="content">
       <div v-if="loading" class="loading">{{ t('workoutDetail.loading') }}</div>
@@ -85,15 +82,10 @@
           >
             <button v-if="isReordering" class="drag-handle" :title="t('workoutDetail.dragToReorder')">⋮⋮</button>
             <div class="ex-info">
-              <img :src="getExerciseImage(ex)" :alt="getTranslatedExerciseName(ex.name)" class="ex-thumb" @click="onExerciseImageClick(ex)" @error="onImgError" />
+              <img :src="getExerciseImage(ex)" :alt="getTranslatedExerciseName(ex.name)" class="ex-thumb" @error="onImgError" />
               <div class="ex-text">
                 <strong>{{ getTranslatedExerciseName(ex.name) }}</strong>
                 <small>{{ getTranslatedMuscleGroup ? getTranslatedMuscleGroup(ex.muscleGroup) : ex.muscleGroup }}</small>
-                <div v-if="ex.imageUrl || ex.thumbnailUrl" class="img-actions">
-                  <button class="link" @click.prevent="replaceExerciseImage(ex)">{{ t('common.replace') }}</button>
-                  <span>•</span>
-                  <button class="link danger" @click.prevent="openRemoveModal(ex)">{{ t('common.remove') }}</button>
-                </div>
 
                 <!-- Notiz-Button und Feld -->
                 <div style="margin-top: 6px;">
@@ -266,14 +258,6 @@
       @cancel="onPickerCancel"
     />
 
-    <!-- Vollbild-Bildvorschau -->
-    <div v-if="preview.open" class="img-overlay" @click="closePreview">
-      <img :src="preview.url" alt="Preview" class="img-large" />
-    </div>
-
-    <!-- Unsichtbarer File-Input für Uploads -->
-    <input ref="uploadInput" type="file" accept="image/*" capture="environment" style="display:none" @change="onUploadSelected" />
-
     <!-- Bestätigungsmodal bei ungespeicherten Änderungen -->
     <AppModal
       v-model="showLeaveModal"
@@ -284,22 +268,10 @@
       type="warning"
       @confirm="confirmLeave"
     />
-
-    <!-- Bestätigungsmodal für Foto-Entfernen -->
-    <AppModal
-      v-model="showRemoveModal"
-      :title="t('workoutDetail.removePhotoTitle')"
-      :message="t('workoutDetail.removePhotoMsg')"
-      :confirm-text="t('common.remove')"
-      :cancel-text="t('common.cancel')"
-      type="warning"
-      @confirm="confirmRemoveImage"
-    />
   </div>
 </template>
 
 <script setup>
-import { onMounted as vueOnMounted } from 'vue'
 // State für Übung hinzufügen
 const showAddExerciseModal = ref(false)
 const allExercises = ref([])
@@ -360,19 +332,17 @@ import NumberPicker from '@/components/NumberPicker.vue'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 import { useRoute, useRouter } from 'vue-router'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
-import { getWorkoutOffline, getExerciseOffline, getAllExercisesOffline, saveWorkoutOffline, db } from '@/utils/offlineStorage'
+import { getWorkoutOffline, getExerciseOffline, getAllExercisesOffline, saveWorkoutOffline } from '@/utils/offlineStorage'
 // import { fetchWorkout } from '@/api/workouts'
-// import { fetchExercise, fetchExercises, uploadExerciseImage, deleteExerciseImage } from '@/api/exercises'
+// import { fetchExercise, fetchExercises } from '@/api/exercises'
 import { useUserStore } from '@/stores/userStore'
 import HeaderBar from '@/components/HeaderBar.vue'
 import BottomNav from '@/components/BottomNav.vue'
 import AppModal from '@/components/AppModal.vue'
 import ExercisePicker from '@/components/ExercisePicker.vue'
-import WorkoutTimer from '@/components/WorkoutTimer.vue'
 import { useToastStore } from '@/stores/toastStore'
 import { useI18n } from 'vue-i18n'
 import { logger } from '@/utils/logger'
-// Doppelt, daher entfernt
 
 const userStore = useUserStore()
 function getDetailDraftKey() {
@@ -405,11 +375,6 @@ const exListRef = ref(null)
 const didAutoScroll = ref(false)
 let initialSnapshot = ''
 const showLeaveModal = ref(false)
-const showRemoveModal = ref(false)
-const removeTarget = ref(null)
-const uploadInput = ref(null)
-const uploadTarget = ref(null)
-const preview = reactive({ open: false, url: '' })
 
 // Notiz-Logik
 const showNote = ref([])
@@ -642,131 +607,19 @@ async function enrichExerciseImages() {
 }
 
 function getExerciseImage(ex) {
-  return ex?.thumbnailUrl || ex?.imageUrl || '/exercises/camera.svg'
+  return ex?.thumbnailUrl || ex?.imageUrl || '/exercises/play.svg'
 }
 
 function onImgError(evt) {
   const img = evt?.target
   if (!img) return
-  if (img.src.includes('camera.svg')) {
+  if (img.src.includes('play.svg')) {
     img.onerror = null
     return
   }
   img.onerror = null
-  img.src = '/exercises/camera.svg'
+  img.src = '/exercises/play.svg'
 }
-
-function onExerciseImageClick(ex) {
-  if (ex?.imageUrl || ex?.thumbnailUrl) {
-    preview.url = ex.imageUrl || ex.thumbnailUrl
-    preview.open = true
-    return
-  }
-  uploadTarget.value = ex
-  ensureExerciseId(uploadTarget.value).finally(() => {
-    try {
-      uploadInput.value?.setAttribute?.('accept', 'image/*')
-      uploadInput.value?.setAttribute?.('capture', 'environment')
-    } catch {}
-    uploadInput.value?.click?.()
-  })
-}
-
-function closePreview() { preview.open = false; preview.url = '' }
-
-async function onUploadSelected(e) {
-  const files = e?.target?.files || []
-  if (!files.length || !uploadTarget.value) return
-  const file = files[0]
-  try { e.target.value = '' } catch {}
-  try {
-    let token = await getIdToken().catch(() => null)
-    const target = uploadTarget.value
-    if (!target?.exerciseId) {
-      const ok = await ensureExerciseId(target)
-      if (!ok || !target.exerciseId) {
-        logger.warn('Kein exerciseId für Upload ermittelbar – Upload abgebrochen')
-        return
-      }
-    }
-    const res = await uploadExerciseImage(target.exerciseId, file, token)
-    const updated = res?.exercise
-    if (updated) {
-      const bust = `?t=${Date.now()}`
-      target.imageUrl = (updated.imageUrl || '') + bust
-      target.thumbnailUrl = (updated.thumbnailUrl || '') + bust
-      toast.show(t('workoutDetail.toastUploaded'), { type: 'success', duration: 3000, position: 'top' })
-    }
-  } catch (err) {
-    logger.warn('Bild-Upload fehlgeschlagen:', err)
-    toast.show(t('workoutDetail.uploadFailed'), { type: 'error', duration: 3000 })
-  } finally {
-    uploadTarget.value = null
-  }
-}
-
-function replaceExerciseImage(ex) {
-  uploadTarget.value = ex
-  ensureExerciseId(uploadTarget.value).finally(() => {
-    try {
-      uploadInput.value?.setAttribute?.('accept', 'image/*')
-      uploadInput.value?.setAttribute?.('capture', 'environment')
-    } catch {}
-    uploadInput.value?.click?.()
-  })
-}
-
-function openRemoveModal(ex) {
-  removeTarget.value = ex
-  showRemoveModal.value = true
-}
-
-async function confirmRemoveImage() {
-  try {
-    const ex = removeTarget.value
-    if (!ex) return
-    let token = await getIdToken().catch(() => null)
-    if (!ex.exerciseId) {
-      const okId = await ensureExerciseId(ex)
-      if (!okId || !ex.exerciseId) {
-        toast.show(t('workoutDetail.removeFailedNoId'), { type: 'error', duration: 3000 })
-        return
-      }
-    }
-    await deleteExerciseImage(ex.exerciseId, token)
-    ex.imageUrl = undefined
-    ex.thumbnailUrl = undefined
-    toast.show(t('workoutDetail.toastRemoved'), { type: 'success', duration: 2500 })
-    showRemoveModal.value = false
-    removeTarget.value = null
-  } catch (err) {
-    logger.warn('Bild entfernen fehlgeschlagen:', err)
-    toast.show(t('workoutDetail.toastRemoveFailed'), { type: 'error', duration: 3000 })
-  }
-}
-
-async function ensureExerciseId(ex) {
-  try {
-    if (!ex || ex.exerciseId) return true
-    const list = await fetchExercises({})
-    if (!Array.isArray(list) || list.length === 0) return false
-    const name = (ex.name || '').trim().toLowerCase()
-    const mg = (ex.muscleGroup || '').trim().toLowerCase()
-    let match = list.find(e => String(e.name || '').trim().toLowerCase() === name && String(e.muscleGroup || '').trim().toLowerCase() === mg)
-    if (!match) {
-      match = list.find(e => String(e.name || '').trim().toLowerCase() === name)
-    }
-    if (match?._id) {
-      ex.exerciseId = match._id
-      return true
-    }
-    return false
-  } catch {
-    return false
-  }
-}
-
-// Dev helper removed: use console calls or import manually in dev when needed
 
 function scrollToExercises() {
   const el = exListRef.value || document.getElementById('exercises')
@@ -820,19 +673,6 @@ function confirmLeave() {
   router.push('/dashboard')
 }
 
-async function onTimerStop(ms) {
-  try {
-    const id = route.params.id
-    if (!workout.value || !id) return
-    const mins = Math.max(0, Math.round(ms / 60000))
-    if (!Number.isFinite(mins)) return
-    let token = await getIdToken().catch(() => null)
-    await store.updateWorkout(id, { duration: mins }, token)
-    if (workout.value) workout.value.duration = mins
-  } catch (err) {
-    logger.warn('Timer-Dauer speichern fehlgeschlagen:', err)
-  }
-}
 
 function toggleReorder() { isReordering.value = !isReordering.value }
 
@@ -1234,10 +1074,4 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnloadHan
 .ex-text { flex: 1; min-width: 0; }
 .ex-text strong { display: block; color: var(--fg); font-size: 0.95rem; }
 .ex-text small { display: block; color: var(--muted); font-size: 0.8rem; margin-top: 2px; }
-.img-actions { display: flex; align-items: center; gap: 6px; margin-top: 4px; font-size: 0.8rem; }
-.img-actions .link { background: transparent; border: none; color: var(--accent); cursor: pointer; padding: 0; }
-.img-actions .link.danger { color: var(--danger-color); }
-.img-actions span { color: var(--muted); }
-.img-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-.img-large { max-width: min(92vw, 1200px); max-height: 86vh; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.4); border: 1px solid var(--card-border); }
 </style>

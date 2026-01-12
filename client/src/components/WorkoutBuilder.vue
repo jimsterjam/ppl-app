@@ -1,67 +1,55 @@
 
 <style scoped>
-/* Set-Row: moderne, klare Darstellung */
-.set-row {
-	display: grid;
-	grid-template-columns: 36px 1fr 1fr 32px;
-	gap: 12px;
-	align-items: center;
-	background: var(--surface, #f8fafc);
-	border-radius: 8px;
-	padding: 8px 0 8px 8px;
-	margin-bottom: 6px;
-	box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+/* Auswahl-Liste für Übungen */
+.selected-exercises {
+	background: var(--card-bg, #fff);
+	border-radius: 16px;
+	box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+	padding: 20px 18px;
+	border: 1px solid var(--card-border, #e5e7eb);
 }
-.set-label {
-	color: var(--muted);
-	font-size: 0.85rem;
-	text-align: center;
-	font-weight: 600;
+.selected-exercise-list {
+	list-style: none;
+	padding: 0;
+	margin: 14px 0 0 0;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
 }
-.set-field {
+.selected-exercise-item {
 	display: flex;
 	align-items: center;
-	gap: 6px;
-	background: transparent;
-	border-radius: 6px;
-	padding: 0 4px;
+	justify-content: space-between;
+	padding: 10px 14px;
+	border-radius: 12px;
+	border: 1px solid var(--card-border, #e5e7eb);
+	background: var(--surface, #f8fafc);
+	cursor: grab;
 }
-.set-field input {
-	width: 60px;
-	padding: 7px 6px;
-	border-radius: 6px;
-	border: 1px solid var(--card-border);
-	background: #fff;
+.selected-exercise-item:active { cursor: grabbing; }
+.exercise-name {
+	font-weight: 600;
 	color: var(--fg);
-	font-size: 1rem;
-	text-align: right;
 }
-.remove-set {
-	background: transparent;
+.remove-btn {
 	border: none;
-	color: var(--danger-color);
-	font-size: 20px;
-	cursor: pointer;
+	background: var(--danger-color, #dc2626);
+	color: #fff;
+	width: 32px;
+	height: 32px;
 	border-radius: 50%;
-	width: 28px;
-	height: 28px;
+	font-size: 1.1rem;
+	line-height: 1;
+	cursor: pointer;
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	transition: background 0.15s;
+	transition: opacity 0.15s ease;
 }
-.remove-set:hover {
-	background: #fee2e2;
-}
+.remove-btn:hover { opacity: 0.85; }
 @media (max-width: 600px) {
-	.set-row {
-		grid-template-columns: 28px 1fr 1fr 28px;
-		gap: 6px;
-		padding: 6px 0 6px 4px;
-	}
-	.set-field input {
-		width: 44px;
-		font-size: 0.98rem;
+	.selected-exercise-item {
+		padding: 10px 12px;
 	}
 }
 /* Section für Übungen optisch hervorheben */
@@ -322,8 +310,18 @@ const filteredExercises = computed(() => {
 
 function toggleExercise(exercise) {
 	const idx = selectedExercises.value.findIndex(e => e._id === exercise._id)
-	if (idx > -1) selectedExercises.value.splice(idx, 1)
-	else selectedExercises.value.push({ ...exercise, setDetails: [{ reps: 10, weight: 0 }] })
+	if (idx > -1) {
+		selectedExercises.value.splice(idx, 1)
+	} else {
+		const sanitized = {
+			...exercise,
+			exerciseId: exercise.exerciseId || exercise._id || exercise.id || null,
+			setDetails: Array.isArray(exercise.setDetails) && exercise.setDetails.length > 0
+				? exercise.setDetails
+				: [{ reps: 10, weight: 0 }]
+		}
+		selectedExercises.value.push(sanitized)
+	}
 	saveDraft()
 }
 function isSelected(exercise) {
@@ -341,21 +339,6 @@ function onDrop(idx) {
 	const [moved] = list.splice(from, 1)
 	list.splice(idx, 0, moved)
 	draggingIndex.value = null
-	saveDraft()
-}
-
-function updateSet(exIdx, setIdx, field, val) {
-	const ex = selectedExercises.value[exIdx]
-	if (!ex?.setDetails?.[setIdx]) return
-	const num = Number(val)
-	if (field === 'reps') ex.setDetails[setIdx].reps = isFinite(num) ? num : ex.setDetails[setIdx].reps
-	if (field === 'weight') ex.setDetails[setIdx].weight = isFinite(num) ? num : ex.setDetails[setIdx].weight
-	saveDraft()
-}
-function removeSet(exIdx, setIdx) {
-	const ex = selectedExercises.value[exIdx]
-	if (!ex?.setDetails) return
-	ex.setDetails.splice(setIdx, 1)
 	saveDraft()
 }
 
@@ -377,6 +360,7 @@ async function createWorkout() {
 			name: `${currentTypeLabel.value} - ${new Date().toLocaleDateString(String(locale.value).startsWith('de') ? 'de-DE' : 'en-US')}`,
 			type: selectedType.value,
 			exercises: selectedExercises.value.map(ex => ({
+				exerciseId: ex.exerciseId || ex._id || ex.id || null,
 				name: ex.name,
 				sets: ex.setDetails?.length || 3,
 				reps: ex.setDetails?.[0]?.reps || 10,
@@ -536,32 +520,12 @@ watch(selectedExercises, saveDraft, { deep: true })
 			   </div>
 			<div v-if="selectedExercises.length > 0" id="workout-plan" ref="planRef" class="selected-exercises">
 				<h3>{{ t('builder.planTitle', { count: selectedExercises.length }) }}</h3>
-				<div v-for="(exercise, index) in selectedExercises" :key="exercise._id" class="selected-exercise" draggable="true" @dragstart="onDragStart(index)" @dragover.prevent
-="onDrop(index)">
-					<div class="sel-row">
-						<span class="ex-name">{{ exercise.displayName || exercise.name }}</span>
-						<input type="text" v-model="exercise.note" :placeholder="t('builder.notePlaceholder')" maxlength="150" />
-					</div>
-					<div class="sets-editor">
-						<div class="set-list">
-							<div v-for="(set, sIdx) in exercise.setDetails" :key="sIdx" class="set-row">
-								<span class="set-label">#{{ sIdx + 1 }}</span>
-								<label class="set-field">
-									<span>{{ t('common.reps') }}</span>
-									<input type="number" min="1" max="50" :value="set.reps || 10" @input="updateSet(index, sIdx, 'reps', $event.target.value)" />
-								</label>
-								<label class="set-field">
-									<span>kg</span>
-									<input type="number" min="0" max="999" step="0.5" :value="set.weight || 0" @input="updateSet(index, sIdx, 'weight', $event.target.value)" />
-								</label>
-								<button class="remove-set" @click="removeSet(index, sIdx)">×</button>
-							</div>
-						</div>
-					</div>
-					<div class="row-actions">
-						<button class="remove-btn" @click="removeExercise(index)">×</button>
-					</div>
-				</div>
+				<ul class="selected-exercise-list">
+					<li v-for="(exercise, index) in selectedExercises" :key="exercise._id" class="selected-exercise-item" draggable="true" @dragstart="onDragStart(index)" @dragover.prevent="onDrop(index)">
+						<span class="exercise-name">{{ exercise.displayName || exercise.name }}</span>
+						<button class="remove-btn" @click="removeExercise(index)" aria-label="remove exercise">×</button>
+					</li>
+				</ul>
 				<p v-if="errorMsg" class="error-hint">{{ errorMsg }}</p>
 			</div>
 		</div>

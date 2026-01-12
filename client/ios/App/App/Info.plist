@@ -133,5 +133,7 @@
 			</dict>
 		</dict>
 	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Camera-Zugriff wird benötigt, um Trainingsbilder aufzunehmen und Übungen zu dokumentieren.</string>
 </dict>
 </plist>

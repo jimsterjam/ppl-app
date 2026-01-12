@@ -2,7 +2,6 @@
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { initFirebaseAuth, useFirebaseAuth } from '@/utils/firebaseAuth'
 import { useAuthStore } from '@/stores/authStore'
-// import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import MotivationWidget from '@/components/MotivationWidget.vue'
 import { useI18n } from 'vue-i18n'
@@ -14,12 +13,22 @@ defineProps({
     handleChangeDisplay: { type: Function, default: null }
 })
 
-const { signInWithGoogle, signInWithAppleRedirect, signInWithEmail, signUpWithEmail, resetPassword, getCurrentUser, getIdToken } = useFirebaseAuth()
+const { signInWithGoogle, signInWithAppleRedirect, signInWithEmail, signUpWithEmail, resetPassword, getCurrentUser, getIdToken, resendVerification, requestVerificationLink } = useFirebaseAuth()
 const router = useRouter()
 const route = useRoute()
 const { t } = useI18n()
 const authStore = useAuthStore()
 const isSignedIn = computed(() => authStore.isAuthenticated)
+
+// Persist pending verification across reloads until verified
+const PENDING_EMAIL_KEY = 'pendingVerificationEmail'
+const PENDING_LINK_KEY = 'pendingVerificationLinkUrl'
+const PENDING_LINK_TS_KEY = 'pendingVerificationLinkTs'
+const VERIFICATION_LINK_TTL_MS = 15 * 60 * 1000
+const WARNING_LABELS = {
+    'continue-url-rejected': 'Weiterleitungsziel wurde von Firebase ignoriert.',
+    'firebase-rate-limited': 'Firebase hat weitere Anfragen vorübergehend blockiert.'
+}
 
 // Auth Form
 const email = ref('')
@@ -27,6 +36,13 @@ const password = ref('')
 const isSignUp = ref(false)
 const authError = ref('')
 const authLoading = ref(false)
+const verificationSent = ref(false)
+const suppressWatcher = ref(false)
+const verificationMessage = ref('')
+const showResendForExisting = ref(false)
+const attemptedEmail = ref('')
+const pendingVerificationLink = ref('')
+const pendingVerificationLinkExpiresAt = ref(0)
 
 // Motivation-Overlay Steuerung (ohne Tages-Limit: bei jedem Login anzeigen)
 const showMotivation = ref(false)
@@ -71,6 +87,90 @@ function skipNow() {
     goNow()
 }
 
+function syncStoredVerificationLink() {
+    try {
+        const link = localStorage.getItem(PENDING_LINK_KEY)
+        const ts = Number(localStorage.getItem(PENDING_LINK_TS_KEY) || 0)
+        if (link && ts && Date.now() - ts < VERIFICATION_LINK_TTL_MS) {
+            pendingVerificationLink.value = link
+            pendingVerificationLinkExpiresAt.value = ts + VERIFICATION_LINK_TTL_MS
+            return
+        }
+    } catch (e) {
+        logger.debug('[WelcomePage] syncStoredVerificationLink failed:', e)
+    }
+    clearStoredVerificationLink()
+}
+
+function persistVerificationLink(link) {
+    if (!link) {
+        clearStoredVerificationLink()
+        return
+    }
+    const now = Date.now()
+    pendingVerificationLink.value = link
+    pendingVerificationLinkExpiresAt.value = now + VERIFICATION_LINK_TTL_MS
+    try {
+        localStorage.setItem(PENDING_LINK_KEY, link)
+        localStorage.setItem(PENDING_LINK_TS_KEY, String(now))
+    } catch (e) {
+        logger.debug('[WelcomePage] persistVerificationLink failed:', e)
+    }
+}
+
+function clearStoredVerificationLink() {
+    pendingVerificationLink.value = ''
+    pendingVerificationLinkExpiresAt.value = 0
+    try {
+        localStorage.removeItem(PENDING_LINK_KEY)
+        localStorage.removeItem(PENDING_LINK_TS_KEY)
+    } catch (e) {
+        logger.debug('[WelcomePage] clearStoredVerificationLink failed:', e)
+    }
+}
+
+function hasFreshVerificationLink() {
+    return Boolean(pendingVerificationLink.value && pendingVerificationLinkExpiresAt.value > Date.now())
+}
+
+async function openVerificationLinkInBrowser(link) {
+    if (!link) return false
+    try {
+        if (Capacitor?.openUrl) {
+            await Capacitor.openUrl({ url: link })
+            return true
+        }
+    } catch (err) {
+        logger.warn('[WelcomePage] Capacitor.openUrl failed:', err)
+    }
+    if (typeof window !== 'undefined') {
+        try {
+            const win = window.open(link, '_blank', 'noopener,noreferrer')
+            if (win) return true
+        } catch (e) {
+            logger.warn('[WelcomePage] window.open failed, fallback to location.assign', e)
+        }
+        try {
+            window.location.assign(link)
+            return true
+        } catch (assignErr) {
+            logger.warn('[WelcomePage] window.location.assign failed:', assignErr)
+        }
+    }
+    return false
+}
+
+async function handleOpenVerificationLink() {
+    if (!hasFreshVerificationLink()) {
+        authError.value = 'Kein gespeicherter Verifizierungslink vorhanden. Bitte erneut senden.'
+        return
+    }
+    const opened = await openVerificationLinkInBrowser(pendingVerificationLink.value)
+    verificationMessage.value = opened
+        ? 'Verifizierungslink wurde im Browser geöffnet.'
+        : 'Link konnte nicht automatisch geöffnet werden. Bitte kopiere ihn in deinen Browser.'
+}
+
 onBeforeUnmount(() => {
     if (redirectTimer) {
         clearTimeout(redirectTimer)
@@ -85,18 +185,80 @@ function maybeProceed() {
     startMotivationFlow()
 }
 
+onMounted(() => {
+    // Wenn localStorage eine noch nicht verifizierte E‑Mail enthält, Anzeige beibehalten
+    try {
+        const pending = localStorage.getItem(PENDING_EMAIL_KEY)
+        if (pending && !route.query?.emailVerified) {
+            verificationSent.value = true
+            attemptedEmail.value = pending
+        }
+        // Falls wir bereits via Query wissen, dass E‑Mail verifiziert wurde, aufräumen
+        if (route.query?.emailVerified) {
+            localStorage.removeItem(PENDING_EMAIL_KEY)
+            verificationSent.value = false
+            attemptedEmail.value = ''
+            showResendForExisting.value = false
+            clearStoredVerificationLink()
+        }
+    } catch (e) {
+        logger.debug('[WelcomePage] localStorage access failed:', e)
+    }
+    syncStoredVerificationLink()
+})
+
 async function handleEmailAuth() {
     authError.value = ''
     authLoading.value = true
     try {
         if (isSignUp.value) {
-            await signUpWithEmail(email.value, password.value)
+            const res = await signUpWithEmail(email.value, password.value)
+            if (res && res.pendingEmailVerification) {
+                verificationSent.value = true
+                authError.value = 'Bestätigungs‑E‑Mail wurde gesendet. Bitte bestätige deine E‑Mail, bevor du dich anmeldest.'
+                // switch back to sign-in view
+                isSignUp.value = false
+                // suppress watcher navigation for a short grace period to avoid brief auto-login redirect
+                suppressWatcher.value = true
+                setTimeout(() => { suppressWatcher.value = false }, 5000)
+                attemptedEmail.value = email.value
+                try { localStorage.setItem(PENDING_EMAIL_KEY, attemptedEmail.value) } catch(e) {}
+                return
+            }
         } else {
             await signInWithEmail(email.value, password.value)
         }
         // Erfolg: Auth State wird automatisch aktualisiert
     } catch (err) {
         authError.value = err.message || 'Authentifizierung fehlgeschlagen'
+        // If email already in use during signup, show option to request verification link
+        if (isSignUp.value && /E[-–\s]?Mail/i.test(email.value) || /E‑Mail/i.test(err.message) || /verwende/i.test(err.message) || /already in use/i.test(err.message)) {
+            showResendForExisting.value = true
+            attemptedEmail.value = email.value
+        }
+    } finally {
+        authLoading.value = false
+    }
+}
+
+async function handleRequestVerification() {
+    authError.value = ''
+    verificationMessage.value = ''
+    authLoading.value = true
+    try {
+        const resp = await requestVerificationLink(attemptedEmail.value, { forceNewLink: true })
+        verificationSent.value = true
+        if (resp?.link) {
+            persistVerificationLink(resp.link)
+        }
+        verificationMessage.value = 'Verifizierungslink wurde gesendet. Bitte prüfe dein Postfach und bestätige die E‑Mail. Optional kannst du den gespeicherten Link über „Link öffnen“ starten.'
+        if (resp?.warnings?.length) {
+            const readable = resp.warnings.map((w) => WARNING_LABELS[w] || w)
+            verificationMessage.value += ' Hinweis: ' + readable.join(' ')
+        }
+        try { localStorage.setItem(PENDING_EMAIL_KEY, attemptedEmail.value) } catch(e) {}
+    } catch (e) {
+        authError.value = e?.message || 'Fehler beim Anfordern des Verifizierungslinks.'
     } finally {
         authLoading.value = false
     }
@@ -114,6 +276,40 @@ async function handlePasswordReset() {
         authError.value = 'Passwort-Reset-E-Mail wurde gesendet'
     } catch (err) {
         authError.value = err.message || 'Passwort-Reset fehlgeschlagen'
+    } finally {
+        authLoading.value = false
+    }
+}
+
+async function handleResendVerification() {
+    verificationMessage.value = ''
+    authError.value = ''
+    authLoading.value = true
+    try {
+        // Wenn ein Nutzer eingeloggt ist, nutze clientseitiges resend
+        const user = getCurrentUser()
+        if (user) {
+            await resendVerification()
+            verificationMessage.value = 'Bestätigungs‑E‑Mail wurde erneut gesendet.'
+        } else if (hasFreshVerificationLink()) {
+            verificationMessage.value = 'Es liegt bereits ein Verifizierungslink vor. Bitte öffne ihn über „Link öffnen“ oder kopiere ihn in deinen Browser.'
+        } else if (attemptedEmail.value) {
+            // Fallback: Admin-Endpoint anfragen, falls kein eingeloggter Nutzer vorhanden
+            const resp = await requestVerificationLink(attemptedEmail.value, { forceNewLink: true })
+            if (resp?.link) {
+                persistVerificationLink(resp.link)
+            }
+            verificationMessage.value = 'Verifizierungslink generiert. Bitte öffne deine E‑Mail oder verwende „Link öffnen“, um den Link manuell aufzurufen.'
+            if (resp?.warnings?.length) {
+                const readable = resp.warnings.map((w) => WARNING_LABELS[w] || w)
+                verificationMessage.value += ' Hinweis: ' + readable.join(' ')
+            }
+        } else {
+            throw new Error('Kein eingeloggter Nutzer vorhanden')
+        }
+        try { localStorage.setItem(PENDING_EMAIL_KEY, attemptedEmail.value) } catch(e) {}
+    } catch (err) {
+        authError.value = err.message || 'Fehler beim erneuten Senden der E‑Mail.'
     } finally {
         authLoading.value = false
     }
@@ -160,6 +356,16 @@ async function handleGoogleLogin() {
 // Deaktiviere Motivation-Overlay im nativen Flow; Navigation erfolgt direkt im Login-Handler
 watch(isSignedIn, async (loggedIn) => {
     logger.debug('[WelcomePage] watch isSignedIn ->', loggedIn, 'route:', router.currentRoute?.value?.fullPath)
+    // If an auth action is in progress (signup/login), avoid auto-navigation
+    if (authLoading.value) {
+        logger.debug('[WelcomePage] auth action in progress; skipping watcher navigation')
+        return
+    }
+    // If we temporarily suppressed watcher (short grace after signup), skip navigation
+    if (suppressWatcher.value) {
+        logger.debug('[WelcomePage] watcher suppressed; skipping navigation')
+        return
+    }
     if (!loggedIn) {
         showMotivation.value = false
         return
@@ -173,10 +379,24 @@ watch(isSignedIn, async (loggedIn) => {
         await new Promise((res) => setTimeout(res, 0))
         logger.debug('[WelcomePage] Auth confirmed via watcher; navigating to:', target)
         router.replace(target)
+        // Nach erfolgreichem Login: aufräumen, falls noch pending verification gesetzt war
+        try { localStorage.removeItem(PENDING_EMAIL_KEY) } catch(e) {}
+        clearStoredVerificationLink()
     } else {
         logger.debug('[WelcomePage] isSignedIn true but no token yet; holding')
     }
 }, { immediate: true })
+
+// Watch für Query-Änderungen (z.B. nach Rückkehr aus Browser mit emailVerified)
+watch(() => route.query?.emailVerified, (val) => {
+    if (val) {
+        try { localStorage.removeItem(PENDING_EMAIL_KEY) } catch(e) {}
+        verificationSent.value = false
+        attemptedEmail.value = ''
+        showResendForExisting.value = false
+        clearStoredVerificationLink()
+    }
+})
 </script>
 
 <template>
@@ -187,6 +407,19 @@ watch(isSignedIn, async (loggedIn) => {
             <p>{{ t('welcome.signInPrompt') }}</p>
             
             <!-- Email/Passwort Form -->
+            <div v-if="verificationSent" class="info-banner">
+                <p>Bestätigungs‑E‑Mail wurde gesendet. Bitte öffne deine E‑Mail und klicke den Bestätigungslink.</p>
+                <div class="resend-row">
+                    <button class="resend-btn" @click="handleResendVerification" :disabled="authLoading">E‑Mail erneut senden</button>
+                    <button v-if="pendingVerificationLink" class="resend-btn ghost" @click="handleOpenVerificationLink" :disabled="authLoading">
+                        Link öffnen
+                    </button>
+                    <span class="small-info" v-if="verificationMessage">{{ verificationMessage }}</span>
+                </div>
+            </div>
+            <div v-else-if="route.query?.emailVerified" class="success-banner">
+                <p>E‑Mail erfolgreich bestätigt. Du kannst dich jetzt anmelden.</p>
+            </div>
             <form @submit.prevent="handleEmailAuth" class="auth-form">
                 <input 
                     v-model="email" 
@@ -218,8 +451,12 @@ watch(isSignedIn, async (loggedIn) => {
                     >
                         {{ t('auth.forgotPassword') }}
                     </button>
+                    <button v-if="showResendForExisting" type="button" @click="handleRequestVerification" class="resend-existing" :disabled="authLoading">
+                        Verifizierungs‑E‑Mail erneut anfordern
+                    </button>
                 </div>
                 <p v-if="authError" class="error">{{ authError }}</p>
+                <p v-if="verificationSent" class="info">{{ 'Bitte bestätige deine E‑Mail-Adresse.' }}</p>
             </form>
             
             <!-- Toggle zwischen Login und Sign Up -->
@@ -438,6 +675,37 @@ watch(isSignedIn, async (loggedIn) => {
         display: flex;
         justify-content: flex-end;
         margin-top: 8px;
+    }
+
+    .resend-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+        justify-content: center;
+        margin-top: 8px;
+    }
+
+    .resend-btn {
+        padding: 8px 16px;
+        border-radius: 999px;
+        border: 1px solid var(--accent);
+        background: var(--accent);
+        color: var(--accent-contrast);
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: opacity .2s ease;
+    }
+
+    .resend-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+    }
+
+    .resend-btn.ghost {
+        background: transparent;
+        color: var(--accent);
     }
 
     .forgot-password {

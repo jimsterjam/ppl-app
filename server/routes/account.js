@@ -3,47 +3,32 @@ import { admin } from '../utils/firebaseAdmin.js';
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import mongoose from 'mongoose';
 import Workout from '../models/Workout.js';
 import Exercise from '../models/Exercise.js';
+import { firebaseAuthMiddleware } from '../middleware/firebaseAuth.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const router = express.Router();
 
-// Middleware to verify Firebase token
-const verifyToken = async (req, res, next) => {
-  try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Unauthorized: No token provided' });
-    }
-
-    const token = authHeader.split(' ')[1];
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    req.userId = decodedToken.uid;
-    req.decodedToken = decodedToken;
-    next();
-  } catch (error) {
-    console.error('Token verification failed:', error?.message || error);
-    res.status(401).json({ error: 'Unauthorized: Invalid token' });
-  }
-};
+// NOTE: use centralized `firebaseAuthMiddleware` (sets `req.auth.userId`)
 
 // Delete account and all associated data
 
 // Purge user data without deleting the account
-router.post('/delete', verifyToken, async (req, res) => {
+router.post('/delete', firebaseAuthMiddleware, async (req, res) => {
   const { confirmation } = req.body;
 
-  // decodedToken kommt aus verifyToken Middleware
-  const decoded = req.decodedToken || {};
-  const tokenUid = decoded?.uid || decoded?.sub; // UID aus Firebase Token
+  // `firebaseAuthMiddleware` setzt `req.auth.userId`
+  const tokenUid = req.auth?.userId;
+  // decoded token may be available on req.auth (not guaranteed)
+  const decoded = req.auth || {};
   const audience = decoded?.aud || decoded?.azp || 'unknown';
 
-  console.log('[account/delete] Decoded token:', decoded);
-  console.log('[account/delete] Token UID:', tokenUid);
-  console.log('[account/delete] Token audience:', audience);
+  // Minimal audit log: start deletion for UID (avoid logging full token)
+  console.info(`[account/delete] Request to delete account for UID: ${tokenUid}`);
 
   if (!tokenUid) {
     return res.status(400).json({ error: 'Invalid token: no UID' });
@@ -57,64 +42,128 @@ router.post('/delete', verifyToken, async (req, res) => {
   }
 
   // Check confirmation
-  const ok = confirmation === 'ACCOUNT LÖSCHEN' || confirmation === 'DELETE ACCOUNT';
+  // Normalize confirmation: allow different casing and remove diacritics (e.g. LÖSCHEN vs LOESCHEN)
+  const normalizeConfirm = (s) => {
+    if (!s) return '';
+    const up = s.toString().toUpperCase().trim();
+    try {
+      return up.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    } catch (e) {
+      return up;
+    }
+  };
+
+  const normalized = normalizeConfirm(confirmation);
+  const compact = normalized.replace(/\s+/g, '');
+  // Accept flexible variants: e.g. 'ACCOUNTLOSCHEN', 'ACCOUNTLOESCHEN', 'DELETEACCOUNT'
+  const ok = /ACCOUNT.*(?:LOESCH|LOSCH)/.test(compact) || compact === 'DELETEACCOUNT' || compact === 'DELETE';
   if (!ok) {
-    return res.status(400).json({ error: 'Invalid confirmation text' });
+    console.warn('[account/delete] Invalid confirmation text received:', { received: confirmation, normalized, compact });
+    return res.status(400).json({ error: 'Invalid confirmation text', received: confirmation, normalized, compact });
   }
 
   try {
-    console.log(`[account/delete] Starting account deletion for UID: ${tokenUid} (audience: ${audience}, adminProjectId: ${adminProjectId})`);
+    console.info(`[account/delete] Starting account deletion (uid=${tokenUid}, project=${adminProjectId})`);
 
-    // 1. Delete all workouts
-    const workoutDeleteResult = await Workout.deleteMany({ userId: tokenUid });
-    console.log(`[account/delete] Deleted ${workoutDeleteResult.deletedCount} workouts`);
+    // --- Step 1: Read records (so we can delete media references) ---
+    const userWorkouts = await Workout.find({ userId: tokenUid }).lean();
+    const userExercises = await Exercise.find({ userId: tokenUid }).lean();
 
-    // 2. Delete all custom exercises
-    const exerciseDeleteResult = await Exercise.deleteMany({ userId: tokenUid });
-    console.log(`[account/delete] Deleted ${exerciseDeleteResult.deletedCount} exercises`);
+    const report = {
+      workoutsFound: userWorkouts.length,
+      exercisesFound: userExercises.length,
+      filesDeleted: [],
+      gridfsDeleted: [],
+      dbDeleted: { workouts: 0, exercises: 0 },
+      deletedAuth: false,
+      errors: []
+    };
 
-    // 3. Delete uploaded images
-    const uploadsDir = path.join(__dirname, '../public/uploads');
-    let deletedFiles = [];
-    try {
-      const files = await fs.readdir(uploadsDir);
-      const userFiles = files.filter(file => file.startsWith(tokenUid + '_'));
-      for (const file of userFiles) {
-        await fs.unlink(path.join(uploadsDir, file));
-        deletedFiles.push(file);
-      }
-      if (deletedFiles.length) {
-        console.log(`[account/delete] Deleted ${deletedFiles.length} uploaded files`);
-      }
-    } catch (error) {
-      console.error('[account/delete] Error deleting files:', error?.message || error);
+    // --- Step 2: Delete filesystem images for workouts & exercises ---
+    const uploadsRoot = path.join(__dirname, '../public/uploads');
+    // Ensure deterministic paths for known patterns
+    for (const w of userWorkouts) {
+      try {
+        const main = path.join(uploadsRoot, 'workouts', `${w._id}.jpg`);
+        const thumb = path.join(uploadsRoot, 'workouts', `${w._id}_thumb.jpg`);
+        try { await fs.unlink(main); report.filesDeleted.push(main); } catch (e) {}
+        try { await fs.unlink(thumb); report.filesDeleted.push(thumb); } catch (e) {}
+      } catch (e) { report.errors.push(String(e)); }
     }
 
-    // 4. Delete Firebase Auth account
-    let deletedAuth = false;
+    for (const ex of userExercises) {
+      try {
+        const exMain = path.join(uploadsRoot, 'exercises', `${ex._id}.jpg`);
+        const exThumb = path.join(uploadsRoot, 'exercises', `${ex._id}_thumb.jpg`);
+        try { await fs.unlink(exMain); report.filesDeleted.push(exMain); } catch (e) {}
+        try { await fs.unlink(exThumb); report.filesDeleted.push(exThumb); } catch (e) {}
+      } catch (e) { report.errors.push(String(e)); }
+    }
+
+    // Also try previous loose pattern: files starting with `${userId}_` in uploads root
     try {
-      console.log('[account/delete] Deleting Firebase Auth user...');
-      await admin.auth().deleteUser(tokenUid);
-      deletedAuth = true;
-      console.log(`[account/delete] Firebase Auth account deleted for UID: ${tokenUid}`);
+      const rootFiles = await fs.readdir(uploadsRoot);
+      for (const f of rootFiles) {
+        if (f.startsWith(`${tokenUid}_`)) {
+          const p = path.join(uploadsRoot, f);
+          try { await fs.unlink(p); report.filesDeleted.push(p); } catch (e) { report.errors.push(`unlink ${p}: ${e}`); }
+        }
+      }
+    } catch (e) { /* ignore if folder missing */ }
+
+    // --- Step 3: Delete GridFS files for exercises (exercise images stored in GridFS bucket 'exerciseImages') ---
+    try {
+      const db = mongoose.connection?.db;
+      if (db) {
+        const bucket = new mongoose.mongo.GridFSBucket(db, { bucketName: 'exerciseImages' });
+        for (const ex of userExercises) {
+          try {
+            if (ex.imageFileId) {
+              const oid = typeof ex.imageFileId === 'string' ? new mongoose.Types.ObjectId(ex.imageFileId) : ex.imageFileId;
+              await bucket.delete(oid);
+              report.gridfsDeleted.push({ exercise: ex._id, id: String(oid) });
+            }
+            if (ex.thumbFileId) {
+              const oid2 = typeof ex.thumbFileId === 'string' ? new mongoose.Types.ObjectId(ex.thumbFileId) : ex.thumbFileId;
+              await bucket.delete(oid2);
+              report.gridfsDeleted.push({ exercise: ex._id, id: String(oid2) });
+            }
+          } catch (e) {
+            // ignore individual deletion errors but record
+            report.errors.push(`gridfs delete ex ${ex._id}: ${e?.message || e}`);
+          }
+        }
+      } else {
+        report.errors.push('No DB connection - skipped GridFS cleanup');
+      }
+    } catch (e) { report.errors.push(`GridFS cleanup failed: ${e?.message || e}`); }
+
+    // --- Step 4: Delete DB documents ---
+    try {
+      const workoutDeleteResult = await Workout.deleteMany({ userId: tokenUid });
+      const exerciseDeleteResult = await Exercise.deleteMany({ userId: tokenUid });
+      report.dbDeleted.workouts = workoutDeleteResult.deletedCount || 0;
+      report.dbDeleted.exercises = exerciseDeleteResult.deletedCount || 0;
     } catch (e) {
-      console.error('[account/delete] Firebase deleteUser failed:', e?.code || e?.message || e);
-      return res.status(500).json({ error: 'Failed to delete Firebase user', code: e?.code, message: e?.message });
+      report.errors.push(`DB delete failed: ${e?.message || e}`);
     }
 
-    console.log(`[account/delete] Account deletion completed for UID: ${tokenUid}`);
-    res.json({
-      success: true,
-      uid: tokenUid,
-      adminProjectId,
-      tokenAudience: audience,
-      deleted: {
-        workouts: workoutDeleteResult.deletedCount,
-        exercises: exerciseDeleteResult.deletedCount,
-        files: deletedFiles
-      },
-      deletedAuth
-    });
+    // --- Step 5: Delete Firebase Auth account (best effort) ---
+    try {
+      await admin.auth().deleteUser(tokenUid);
+      report.deletedAuth = true;
+    } catch (e) {
+      const code = e?.code || '<no-code>';
+      const message = e?.message || String(e);
+      const stack = e?.stack || '<no-stack>';
+      const errString = `Firebase deleteUser failed: ${code} -- ${message}`;
+      report.errors.push({ code, message, stack });
+      console.error('[account/delete] Firebase deleteUser error:', errString);
+      console.error(stack);
+    }
+
+    console.info(`[account/delete] Account deletion completed for UID: ${tokenUid}`);
+    res.json({ success: true, uid: tokenUid, adminProjectId, tokenAudience: audience, report });
 
   } catch (error) {
     console.error('[account/delete] Account deletion failed:', error?.message || error);

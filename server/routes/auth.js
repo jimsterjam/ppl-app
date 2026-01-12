@@ -2,8 +2,244 @@ import express from 'express';
 import { OAuth2Client } from 'google-auth-library';
 import { admin } from '../utils/firebaseAdmin.js';
 import { logger } from '../utils/logger.js';
+import rateLimit from 'express-rate-limit';
 
 const router = express.Router();
+const firebaseWebApiKey = process.env.FIREBASE_WEB_API_KEY || process.env.VITE_FIREBASE_API_KEY || null;
+
+// Allow configuring resend verification rate limit via envs (dev needs higher limits)
+const rawResendWindow = Number(process.env.RESEND_VERIFICATION_WINDOW_MS || (60 * 60 * 1000));
+const resendLimitWindowMs = Number.isFinite(rawResendWindow) && rawResendWindow > 0 ? rawResendWindow : (60 * 60 * 1000);
+const resendLimitDefaultMax = process.env.NODE_ENV === 'production' ? 5 : 20;
+const rawResendMax = Number(process.env.RESEND_VERIFICATION_MAX || resendLimitDefaultMax);
+const resendLimitMax = Number.isFinite(rawResendMax) && rawResendMax > 0 ? rawResendMax : resendLimitDefaultMax;
+const disableResendLimiter = process.env.RESEND_VERIFICATION_DISABLE_RATE_LIMIT === '1' || rawResendMax === 0;
+
+const rawCacheTtl = Number(process.env.RESEND_VERIFICATION_CACHE_TTL_MS || (15 * 60 * 1000));
+const resendCacheTtlMs = Number.isFinite(rawCacheTtl) && rawCacheTtl > 0 ? rawCacheTtl : 0;
+const resendLinkCache = new Map();
+
+const getCacheKey = (email) => {
+  if (typeof email !== 'string') return null;
+  const trimmed = email.trim().toLowerCase();
+  return trimmed || null;
+};
+
+const getCachedLink = (email) => {
+  if (!resendCacheTtlMs) return null;
+  const cacheKey = getCacheKey(email);
+  if (!cacheKey) return null;
+  const entry = resendLinkCache.get(cacheKey);
+  if (entry && entry.expiresAt > Date.now()) return entry;
+  if (entry) resendLinkCache.delete(cacheKey);
+  return null;
+};
+
+const rememberCachedLink = (email, payload) => {
+  if (!resendCacheTtlMs) return;
+  const cacheKey = getCacheKey(email);
+  if (!cacheKey) return;
+  const expiresAt = payload.expiresAt && Number.isFinite(payload.expiresAt)
+    ? payload.expiresAt
+    : Date.now() + resendCacheTtlMs;
+  resendLinkCache.set(cacheKey, {
+    link: payload.link,
+    warnings: payload.warnings || null,
+    expiresAt
+  });
+};
+
+const clearCachedLink = (email) => {
+  if (!resendCacheTtlMs) return;
+  const cacheKey = getCacheKey(email);
+  if (!cacheKey) return;
+  resendLinkCache.delete(cacheKey);
+};
+
+async function sendVerificationEmailThroughFirebase(email, continueUrl) {
+  if (!firebaseWebApiKey) {
+    return { sent: false, reason: 'missing-api-key' };
+  }
+  try {
+    const userRecord = await admin.auth().getUserByEmail(email);
+    if (!userRecord?.uid) {
+      return { sent: false, reason: 'user-not-found' };
+    }
+    const customToken = await admin.auth().createCustomToken(userRecord.uid);
+    const tokenResp = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${firebaseWebApiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: customToken, returnSecureToken: true })
+    });
+    const tokenJson = await tokenResp.json().catch(() => ({}));
+    if (!tokenResp.ok || !tokenJson?.idToken) {
+      logger.error('resend-verification: failed to exchange custom token', tokenJson);
+      return { sent: false, reason: 'custom-token-exchange-failed', details: tokenJson?.error?.message || null };
+    }
+    const sendPayload = { requestType: 'VERIFY_EMAIL', idToken: tokenJson.idToken };
+    if (continueUrl && typeof continueUrl === 'string') {
+      sendPayload.continueUrl = continueUrl;
+      sendPayload.handleCodeInApp = false;
+    }
+    const sendResp = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${firebaseWebApiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(sendPayload)
+    });
+    const sendJson = await sendResp.json().catch(() => ({}));
+    if (!sendResp.ok) {
+      logger.error('resend-verification: sendOobCode failed', sendJson);
+      return { sent: false, reason: 'send-oob-failed', details: sendJson?.error?.message || null };
+    }
+    return { sent: true };
+  } catch (err) {
+    logger.error('resend-verification: sendVerificationEmailThroughFirebase exception', err?.message || err);
+    return { sent: false, reason: 'exception', details: err?.message || String(err) };
+  }
+}
+
+// Per-email/IP rate limiter for resend verification to avoid hitting Firebase limits
+const resendLimiter = rateLimit({
+  windowMs: resendLimitWindowMs,
+  max: resendLimitMax,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    try { return req.body && req.body.email ? `email:${String(req.body.email).toLowerCase()}` : req.ip }
+    catch { return req.ip }
+  },
+  handler: (req, res, _next, options) => {
+    const retryAfterSec = Math.max(1, Math.ceil(options.windowMs / 1000));
+    res.set('Retry-After', String(retryAfterSec));
+    return res.status(429).json({ error: 'too-many-requests', message: 'Zu viele Anfragen. Bitte später erneut versuchen.' });
+  }
+});
+const resendLimiterMiddleware = disableResendLimiter ? (req, _res, next) => next() : resendLimiter;
+
+// Generate email verification link for an existing email (admin-generated)
+// POST /api/auth/resend-verification { email, continueUrl }
+router.post('/resend-verification', resendLimiterMiddleware, async (req, res) => {
+  try {
+    const { email, continueUrl, forceNewLink } = req.body || {};
+    // Always log attempts so we can debug missing links (warn is always emitted)
+    logger.warn('resend-verification requested', { email, continueUrl, ip: req.ip, forceNewLink: Boolean(forceNewLink) });
+    if (!email) return res.status(400).json({ error: 'missing-email' });
+
+    const wantsFreshLink = Boolean(forceNewLink);
+    if (wantsFreshLink) clearCachedLink(email);
+
+    const cachedEntry = wantsFreshLink ? null : getCachedLink(email);
+    if (cachedEntry) {
+      logger.info('resend-verification: serving cached link', { email });
+      const cachedPayload = {
+        link: cachedEntry.link,
+        cached: true,
+        cachedExpiresAt: cachedEntry.expiresAt
+      };
+      if (cachedEntry.warnings) cachedPayload.warnings = cachedEntry.warnings;
+      return res.json(cachedPayload);
+    }
+
+    // Validate continueUrl: must be a valid absolute URL with http(s) protocol
+    let actionCodeSettings = undefined;
+    if (continueUrl && typeof continueUrl === 'string') {
+      try {
+        const parsed = new URL(continueUrl);
+        // Allow only https in production, or localhost/loopback for local dev
+        const isLocalhost = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1' || parsed.hostname === '::1';
+        if (parsed.protocol === 'https:' || isLocalhost) {
+          actionCodeSettings = { url: continueUrl, handleCodeInApp: false };
+        } else {
+          // reject other hosts (including LAN IPs) because Firebase often rejects them
+          logger.warn('resend-verification: continueUrl rejected (must be https or localhost):', continueUrl);
+        }
+      } catch (e) {
+        logger.warn('resend-verification: invalid continueUrl provided, ignoring', continueUrl, e?.message || e);
+        // include raw body for debugging
+        logger.warn('resend-verification: raw request body', req.body);
+      }
+    }
+
+    const warnings = [];
+    let link;
+    try {
+      link = await admin.auth().generateEmailVerificationLink(email, actionCodeSettings);
+    } catch (linkErr) {
+      const msg = linkErr?.message || String(linkErr);
+      const continueUrlRejected = Boolean(actionCodeSettings && msg && msg.includes('continue URL'));
+      if (continueUrlRejected) {
+        warnings.push('continue-url-rejected');
+        logger.warn('resend-verification: continueUrl rejected by Firebase, retrying without it', { continueUrl });
+        link = await admin.auth().generateEmailVerificationLink(email).catch((fallbackErr) => {
+          logger.error('resend-verification: fallback without continueUrl failed', fallbackErr?.message || fallbackErr);
+          throw fallbackErr;
+        });
+      } else {
+        throw linkErr;
+      }
+    }
+    // Log the link for developers: show in non-production or when explicitly enabled
+    try {
+      if (process.env.NODE_ENV !== 'production' || process.env.SHOW_EMAIL_LINKS === '1') {
+        logger.info(`Email verification link for ${email}: ${link}`);
+      }
+    } catch (logErr) {
+      // don't fail the request if logging throws
+      logger.warn('Could not log verification link', logErr?.message || logErr);
+    }
+    // Return the link so the client can open it or display instructions
+    let delivery = null;
+    if (!cachedEntry) {
+      delivery = await sendVerificationEmailThroughFirebase(email, actionCodeSettings?.url);
+      if (!delivery?.sent) {
+        logger.warn('resend-verification: email dispatch skipped/failed', { email, delivery });
+      }
+    }
+    const payload = warnings.length ? { link, warnings } : { link };
+    if (delivery) payload.delivery = delivery;
+    if (resendCacheTtlMs) {
+      const expiresAt = Date.now() + resendCacheTtlMs;
+      rememberCachedLink(email, { link, warnings: warnings.length ? warnings : null, expiresAt });
+      payload.cached = false;
+      payload.cachedExpiresAt = expiresAt;
+    }
+    res.json(payload);
+  } catch (e) {
+    // Log full error and request body to aid debugging when Firebase rejects continueUrl
+    logger.error('resend-verification failed', e?.message || e, { body: req.body });
+
+    // Map Firebase rate-limit error to 429 so the client can back off
+    const msg = e && (e.message || String(e));
+    if (msg && msg.includes('TOO_MANY_ATTEMPTS_TRY_LATER')) {
+      logger.warn('resend-verification: firebase rate limit hit', { email: req.body && req.body.email });
+      const wantsFreshLink = Boolean(req.body && req.body.forceNewLink);
+      const cachedEntryOnRateLimit = wantsFreshLink ? null : getCachedLink(req.body && req.body.email);
+      if (cachedEntryOnRateLimit) {
+        return res.status(200).json({
+          link: cachedEntryOnRateLimit.link,
+          cached: true,
+          warnings: [
+            ...(cachedEntryOnRateLimit.warnings || []),
+            'firebase-rate-limited'
+          ],
+          cachedExpiresAt: cachedEntryOnRateLimit.expiresAt,
+          delivery: { sent: false, reason: 'rate-limited-served-from-cache' }
+        });
+      }
+      // Suggest client to retry later; set Retry-After (3600s) as a hint
+      res.set('Retry-After', '3600');
+      return res.status(429).json({ error: 'too-many-requests', message: 'Zu viele Anfragen. Bitte später erneut versuchen.' });
+    }
+
+    // If Firebase returned specific error about continueUrl, surface it at warn level
+    if (msg && msg.includes('The continue URL must be a valid URL string')) {
+      logger.warn('resend-verification: firebase rejected continueUrl', { continueUrl: req.body && req.body.continueUrl });
+      return res.status(400).json({ error: 'invalid-continue-url', message: 'Ungültige continueUrl.' });
+    }
+
+    res.status(500).json({ error: 'resend-verification-failed', message: e?.message || String(e) });
+  }
+})
 
 const configuredAudiences = [
   process.env.GOOGLE_IOS_CLIENT_ID,

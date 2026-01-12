@@ -52,10 +52,10 @@
           <img :src="getExerciseImage(ex)" :alt="t('common.image')" class="thumb" @error="onImgError($event, ex)" />
           <div class="meta">
             <h2 class="title">{{ getTranslatedExerciseName(ex.name_en) }}</h2>
-              <p class="sub">{{ ex.category }} · {{ getTranslatedMuscleGroup(ex.muscleGroup || (ex.muscleGroups?.[0] || '')) }}</p>
+              <p class="sub">{{ getTranslatedCategory(ex.category) }} · {{ getTranslatedMuscleGroup(ex.muscleGroup || (ex.muscleGroups?.[0] || '')) }}</p>
           </div>
         </div>
-        <p class="desc">{{ ex.description }}</p>
+                <p class="desc">{{ getLocalizedDescription(ex) }}</p>
     <p class="equip">{{ t('exercises.equipment') }}: {{ getTranslatedEquipment(ex.equipment) }}</p>
       </div>
     </div>
@@ -71,6 +71,7 @@
 import { ref, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n'
 import { logger } from '@/utils/logger'
+import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 
 const { t } = useI18n()
 
@@ -80,27 +81,13 @@ const loading = ref(false);
 const selectedCategory = ref('');
 const selectedMuscleGroup = ref('');
 
-const { getTranslatedExerciseName, getAllTranslations } = useExerciseTranslation()
-
-function getTranslatedMuscleGroup(muscleGroup) {
-  if (!muscleGroup) return ''
-  const all = getAllTranslations()
-  // Suche nach passendem Eintrag (deutsch oder englisch)
-  const found = all.find(e => e.muscleGroup === muscleGroup || e.muscleGroup_en === muscleGroup)
-  const lang = (navigator.language || 'de').startsWith('de') ? 'de' : 'en'
-  if (lang === 'de') return found ? found.muscleGroup : muscleGroup
-  return found ? found.muscleGroup_en : muscleGroup
-}
-
-function getTranslatedEquipment(equipment) {
-  if (!equipment) return ''
-  const all = getAllTranslations()
-  // Suche nach passendem Eintrag (deutsch oder englisch)
-  const found = all.find(e => e.equipment === equipment || e.equipment_en === equipment)
-  const lang = (navigator.language || 'de').startsWith('de') ? 'de' : 'en'
-  if (lang === 'de') return found ? found.equipment : equipment
-  return found ? found.equipment_en : equipment
-}
+const {
+  getTranslatedExerciseName,
+  getTranslatedMuscleGroup,
+  getTranslatedEquipment,
+  getLocalizedDescription,
+  getTranslatedCategory
+} = useExerciseTranslation()
 
 // Muskelgruppen (Dropdown)
 const muscleGroups = [
@@ -178,30 +165,30 @@ function slugify(name) {
     .replace(/^-+|-+$/g, '');
 }
 
-// Kategorie-Icons werden in der Liste nicht mehr verwendet; Kamera ist der generische Placeholder
+// Kategorie-Icons werden in der Liste nicht mehr verwendet; Play-Button ist der generische Placeholder
 
 function getExerciseImage(ex) {
   // 1) Bevorzugt Thumbnail, dann großes Bild, dann evtl. externe Media-URL
   if (ex?.thumbnailUrl) return ex.thumbnailUrl;
   if (ex?.imageUrl) return ex.imageUrl;
   if (ex?.mediaUrl) return ex.mediaUrl;
-  // 2) Generischer Kamera-Placeholder
-  return '/exercises/camera.svg';
+  // 2) Generischer Play-Placeholder
+  return '/exercises/play.svg';
 }
 
 function onImgError(evt, ex) {
   const img = evt?.target;
   if (!img) return;
   
-  // Verhindere Endlosschleife: Wenn src schon camera.svg ist, nicht nochmal setzen
-  if (img.src.includes('camera.svg')) {
+  // Verhindere Endlosschleife: Wenn src schon play.svg ist, nicht nochmal setzen
+  if (img.src.includes('play.svg')) {
     img.onerror = null;
     return;
   }
   
-  // Einmalig auf Kamera-Placeholder fallen
+  // Einmalig auf Play-Placeholder fallen
   img.onerror = null;
-  img.src = '/exercises/camera.svg';
+  img.src = '/exercises/play.svg';
 }
 </script>
 
@@ -209,14 +196,15 @@ function onImgError(evt, ex) {
 .exercise-card { display: flex; flex-direction: column; gap: 8px; }
 .thumb-row { display: flex; align-items: center; gap: 12px; }
 .thumb {
-  width: 56px;
-  height: 56px;
-  flex: 0 0 56px;
+  width: 64px;
+  height: 64px;
+  flex: 0 0 64px;
   object-fit: contain;
   background: #f8fafc;
   border-radius: 10px;
   border: 1px solid #eef2f7;
-  padding: 6px;
+  padding: 8px;
+  box-sizing: border-box;
 }
 .meta { display: flex; flex-direction: column; min-width: 0; }
 .title { font-weight: 700; font-size: 1.125rem; line-height: 1.4; }
@@ -226,7 +214,7 @@ function onImgError(evt, ex) {
 /* Mobile: Thumbnail rechts und größer */
 @media (max-width: 480px) {
   .thumb-row { flex-direction: row-reverse; justify-content: space-between; }
-  .thumb { width: 84px; height: 84px; flex-basis: 84px; }
+  .thumb { width: 72px; height: 72px; flex-basis: 72px; }
   .meta { flex: 1 1 auto; }
 }
 </style>

@@ -64,11 +64,11 @@
       </section>
 
       <section class="card">
-        <h3>ℹ️ Rechtliches</h3>
-        <p class="hint">Impressum, Datenschutz, Nutzungsbedingungen</p>
+        <h3>{{ $t('settings.legalTitle') }}</h3>
+        <p class="hint">{{ $t('settings.legalHint') }}</p>
         <button class="legal-btn" @click="$router.push('/legal')">
           <span>ℹ️</span>
-          <span>Rechtliche Hinweise</span>
+          <span>{{ $t('settings.legalLink') }}</span>
         </button>
       </section>
 

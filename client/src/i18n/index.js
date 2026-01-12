@@ -34,6 +34,7 @@ export const messages = {
       sets: 'Sätze',
       reps: 'Wdh.',
       duration: 'Dauer',
+      today: 'Heute',
       
       
       unknownDuration: 'Dauer unbekannt',
@@ -101,6 +102,9 @@ export const messages = {
       language: 'Sprache',
       german: 'Deutsch',
       english: 'Englisch',
+      legalTitle: 'ℹ️ Rechtliches',
+      legalHint: 'Impressum, Datenschutz, Nutzungsbedingungen',
+      legalLink: 'Rechtliche Hinweise',
       dangerZone: 'Gefahrenzone',
       dangerZoneHint: 'Diese Aktion ist unwiderruflich und löscht alle deine Workout-Daten, Einstellungen und Drafts.',
       deleteAllData: 'Alle Daten löschen',
@@ -422,7 +426,7 @@ export const messages = {
       title: 'Impressum',
       section1Title: 'Angaben gemäß § 5 TMG:',
       section1Address: 'Max Mustermann\nMusterstraße 1\n12345 Musterstadt\nDeutschland',
-      section1Mail: 'E-Mail: kontakt@bro-split-app.de',
+      section1Mail: 'E-Mail: {email}',
       section1ResponsibleTitle: 'Verantwortlich für den Inhalt nach § 55 Abs. 2 RStV:',
       section1Responsible: 'Max Mustermann\nMusterstraße 1\n12345 Musterstadt',
       copyrightTitle: 'Urheberrecht / Copyright',
@@ -438,13 +442,13 @@ export const messages = {
       userHint4: 'Die Nutzung der App ist für Minderjährige nur mit Zustimmung der Erziehungsberechtigten gestattet.',
       privacyTitle: 'Datenschutzerklärung',
       privacy1: '1. Verantwortlicher',
-      privacy1Text: 'Verantwortlich für die Datenverarbeitung im Sinne der Datenschutz-Grundverordnung (DSGVO) ist:\nMax Mustermann\nMusterstraße 1\n12345 Musterstadt\nE-Mail: kontakt@bro-split-app.de',
+      privacy1Text: 'Verantwortlich für die Datenverarbeitung im Sinne der Datenschutz-Grundverordnung (DSGVO) ist:\nMax Mustermann\nMusterstraße 1\n12345 Musterstadt\nE-Mail: {email}',
       privacy2: '2. Erhebung und Verarbeitung personenbezogener Daten',
       privacy2Text: 'Die App verarbeitet personenbezogene Daten nur, soweit dies zur Bereitstellung, Nutzung oder Verbesserung der App erforderlich ist (z. B. Trainingsdaten, App-Statistiken, Fehlerberichte). Eine Weitergabe an Dritte erfolgt ausschließlich, wenn dies technisch notwendig ist (z. B. Apple iCloud, Hosting-Anbieter) oder eine gesetzliche Verpflichtung besteht.',
       privacy3: '3. Zugriffsdaten & Nutzungsanalyse',
       privacy3Text: 'Zur Verbesserung der App können anonyme Nutzungsdaten (z. B. verwendete Funktionen, Geräteinformationen) ausgewertet werden. Eine personenbezogene Auswertung findet nicht statt.',
       privacy4: '4. Rechte der Nutzer',
-      privacy4Text: 'Nutzer haben das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung und Datenübertragbarkeit ihrer personenbezogenen Daten. Anfragen können per E-Mail an kontakt@bro-split-app.de gestellt werden.',
+      privacy4Text: 'Nutzer haben das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung und Datenübertragbarkeit ihrer personenbezogenen Daten. Anfragen können per E-Mail an {email} gestellt werden.',
       privacy5: '5. Änderungen',
       privacy5Text: 'Diese Datenschutzerklärung kann bei Bedarf angepasst werden, um rechtliche oder technische Änderungen zu berücksichtigen.',
       lastUpdate: 'Letzte Aktualisierung: 11. November 2025'
@@ -538,6 +542,9 @@ export const messages = {
       language: 'Language',
       german: 'German',
       english: 'English',
+      legalTitle: 'ℹ️ Legal',
+      legalHint: 'Imprint, privacy policy, terms',
+      legalLink: 'Open legal notice',
       dangerZone: 'Danger Zone',
       dangerZoneHint: 'This action is irreversible and will delete all your workout data, settings and drafts.',
       deleteAllData: 'Delete all data',
@@ -856,7 +863,7 @@ export const messages = {
       title: 'Legal Notice',
       section1Title: 'Information according to § 5 TMG:',
       section1Address: 'Max Mustermann\nMusterstraße 1\n12345 Musterstadt\nGermany',
-      section1Mail: 'E-mail: kontakt@bro-split-app.de',
+      section1Mail: 'E-mail: {email}',
       section1ResponsibleTitle: 'Responsible for content according to § 55 Abs. 2 RStV:',
       section1Responsible: 'Max Mustermann\nMusterstraße 1\n12345 Musterstadt',
       copyrightTitle: 'Copyright',
@@ -872,13 +879,13 @@ export const messages = {
       userHint4: 'Use of the app by minors is only permitted with the consent of their legal guardians.',
       privacyTitle: 'Privacy Policy',
       privacy1: '1. Controller',
-      privacy1Text: 'The controller for data processing within the meaning of the GDPR is:\nMax Mustermann\nMusterstraße 1\n12345 Musterstadt\nE-mail: kontakt@bro-split-app.de',
+      privacy1Text: 'The controller for data processing within the meaning of the GDPR is:\nMax Mustermann\nMusterstraße 1\n12345 Musterstadt\nE-mail: {email}',
       privacy2: '2. Collection and processing of personal data',
       privacy2Text: 'The app processes personal data only to the extent necessary to provide, use or improve the app (e.g. training data, app statistics, error reports). Data is only passed on to third parties if this is technically necessary (e.g. Apple iCloud, hosting provider) or if there is a legal obligation.',
       privacy3: '3. Access data & usage analysis',
       privacy3Text: 'To improve the app, anonymous usage data (e.g. used features, device information) may be evaluated. No personal evaluation takes place.',
       privacy4: '4. User rights',
-      privacy4Text: 'Users have the right to information, correction, deletion, restriction of processing and data portability of their personal data. Requests can be sent by e-mail to kontakt@bro-split-app.de.',
+      privacy4Text: 'Users have the right to information, correction, deletion, restriction of processing and data portability of their personal data. Requests can be sent by e-mail to {email}.',
       privacy5: '5. Changes',
       privacy5Text: 'This privacy policy may be adapted as necessary to take account of legal or technical changes.',
       lastUpdate: 'Last update: 11 November 2025'
@@ -894,7 +901,8 @@ export function createI18nInstance() {
     fallbackLocale: 'en',
     messages,
     missingWarn: false,
-    fallbackWarn: false
+    fallbackWarn: false,
+    linkKey: '$:' // avoid conflicts with literal @ in translations
   })
 }
 

@@ -31,9 +31,9 @@
       </div>
 
       <!-- Aktiver Filterstatus -->
-      <div v-if="selectedCategory || selectedMuscleGroup" class="filter-status">
-  <span v-if="selectedCategory">{{ t('exercises.filters.category') }}: {{ selectedCategory }}</span>
-  <span v-if="selectedMuscleGroup">{{ t('exercises.filters.muscleGroup') }}: {{ selectedMuscleGroup }}</span>
+        <div v-if="selectedCategory || selectedMuscleGroup" class="filter-status">
+      <span v-if="selectedCategory">{{ t('exercises.filters.category') }}: {{ getTranslatedCategory(selectedCategory) }}</span>
+      <span v-if="selectedMuscleGroup">{{ t('exercises.filters.muscleGroup') }}: {{ getTranslatedMuscleGroup(selectedMuscleGroup) }}</span>
   <button class="reset-btn" @click="resetFilters">{{ t('exercises.filters.reset') }}</button>
       </div>
 
@@ -50,39 +50,19 @@
   <div v-for="exercise in exercises" :key="exercise._id" class="exercise-card glass">
           <div class="thumb-row">
             <div class="thumb-wrapper">
-              <button
-                type="button"
-                class="thumb-btn"
-                :title="t('exercises.addOrChangePhoto')"
-                :aria-label="t('exercises.addOrChangePhoto')"
-                @click="pickImage(exercise)"
-                @keydown.enter.prevent="pickImage(exercise)"
-                @keydown.space.prevent="pickImage(exercise)"
-              >
-                <img :src="getExerciseImage(exercise)" :alt="t('common.image')" class="thumb" @error="onImgError($event, exercise)" />
-              </button>
-              <button
-                v-if="exercise.imageUrl"
-                type="button"
-                class="thumb-remove"
-                :title="t('exercises.removePhoto')"
-                :aria-label="t('exercises.removePhoto')"
-                @click.stop="removeImage(exercise)"
-              >
-                ×
-              </button>
+              <img :src="getExerciseImage(exercise)" :alt="t('common.image')" class="thumb" @error="onImgError($event, exercise)" />
             </div>
             <div class="meta">
-              <div style="display: flex; align-items: center; gap: 6px;">
-                <h3 class="title" style="margin-bottom:0;">{{ getTranslatedExerciseName(exercise.name) }}</h3>
+              <div class="title-row">
+                <h3 class="title">{{ getTranslatedExerciseName(exercise.name) }}</h3>
                 <button class="info-btn" :aria-label="t('exercises.info')" @click="showInfo(exercise)">
                   <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="10" cy="10" r="9" stroke="#888" stroke-width="2"/><rect x="9" y="8" width="2" height="6" rx="1" fill="#888"/><rect x="9" y="5" width="2" height="2" rx="1" fill="#888"/></svg>
                 </button>
               </div>
-              <p class="sub">{{ exercise.category }} · {{ exercise.muscleGroup }}</p>
+              <p class="sub">{{ getTranslatedCategory(exercise.category) }} · {{ getTranslatedMuscleGroup(exercise.muscleGroup) }}</p>
             </div>
           </div>
-          <p class="equip"><strong>{{ t('exercises.equipment') }}:</strong> {{ exercise.equipment || t('exercises.bodyweight') }}</p>
+          <p class="equip"><strong>{{ t('exercises.equipment') }}:</strong> {{ getTranslatedEquipment(exercise.equipment) || t('exercises.bodyweight') }}</p>
         </div>
       </div>
       <!-- Info Overlay (außerhalb der v-for) -->
@@ -103,13 +83,10 @@
 
 <script setup>
 
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
-import { useToastStore } from '@/stores/toastStore'
 import { logger } from '@/utils/logger'
-import { useFirebaseAuth } from '@/utils/firebaseAuth'
-// import { fetchExercises, uploadExerciseImage, deleteExerciseImage } from '@/api/exercises'
 
 // Komponenten explizit registrieren (für <script setup> reicht der Import)
 import HeaderBar from '@/components/HeaderBar.vue'
@@ -122,7 +99,14 @@ const selectedMuscleGroup = ref('')
 const loading = ref(false)
 const exercises = ref([])
 const infoExercise = ref(null)
-const fileInput = ref(null)
+const { t } = useI18n()
+const {
+  getTranslatedExerciseName,
+  getTranslatedMuscleGroup,
+  getTranslatedEquipment,
+  getLocalizedDescription,
+  getTranslatedCategory
+} = useExerciseTranslation()
 // Info-Overlay Methoden
 function showInfo(exercise) {
   infoExercise.value = exercise
@@ -130,27 +114,7 @@ function showInfo(exercise) {
 function closeInfo() {
   infoExercise.value = null
 }
-function getTranslatedDescription(exercise) {
-  if (!exercise) return ''
-  if (t && t.locale && t.locale.value === 'en') {
-    return exercise.description_en || exercise.description || ''
-  }
-  return exercise.description || exercise.description_en || ''
-}
-const targetExerciseId = ref('')
-const bust = ref({})
-
-const { onAuthStateChanged } = useFirebaseAuth()
-const firebaseUser = ref(null)
-const isSignedIn = computed(() => !!firebaseUser.value)
-onAuthStateChanged((user) => {
-  firebaseUser.value = user
-})
-const { t } = useI18n()
-const { getTranslatedExerciseName } = useExerciseTranslation()
-
-
-const toast = useToastStore()
+const getTranslatedDescription = getLocalizedDescription
 
 // 🔄 Übungen direkt aus default-exercises.json laden (offlinefähig)
 import defaultExercises from '@/data/default-exercises.json'
@@ -237,188 +201,22 @@ onMounted(() => {
   loadAllExercises()
 })
 
-function ensureFileInput() {
-  if (fileInput.value) return
-  const input = document.createElement('input')
-  input.type = 'file'
-  input.accept = 'image/*'
-  input.capture = 'environment'
-  input.style.display = 'none'
-  input.addEventListener('change', onFileSelected)
-  document.body.appendChild(input)
-  fileInput.value = input
-}
-
-function pickImage(exercise) {
-  targetExerciseId.value = exercise._id
-  ensureFileInput()
-  try {
-    fileInput.value.setAttribute('accept', 'image/*')
-    fileInput.value.setAttribute('capture', 'environment')
-  } catch {}
-  fileInput.value.click()
-}
-
-async function onFileSelected(e) {
-  try {
-    const files = e.target.files || []
-    if (!files.length || !targetExerciseId.value) return
-    const rawFile = files[0]
-    const resized = await resizeImageFile(rawFile, 1280, 0.85).catch(() => rawFile)
-
-    // OFFLINE: Speichere Foto lokal als Base64 in IndexedDB
-    if (!navigator.onLine) {
-      const dataUrl = await fileToDataURL(resized)
-      
-      // Finde Exercise in Cache und aktualisiere mit lokalem Foto
-      const exercise = await db.exercises.get(targetExerciseId.value)
-      if (exercise) {
-        exercise.imageUrl = dataUrl
-        exercise._pendingImageSync = true // Markiere für späteren Upload
-        exercise._offlineImageData = dataUrl // Speichere für Sync
-        await db.exercises.put(exercise)
-        
-        logger.debug('📸 Offline: Foto lokal gespeichert für Exercise:', targetExerciseId.value)
-        bust.value = { ...bust.value, [targetExerciseId.value]: Date.now() }
-        await loadExercises()
-        toast.show('📸 Foto offline gespeichert - wird später hochgeladen', { 
-          type: 'info', 
-          duration: 3000, 
-          position: 'top' 
-        })
-      }
-      return
-    }
-
-    // ONLINE: Direkter Upload zum Backend
-
-    let token = null
-    // Warte auf Clerk-Initialisierung und Login
-    logger.debug('Clerk loaded:', window.Clerk?.loaded, 'isSignedIn:', isSignedIn.value)
-    if (window.Clerk?.loaded && isSignedIn.value) {
-      try {
-        token = await getAuthToken({ clerk, auth })
-      } catch (err) {
-        logger.warn('⚠️ Token-Abruf fehlgeschlagen:', err.message)
-      }
-    } else {
-      logger.warn('⚠️ Clerk noch nicht bereit oder User nicht eingeloggt')
-    }
-
-    await uploadExerciseImage(targetExerciseId.value, resized, token)
-    bust.value = { ...bust.value, [targetExerciseId.value]: Date.now() }
-    await loadExercises()
-    toast.show(t('exercises.toastUploaded'), { type: 'success', duration: 3000, position: 'top' })
-  } catch (err) {
-    logger.error('❌ Fehler beim Foto-Upload:', err)
-    toast.show(t('exercises.toastUploadFailed') || 'Foto-Upload fehlgeschlagen', { 
-      type: 'error', 
-      duration: 3000 
-    })
-  } finally {
-    if (fileInput.value) fileInput.value.value = ''
-    targetExerciseId.value = ''
-  }
-}
-
-async function removeImage(exercise) {
-  if (!exercise?._id) return
-  
-  // OFFLINE: Entferne Foto nur lokal aus Cache
-  if (!navigator.onLine) {
-    try {
-      const cachedExercise = await db.exercises.get(exercise._id)
-      if (cachedExercise) {
-        cachedExercise.imageUrl = null
-        cachedExercise._pendingImageSync = false
-        cachedExercise._offlineImageData = null
-        await db.exercises.put(cachedExercise)
-        
-        logger.debug('🗑️ Offline: Foto lokal entfernt für Exercise:', exercise._id)
-        bust.value = { ...bust.value, [exercise._id]: Date.now() }
-        await loadExercises()
-        toast.show('🗑️ Foto offline entfernt', { type: 'info', duration: 3000 })
-      }
-    } catch (err) {
-      logger.error('❌ Fehler beim lokalen Entfernen:', err)
-      toast.show('Foto konnte nicht entfernt werden', { type: 'error', duration: 3000 })
-    }
-    return
-  }
-  
-  // ONLINE: Backend-Delete
-  let token = null
-  logger.debug('Clerk loaded:', window.Clerk?.loaded, 'isSignedIn:', isSignedIn.value)
-  if (window.Clerk?.loaded && isSignedIn.value) {
-    try { token = await getAuthToken({ clerk, auth }) } catch {}
-  } else {
-    logger.warn('⚠️ Clerk noch nicht bereit oder User nicht eingeloggt')
-  }
-  try {
-    await deleteExerciseImage(exercise._id, token)
-    await loadExercises()
-    toast.show(t('exercises.toastRemoved'), { type: 'success', duration: 3000 })
-  } catch (e) {
-    toast.show(t('exercises.toastRemoveFailed'), { type: 'error', duration: 3000 })
-  }
-}
-
-function resizeImageFile(file, maxSize = 1280, quality = 0.85) {
-  return new Promise((resolve, reject) => {
-    const img = new Image()
-    img.onload = () => {
-      const scale = Math.min(maxSize / img.width, maxSize / img.height, 1)
-      const w = Math.round(img.width * scale)
-      const h = Math.round(img.height * scale)
-      const canvas = document.createElement('canvas')
-      canvas.width = w; canvas.height = h
-      const ctx = canvas.getContext('2d')
-      ctx.drawImage(img, 0, 0, w, h)
-      canvas.toBlob((blob) => {
-        if (blob) {
-          const f = new File([blob], (file.name || 'upload').replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' })
-          resolve(f)
-        } else {
-          reject(new Error('Blob-Erzeugung fehlgeschlagen'))
-        }
-      }, 'image/jpeg', quality)
-    }
-    img.onerror = reject
-    const reader = new FileReader()
-    reader.onload = () => { img.src = reader.result }
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
-}
-
-function fileToDataURL(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result)
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
-}
-
 function getExerciseImage(ex) {
-  const base = ex?.thumbnailUrl || ex?.imageUrl || ex?.mediaUrl || '/exercises/camera.svg'
-  const id = ex?._id
-  const stamp = id && bust.value?.[id] ? `?t=${bust.value[id]}` : ''
-  return `${base}${stamp}`
+  return ex?.thumbnailUrl || ex?.imageUrl || ex?.mediaUrl || '/exercises/play.svg'
 }
 
 function onImgError(evt, ex) {
   const img = evt?.target
   if (!img) return
   
-  // Verhindere Endlosschleife: Wenn src schon camera.svg ist, nicht nochmal setzen
-  if (img.src.includes('camera.svg')) {
+  // Verhindere Endlosschleife: Wenn src schon play.svg ist, nicht nochmal setzen
+  if (img.src.includes('play.svg')) {
     img.onerror = null
     return
   }
   
   img.onerror = null
-  img.src = '/exercises/camera.svg'
+  img.src = '/exercises/play.svg'
 }
 </script>
 <style scoped>
@@ -428,7 +226,6 @@ function onImgError(evt, ex) {
   background: none;
   border: none;
   padding: 0 2px;
-  margin-left: 2px;
   cursor: pointer;
   vertical-align: middle;
   border-radius: 50%;
@@ -438,6 +235,7 @@ function onImgError(evt, ex) {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 .info-btn:hover {
   background: #e5e7eb;
@@ -613,7 +411,7 @@ function onImgError(evt, ex) {
 
 .exercise-card { background: transparent; border-radius: 12px; padding: 16px; border: 1px solid transparent; }
 
-.exercise-card h3 { margin: 0 0 8px 0; color: var(--accent-color); font-size: 1.1rem; }
+.exercise-card h3 { margin: 0; color: var(--accent-color); font-size: 1.1rem; }
 
 .exercise-card p { margin: 4px 0; font-size: 0.9rem; color: var(--muted); }
 
@@ -634,38 +432,21 @@ function onImgError(evt, ex) {
 
 /* Thumbnail-Styles */
 .thumb-row { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+.title-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; flex-wrap: nowrap; }
 .thumb-wrapper { position: relative; display: inline-block; }
-.thumb-btn { padding: 0; margin: 0; border: none; background: transparent; cursor: pointer; border-radius: 10px; }
-.thumb-btn:focus { outline: 2px solid var(--accent-color); outline-offset: 2px; }
 .thumb {
-  width: 56px;
-  height: 56px;
-  flex: 0 0 56px;
+  width: 64px;
+  height: 64px;
+  flex: 0 0 64px;
   object-fit: contain;
   background: #f8fafc;
   border-radius: 10px;
   border: 1px solid var(--card-border);
-  padding: 6px;
-}
-.thumb-remove {
-  position: absolute;
-  top: -6px;
-  right: -6px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 1px solid var(--danger-color);
-  background: var(--bg);
-  color: var(--danger-color);
-  font-weight: 700;
-  line-height: 20px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
+  padding: 8px;
+  box-sizing: border-box;
 }
 .meta { display: flex; flex-direction: column; min-width: 0; }
-.title { margin: 0; line-height: 1.2; }
+.title { margin: 0; line-height: 1.2; flex: 1 1 auto; min-width: 0; }
 .sub { color: var(--muted); font-size: 0.9rem; }
 .equip, .id { color: var(--muted); font-size: 0.85rem; }
 
@@ -687,7 +468,7 @@ function onImgError(evt, ex) {
 /* Mobile: Thumbnail rechts und größer */
 @media (max-width: 480px) {
   .thumb-row { flex-direction: row-reverse; justify-content: space-between; }
-  .thumb { width: 84px; height: 84px; flex-basis: 84px; }
+  .thumb { width: 72px; height: 72px; flex-basis: 72px; }
   .meta { flex: 1 1 auto; }
 }
 </style>

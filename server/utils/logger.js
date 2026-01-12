@@ -9,8 +9,33 @@
  * In Production werden nur warn, error und critical geloggt.
  */
 
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
 const isDev = process.env.NODE_ENV !== 'production'
 const isProd = process.env.NODE_ENV === 'production'
+
+// Optional file logging (enable with LOG_TO_FILE=1)
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
+const logFilePath = path.join(__dirname, '..', 'server.log')
+const logToFile = process.env.LOG_TO_FILE === '1' || false
+
+function writeFileLog(level, args) {
+  if (!logToFile) return
+  try {
+    const ts = getTimestamp()
+    const message = args.map(a => {
+      try { return typeof a === 'string' ? a : JSON.stringify(a) }
+      catch { return String(a) }
+    }).join(' ')
+    const line = `[${ts}] [${level}] ${message}\n`
+    fs.appendFile(logFilePath, line, () => {})
+  } catch (e) {
+    // never throw from the logger
+  }
+}
 
 /**
  * ANSI Color Codes für Terminal-Ausgabe
@@ -62,6 +87,7 @@ export const logger = {
   debug: (...args) => {
     if (isDev) {
       console.log(formatMessage('DEBUG', colors.cyan, args), ...args)
+      writeFileLog('DEBUG', args)
     }
   },
 
@@ -71,6 +97,7 @@ export const logger = {
   info: (...args) => {
     if (isDev) {
       console.log(formatMessage('INFO', colors.blue, args), ...args)
+      writeFileLog('INFO', args)
     }
   },
 
@@ -79,6 +106,7 @@ export const logger = {
    */
   warn: (...args) => {
     console.warn(formatMessage('WARN', colors.yellow, args), ...args)
+    writeFileLog('WARN', args)
   },
 
   /**
@@ -86,6 +114,7 @@ export const logger = {
    */
   error: (...args) => {
     console.error(formatMessage('ERROR', colors.red, args), ...args)
+    writeFileLog('ERROR', args)
   },
 
   /**
@@ -104,6 +133,7 @@ export const logger = {
       // TODO: Integration mit Sentry, etc.
       // Sentry.captureException(new Error(args.join(' ')))
     }
+    writeFileLog('CRITICAL', args)
   },
 
   /**
