@@ -74,6 +74,91 @@
           </div>
         </div>
         
+        <div v-if="statsLoading" class="ai-progress glass">
+          <div class="section-header">
+            <div>
+              <p class="eyebrow">{{ t('stats.ai.cockpitLabel') }}</p>
+              <h3>{{ t('stats.loading') }}</h3>
+            </div>
+            <span class="range-chip pulse"></span>
+          </div>
+          <p class="loading-copy">{{ t('stats.ai.loadingCopy') }}</p>
+        </div>
+
+        <div v-else-if="hasProgressStats" class="ai-progress glass">
+          <div class="section-header">
+            <div>
+              <p class="eyebrow">{{ t('stats.ai.cockpitLabel') }}</p>
+              <h3>{{ t('stats.ai.monthlyPulse') }}</h3>
+            </div>
+            <span class="range-chip">{{ progressRangeLabel }}</span>
+          </div>
+
+          <div class="kpi-grid">
+            <div v-for="card in kpiCards" :key="card.label" class="kpi-card" :class="card.tone">
+              <p class="kpi-label">{{ card.label }}</p>
+              <p class="kpi-value">{{ card.value }}</p>
+              <p class="kpi-hint">{{ card.hint }}</p>
+            </div>
+          </div>
+
+          <div class="insights-grid">
+            <div class="weekly-panel">
+              <div class="panel-header">
+                <h4>{{ t('stats.ai.weeklyRhythmTitle') }}</h4>
+                <span class="panel-hint">{{ t('stats.ai.weeklyRhythmHint', { count: weeklyMomentum.length }) }}</span>
+              </div>
+              <div v-if="weeklyMomentum.length" class="week-list">
+                <div v-for="week in weeklyMomentum" :key="week.weekStart" class="week-item">
+                  <div>
+                    <p class="week-label">{{ week.label }}</p>
+                    <p class="week-intensity">{{ formatWeekIntensity(week.avgIntensity) }}</p>
+                  </div>
+                  <div class="week-badges">
+                    <span class="badge" :class="getWeekBadgeClass(week.sessions)">{{ getWeekSessionsLabel(week.sessions) }}</span>
+                    <span class="badge ghost">{{ getWeekVolumeLabel(week.volume) }}</span>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="empty-panel">{{ t('stats.ai.weeklyEmpty') }}</div>
+            </div>
+
+            <div class="top-lifts-panel">
+              <div class="panel-header">
+                <h4>{{ t('stats.ai.topLiftsTitle') }}</h4>
+                <span class="panel-hint">{{ t('stats.ai.topLiftsHint') }}</span>
+              </div>
+              <div v-if="topLiftList.length" class="lift-list">
+                <div v-for="lift in topLiftList" :key="lift.name" class="lift-item">
+                  <div>
+                    <p class="lift-name">{{ lift.name }}</p>
+                    <p class="lift-meta">{{ getLiftMeta(lift) }}</p>
+                  </div>
+                  <span class="lift-weight">{{ lift.weight }}kg</span>
+                </div>
+              </div>
+              <div v-else class="empty-panel">{{ t('stats.ai.topLiftsEmpty') }}</div>
+            </div>
+          </div>
+
+          <div class="muscle-panel">
+            <div class="panel-header">
+              <h4>{{ t('stats.ai.muscleFocusTitle') }}</h4>
+              <span class="panel-hint">{{ t('stats.ai.muscleFocusHint') }}</span>
+            </div>
+            <div v-if="muscleDistribution.length" class="muscle-bars">
+              <div v-for="muscle in muscleDistribution" :key="muscle.key" class="muscle-row">
+                <span class="muscle-label">{{ muscle.label }}</span>
+                <div class="muscle-bar-wrap">
+                  <div class="muscle-bar" :style="{ width: getMuscleBarWidth(muscle.volume) }"></div>
+                </div>
+                <span class="muscle-value">{{ formatKgValue(muscle.volume) }}kg</span>
+              </div>
+            </div>
+            <div v-else class="empty-panel">{{ t('stats.ai.muscleEmpty') }}</div>
+          </div>
+        </div>
+
         <WorkoutTypeChart :workouts="workouts" />
         <ProgressChart :workouts="workouts" />
       </div>
@@ -105,6 +190,84 @@ const { t } = useI18n()
 const loading = ref(true)
 const workouts = ref([])
 const selectedPeriod = ref('week')
+const authToken = ref(null)
+
+const compactNumber = new Intl.NumberFormat('de-DE', { notation: 'compact', maximumFractionDigits: 1 })
+const decimalNumber = new Intl.NumberFormat('de-DE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+const dateFormatter = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: 'short' })
+
+const progressStats = computed(() => store.stats)
+const statsLoading = computed(() => store.loadingStats)
+const hasProgressStats = computed(() => !!(progressStats.value && progressStats.value.kpis))
+
+const progressRangeLabel = computed(() => {
+  if (!hasProgressStats.value) return '—'
+  try {
+    const start = new Date(progressStats.value.range.start)
+    const end = new Date(progressStats.value.range.end)
+    return `${dateFormatter.format(start)} – ${dateFormatter.format(end)}`
+  } catch (e) {
+    return '—'
+  }
+})
+
+const consistencyTagline = computed(() => {
+  const score = progressStats.value?.kpis?.consistencyScore ?? 0
+  if (score >= 85) return t('stats.ai.consistencyTaglines.machine')
+  if (score >= 70) return t('stats.ai.consistencyTaglines.steady')
+  if (score >= 50) return t('stats.ai.consistencyTaglines.onTrack')
+  return t('stats.ai.consistencyTaglines.routine')
+})
+
+const kpiCards = computed(() => {
+  if (!hasProgressStats.value) return []
+  const kpis = progressStats.value.kpis
+  return [
+    {
+      label: t('stats.ai.kpis.sessions'),
+      value: kpis.sessions ?? 0,
+      hint: t('stats.ai.kpis.sessionsHint', { value: decimalNumber.format(kpis.avgSessionsPerWeek || 0) }),
+      tone: 'sessions'
+    },
+    {
+      label: t('stats.ai.kpis.avgSessions'),
+      value: decimalNumber.format(kpis.avgSessionsPerWeek || 0),
+      hint: t('stats.ai.kpis.avgSessionsHint'),
+      tone: 'tempo'
+    },
+    {
+      label: t('stats.ai.kpis.volume'),
+      value: `${formatKgValue(kpis.totalVolume)}kg`,
+      hint: t('stats.ai.kpis.volumeHint', { value: formatKgValue(kpis.avgWeeklyVolume || 0) }),
+      tone: 'volume'
+    },
+    {
+      label: t('stats.ai.kpis.consistency'),
+      value: `${Math.round(kpis.consistencyScore || 0)}%`,
+      hint: consistencyTagline.value,
+      tone: kpis.consistencyScore >= 75 ? 'good' : kpis.consistencyScore >= 50 ? 'neutral' : 'alert'
+    }
+  ]
+})
+
+const weeklyMomentum = computed(() => {
+  if (!hasProgressStats.value) return []
+  const weeks = progressStats.value.weeks || []
+  return weeks.slice(-5).reverse().map(week => ({
+    weekStart: week.weekStart,
+    label: dateFormatter.format(new Date(week.weekStart)),
+    sessions: week.sessionCount,
+    volume: week.totalVolume,
+    avgIntensity: week.avgIntensity
+  }))
+})
+
+const topLiftList = computed(() => (hasProgressStats.value ? progressStats.value.topLifts || [] : []))
+const muscleDistribution = computed(() => (hasProgressStats.value ? progressStats.value.muscleBreakdown || [] : []))
+const maxMuscleVolume = computed(() => {
+  const volumes = muscleDistribution.value.map(item => Number(item.volume) || 0)
+  return volumes.length ? Math.max(...volumes) : 1
+})
 
 // Circle progress calculation
 const circumference = 2 * Math.PI * 50
@@ -159,8 +322,15 @@ const weekProgress = computed(() => {
 })
 
 // Enhanced Stats Functions
+function getRangeDays(period) {
+  if (period === 'week') return 60
+  if (period === 'month') return 120
+  return 365
+}
+
 function updatePeriodStats() {
-  // Trigger reactivity for period-based calculations
+  if (!authToken.value) return
+  store.loadStats(authToken.value, { rangeDays: getRangeDays(selectedPeriod.value) })
 }
 
 function getProgressColor() {
@@ -248,12 +418,55 @@ function getBestMonth() {
   return max || 0
 }
 
+function formatKgValue(value) {
+  const numeric = Number(value) || 0
+  if (numeric >= 1000) {
+    return compactNumber.format(numeric)
+  }
+  return Math.round(numeric).toString()
+}
+
+function formatWeekIntensity(value) {
+  return t('stats.ai.weekAvgIntensity', { value: decimalNumber.format(value || 0) })
+}
+
+function getWeekSessionsLabel(count) {
+  return t('stats.ai.badges.sessions', { count })
+}
+
+function getWeekVolumeLabel(volume) {
+  return t('stats.ai.badges.volume', { value: formatKgValue(volume) })
+}
+
+function getLiftMeta(lift) {
+  if (lift?.reps) {
+    return t('stats.ai.badges.reps', { count: lift.reps })
+  }
+  return t('stats.ai.badges.pr')
+}
+
+function getWeekBadgeClass(count) {
+  if (count >= 4) return 'badge-strong'
+  if (count >= 2) return 'badge-solid'
+  return 'badge-ghost'
+}
+
+function getMuscleBarWidth(volume) {
+  const max = maxMuscleVolume.value || 1
+  const pct = Math.round((Number(volume) / max) * 100)
+  return `${Math.max(pct, 5)}%`
+}
+
 
 async function loadData() {
   try {
     loading.value = true
     const token = await getIdToken().catch(() => null)
-    await store.loadWorkouts(token)
+    authToken.value = token
+    await Promise.all([
+      store.loadWorkouts(token),
+      store.loadStats(token, { rangeDays: getRangeDays(selectedPeriod.value) })
+    ])
     workouts.value = store.workouts
   } catch (error) {
     logger.error('Fehler beim Laden der Workout-Daten:', error)
@@ -422,6 +635,207 @@ onMounted(() => {
 
 .stat-label { display: block; color: var(--muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px; }
 
+.ai-progress {
+  background: var(--surface);
+  border-radius: 18px;
+  padding: 22px;
+  border: 1px solid var(--card-border);
+  box-shadow: 0 12px 32px rgba(0,0,0,0.18);
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  font-size: 0.7rem;
+  color: var(--muted);
+  margin: 0 0 4px 0;
+}
+
+.range-chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--card-border);
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.range-chip.pulse {
+  min-width: 48px;
+  min-height: 12px;
+  background: var(--card-border);
+  animation: shimmer 1.4s infinite;
+}
+
+.loading-copy {
+  color: var(--muted);
+  margin: 0;
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.kpi-card {
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid var(--card-border);
+  background: rgba(255,255,255,0.02);
+}
+
+.kpi-card.sessions { border-color: rgba(255,166,0,0.35); }
+.kpi-card.tempo { border-color: rgba(59,130,246,0.35); }
+.kpi-card.volume { border-color: rgba(16,185,129,0.35); }
+.kpi-card.good { border-color: rgba(34,197,94,0.35); }
+.kpi-card.neutral { border-color: rgba(148,163,184,0.35); }
+.kpi-card.alert { border-color: rgba(248,113,113,0.45); }
+
+.kpi-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 0 0 6px 0;
+}
+
+.kpi-value {
+  font-size: 1.8rem;
+  margin: 0;
+  font-weight: 700;
+  color: var(--fg);
+}
+
+.kpi-hint {
+  margin: 6px 0 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.insights-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.panel-hint {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.week-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.week-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--card-border);
+}
+
+.week-label { font-weight: 600; margin: 0; }
+.week-intensity { margin: 4px 0 0 0; color: var(--muted); font-size: 0.85rem; }
+
+.week-badges { display: flex; gap: 8px; }
+
+.badge {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border: 1px solid transparent;
+}
+
+.badge-strong { border-color: rgba(34,197,94,0.4); color: #22c55e; }
+.badge-solid { border-color: rgba(250,204,21,0.5); color: #facc15; }
+.badge-ghost { border-color: rgba(148,163,184,0.4); color: var(--muted); }
+.badge.ghost { border-color: rgba(148,163,184,0.2); color: var(--muted); }
+
+.top-lifts-panel, .weekly-panel, .muscle-panel {
+  padding: 16px;
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.01);
+}
+
+.lift-list { display: flex; flex-direction: column; gap: 10px; }
+
+.lift-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+
+.lift-item:last-child { border-bottom: none; }
+
+.lift-name { margin: 0; font-weight: 600; }
+.lift-meta { margin: 2px 0 0 0; color: var(--muted); font-size: 0.8rem; }
+.lift-weight { font-weight: 700; color: var(--fg); }
+
+.muscle-bars { display: flex; flex-direction: column; gap: 12px; }
+
+.muscle-row {
+  display: grid;
+  grid-template-columns: 80px 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.muscle-label { font-size: 0.9rem; color: var(--muted); }
+
+.muscle-bar-wrap {
+  background: rgba(148,163,184,0.2);
+  border-radius: 999px;
+  overflow: hidden;
+  height: 10px;
+}
+
+.muscle-bar {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-color), var(--success-color));
+}
+
+.muscle-value { font-weight: 600; color: var(--fg); }
+
+.empty-panel {
+  text-align: center;
+  padding: 20px;
+  border: 1px dashed var(--card-border);
+  border-radius: 12px;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+@keyframes shimmer {
+  0% { opacity: 0.4; }
+  50% { opacity: 1; }
+  100% { opacity: 0.4; }
+}
+
 @media (max-width: 480px) {
   .stats-content {
     padding: 16px;
@@ -470,6 +884,10 @@ onMounted(() => {
   
   .charts-container {
     gap: 16px;
+  }
+
+  .kpi-grid {
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   }
 }
 

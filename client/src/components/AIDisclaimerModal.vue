@@ -121,19 +121,20 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 1400;
   padding: 20px;
 }
 
 .disclaimer-modal {
-  background: rgb(255 255 255 / 100%);
+  background: color-mix(in srgb, var(--card-bg) 95%, #ffffff 5%);
+  color: var(--fg);
   border-radius: 16px;
   max-width: 600px;
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--card-border);
 }
 
 .disclaimer-header {
@@ -141,7 +142,7 @@ export default {
   align-items: center;
   justify-content: space-between;
   padding: 24px 24px 0;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--card-border);
   margin-bottom: 24px;
 }
 
@@ -176,8 +177,8 @@ export default {
 }
 
 .warning-box {
-  background: linear-gradient(135deg, #ff6b6b20, #ffa50020);
-  border: 1px solid #ff6b6b40;
+  background: color-mix(in srgb, #ff6b6b 12%, transparent);
+  border: 1px solid color-mix(in srgb, #ff6b6b 45%, transparent);
   border-radius: 12px;
   padding: 20px;
   margin-bottom: 24px;
@@ -200,10 +201,11 @@ export default {
 }
 
 .beta-info, .data-info {
-  background: var(--bg-secondary);
+  background: color-mix(in srgb, var(--surface) 90%, #ffffff 4%);
   border-radius: 12px;
   padding: 20px;
   margin-bottom: 24px;
+  border: 1px solid color-mix(in srgb, var(--card-border) 70%, transparent);
 }
 
 .beta-info h4, .data-info h4 {
@@ -237,7 +239,7 @@ export default {
 .checkmark {
   width: 20px;
   height: 20px;
-  border: 2px solid var(--border-color);
+  border: 2px solid var(--card-border);
   border-radius: 4px;
   margin-right: 12px;
   margin-top: 2px;
@@ -264,7 +266,7 @@ export default {
   display: flex;
   gap: 12px;
   padding: 24px;
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--card-border);
 }
 
 .btn-secondary, .btn-primary {
@@ -279,22 +281,22 @@ export default {
 }
 
 .btn-secondary {
-  background: #f0f0f0;
-  color: #333;
-  border: 1px solid #ddd;
+  background: color-mix(in srgb, var(--surface) 85%, #ffffff 8%);
+  color: var(--fg);
+  border: 1px solid color-mix(in srgb, var(--card-border) 60%, transparent);
 }
 
 .btn-secondary:hover {
-  background: #e0e0e0;
+  background: color-mix(in srgb, var(--surface) 75%, #ffffff 12%);
 }
 
 .btn-primary {
-  background: #0074d9;
-  color: white;
+  background: var(--primary-color);
+  color: var(--accent-contrast);
 }
 
 .btn-primary:hover {
-  background: #0057a8;
+  background: var(--primary-hover, #0057a8);
   transform: translateY(-1px);
 }
 

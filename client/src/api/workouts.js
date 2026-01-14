@@ -170,6 +170,21 @@ export async function fetchWorkoutStats(token = null) {
   }
 }
 
+export async function fetchWorkoutProgressStats(token = null, params = {}) {
+  try {
+    const config = {
+      params,
+      validateStatus: (status) => (status >= 200 && status < 300) || [404, 204, 500].includes(status)
+    };
+    if (token) config.headers = { Authorization: `Bearer ${token}` };
+    const res = await api.get("/stats/progress", config);
+    if (!res || [404, 204, 500].includes(res.status)) return null;
+    return res.data ?? null;
+  } catch (error) {
+    throw handleAPIError(error, 'Progress-Stats laden', { showToast: false });
+  }
+}
+
 // Alle Workouts löschen
 export async function deleteAllWorkouts(token = null) {
   try {

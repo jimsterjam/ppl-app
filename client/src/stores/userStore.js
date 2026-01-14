@@ -126,24 +126,41 @@ export const useUserStore = defineStore("user", {
       }
     },
 
-    async loadStats(token = null) {
-      // Offline/Demo: Stats aus localStorage laden
-      this.loadingStats = true
-      this.error = null
-      try {
-        const data = localStorage.getItem('bro_split_stats')
-        if (data) {
-          this.stats = JSON.parse(data)
-          logger.debug('✅ [Demo] Stats loaded from localStorage:', this.stats)
-        } else {
-          this.stats = null
-          logger.debug('⚠️ [Demo] No stats in localStorage')
+    async loadStats(token = null, params = {}) {
+      this.loadingStats = true;
+      this.error = null;
+      const readCachedStats = () => {
+        try {
+          const cached = localStorage.getItem('bro_split_stats');
+          return cached ? JSON.parse(cached) : null;
+        } catch (err) {
+          logger.warn('⚠️ [userStore] Konnte Stats-Cache nicht lesen:', err);
+          return null;
         }
+      };
+
+      try {
+        const { fetchWorkoutProgressStats } = await import('@/api/workouts');
+        const stats = await fetchWorkoutProgressStats(token, params);
+        if (stats) {
+          this.stats = stats;
+          localStorage.setItem('bro_split_stats', JSON.stringify(stats));
+          logger.debug('✅ [API] Progress Stats geladen:', {
+            sessions: stats?.kpis?.sessions,
+            weeks: stats?.weeks?.length || 0
+          });
+        } else {
+          this.stats = readCachedStats();
+          logger.debug('ℹ️ [userStore] Keine frischen Stats, nutze Cache:', !!this.stats);
+        }
+        return this.stats;
       } catch (error) {
-        logger.error('❌ [Demo] Error loading stats from localStorage:', error)
-        this.stats = null
+        logger.error('❌ [API] Fehler beim Laden der Progress Stats:', error);
+        this.error = error?.message || 'Fehler beim Laden der Progress Stats';
+        this.stats = readCachedStats();
+        return this.stats;
       } finally {
-        this.loadingStats = false
+        this.loadingStats = false;
       }
     },
 

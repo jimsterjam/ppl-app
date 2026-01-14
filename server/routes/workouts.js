@@ -13,6 +13,28 @@ const router = express.Router();
 let openai = null;
 let openaiInitialized = false;
 
+const aiFeatureConfig = {
+  remoteEnabled: process.env.AI_REMOTE_ENABLED === 'true',
+  requireAuth: process.env.AI_REQUIRE_AUTH !== 'false',
+  allowTestUserRemote: process.env.AI_REMOTE_ALLOW_TEST === 'true',
+  allowDemoFallback: process.env.AI_DEMO_FALLBACK !== 'false',
+  betaUsers: (process.env.AI_REMOTE_BETA_USERS || '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean)
+};
+
+const aiAuthMiddleware = aiFeatureConfig.requireAuth ? firebaseAuthMiddleware : (req, _res, next) => next();
+
+function canUseRemoteAI(userId = '') {
+  if (!aiFeatureConfig.remoteEnabled) return false;
+  if (!userId || userId === 'test_user') {
+    return aiFeatureConfig.allowTestUserRemote;
+  }
+  if (!aiFeatureConfig.betaUsers.length) return true;
+  return aiFeatureConfig.betaUsers.includes(userId);
+}
+
 // Exercise name mapping für AI-Responses
 const exerciseNameMapping = {
   // Englisch -> Deutsch Mapping
@@ -50,6 +72,90 @@ const exerciseNameMapping = {
   'leg press': 'Beinpresse',
   'calf raises': 'Wadenheben stehend'
 };
+
+const DEFAULT_PROGRESS_RANGE_DAYS = 120;
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const muscleLabelMap = {
+  push: 'Push',
+  pull: 'Pull',
+  legs: 'Legs',
+  core: 'Core',
+  cardio: 'Cardio'
+};
+
+function startOfIsoWeek(dateInput) {
+  const date = new Date(dateInput);
+  const isoDay = date.getUTCDay() === 0 ? 7 : date.getUTCDay();
+  date.setUTCDate(date.getUTCDate() - isoDay + 1);
+  date.setUTCHours(0, 0, 0, 0);
+  return date;
+}
+
+function normalizeCategory(input, workoutType) {
+  const source = (input || workoutType || 'push').toString().toLowerCase();
+  if (source.includes('pull') || source.includes('rück') || source.includes('back')) return 'pull';
+  if (source.includes('leg') || source.includes('bein')) return 'legs';
+  if (source.includes('core') || source.includes('abs') || source.includes('bauch')) return 'core';
+  if (source.includes('cardio')) return 'cardio';
+  return 'push';
+}
+
+function calculateExerciseVolume(exercise) {
+  if (!exercise) return 0;
+  if (Array.isArray(exercise.setDetails) && exercise.setDetails.length) {
+    return exercise.setDetails.reduce((sum, set) => {
+      const reps = Number(set?.reps ?? exercise.reps ?? 0);
+      const weight = Number(set?.weight ?? exercise.weight ?? 0);
+      return sum + Math.max(0, reps) * Math.max(0, weight);
+    }, 0);
+  }
+  const sets = Number(exercise.sets) || 1;
+  const reps = Number(exercise.reps) || 0;
+  const weight = Number(exercise.weight) || 0;
+  return Math.max(0, sets) * Math.max(0, reps) * Math.max(0, weight);
+}
+
+function getExerciseBestWeight(exercise) {
+  let best = Number(exercise?.weight) || 0;
+  if (Array.isArray(exercise?.setDetails)) {
+    exercise.setDetails.forEach((set) => {
+      const current = Number(set?.weight) || 0;
+      if (current > best) best = current;
+    });
+  }
+  return best;
+}
+
+function computeWorkoutMetrics(workout) {
+  const metrics = {
+    volume: 0,
+    bestLifts: [],
+    muscleVolume: new Map()
+  };
+
+  if (!Array.isArray(workout?.exercises)) {
+    return metrics;
+  }
+
+  workout.exercises.forEach((exercise) => {
+    const exerciseVolume = calculateExerciseVolume(exercise);
+    metrics.volume += exerciseVolume;
+
+    const category = normalizeCategory(exercise?.category, workout?.type);
+    metrics.muscleVolume.set(category, (metrics.muscleVolume.get(category) || 0) + exerciseVolume);
+
+    const peakWeight = getExerciseBestWeight(exercise);
+    if (peakWeight > 0 && exercise?.name) {
+      metrics.bestLifts.push({
+        name: exercise.name,
+        weight: peakWeight,
+        reps: Number(exercise.reps) || null
+      });
+    }
+  });
+
+  return metrics;
+}
 
 // 🎯 Automatische Übungs-Hinzufügung zur Datenbank
 async function addNewExercisesToDatabase(exercises, source = 'ai_suggestion', userId = null) {
@@ -213,6 +319,23 @@ async function initializeOpenAI() {
   }
 }
 
+function sanitizeWorkoutRequest(body) {
+  const toNumber = (value, fallback) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+  };
+
+  return {
+    timeAvailable: toNumber(body.timeAvailable, 45),
+    experienceLevel: typeof body.experienceLevel === 'string' ? body.experienceLevel : 'intermediate',
+    intensity: toNumber(body.intensity, 3),
+    focus: typeof body.focus === 'string' ? body.focus : 'push',
+    recentWorkouts: Array.isArray(body.recentWorkouts) ? body.recentWorkouts.slice(0, 10) : null,
+    injuries: body.injuries || null,
+    mode: typeof body.mode === 'string' ? body.mode : undefined
+  };
+}
+
 // Alle Workouts für den eingeloggten User holen
 router.get("/", firebaseAuthMiddleware, async (req, res) => {
   try {
@@ -220,6 +343,132 @@ router.get("/", firebaseAuthMiddleware, async (req, res) => {
     const workouts = await Workout.find({ userId })
       .sort({ date: -1 }); // Neueste zuerst
     res.json(workouts);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get("/stats/progress", firebaseAuthMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.auth;
+    const rangeDays = Math.min(
+      365,
+      Math.max(30, Number(req.query.rangeDays) || DEFAULT_PROGRESS_RANGE_DAYS)
+    );
+    const fromDate = new Date(Date.now() - rangeDays * MS_PER_DAY);
+
+    const workouts = await Workout.find({
+      userId,
+      date: { $gte: fromDate }
+    }).sort({ date: 1 }).lean();
+
+    const weeksMap = new Map();
+    const liftRecords = new Map();
+    const muscleMap = new Map();
+    let totalVolume = 0;
+
+    workouts.forEach((workout) => {
+      const metrics = computeWorkoutMetrics(workout);
+      totalVolume += metrics.volume;
+
+      const weekStart = startOfIsoWeek(workout.date);
+      const weekKey = weekStart.toISOString();
+      const existingWeek = weeksMap.get(weekKey) || {
+        weekStart: weekKey,
+        sessionCount: 0,
+        totalVolume: 0
+      };
+      existingWeek.sessionCount += 1;
+      existingWeek.totalVolume += metrics.volume;
+      weeksMap.set(weekKey, existingWeek);
+
+      metrics.bestLifts.forEach((lift) => {
+        const existing = liftRecords.get(lift.name);
+        if (!existing || lift.weight > existing.weight) {
+          liftRecords.set(lift.name, {
+            ...lift,
+            date: workout.date
+          });
+        }
+      });
+
+      metrics.muscleVolume.forEach((value, key) => {
+        muscleMap.set(key, (muscleMap.get(key) || 0) + value);
+      });
+    });
+
+    const weeks = Array.from(weeksMap.values())
+      .sort((a, b) => new Date(a.weekStart) - new Date(b.weekStart))
+      .map((week) => ({
+        ...week,
+        totalVolume: Math.round(week.totalVolume),
+        avgIntensity: week.sessionCount ? Math.round(week.totalVolume / week.sessionCount) : 0
+      }));
+
+    const totalWeeks = weeks.length || 1;
+    const avgWeeklyVolume = totalWeeks ? Math.round(totalVolume / totalWeeks) : 0;
+    const avgSessionsPerWeek = totalWeeks ? Number((workouts.length / totalWeeks).toFixed(2)) : 0;
+    const consistencyScore = totalWeeks
+      ? Math.round((weeks.filter((week) => week.sessionCount >= 2).length / totalWeeks) * 100)
+      : 0;
+
+    const topLifts = Array.from(liftRecords.values())
+      .sort((a, b) => b.weight - a.weight)
+      .slice(0, 5);
+
+    const muscleBreakdown = Array.from(muscleMap.entries())
+      .map(([key, value]) => ({
+        key,
+        label: muscleLabelMap[key] || key,
+        volume: Math.round(value)
+      }))
+      .sort((a, b) => b.volume - a.volume);
+
+    res.json({
+      range: {
+        start: fromDate,
+        end: new Date()
+      },
+      kpis: {
+        sessions: workouts.length,
+        totalVolume: Math.round(totalVolume),
+        avgWeeklyVolume,
+        avgSessionsPerWeek,
+        consistencyScore
+      },
+      weeks,
+      topLifts,
+      muscleBreakdown
+    });
+  } catch (err) {
+    logger.error('progress stats error', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.get("/stats/overview", firebaseAuthMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.auth;
+    const totalWorkouts = await Workout.countDocuments({ userId });
+
+    const totalDuration = await Workout.aggregate([
+      { $match: { userId } },
+      { $group: { _id: null, total: { $sum: "$duration" } } }
+    ]);
+
+    const lastWeek = new Date();
+    lastWeek.setDate(lastWeek.getDate() - 7);
+
+    const recentWorkouts = await Workout.countDocuments({
+      userId,
+      date: { $gte: lastWeek }
+    });
+
+    res.json({
+      totalWorkouts,
+      totalDuration: totalDuration[0]?.total || 0,
+      recentWorkouts
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -306,38 +555,6 @@ router.delete("/:id", firebaseAuthMiddleware, async (req, res) => {
   }
 });
 
-// Workout-Statistiken für den User
-router.get("/stats/overview", firebaseAuthMiddleware, async (req, res) => {
-  try {
-    const { userId } = req.auth;
-    
-    // Gesamt-Statistiken
-    const totalWorkouts = await Workout.countDocuments({ userId });
-    
-    const totalDuration = await Workout.aggregate([
-      { $match: { userId: userId } },
-      { $group: { _id: null, total: { $sum: "$duration" } } }
-    ]);
-    
-    // Workouts der letzten 7 Tage
-    const lastWeek = new Date();
-    lastWeek.setDate(lastWeek.getDate() - 7);
-    
-    const recentWorkouts = await Workout.countDocuments({
-      userId,
-      date: { $gte: lastWeek }
-    });
-    
-    res.json({
-      totalWorkouts,
-      totalDuration: totalDuration[0]?.total || 0,
-      recentWorkouts
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // ALLE Workouts des Users aus MongoDB löschen (Danger Zone)
 router.delete("/", firebaseAuthMiddleware, async (req, res) => {
   try {
@@ -407,111 +624,118 @@ router.post("/ai-demo", async (req, res) => {
   }
 });
 
-// �🤖 AI WORKOUT SUGGESTION (Temporär public für Testing)
-router.post("/ai-suggestion", async (req, res) => {
+// 🤖 AI WORKOUT SUGGESTION (Feature-Flag gesteuert)
+router.post("/ai-suggestion", aiAuthMiddleware, async (req, res) => {
+  const requestId = `ai_req_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
+  res.set('X-AI-Request-Id', requestId);
+
   try {
-    const userId = 'test_user'; // Fallback für Testing
-    
-    logger.debug('🤖 AI Suggestion requested by user:', userId);
-    logger.debug('📋 Request context:', req.body);
+    const userId = req.auth?.userId || 'test_user';
+    const context = sanitizeWorkoutRequest(req.body || {});
+    const requestedMode = (context.mode || req.header('x-ai-mode') || 'auto').toLowerCase();
+    delete context.mode;
 
-    // OpenAI beim ersten Aufruf initialisieren
-    const openaiClient = await initializeOpenAI();
+    const forceDemo = requestedMode === 'demo';
+    const tryRemote = !forceDemo && canUseRemoteAI(userId);
 
-    // Wenn OpenAI verfügbar ist, echte AI verwenden
-    if (openaiClient) {
-      try {
-        const aiSuggestion = await generateGPT4Suggestion(req.body, openaiClient);
-        
-        // Schnelle Validierung: Batch lookup statt Individual findOne
-        if (aiSuggestion.exercises?.length > 0) {
-          const exerciseNames = aiSuggestion.exercises.map(ex => ex.name);
-          const dbExercises = await Exercise.find({ name: { $in: exerciseNames } }).lean();
-          const nameToId = {};
-          dbExercises.forEach(ex => {
-            nameToId[ex.name] = ex._id;
-          });
-          
-          // Enriche AI-Übungen mit _id
-          aiSuggestion.exercises = aiSuggestion.exercises.map(ex => ({
-            ...ex,
-            _id: nameToId[ex.name] || `temp_${Math.random()}`
-          }));
-          
-          logger.debug('✅ AI-Übungen mit _id enriched:', aiSuggestion.exercises.filter(e => e._id && !e._id.startsWith('temp')).length);
+    logger.debug('🤖 AI Suggestion requested', {
+      requestId,
+      userId,
+      requestedMode,
+      tryRemote
+    });
+
+    let responsePayload = null;
+    let modeUsed = 'demo';
+
+    if (tryRemote) {
+      const openaiClient = await initializeOpenAI();
+      if (openaiClient) {
+        try {
+          const aiSuggestion = await generateGPT4Suggestion(context, openaiClient);
+
+          if (aiSuggestion.exercises?.length > 0) {
+            const exerciseNames = aiSuggestion.exercises.map(ex => ex.name);
+            const dbExercises = await Exercise.find({ name: { $in: exerciseNames } }).lean();
+            const nameToId = {};
+            dbExercises.forEach(ex => { nameToId[ex.name] = ex._id; });
+
+            aiSuggestion.exercises = aiSuggestion.exercises.map(ex => ({
+              ...ex,
+              _id: nameToId[ex.name] || `temp_${Math.random()}`
+            }));
+          }
+
+          aiSuggestion.metadata = {
+            source: 'openai_gpt4',
+            recommendationId: `ai_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            requestedAt: new Date().toISOString(),
+            userId,
+            confidence: aiSuggestion.metadata?.confidence || 85,
+            exercisesValidated: true,
+            mode: 'remote'
+          };
+
+          responsePayload = aiSuggestion;
+          modeUsed = 'remote';
+        } catch (aiError) {
+          logger.error('❌ OpenAI Error:', { requestId, message: aiError.message });
         }
-        
-        // Metadata hinzufügen
-        aiSuggestion.metadata = {
-          source: 'openai_gpt4',
-          recommendationId: `ai_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-          requestedAt: new Date().toISOString(),
-          userId: userId,
-          confidence: 85, // Hohe Confidence für echte AI
-          exercisesValidated: true
-        };
-
-        logger.debug('✅ OpenAI suggestion generated:', {
-          id: aiSuggestion.metadata.recommendationId,
-          exercises: aiSuggestion.exercises?.length || 0,
-          confidence: aiSuggestion.metadata.confidence
-        });
-
-        return res.json(aiSuggestion);
-
-      } catch (aiError) {
-        logger.error('❌ OpenAI Error:', aiError.message);
-        // Fallback bei AI-Fehler
+      } else {
+        logger.debug('ℹ️ Remote AI nicht aktiv/kein API-Key', { requestId });
       }
     }
 
-    // Fallback: Demo-Suggestion
-  const demoSuggestion = await generateDemoSuggestion(req.body);
-    
-    // Schnelle Validierung: Batch lookup statt Individual findOne
-    if (demoSuggestion.exercises?.length > 0) {
-      const exerciseNames = demoSuggestion.exercises.map(ex => ex.name);
-      const dbExercises = await Exercise.find({ name: { $in: exerciseNames } }).lean();
-      const nameToId = {};
-      dbExercises.forEach(ex => {
-        nameToId[ex.name] = ex._id;
-      });
-      
-      // Enriche Demo-Übungen mit _id
-      demoSuggestion.exercises = demoSuggestion.exercises.map(ex => ({
-        ...ex,
-        _id: nameToId[ex.name] || `temp_${Math.random()}`
-      }));
-      
-      const foundCount = demoSuggestion.exercises.filter(e => {
-        const idStr = typeof e._id === 'string' ? e._id : (e._id?.toString?.() || '');
-        return e._id && !idStr.startsWith('temp');
-      }).length;
-      logger.debug('✅ Demo-Übungen mit _id enriched:', foundCount);
-    }
-    
-    demoSuggestion.metadata = {
-      source: openaiClient ? 'fallback_after_ai_error' : 'demo_no_api_key',
-      recommendationId: `demo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      requestedAt: new Date().toISOString(),
-      userId: userId,
-      confidence: 0,
-      isDemoData: true,
-      exercisesValidated: true
-    };
+    if (!responsePayload) {
+      if (!aiFeatureConfig.allowDemoFallback && tryRemote) {
+        return res.status(503).json({
+          error: 'AI temporarily unavailable',
+          requestId
+        });
+      }
 
-    logger.debug('🧪 Demo suggestion generated:', {
-      id: demoSuggestion.metadata.recommendationId,
-      reason: demoSuggestion.metadata.source
+      const demoSuggestion = await generateDemoSuggestion(context);
+      
+      if (demoSuggestion.exercises?.length > 0) {
+        const exerciseNames = demoSuggestion.exercises.map(ex => ex.name);
+        const dbExercises = await Exercise.find({ name: { $in: exerciseNames } }).lean();
+        const nameToId = {};
+        dbExercises.forEach(ex => { nameToId[ex.name] = ex._id; });
+        demoSuggestion.exercises = demoSuggestion.exercises.map(ex => ({
+          ...ex,
+          _id: nameToId[ex.name] || `temp_${Math.random()}`
+        }));
+      }
+
+      demoSuggestion.metadata = {
+        source: tryRemote ? 'fallback_after_ai_error' : 'demo_no_api_key',
+        recommendationId: `demo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        requestedAt: new Date().toISOString(),
+        userId,
+        confidence: 0,
+        isDemoData: true,
+        exercisesValidated: true,
+        mode: 'demo'
+      };
+
+      responsePayload = demoSuggestion;
+      modeUsed = 'demo';
+    }
+
+    logger.debug('✅ AI Suggestion fulfilled', {
+      requestId,
+      modeUsed,
+      exercises: responsePayload.exercises?.length || 0
     });
 
-    res.json(demoSuggestion);
+    res.json(responsePayload);
 
   } catch (err) {
-    logger.error('❌ AI Suggestion Route Error:', err);
+    logger.error('❌ AI Suggestion Route Error:', { requestId, message: err.message });
     res.status(500).json({ 
       error: 'Interner Server-Fehler',
-      message: err.message 
+      message: err.message,
+      requestId
     });
   }
 });

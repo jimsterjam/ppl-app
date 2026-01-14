@@ -209,12 +209,12 @@
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { storeToRefs } from 'pinia'
 import { useAICoachStore } from '@/stores/aiCoachStore'
 import { useToastStore } from '@/stores/toastStore'
 import { useUserStore } from '@/stores/userStore'
 import HeaderBar from '@/components/HeaderBar.vue'
 import AIDisclaimerModal from '@/components/AIDisclaimerModal.vue'
-import { http } from '@/api/http'
 import { logger } from '@/utils/logger'
 
 // Composables
@@ -246,11 +246,12 @@ function getTranslatedEquipment(equipment, lang = 'de') {
 const router = useRouter()
 const aiStore = useAICoachStore()
 const toast = useToastStore()
+const { lastRecommendation, isLoading: aiLoading } = storeToRefs(aiStore)
 
 // Reactive state
 const showAIDisclaimer = ref(false)
-const aiProcessing = ref(false)
-const aiRecommendation = ref(null)
+const aiRecommendation = computed(() => lastRecommendation.value)
+const aiProcessing = computed(() => aiLoading.value)
 const aiResultCard = ref(null) // Ref für das Ergebnis-Card
 
 const workoutConfig = ref({
@@ -279,7 +280,7 @@ const onAIConsentDecline = () => {
 
 const revokeAIConsent = () => {
   aiStore.revokeConsent()
-  aiRecommendation.value = null
+  aiStore.clearLastRecommendation()
   workoutConfig.value = {
     timeAvailable: 45,
     experienceLevel: 'intermediate',
@@ -301,28 +302,32 @@ const getIntensityLabel = (intensity) => {
 }
 
 const requestAIWorkout = async () => {
-  if (!aiStore.canUseAI) {
-    toast.show('AI Coach nicht verfügbar', 'error')
+  if (!aiStore.hasConsent && !aiStore.canUseAI) {
+    showAIDisclaimer.value = true
+    toast.show('Bitte zuerst dem AI Coach zustimmen', 'info')
     return
   }
-  aiProcessing.value = true
-  aiRecommendation.value = null
+
   try {
-    const response = await http.post('/workouts/ai-suggestion', workoutConfig.value)
-    aiRecommendation.value = response.data
+    await aiStore.requestRecommendation(workoutConfig.value)
     toast.show('AI Workout generiert! 🤖', 'success')
-    
-    // Scrolle automatisch zum Ergebnis
+
     await nextTick()
     if (aiResultCard.value) {
       aiResultCard.value.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   } catch (error) {
+    if (error.code === 'consent-missing') {
+      showAIDisclaimer.value = true
+      toast.show('Bitte bestätige den AI Hinweis', 'info')
+      return
+    }
+    if (error.code === 'plan-missing') {
+      toast.show('AI Coach benötigt einen Pro/Elite Plan', 'warning')
+      return
+    }
     logger.error('AI Workout Request failed:', error)
     toast.show('Fehler beim Generieren des Workouts', 'error')
-    aiRecommendation.value = null
-  } finally {
-    aiProcessing.value = false
   }
 }
 
@@ -477,7 +482,7 @@ const resetConfig = () => {
     intensity: 3,
     focus: 'push'
   }
-  aiRecommendation.value = null
+  aiStore.clearLastRecommendation()
 }
 
 // Lifecycle
@@ -489,9 +494,9 @@ onMounted(() => {
 <style scoped>
 .features-test-page {
   min-height: 100vh;
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  padding-bottom: 80px;
+  background: var(--bg);
+  color: var(--fg);
+  padding-bottom: calc(140px + var(--safe-bottom, 0px));
 }
 
 .test-content {
@@ -511,12 +516,12 @@ onMounted(() => {
 }
 
 .test-card {
-  background: var(--bg-secondary);
-  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface) 92%, #ffffff 6%);
+  border-radius: 16px;
   padding: 20px;
   margin-bottom: 20px;
-  border: 1px solid var(--border-color);
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  border: 1px solid color-mix(in srgb, var(--card-border) 85%, transparent);
+  box-shadow: 0 18px 45px color-mix(in srgb, #000000 12%, transparent);
 }
 
 .test-card h4 {
@@ -544,30 +549,30 @@ onMounted(() => {
 }
 
 .success {
-  color: var(--success-color);
-  background: #eafbe7;
+  color: color-mix(in srgb, var(--success-color) 80%, #ffffff 20%);
+  background: color-mix(in srgb, var(--success-color) 15%, transparent);
   font-weight: bold;
   padding: 2px 8px;
   border-radius: 6px;
 }
 .warning {
-  color: var(--warning-color);
-  background: #fff3e0;
+  color: color-mix(in srgb, var(--warning-color) 85%, #ffffff 15%);
+  background: color-mix(in srgb, var(--warning-color) 18%, transparent);
   font-weight: bold;
   padding: 2px 8px;
   border-radius: 6px;
 }
 .error {
-  color: var(--error-color);
-  background: #fdecea;
+  color: color-mix(in srgb, var(--error-color) 82%, #ffffff 18%);
+  background: color-mix(in srgb, var(--error-color) 18%, transparent);
   font-weight: bold;
   padding: 2px 8px;
   border-radius: 6px;
 }
 
 .ai-consent-card {
-  border: 2px solid var(--primary-color);
-  background: var(--bg-secondary);
+  border: 2px solid color-mix(in srgb, var(--primary-color) 70%, transparent);
+  background: color-mix(in srgb, var(--surface) 92%, #ffffff 4%);
 }
 
 .test-actions {
@@ -656,11 +661,11 @@ onMounted(() => {
 }
 
 .config-select {
-  padding: 10px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--card-border) 75%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 92%, #ffffff 5%);
+  color: var(--fg);
   font-size: 1rem;
   font-family: inherit;
   cursor: pointer;
@@ -675,8 +680,8 @@ onMounted(() => {
 .config-slider {
   width: 100%;
   height: 8px;
-  border-radius: 4px;
-  background: var(--border-color);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--card-border) 70%, transparent);
   outline: none;
   cursor: pointer;
   appearance: none;
@@ -687,7 +692,7 @@ onMounted(() => {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: var(--primary-color);
+  background: linear-gradient(135deg, var(--primary-color), var(--primary-hover, #ff3333));
   cursor: pointer;
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
   border: 2px solid white;
@@ -742,9 +747,11 @@ onMounted(() => {
 }
 
 .ai-result {
-  border-radius: 10px;
-  border: 2px solid var(--primary-color);
-  padding: 20px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--primary-color) 50%, transparent);
+  padding: 24px;
+  background: color-mix(in srgb, var(--surface) 90%, #ffffff 6%);
+  box-shadow: 0 16px 40px color-mix(in srgb, #000000 15%, transparent);
 }
 
 .rec-header {
@@ -816,10 +823,10 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 12px;
-  background: var(--bg-primary);
-  border-radius: 8px;
-  border: 1px solid var(--border-color);
+  padding: 10px 14px;
+  background: color-mix(in srgb, var(--surface) 85%, #ffffff 8%);
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--card-border) 75%, transparent);
 }
 
 .exercise-name {
@@ -856,7 +863,7 @@ onMounted(() => {
 
 .action-btn.primary {
   background: var(--primary-color);
-  color: var(--text-primary);
+  color: var(--accent-contrast);
 }
 
 .action-btn.secondary {

@@ -328,7 +328,50 @@ export const messages = {
       weeklyGoal: 'Wochenziel',
       overview: 'Übersicht',
       emptyTitle: 'Noch keine Workouts',
-      emptyMsg: 'Starte dein erstes Workout um Statistiken zu sehen!'
+      emptyMsg: 'Starte dein erstes Workout um Statistiken zu sehen!',
+      ai: {
+        cockpitLabel: 'AI Progress Cockpit',
+        monthlyPulse: 'Monatlicher Pulse',
+        loadingCopy: 'Wir holen deine KPIs aus der Cloud …',
+        weeklyRhythmTitle: 'Weekly Rhythm',
+        weeklyRhythmHint: 'letzte {count} Wochen',
+        weekAvgIntensity: 'Ø {value}kg / Session',
+        weeklyEmpty: 'Noch keine Wochenhistorie',
+        topLiftsTitle: 'Top Lifts',
+        topLiftsHint: 'persönliche Bestwerte',
+        topLiftsEmpty: 'Noch keine PRs geloggt',
+        muscleFocusTitle: 'Muscle Focus',
+        muscleFocusHint: 'Volumen-Verteilung',
+        muscleEmpty: 'Noch keine Volumen-Daten',
+        badges: {
+          sessions: '{count} Sessions',
+          volume: '{value}kg',
+          reps: '{count} Wdh.',
+          pr: 'PR'
+        },
+        kpis: {
+          sessions: 'Sessions',
+          sessionsHint: 'Ø {value}/Woche',
+          avgSessions: 'Ø Sessions/Woche',
+          avgSessionsHint: 'Ziel ≥ 3',
+          volume: 'Gesamtvolumen',
+          avgWeeklyVolume: 'Ø Volumen/Woche',
+          volumeHint: 'Ø {value}kg/Woche',
+          consistency: 'Konstanz'
+        },
+        consistencyTaglines: {
+          machine: 'Machine Mode',
+          steady: 'Sehr stabil',
+          onTrack: 'Auf Kurs',
+          routine: 'Zeit für Routine'
+        }
+      },
+      widget: {
+        title: 'Fortschritt',
+        offlineTitle: 'Fortschritt (lokal)',
+        fallbackCopy: '{completed} / {total} Workouts erledigt',
+        draftsHint: 'Entwürfe werden nicht gezählt.'
+      }
     },
     quick: {
       title: 'Deine Woche',
@@ -382,6 +425,8 @@ export const messages = {
       navigationText: 'Unten findest du die Hauptnavigation: Dashboard (Überblick und Schnellstart), Stats (Auswertungen), Übungen (Übersicht und Bild-Uploads), FAQ’s (Hilfe) und Einstellungen (Theme, Sprache, Ziele).\n\nAuf größeren Bildschirmen befindet sich die Navigation als Seitenleiste links. Aktive Bereiche sind farblich hervorgehoben.',
       workouts: 'Workflows',
       workoutsText: 'Du kannst Workouts als Entwurf beginnen und später fortsetzen. Über “Letzte Workouts” gelangst du schnell zu den letzten Sessions und kannst sie mit einem Tipp wiederholen.\n\nIm Detail können Reihenfolgen per Drag & Drop geändert und Sätze flexibel angepasst werden. Speichern sichert den aktuellen Stand.',
+      aiCoach: 'AI Coach & Insights',
+      aiCoachText: '✨ **Dein persönlicher AI Coach**\n\nStell dir vor, dein Training plant sich von selbst. Der AI Coach erstellt dir in Sekunden komplette Push/Pull/Legs-Workouts – abgestimmt auf dein Ziel, deine verfügbare Zeit und das, was du zuletzt trainiert hast. Kein Planen, kein Grübeln. Öffnen, auswählen, starten.\n\n🧠 **Trainiere mit System statt Zufall**\nDer Coach erkennt, wie oft du trainierst, welche Muskelgruppen du priorisierst und wo Abwechslung oder Fokus fehlt. So entstehen strukturierte Sessions mit klaren Satz- und Wiederholungszahlen – inklusive kürzerer Varianten für stressige Tage.\n\n📊 **Verstehe deinen Fortschritt**\nIm Stats-Bereich bekommst du einfache, visuelle Insights: wie konstant du trainierst, ob du gerade stagnierst und welche Bereiche besonders gefordert werden. Verständlich, motivierend, ohne Zahlenchaos.\n\n🚀 **Jetzt kostenlos testen**\nDu kannst alle AI-Funktionen einen Monat lang kostenlos nutzen. In dieser Zeit siehst du selbst, wie sich strukturiertes Training anfühlt – ganz ohne Verpflichtung. Gehe dazu einfach in die Einstellungen und aktiviere den Testzeitraum für den AI Coach.\n\n**Nach dem Test entscheidest du:**\n- weiter trainieren ohne AI\n- oder mit einem Abo das volle Potenzial aus der App und deinem Training holen\n\n🔒 **Deine Daten, deine Kontrolle**\nDein Trainingsverlauf bleibt bei dir. Du entscheidest jederzeit, wie der AI Coach genutzt wird.\n\n💡 **Kurz gesagt**\nDer AI Coach nimmt dir das Denken ab – damit du dich auf das Training konzentrieren kannst.',
       uploads: 'Bilder & Uploads',
       uploadsText: 'Tippe direkt auf das Übungs-Thumbnail, um ein Foto hinzuzufügen oder zu ersetzen. Ein kleines × oben rechts entfernt das Bild wieder.\n\nBilder werden vor dem Upload automatisch verkleinert, um Speicherplatz zu sparen. Bei schlechter Verbindung einfach erneut versuchen.',
       privacy: 'Datenschutz',
@@ -765,7 +810,50 @@ export const messages = {
       weeklyGoal: 'Weekly goal',
       overview: 'Overview',
       emptyTitle: 'No workouts yet',
-      emptyMsg: 'Start your first workout to see statistics!'
+      emptyMsg: 'Start your first workout to see statistics!',
+      ai: {
+        cockpitLabel: 'AI Progress Cockpit',
+        monthlyPulse: 'Monthly Pulse',
+        loadingCopy: "We're fetching your KPIs from the cloud…",
+        weeklyRhythmTitle: 'Weekly Rhythm',
+        weeklyRhythmHint: 'last {count} weeks',
+        weekAvgIntensity: 'Ø {value}kg / session',
+        weeklyEmpty: 'No weekly history yet',
+        topLiftsTitle: 'Top Lifts',
+        topLiftsHint: 'personal bests',
+        topLiftsEmpty: 'No PRs logged yet',
+        muscleFocusTitle: 'Muscle Focus',
+        muscleFocusHint: 'Volume split',
+        muscleEmpty: 'No volume data yet',
+        badges: {
+          sessions: '{count} sessions',
+          volume: '{value}kg',
+          reps: '{count} reps',
+          pr: 'PR'
+        },
+        kpis: {
+          sessions: 'Sessions',
+          sessionsHint: 'Avg {value}/week',
+          avgSessions: 'Avg Sessions/Week',
+          avgSessionsHint: 'Target ≥ 3',
+          volume: 'Total Volume',
+          avgWeeklyVolume: 'Avg Volume/Week',
+          volumeHint: 'Avg {value}kg/week',
+          consistency: 'Consistency'
+        },
+        consistencyTaglines: {
+          machine: 'Machine mode',
+          steady: 'Very steady',
+          onTrack: 'On track',
+          routine: 'Build the habit'
+        }
+      },
+      widget: {
+        title: 'Progress',
+        offlineTitle: 'Progress (local)',
+        fallbackCopy: '{completed} / {total} workouts completed',
+        draftsHint: 'Drafts are not counted.'
+      }
     },
     quick: {
       title: 'Your week',
@@ -819,6 +907,8 @@ export const messages = {
       navigationText: 'Use the bottom navigation for the main areas: Dashboard (overview and quick start), Stats (analytics), Exercises (catalog and image uploads), FAQ’s (help), and Settings (theme, language, goals).\n\nOn larger screens, the navigation appears as a left sidebar. The active section is highlighted.',
       workouts: 'Workflows',
       workoutsText: 'You can start workouts as drafts and continue later. “Recent workouts” lets you jump back quickly and repeat a session with one tap.\n\nIn detail view, reorder with drag & drop and tweak sets flexibly. Save to persist your current state.',
+      aiCoach: 'AI Coach & Insights',
+      aiCoachText: '✨ **Your personal AI Coach**\n\nImagine your training thinking with you. The AI Coach builds full Push/Pull/Legs sessions in seconds, tuned to your goal, available time, and latest workouts. Open, select, train.\n\n🧠 **What does it look at?**\n- recent sessions and weekly consistency\n- your focus (hypertrophy, balance, routine)\n- how steady you actually train\n\nFrom that you get ready-to-go sessions with sets/reps, quick variants for busy days, and enough variety to avoid plateaus.\n\n📊 **More than workouts**\nInside Stats you see digestible insights instead of spreadsheets: consistency trend, plateau warnings, and which muscle groups you might over/under-train.\n\n🚀 **Getting started**\nTap the AI tile on the dashboard (or open the feature test view), accept the beta disclaimer once, and request a plan. Consent lives locally and can be revoked any time in Settings by clearing the AI Coach data.\n\n🌐 **Remote & Demo modes**\nIf the backend has an OPENAI_API_KEY and you are online, remote mode fetches live GPT answers. Offline or without a key, demo mode serves curated templates. Each response clearly states which mode delivered it.\n\n🔒 **Privacy**\nYour training history stays on your device. Only when a valid token exists are requests sent to the server; otherwise everything runs locally.',
       uploads: 'Images & uploads',
       uploadsText: 'Tap an exercise thumbnail to add or replace a photo. Use the small × in the corner to remove it.\n\nImages are automatically resized before upload to save storage. On a flaky connection, just try again.',
       privacy: 'Privacy',

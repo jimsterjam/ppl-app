@@ -1,18 +1,7 @@
 <template>
   <div class="dashboard">
     <!-- Header -->
-    <HeaderBar :title="greeting || $t('dashboard.title')">
-      <template #actions>
-        <button 
-          class="refresh-btn" 
-          :disabled="store.isWorkoutsLoading"
-          :title="$t('dashboard.refreshTitle')"
-          @click="refreshData"
-        >
-          <span :class="{ 'spinning': store.isWorkoutsLoading }">🔄</span>
-        </button>
-      </template>
-    </HeaderBar>
+    <HeaderBar :title="greeting || $t('dashboard.title')" />
 
     <!-- Loading State -->
     <div v-if="store.isWorkoutsLoading" class="loading-section">
@@ -51,57 +40,52 @@
         </div>
       </div>
 
-      <!-- Quick Overview -->
-      <QuickOverview :workouts="store.workouts" />
+      <!-- Action Hub -->
+        <section class="today">
+          <div class="next-card glass">
+            <div class="next-header">
+              <div>
+                <h3>{{ $t('dashboard.nextWorkout') }}</h3>
+                <span v-if="lastLabel" class="muted">{{ $t('dashboard.last') }}: {{ lastLabel }}</span>
+              </div>
+            </div>
+            <p class="next-title">{{ nextLabel }}</p>
+            <p class="action-lead">{{ actionLead }}</p>
 
-      <!-- Today's Workout -->
-      <section class="today">
-        <div class="next-card glass">
-          <div class="next-header">
-            <h3>{{ $t('dashboard.nextWorkout') }}</h3>
-            <span v-if="lastLabel" class="muted">{{ $t('dashboard.last') }}: {{ lastLabel }}</span>
-          </div>
-          <p class="next-title">{{ nextLabel }}</p>
+            <!-- Draft Notice -->
+            <div v-if="hasDraft" class="draft-notice">
+              <span class="draft-icon">📝</span>
+              <span>{{ $t('dashboard.draftAvailable') }}</span>
+              <div v-if="draftTimestamp" class="draft-timestamp">
+                {{ $t('dashboard.lastSaved') }}: {{ draftTimestamp.toLocaleString() }}
+              </div>
+            </div>
 
-          <!-- Draft Notice -->
-          <div v-if="hasDraft" class="draft-notice">
-            <span class="draft-icon">📝</span>
-            <span>{{ $t('dashboard.draftAvailable') }}</span>
-            <div v-if="draftTimestamp" class="draft-timestamp">
-              {{ $t('dashboard.lastSaved') }}: {{ draftTimestamp.toLocaleString() }}
+            <div class="action-buttons">
+              <button 
+                v-if="hasDraft"
+                class="primary-action"
+                :disabled="workoutCreated"
+                @click="startWorkout(draftId)"
+              >
+                📝 {{ resumeLabel }}
+              </button>
+              <button 
+                class="primary-action"
+                :class="{ ghost: hasDraft }"
+                :disabled="workoutCreated"
+                @click="hasDraft ? startNewWorkout() : startWorkout(nextType)"
+              >
+                {{ primaryActionLabel }}
+              </button>
             </div>
           </div>
+        </section>
 
-          <!-- Main Button -->
-          <button 
-            :disabled="workoutCreated" 
-            @click="startWorkout(hasDraft ? draftId : nextType)"
-            :class="{ 'draft-button': hasDraft }"
-          >
-            {{ startButtonText }}
-          </button>
-
-          <!-- Secondary Button (Draft) -->
-          <button 
-            v-if="hasDraft && !workoutCreated"
-            @click="startNewWorkout"
-            class="secondary-btn"
-          >
-            {{ $t('dashboard.startNew') }}
-          </button>
+        <!-- Recent Workouts -->
+        <div class="recent-section">
+          <RecentWorkouts :workouts="recentWorkoutsPreview" />
         </div>
-      </section>
-
-      <!-- Recent Workouts -->
-      <RecentWorkouts :workouts="store.workouts" />
-
-      <!-- Stats Widget -->
-      <StatsWidget v-if="!store.isWorkoutsLoading" :workouts="store.workouts" />
-      <div v-else class="stats-skeleton">
-        <div class="sk-card" />
-        <div class="sk-card" />
-        <div class="sk-card" />
-      </div>
     </template>
 
     <!-- Bottom Navigation -->
@@ -115,21 +99,18 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { useUserStore } from "../stores/userStore";
-import { useToastStore } from "../stores/toastStore";
 
 import HeaderBar from "../components/HeaderBar.vue";
 import BottomNav from "../components/BottomNav.vue";
 import EmptyState from "../components/EmptyState.vue";
-import QuickOverview from "../components/QuickOverview.vue";
 import RecentWorkouts from "../components/RecentWorkouts.vue";
-import StatsWidget from "../components/StatsWidget.vue";
 import { logger } from '@/utils/logger'
 
 const store = useUserStore()
-const toast = useToastStore()
 const { t: $t } = useI18n()
 const router = useRouter()
 const { getIdToken, onAuthStateChanged, getCurrentUser } = useFirebaseAuth()
+const PROGRESS_RANGE_DAYS = 120
 
 const user = ref(null)
 const isSignedIn = ref(false)
@@ -146,10 +127,17 @@ const draftType = computed(() => store.draftType)
 const draftTimestamp = computed(() => store.draftTimestamp)
 const draftId = computed(() => store.workouts.find(w => w.isDraft)?._id)
 
-const startButtonText = computed(() => {
-  const text = hasDraft.value ? $t('dashboard.resumeDraft') : $t('dashboard.startNext')
-  return text
-})
+const resumeLabel = computed(() => $t('dashboard.resumeDraft'))
+
+const primaryActionLabel = computed(() => hasDraft.value ? $t('dashboard.startNew') : $t('dashboard.startNext'))
+
+const actionLead = computed(() => hasDraft.value
+  ? 'Du hast noch ein gespeichertes Workout. Entscheide, ob du es fortsetzt oder frisch beginnst.'
+  : 'Wähle dein nächstes Workout und leg direkt los.')
+
+const nextType = computed(() => store.nextWorkoutType || 'push')
+
+const recentWorkoutsPreview = computed(() => (store.workouts || []).slice(0, 3))
 
 // Greeting Computed
 const greeting = computed(() => {
@@ -170,26 +158,29 @@ async function loadWorkoutsData(force = false) {
     logger.debug('🔑 [Dashboard] Token vorhanden:', !!token, 'User:', !!currentUser)
     if (token && currentUser) {
       logger.debug('📥 DashboardView - Lade Workouts', force ? '(forced)' : '(cached allowed)')
-      await store.loadWorkouts(token, { force })
+      await Promise.all([
+        store.loadWorkouts(token, { force }),
+        store.loadStats(token, { rangeDays: PROGRESS_RANGE_DAYS })
+      ])
       logger.debug('✅ [Dashboard] Workouts geladen')
     } else {
       logger.warn('⚠️ Workouts werden nicht geladen, da kein Token/User vorhanden ist.');
+      await Promise.all([
+        store.loadWorkouts(null, { force }),
+        store.loadStats(null, { rangeDays: PROGRESS_RANGE_DAYS })
+      ])
     }
   } catch (error) {
     logger.warn('⚠️ Fehler beim Laden der Workouts mit Token:', error)
-    await store.loadWorkouts(null, { force })
+    await Promise.all([
+      store.loadWorkouts(null, { force }),
+      store.loadStats(null, { rangeDays: PROGRESS_RANGE_DAYS })
+    ])
   }
 }
 
 function retryLoadWorkouts() {
   loadWorkoutsData(true);
-}
-
-// Refresh Data
-async function refreshData() {
-  logger.debug('🔄 Manueller Daten-Refresh...')
-  await loadWorkoutsData(true)
-  toast.show($t('common.updated'), { type: 'success', duration: 1500 })
 }
 
 // Start Workout
@@ -221,7 +212,10 @@ onMounted(() => {
     if (isSignedIn.value && firebaseUser) {
       const token = await firebaseUser.getIdToken()
       logger.debug('📥 DashboardView - Lade Workouts (authState)', 'Token:', token)
-      await store.loadWorkouts(token, { force: false })
+      await Promise.all([
+        store.loadWorkouts(token, { force: false }),
+        store.loadStats(token, { rangeDays: PROGRESS_RANGE_DAYS })
+      ])
     }
   })
 
@@ -296,27 +290,6 @@ onActivated(async () => {
   box-shadow: 0 4px 12px color-mix(in srgb, var(--accent-color) 30%, transparent) !important;
 }
 
-.secondary-btn {
-  width: 100%;
-  padding: 10px 20px;
-  margin-top: 8px;
-  background: transparent;
-  border: 1px solid var(--card-border);
-  color: var(--fg);
-  border-radius: 10px;
-  font-size: 1rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.secondary-btn:hover {
-  background: color-mix(in srgb, var(--fg) 5%, transparent);
-  border-color: color-mix(in srgb, var(--fg) 30%, transparent);
-  transform: translateY(-1px);
-}
-
-.secondary-btn:active { transform: translateY(0); }
 
 /* =======================
    Today Section
@@ -346,6 +319,12 @@ onActivated(async () => {
   font-size: 1.15rem; 
   font-weight: 600; 
   margin: 6px 0 0; 
+}
+
+.action-lead {
+  color: var(--muted);
+  font-size: 0.95rem;
+  margin: 8px 0 0;
 }
 
 /* Draft Hinweis */
@@ -417,20 +396,40 @@ onActivated(async () => {
 .success-message p { color: var(--muted); margin: 0; font-size: 0.9rem; }
 
 /* =======================
-   Stats Skeleton
+   Action Hub
 ======================= */
-.stats-skeleton {
-  margin: 16px;
+.action-buttons {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  margin-top: 16px;
 }
 
-.sk-card {
-  height: 80px;
-  background: var(--surface);
+.primary-action {
+  width: 100%;
+  padding: 16px;
   border-radius: 12px;
-  animation: pulse 1.5s ease-in-out infinite;
+  border: none;
+  background: var(--accent-color);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary-action.ghost {
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--card-border) 80%, transparent);
+  color: var(--fg);
+}
+
+.primary-action.ghost:hover {
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
+}
+
+
+.recent-section {
+  padding-bottom: calc(140px + var(--safe-bottom, 0px));
 }
 
 /* =======================
@@ -462,8 +461,4 @@ onActivated(async () => {
   100% { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
 </style>

@@ -61,6 +61,50 @@
         <button class="dev-btn" @click="goToFeatureTest">
           🚀 Open Features Test Dashboard
         </button>
+        <div class="dev-plan-toggle">
+          <div class="plan-status">
+            <div>
+              <span>Current plan:</span>
+              <strong>{{ subscription.plan }}</strong>
+            </div>
+            <span v-if="devPlanOverride" class="override-chip">Override: {{ devPlanOverride }}</span>
+            <span v-else class="override-chip ghost">Override inactive</span>
+          </div>
+          <div class="dev-plan-buttons">
+            <button
+              v-for="plan in devPlanOptions"
+              :key="plan"
+              class="dev-plan-btn"
+              :class="{ active: (devPlanOverride || subscription.plan) === plan }"
+              @click="forcePlan(plan)"
+            >
+              {{ planLabels[plan] }}
+            </button>
+            <button
+              class="dev-plan-btn ghost"
+              :disabled="!devPlanOverride"
+              @click="clearDevPlan"
+            >
+              Clear Override
+            </button>
+            <button
+              class="dev-plan-btn ghost danger"
+              @click="disableDevTools"
+            >
+              Hide Dev Tools
+            </button>
+          </div>
+          <p class="hint tiny">Local-only override. Clear storage to reset.</p>
+        </div>
+      </section>
+      <section v-else class="card dev-unlock">
+        <h3>🔒 Developer Tools</h3>
+        <p class="hint">Tap the badge below five times to unlock QA controls on this device.</p>
+        <button class="dev-unlock-badge" @click="handleDevUnlockTap">
+          <span v-if="devTapCount === 0">Tap 5x to unlock</span>
+          <span v-else>{{ tapsRemaining }} more tap{{ tapsRemaining === 1 ? '' : 's' }}</span>
+        </button>
+        <p class="hint tiny">Unlock state lives in localStorage and never syncs to production users.</p>
       </section>
 
       <section class="card">
@@ -221,9 +265,10 @@ import { storeToRefs } from 'pinia'
 import { useThemeStore } from '@/stores/themeStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useUserStore } from '@/stores/userStore'
+import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useToastStore } from '@/stores/toastStore'
 import { useI18n } from 'vue-i18n'
-import { computed, ref } from 'vue'
+import { computed, ref, onBeforeUnmount } from 'vue'
 import { useRouter } from 'vue-router'
 import { initFirebaseAuth, useFirebaseAuth } from '@/utils/firebaseAuth'
 import { logger } from '@/utils/logger'
@@ -250,10 +295,82 @@ function setLang(l) {
   settings.setLanguage(l)
 }
 
-// Development mode detection
-const isDevelopment = computed(() => {
-  return import.meta.env.DEV || localStorage.getItem('enableDevTools') === 'true'
+// Subscription testing helpers
+const subscriptionStore = useSubscriptionStore()
+const { subscription, devPlanOverride } = storeToRefs(subscriptionStore)
+const devPlanOptions = ['free', 'pro', 'elite']
+const planLabels = {
+  free: 'Free',
+  pro: 'Pro',
+  elite: 'Elite'
+}
+
+const router = useRouter()
+const toast = useToastStore()
+const userStore = useUserStore()
+
+const readDevToolsFlag = () => {
+  try {
+    return localStorage.getItem('enableDevTools') === 'true'
+  } catch {
+    return false
+  }
+}
+
+const devToolsUnlocked = ref(readDevToolsFlag())
+const devTapCount = ref(0)
+const DEV_UNLOCK_TAPS = 5
+const tapsRemaining = computed(() => Math.max(0, DEV_UNLOCK_TAPS - devTapCount.value))
+let devTapTimer = null
+
+const persistDevFlag = (state) => {
+  try {
+    if (state) {
+      localStorage.setItem('enableDevTools', 'true')
+    } else {
+      localStorage.removeItem('enableDevTools')
+    }
+  } catch {}
+}
+
+const enableDevTools = () => {
+  if (devToolsUnlocked.value) return
+  devToolsUnlocked.value = true
+  persistDevFlag(true)
+  devTapCount.value = 0
+  toast.show('Developer tools unlocked for this device', { type: 'success', duration: 2500 })
+}
+
+const disableDevTools = () => {
+  if (!devToolsUnlocked.value) return
+  devToolsUnlocked.value = false
+  persistDevFlag(false)
+  devTapCount.value = 0
+  toast.show('Developer tools hidden', { type: 'info', duration: 2000 })
+}
+
+const handleDevUnlockTap = () => {
+  if (devToolsUnlocked.value || import.meta.env.DEV) return
+  devTapCount.value += 1
+  if (devTapTimer) {
+    clearTimeout(devTapTimer)
+  }
+  devTapTimer = setTimeout(() => {
+    devTapCount.value = 0
+  }, 1500)
+  if (devTapCount.value >= DEV_UNLOCK_TAPS) {
+    devTapCount.value = 0
+    enableDevTools()
+  }
+}
+
+onBeforeUnmount(() => {
+  if (devTapTimer) {
+    clearTimeout(devTapTimer)
+  }
 })
+
+const isDevelopment = computed(() => import.meta.env.DEV || devToolsUnlocked.value)
 
 // Navigation to features test
 const goToFeatureTest = () => {
@@ -261,13 +378,20 @@ const goToFeatureTest = () => {
 }
 
 // Alle Daten löschen
-const userStore = useUserStore()
-const toast = useToastStore()
-const router = useRouter()
 const { getIdToken } = useFirebaseAuth()
 const showDeleteConfirm = ref(false)
 const confirmText = ref('')
 const isDeleting = ref(false)
+
+const forcePlan = (plan) => {
+  subscriptionStore.setDevPlanOverride(plan)
+  toast.show(`Local plan set to ${planLabels[plan]}`, { type: 'success', duration: 2000 })
+}
+
+const clearDevPlan = () => {
+  subscriptionStore.clearDevPlanOverride()
+  toast.show('Cleared local plan override', { type: 'info', duration: 2000 })
+}
 
 const showDeleteAccountConfirm = ref(false)
 const confirmAccountText = ref('')
@@ -757,6 +881,106 @@ async function confirmDeleteAccount() {
 .dev-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 25px rgba(34, 197, 94, 0.3);
+}
+
+.dev-plan-toggle {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid color-mix(in srgb, #22c55e 35%, transparent);
+}
+
+.plan-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.95rem;
+}
+
+.override-chip {
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  color: #15803d;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+}
+
+.override-chip.ghost {
+  opacity: 0.6;
+  border-style: dashed;
+}
+
+.dev-plan-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.dev-plan-btn {
+  flex: 1 1 90px;
+  min-width: 90px;
+  background: rgba(34, 197, 94, 0.08);
+  color: #15803d;
+  border: 1px solid rgba(34, 197, 94, 0.5);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dev-plan-btn.active {
+  background: linear-gradient(135deg, #166534 0%, #15803d 100%);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 6px 16px rgba(21, 128, 61, 0.3);
+}
+
+.dev-plan-btn.ghost {
+  border: 1px dashed rgba(34, 197, 94, 0.7);
+  background: transparent;
+  color: rgba(34, 197, 94, 0.9);
+  flex: 1 1 140px;
+}
+
+.dev-plan-btn.ghost.danger {
+  border-color: rgba(248, 113, 113, 0.6);
+  color: #b91c1c;
+}
+
+.dev-plan-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.hint.tiny {
+  margin-top: 8px;
+  font-size: 0.75rem;
+}
+
+.dev-unlock {
+  border: 2px dashed #93c5fd;
+  background: color-mix(in srgb, #93c5fd 12%, transparent);
+}
+
+.dev-unlock-badge {
+  width: 100%;
+  margin-top: 12px;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: white;
+  border: none;
+  border-radius: 999px;
+  padding: 12px 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.dev-unlock-badge:active {
+  transform: scale(0.98);
 }
 
 /* Toast Einstellungen entfernt */

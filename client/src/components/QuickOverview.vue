@@ -38,6 +38,25 @@
           <span class="stat-label">{{ t('quick.lastWorkout') }}</span>
         </div>
       </div>
+
+      <div v-if="hasStats" class="stat-card ai-kpi glass">
+        <div class="stat-icon">📈</div>
+        <div class="stat-info">
+          <span class="stat-number">{{ avgSessionsDisplay }}</span>
+          <span class="stat-label">{{ t('stats.ai.kpis.avgSessions') }}</span>
+          <span class="stat-sub">{{ consistencyPercent }}% {{ t('stats.ai.kpis.consistency') }}</span>
+          <span class="stat-sub muted">{{ t('stats.ai.kpis.volumeHint', { value: avgVolumeLabel }) }}</span>
+        </div>
+      </div>
+
+      <div v-else-if="loadingStats" class="stat-card ai-kpi glass ai-kpi-skeleton">
+        <div class="stat-icon">📈</div>
+        <div class="stat-info">
+          <span class="stat-number skeleton-line"></span>
+          <span class="stat-label skeleton-line"></span>
+          <span class="stat-sub skeleton-line"></span>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -51,9 +70,24 @@ const props = defineProps({
   workouts: {
     type: Array,
     default: () => []
+  },
+  stats: {
+    type: Object,
+    default: null
+  },
+  loadingStats: {
+    type: Boolean,
+    default: false
   }
 })
 const { t, tm } = useI18n()
+
+const compactNumber = new Intl.NumberFormat('de-DE', { notation: 'compact', maximumFractionDigits: 1 })
+const statsKpis = computed(() => (props.stats && props.stats.kpis) ? props.stats.kpis : null)
+const hasStats = computed(() => !!statsKpis.value)
+const avgSessionsDisplay = computed(() => hasStats.value ? Number(statsKpis.value.avgSessionsPerWeek || 0).toFixed(1) : '—')
+const consistencyPercent = computed(() => hasStats.value ? Math.round(statsKpis.value.consistencyScore || 0) : 0)
+const avgVolumeLabel = computed(() => hasStats.value ? formatKgValue(statsKpis.value.avgWeeklyVolume || 0) : '0')
 
 // 7-Tage Daten für Mini-Chart
 const weekData = computed(() => {
@@ -138,6 +172,14 @@ const lastWorkoutLabel = computed(() => {
   if (d === 1) return 'Gestern'
   return `vor ${d} Tagen`
 })
+
+function formatKgValue(value) {
+  const numeric = Number(value) || 0
+  if (numeric >= 1000) {
+    return compactNumber.format(numeric)
+  }
+  return Math.round(numeric).toString()
+}
 </script>
 
 <style scoped>
@@ -195,6 +237,11 @@ const lastWorkoutLabel = computed(() => {
 
 .stat-card:hover { background: color-mix(in oklab, var(--fg) 4%, transparent); border-color: var(--card-border); }
 
+.stat-card.ai-kpi {
+  align-items: flex-start;
+  border-color: var(--card-border);
+}
+
 .stat-icon {
   font-size: 1.2rem;
   flex-shrink: 0;
@@ -209,6 +256,18 @@ const lastWorkoutLabel = computed(() => {
 .stat-number { font-size: 1.1rem; font-weight: 700; color: var(--fg); line-height: 1; }
 
 .stat-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; line-height: 1; margin-top: 2px; }
+.stat-sub { font-size: 0.72rem; color: var(--fg); line-height: 1.2; margin-top: 4px; }
+.stat-sub.muted { color: var(--muted); }
+
+.ai-kpi-skeleton .skeleton-line {
+  display: block;
+  width: 80%;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--card-border);
+  margin-top: 6px;
+  animation: shimmer 1.2s ease-in-out infinite;
+}
 
 .streak .stat-number {
   color: #ff6b47;
@@ -276,5 +335,11 @@ const lastWorkoutLabel = computed(() => {
   .stat-card {
     justify-content: center;
   }
+}
+
+@keyframes shimmer {
+  0% { opacity: 0.4; }
+  50% { opacity: 1; }
+  100% { opacity: 0.4; }
 }
 </style>

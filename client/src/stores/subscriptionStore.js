@@ -40,8 +40,9 @@ import { getAuthToken } from '@/utils/authToken'
 // which falls back to window.Clerk or cached tokens.
 
 export const useSubscriptionStore = defineStore('subscription', () => {
+  const DEV_PLAN_KEY = 'bro_split_dev_plan'
   const subscription = ref({
-    plan: 'free', // 'free', 'pro', 'elite'
+    plan: 'free',
     status: 'active',
     expiresAt: null,
     features: []
@@ -86,35 +87,49 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     }
   })
   
+  const devPlanOverride = ref(localStorage.getItem(DEV_PLAN_KEY))
+
+  const buildPlanSnapshot = (planType) => {
+    const validPlan = ['free', 'pro', 'elite'].includes(planType) ? planType : 'free'
+    return {
+      plan: validPlan,
+      status: 'active',
+      expiresAt: validPlan === 'free' ? null : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
+      features: []
+    }
+  }
+
+  const applyPlan = (planType, { persist = true, reason = 'manual' } = {}) => {
+    const snapshot = buildPlanSnapshot(planType)
+    subscription.value = snapshot
+    if (persist) {
+      localStorage.setItem('bro_split_subscription', JSON.stringify(snapshot))
+    }
+    logger.debug(`📦 Subscription plan set to ${snapshot.plan} (${reason})`)
+    return snapshot
+  }
+
   // Subscription Status checken
-  // Offline/Demo: Nur aus localStorage laden
-  const checkSubscription = async () => {
+  const checkSubscription = async (planOverride = null) => {
     const savedSubscription = localStorage.getItem('bro_split_subscription')
     if (savedSubscription) {
       subscription.value = JSON.parse(savedSubscription)
       logger.debug('🧪 Demo Mode: Loaded subscription from localStorage:', subscription.value.plan)
     } else {
-      // Default: free
-      subscription.value = {
-        plan: 'free',
-        status: 'active',
-        expiresAt: null,
-        features: []
-      }
-      localStorage.setItem('bro_split_subscription', JSON.stringify(subscription.value))
-      logger.debug('🧪 Demo Mode: Set default free plan in localStorage')
+      applyPlan(planOverride || 'free', { persist: true, reason: 'bootstrap' })
+    }
+
+    const effectiveOverride = planOverride || devPlanOverride.value
+    if (effectiveOverride && limits.value[effectiveOverride]) {
+      applyPlan(effectiveOverride, { persist: false, reason: 'dev-override' })
     }
   }
   
   // Demo-Reset Funktion für Testing
   const resetToFree = () => {
-    subscription.value = {
-      plan: 'free',
-      status: 'active',
-      expiresAt: null,
-      features: []
-    }
-    localStorage.removeItem('bro_split_subscription')
+    applyPlan('free', { persist: true, reason: 'reset' })
+    localStorage.removeItem(DEV_PLAN_KEY)
+    devPlanOverride.value = null
     logger.debug('🧪 Demo Mode: Reset to free plan')
   }
   
@@ -122,15 +137,24 @@ export const useSubscriptionStore = defineStore('subscription', () => {
   // Offline/Demo: Upgrade nur lokal simulieren
   const upgradeSubscription = async (planType, paymentMethod) => {
     logger.debug('🧪 Demo Mode: Simulating upgrade to', planType)
-    subscription.value = {
-      plan: planType,
-      status: 'active',
-      expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
-      features: limits.value[planType]
-    }
-    localStorage.setItem('bro_split_subscription', JSON.stringify(subscription.value))
+    const snapshot = applyPlan(planType, { persist: true, reason: 'upgrade' })
     logger.debug('🧪 Demo Mode: Upgrade completed and saved to localStorage')
-    return { subscription: subscription.value, success: true, demo: true }
+    return { subscription: snapshot, success: true, demo: true }
+  }
+
+  const setDevPlanOverride = (planType) => {
+    if (!planType || !limits.value[planType]) {
+      return
+    }
+    devPlanOverride.value = planType
+    localStorage.setItem(DEV_PLAN_KEY, planType)
+    applyPlan(planType, { persist: false, reason: 'dev-override' })
+  }
+
+  const clearDevPlanOverride = () => {
+    devPlanOverride.value = null
+    localStorage.removeItem(DEV_PLAN_KEY)
+    checkSubscription()
   }
   
   // Usage tracking
@@ -177,6 +201,8 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     if (subscription.value.plan !== 'free') return false
     return usage.value.workoutsThisWeek >= limits.value.free.maxWorkoutsPerWeek - 1
   })
+
+  const hasDevOverride = computed(() => !!devPlanOverride.value)
   
   // Pricing
   const pricing = ref({
@@ -212,12 +238,15 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     usage,
     limits,
     pricing,
+    devPlanOverride,
     
     // Actions
     checkSubscription,
     upgradeSubscription,
     trackWorkoutCreated,
     resetToFree,
+    setDevPlanOverride,
+    clearDevPlanOverride,
     
     // Computed
     canCreateWorkout,
@@ -226,6 +255,7 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     isPremium,
     isElite,
     workoutsRemaining,
-    shouldShowUpgrade
+    shouldShowUpgrade,
+    hasDevOverride
   }
 })

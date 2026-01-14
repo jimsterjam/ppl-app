@@ -60,7 +60,7 @@ const version = computed(() => pkg?.version || '0.0.0')
 
 // FAQ modal state
 const selectedFaqKey = ref('')
-const baseKeys = ['gettingStarted', 'navigation', 'workouts', 'uploads', 'privacy']
+const baseKeys = ['gettingStarted', 'navigation', 'workouts', 'aiCoach', 'uploads', 'privacy']
 const items = computed(() => baseKeys.map(key => ({ key })))
 
 function openFaq(faqKey) {
