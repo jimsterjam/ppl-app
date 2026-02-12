@@ -515,11 +515,16 @@ watch(() => route.query?.emailVerified, (val) => {
         position: fixed;
         inset: 0; /* top/right/bottom/left 0 -> voller Viewport */
         width: 100vw;
-        height: 100vh;
+        height: 100dvh;
+        min-height: 100vh;
         display: flex;
         align-items: center;
         justify-content: center;
         padding: 0; /* kein Außenabstand */
+        padding-top: env(safe-area-inset-top, 0px);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+        padding-left: env(safe-area-inset-left, 0px);
+        padding-right: env(safe-area-inset-right, 0px);
     background: var(--bg);
     color: var(--fg);
         box-sizing: border-box;
@@ -536,14 +541,15 @@ watch(() => route.query?.emailVerified, (val) => {
         gap: 1rem;
         padding: 2rem;
         text-align: center;
-    background: color-mix(in oklab, var(--fg) 5%, transparent);
-        border-radius: 16px;
-        backdrop-filter: blur(10px);
-    border: 1px solid var(--card-border);
+        background: transparent;
+        border-radius: 0;
+        backdrop-filter: none;
+        border: none;
+        box-shadow: none;
     }
 
     .loading-container {
-    border: 1px solid color-mix(in oklab, var(--accent-color) 30%, transparent);
+        border: none;
     }
 
     /* Verwende globale .spinner; skaliere hier nur Größe wenn nötig */

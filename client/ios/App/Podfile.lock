@@ -9,6 +9,8 @@ PODS:
     - CapacitorCordova
   - CapacitorApp (7.1.1):
     - Capacitor
+  - CapacitorCamera (7.0.3):
+    - Capacitor
   - CapacitorCordova (7.4.4)
   - GoogleSignIn (6.2.4):
     - AppAuth (~> 1.5)
@@ -25,6 +27,7 @@ PODS:
 DEPENDENCIES:
   - "Capacitor (from `../../node_modules/@capacitor/ios`)"
   - "CapacitorApp (from `../../node_modules/@capacitor/app`)"
+  - "CapacitorCamera (from `../../node_modules/@capacitor/camera`)"
   - "CapacitorCordova (from `../../node_modules/@capacitor/ios`)"
   - "SouthdevsCapacitorGoogleAuth (from `../../node_modules/@southdevs/capacitor-google-auth`)"
 
@@ -40,6 +43,8 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor/ios"
   CapacitorApp:
     :path: "../../node_modules/@capacitor/app"
+  CapacitorCamera:
+    :path: "../../node_modules/@capacitor/camera"
   CapacitorCordova:
     :path: "../../node_modules/@capacitor/ios"
   SouthdevsCapacitorGoogleAuth:
@@ -49,12 +54,13 @@ SPEC CHECKSUMS:
   AppAuth: d4f13a8fe0baf391b2108511793e4b479691fb73
   Capacitor: 358dd1c3fdd71d969547b17e159fd8a7736cb45f
   CapacitorApp: 63b237168fc869e758481dba283315a85743ee78
+  CapacitorCamera: 6746827d82376f31cea9224945c0458c9fd0b0b2
   CapacitorCordova: bf648a636f3c153f652d312ae145fb508b6ffced
   GoogleSignIn: 5651ce3a61e56ca864160e79b484cd9ed3f49b7a
   GTMAppAuth: 0ff230db599948a9ad7470ca667337803b3fc4dd
   GTMSessionFetcher: 3a63d75eecd6aa32c2fc79f578064e1214dfdec2
   SouthdevsCapacitorGoogleAuth: 6488c21faed47c2cf72404bfbfc0fe0e9af766bc
 
-PODFILE CHECKSUM: 2606acaa76c610b8911d8a3437c5e033a874aa6d
+PODFILE CHECKSUM: 3a73f997ce4f684ef37efd681de7d31218e83283
 
 COCOAPODS: 1.16.2

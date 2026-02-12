@@ -3,7 +3,6 @@ import { onMounted } from 'vue'
 import { RouterView } from 'vue-router'
 import ToastHost from './components/ToastHost.vue'
 import OfflineIndicator from './components/OfflineIndicator.vue'
-import BottomNav from './components/BottomNav.vue'
 import { setupAutoSync } from './utils/syncManager'
 import { initializeDefaultExercises } from './utils/offlineStorage'
 import { logger } from './utils/logger'
@@ -21,7 +20,13 @@ onMounted(async () => {
 
 <template>
   <div id="app">
-    <RouterView />
+    <RouterView v-slot="{ Component, route }">
+      <Transition name="page-fade" mode="out-in" appear>
+        <div class="route-view" :key="route.fullPath">
+          <component :is="Component" />
+        </div>
+      </Transition>
+    </RouterView>
     <ToastHost />
     <OfflineIndicator />
   </div>
@@ -34,5 +39,9 @@ onMounted(async () => {
   min-height: 100vh;
   background: var(--bg);
   color: var(--fg);
+}
+
+.route-view {
+  min-height: 100vh;
 }
 </style>

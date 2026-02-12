@@ -49,7 +49,16 @@
         class="exercise-card p-4 border rounded-xl shadow-sm bg-white hover:shadow-md transition"
       >
         <div class="thumb-row">
-          <img :src="getExerciseImage(ex)" :alt="t('common.image')" class="thumb" @error="onImgError($event, ex)" />
+          <img
+            v-if="hasExerciseImage(ex)"
+            :src="getExerciseImage(ex)"
+            :alt="t('common.image')"
+            class="thumb"
+            @error="onImgError($event, ex)"
+          />
+          <div v-else class="thumb thumb-fallback" aria-hidden="true">
+            <img class="thumb-fallback-icon" src="/exercises/play.svg" alt="" />
+          </div>
           <div class="meta">
             <h2 class="title">{{ getTranslatedExerciseName(ex.name_en) }}</h2>
               <p class="sub">{{ getTranslatedCategory(ex.category) }} · {{ getTranslatedMuscleGroup(ex.muscleGroup || (ex.muscleGroups?.[0] || '')) }}</p>
@@ -80,6 +89,7 @@ const exercises = ref([]);
 const loading = ref(false);
 const selectedCategory = ref('');
 const selectedMuscleGroup = ref('');
+const brokenImageIds = ref(new Set())
 
 const {
   getTranslatedExerciseName,
@@ -176,19 +186,18 @@ function getExerciseImage(ex) {
   return '/exercises/play.svg';
 }
 
+function hasExerciseImage(ex) {
+  if (!ex) return false
+  const id = ex._id
+  if (id != null && brokenImageIds.value.has(id)) return false
+  return Boolean(ex?.thumbnailUrl || ex?.imageUrl || ex?.mediaUrl)
+}
+
 function onImgError(evt, ex) {
-  const img = evt?.target;
-  if (!img) return;
-  
-  // Verhindere Endlosschleife: Wenn src schon play.svg ist, nicht nochmal setzen
-  if (img.src.includes('play.svg')) {
-    img.onerror = null;
-    return;
+  const id = ex?._id
+  if (id != null) {
+    brokenImageIds.value = new Set([...brokenImageIds.value, id])
   }
-  
-  // Einmalig auf Play-Placeholder fallen
-  img.onerror = null;
-  img.src = '/exercises/play.svg';
 }
 </script>
 
@@ -205,6 +214,17 @@ function onImgError(evt, ex) {
   border: 1px solid #eef2f7;
   padding: 8px;
   box-sizing: border-box;
+}
+.thumb-fallback {
+  padding: 0;
+  display: grid;
+  place-items: center;
+}
+
+.thumb-fallback-icon {
+  width: 26px;
+  height: 26px;
+  opacity: 0.7;
 }
 .meta { display: flex; flex-direction: column; min-width: 0; }
 .title { font-weight: 700; font-size: 1.125rem; line-height: 1.4; }

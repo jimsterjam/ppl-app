@@ -106,6 +106,12 @@ button { background: var(--accent); color: var(--accent-contrast); border: none;
 button:hover { filter: brightness(1.02); }
 button:active { transform: scale(0.98); }
 
+[data-theme="light"] .workout-card {
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-soft);
+  border-color: rgba(12, 16, 30, 0.12);
+}
+
 /* Tablet Styles */
 @media (min-width: 768px) {
   .workout-card {

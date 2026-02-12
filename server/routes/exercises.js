@@ -48,7 +48,6 @@ router.get("/", async (req, res) => {
     
     // Wenn keine DB-Übungen gefunden oder explizit angefordert, füge statische hinzu
     if (dbExercises.length === 0 || includeStatic === 'true') {
-      // Import der statischen Übungen
       const staticExercises = await import('../data/exercises.js').then(m => m.default);
       
       // Formatiere statische Übungen für Konsistenz

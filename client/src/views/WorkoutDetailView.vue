@@ -24,15 +24,14 @@
           </div>
         </div>
 
-        <div id="exercises" ref="exListRef" class="ex-list glass">
+          <div id="exercises" ref="exListRef" class="ex-list glass" :class="{ reordering: isReordering }">
 
           <div class="ex-list-header">
-            <!-- <h3>{{ t('workoutDetail.exercises') }}</h3> -->
-            <div style="display: flex; gap: 8px; align-items: center;">
-              <button class="primary" style="padding: 6px 12px; font-size: 0.95em;" @click="showAddExerciseModal = true">
+            <div class="ex-list-actions">
+              <button class="primary" type="button" @click="showAddExerciseModal = true">
                 + {{ t('workoutDetail.addExercise') }}
               </button>
-              <button class="reorder-toggle" :aria-pressed="isReordering" @click="toggleReorder">
+              <button class="reorder-toggle" type="button" :aria-pressed="isReordering" @click="toggleReorder">
                 {{ isReordering ? t('workoutDetail.done') : t('workoutDetail.editOrder') }}
               </button>
             </div>
@@ -73,46 +72,61 @@
           <div
             v-for="(ex, i) in workout.exercises || []"
             :key="ex.exerciseId || i"
+            :data-ex-index="i"
             class="ex-item"
-            :class="{ reordering: isReordering }"
-            :draggable="isReordering"
-            @dragstart="onDragStart(i)"
-            @dragover.prevent="onDragOver(i)"
-            @drop.prevent="onDrop(i)"
+                  :class="{ reordering: isReordering, dragging: draggingIndex === i, 'drop-target': dropTargetIndex === i }"
+                  :draggable="isReordering && !isMobile"
+                    @pointerdown="onPointerDown($event, i)"
+                @dragstart="onDragStart(i)"
+                @dragover.prevent="onDragOver(i)"
+                @dragleave.prevent="onDragLeave(i)"
+                @drop.prevent="onDrop(i)"
+                @dragend="stopDrag()"
           >
-            <button v-if="isReordering" class="drag-handle" :title="t('workoutDetail.dragToReorder')">⋮⋮</button>
-            <div class="ex-info">
-              <img :src="getExerciseImage(ex)" :alt="getTranslatedExerciseName(ex.name)" class="ex-thumb" @error="onImgError" />
-              <div class="ex-text">
-                <strong>{{ getTranslatedExerciseName(ex.name) }}</strong>
-                <small>{{ getTranslatedMuscleGroup ? getTranslatedMuscleGroup(ex.muscleGroup) : ex.muscleGroup }}</small>
+              <button
+                v-if="isReordering"
+                class="drag-handle"
+                :title="t('workoutDetail.dragToReorder')"
+                @touchstart.prevent="onTouchStart($event, i)"
+                @pointerdown="onPointerDown($event, i)"
+              >⋮⋮</button>
+            <div class="ex-info" :class="{ minimal: isReordering }">
+              <template v-if="isReordering">
+                <strong class="ex-name-only">{{ getTranslatedExerciseName(ex.name) }}</strong>
+              </template>
+              <template v-else>
+                <img :src="getExerciseImage(ex)" :alt="getTranslatedExerciseName(ex.name)" class="ex-thumb" @error="onImgError" />
+                <div class="ex-text">
+                  <strong>{{ getTranslatedExerciseName(ex.name) }}</strong>
+                  <small>{{ getTranslatedMuscleGroup ? getTranslatedMuscleGroup(ex.muscleGroup) : ex.muscleGroup }}</small>
 
-                <!-- Notiz-Button und Feld -->
-                <div style="margin-top: 6px;">
-                  <button class="link" @click="toggleNote(i)">
-                    📝
-                    {{ getNote(i)
-                      ? (showNote[i] ? 'ändern' : 'anzeigen')
-                      : 'Notiz hinzufügen' }}
-                  </button>
+                  <!-- Notiz-Button und Feld -->
+                  <div style="margin-top: 6px;">
+                    <button class="link" @click="toggleNote(i)">
+                      📝
+                      {{ getNote(i)
+                        ? (showNote[i] ? 'ändern' : 'anzeigen')
+                        : 'Notiz hinzufügen' }}
+                    </button>
 
-                  <button
-                    class="link danger"
-                    v-if="getNote(i)"
-                    @click="deleteNote(i)"
-                    style="margin-left:8px;"
-                  >
-                    🗑️ löschen
-                  </button>
+                    <button
+                      class="link danger"
+                      v-if="getNote(i)"
+                      @click="deleteNote(i)"
+                      style="margin-left:8px;"
+                    >
+                      🗑️ löschen
+                    </button>
+                  </div>
+
+                  <div v-if="showNote && showNote[i]" style="margin-top: 4px;">
+                    <textarea :value="getNote(i)" @input="setNote(i, $event.target.value)" rows="2" style="width:100%;resize:vertical" placeholder="Notiz zu dieser Übung..."></textarea>
+                  </div>
                 </div>
-
-                <div v-if="showNote && showNote[i]" style="margin-top: 4px;">
-                  <textarea :value="getNote(i)" @input="setNote(i, $event.target.value)" rows="2" style="width:100%;resize:vertical" placeholder="Notiz zu dieser Übung..."></textarea>
-                </div>
-              </div>
+              </template>
             </div>
 
-            <div class="ex-sets">
+            <div class="ex-sets" v-if="!isReordering">
               <div class="set-row header">
                 <span class="col set">{{ t('workoutDetail.set') }}</span>
                 <span class="col reps">{{ t('workoutDetail.reps') }}</span>
@@ -178,25 +192,25 @@
                         type="number"
                         min="0"
                         max="1000"
-                        step="0.125"
+                        step="2.5"
                         inputmode="decimal"
                         :readonly="isMobile"
-                        @input="() => { clampRowValue(row, 'weight', 0, 1000, 0.125); triggerAutoSave() }"
-                        @wheel.prevent="onNumberWheel($event, row, 'weight', 0.125, 0, 1000)"
+                        @input="() => { clampRowValue(row, 'weight', 0, 1000, 2.5); triggerAutoSave() }"
+                        @wheel.prevent="onNumberWheel($event, row, 'weight', 2.5, 0, 1000)"
                         @keydown="onNumberKeyDown($event, true)"
-                        @focus.prevent="openPicker(row, 'weight', 0.125, 0, 1000)"
-                        @click.prevent="openPicker(row, 'weight', 0.125, 0, 1000)"
+                        @focus.prevent="openPicker(row, 'weight', 2.5, 0, 1000)"
+                        @click.prevent="openPicker(row, 'weight', 2.5, 0, 1000)"
                       />
                       <div v-if="!isMobile" class="spinner-vertical">
                         <button
                           type="button"
                           class="spin-btn up"
                           aria-label="increment weight"
-                          @click="adjustRowField(row, 'weight', 1, 0.125, 0, 1000)"
-                          @mousedown="startSpin(row, 'weight', 1, 0.125, 0, 1000)"
+                          @click="adjustRowField(row, 'weight', 1, 2.5, 0, 1000)"
+                          @mousedown="startSpin(row, 'weight', 1, 2.5, 0, 1000)"
                           @mouseup="stopSpin(row, 'weight')"
                           @mouseleave="stopSpin(row, 'weight')"
-                          @touchstart.prevent="startSpin(row, 'weight', 1, 0.125, 0, 1000)"
+                          @touchstart.prevent="startSpin(row, 'weight', 1, 2.5, 0, 1000)"
                           @touchend.prevent="stopSpin(row, 'weight')"
                           @touchcancel.prevent="stopSpin(row, 'weight')"
                         >▲</button>
@@ -204,11 +218,11 @@
                           type="button"
                           class="spin-btn down"
                           aria-label="decrement weight"
-                          @click="adjustRowField(row, 'weight', -1, 0.125, 0, 1000)"
-                          @mousedown="startSpin(row, 'weight', -1, 0.125, 0, 1000)"
+                          @click="adjustRowField(row, 'weight', -1, 2.5, 0, 1000)"
+                          @mousedown="startSpin(row, 'weight', -1, 2.5, 0, 1000)"
                           @mouseup="stopSpin(row, 'weight')"
                           @mouseleave="stopSpin(row, 'weight')"
-                          @touchstart.prevent="startSpin(row, 'weight', -1, 0.125, 0, 1000)"
+                          @touchstart.prevent="startSpin(row, 'weight', -1, 2.5, 0, 1000)"
                           @touchend.prevent="stopSpin(row, 'weight')"
                           @touchcancel.prevent="stopSpin(row, 'weight')"
                         >▼</button>
@@ -370,6 +384,17 @@ const saveMsg = ref('')
 const saveError = ref(false)
 const isReordering = ref(false)
 const draggingIndex = ref(null)
+const dropTargetIndex = ref(null)
+const activeTouchPointerId = ref(null)
+let pointerMoveListener = null
+let pointerUpListener = null
+let pointerCancelListener = null
+const touchPointerTypes = new Set(['touch', 'pen'])
+const supportsPointerEvents = typeof window !== 'undefined' && typeof window.PointerEvent !== 'undefined'
+const activeFallbackTouchId = ref(null)
+let fallbackTouchMoveListener = null
+let fallbackTouchEndListener = null
+let fallbackTouchCancelListener = null
 const isDirty = ref(false)
 const exListRef = ref(null)
 const didAutoScroll = ref(false)
@@ -928,7 +953,8 @@ async function saveWorkout() {
 }
 
 function onDragStart(index) { if (!isReordering.value) return; draggingIndex.value = index }
-function onDragOver(_index) { /* optional visual */ }
+function onDragOver(index) { if (!isReordering.value) return; dropTargetIndex.value = index }
+function onDragLeave(index) { if (!isReordering.value) return; if (dropTargetIndex.value === index) dropTargetIndex.value = null }
 function onDrop(index) {
   if (!isReordering.value) return
   const from = draggingIndex.value
@@ -938,7 +964,174 @@ function onDrop(index) {
   if (!Array.isArray(list)) return
   const [moved] = list.splice(from, 1)
   list.splice(to, 0, moved)
+  stopDrag()
+}
+
+function onPointerDown(event, index) {
+  if (!isReordering.value || !touchPointerTypes.has(event.pointerType)) return
+  if (activeFallbackTouchId.value !== null) return
+  event.preventDefault()
+  draggingIndex.value = index
+  dropTargetIndex.value = index
+  activeTouchPointerId.value = event.pointerId
+  attachPointerDragListeners()
+}
+
+function attachPointerDragListeners() {
+  if (typeof window === 'undefined' || pointerMoveListener) return
+  pointerMoveListener = handlePointerMove
+  pointerUpListener = handlePointerUp
+  pointerCancelListener = handlePointerCancel
+  window.addEventListener('pointermove', pointerMoveListener, { passive: false })
+  window.addEventListener('pointerup', pointerUpListener)
+  window.addEventListener('pointercancel', pointerCancelListener)
+}
+
+function cleanupPointerDragListeners() {
+  if (typeof window === 'undefined') return
+  if (pointerMoveListener) {
+    window.removeEventListener('pointermove', pointerMoveListener)
+    pointerMoveListener = null
+  }
+  if (pointerUpListener) {
+    window.removeEventListener('pointerup', pointerUpListener)
+    pointerUpListener = null
+  }
+  if (pointerCancelListener) {
+    window.removeEventListener('pointercancel', pointerCancelListener)
+    pointerCancelListener = null
+  }
+  activeTouchPointerId.value = null
+}
+
+function handlePointerMove(event) {
+  if (event.pointerId !== activeTouchPointerId.value) return
+  event.preventDefault()
+  const nextIndex = findExerciseIndexAtPoint(event.clientX, event.clientY)
+  if (nextIndex !== null) {
+    dropTargetIndex.value = nextIndex
+  }
+}
+
+function handlePointerUp(event) {
+  if (event.pointerId !== activeTouchPointerId.value) return
+  const targetIndex = dropTargetIndex.value ?? draggingIndex.value
+  if (targetIndex !== null) {
+    onDrop(targetIndex)
+  }
+  stopDrag()
+}
+
+function handlePointerCancel(event) {
+  if (event.pointerId !== activeTouchPointerId.value) return
+  stopDrag()
+}
+
+function onTouchStart(event, index) {
+  if (!isReordering.value) return
+  if (activeTouchPointerId.value !== null || activeFallbackTouchId.value !== null) return
+  const touch = event.touches && event.touches[0]
+  if (!touch) return
+  draggingIndex.value = index
+  dropTargetIndex.value = index
+  activeFallbackTouchId.value = touch.identifier
+  attachTouchDragListeners()
+}
+
+function attachTouchDragListeners() {
+  if (typeof window === 'undefined' || fallbackTouchMoveListener) return
+  fallbackTouchMoveListener = handleTouchMove
+  fallbackTouchEndListener = handleTouchEnd
+  fallbackTouchCancelListener = handleTouchCancel
+  window.addEventListener('touchmove', fallbackTouchMoveListener, { passive: false })
+  window.addEventListener('touchend', fallbackTouchEndListener)
+  window.addEventListener('touchcancel', fallbackTouchCancelListener)
+}
+
+function cleanupTouchDragListeners() {
+  if (typeof window === 'undefined') return
+  if (fallbackTouchMoveListener) {
+    window.removeEventListener('touchmove', fallbackTouchMoveListener)
+    fallbackTouchMoveListener = null
+  }
+  if (fallbackTouchEndListener) {
+    window.removeEventListener('touchend', fallbackTouchEndListener)
+    fallbackTouchEndListener = null
+  }
+  if (fallbackTouchCancelListener) {
+    window.removeEventListener('touchcancel', fallbackTouchCancelListener)
+    fallbackTouchCancelListener = null
+  }
+  activeFallbackTouchId.value = null
+}
+
+function handleTouchMove(event) {
+  if (!activeFallbackTouchId.value) return
+  const touches = event.touches || []
+  let touch = null
+  for (let i = 0; i < touches.length; i++) {
+    if (touches[i].identifier === activeFallbackTouchId.value) {
+      touch = touches[i]
+      break
+    }
+  }
+  if (!touch) return
+  event.preventDefault()
+  const nextIndex = findExerciseIndexAtPoint(touch.clientX, touch.clientY)
+  if (nextIndex !== null) {
+    dropTargetIndex.value = nextIndex
+  }
+}
+
+function handleTouchEnd(event) {
+  if (!activeFallbackTouchId.value) return
+  const changed = event.changedTouches || []
+  let touch = null
+  for (let i = 0; i < changed.length; i++) {
+    if (changed[i].identifier === activeFallbackTouchId.value) {
+      touch = changed[i]
+      break
+    }
+  }
+  if (!touch) return
+  const targetIndex = dropTargetIndex.value ?? draggingIndex.value
+  if (targetIndex !== null) {
+    onDrop(targetIndex)
+  }
+  stopDrag()
+}
+
+function handleTouchCancel(event) {
+  if (!activeFallbackTouchId.value) return
+  const changed = event.changedTouches || []
+  let touch = null
+  for (let i = 0; i < changed.length; i++) {
+    if (changed[i].identifier === activeFallbackTouchId.value) {
+      touch = changed[i]
+      break
+    }
+  }
+  if (!touch) return
+  stopDrag()
+}
+
+function stopDrag() {
   draggingIndex.value = null
+  dropTargetIndex.value = null
+  cleanupPointerDragListeners()
+  cleanupTouchDragListeners()
+}
+
+function findExerciseIndexAtPoint(x, y) {
+  if (typeof document === 'undefined') return null
+  const element = document.elementFromPoint(x, y)
+  if (!element || typeof element.closest !== 'function') return null
+  const target = element.closest('[data-ex-index]')
+  if (!target || !exListRef.value || !exListRef.value.contains(target)) return null
+  const raw = target.dataset?.exIndex
+  if (!raw) return null
+  const idx = Number(raw)
+  return Number.isNaN(idx) ? null : idx
 }
 
 // Watchers for auto-scroll and dirty tracking
@@ -992,7 +1185,10 @@ function beforeUnloadHandler(e) {
   e.returnValue = ''
 }
 
-onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnloadHandler))
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeunload', beforeUnloadHandler)
+  cleanupPointerDragListeners()
+})
 </script>
 
 <style scoped>
@@ -1038,18 +1234,28 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnloadHan
 .badge { background: var(--surface); padding: 3px 8px; border-radius: 6px; font-size: 0.7rem; border: 1px solid var(--card-border); }
 .completed { color: #4ade80; }
 .ex-list { background: transparent; border: 1px solid transparent; border-radius: 12px; padding: 12px; }
+.ex-list input,
+.ex-list button,
+.ex-list textarea {
+  font-size: 16px;
+}
 .ex-list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.ex-list-actions { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; width: 100%; }
 .ex-list-header h3 { margin: 0; font-size: 1.1rem; }
 .reorder-toggle { background: var(--surface); color: var(--fg); border: 1px solid var(--card-border); border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 0.85rem; }
 .reorder-hint { color: var(--muted); margin: 0 0 8px; font-size: 0.85rem; }
 .ex-item { padding: 10px 0; border-bottom: 1px solid var(--card-border); }
 .ex-item:last-child { border-bottom: none; }
+.ex-list.reordering { touch-action: pan-y; }
 .ex-item.reordering { cursor: move; }
+.ex-item.dragging { touch-action: none; }
+.ex-item.dragging { opacity: 0.6; transform: scale(0.98); background: color-mix(in oklab, var(--accent) 10%, transparent); border-radius: 8px; }
+.ex-item.drop-target { outline: 2px dashed color-mix(in oklab, var(--accent) 60%, transparent); outline-offset: 4px; background: color-mix(in oklab, var(--accent) 14%, transparent); border-radius: 8px; }
 .drag-handle { background: transparent; border: none; color: var(--muted); cursor: grab; font-size: 16px; margin-right: 4px; padding: 0; }
 .ex-sets { margin-top: 6px; }
 .set-row { display: grid; grid-template-columns: 50px 1fr 1fr 60px; gap: 8px; align-items: center; padding: 4px 0; }
 .set-row.header { color: var(--muted); font-size: 0.75rem; padding-top: 0; }
-.set-row .col input { width: 100%; padding: 5px 6px; border-radius: 6px; border: 1px solid var(--card-border); background: var(--surface); color: var(--fg); text-align: center; font-size: 0.9rem; }
+.set-row .col input { width: 100%; padding: 5px 6px; border-radius: 6px; border: 1px solid var(--card-border); background: var(--surface); color: var(--fg); text-align: center; font-size: 1rem; }
 .weight-input { position: relative; }
 .weight-input .unit { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 0.75rem; pointer-events: none; }
 .row-actions { padding: 4px 0; }
@@ -1070,6 +1276,8 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', beforeUnloadHan
 .save-msg { display: block; margin-top: 6px; color: var(--success-color); font-size: 0.85rem; }
 .save-msg.error { color: var(--danger-color); }
 .ex-info { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+.ex-info.minimal { align-items: center; gap: 12px; min-height: 48px; }
+.ex-name-only { font-size: 1rem; font-weight: 600; }
 .ex-thumb { width: 56px; height: 56px; flex-shrink: 0; object-fit: contain; background: #0b1220; border: 1px solid var(--card-border); border-radius: 8px; padding: 4px; cursor: pointer; }
 .ex-text { flex: 1; min-width: 0; }
 .ex-text strong { display: block; color: var(--fg); font-size: 0.95rem; }

@@ -1,13 +1,19 @@
 <template>
   <header class="header-bar glass">
     <div class="header-content">
-      <h1>{{ title }}</h1>
+      <div class="header-left">
+        <slot name="leading"></slot>
+        <div class="header-titles">
+          <h1>{{ title }}</h1>
+          <p v-if="subtitle" class="header-subtitle">{{ subtitle }}</p>
+        </div>
+      </div>
       <div class="header-actions">
         <slot name="actions"></slot>
         <div class="auth-section">
           <button v-if="!signedIn" class="auth-button" @click="signInWithGoogle">{{ $t('auth.signIn') }}</button>
           <div v-else class="user-info">
-            <span class="user-name">{{ userName }}</span>
+            <span v-if="showUserName" class="user-name">{{ userName }}</span>
             <button class="auth-button" @click="signOut">{{ $t('auth.signOut') }}</button>
           </div>
         </div>
@@ -24,6 +30,14 @@ defineProps({
   title: {
     type: String,
     required: true
+  },
+  subtitle: {
+    type: String,
+    default: ''
+  },
+  showUserName: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -60,6 +74,20 @@ onAuthStateChanged((user) => {
   margin: 0 auto;
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.header-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
 .header-actions {
   display: flex;
   align-items: center;
@@ -77,6 +105,15 @@ onAuthStateChanged((user) => {
   font-weight: 700;
   color: var(--fg);
   letter-spacing: -0.01em;
+}
+
+.header-subtitle {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: -0.01em;
+  line-height: 1.1;
 }
 
 .auth-section {

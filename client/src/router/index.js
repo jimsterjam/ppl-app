@@ -10,6 +10,7 @@ import ExercisesView from '../views/ExercisesView.vue'
 import SettingsView from '../views/SettingsView.vue'
 import WorkoutBuilder from '../components/WorkoutBuilder.vue'
 import WorkoutDetailView from '../views/WorkoutDetailView.vue'
+import FeedbackInboxView from '../views/FeedbackInboxView.vue'
 import FaqsView from '../views/FaqsView.vue'
 import FeaturesTestView from '../views/FeaturesTestView.vue'
 
@@ -40,6 +41,7 @@ const routes = [
       { path: 'stats', name: 'stats', component: StatsView },
       { path: 'exercises', name: 'exercises', component: ExercisesView },
       { path: 'settings', name: 'settings', component: SettingsView },
+      { path: 'feedback', name: 'feedback', component: FeedbackInboxView },
       { path: 'workout-builder', name: 'workout-builder', component: WorkoutBuilder },
       { path: 'faqs', name: 'faqs', component: FaqsView },
       { path: 'features-test', name: 'features-test', component: FeaturesTestView },

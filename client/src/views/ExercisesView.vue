@@ -50,7 +50,16 @@
   <div v-for="exercise in exercises" :key="exercise._id" class="exercise-card glass">
           <div class="thumb-row">
             <div class="thumb-wrapper">
-              <img :src="getExerciseImage(exercise)" :alt="t('common.image')" class="thumb" @error="onImgError($event, exercise)" />
+              <img
+                v-if="hasExerciseImage(exercise)"
+                :src="getExerciseImage(exercise)"
+                :alt="t('common.image')"
+                class="thumb"
+                @error="onImgError($event, exercise)"
+              />
+              <div v-else class="thumb thumb-fallback" aria-hidden="true">
+                <img class="thumb-fallback-icon" src="/exercises/play.svg" alt="" />
+              </div>
             </div>
             <div class="meta">
               <div class="title-row">
@@ -99,6 +108,7 @@ const selectedMuscleGroup = ref('')
 const loading = ref(false)
 const exercises = ref([])
 const infoExercise = ref(null)
+const brokenImageIds = ref(new Set())
 const { t } = useI18n()
 const {
   getTranslatedExerciseName,
@@ -205,18 +215,18 @@ function getExerciseImage(ex) {
   return ex?.thumbnailUrl || ex?.imageUrl || ex?.mediaUrl || '/exercises/play.svg'
 }
 
+function hasExerciseImage(ex) {
+  if (!ex) return false
+  const id = ex._id
+  if (id != null && brokenImageIds.value.has(id)) return false
+  return Boolean(ex?.thumbnailUrl || ex?.imageUrl || ex?.mediaUrl)
+}
+
 function onImgError(evt, ex) {
-  const img = evt?.target
-  if (!img) return
-  
-  // Verhindere Endlosschleife: Wenn src schon play.svg ist, nicht nochmal setzen
-  if (img.src.includes('play.svg')) {
-    img.onerror = null
-    return
+  const id = ex?._id
+  if (id != null) {
+    brokenImageIds.value = new Set([...brokenImageIds.value, id])
   }
-  
-  img.onerror = null
-  img.src = '/exercises/play.svg'
 }
 </script>
 <style scoped>
@@ -230,12 +240,13 @@ function onImgError(evt, ex) {
   vertical-align: middle;
   border-radius: 50%;
   transition: background 0.15s;
-  width: 22px;
-  height: 22px;
+  width: 28px;
+  height: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  margin-left: auto;
 }
 .info-btn:hover {
   background: #e5e7eb;
@@ -438,12 +449,22 @@ function onImgError(evt, ex) {
   width: 64px;
   height: 64px;
   flex: 0 0 64px;
-  object-fit: contain;
+  object-fit: cover;
   background: #f8fafc;
   border-radius: 10px;
   border: 1px solid var(--card-border);
-  padding: 8px;
+  padding: 0;
   box-sizing: border-box;
+}
+.thumb-fallback {
+  display: grid;
+  place-items: center;
+}
+
+.thumb-fallback-icon {
+  width: 26px;
+  height: 26px;
+  opacity: 0.7;
 }
 .meta { display: flex; flex-direction: column; min-width: 0; }
 .title { margin: 0; line-height: 1.2; flex: 1 1 auto; min-width: 0; }
