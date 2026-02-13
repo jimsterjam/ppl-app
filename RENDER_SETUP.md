@@ -27,12 +27,11 @@ Quick checklist
        - Branch: `main`
 
 4. Add environment variables (Render Dashboard → Service → Environment)
-   - For `ppl-app-server` add (example keys):
-     - `MONGO_URI` = mongodb+srv://... (rotate credentials first)
-     - `CLERK_PUBLISHABLE_KEY` = pk_...
-     - `CLERK_SECRET_KEY` = sk_... (secret)
-     - `OPENAI_API_KEY` = sk-... (if used)
-     - `NODE_ENV` = production
+    - For `ppl-app-server` add (example keys):
+       - `MONGO_URI` = mongodb+srv://... (rotate credentials first)
+       - `FIREBASE_ADMIN_CREDENTIAL_JSON` = <full Firebase service account JSON as a single line>
+       - `OPENAI_API_KEY` = sk-... (if used)
+       - `NODE_ENV` = production
 
 5. Deploy and verify
    - After import / manual creation, trigger a deploy or push to `main`.
@@ -47,6 +46,7 @@ Quick checklist
 Notes & Tips
 ------------
 - The manifest `render.yaml` includes placeholders for env vars. Fill them in the Render Dashboard rather than committing secrets to the repo.
+- Do not commit `server/serviceAccount.json`; use `FIREBASE_ADMIN_CREDENTIAL_JSON` in Render instead.
 - Render sets a `PORT` env var for web services — the server reads `process.env.PORT` already.
 - If you want automatic certificate management for custom domains, enable Render's managed TLS.
 - For production, consider using a paid plan for better performance and persistent disks (if needed for uploads).
