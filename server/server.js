@@ -20,6 +20,17 @@ import { ObjectId } from 'mongodb';
 import { validateEnv } from './utils/validateEnv.js';
 import { logger } from './utils/logger.js';
 
+// Verhindert Crash bei TTY/STDIN ReadStream-Fehlern (z. B. EIO in nodemon)
+if (process.stdin && typeof process.stdin.on === 'function') {
+  process.stdin.on('error', (err) => {
+    try {
+      logger.warn('STDIN stream error (ignored):', err?.code || err?.message || err)
+    } catch {
+      // ignore
+    }
+  })
+}
+
 
 // .env zuverlässig relativ zu dieser Datei laden (unabhängig vom CWD)
 const __filename = fileURLToPath(import.meta.url);
@@ -403,7 +414,8 @@ app.use((err, req, res, _next) => {
 
 // Server starten
 const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => {
+const HOST = process.env.HOST || '0.0.0.0';
+app.listen(PORT, HOST, () => {
   logger.info(`🚀 Server läuft auf Port ${PORT}`);
   try {
     const opts = admin?.apps?.[0]?.options || {};

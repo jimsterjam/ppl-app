@@ -222,11 +222,14 @@ const { t } = useI18n()
 
 // Dynamisches Mapping aus default-exercises.json
 import exercisesData from '@/data/default-exercises.json'
+import { normalizeDefaultExercises } from '@/utils/normalizeDefaultExercises'
+
+const normalizedExercises = normalizeDefaultExercises(exercisesData)
 
 function getTranslatedMuscleGroup(muscleGroup, lang = 'de') {
   if (!muscleGroup) return ''
   // Suche nach erster Übung mit passender Muskelgruppe
-  const found = exercisesData.find(ex =>
+  const found = normalizedExercises.find(ex =>
     (lang === 'de' ? ex.muscleGroup : ex.muscleGroup_en) === muscleGroup
     || (lang === 'de' ? ex.muscleGroup_en : ex.muscleGroup) === muscleGroup
   )
@@ -236,7 +239,7 @@ function getTranslatedMuscleGroup(muscleGroup, lang = 'de') {
 
 function getTranslatedEquipment(equipment, lang = 'de') {
   if (!equipment) return ''
-  const found = exercisesData.find(ex =>
+  const found = normalizedExercises.find(ex =>
     (lang === 'de' ? ex.equipment : ex.equipment_en) === equipment
     || (lang === 'de' ? ex.equipment_en : ex.equipment) === equipment
   )

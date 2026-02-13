@@ -84,33 +84,67 @@ export const useUserStore = defineStore("user", {
           return await this.createWorkout(workoutData, token);
         },
     async loadWorkouts(token = null, options = {}) {
-      // Workouts per API vom Server laden
+      // Workouts per API laden, aber offline-first fallback
       this.error = null;
       this.loadingWorkouts = true;
       try {
-        const { fetchWorkouts } = await import('@/api/workouts');
-        const workouts = await fetchWorkouts(token);
-        this.workouts = Array.isArray(workouts) ? workouts : [];
-        // Setze completed: false für Workouts ohne completed Feld (Migration)
+        const { isOnline, getAllWorkoutsOffline, getWorkoutOffline, cacheWorkouts } = await import('@/utils/offlineStorage');
+        const online = isOnline();
+
+        if (online) {
+          const { fetchWorkouts } = await import('@/api/workouts');
+          const workouts = await fetchWorkouts(token);
+          this.workouts = Array.isArray(workouts) ? workouts : [];
+          // Setze completed: false für Workouts ohne completed Feld (Migration)
+          this.workouts = this.workouts.map(w => ({
+            ...w,
+            completed: w.completed !== undefined ? w.completed : false
+          }));
+          this.workoutsLoaded = true;
+          this.workoutsLoadedAt = Date.now();
+          logger.debug(`✅ [API] Loaded ${this.workouts.length} workouts from server:`, this.workouts.map(w => ({ _id: w._id, name: w.name, completed: w.completed, isDraft: w.isDraft })));
+
+          try {
+            await cacheWorkouts(this.workouts);
+          } catch (e) {
+            logger.warn('⚠️ [Offline] Konnte Workouts nicht cachen:', e);
+          }
+
+          // Lokale Drafts laden und hinzufügen
+          try {
+            const localDraft = await getWorkoutOffline('draft');
+            if (localDraft) {
+              localDraft.isDraft = true;
+              this.workouts.push(localDraft);
+              logger.debug('✅ [Offline] Draft geladen und hinzugefügt:', { _id: localDraft._id, name: localDraft.name });
+            } else {
+              logger.debug('ℹ️ [Offline] Kein lokaler Draft gefunden');
+            }
+          } catch (e) {
+            logger.warn('⚠️ Fehler beim Laden des lokalen Drafts:', e);
+          }
+
+          return this.workouts;
+        }
+
+        // Offline: Workouts aus IndexedDB laden
+        const offlineWorkouts = await getAllWorkoutsOffline();
+        this.workouts = Array.isArray(offlineWorkouts) ? offlineWorkouts : [];
         this.workouts = this.workouts.map(w => ({
           ...w,
           completed: w.completed !== undefined ? w.completed : false
         }));
         this.workoutsLoaded = true;
         this.workoutsLoadedAt = Date.now();
-        logger.debug(`✅ [API] Loaded ${this.workouts.length} workouts from server:`, this.workouts.map(w => ({ _id: w._id, name: w.name, completed: w.completed, isDraft: w.isDraft })));
+        this.error = this.workouts.length ? null : this.error;
+        logger.debug(`✅ [Offline] Loaded ${this.workouts.length} workouts from IndexedDB`);
 
-        // Lokale Drafts laden und hinzufügen
         try {
-          const { getWorkoutOffline } = await import('@/utils/offlineStorage');
           const localDraft = await getWorkoutOffline('draft');
-            if (localDraft) {
-            // Stelle sicher, dass isDraft gesetzt ist
+          if (localDraft) {
             localDraft.isDraft = true;
-            this.workouts.push(localDraft);
-              logger.debug('✅ [Offline] Draft geladen und hinzugefügt:', { _id: localDraft._id, name: localDraft.name });
-          } else {
-            logger.debug('ℹ️ [Offline] Kein lokaler Draft gefunden');
+            const existing = this.workouts.find(w => w._id === localDraft._id);
+            if (!existing) this.workouts.push(localDraft);
           }
         } catch (e) {
           logger.warn('⚠️ Fehler beim Laden des lokalen Drafts:', e);
@@ -120,7 +154,20 @@ export const useUserStore = defineStore("user", {
       } catch (error) {
         logger.error('❌ [API] Error loading workouts from server:', error);
         this.error = error?.message || 'Fehler beim Laden der Workouts';
-        this.workouts = [];
+        try {
+          const { getAllWorkoutsOffline, getWorkoutOffline } = await import('@/utils/offlineStorage');
+          const offlineWorkouts = await getAllWorkoutsOffline();
+          this.workouts = Array.isArray(offlineWorkouts) ? offlineWorkouts : [];
+          const localDraft = await getWorkoutOffline('draft');
+          if (localDraft) {
+            localDraft.isDraft = true;
+            const existing = this.workouts.find(w => w._id === localDraft._id);
+            if (!existing) this.workouts.push(localDraft);
+          }
+          if (this.workouts.length) this.error = null;
+        } catch (e) {
+          this.workouts = [];
+        }
       } finally {
         this.loadingWorkouts = false;
       }
@@ -140,6 +187,13 @@ export const useUserStore = defineStore("user", {
       };
 
       try {
+        const { isOnline } = await import('@/utils/offlineStorage');
+        if (!isOnline()) {
+          this.stats = readCachedStats();
+          if (this.stats) this.error = null;
+          return this.stats;
+        }
+
         const { fetchWorkoutProgressStats } = await import('@/api/workouts');
         const stats = await fetchWorkoutProgressStats(token, params);
         if (stats) {
@@ -158,6 +212,7 @@ export const useUserStore = defineStore("user", {
         logger.error('❌ [API] Fehler beim Laden der Progress Stats:', error);
         this.error = error?.message || 'Fehler beim Laden der Progress Stats';
         this.stats = readCachedStats();
+        if (this.stats) this.error = null;
         return this.stats;
       } finally {
         this.loadingStats = false;

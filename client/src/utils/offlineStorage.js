@@ -9,6 +9,7 @@
 
 import Dexie from 'dexie'
 import { logger } from './logger'
+import { normalizeDefaultExercises } from './normalizeDefaultExercises'
 
 // Dexie Database Instance
 export const db = new Dexie('PPLAppDB')
@@ -301,11 +302,11 @@ export async function initializeDefaultExercises() {
       throw new Error('Default exercises nicht verfügbar')
     }
     
-    const exercises = await response.json()
+    const exercises = normalizeDefaultExercises(await response.json())
     
     // Generiere IDs für die Übungen
     const exercisesWithIds = exercises.map((ex, idx) => ({
-      _id: `default_${idx + 1}`,
+      _id: ex._id || (ex.id ? `ex_${ex.id}` : `default_${idx + 1}`),
       ...ex,
       _isDefault: true,
       _syncedAt: Date.now()

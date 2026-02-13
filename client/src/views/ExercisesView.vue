@@ -56,6 +56,7 @@
                 :alt="t('common.image')"
                 class="thumb"
                 @error="onImgError($event, exercise)"
+                @click="openMedia(exercise)"
               />
               <div v-else class="thumb thumb-fallback" aria-hidden="true">
                 <img class="thumb-fallback-icon" src="/exercises/play.svg" alt="" />
@@ -80,6 +81,13 @@
           <h3>{{ getTranslatedExerciseName(infoExercise.name) }}</h3>
           <p>{{ getTranslatedDescription(infoExercise) }}</p>
           <button class="close-btn" @click="closeInfo">OK</button>
+        </div>
+      </div>
+
+      <div v-if="mediaExercise" class="media-overlay" @click.self="closeMedia">
+        <div class="media-content">
+          <img :src="getExerciseLargeImage(mediaExercise)" :alt="mediaExercise.name" class="media-image" />
+          <button class="close-btn" @click="closeMedia">OK</button>
         </div>
       </div>
 
@@ -108,6 +116,7 @@ const selectedMuscleGroup = ref('')
 const loading = ref(false)
 const exercises = ref([])
 const infoExercise = ref(null)
+const mediaExercise = ref(null)
 const brokenImageIds = ref(new Set())
 const { t } = useI18n()
 const {
@@ -124,15 +133,23 @@ function showInfo(exercise) {
 function closeInfo() {
   infoExercise.value = null
 }
+function openMedia(exercise) {
+  if (!exercise) return
+  mediaExercise.value = exercise
+}
+function closeMedia() {
+  mediaExercise.value = null
+}
 const getTranslatedDescription = getLocalizedDescription
 
 // 🔄 Übungen direkt aus default-exercises.json laden (offlinefähig)
 import defaultExercises from '@/data/default-exercises.json'
+import { normalizeDefaultExercises } from '@/utils/normalizeDefaultExercises'
 function loadExercises() {
   loading.value = true
   try {
     logger.debug('🔄 Lade Exercises aus default-exercises.json')
-    let allExercises = Array.isArray(defaultExercises) ? defaultExercises : (defaultExercises?.default || [])
+    let allExercises = normalizeDefaultExercises(defaultExercises)
     // Filter anwenden
     if (selectedCategory.value) {
       allExercises = allExercises.filter(ex => ex.category === selectedCategory.value)
@@ -215,6 +232,10 @@ function getExerciseImage(ex) {
   return ex?.thumbnailUrl || ex?.imageUrl || ex?.mediaUrl || '/exercises/play.svg'
 }
 
+function getExerciseLargeImage(ex) {
+  return ex?.imageUrl || ex?.thumbnailUrl || ex?.mediaUrl || '/exercises/play.svg'
+}
+
 function hasExerciseImage(ex) {
   if (!ex) return false
   const id = ex._id
@@ -293,6 +314,32 @@ function onImgError(evt, ex) {
 }
 .close-btn:hover {
   background: #1D4ED8;
+}
+.media-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 13, 22, 0.72);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.media-content {
+  background: var(--surface, #0b1220);
+  border: 1px solid var(--card-border, #1f2937);
+  border-radius: 16px;
+  padding: 16px;
+  max-width: min(90vw, 520px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.media-image {
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  background: #0b1220;
+  border: 1px solid var(--card-border, #1f2937);
 }
 </style>
 

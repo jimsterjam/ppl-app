@@ -135,12 +135,14 @@ const draggingIndex = ref(null)
 const planRef = ref(null)
 // Equipment-Filter (dynamisch)
 import allExercisesData from '@/data/default-exercises.json'
+import { normalizeDefaultExercises } from '@/utils/normalizeDefaultExercises'
 const showEquipmentFilter = ref(false)
 const selectedEquipment = ref('')
 // Alle Equipment-Typen aus den Exercises extrahieren
+const normalizedExercises = normalizeDefaultExercises(allExercisesData)
 const allEquipmentTypes = computed(() => {
 	const set = new Set()
-	allExercisesData.forEach(e => {
+	normalizedExercises.forEach(e => {
 		if (e.equipment) set.add(e.equipment)
 	})
 	return Array.from(set)
@@ -175,7 +177,7 @@ const equipmentTranslation = (equip) => {
 	const translated = t(`exercises.equipment.${key}`)
 	if (translated && !translated.startsWith('exercises.equipment.')) return translated
 	// Fallback: Zeige englischen Namen aus default-exercises.json, falls vorhanden
-	const found = allExercisesData.find(e => e.equipment === equip)
+	const found = normalizedExercises.find(e => e.equipment === equip)
 	if (found && found.equipment_en) return found.equipment_en
 	return equip
 }

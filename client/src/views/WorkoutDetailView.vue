@@ -95,7 +95,13 @@
                 <strong class="ex-name-only">{{ getTranslatedExerciseName(ex.name) }}</strong>
               </template>
               <template v-else>
-                <img :src="getExerciseImage(ex)" :alt="getTranslatedExerciseName(ex.name)" class="ex-thumb" @error="onImgError" />
+                <img
+                  :src="getExerciseImage(ex)"
+                  :alt="getTranslatedExerciseName(ex.name)"
+                  class="ex-thumb"
+                  @error="onImgError"
+                  @click="openExerciseMedia(ex)"
+                />
                 <div class="ex-text">
                   <strong>{{ getTranslatedExerciseName(ex.name) }}</strong>
                   <small>{{ getTranslatedMuscleGroup ? getTranslatedMuscleGroup(ex.muscleGroup) : ex.muscleGroup }}</small>
@@ -121,6 +127,12 @@
 
                   <div v-if="showNote && showNote[i]" style="margin-top: 4px;">
                     <textarea :value="getNote(i)" @input="setNote(i, $event.target.value)" rows="2" style="width:100%;resize:vertical" placeholder="Notiz zu dieser Übung..."></textarea>
+                  </div>
+                  <div v-if="mediaExercise" class="media-overlay" @click.self="closeExerciseMedia">
+                    <div class="media-content">
+                      <img :src="getExerciseLargeImage(mediaExercise)" :alt="mediaExercise.name" class="media-image" />
+                      <button class="close-btn" @click="closeExerciseMedia">OK</button>
+                    </div>
                   </div>
                 </div>
               </template>
@@ -344,6 +356,8 @@ function onAddExerciseConfirm() {
 import { ref, onMounted, onBeforeUnmount, watch, nextTick, reactive } from 'vue'
 import NumberPicker from '@/components/NumberPicker.vue'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
+import defaultExercises from '@/data/default-exercises.json'
+import { normalizeDefaultExercises } from '@/utils/normalizeDefaultExercises'
 import { useRoute, useRouter } from 'vue-router'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { getWorkoutOffline, getExerciseOffline, getAllExercisesOffline, saveWorkoutOffline } from '@/utils/offlineStorage'
@@ -371,6 +385,15 @@ const { getIdToken } = useFirebaseAuth()
 
 const { t, locale } = useI18n()
 const { getTranslatedExerciseName } = useExerciseTranslation()
+const defaultExercisesNormalized = normalizeDefaultExercises(defaultExercises)
+const defaultExerciseByName = new Map(
+  defaultExercisesNormalized.flatMap(ex => {
+    const entries = []
+    if (ex.name) entries.push([String(ex.name).trim().toLowerCase(), ex])
+    if (ex.name_en) entries.push([String(ex.name_en).trim().toLowerCase(), ex])
+    return entries
+  })
+)
 // Optional: eigene Übersetzungsfunktion für Muskelgruppen
 const getTranslatedMuscleGroup = (mg) => mg
 
@@ -382,6 +405,7 @@ const error = ref('')
 const saving = ref(false)
 const saveMsg = ref('')
 const saveError = ref(false)
+const mediaExercise = ref(null)
 const isReordering = ref(false)
 const draggingIndex = ref(null)
 const dropTargetIndex = ref(null)
@@ -632,7 +656,28 @@ async function enrichExerciseImages() {
 }
 
 function getExerciseImage(ex) {
-  return ex?.thumbnailUrl || ex?.imageUrl || '/exercises/play.svg'
+  const direct = ex?.thumbnailUrl || ex?.imageUrl
+  if (direct) return direct
+  const nameKey = String(ex?.name || '').trim().toLowerCase()
+  const mapped = nameKey ? defaultExerciseByName.get(nameKey) : null
+  return mapped?.thumbnailUrl || mapped?.imageUrl || '/exercises/play.svg'
+}
+
+function getExerciseLargeImage(ex) {
+  const direct = ex?.imageUrl || ex?.thumbnailUrl
+  if (direct) return direct
+  const nameKey = String(ex?.name || '').trim().toLowerCase()
+  const mapped = nameKey ? defaultExerciseByName.get(nameKey) : null
+  return mapped?.imageUrl || mapped?.thumbnailUrl || '/exercises/play.svg'
+}
+
+function openExerciseMedia(exercise) {
+  if (!exercise || isReordering.value) return
+  mediaExercise.value = exercise
+}
+
+function closeExerciseMedia() {
+  mediaExercise.value = null
 }
 
 function onImgError(evt) {
@@ -1251,6 +1296,32 @@ onBeforeUnmount(() => {
 .ex-item.dragging { touch-action: none; }
 .ex-item.dragging { opacity: 0.6; transform: scale(0.98); background: color-mix(in oklab, var(--accent) 10%, transparent); border-radius: 8px; }
 .ex-item.drop-target { outline: 2px dashed color-mix(in oklab, var(--accent) 60%, transparent); outline-offset: 4px; background: color-mix(in oklab, var(--accent) 14%, transparent); border-radius: 8px; }
+.media-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 13, 22, 0.72);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.media-content {
+  background: var(--surface, #0b1220);
+  border: 1px solid var(--card-border, #1f2937);
+  border-radius: 16px;
+  padding: 16px;
+  max-width: min(90vw, 520px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.media-image {
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  background: #0b1220;
+  border: 1px solid var(--card-border, #1f2937);
+}
 .drag-handle { background: transparent; border: none; color: var(--muted); cursor: grab; font-size: 16px; margin-right: 4px; padding: 0; }
 .ex-sets { margin-top: 6px; }
 .set-row { display: grid; grid-template-columns: 50px 1fr 1fr 60px; gap: 8px; align-items: center; padding: 4px 0; }

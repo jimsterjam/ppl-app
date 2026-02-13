@@ -135,5 +135,7 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>Camera-Zugriff wird benötigt, um Trainingsbilder aufzunehmen und Übungen zu dokumentieren.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Lokales Netzwerk wird benötigt, um die lokale API im Heimnetz zu erreichen.</string>
 </dict>
 </plist>

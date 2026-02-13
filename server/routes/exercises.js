@@ -18,6 +18,22 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const uploadsDir = path.join(__dirname, '..', 'public', 'uploads', 'exercises');
 fs.mkdirSync(uploadsDir, { recursive: true });
+const fallbackJsonPath = path.resolve(__dirname, '..', '..', 'client', 'public', 'data', 'default-exercises.json');
+
+async function loadStaticExercisesFallback() {
+  try {
+    if (fs.existsSync(fallbackJsonPath)) {
+      const raw = fs.readFileSync(fallbackJsonPath, 'utf-8');
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed;
+      }
+    }
+  } catch (err) {
+    logger.warn('⚠️ fallback default-exercises.json load failed:', err?.message || err);
+  }
+  return await import('../data/exercises.js').then(m => m.default);
+}
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -48,7 +64,7 @@ router.get("/", async (req, res) => {
     
     // Wenn keine DB-Übungen gefunden oder explizit angefordert, füge statische hinzu
     if (dbExercises.length === 0 || includeStatic === 'true') {
-      const staticExercises = await import('../data/exercises.js').then(m => m.default);
+      const staticExercises = await loadStaticExercisesFallback();
       
       // Formatiere statische Übungen für Konsistenz
       const formattedStaticExercises = staticExercises
@@ -223,7 +239,7 @@ router.get('/category/:category', async (req, res) => {
     // Optional: Fallback zu statischen Übungen
     let allExercises = [...exercises];
     if (exercises.length === 0) {
-      const staticExercises = await import('../data/exercises.js').then(m => m.default);
+      const staticExercises = await loadStaticExercisesFallback();
       const filteredStatic = staticExercises.filter(ex => ex.category === category).map(ex => ({
         _id: `static_${ex.name.toLowerCase().replace(/\s+/g, '_')}`,
         name: ex.name,

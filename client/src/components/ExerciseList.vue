@@ -55,6 +55,7 @@
             :alt="t('common.image')"
             class="thumb"
             @error="onImgError($event, ex)"
+            @click="openMedia(ex)"
           />
           <div v-else class="thumb thumb-fallback" aria-hidden="true">
             <img class="thumb-fallback-icon" src="/exercises/play.svg" alt="" />
@@ -73,6 +74,13 @@
     <div v-if="!loading && exercises.length === 0" class="text-center text-gray-500 mt-8">
       {{ t('exercises.none') }}
     </div>
+
+    <div v-if="mediaExercise" class="media-overlay" @click.self="closeMedia">
+      <div class="media-content">
+        <img :src="getExerciseLargeImage(mediaExercise)" :alt="mediaExercise.name" class="media-image" />
+        <button class="close-btn" @click="closeMedia">OK</button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -90,6 +98,7 @@ const loading = ref(false);
 const selectedCategory = ref('');
 const selectedMuscleGroup = ref('');
 const brokenImageIds = ref(new Set())
+const mediaExercise = ref(null)
 
 const {
   getTranslatedExerciseName,
@@ -186,6 +195,10 @@ function getExerciseImage(ex) {
   return '/exercises/play.svg';
 }
 
+function getExerciseLargeImage(ex) {
+  return ex?.imageUrl || ex?.thumbnailUrl || ex?.mediaUrl || '/exercises/play.svg'
+}
+
 function hasExerciseImage(ex) {
   if (!ex) return false
   const id = ex._id
@@ -198,6 +211,15 @@ function onImgError(evt, ex) {
   if (id != null) {
     brokenImageIds.value = new Set([...brokenImageIds.value, id])
   }
+}
+
+function openMedia(exercise) {
+  if (!exercise) return
+  mediaExercise.value = exercise
+}
+
+function closeMedia() {
+  mediaExercise.value = null
 }
 </script>
 
@@ -231,6 +253,32 @@ function onImgError(evt, ex) {
 .sub { color: #64748b; font-size: 0.875rem; }
 .desc { margin-top: 6px; color: #334155; }
 .equip { font-size: 0.75rem; color: #94a3b8; margin-top: 2px; }
+.media-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(8, 13, 22, 0.72);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.media-content {
+  background: var(--surface, #0b1220);
+  border: 1px solid var(--card-border, #1f2937);
+  border-radius: 16px;
+  padding: 16px;
+  max-width: min(90vw, 520px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.media-image {
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  background: #0b1220;
+  border: 1px solid var(--card-border, #1f2937);
+}
 /* Mobile: Thumbnail rechts und größer */
 @media (max-width: 480px) {
   .thumb-row { flex-direction: row-reverse; justify-content: space-between; }
