@@ -90,6 +90,7 @@ export function normalizeDefaultExercise(exercise = {}) {
   const description_en = exercise.description_en || exercise.description || ''
   const imageUrl = exercise.imageUrl || (rawId ? `/exercises/360/${rawId}.gif` : undefined)
   const thumbnailUrl = exercise.thumbnailUrl || (rawId ? `/exercises/180/${rawId}.gif` : undefined)
+  const thumbnailStaticUrl = exercise.thumbnailStaticUrl || (rawId ? `/exercises/static/180/${rawId}.jpg` : undefined)
 
   const normalized = {
     ...exercise,
@@ -104,7 +105,8 @@ export function normalizeDefaultExercise(exercise = {}) {
     description,
     description_en,
     imageUrl,
-    thumbnailUrl
+    thumbnailUrl,
+    thumbnailStaticUrl
   }
 
   if (originalCategory && originalCategory !== category) {

@@ -41,34 +41,32 @@
       {{ t('exercises.loading') }}
     </div>
 
-    <!-- Übungsliste -->
-    <div v-else class="grid sm:grid-cols-2 gap-4">
-      <div
-        v-for="ex in exercises"
-        :key="ex._id"
-        class="exercise-card p-4 border rounded-xl shadow-sm bg-white hover:shadow-md transition"
-      >
-        <div class="thumb-row">
-          <img
-            v-if="hasExerciseImage(ex)"
-            :src="getExerciseImage(ex)"
-            :alt="t('common.image')"
-            class="thumb"
-            @error="onImgError($event, ex)"
-            @click="openMedia(ex)"
-          />
-          <div v-else class="thumb thumb-fallback" aria-hidden="true">
-            <img class="thumb-fallback-icon" src="/exercises/play.svg" alt="" />
+    <!-- Übungsliste (virtualisiert, GIFs erst beim Tap) -->
+    <DynamicScroller v-else class="exercise-grid" :items="exercises" :min-item-size="140" page-mode>
+      <template #default="{ item: ex, index, active }">
+        <DynamicScrollerItem :item="ex" :active="active" :data-index="index">
+          <div class="exercise-card p-4 border rounded-xl shadow-sm bg-white hover:shadow-md transition">
+            <div class="thumb-row">
+              <img
+                :src="getExerciseListImage(ex)"
+                :alt="t('common.image')"
+                class="thumb"
+                loading="lazy"
+                decoding="async"
+                @error="onImgError($event, ex)"
+                @click="openMedia(ex)"
+              />
+              <div class="meta">
+                <h2 class="title">{{ getTranslatedExerciseName(ex.name_en) }}</h2>
+                  <p class="sub">{{ getTranslatedCategory(ex.category) }} · {{ getTranslatedMuscleGroup(ex.muscleGroup || (ex.muscleGroups?.[0] || '')) }}</p>
+              </div>
+            </div>
+                    <p class="desc">{{ getLocalizedDescription(ex) }}</p>
+        <p class="equip">{{ t('exercises.equipment') }}: {{ getTranslatedEquipment(ex.equipment) }}</p>
           </div>
-          <div class="meta">
-            <h2 class="title">{{ getTranslatedExerciseName(ex.name_en) }}</h2>
-              <p class="sub">{{ getTranslatedCategory(ex.category) }} · {{ getTranslatedMuscleGroup(ex.muscleGroup || (ex.muscleGroups?.[0] || '')) }}</p>
-          </div>
-        </div>
-                <p class="desc">{{ getLocalizedDescription(ex) }}</p>
-    <p class="equip">{{ t('exercises.equipment') }}: {{ getTranslatedEquipment(ex.equipment) }}</p>
-      </div>
-    </div>
+        </DynamicScrollerItem>
+      </template>
+    </DynamicScroller>
 
     <!-- Keine Ergebnisse -->
     <div v-if="!loading && exercises.length === 0" class="text-center text-gray-500 mt-8">
@@ -89,6 +87,7 @@ import { ref, onMounted } from 'vue';
 import { useI18n } from 'vue-i18n'
 import { logger } from '@/utils/logger'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
+import { DynamicScroller, DynamicScrollerItem } from 'vue-virtual-scroller'
 
 const { t } = useI18n()
 
@@ -186,24 +185,15 @@ function slugify(name) {
 
 // Kategorie-Icons werden in der Liste nicht mehr verwendet; Play-Button ist der generische Placeholder
 
-function getExerciseImage(ex) {
-  // 1) Bevorzugt Thumbnail, dann großes Bild, dann evtl. externe Media-URL
-  if (ex?.thumbnailUrl) return ex.thumbnailUrl;
-  if (ex?.imageUrl) return ex.imageUrl;
-  if (ex?.mediaUrl) return ex.mediaUrl;
-  // 2) Generischer Play-Placeholder
-  return '/exercises/play.svg';
+function getExerciseListImage(ex) {
+  if (!ex) return '/exercises/play.svg'
+  const id = ex._id
+  if (id != null && brokenImageIds.value.has(id)) return '/exercises/play.svg'
+  return ex?.thumbnailStaticUrl || ex?.thumbnailUrl || ex?.imageUrl || ex?.mediaUrl || '/exercises/play.svg'
 }
 
 function getExerciseLargeImage(ex) {
   return ex?.imageUrl || ex?.thumbnailUrl || ex?.mediaUrl || '/exercises/play.svg'
-}
-
-function hasExerciseImage(ex) {
-  if (!ex) return false
-  const id = ex._id
-  if (id != null && brokenImageIds.value.has(id)) return false
-  return Boolean(ex?.thumbnailUrl || ex?.imageUrl || ex?.mediaUrl)
 }
 
 function onImgError(evt, ex) {
@@ -247,6 +237,11 @@ function closeMedia() {
   width: 26px;
   height: 26px;
   opacity: 0.7;
+}
+.exercise-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
 }
 .meta { display: flex; flex-direction: column; min-width: 0; }
 .title { font-weight: 700; font-size: 1.125rem; line-height: 1.4; }

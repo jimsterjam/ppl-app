@@ -45,22 +45,22 @@
         {{ t('exercises.none') }}
       </div>
 
-      <!-- Übungsliste (mit Thumbnail) -->
-  <div v-else-if="exercises && exercises.length" class="exercises-list">
-  <div v-for="exercise in exercises" :key="exercise._id" class="exercise-card glass">
+      <!-- Übungsliste (virtualisiert, GIFs erst beim Tap) -->
+  <DynamicScroller v-else-if="exercises && exercises.length" class="exercises-list" :items="exercises" :min-item-size="120" page-mode>
+    <template #default="{ item: exercise, index, active }">
+      <DynamicScrollerItem :item="exercise" :active="active" :data-index="index">
+        <div class="exercise-card glass">
           <div class="thumb-row">
             <div class="thumb-wrapper">
               <img
-                v-if="hasExerciseImage(exercise)"
-                :src="getExerciseImage(exercise)"
+                :src="getExerciseListImage(exercise)"
                 :alt="t('common.image')"
                 class="thumb"
+                loading="lazy"
+                decoding="async"
                 @error="onImgError($event, exercise)"
                 @click="openMedia(exercise)"
               />
-              <div v-else class="thumb thumb-fallback" aria-hidden="true">
-                <img class="thumb-fallback-icon" src="/exercises/play.svg" alt="" />
-              </div>
             </div>
             <div class="meta">
               <div class="title-row">
@@ -74,7 +74,9 @@
           </div>
           <p class="equip"><strong>{{ t('exercises.equipment') }}:</strong> {{ getTranslatedEquipment(exercise.equipment) || t('exercises.bodyweight') }}</p>
         </div>
-      </div>
+      </DynamicScrollerItem>
+    </template>
+  </DynamicScroller>
       <!-- Info Overlay (außerhalb der v-for) -->
       <div v-if="infoExercise" class="info-overlay" @click.self="closeInfo">
         <div class="info-content">
@@ -104,6 +106,7 @@ import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 import { logger } from '@/utils/logger'
+import { DynamicScroller, DynamicScrollerItem } from 'vue-virtual-scroller'
 
 // Komponenten explizit registrieren (für <script setup> reicht der Import)
 import HeaderBar from '@/components/HeaderBar.vue'
@@ -228,19 +231,15 @@ onMounted(() => {
   loadAllExercises()
 })
 
-function getExerciseImage(ex) {
-  return ex?.thumbnailUrl || ex?.imageUrl || ex?.mediaUrl || '/exercises/play.svg'
+function getExerciseListImage(ex) {
+  if (!ex) return '/exercises/play.svg'
+  const id = ex._id
+  if (id != null && brokenImageIds.value.has(id)) return '/exercises/play.svg'
+  return ex?.thumbnailStaticUrl || ex?.thumbnailUrl || ex?.imageUrl || ex?.mediaUrl || '/exercises/play.svg'
 }
 
 function getExerciseLargeImage(ex) {
   return ex?.imageUrl || ex?.thumbnailUrl || ex?.mediaUrl || '/exercises/play.svg'
-}
-
-function hasExerciseImage(ex) {
-  if (!ex) return false
-  const id = ex._id
-  if (id != null && brokenImageIds.value.has(id)) return false
-  return Boolean(ex?.thumbnailUrl || ex?.imageUrl || ex?.mediaUrl)
 }
 
 function onImgError(evt, ex) {
