@@ -1,78 +1,3 @@
-
-<style scoped>
-/* Auswahl-Liste für Übungen */
-.selected-exercises {
-	background: var(--card-bg, #fff);
-	border-radius: 16px;
-	box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-	padding: 20px 18px;
-	border: 1px solid var(--card-border, #e5e7eb);
-}
-.selected-exercise-list {
-	list-style: none;
-	padding: 0;
-	margin: 14px 0 0 0;
-	display: flex;
-	flex-direction: column;
-	gap: 10px;
-}
-.selected-exercise-item {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	padding: 10px 14px;
-	border-radius: 12px;
-	border: 1px solid var(--card-border, #e5e7eb);
-	background: var(--surface, #f8fafc);
-	cursor: grab;
-}
-.selected-exercise-item:active { cursor: grabbing; }
-.exercise-name {
-	font-weight: 600;
-	color: var(--fg);
-}
-.remove-btn {
-	border: none;
-	background: var(--danger-color, #dc2626);
-	color: #fff;
-	width: 32px;
-	height: 32px;
-	border-radius: 50%;
-	font-size: 1.1rem;
-	line-height: 1;
-	cursor: pointer;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	transition: opacity 0.15s ease;
-}
-.remove-btn:hover { opacity: 0.85; }
-@media (max-width: 600px) {
-	.selected-exercise-item {
-		padding: 10px 12px;
-	}
-}
-/* Section für Übungen optisch hervorheben */
-.exercises-section {
-	background: var(--card-bg, #fff);
-	border-radius: 16px;
-	box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-	padding: 24px 18px 18px 18px;
-	margin: 0 auto 28px auto;
-	max-width: 700px;
-	border: 1px solid var(--card-border, #e5e7eb);
-	display: flex;
-	flex-direction: column;
-	gap: 18px;
-}
-@media (max-width: 600px) {
-	.exercises-section {
-		padding: 14px 4vw 12px 4vw;
-		max-width: 98vw;
-	}
-}
-</style>
-
 <script setup>
 import ExercisePicker from '@/components/ExercisePicker.vue'
 
@@ -91,6 +16,7 @@ import { getAllExercisesOffline } from '@/utils/offlineStorage';
 import { getMergedSortedExercises } from '@/utils/exerciseList';
 import { saveWorkoutOffline, getWorkoutOffline } from '@/utils/offlineStorage';
 import { logger } from '@/utils/logger'
+import { getAllWorkoutsOffline } from '@/utils/offlineStorage'
 
 
 // --- State & Stores ---
@@ -115,7 +41,7 @@ const { t, locale } = useI18n()
 const isLoaded = computed(() => !userStore.loading)
 const isSignedIn = computed(() => !!firebaseUser.value)
 const loadingUser = computed(() => userStore.loading)
-const userId = computed(() => firebaseUser.value?.uid || 'guest')
+const userIdComputed = computed(() => firebaseUser.value?.uid || 'guest')
 
 const selectedType = ref('push')
 const selectedExercises = ref([])
@@ -187,39 +113,70 @@ function setEquipment(equip) {
 }
 
 // --- Draft-Logik ---
-async function saveDraft() {
-	const draft = {
-		_id: 'draft',
-		type: selectedType.value,
-		exercises: selectedExercises.value,
-		isDraft: true,
-		updatedAt: Date.now(),
-		name: (selectedType.value ? `${selectedType.value.charAt(0).toUpperCase() + selectedType.value.slice(1)} Day` : 'Workout Draft')
-	}
-	await saveWorkoutOffline(draft)
-}
-async function loadDraft() {
-	const draft = await getWorkoutOffline('draft')
-	if (draft) {
-		if (draft.type) selectedType.value = draft.type
-		if (Array.isArray(draft.exercises)) selectedExercises.value = draft.exercises
-		return true
-	}
-	return false
-}
-function clearDraft() {
-	// Optional: delete from IndexedDB
+function getDraftId() {
+	const currentUserId = userIdComputed.value || 'guest';
+	return `draft-${currentUserId}-${selectedType.value}`;
 }
 
+async function saveDraft() {
+  if (selectedExercises.value.length === 0) return;
+  const draft = {
+    _id: getDraftId(),
+    type: selectedType.value,
+    exercises: selectedExercises.value,
+    _isDraft: true,
+    updatedAt: Date.now(),
+    name: (selectedType.value ? `${selectedType.value.charAt(0).toUpperCase() + selectedType.value.slice(1)} Day` : 'Workout Draft')
+  };
+  await saveWorkoutOffline(draft);
+}
+
+async function loadDraft() {
+  const drafts = (await getAllWorkoutsOffline()).filter(w => w._isDraft === true);
+  const myDraft = drafts.find(d => d._id === getDraftId());
+  if (myDraft) {
+    if (myDraft.type) selectedType.value = myDraft.type;
+    if (Array.isArray(myDraft.exercises)) selectedExercises.value = myDraft.exercises;
+    return true;
+  }
+  return false;
+}
+
+function clearDraft() {
+  getAllWorkoutsOffline().then(workouts => {
+    const draftIds = workouts.filter(w => w._isDraft === true).map(w => w._id);
+    draftIds.forEach(id => deleteWorkoutOffline(id));
+  });
+}
+
+watch(selectedExercises, (val) => {
+  if (val.length > 0) saveDraft();
+});
+
 // --- Workout Types ---
-const workoutTypes = [
-	{ value: 'push', label: t('builder.pushDay') && t('builder.pushDay') !== 'builder.pushDay' ? t('builder.pushDay') : 'Push Day' },
-	{ value: 'pull', label: t('builder.pullDay') && t('builder.pullDay') !== 'builder.pullDay' ? t('builder.pullDay') : 'Pull Day' },
-	{ value: 'legs', label: t('builder.legsDay') && t('builder.legsDay') !== 'builder.legsDay' ? t('builder.legsDay') : 'Leg Day' }
-]
+const workoutTypes = computed(() => [
+  {
+    value: 'push',
+    label: t('builder.pushDay') !== 'builder.pushDay'
+      ? t('builder.pushDay')
+      : 'Push Day'
+  },
+  {
+    value: 'pull',
+    label: t('builder.pullDay') !== 'builder.pullDay'
+      ? t('builder.pullDay')
+      : 'Pull Day'
+  },
+  {
+    value: 'legs',
+    label: t('builder.legsDay') !== 'builder.legsDay'
+      ? t('builder.legsDay')
+      : 'Leg Day'
+  }
+])
 const currentTypeLabel = computed(() => {
-	const type = workoutTypes.find(t => t.value === selectedType.value)
-	return type ? type.label : ''
+  const type = workoutTypes.value.find(typeItem => typeItem.value === selectedType.value)
+  return type ? type.label : ''
 })
 
 // --- Responsive ---
@@ -331,7 +288,6 @@ function isSelected(exercise) {
 }
 function removeExercise(idx) {
 	selectedExercises.value.splice(idx, 1)
-	saveDraft()
 }
 function onDragStart(idx) { draggingIndex.value = idx }
 function onDrop(idx) {
@@ -341,22 +297,21 @@ function onDrop(idx) {
 	const [moved] = list.splice(from, 1)
 	list.splice(idx, 0, moved)
 	draggingIndex.value = null
-	saveDraft()
 }
 
 // --- Create Workout ---
 async function createWorkout() {
-	errorMsg.value = ''
+  errorMsg.value = '';
 	if (!isSignedIn.value) {
-		errorMsg.value = t('builder.signInFirst')
-		return
+		errorMsg.value = t('builder.signInFirst');
+		return;
 	}
-	if (!subscriptionStore.canCreateWorkout) {
-		upgradeLimitType.value = 'workouts'
-		showUpgradeModal.value = true
-		return
-	}
-	creating.value = true
+  if (!subscriptionStore.canCreateWorkout) {
+    upgradeLimitType.value = 'workouts';
+    showUpgradeModal.value = true;
+    return;
+  }
+  creating.value = true;
 	try {
 		const workoutData = {
 			name: `${currentTypeLabel.value} - ${new Date().toLocaleDateString(String(locale.value).startsWith('de') ? 'de-DE' : 'en-US')}`,
@@ -373,25 +328,39 @@ async function createWorkout() {
 			})),
 			date: new Date().toISOString(),
 			completed: false
-		}
-		let token = await getIdToken()
+		};
+		let token = await getIdToken();
 		if (!token) {
-			// kurze Wartezeit, falls Auth-State noch nachzieht (WKWebView)
-			await new Promise(r => setTimeout(r, 400))
-			token = await getIdToken()
+			errorMsg.value = t('builder.authLoading');
+			return;
 		}
-		if (!token) {
-			errorMsg.value = t('builder.authLoading')
-			return
-		}
-		const created = await userStore.createWorkout(workoutData, token)
-		clearDraft()
-		await router.push({ name: 'workout-detail', params: { id: created?._id } })
-		toast.success(t('builder.created'))
+		// Draft mit eindeutiger ID verwenden
+		const tempId = getDraftId();
+		const tempWorkout = { ...workoutData, _id: tempId, _isDraft: true };
+		await saveWorkoutOffline(tempWorkout);
+		router.push({ name: 'workout-detail', params: { id: tempId } });
+		toast.success(t('builder.created'));
+		// Backend-Speichern im Hintergrund
+		userStore.createWorkout(workoutData, token).then(async created => {
+			if (created?._id) {
+				// Lösche Draft und speichere echtes Workout
+				await deleteWorkoutOffline(tempId);
+				// _isDraft entfernen, falls vorhanden
+				const cleanWorkout = { ...workoutData, _id: created._id };
+				delete cleanWorkout._isDraft;
+				await saveWorkoutOffline(cleanWorkout);
+			}
+		}).catch((err) => {
+			toast.error(t('builder.createFailed') + (err?.message ? ': ' + err.message : ''));
+		});
 	} catch (e) {
-		errorMsg.value = t('builder.createFailed')
+		let hint = '';
+		if (e && typeof e.message === 'string' && /Cannot access 'te' before initialization/.test(e.message)) {
+			hint = '\nHinweis: Im Template wird vermutlich eine Variable (z.B. v-for=\"t in ...\") verwendet, die die Übersetzungsfunktion t() überschattet. Bitte prüfe die v-for-Schleifen und benenne die Variable um.';
+		}
+		errorMsg.value = t('builder.createFailed') + (e?.message ? ': ' + e.message : (e?.toString() ? ': ' + e.toString() : '')) + hint;
 	} finally {
-		creating.value = false
+		creating.value = false;
 	}
 }
 
@@ -403,10 +372,9 @@ function pickType(val) {
 	selectedExercises.value = []
 	showTypePicker.value = false
 	loadExercises()
-	saveDraft()
 }
 watch(selectedType, loadExercises)
-watch(selectedExercises, saveDraft, { deep: true })
+// Draft wird nicht mehr automatisch gespeichert
 </script>
 
 <template>
@@ -425,13 +393,19 @@ watch(selectedExercises, saveDraft, { deep: true })
 		</div>
 		<div v-else-if="initialReady" class="type-select">
 			<label for="wb-type" class="type-label">{{ t('builder.stepType') }}</label>
-			<div v-if="isMobile" class="mobile-ex-picker">
+			<div v-if="isMobile" class="mobile-type-actions">
 				<button class="open-picker-btn" @click="showTypePicker = true">
 					{{ currentTypeLabel ? `${t('builder.stepType')}: ${currentTypeLabel}` : t('builder.selectType') }}
 				</button>
+				<div class="mobile-secondary-actions">
+					<button class="open-picker-btn" @click="showMobilePicker = true">{{ t('builder.pickExercises') }}</button>
+					<button class="create-btn" :disabled="creating || selectedExercises.length === 0" @click="createWorkout">
+						{{ creating ? t('builder.creating') : `${t('builder.create')} (${selectedExercises.length})` }}
+					</button>
+				</div>
 			</div>
 			<select v-else id="wb-type" v-model="selectedType" class="type-dropdown" @change="loadExercises">
-				<option v-for="type in workoutTypes" :key="type.value" :value="type.value">{{ type.label }}</option>
+				<option v-for="typeItem in workoutTypes" :key="typeItem.value" :value="typeItem.value">{{ typeItem.label }}</option>
 			</select>
 
 		</div>
@@ -444,7 +418,7 @@ watch(selectedExercises, saveDraft, { deep: true })
 				</div>
 				<div class="picker-list">
 					<div class="type-list">
-						<button v-for="t in workoutTypes" :key="t.value" class="type-item" :aria-pressed="selectedType === t.value" @click="pickType(t.value)">{{ t.label }}</button>
+						<button v-for="typeItem in workoutTypes" :key="typeItem.value" class="type-item" :aria-pressed="selectedType === typeItem.value" @click="pickType(typeItem.value)">{{ typeItem.label }}</button>
 					</div>
 				</div>
 				<div class="picker-actions">
@@ -453,73 +427,69 @@ watch(selectedExercises, saveDraft, { deep: true })
 			</div>
 		</div>
 		<div v-if="isSignedIn" class="exercises-section">
-			<h3>{{ t('builder.availableExercises', { type: currentTypeLabel }) }}</h3>
-			<div class="sticky-cta">
+			<div v-if="!isMobile" class="sticky-cta">
 				<button class="create-btn" :disabled="creating || selectedExercises.length === 0" @click="createWorkout">
 					{{ creating ? t('builder.creating') : `${t('builder.create')} (${selectedExercises.length})` }}
 				</button>
-			</div>
-			<div v-if="isMobile" class="mobile-ex-picker">
-				<button class="open-picker-btn" @click="showMobilePicker = true">{{ t('builder.pickExercises') }}</button>
 			</div>
 			<template v-if="!isMobile">
 				<div class="search-row">
 					<input v-model="search" class="search-input" type="search" :placeholder="t('builder.searchPlaceholder')" />
 				</div>
-				<div v-if="loading && initialReady" class="exercises-grid">
-					<div v-for="n in 6" :key="n" class="exercise-item sk"></div>
-				</div>
-				<div v-else-if="!loading && filteredExercises.length === 0 && initialReady" class="empty-state">
-					<p>😅 Keine Übungen für diese Kategorie verfügbar</p>
-				</div>
-				<div v-else class="exercises-grid">
-					<div v-for="exercise in filteredExercises" :key="exercise._id" :class="{ selected: isSelected(exercise) }" class="exercise-item" @click="toggleExercise(exercise)">
-						<div class="ex-row">
-							<span class="title">{{ exercise.displayName || exercise.name }}</span>
-							<span class="sub">{{ exercise.muscleGroup }}</span>
-							<span class="sub small">{{ exercise.equipment || t('exercises.bodyweight') }}</span>
+					<div v-if="loading && initialReady" class="exercises-grid">
+						<div v-for="n in 6" :key="n" class="exercise-item sk"></div>
+					</div>
+					<div v-else-if="!loading && filteredExercises.length === 0 && initialReady" class="empty-state">
+						<p>😅 Keine Übungen für diese Kategorie verfügbar</p>
+					</div>
+					<div v-else class="exercises-grid">
+						<div v-for="filteredExercise in filteredExercises" :key="filteredExercise._id" :class="{ selected: isSelected(filteredExercise) }" class="exercise-item" @click="toggleExercise(filteredExercise)">
+							<div class="ex-row">
+								<span class="title">{{ filteredExercise.displayName || filteredExercise.name }}</span>
+								<span class="sub">{{ filteredExercise.muscleGroup }}</span>
+								<span class="sub small">{{ filteredExercise.equipment || t('exercises.bodyweight') }}</span>
+							</div>
 						</div>
 					</div>
-				</div>
 			</template>
-			   <div v-if="isMobile && showMobilePicker" class="picker-overlay" @click.self="showMobilePicker = false">
-				   <div class="picker-sheet">
-					   <div class="picker-header">
-						   <h4>{{ t('builder.selectExercises') }}</h4>
-						   <button class="close-picker" @click="showMobilePicker = false">✕</button>
-					   </div>
-									 <!-- Equipment-Filter als zentriertes Dropdown im Overlay -->
-									 <div style="margin-bottom: 10px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 8px;">
-										 <label for="equipment-filter-select" style="font-weight:600;">
-											 {{ t('builder.filterEquipment') !== 'builder.filterEquipment' ? t('builder.filterEquipment') : 'Equipment filtern' }}
-										 </label>
-										 <select id="equipment-filter-select" v-model="selectedEquipment" @change="setEquipment($event.target.value)" style="padding:7px 12px; border-radius:8px; border:1px solid #e5e7eb; min-width:140px;">
-											 <option :value="''">{{ t('exercises.filters.all') || 'Alle' }}</option>
-											 <option v-for="equip in allEquipmentTypes" :key="equip" :value="equip">{{ equipmentTranslation(equip) }}</option>
-										 </select>
-									 </div>
-					   <div class="search-row in-sheet">
-						   <input v-model="search" class="search-input" type="search" :placeholder="t('builder.searchPlaceholder')" />
-					   </div>
-			   		   <div class="picker-list" :aria-busy="loading">
-						   <div v-if="loading" class="exercises-grid">
-							   <div v-for="n in 6" :key="n" class="exercise-item sk"></div>
-						   </div>
-			   		   <div v-else class="exercises-grid">
-			   		   	<div v-for="exercise in filteredExercises" :key="exercise._id" :class="{ selected: isSelected(exercise) }" class="exercise-item" @click="toggleExercise(exercise)">
-			   		   		<div class="ex-row">
-			   		   			<span class="title">{{ exercise.displayName || exercise.name }}</span>
-			   		   			<span class="sub">{{ exercise.muscleGroup }}</span>
-			   		   			<span class="sub small">{{ exercise.equipment || t('exercises.bodyweight') }}</span>
-			   		   		</div>
-			   		   	</div>
-			   		   </div>
-					   </div>
-					   <div class="picker-actions">
-						   <button class="done-btn" @click="showMobilePicker = false">{{ t('builder.done') }}</button>
-					   </div>
-				   </div>
-			   </div>
+			<div v-if="isMobile && showMobilePicker" class="picker-overlay" @click.self="showMobilePicker = false">
+				<div class="picker-sheet">
+					<div class="picker-header">
+						<h4>{{ t('builder.selectExercises') }}</h4>
+						<button class="close-picker" @click="showMobilePicker = false">✕</button>
+					</div>
+					<!-- Equipment-Filter als zentriertes Dropdown im Overlay -->
+					<div style="margin-bottom: 10px; display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 8px;">
+						<label for="equipment-filter-select" style="font-weight:600;">
+							{{ t('builder.filterEquipment') !== 'builder.filterEquipment' ? t('builder.filterEquipment') : 'Equipment filtern' }}
+						</label>
+						<select id="equipment-filter-select" v-model="selectedEquipment" @change="setEquipment($event.target.value)" style="padding:7px 12px; border-radius:8px; border:1px solid #e5e7eb; min-width:140px;">
+							<option :value="''">{{ t('exercises.filters.all') || 'Alle' }}</option>
+							<option v-for="equipmentOption in allEquipmentTypes" :key="equipmentOption" :value="equipmentOption">{{ equipmentTranslation(equipmentOption) }}</option>
+						 </select>
+					 </div>
+					<div class="search-row in-sheet">
+						<input v-model="search" class="search-input" type="search" :placeholder="t('builder.searchPlaceholder')" />
+					</div>
+					<div class="picker-list" :aria-busy="loading">
+						<div v-if="loading" class="exercises-grid">
+							<div v-for="n in 6" :key="n" class="exercise-item sk"></div>
+						</div>
+						<div v-else class="exercises-grid">
+							<div v-for="filteredExercise in filteredExercises" :key="filteredExercise._id" :class="{ selected: isSelected(filteredExercise) }" class="exercise-item" @click="toggleExercise(filteredExercise)">
+								<div class="ex-row">
+									<span class="title">{{ filteredExercise.displayName || filteredExercise.name }}</span>
+									<span class="sub">{{ filteredExercise.muscleGroup }}</span>
+									<span class="sub small">{{ filteredExercise.equipment || t('exercises.bodyweight') }}</span>
+								</div>
+							</div>
+						</div>
+					</div>
+					<div class="picker-actions">
+						<button class="done-btn" @click="showMobilePicker = false">{{ t('builder.done') }}</button>
+					</div>
+				</div>
+			</div>
 			<div v-if="selectedExercises.length > 0" id="workout-plan" ref="planRef" class="selected-exercises">
 				<h3>{{ t('builder.planTitle', { count: selectedExercises.length }) }}</h3>
 				<ul class="selected-exercise-list">
@@ -537,6 +507,73 @@ watch(selectedExercises, saveDraft, { deep: true })
 </template>
 
 <style scoped>
+
+/* Auswahl-Liste für Übungen */
+.selected-exercises {
+	background: var(--card-bg, #fff);
+	border-radius: 16px;
+	box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+	padding: 20px 18px;
+	border: 1px solid var(--card-border, #e5e7eb);
+}
+.selected-exercise-list {
+	list-style: none;
+	padding: 0;
+	margin: 14px 0 0 0;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+.selected-exercise-item {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 10px 14px;
+	border-radius: 12px;
+	border: 1px solid var(--card-border, #e5e7eb);
+	background: var(--surface, #f8fafc);
+	cursor: grab;
+}
+.selected-exercise-item:active { cursor: grabbing; }
+.exercise-name {
+	font-weight: 600;
+	color: var(--fg);
+}
+.remove-btn {
+	border: none;
+	background: var(--danger-color, #dc2626);
+	color: #fff;
+	width: 32px;
+	height: 32px;
+	border-radius: 50%;
+	font-size: 1.1rem;
+	line-height: 1;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	transition: opacity 0.15s ease;
+}
+
+/* Section für Übungen optisch hervorheben */
+.exercises-section {
+	background: var(--card-bg, #fff);
+	border-radius: 16px;
+	box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+	padding: 24px 18px 18px 18px;
+	margin: 0 auto 28px auto;
+	max-width: 700px;
+	border: 1px solid var(--card-border, #e5e7eb);
+	display: flex;
+	flex-direction: column;
+	gap: 18px;
+}
+@media (max-width: 600px) {
+	.exercises-section {
+		padding: 14px 4vw 12px 4vw;
+		max-width: 98vw;
+	}
+}
 
 /* --- ExercisesView-ähnliches Layout für WorkoutBuilder --- */
 .workout-builder {
@@ -695,6 +732,19 @@ watch(selectedExercises, saveDraft, { deep: true })
 	align-items: center;
 }
 .mobile-ex-picker { margin: 8px 0 12px; }
+.mobile-type-actions {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.mobile-secondary-actions {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.mobile-secondary-actions .create-btn {
+	width: 100%;
+}
 .open-picker-btn { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--card-border); background: var(--surface); color: var(--fg); font-weight: 600; }
 .picker-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: flex-start; z-index: 50; }
 .picker-sheet { background: var(--bg); border-radius: 0 0 12px 12px; width: 100%; max-height: 80vh; display: flex; flex-direction: column; border: 1px solid var(--card-border); }
@@ -741,9 +791,15 @@ watch(selectedExercises, saveDraft, { deep: true })
 	background: #B91C1C;
 	transform: translateY(-1px) scale(1.03);
 }
+
+.remove-btn:hover { opacity: 0.85; }
+@media (max-width: 600px) {
+	.selected-exercise-item {
+		padding: 10px 12px;
+	}
+}
 @media (min-width: 481px) { .mobile-ex-picker, .picker-overlay { display: none; } }
 .auth-gate { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
 .auth-gate-text { color: #fbbf24; margin: 0 0 12px 0; }
 .error-hint { margin-top: 8px; color: var(--danger-color); font-size: 0.95rem; }
 </style>
-
