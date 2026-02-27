@@ -41,6 +41,7 @@ import { getAuthToken } from '@/utils/authToken'
 
 export const useSubscriptionStore = defineStore('subscription', () => {
   const DEV_PLAN_KEY = 'bro_split_dev_plan'
+  const USAGE_KEY = 'bro_split_usage'
   const subscription = ref({
     plan: 'free',
     status: 'active',
@@ -52,13 +53,16 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     workoutsThisWeek: 0,
     workoutsThisMonth: 0,
     totalWorkouts: 0,
-    lastWorkoutDate: null
+    lastWorkoutDate: null,
+    quickGenerationsThisMonth: 0,
+    quickGenerationMonth: null
   })
   
   const limits = ref({
     free: {
       maxWorkoutsPerWeek: 3,
       maxExercisesPerWorkout: 6,
+      maxQuickGenerationsPerMonth: 3,
       maxFriends: 5,
       hasAICoach: false,
       hasAdvancedStats: false,
@@ -68,6 +72,7 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     pro: {
       maxWorkoutsPerWeek: -1, // unlimited
       maxExercisesPerWorkout: -1,
+      maxQuickGenerationsPerMonth: -1,
       maxFriends: 50,
       hasAICoach: true,
       hasAdvancedStats: true,
@@ -77,6 +82,7 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     elite: {
       maxWorkoutsPerWeek: -1,
       maxExercisesPerWorkout: -1,
+      maxQuickGenerationsPerMonth: -1,
       maxFriends: -1, // unlimited
       hasAICoach: true,
       hasAdvancedStats: true,
@@ -88,6 +94,26 @@ export const useSubscriptionStore = defineStore('subscription', () => {
   })
   
   const devPlanOverride = ref(localStorage.getItem(DEV_PLAN_KEY))
+
+  const getMonthKey = () => {
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  }
+
+  const persistUsage = () => {
+    try {
+      localStorage.setItem(USAGE_KEY, JSON.stringify(usage.value))
+    } catch {}
+  }
+
+  const ensureQuickGeneratorMonthWindow = () => {
+    const monthKey = getMonthKey()
+    if (usage.value.quickGenerationMonth !== monthKey) {
+      usage.value.quickGenerationMonth = monthKey
+      usage.value.quickGenerationsThisMonth = 0
+      persistUsage()
+    }
+  }
 
   const buildPlanSnapshot = (planType) => {
     const validPlan = ['free', 'pro', 'elite'].includes(planType) ? planType : 'free'
@@ -111,6 +137,16 @@ export const useSubscriptionStore = defineStore('subscription', () => {
 
   // Subscription Status checken
   const checkSubscription = async (planOverride = null) => {
+    try {
+      const savedUsage = localStorage.getItem(USAGE_KEY)
+      if (savedUsage) {
+        usage.value = {
+          ...usage.value,
+          ...JSON.parse(savedUsage)
+        }
+      }
+    } catch {}
+
     const savedSubscription = localStorage.getItem('bro_split_subscription')
     if (savedSubscription) {
       subscription.value = JSON.parse(savedSubscription)
@@ -123,6 +159,8 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     if (effectiveOverride && limits.value[effectiveOverride]) {
       applyPlan(effectiveOverride, { persist: false, reason: 'dev-override' })
     }
+
+    ensureQuickGeneratorMonthWindow()
   }
   
   // Demo-Reset Funktion für Testing
@@ -163,6 +201,13 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     usage.value.workoutsThisMonth++
     usage.value.totalWorkouts++
     usage.value.lastWorkoutDate = new Date().toISOString()
+    persistUsage()
+  }
+
+  const trackQuickGeneration = () => {
+    ensureQuickGeneratorMonthWindow()
+    usage.value.quickGenerationsThisMonth += 1
+    persistUsage()
   }
   
   // Feature-Checks
@@ -195,6 +240,35 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     const currentLimits = limits.value[subscription.value.plan]
     if (currentLimits.maxWorkoutsPerWeek === -1) return Infinity
     return Math.max(0, currentLimits.maxWorkoutsPerWeek - usage.value.workoutsThisWeek)
+  })
+
+  const canUseQuickGenerator = computed(() => {
+    ensureQuickGeneratorMonthWindow()
+    const currentLimits = limits.value[subscription.value.plan]
+    if (currentLimits.maxQuickGenerationsPerMonth === -1) return true
+    return usage.value.quickGenerationsThisMonth < currentLimits.maxQuickGenerationsPerMonth
+  })
+
+  const quickGenerationsRemaining = computed(() => {
+    ensureQuickGeneratorMonthWindow()
+    const currentLimits = limits.value[subscription.value.plan]
+    if (currentLimits.maxQuickGenerationsPerMonth === -1) return Infinity
+    return Math.max(0, currentLimits.maxQuickGenerationsPerMonth - usage.value.quickGenerationsThisMonth)
+  })
+
+  const quickGeneratorResetDate = computed(() => {
+    ensureQuickGeneratorMonthWindow()
+    const [year, month] = String(usage.value.quickGenerationMonth || getMonthKey()).split('-').map((part) => Number(part))
+    if (!Number.isFinite(year) || !Number.isFinite(month)) {
+      const now = new Date()
+      return new Date(now.getFullYear(), now.getMonth() + 1, 1)
+    }
+    return new Date(year, month, 1)
+  })
+
+  const quickGenerationsUsedThisMonth = computed(() => {
+    ensureQuickGeneratorMonthWindow()
+    return usage.value.quickGenerationsThisMonth
   })
   
   const shouldShowUpgrade = computed(() => {
@@ -244,6 +318,7 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     checkSubscription,
     upgradeSubscription,
     trackWorkoutCreated,
+    trackQuickGeneration,
     resetToFree,
     setDevPlanOverride,
     clearDevPlanOverride,
@@ -255,6 +330,10 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     isPremium,
     isElite,
     workoutsRemaining,
+    canUseQuickGenerator,
+    quickGenerationsRemaining,
+    quickGeneratorResetDate,
+    quickGenerationsUsedThisMonth,
     shouldShowUpgrade,
     hasDevOverride
   }

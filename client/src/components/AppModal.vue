@@ -2,7 +2,7 @@
   <teleport to="body">
     <div v-if="modelValue" class="modal-overlay" role="presentation" @click.self="overlayClick">
       <div
-        :class="['modal', 'glass-strong', type]"
+        :class="['modal', 'glass-strong', type, modalClass]"
         role="dialog"
         aria-modal="true"
         :aria-labelledby="title ? 'modal-title' : null"
@@ -36,6 +36,7 @@ const props = defineProps({
   confirmText: { type: String, default: '' },
   cancelText: { type: String, default: '' },
   type: { type: String, default: 'danger' }, // danger | warning | info
+  modalClass: { type: String, default: '' },
   showCancel: { type: Boolean, default: true },
   persistent: { type: Boolean, default: false }
 })

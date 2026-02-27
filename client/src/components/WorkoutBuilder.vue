@@ -60,6 +60,7 @@ const planRef = ref(null)
 import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
 const showEquipmentFilter = ref(false)
 const selectedEquipment = ref('')
+const QUICK_PREFILL_KEY = 'quick_workout_prefill'
 // Alle Equipment-Typen aus den Exercises extrahieren
 const normalizedExercises = ref([])
 const allEquipmentTypes = computed(() => {
@@ -106,6 +107,26 @@ const equipmentTranslation = (equip) => {
 function setEquipment(equip) {
 	selectedEquipment.value = equip
 	loadExercises()
+}
+
+function consumeQuickPrefill() {
+	if (String(route.query?.quick || '') !== '1') return
+	try {
+		const raw = sessionStorage.getItem(QUICK_PREFILL_KEY)
+		if (!raw) return
+		const parsed = JSON.parse(raw)
+		const list = Array.isArray(parsed?.exercises) ? parsed.exercises : []
+		if (!list.length) return
+		selectedExercises.value = list.map((exercise, index) => ({
+			...exercise,
+			_id: exercise._id || `quick_${index}`,
+			exerciseId: exercise.exerciseId || exercise._id || null,
+			setDetails: Array.isArray(exercise.setDetails) && exercise.setDetails.length > 0
+				? exercise.setDetails
+				: [{ reps: Number(exercise.reps) || 10, weight: Number(exercise.weight) || 0 }]
+		}))
+		sessionStorage.removeItem(QUICK_PREFILL_KEY)
+	} catch {}
 }
 
 // --- Draft-Logik ---
@@ -175,6 +196,7 @@ onMounted(async () => {
 		selectedType.value = qType
 		if (qType === 'fullbody') selectedEquipment.value = ''
 	}
+	consumeQuickPrefill()
 	// Affirmation
 	const beliefsDe = [
 		'Jede Wiederholung bringt dich deinem Ziel näher.',

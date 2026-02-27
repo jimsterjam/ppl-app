@@ -38,28 +38,28 @@
             label="Push"
             :active="lastWorkoutType === 'push'"
             :info-label="$t('dashboard.workoutTypeInfo')"
-            @click="startQuick('push')"
+            @click="openStartMode('push')"
             @info="openWorkoutInfo('push')"
           />
           <WorkoutCard
             label="Pull"
             :active="lastWorkoutType === 'pull'"
             :info-label="$t('dashboard.workoutTypeInfo')"
-            @click="startQuick('pull')"
+            @click="openStartMode('pull')"
             @info="openWorkoutInfo('pull')"
           />
           <WorkoutCard
             label="Legs"
             :active="lastWorkoutType === 'legs'"
             :info-label="$t('dashboard.workoutTypeInfo')"
-            @click="startQuick('legs')"
+            @click="openStartMode('legs')"
             @info="openWorkoutInfo('legs')"
           />
           <WorkoutCard
             :label="$t('dashboard.fullBodyLabel')"
             :active="lastWorkoutType === 'fullbody'"
             :info-label="$t('dashboard.workoutTypeInfo')"
-            @click="startQuick('fullbody')"
+            @click="openStartMode('fullbody')"
             @info="openWorkoutInfo('fullbody')"
           />
         </div>
@@ -90,6 +90,121 @@
       :confirm-text="$t('common.confirm')"
       type="info"
     />
+
+    <AppModal
+      v-model="showStartModeModal"
+      modal-class="quick-cta-modal"
+      :title="$t('dashboard.startModeTitle')"
+      :message="$t('dashboard.startModeText')"
+      :cancel-text="$t('dashboard.startModeManual')"
+      :confirm-text="$t('dashboard.startModeGenerate')"
+      type="info"
+      @cancel="onManualSelected"
+      @confirm="onGenerateSelected"
+    />
+
+    <AppModal
+      v-model="showQuickIntroModal"
+      modal-class="quick-cta-modal"
+      :title="$t('dashboard.quickGenIntroTitle')"
+      :message="$t('dashboard.quickGenIntroText')"
+      :cancel-text="$t('dashboard.quickGenLearnPro')"
+      :confirm-text="$t('dashboard.quickGenGenerateNow')"
+      type="info"
+      @cancel="openUpgrade"
+      @confirm="onQuickIntroConfirmed"
+    />
+
+    <AppModal
+      v-model="showQuickLimitModal"
+      modal-class="quick-cta-modal"
+      :title="$t('dashboard.quickGenLimitTitle')"
+      :message="quickLimitText"
+      :cancel-text="$t('dashboard.quickGenLearnPro')"
+      :confirm-text="$t('common.close')"
+      type="warning"
+      @cancel="openUpgrade"
+    />
+
+    <AppModal
+      v-model="showQuickLastHintModal"
+      modal-class="quick-cta-modal"
+      :title="$t('dashboard.quickGenLastHintTitle')"
+      :message="quickLastHintText"
+      :cancel-text="$t('dashboard.quickGenLearnPro')"
+      :confirm-text="$t('dashboard.quickGenContinueFree')"
+      type="warning"
+      @cancel="openUpgrade"
+      @confirm="showQuickFormModal = true"
+    />
+
+    <AppModal
+      v-model="showQuickFormModal"
+      modal-class="quick-cta-modal"
+      :title="$t('dashboard.quickGenFormTitle')"
+      :confirm-text="isGeneratingQuickWorkout ? $t('dashboard.quickGenGenerating') : $t('dashboard.quickGenGenerateNow')"
+      :cancel-text="$t('common.cancel')"
+      type="info"
+      @confirm="generateQuickWorkout"
+    >
+      <div class="quick-form-grid">
+        <label class="quick-form-field">
+          <span>{{ $t('dashboard.quickGenDuration') }}</span>
+          <select v-model.number="quickGeneratorForm.durationMinutes">
+            <option :value="30">30 min</option>
+            <option :value="45">45 min</option>
+            <option :value="60">60 min</option>
+            <option :value="75">75 min</option>
+          </select>
+        </label>
+
+        <label class="quick-form-field">
+          <span>{{ $t('dashboard.quickGenGoal') }}</span>
+          <select v-model="quickGeneratorForm.goal">
+            <option value="muscle_building">{{ $t('dashboard.quickGenGoalMuscle') }}</option>
+            <option value="strength">{{ $t('dashboard.quickGenGoalStrength') }}</option>
+          </select>
+        </label>
+
+        <label class="quick-form-field">
+          <span>{{ $t('dashboard.quickGenGender') }}</span>
+          <select v-model="quickGeneratorForm.gender">
+            <option value="male">{{ $t('dashboard.quickGenGenderMale') }}</option>
+            <option value="female">{{ $t('dashboard.quickGenGenderFemale') }}</option>
+            <option value="diverse">{{ $t('dashboard.quickGenGenderDiverse') }}</option>
+          </select>
+        </label>
+
+        <label class="quick-form-field">
+          <span>{{ $t('dashboard.quickGenBodyweight') }}</span>
+          <input v-model.number="quickGeneratorForm.bodyweightKg" type="number" min="35" max="250" step="1" />
+        </label>
+
+        <label class="quick-form-field">
+          <span>{{ $t('dashboard.quickGenLevel') }}</span>
+          <select v-model="quickGeneratorForm.level">
+            <option value="beginner">{{ $t('dashboard.quickGenLevelBeginner') }}</option>
+            <option value="advanced">{{ $t('dashboard.quickGenLevelAdvanced') }}</option>
+          </select>
+        </label>
+
+        <label class="quick-form-field">
+          <span>{{ $t('dashboard.quickGenEquipment') }}</span>
+          <select v-model="quickGeneratorForm.equipmentMode">
+            <option value="gym_only">{{ $t('dashboard.quickGenEquipmentGymOnly') }}</option>
+            <option value="gym_plus_bodyweight">{{ $t('dashboard.quickGenEquipmentBodyweight') }}</option>
+          </select>
+        </label>
+      </div>
+      <p class="quick-form-hint">{{ $t('dashboard.quickGenRemaining', { count: quickGenerationsRemainingLabel }) }}</p>
+    </AppModal>
+
+    <UpgradeModal
+      v-model:show="showUpgradeModal"
+      limit-type="general"
+      @close="showUpgradeModal = false"
+      @continue-free="showUpgradeModal = false"
+    />
   </div>
 </template>
 
@@ -101,16 +216,20 @@ import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { useUserStore } from "../stores/userStore";
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useAuthStore } from '@/stores/authStore'
+import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { isOnline, deleteWorkoutOffline, getWorkoutOffline } from '@/utils/offlineStorage'
+import { http } from '@/api/http'
 
 import HeaderBar from "../components/HeaderBar.vue";
 import WorkoutCard from "../components/WorkoutCard.vue";
 import AppModal from "../components/AppModal.vue";
+import UpgradeModal from '@/components/UpgradeModal.vue'
 import { logger } from '@/utils/logger'
 
 const store = useUserStore()
 const settings = useSettingsStore()
-const { t: $t } = useI18n()
+const subscriptionStore = useSubscriptionStore()
+const { t: $t, locale } = useI18n()
 const router = useRouter()
 const { getIdToken, onAuthStateChanged, getCurrentUser } = useFirebaseAuth()
 const authStore = useAuthStore()
@@ -124,6 +243,23 @@ const detailDraft = ref(null)
 const showInfoModal = ref(false)
 const infoMessage = ref('')
 const draftSourceLogged = ref(false)
+const showStartModeModal = ref(false)
+const showQuickIntroModal = ref(false)
+const showQuickFormModal = ref(false)
+const showQuickLimitModal = ref(false)
+const showQuickLastHintModal = ref(false)
+const showUpgradeModal = ref(false)
+const pendingWorkoutType = ref('push')
+const isGeneratingQuickWorkout = ref(false)
+const QUICK_PREFILL_KEY = 'quick_workout_prefill'
+const quickGeneratorForm = ref({
+  durationMinutes: 45,
+  goal: 'muscle_building',
+  gender: 'male',
+  bodyweightKg: 80,
+  level: 'beginner',
+  equipmentMode: 'gym_plus_bodyweight'
+})
 
 
 const hasDraft = computed(() => {
@@ -133,6 +269,29 @@ const hasDraft = computed(() => {
 const draftId = computed(() => {
   return store.workouts.find(w => (w?._isDraft === true || w?.isDraft === true) && w?.completed !== true)?._id || detailDraft.value?._id
 })
+const quickGenerationsRemainingLabel = computed(() => {
+  const remaining = subscriptionStore.quickGenerationsRemaining
+  return remaining === Infinity ? '∞' : String(remaining)
+})
+const quickGenerationsRemainingCount = computed(() => {
+  const remaining = subscriptionStore.quickGenerationsRemaining
+  return remaining === Infinity ? Number.MAX_SAFE_INTEGER : Number(remaining)
+})
+const quickResetDateLabel = computed(() => {
+  const dateValue = subscriptionStore.quickGeneratorResetDate
+  const date = dateValue instanceof Date ? dateValue : new Date(dateValue)
+  try {
+    return date.toLocaleDateString(String(locale.value || '').startsWith('en') ? 'en-US' : 'de-DE', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    })
+  } catch {
+    return date.toLocaleDateString('de-DE')
+  }
+})
+const quickLimitText = computed(() => $t('dashboard.quickGenLimitText', { date: quickResetDateLabel.value }))
+const quickLastHintText = computed(() => $t('dashboard.quickGenLastHintText', { date: quickResetDateLabel.value }))
 
 function logDraftSourceOnce() {
   if (draftSourceLogged.value) return
@@ -341,6 +500,109 @@ function startQuick(type) {
   router.push({ name: 'workout-builder', query: { type: safeType } })
 }
 
+function openStartMode(type) {
+  pendingWorkoutType.value = typeof type === 'string' && type.length > 0 ? type : 'push'
+  showStartModeModal.value = true
+}
+
+function onManualSelected() {
+  startQuick(pendingWorkoutType.value)
+}
+
+function onGenerateSelected() {
+  setTimeout(() => {
+    showQuickIntroModal.value = true
+  }, 0)
+}
+
+function onQuickIntroConfirmed() {
+  openQuickGeneratorForm()
+}
+
+function openUpgrade() {
+  showUpgradeModal.value = true
+}
+
+function openQuickGeneratorForm() {
+  if (!subscriptionStore.canUseQuickGenerator) {
+    showQuickLimitModal.value = true
+    return
+  }
+  if (subscriptionStore.subscription?.plan === 'free' && quickGenerationsRemainingCount.value === 1) {
+    showQuickLastHintModal.value = true
+    return
+  }
+  showQuickFormModal.value = true
+}
+
+async function generateQuickWorkout() {
+  if (isGeneratingQuickWorkout.value) return
+  isGeneratingQuickWorkout.value = true
+  try {
+    const token = await getIdToken().catch(async () => {
+      const currentUser = getCurrentUser()
+      if (!currentUser?.getIdToken) return null
+      try {
+        return await currentUser.getIdToken(true)
+      } catch {
+        return null
+      }
+    })
+    if (!token) {
+      throw new Error('NO_AUTH_TOKEN')
+    }
+
+    const headers = {}
+    headers.Authorization = `Bearer ${token}`
+
+    const payload = {
+      durationMinutes: Number(quickGeneratorForm.value.durationMinutes) || 45,
+      goal: quickGeneratorForm.value.goal,
+      gender: quickGeneratorForm.value.gender,
+      bodyweightKg: Number(quickGeneratorForm.value.bodyweightKg) || 80,
+      level: quickGeneratorForm.value.level,
+      equipmentMode: quickGeneratorForm.value.equipmentMode,
+      requestedType: pendingWorkoutType.value
+    }
+
+    const { data } = await http.post('/workouts/quick-generator', payload, { headers })
+    const exercises = Array.isArray(data?.exercises) ? data.exercises : []
+
+    const prefill = {
+      workoutName: data?.workoutName || 'Quick Workout',
+      type: pendingWorkoutType.value || 'fullbody',
+      exercises: exercises.map((exercise, index) => ({
+        _id: exercise._id || `quick_${index}`,
+        exerciseId: exercise.exerciseId || exercise._id || null,
+        name: exercise.name,
+        category: exercise.category || pendingWorkoutType.value || 'fullbody',
+        muscleGroup: exercise.muscleGroup || pendingWorkoutType.value || 'fullbody',
+        setDetails: [{
+          reps: Number(exercise.reps) || 10,
+          weight: Number(exercise.weight) || 0
+        }],
+        sets: Number(exercise.sets) || 3,
+        reps: Number(exercise.reps) || 10,
+        weight: Number(exercise.weight) || 0,
+        rest: Number(exercise.rest) || 90
+      }))
+    }
+
+    try {
+      sessionStorage.setItem(QUICK_PREFILL_KEY, JSON.stringify(prefill))
+    } catch {}
+
+    subscriptionStore.trackQuickGeneration()
+    router.push({ name: 'workout-builder', query: { type: pendingWorkoutType.value, quick: '1' } })
+  } catch (error) {
+    logger.error('Quick generator failed', error)
+    infoMessage.value = $t('dashboard.quickGenRequestFailed')
+    showInfoModal.value = true
+  } finally {
+    isGeneratingQuickWorkout.value = false
+  }
+}
+
 function openWorkoutInfo(type) {
   if (type === 'push') infoMessage.value = $t('dashboard.pushInfo')
   else if (type === 'pull') infoMessage.value = $t('dashboard.pullInfo')
@@ -375,6 +637,7 @@ onMounted(() => {
   window.addEventListener('online', onOnlineStatus)
   window.addEventListener('offline', onOfflineStatus)
   readDetailDraft()
+  subscriptionStore.checkSubscription()
 
   if (!isOnline() && authStore.isOfflineSessionValid) {
     user.value = authStore.user
@@ -636,6 +899,55 @@ onActivated(async () => {
 }
 
 .success-message p { color: var(--muted); }
+
+.quick-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.quick-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--fg-strong);
+  font-size: 0.85rem;
+}
+
+.quick-form-field select,
+.quick-form-field input {
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: var(--bg-panel);
+  color: var(--fg);
+  padding: 8px 10px;
+}
+
+.quick-form-hint {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+:deep(.modal.quick-cta-modal .btn) {
+  font-weight: 800;
+  padding: 11px 16px;
+}
+
+:deep(.modal.quick-cta-modal .btn.primary) {
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--accent) 30%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 52%, transparent);
+}
+
+:deep(.modal.quick-cta-modal .btn.secondary) {
+  border-color: var(--line-strong);
+}
+
+@media (max-width: 560px) {
+  .quick-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
 
 
 @keyframes fadeSlide {

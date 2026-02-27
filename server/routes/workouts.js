@@ -336,6 +336,29 @@ function sanitizeWorkoutRequest(body) {
   };
 }
 
+function sanitizeQuickGeneratorRequest(body) {
+  const clampNumber = (value, fallback, min, max) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) return fallback;
+    return Math.min(max, Math.max(min, parsed));
+  };
+
+  const normalizeEnum = (value, allowed, fallback) => {
+    const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
+    return allowed.includes(normalized) ? normalized : fallback;
+  };
+
+  return {
+    durationMinutes: clampNumber(body.durationMinutes, 45, 20, 120),
+    goal: normalizeEnum(body.goal, ['muscle_building', 'strength'], 'muscle_building'),
+    gender: normalizeEnum(body.gender, ['male', 'female', 'diverse'], 'male'),
+    bodyweightKg: clampNumber(body.bodyweightKg, 80, 35, 250),
+    level: normalizeEnum(body.level, ['beginner', 'advanced'], 'beginner'),
+    equipmentMode: normalizeEnum(body.equipmentMode, ['gym_only', 'gym_plus_bodyweight'], 'gym_plus_bodyweight'),
+    requestedType: normalizeEnum(body.requestedType, ['push', 'pull', 'legs', 'fullbody'], 'fullbody')
+  };
+}
+
 // Alle Workouts für den eingeloggten User holen
 router.get("/", firebaseAuthMiddleware, async (req, res) => {
   try {
@@ -443,6 +466,39 @@ router.get("/stats/progress", firebaseAuthMiddleware, async (req, res) => {
   } catch (err) {
     logger.error('progress stats error', err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+router.post('/quick-generator', aiAuthMiddleware, async (req, res) => {
+  const requestId = `quick_gen_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  try {
+    const context = sanitizeQuickGeneratorRequest(req.body || {});
+    const openaiClient = await initializeOpenAI();
+
+    let suggestion = null;
+    if (openaiClient) {
+      try {
+        suggestion = await generateQuickGeneratorWithOpenAI(context, openaiClient);
+      } catch (error) {
+        logger.error('❌ Quick generator OpenAI error', { requestId, message: error?.message });
+      }
+    }
+
+    if (!suggestion) {
+      suggestion = generateQuickGeneratorDemo(context);
+    }
+
+    const normalized = normalizeQuickGeneratorResponse(suggestion, context);
+    return res.json(normalized);
+  } catch (error) {
+    logger.error('❌ Quick generator route error', { requestId, message: error?.message });
+    return res.status(500).json({
+      workoutName: 'Quick Workout',
+      exercises: [],
+      estimatedDuration: 45,
+      difficulty: 'beginner',
+      notes: 'Generierung fehlgeschlagen.'
+    });
   }
 });
 
@@ -862,6 +918,187 @@ async function generateGPT4Suggestion(workoutContext, openaiClient) {
 
   const response = completion.choices[0].message.content;
   return JSON.parse(response);
+}
+
+async function generateQuickGeneratorWithOpenAI(context, openaiClient) {
+  const prompt = createQuickGeneratorPrompt(context);
+
+  const completion = await openaiClient.chat.completions.create({
+    model: 'gpt-4o-mini',
+    messages: [
+      {
+        role: 'system',
+        content: `Erzeuge genau 1 Workout aus den gelieferten Parametern, zustandslos, ohne Historie, ohne Coaching-Stil.
+Nur JSON, kein Markdown, keine Zusatzschlüssel, keine Erklärtexte, kein Motivations-Text.
+Schema exakt:
+{"workoutName":"string","exercises":[{"name":"string","sets":3,"reps":10,"weight":0,"rest":90}],"estimatedDuration":45,"difficulty":"beginner|advanced","notes":"string"}
+Fallback auf sinnvolle Standardwerte bei fehlenden Parametern.`
+      },
+      {
+        role: 'user',
+        content: prompt
+      }
+    ],
+    temperature: 0.7,
+    max_tokens: 360,
+    timeout: 15000,
+    response_format: { type: 'json_object' }
+  });
+
+  const raw = completion?.choices?.[0]?.message?.content || '{}';
+  return JSON.parse(raw);
+}
+
+function createQuickGeneratorPrompt(context) {
+  return `durationMinutes=${context.durationMinutes}; goal=${context.goal}; gender=${context.gender}; bodyweightKg=${context.bodyweightKg}; level=${context.level}; equipmentMode=${context.equipmentMode}; requestedType=${context.requestedType}; constraint=exercises_must_match_requestedType_strictly`;
+}
+
+function normalizeRequestedType(type) {
+  const normalized = typeof type === 'string' ? type.trim().toLowerCase() : '';
+  return ['push', 'pull', 'legs', 'fullbody'].includes(normalized) ? normalized : 'fullbody';
+}
+
+function inferExerciseType(name = '') {
+  const normalized = String(name).toLowerCase();
+
+  const pushTerms = ['bank', 'drücken', 'liegestütz', 'dips', 'trizeps', 'seitheben', 'frontheben', 'press', 'push-up', 'push up', 'pushup'];
+  const pullTerms = ['rudern', 'klimm', 'latzug', 'bizeps', 'face pull', 'curl', 'shrug', 'pull', 'row'];
+  const legTerms = ['kniebeuge', 'bein', 'ausfallschritt', 'waden', 'squat', 'deadlift', 'kreuzheben', 'hip thrust', 'lunge', 'glute'];
+
+  if (pushTerms.some((term) => normalized.includes(term))) return 'push';
+  if (pullTerms.some((term) => normalized.includes(term))) return 'pull';
+  if (legTerms.some((term) => normalized.includes(term))) return 'legs';
+  return 'fullbody';
+}
+
+function matchesRequestedType(exerciseName, requestedType) {
+  const type = normalizeRequestedType(requestedType);
+  if (type === 'fullbody') return true;
+  return inferExerciseType(exerciseName) === type;
+}
+
+function generateQuickGeneratorDemo(context) {
+  const requestedType = normalizeRequestedType(context.requestedType);
+  const plans = {
+    push: {
+      gym_only: [
+        { name: 'Bankdrücken', sets: 4, reps: 8, weight: 0, rest: 120 },
+        { name: 'Schulterdrücken', sets: 4, reps: 8, weight: 0, rest: 120 },
+        { name: 'Dips', sets: 3, reps: 10, weight: 0, rest: 90 },
+        { name: 'Seitheben', sets: 3, reps: 12, weight: 0, rest: 75 },
+        { name: 'Overhead Trizepsdrücken', sets: 3, reps: 12, weight: 0, rest: 75 }
+      ],
+      gym_plus_bodyweight: [
+        { name: 'Liegestütze', sets: 4, reps: 12, weight: 0, rest: 60 },
+        { name: 'Kurzhantel Bankdrücken', sets: 4, reps: 10, weight: 0, rest: 90 },
+        { name: 'Dips', sets: 3, reps: 10, weight: 0, rest: 90 },
+        { name: 'Seitheben', sets: 3, reps: 15, weight: 0, rest: 60 },
+        { name: 'Trizeps-Kickbacks', sets: 3, reps: 12, weight: 0, rest: 60 }
+      ]
+    },
+    pull: {
+      gym_only: [
+        { name: 'Rudern Langhantel', sets: 4, reps: 8, weight: 0, rest: 120 },
+        { name: 'Latzug zur Brust', sets: 4, reps: 10, weight: 0, rest: 90 },
+        { name: 'Kurzhantelrudern', sets: 3, reps: 10, weight: 0, rest: 90 },
+        { name: 'Bizeps Curls Langhantel', sets: 3, reps: 10, weight: 0, rest: 75 },
+        { name: 'Face Pulls', sets: 3, reps: 12, weight: 0, rest: 60 }
+      ],
+      gym_plus_bodyweight: [
+        { name: 'Klimmzüge', sets: 4, reps: 8, weight: 0, rest: 90 },
+        { name: 'Rudern Kabelzug', sets: 4, reps: 10, weight: 0, rest: 90 },
+        { name: 'Kurzhantel Bizeps Curls', sets: 3, reps: 12, weight: 0, rest: 60 },
+        { name: 'Hammer Curls', sets: 3, reps: 12, weight: 0, rest: 60 },
+        { name: 'Umgekehrtes Flys', sets: 3, reps: 15, weight: 0, rest: 60 }
+      ]
+    },
+    legs: {
+      gym_only: [
+        { name: 'Kniebeugen Langhantel', sets: 4, reps: 8, weight: 0, rest: 150 },
+        { name: 'Rumänisches Kreuzheben', sets: 4, reps: 8, weight: 0, rest: 150 },
+        { name: 'Beinpresse', sets: 3, reps: 12, weight: 0, rest: 90 },
+        { name: 'Beincurls liegend', sets: 3, reps: 12, weight: 0, rest: 90 },
+        { name: 'Wadenheben stehend', sets: 4, reps: 12, weight: 0, rest: 60 }
+      ],
+      gym_plus_bodyweight: [
+        { name: 'Kniebeugen Langhantel', sets: 4, reps: 10, weight: 0, rest: 120 },
+        { name: 'Ausfallschritte Kurzhantel', sets: 3, reps: 12, weight: 0, rest: 90 },
+        { name: 'Bulgarian Split Squats', sets: 3, reps: 10, weight: 0, rest: 90 },
+        { name: 'Glute Bridge', sets: 3, reps: 15, weight: 0, rest: 60 },
+        { name: 'Wadenheben sitzend', sets: 4, reps: 15, weight: 0, rest: 60 }
+      ]
+    },
+    fullbody: {
+      gym_only: [
+        { name: 'Kniebeugen Langhantel', sets: 4, reps: 6, weight: 0, rest: 120 },
+        { name: 'Kurzhantel Bankdrücken', sets: 4, reps: 8, weight: 0, rest: 90 },
+        { name: 'Rudern Kabelzug', sets: 3, reps: 10, weight: 0, rest: 90 },
+        { name: 'Schulterdrücken', sets: 3, reps: 10, weight: 0, rest: 90 },
+        { name: 'Wadenheben stehend', sets: 3, reps: 12, weight: 0, rest: 60 }
+      ],
+      gym_plus_bodyweight: [
+        { name: 'Liegestütze', sets: 4, reps: 12, weight: 0, rest: 60 },
+        { name: 'Kniebeugen Langhantel', sets: 4, reps: 8, weight: 0, rest: 90 },
+        { name: 'Klimmzüge', sets: 3, reps: 8, weight: 0, rest: 90 },
+        { name: 'Ausfallschritte Kurzhantel', sets: 3, reps: 10, weight: 0, rest: 75 },
+        { name: 'Plank', sets: 3, reps: 45, weight: 0, rest: 45 }
+      ]
+    }
+  };
+
+  const strength = context.goal === 'strength';
+  const selectedTypePlans = plans[requestedType] || plans.fullbody;
+  const exercises = context.equipmentMode === 'gym_only'
+    ? selectedTypePlans.gym_only
+    : selectedTypePlans.gym_plus_bodyweight;
+
+  return {
+    workoutName: `${requestedType === 'fullbody' ? 'Full Body' : requestedType.toUpperCase()} ${strength ? 'Strength' : 'Hypertrophy'} Session`,
+    exercises: exercises.map((exercise) => ({
+      ...exercise,
+      reps: strength ? Math.min(exercise.reps, 8) : Math.max(exercise.reps, 10),
+      sets: strength ? Math.max(exercise.sets, 4) : exercise.sets,
+      category: requestedType
+    })),
+    estimatedDuration: context.durationMinutes,
+    difficulty: context.level,
+    notes: `${strength ? 'Fokus auf kontrollierte schwere Sätze.' : 'Fokus auf saubere Wiederholungen und Volumen.'} Typ: ${requestedType}.`
+  };
+}
+
+function normalizeQuickGeneratorResponse(payload, context) {
+  const requestedType = normalizeRequestedType(context.requestedType);
+  const exercises = Array.isArray(payload?.exercises) ? payload.exercises : [];
+  const sanitizedExercises = exercises
+    .filter((exercise) => typeof exercise?.name === 'string' && exercise.name.trim())
+    .filter((exercise) => matchesRequestedType(exercise.name, requestedType))
+    .slice(0, 8)
+    .map((exercise) => ({
+      name: String(exercise.name).trim(),
+      sets: Math.min(6, Math.max(1, Number(exercise.sets) || 3)),
+      reps: Math.min(20, Math.max(1, Number(exercise.reps) || 10)),
+      weight: Math.max(0, Number(exercise.weight) || 0),
+      rest: Math.min(240, Math.max(20, Number(exercise.rest) || 90)),
+      category: requestedType
+    }));
+
+  const fallbackExercises = generateQuickGeneratorDemo(context).exercises;
+  const finalExercises = sanitizedExercises.length >= 3
+    ? sanitizedExercises
+    : fallbackExercises;
+
+  return {
+    workoutName: typeof payload?.workoutName === 'string' && payload.workoutName.trim()
+      ? payload.workoutName.trim()
+      : 'Quick Workout',
+    exercises: finalExercises,
+    estimatedDuration: Math.min(120, Math.max(20, Number(payload?.estimatedDuration) || context.durationMinutes || 45)),
+    difficulty: payload?.difficulty === 'advanced' ? 'advanced' : 'beginner',
+    notes: typeof payload?.notes === 'string' && payload.notes.trim()
+      ? payload.notes.trim().slice(0, 220)
+      : 'Standardisiertes Quick Workout.',
+    requestedType
+  };
 }
 
 function createWorkoutPrompt(context) {
