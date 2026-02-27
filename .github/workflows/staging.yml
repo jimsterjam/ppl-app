@@ -39,16 +39,20 @@ jobs:
           npm run build
 
       - name: Upload client build artifact
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: client-dist
           path: client/dist
+          retention-days: 1
 
       - name: Upload server artifact (source)
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: server-source
           path: server
+          retention-days: 1
 
       - name: Staging smoke tests placeholder
         run: |
