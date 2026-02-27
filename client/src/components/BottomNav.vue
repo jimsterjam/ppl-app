@@ -1,5 +1,5 @@
 <template>
-  <nav class="app-nav glass" :class="{ 'ios-device': isIOS }" role="navigation" :aria-label="$t('nav.ariaMain')">
+  <nav class="app-nav" :class="{ 'ios-device': isIOS }" role="navigation" :aria-label="$t('nav.ariaMain')">
     <ul class="nav-list">
       <li v-for="link in links" :key="link.path">
         <button
@@ -8,7 +8,9 @@
           :aria-current="$route.path.startsWith(link.path) ? 'page' : undefined"
           @click="$router.push(link.path)"
         >
-          <span class="icon" aria-hidden="true">{{ link.icon }}</span>
+          <span class="icon" aria-hidden="true">
+            <component :is="link.icon" class="icon-svg" />
+          </span>
           <span class="label">{{ link.label }}</span>
         </button>
       </li>
@@ -20,7 +22,9 @@
           @click="$router.push(`/workouts/${activeWorkout._id}`)"
           title="Zum laufenden Workout"
         >
-          <span class="icon" aria-hidden="true">⏱️</span>
+          <span class="icon" aria-hidden="true">
+            <Timer class="icon-svg" />
+          </span>
           <span class="label">Workout</span>
         </button>
       </li>
@@ -29,15 +33,11 @@
 </template>
 
 <script setup>
-onMounted(() => {
-  // Detect iOS/iPhone Simulator
-  isIOS.value = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-                (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-})
 import { useI18n } from 'vue-i18n'
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
+import { Home, BarChart3, Dumbbell, HelpCircle, Settings, Timer } from 'lucide-vue-next'
 
 const { t } = useI18n()
 const isIOS = ref(false)
@@ -55,11 +55,11 @@ onMounted(() => {
 })
 
 const links = [
-  { get label() { return t('nav.home') }, path: "/dashboard", icon: "🏠" },
-  { get label() { return t('nav.stats') }, path: "/stats", icon: "📊" },
-  { get label() { return t('nav.exercises') }, path: "/exercises", icon: "🏋️‍♂️" },
-  { get label() { return t('nav.faqs') }, path: "/faqs", icon: "❓" },
-  { get label() { return t('nav.settings') }, path: "/settings", icon: "⚙️" }
+  { get label() { return t('nav.home') }, path: "/dashboard", icon: Home },
+  { get label() { return t('nav.stats') }, path: "/stats", icon: BarChart3 },
+  { get label() { return t('nav.exercises') }, path: "/exercises", icon: Dumbbell },
+  { get label() { return t('nav.faqs') }, path: "/faqs", icon: HelpCircle },
+  { get label() { return t('nav.settings') }, path: "/settings", icon: Settings }
 ];
 </script>
 
@@ -71,11 +71,9 @@ const links = [
   left: 0;
   right: 0;
   width: 100%;
-  background: color-mix(in srgb, var(--surface) 40%, transparent);
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border-top: 1px solid color-mix(in srgb, var(--card-border) 20%, transparent);
-  box-shadow: 0 -2px 16px color-mix(in srgb, black 6%, transparent);
+  background: var(--bg-panel);
+  border-top: 1px solid var(--line-soft);
+  box-shadow: none;
   z-index: 1000;
   /* Sehr kompakte Höhe */
   min-height: calc(50px + env(safe-area-inset-bottom));
@@ -93,7 +91,8 @@ const links = [
 }
 .nav-btn { background: none; border: none; color: var(--fg); opacity: 0.7; display: flex; flex-direction: column; align-items: center; font-size: 0.7rem; padding: 4px 8px; cursor: pointer; transition: all 0.2s ease; border-radius: 8px; min-height: 46px; min-width: 46px; -webkit-tap-highlight-color: transparent; }
 .nav-btn:hover, .nav-btn:active, .nav-btn.active { color: var(--accent-color); opacity: 1; background: color-mix(in srgb, var(--accent-color) 8%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
-.icon { font-size: 1.2rem; margin-bottom: 2px; line-height: 1; }
+.icon { margin-bottom: 2px; line-height: 1; }
+.icon-svg { width: 20px; height: 20px; }
 .label { font-size: 0.6rem; font-weight: 600; line-height: 1; }
 
 .workout-btn {
@@ -120,7 +119,8 @@ const links = [
   }
   .nav-list { padding: 6px 0; min-height: 56px; }
   .nav-btn { padding: 6px 12px; font-size: 0.75rem; min-height: 52px; min-width: 54px; }
-  .icon { font-size: 1.3rem; margin-bottom: 3px; }
+  .icon { margin-bottom: 3px; }
+  .icon-svg { width: 22px; height: 22px; }
   .label { font-size: 0.65rem; }
 }
 
@@ -154,7 +154,8 @@ const links = [
     border-radius: 12px;
     padding: 10px 12px;
   }
-  .icon { margin-bottom: 0; font-size: 1.1rem; }
+  .icon { margin-bottom: 0; }
+  .icon-svg { width: 20px; height: 20px; }
   .label { font-size: 0.9rem; }
 }
 </style>

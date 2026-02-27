@@ -72,18 +72,15 @@
     </div>
   </div>
 
-  <BottomNav v-if="signedIn" />
 </template>
 
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import BottomNav from '../components/BottomNav.vue'
 import { useAuthStore } from '@/stores/authStore'
 
 const authStore = useAuthStore()
 const router = useRouter()
-const signedIn = computed(() => authStore.isAuthenticated)
 const legalEmail = 'kontakt@bro-split-app.de'
 const fallbackRoute = computed(() => authStore.isAuthenticated ? { name: 'settings' } : { name: 'welcome' })
 

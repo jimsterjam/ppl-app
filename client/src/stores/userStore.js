@@ -1,5 +1,21 @@
 import { defineStore } from "pinia";
 import { logger } from '@/utils/logger'
+import {
+  isOnline,
+  getAllWorkoutsOffline,
+  getWorkoutOffline,
+  cacheWorkouts,
+  deleteWorkoutOffline,
+  saveWorkoutOffline,
+  queueAction,
+  db
+} from '@/utils/offlineStorage'
+import {
+  fetchWorkouts,
+  fetchWorkoutProgressStats,
+  createWorkout as createWorkoutApi,
+  updateWorkout as updateWorkoutApi
+} from '@/api/workouts'
 
 
 export const useUserStore = defineStore("user", {
@@ -17,11 +33,11 @@ export const useUserStore = defineStore("user", {
 
   getters: {
     // Computed properties für die UI
-    totalWorkouts: (state) => state.workouts.filter(w => !w.isDraft).length,
+    totalWorkouts: (state) => state.workouts.filter(w => !w._isDraft).length,
     
     completedWorkoutsCount: (state) => 
       state.workouts.filter(w => {
-        if (w.isDraft) return false;
+        if (w._isDraft) return false;
         if (w.completed) return true;
         const hasSets = (w?.exercises || []).some(ex => {
           const sets = ex?.setDetails?.length ?? ex?.sets ?? 0;
@@ -33,15 +49,15 @@ export const useUserStore = defineStore("user", {
     todaysWorkout: (state) => {
       const today = new Date().toISOString().split('T')[0];
       const workout = state.workouts.find(w => 
-        (w?.date || '').startsWith(today) && (w.completed === false || w.completed === undefined) && !w.isDraft
+        (w?.date || '').startsWith(today) && (w.completed === false || w.completed === undefined) && !w._isDraft
       );
-      logger.debug('🧠 [userStore] todaysWorkout:', workout ? { _id: workout._id, name: workout.name, completed: workout.completed, isDraft: workout.isDraft } : null)
+      logger.debug('🧠 [userStore] todaysWorkout:', workout ? { _id: workout._id, name: workout.name, completed: workout.completed, _isDraft: workout._isDraft } : null)
       return workout;
     },
 
     // Letztes gespeichertes Workout (kein Draft), nach updatedAt oder date
     lastSavedWorkout: (state) => {
-      const list = state.workouts.filter(w => !w.isDraft);
+      const list = state.workouts.filter(w => !w._isDraft);
       if (list.length === 0) return null;
       return [...list].sort((a, b) => {
         const ad = new Date(a.updatedAt || a.date || 0).getTime();
@@ -51,7 +67,7 @@ export const useUserStore = defineStore("user", {
     },
 
     workoutsByType: (state) => (type) => 
-      state.workouts.filter(w => !w.isDraft && w.type === type),
+      state.workouts.filter(w => !w._isDraft && w.type === type),
 
     hasError: (state) => !!state.error,
 
@@ -61,15 +77,15 @@ export const useUserStore = defineStore("user", {
     isStatsLoading: (state) => state.loadingStats,
 
     hasDraft: (state) => {
-      const has = state.workouts.some(w => w.isDraft);
-      logger.debug('🧠 [userStore] hasDraft:', has, 'drafts:', state.workouts.filter(w => w.isDraft).map(w => ({ _id: w._id, name: w.name })) )
+      const has = state.workouts.some(w => w._isDraft === true);
+      logger.debug('🧠 [userStore] hasDraft:', has, 'drafts:', state.workouts.filter(w => w._isDraft === true).map(w => ({ _id: w._id, name: w.name })) )
       return has;
     },
 
-    draftType: (state) => state.workouts.find(w => w.isDraft)?.type,
+    draftType: (state) => state.workouts.find(w => w._isDraft === true)?.type,
 
     draftTimestamp: (state) => {
-      const draft = state.workouts.find(w => w.isDraft);
+      const draft = state.workouts.find(w => w._isDraft === true);
       if (!draft) return null;
       const ts = draft.updatedAt || draft.date || draft._syncedAt || draft.createdAt;
       const d = typeof ts === 'number' ? new Date(ts) : new Date(ts);
@@ -77,6 +93,89 @@ export const useUserStore = defineStore("user", {
     }
   },
   actions: {
+
+    buildOfflineStatsFromWorkouts(list = []) {
+      const workouts = Array.isArray(list) ? list.filter(w => w && !w._isDraft) : []
+      if (!workouts.length) return null
+
+      const weekMap = new Map()
+      const toWeekStart = (date) => {
+        const d = new Date(date)
+        if (Number.isNaN(d.getTime())) return null
+        const day = d.getDay()
+        const diff = (day === 0 ? -6 : 1) - day
+        d.setDate(d.getDate() + diff)
+        d.setHours(0, 0, 0, 0)
+        return d
+      }
+
+      const calcVolume = (workout) => {
+        let total = 0
+        ;(workout.exercises || []).forEach((ex) => {
+          if (Array.isArray(ex.setDetails) && ex.setDetails.length) {
+            ex.setDetails.forEach((set) => {
+              const reps = Number(set?.reps) || 0
+              const weight = Number(set?.weight) || 0
+              total += reps * weight
+            })
+          } else {
+            const sets = Number(ex?.sets) || 0
+            const reps = Number(ex?.reps) || 0
+            const weight = Number(ex?.weight) || 0
+            total += sets * reps * weight
+          }
+        })
+        return total
+      }
+
+      workouts.forEach((workout) => {
+        const date = workout.date || workout.updatedAt || workout.createdAt
+        const weekStart = toWeekStart(date)
+        if (!weekStart) return
+        const key = weekStart.toISOString().slice(0, 10)
+        const entry = weekMap.get(key) || {
+          weekStart: key,
+          weekEnd: new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+          sessionCount: 0,
+          totalVolume: 0
+        }
+        entry.sessionCount += 1
+        entry.totalVolume += calcVolume(workout)
+        weekMap.set(key, entry)
+      })
+
+      const weeks = Array.from(weekMap.values()).sort((a, b) => new Date(a.weekStart) - new Date(b.weekStart))
+      if (!weeks.length) return null
+
+      const totalSessions = weeks.reduce((sum, week) => sum + (Number(week.sessionCount) || 0), 0)
+      const totalVolume = weeks.reduce((sum, week) => sum + (Number(week.totalVolume) || 0), 0)
+      const avgSessionsPerWeek = totalSessions / weeks.length
+      const avgWeeklyVolume = totalVolume / weeks.length
+      const weeksWithSessions = weeks.filter(week => (Number(week.sessionCount) || 0) > 0).length
+      const consistencyScore = weeks.length ? Math.round((weeksWithSessions / weeks.length) * 100) : 0
+
+      return {
+        weeks,
+        kpis: {
+          sessions: totalSessions,
+          avgSessionsPerWeek,
+          avgWeeklyVolume,
+          consistencyScore
+        }
+      }
+    },
+
+    applyWorkoutLimit(list, limit = 3) {
+      const items = Array.isArray(list) ? list : []
+      const drafts = items.filter(w => (w?._isDraft === true || w?.isDraft === true) && w?.completed !== true)
+      const regular = items.filter(w => !((w?._isDraft === true || w?.isDraft === true) && w?.completed !== true))
+      const sorted = [...regular].sort((a, b) => {
+        const ad = new Date(a.updatedAt || a.date || 0).getTime()
+        const bd = new Date(b.updatedAt || b.date || 0).getTime()
+        return bd - ad
+      })
+      return [...drafts, ...sorted.slice(0, limit)]
+    },
 
         async startWorkout(type, token = null) {
           // Wrapper für createWorkout mit minimalen Daten
@@ -88,21 +187,76 @@ export const useUserStore = defineStore("user", {
       this.error = null;
       this.loadingWorkouts = true;
       try {
-        const { isOnline, getAllWorkoutsOffline, getWorkoutOffline, cacheWorkouts } = await import('@/utils/offlineStorage');
         const online = isOnline();
 
+        // Sofortige Anzeige aus Offline-Cache, damit UI nicht leer bleibt
+        try {
+          const cachedWorkouts = await getAllWorkoutsOffline();
+          if (Array.isArray(cachedWorkouts) && cachedWorkouts.length) {
+            this.workouts = cachedWorkouts.map(w => ({
+              ...w,
+              completed: w.completed !== undefined ? w.completed : false,
+              _isDraft: w._isDraft === true || w?.isDraft === true,
+              isDraft: w._isDraft === true || w?.isDraft === true
+            }));
+            this.workoutsLoaded = true;
+            this.workoutsLoadedAt = Date.now();
+          }
+        } catch (e) {
+          logger.warn('⚠️ [Offline] Konnte cached Workouts nicht lesen:', e);
+        }
+
         if (online) {
-          const { fetchWorkouts } = await import('@/api/workouts');
+          const previousDrafts = (this.workouts || [])
+            .filter(w => (w?._isDraft === true || w?.isDraft === true) && w?.completed !== true)
+            .map(w => ({ ...w, _isDraft: true, isDraft: true, completed: false }))
+
           const workouts = await fetchWorkouts(token);
           this.workouts = Array.isArray(workouts) ? workouts : [];
           // Setze completed: false für Workouts ohne completed Feld (Migration)
           this.workouts = this.workouts.map(w => ({
             ...w,
-            completed: w.completed !== undefined ? w.completed : false
+            completed: w.completed !== undefined ? w.completed : false,
+            _isDraft: w._isDraft === true || w?.isDraft === true,
+            isDraft: w._isDraft === true || w?.isDraft === true
           }));
           this.workoutsLoaded = true;
           this.workoutsLoadedAt = Date.now();
           logger.debug(`✅ [API] Loaded ${this.workouts.length} workouts from server:`, this.workouts.map(w => ({ _id: w._id, name: w.name, completed: w.completed, isDraft: w.isDraft })));
+
+          // Lokale Offline-Workouts behalten (z.B. direkt gestartete Sessions)
+          try {
+            const offlineAll = await getAllWorkoutsOffline();
+            const offlineCreated = offlineAll.filter(w =>
+              String(w?._id || '').startsWith('offline_') || w?._offlineCreated
+            );
+            const existingIds = new Set(this.workouts.map(w => w._id));
+            offlineCreated.forEach(w => {
+              if (!existingIds.has(w._id)) this.workouts.unshift(w);
+            });
+
+            previousDrafts.forEach((draft) => {
+              const idx = this.workouts.findIndex(w => String(w?._id || '') === String(draft?._id || ''))
+              if (idx !== -1) {
+                this.workouts[idx] = { ...this.workouts[idx], ...draft, _isDraft: true, isDraft: true, completed: false }
+              } else {
+                this.workouts.unshift({ ...draft, _isDraft: true, isDraft: true, completed: false })
+              }
+            })
+
+            const offlineDrafts = offlineAll.filter(w => (w?._isDraft === true || w?.isDraft === true) && w?.completed !== true)
+            offlineDrafts.forEach((draft) => {
+              const idx = this.workouts.findIndex(w => String(w?._id || '') === String(draft?._id || ''))
+              const normalizedDraft = { ...draft, _isDraft: true, isDraft: true, completed: false }
+              if (idx !== -1) {
+                this.workouts[idx] = { ...this.workouts[idx], ...normalizedDraft }
+              } else {
+                this.workouts.unshift(normalizedDraft)
+              }
+            })
+          } catch (e) {
+            logger.warn('⚠️ [Offline] Konnte lokale Workouts nicht mergen:', e);
+          }
 
           try {
             await cacheWorkouts(this.workouts);
@@ -110,19 +264,7 @@ export const useUserStore = defineStore("user", {
             logger.warn('⚠️ [Offline] Konnte Workouts nicht cachen:', e);
           }
 
-          // Lokale Drafts laden und hinzufügen
-          try {
-            const localDraft = await getWorkoutOffline('draft');
-            if (localDraft) {
-              localDraft.isDraft = true;
-              this.workouts.push(localDraft);
-              logger.debug('✅ [Offline] Draft geladen und hinzugefügt:', { _id: localDraft._id, name: localDraft.name });
-            } else {
-              logger.debug('ℹ️ [Offline] Kein lokaler Draft gefunden');
-            }
-          } catch (e) {
-            logger.warn('⚠️ Fehler beim Laden des lokalen Drafts:', e);
-          }
+          this.workouts = this.applyWorkoutLimit(this.workouts, 3)
 
           return this.workouts;
         }
@@ -132,38 +274,31 @@ export const useUserStore = defineStore("user", {
         this.workouts = Array.isArray(offlineWorkouts) ? offlineWorkouts : [];
         this.workouts = this.workouts.map(w => ({
           ...w,
-          completed: w.completed !== undefined ? w.completed : false
+          completed: w.completed !== undefined ? w.completed : false,
+          _isDraft: w._isDraft === true || w?.isDraft === true,
+          isDraft: w._isDraft === true || w?.isDraft === true
         }));
         this.workoutsLoaded = true;
         this.workoutsLoadedAt = Date.now();
         this.error = this.workouts.length ? null : this.error;
         logger.debug(`✅ [Offline] Loaded ${this.workouts.length} workouts from IndexedDB`);
 
-        try {
-          const localDraft = await getWorkoutOffline('draft');
-          if (localDraft) {
-            localDraft.isDraft = true;
-            const existing = this.workouts.find(w => w._id === localDraft._id);
-            if (!existing) this.workouts.push(localDraft);
-          }
-        } catch (e) {
-          logger.warn('⚠️ Fehler beim Laden des lokalen Drafts:', e);
-        }
+        this.workouts = this.applyWorkoutLimit(this.workouts, 3)
 
         return this.workouts;
       } catch (error) {
         logger.error('❌ [API] Error loading workouts from server:', error);
         this.error = error?.message || 'Fehler beim Laden der Workouts';
         try {
-          const { getAllWorkoutsOffline, getWorkoutOffline } = await import('@/utils/offlineStorage');
           const offlineWorkouts = await getAllWorkoutsOffline();
-          this.workouts = Array.isArray(offlineWorkouts) ? offlineWorkouts : [];
-          const localDraft = await getWorkoutOffline('draft');
-          if (localDraft) {
-            localDraft.isDraft = true;
-            const existing = this.workouts.find(w => w._id === localDraft._id);
-            if (!existing) this.workouts.push(localDraft);
-          }
+          this.workouts = Array.isArray(offlineWorkouts)
+            ? offlineWorkouts.map(w => ({
+                ...w,
+                _isDraft: w._isDraft === true || w?.isDraft === true,
+                isDraft: w._isDraft === true || w?.isDraft === true
+              }))
+            : [];
+          this.workouts = this.applyWorkoutLimit(this.workouts, 3)
           if (this.workouts.length) this.error = null;
         } catch (e) {
           this.workouts = [];
@@ -187,14 +322,31 @@ export const useUserStore = defineStore("user", {
       };
 
       try {
-        const { isOnline } = await import('@/utils/offlineStorage');
+        const cached = readCachedStats();
+        if (cached) {
+          this.stats = cached;
+        }
         if (!isOnline()) {
-          this.stats = readCachedStats();
+          if (!cached || !Array.isArray(cached?.weeks) || cached.weeks.length === 0) {
+            try {
+              const offlineWorkouts = await getAllWorkoutsOffline()
+              const derived = this.buildOfflineStatsFromWorkouts(offlineWorkouts)
+              if (derived) {
+                this.stats = derived
+                localStorage.setItem('bro_split_stats', JSON.stringify(derived))
+              } else {
+                this.stats = cached
+              }
+            } catch {
+              this.stats = cached
+            }
+          } else {
+            this.stats = cached
+          }
           if (this.stats) this.error = null;
           return this.stats;
         }
 
-        const { fetchWorkoutProgressStats } = await import('@/api/workouts');
         const stats = await fetchWorkoutProgressStats(token, params);
         if (stats) {
           this.stats = stats;
@@ -223,11 +375,11 @@ export const useUserStore = defineStore("user", {
       logger.debug('🏗️ [userStore] createWorkout called:', workoutData, 'token:', !!token)
       try {
         logger.debug('DEBUG: createWorkout token:', token ? 'present' : 'null', 'data:', workoutData)
-        const { createWorkout } = await import('@/api/workouts');
-        const newWorkout = await createWorkout(workoutData, token);
+        const newWorkout = await createWorkoutApi(workoutData, token);
         logger.debug('🏗️ [userStore] API returned:', newWorkout)
         if (newWorkout) {
           this.workouts.push(newWorkout);
+          this.workouts = this.applyWorkoutLimit(this.workouts, 3)
           logger.debug('✅ [API] Workout created:', newWorkout._id)
         }
         return newWorkout;
@@ -237,14 +389,53 @@ export const useUserStore = defineStore("user", {
       }
     },
 
+    async createWorkoutOptimistic(workoutData, token = null) {
+      const localId = `offline_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+      const localWorkout = {
+        ...workoutData,
+        _id: localId,
+        _offlineCreated: true,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        completed: workoutData.completed ?? false,
+        userId: this.user?.id || this.user?.uid || null
+      }
+
+      try { await saveWorkoutOffline(localWorkout) } catch {}
+      this.workouts.unshift(localWorkout)
+      this.workouts = this.applyWorkoutLimit(this.workouts, 3)
+
+      try { await queueAction('create', 'workout', localWorkout) } catch {}
+
+      return localWorkout
+    },
+
     async updateWorkout(id, updates, token = null) {
       logger.debug('📡 [userStore] updateWorkout called:', id, updates)
+      const isOfflineId = typeof id === 'string' && (id.startsWith('offline_') || id.startsWith('draft-'))
+      if (isOfflineId) {
+        try {
+          const idx = this.workouts.findIndex(w => w._id === id)
+          const merged = idx !== -1 ? { ...this.workouts[idx], ...updates } : { ...updates, _id: id }
+          await saveWorkoutOffline({ ...merged, _id: id, _offlineUpdated: true, updatedAt: Date.now() })
+          await queueAction('update', 'workout', { ...merged, _id: id, _offlineUpdated: true })
+          if (idx !== -1) {
+            this.workouts[idx] = merged
+          } else {
+            this.workouts.unshift(merged)
+          }
+          this.workouts = this.applyWorkoutLimit(this.workouts, 3)
+          return merged
+        } catch (error) {
+          logger.error('❌ [userStore] Error updating offline workout:', error)
+          throw error
+        }
+      }
       // Wenn kein gültiges ObjectId: als neues Workout anlegen (POST)
       const isValidObjectId = typeof id === 'string' && /^[a-f\d]{24}$/i.test(id);
       if (!isValidObjectId) {
         logger.debug('📡 [userStore] Invalid ObjectId, creating new workout')
         try {
-          const { createWorkout } = await import('@/api/workouts');
           // type aus vorhandenem Draft holen, falls nicht im updates-Objekt
           let draftType = updates.type;
           if (!draftType) {
@@ -258,18 +449,14 @@ export const useUserStore = defineStore("user", {
             else if (draftType.toLowerCase() === 'pull') draftName = 'Pull Day';
             else if (draftType.toLowerCase() === 'legs') draftName = 'Leg Day';
           }
-          const newWorkout = await createWorkout({ ...updates, type: draftType, name: draftName }, token);
-          // Entferne alle alten Drafts/temporären Workouts aus dem Store
-          this.workouts = this.workouts.filter(w => /^[a-f\d]{24}$/i.test(w._id));
+          const newWorkout = await createWorkoutApi({ ...updates, type: draftType, name: draftName }, token);
+          // Ersetze nur den konkreten temporären Eintrag, behalte andere Drafts
+          this.workouts = this.workouts.filter(w => String(w?._id || '') !== String(id));
           // Füge das neue Workout hinzu
             if (newWorkout) {
             this.workouts.push(newWorkout);
+            this.workouts = this.applyWorkoutLimit(this.workouts, 3)
             logger.debug('✅ [userStore] New workout created:', newWorkout._id, 'completed:', newWorkout.completed)
-            // Lösche Draft aus Offline-DB, falls vorhanden
-            try {
-              const { db } = await import('@/utils/offlineStorage');
-              await db.workouts.delete('draft');
-            } catch (e) { /* ignore */ }
           }
           return newWorkout;
         } catch (error) {
@@ -279,16 +466,51 @@ export const useUserStore = defineStore("user", {
       }
       // Andernfalls normales Update (PUT)
       try {
-        const { updateWorkout } = await import('@/api/workouts');
-        const updatedWorkout = await updateWorkout(id, updates, token);
-        const idx = this.workouts.findIndex(w => w._id === id);
-        if (updatedWorkout && idx !== -1) {
-          this.workouts[idx] = { ...this.workouts[idx], ...updatedWorkout };
+        const idx = this.workouts.findIndex(w => w._id === id)
+        const optimistic = idx !== -1 ? { ...this.workouts[idx], ...updates } : { ...updates, _id: id }
+        const optimisticWithTs = { ...optimistic, updatedAt: new Date().toISOString() }
+        try {
+          await saveWorkoutOffline(optimisticWithTs)
+        } catch (e) {
+          logger.warn('⚠️ [userStore] Konnte Workout nicht offline zwischenspeichern:', e)
+        }
+        if (idx !== -1) {
+          this.workouts[idx] = optimisticWithTs
+        } else {
+          this.workouts.unshift(optimisticWithTs)
+        }
+        this.workouts = this.applyWorkoutLimit(this.workouts, 3)
+
+        const timeoutMs = 4000
+        const apiPromise = updateWorkoutApi(id, updates, token)
+        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), timeoutMs))
+        const updatedWorkout = await Promise.race([apiPromise, timeoutPromise])
+        if (!updatedWorkout) {
+          logger.warn('⏳ [userStore] updateWorkout timeout, keep optimistic state')
+          apiPromise
+            .then((lateUpdate) => {
+              if (!lateUpdate) return
+              const lateIdx = this.workouts.findIndex(w => w._id === id)
+              if (lateIdx !== -1) {
+                this.workouts[lateIdx] = { ...this.workouts[lateIdx], ...lateUpdate }
+                if (updates.completed !== undefined) {
+                  this.workouts[lateIdx].completed = updates.completed
+                }
+                this.workouts = this.applyWorkoutLimit(this.workouts, 3)
+              }
+            })
+            .catch(() => {})
+          return optimisticWithTs
+        }
+        const updatedIdx = this.workouts.findIndex(w => w._id === id);
+        if (updatedWorkout && updatedIdx !== -1) {
+          this.workouts[updatedIdx] = { ...this.workouts[updatedIdx], ...updatedWorkout };
           // Sicherstellen, dass completed gesetzt wird, falls der Server es nicht zurückgibt
           if (updates.completed !== undefined) {
-            this.workouts[idx].completed = updates.completed;
+            this.workouts[updatedIdx].completed = updates.completed;
           }
         }
+        this.workouts = this.applyWorkoutLimit(this.workouts, 3)
         return updatedWorkout;
       } catch (error) {
         logger.error('❌ [userStore] Error updating workout:', error);
@@ -306,6 +528,7 @@ export const useUserStore = defineStore("user", {
             completed: true,
             completedAt: new Date().toISOString()
           }
+          this.workouts = this.applyWorkoutLimit(this.workouts, 3)
           localStorage.setItem('bro_split_workouts', JSON.stringify(this.workouts))
           logger.debug('✅ [Demo] Workout marked completed offline:', id)
           return this.workouts[idx]
@@ -319,16 +542,19 @@ export const useUserStore = defineStore("user", {
 
     async clearDraft() {
       try {
-        const { deleteWorkoutOffline } = await import('@/utils/offlineStorage')
-        await deleteWorkoutOffline('draft')
+        const offline = await getAllWorkoutsOffline()
+        const draftIds = offline
+          .filter(w => w._isDraft === true || w?.isDraft === true)
+          .map(w => w._id)
+        await Promise.all(draftIds.map(id => deleteWorkoutOffline(id)))
       } catch (e) {
-        logger.warn('⚠️ [userStore] Konnte Offline-Draft nicht löschen:', e)
+        logger.warn('⚠️ [userStore] Konnte Offline-Drafts nicht löschen:', e)
       }
       try {
         const before = this.workouts.length
-        this.workouts = this.workouts.filter(w => !w.isDraft)
+        this.workouts = this.workouts.filter(w => !(w?._isDraft === true || w?.isDraft === true))
         const after = this.workouts.length
-        logger.debug('🧹 [userStore] Draft aus Store entfernt. Workouts:', before, '→', after)
+        logger.debug('🧹 [userStore] Drafts aus Store entfernt. Workouts:', before, '→', after)
       } catch (e) {
         // ignore
       }

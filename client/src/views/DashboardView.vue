@@ -25,129 +25,71 @@
     </HeaderBar>
 
     <main class="dashboard-content">
+      <section class="hero">
+        <div>
+          <h2 class="hero-title">Bereit für dein Training?</h2>
+          <p class="hero-sub">{{ weeklyProgressLabel }}</p>
+        </div>
+      </section>
 
-      <!-- Loading State -->
-      <div v-if="store.isWorkoutsLoading" class="loading-section">
-        <div class="spinner"></div>
-        <p>{{ $t('dashboard.loading') }}</p>
-      </div>
-
-      <!-- Error State -->
-      <EmptyState 
-        v-else-if="store.hasError"
-        icon="⚠️"
-        :title="$t('dashboard.connectionErrorTitle')"
-        :message="store.error"
-        :action-text="$t('dashboard.retry')"
-        @action="retryLoadWorkouts"
-      />
-
-      <!-- No Workouts -->
-      <EmptyState 
-        v-else-if="store.workouts.length === 0"
-        icon="💪"
-        :title="$t('dashboard.noWorkoutsTitle')"
-        :message="$t('dashboard.noWorkoutsMsg')"
-        :action-text="$t('dashboard.startFirst')"
-        @action="() => startWorkout(nextType)"
-      />
-
-      <!-- Normal State -->
-      <template v-else>
-        <!-- Success Message -->
-        <div v-if="workoutCreated" class="success-message">
-          <div class="success-content">
-            <span class="success-icon">✅</span>
-            <h3>{{ $t('dashboard.successCreated') }}</h3>
-            <p>{{ capitalize(selectedWorkoutType) }} Day {{ $t('dashboard.successCreated') }}</p>
-          </div>
+      <section class="quick-start">
+        <div class="quick-grid">
+          <WorkoutCard
+            label="Push"
+            :active="lastWorkoutType === 'push'"
+            :info-label="$t('dashboard.workoutTypeInfo')"
+            @click="startQuick('push')"
+            @info="openWorkoutInfo('push')"
+          />
+          <WorkoutCard
+            label="Pull"
+            :active="lastWorkoutType === 'pull'"
+            :info-label="$t('dashboard.workoutTypeInfo')"
+            @click="startQuick('pull')"
+            @info="openWorkoutInfo('pull')"
+          />
+          <WorkoutCard
+            label="Legs"
+            :active="lastWorkoutType === 'legs'"
+            :info-label="$t('dashboard.workoutTypeInfo')"
+            @click="startQuick('legs')"
+            @info="openWorkoutInfo('legs')"
+          />
+          <WorkoutCard
+            :label="$t('dashboard.fullBodyLabel')"
+            :active="lastWorkoutType === 'fullbody'"
+            :info-label="$t('dashboard.workoutTypeInfo')"
+            @click="startQuick('fullbody')"
+            @info="openWorkoutInfo('fullbody')"
+          />
         </div>
 
-        <!-- Action Hub -->
-          <section class="today">
-            <div class="next-card glass">
-              <div class="next-header">
-                <div>
-                  <h3>{{ $t('dashboard.nextWorkout') }}</h3>
-                  <span v-if="lastLabel" class="muted">{{ $t('dashboard.last') }}: {{ lastLabel }}</span>
-                </div>
-              </div>
-              <p class="next-title">{{ nextLabel }}</p>
-              <p class="action-lead">{{ actionLead }}</p>
-
-              <!-- Draft Notice -->
-              <div v-if="hasDraft" class="draft-notice">
-                <span class="draft-icon">📝</span>
-                <span>{{ $t('dashboard.draftAvailable') }}</span>
-                <div v-if="draftTimestamp" class="draft-timestamp">
-                  {{ $t('dashboard.lastSaved') }}: {{ draftTimestamp.toLocaleString() }}
-                </div>
-              </div>
-
-              <div class="action-buttons">
-                <button 
-                  v-if="hasDraft"
-                  class="primary-action"
-                  :disabled="workoutCreated"
-                  @click="startWorkout(draftId)"
-                >
-                  📝 {{ resumeLabel }}
-                </button>
-                <button 
-                  class="primary-action"
-                  :class="{ ghost: hasDraft }"
-                  :disabled="workoutCreated"
-                  @click="hasDraft ? startNewWorkout() : startWorkout(nextType)"
-                >
-                  {{ primaryActionLabel }}
-                </button>
-              </div>
-            </div>
-          </section>
-
-          <!-- Feedback Inbox Preview (skalierbar, aber dezent) -->
-          <section v-if="feedbackThreads.length" class="feedback-section">
-            <div class="feedback-card glass">
-              <div class="feedback-header">
-                <div>
-                  <h3 class="feedback-title">{{ $t('feedback.title') }}</h3>
-                  <p class="muted" style="margin-top:6px">{{ $t('feedback.inboxHint') }}</p>
-                </div>
-                <button class="feedback-btn" type="button" :disabled="feedbackLoading" @click="openFeedbackInbox">
-                  {{ feedbackLoading ? $t('common.loading') : $t('feedback.inboxTitle') }}
-                </button>
-              </div>
-
-              <div class="feedback-preview" v-if="feedbackThreads[0]">
-                <div class="preview-top">
-                  <div class="preview-workout">
-                    <strong>{{ feedbackThreads[0].workout?.name || $t('feedback.unknownWorkout') }}</strong>
-                    <span class="preview-meta">
-                      {{ (feedbackThreads[0].workout?.type || '').toUpperCase() }}
-                    </span>
-                  </div>
-                  <span class="preview-time">{{ formatPreviewTime(feedbackThreads[0].lastMessage?.createdAt) }}</span>
-                </div>
-                <div class="preview-text">
-                  <span class="preview-sender">
-                    {{ feedbackThreads[0].lastMessage?.sender === 'client' ? $t('feedback.you') : $t('feedback.coach') }}:
-                  </span>
-                  {{ feedbackThreads[0].lastMessage?.text }}
-                </div>
-              </div>
-            </div>
-          </section>
-
-          <!-- Recent Workouts -->
-          <div class="recent-section">
-            <RecentWorkouts :workouts="recentWorkoutsPreview" />
+        <div v-if="hasDraft" class="draft-note">
+          <span>{{ $t('dashboard.draftAvailable') }}</span>
+          <div class="draft-actions">
+            <button class="cta-inline" type="button" @click="startWorkout(draftId)">Fortsetzen</button>
+            <button class="cta-inline danger" type="button" @click="discardDraft">{{ $t('dashboard.deleteDraft') }}</button>
           </div>
-      </template>
+        </div>
+      </section>
+
+      <div v-if="workoutCreated" class="success-message">
+        <div class="success-content">
+          <h3>{{ $t('dashboard.successCreated') }}</h3>
+          <p>{{ capitalize(selectedWorkoutType) }} Day {{ $t('dashboard.successCreated') }}</p>
+        </div>
+      </div>
 
     </main>
 
-    <!-- Bottom Navigation -->
-    <BottomNav />
+    <AppModal
+      v-model="showInfoModal"
+      :title="$t('dashboard.workoutTypeInfoTitle')"
+      :message="infoMessage"
+      :show-cancel="false"
+      :confirm-text="$t('common.confirm')"
+      type="info"
+    />
   </div>
 </template>
 
@@ -158,13 +100,12 @@ import { useRouter } from 'vue-router'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { useUserStore } from "../stores/userStore";
 import { useSettingsStore } from '@/stores/settingsStore'
-import { listWorkoutChatThreads } from '@/api/account'
-import { isOnline } from '@/utils/offlineStorage'
+import { useAuthStore } from '@/stores/authStore'
+import { isOnline, deleteWorkoutOffline, getWorkoutOffline } from '@/utils/offlineStorage'
 
 import HeaderBar from "../components/HeaderBar.vue";
-import BottomNav from "../components/BottomNav.vue";
-import EmptyState from "../components/EmptyState.vue";
-import RecentWorkouts from "../components/RecentWorkouts.vue";
+import WorkoutCard from "../components/WorkoutCard.vue";
+import AppModal from "../components/AppModal.vue";
 import { logger } from '@/utils/logger'
 
 const store = useUserStore()
@@ -172,39 +113,66 @@ const settings = useSettingsStore()
 const { t: $t } = useI18n()
 const router = useRouter()
 const { getIdToken, onAuthStateChanged, getCurrentUser } = useFirebaseAuth()
-const PROGRESS_RANGE_DAYS = 120
+const authStore = useAuthStore()
 
 const user = ref(null)
 const isSignedIn = ref(false)
 const selectedWorkoutType = ref('push')
+const isOffline = ref(!isOnline())
 const workoutCreated = ref(false)
+const detailDraft = ref(null)
+const showInfoModal = ref(false)
+const infoMessage = ref('')
+const draftSourceLogged = ref(false)
 
-// Feedback inbox preview state
-const feedbackThreads = ref([])
-const feedbackLoading = ref(false)
-let feedbackLoadedAt = 0
 
-const nextLabel = computed(() => store.nextWorkoutLabel)
-const lastLabel = computed(() => store.lastWorkoutLabel)
 const hasDraft = computed(() => {
-  const hd = store.hasDraft
-  return hd
+  const storeHasDraft = (store.workouts || []).some(w => (w?._isDraft === true || w?.isDraft === true) && w?.completed !== true)
+  return storeHasDraft || Boolean(detailDraft.value)
 })
-const draftType = computed(() => store.draftType)
-const draftTimestamp = computed(() => store.draftTimestamp)
-const draftId = computed(() => store.workouts.find(w => w.isDraft)?._id)
+const draftId = computed(() => {
+  return store.workouts.find(w => (w?._isDraft === true || w?.isDraft === true) && w?.completed !== true)?._id || detailDraft.value?._id
+})
 
-const resumeLabel = computed(() => $t('dashboard.resumeDraft'))
+function logDraftSourceOnce() {
+  if (draftSourceLogged.value) return
+  const storeDrafts = (store.workouts || []).filter(w => w?._isDraft === true || w?.isDraft === true)
+  const hasStoreDraft = storeDrafts.length > 0
+  const hasSessionDraft = Boolean(detailDraft.value)
+  let source = 'none'
+  if (hasStoreDraft && hasSessionDraft) source = 'both'
+  else if (hasStoreDraft) source = 'store'
+  else if (hasSessionDraft) source = 'sessionStorage'
 
-const primaryActionLabel = computed(() => hasDraft.value ? $t('dashboard.startNew') : $t('dashboard.startNext'))
+  logger.debug('🧪 [Dashboard] Draft source diagnostic', {
+    source,
+    hasStoreDraft,
+    hasSessionDraft,
+    storeDraftIds: storeDrafts.map(d => d?._id),
+    sessionDraftId: detailDraft.value?._id || null,
+    hasDraftComputed: hasDraft.value,
+    draftIdComputed: draftId.value || null
+  })
 
-const actionLead = computed(() => hasDraft.value
-  ? 'Du hast noch ein gespeichertes Workout. Entscheide, ob du es fortsetzt oder frisch beginnst.'
-  : 'Wähle dein nächstes Workout und leg direkt los.')
+  draftSourceLogged.value = true
+}
+
+const weeklyGoal = computed(() => Number(settings.weeklyGoal) || 4)
+const weeklyCount = computed(() => {
+  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
+  return (store.workouts || []).filter(w => !(w?.isDraft || w?._isDraft) && new Date(w.date || w.updatedAt || 0).getTime() >= cutoff).length
+})
+const weeklyProgressLabel = computed(() => `Wochenfortschritt: ${weeklyCount.value}/${weeklyGoal.value} Trainings`)
+
+const lastWorkoutType = computed(() => {
+  const last = store.lastSavedWorkout
+  const type = last?.type?.toString().trim().toLowerCase()
+  if (type === 'leg') return 'legs'
+  if (type === 'freestyle') return 'fullbody'
+  return type || null
+})
 
 const nextType = computed(() => store.nextWorkoutType || 'push')
-
-const recentWorkoutsPreview = computed(() => (store.workouts || []).slice(0, 3))
 
 const userSubtitle = computed(() => {
   const preferred = (settings.username || '').trim()
@@ -218,7 +186,7 @@ const avatarSrc = computed(() => String(settings.avatarUrl || '').trim())
 
 const avatarInitials = computed(() => {
   const name = String(userSubtitle.value || '').trim()
-  if (!name) return '👤'
+  if (!name) return 'U'
   const parts = name.split(/\s+/).filter(Boolean)
   if (parts.length === 1) return parts[0].slice(0, 1).toUpperCase()
   const a = parts[0].slice(0, 1)
@@ -226,9 +194,90 @@ const avatarInitials = computed(() => {
   return (a + b).toUpperCase()
 })
 
+function getDetailDraftKey() {
+  const userId = store?.user?.id || store?.user?._id || authStore?.user?.id || authStore?.user?._id || 'guest'
+  return `workout_detail_draft_${userId}`
+}
+
+async function readDetailDraft() {
+  try {
+    const raw = sessionStorage.getItem(getDetailDraftKey())
+    if (!raw) {
+      detailDraft.value = null
+      logDraftSourceOnce()
+      return
+    }
+    const parsed = JSON.parse(raw)
+    const data = parsed?.workout || parsed
+    if (!data || !data._id || data.completed) {
+      detailDraft.value = null
+      try { sessionStorage.removeItem(getDetailDraftKey()) } catch {}
+      logDraftSourceOnce()
+      return
+    }
+    const draftId = String(data._id)
+    const isDraftLike = data?._isDraft === true || data?.isDraft === true || draftId === 'draft' || draftId.startsWith('draft-')
+    if (!isDraftLike) {
+      detailDraft.value = null
+      try { sessionStorage.removeItem(getDetailDraftKey()) } catch {}
+      logDraftSourceOnce()
+      return
+    }
+    const mappedRealId = draftId.startsWith('draft-')
+      ? String(sessionStorage.getItem(`workout_map_${draftId}`) || '')
+      : ''
+    if (mappedRealId) {
+      const mappedFromStore = (store.workouts || []).find(w => String(w?._id || '') === mappedRealId) || null
+      const mappedFromOffline = mappedFromStore ? null : (await getWorkoutOffline(mappedRealId).catch(() => null))
+      const mapped = mappedFromStore || mappedFromOffline
+      if (mapped?.completed === true) {
+        detailDraft.value = null
+        try { sessionStorage.removeItem(getDetailDraftKey()) } catch {}
+        logDraftSourceOnce()
+        return
+      }
+      if (mapped && mapped.completed !== true) {
+        detailDraft.value = {
+          ...mapped,
+          _id: mappedRealId,
+          _isDraft: true,
+          isDraft: true,
+          completed: false
+        }
+        logDraftSourceOnce()
+        return
+      }
+
+      detailDraft.value = {
+        ...data,
+        _isDraft: true,
+        isDraft: true,
+        completed: false
+      }
+      logDraftSourceOnce()
+      return
+    }
+    const offlineDraft = await getWorkoutOffline(draftId)
+    if (!offlineDraft) {
+      detailDraft.value = null
+      try { sessionStorage.removeItem(getDetailDraftKey()) } catch {}
+      logDraftSourceOnce()
+      return
+    }
+    detailDraft.value = data
+    logDraftSourceOnce()
+  } catch {
+    detailDraft.value = null
+    logDraftSourceOnce()
+  }
+}
+
 function onAvatarImgError() {
   avatarLoadError.value = true
 }
+
+const onOnlineStatus = () => { isOffline.value = false }
+const onOfflineStatus = () => { isOffline.value = true }
 
 // Helper
 const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1)
@@ -236,6 +285,14 @@ const capitalize = (s) => s.charAt(0).toUpperCase() + s.slice(1)
 // Load workouts
 async function loadWorkoutsData(force = false) {
   try {
+    const hasAuth = authStore.isAuthenticated || Boolean(getCurrentUser && getCurrentUser())
+    if (!isOnline()) {
+      if (!hasAuth || !authStore.isOfflineSessionValid) return
+      await Promise.all([
+        store.loadWorkouts(null, { force })
+      ])
+      return
+    }
     const token = await getIdToken();
     const currentUser = getCurrentUser ? getCurrentUser() : null;
     logger.debug('🔑 [Dashboard] Token vorhanden:', !!token, 'User:', !!currentUser)
@@ -243,60 +300,25 @@ async function loadWorkoutsData(force = false) {
       logger.debug('📥 DashboardView - Lade Workouts', force ? '(forced)' : '(cached allowed)')
       await Promise.all([
         store.loadWorkouts(token, { force }),
-        store.loadStats(token, { rangeDays: PROGRESS_RANGE_DAYS }),
-        settings.loadProfile(token).catch(() => null),
-        loadFeedbackThreads({ token, force })
+        settings.loadProfile(token).catch(() => null)
       ])
       logger.debug('✅ [Dashboard] Workouts geladen')
     } else {
       logger.warn('⚠️ Workouts werden nicht geladen, da kein Token/User vorhanden ist.');
       await Promise.all([
-        store.loadWorkouts(null, { force }),
-        store.loadStats(null, { rangeDays: PROGRESS_RANGE_DAYS })
+        store.loadWorkouts(null, { force })
       ])
     }
   } catch (error) {
     logger.warn('⚠️ Fehler beim Laden der Workouts mit Token:', error)
     await Promise.all([
-      store.loadWorkouts(null, { force }),
-      store.loadStats(null, { rangeDays: PROGRESS_RANGE_DAYS })
+      store.loadWorkouts(null, { force })
     ])
-  }
-}
-
-function openFeedbackInbox() {
-  router.push({ name: 'feedback' })
-}
-
-function formatPreviewTime(d) {
-  if (!d) return ''
-  try {
-    return new Date(d).toLocaleDateString()
-  } catch {
-    return ''
-  }
-}
-
-async function loadFeedbackThreads({ token = null, force = false } = {}) {
-  if (feedbackLoading.value) return
-  if (!isOnline()) return
-
-  const now = Date.now()
-  if (!force && feedbackLoadedAt && (now - feedbackLoadedAt) < 60_000) return
-
-  feedbackLoading.value = true
-  try {
-    const authToken = token || (await getIdToken().catch(() => null))
-    if (!authToken) return
-    const items = await listWorkoutChatThreads(authToken, 5)
-    feedbackThreads.value = Array.isArray(items) ? items : []
-    feedbackLoadedAt = Date.now()
-  } catch {
-    // silent; dashboard should stay clean
   } finally {
-    feedbackLoading.value = false
+    logDraftSourceOnce()
   }
 }
+
 
 function retryLoadWorkouts() {
   loadWorkoutsData(true);
@@ -304,7 +326,7 @@ function retryLoadWorkouts() {
 
 // Start Workout
 function startWorkout(typeOrId) {
-  if (hasDraft.value) {
+  if (hasDraft.value && draftId.value) {
     logger.debug('🏁 [Dashboard] Navigating to workout-detail:', draftId.value)
     router.push({ name: 'workout-detail', params: { id: draftId.value } });
   } else {
@@ -313,10 +335,34 @@ function startWorkout(typeOrId) {
     router.push({ name: 'workout-builder', query: { type: safeType } });
   }
 }
-async function startNewWorkout() {
-  await store.clearDraft()
-  router.push({ name: 'workout-builder' })
+
+function startQuick(type) {
+  const safeType = typeof type === 'string' && type.length > 0 ? type : 'push'
+  router.push({ name: 'workout-builder', query: { type: safeType } })
 }
+
+function openWorkoutInfo(type) {
+  if (type === 'push') infoMessage.value = $t('dashboard.pushInfo')
+  else if (type === 'pull') infoMessage.value = $t('dashboard.pullInfo')
+  else if (type === 'legs') infoMessage.value = $t('dashboard.legsInfo')
+  else if (type === 'freestyle' || type === 'fullbody') infoMessage.value = $t('dashboard.freestyleInfo')
+  else infoMessage.value = ''
+  showInfoModal.value = true
+}
+
+async function discardDraft() {
+  try {
+    await store.clearDraft()
+    // Draft aus Pinia-Store entfernen
+    store.workouts = store.workouts.filter(w => !(w?._isDraft === true || w?.isDraft === true))
+    store.hasDraft = false
+  } catch {}
+  detailDraft.value = null
+  try { sessionStorage.removeItem(getDetailDraftKey()) } catch {}
+  // Workouts neu laden, damit UI sofort aktualisiert
+  await loadWorkoutsData(true)
+}
+
 
 // keep a single afterEach registration to avoid duplicates
 let afterEachRegistered = false
@@ -325,18 +371,30 @@ const onWindowFocus = () => { if (isSignedIn.value) loadWorkoutsData(true) }
 
 // Mounted: Auth & Refresh
 onMounted(() => {
+  draftSourceLogged.value = false
+  window.addEventListener('online', onOnlineStatus)
+  window.addEventListener('offline', onOfflineStatus)
+  readDetailDraft()
+
+  if (!isOnline() && authStore.isOfflineSessionValid) {
+    user.value = authStore.user
+    isSignedIn.value = true
+    loadWorkoutsData(false)
+  }
+
   onAuthStateChanged(async (firebaseUser) => {
     user.value = firebaseUser
     isSignedIn.value = !!firebaseUser
+    readDetailDraft()
     if (isSignedIn.value && firebaseUser) {
       const token = await firebaseUser.getIdToken()
       logger.debug('📥 DashboardView - Lade Workouts (authState)', 'Token:', token)
       await Promise.all([
         store.loadWorkouts(token, { force: false }),
-        store.loadStats(token, { rangeDays: PROGRESS_RANGE_DAYS }),
-        settings.loadProfile(token).catch(() => null),
-        loadFeedbackThreads({ token, force: true })
+        settings.loadProfile(token).catch(() => null)
       ])
+    } else if (!isOnline() && authStore.isOfflineSessionValid) {
+      await loadWorkoutsData(false)
     }
   })
 
@@ -358,6 +416,8 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  window.removeEventListener('online', onOnlineStatus)
+  window.removeEventListener('offline', onOfflineStatus)
   // remove window listener
   window.removeEventListener('focus', onWindowFocus)
   // if router provides an unregister fn, call it and allow re-registration later
@@ -369,50 +429,55 @@ onUnmounted(() => {
 })
 
 onActivated(async () => {
-  if (isSignedIn.value) {
+  draftSourceLogged.value = false
+  if (isSignedIn.value || (!isOnline() && authStore.isOfflineSessionValid)) {
     logger.debug('📥 DashboardView - Route aktiviert, lade Workouts neu')
     await loadWorkoutsData(true)
+    await readDetailDraft()
   } else {
     logger.debug('🚫 [Dashboard] onActivated: Nicht eingeloggt')
+    await readDetailDraft()
   }
 })
 </script>
 
 <style scoped>
 .dashboard {
-  min-height: 100vh;
-  background: var(--bg);
+  min-height: 100dvh;
+  background: var(--bg-inner);
   color: var(--fg);
-  padding-bottom: 70px;
 }
 
 .dashboard-content {
   display: flex;
   flex-direction: column;
-  gap: 32px;
-  padding: 24px clamp(16px, 4vw, 48px);
+  gap: 12px;
+  padding: 14px clamp(12px, 3vw, 32px);
+  padding-bottom: 0;
+  min-height: calc(100dvh - var(--header-height) - var(--safe-top) - 64px - var(--safe-bottom, 0px));
+  font-family: "Sora", "Space Grotesk", "SF Pro Display", sans-serif;
 }
 
 .dashboard-avatar {
   width: 40px;
   height: 40px;
   border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--card-border) 35%, transparent);
-  background: color-mix(in srgb, var(--surface) 55%, transparent);
+  border: 1px solid var(--line-soft);
+  background: var(--card-bg);
   padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
   cursor: pointer;
-  box-shadow: 0 8px 18px color-mix(in srgb, black 10%, transparent);
+  box-shadow: var(--shadow-soft);
   transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
 }
 
 .dashboard-avatar:hover {
   transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--card-border) 55%, transparent);
-  background: color-mix(in srgb, var(--surface) 65%, transparent);
+  border-color: var(--line-strong);
+  background: var(--bg-panel);
 }
 
 .dashboard-avatar:active {
@@ -435,92 +500,101 @@ onActivated(async () => {
   font-weight: 800;
   letter-spacing: 0.02em;
   color: var(--fg);
-  background: radial-gradient(circle at 30% 30%, rgba(215, 255, 31, 0.32), rgba(255, 255, 255, 0.06) 60%);
+  background: var(--card-bg);
 }
 
-.today {
-  max-width: 720px;
-  margin: 0 auto;
-  width: 100%;
-}
-
-.next-card {
-  position: relative;
-  border-radius: var(--panel-radius);
-  border: 1px solid var(--line-soft);
-  /* background: linear-gradient(145deg, rgba(11, 12, 15, 0.92), rgba(24, 26, 33, 0.85)); */
-  box-shadow: var(--shadow-hard);
-  padding: clamp(22px, 4vw, 36px);
-  overflow: hidden;
-}
-
-.next-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(circle at 80% 0%, rgba(215, 255, 31, 0.22), transparent 55%);
-  opacity: 0.9;
-  pointer-events: none;
-}
-
-.next-card::after {
-  content: '';
-  position: absolute;
-  inset: 18px;
-  border-radius: calc(var(--panel-radius) - 18px);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  pointer-events: none;
-}
-
-.next-header {
-  position: relative;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 18px;
-  z-index: 1;
-}
-
-.next-title {
-  font-size: clamp(1.4rem, 3vw, 1.8rem);
-  font-weight: 600;
-  color: var(--fg-strong);
-  margin-top: 6px;
-}
-
-.muted {
-  color: var(--muted);
-  font-size: 0.85rem;
-}
-
-.action-lead {
-  position: relative;
-  z-index: 1;
-  color: var(--muted);
-  font-size: 1rem;
-  margin-top: 12px;
-  max-width: 420px;
-  line-height: 1.6;
-}
-
-.draft-notice {
-  position: relative;
-  z-index: 1;
-  margin-top: 18px;
-  border-radius: 20px;
-  border: 1px solid rgba(215, 255, 31, 0.45);
-  background: rgba(215, 255, 31, 0.08);
-  padding: 14px 16px;
+.hero {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  color: var(--accent);
-  font-weight: 600;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: calc(var(--panel-radius) - 12px);
+  border: 1px solid var(--line-strong);
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-soft);
 }
 
-.draft-icon { font-size: 1.2rem; }
-.draft-timestamp { font-size: 0.78rem; color: var(--muted); }
+.hero-title {
+  margin: 6px 0 0;
+  font-size: clamp(1.9rem, 3.6vw, 2.5rem);
+  font-weight: 900;
+  color: var(--fg-strong);
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-shadow: 0 0 18px color-mix(in srgb, var(--accent) 40%, transparent);
+}
 
+.hero-sub {
+  color: var(--muted);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+.quick-start {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+
+.quick-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.draft-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--panel-radius);
+  border: 1px solid var(--line-strong);
+  background: var(--card-soft);
+  font-size: 0.85rem;
+  flex-wrap: wrap;
+}
+
+.draft-actions {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: center;
+}
+
+.cta-inline {
+  border: 1px solid var(--accent);
+  background: transparent;
+  color: var(--fg-strong);
+  padding: 5px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.cta-inline.danger {
+  border-color: var(--danger);
+  color: var(--danger-text);
+}
+
+@media (max-width: 520px) {
+  .draft-note {
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+
+  .draft-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+}
+
+:deep(.empty-state .icon) {
+  display: none;
+}
 .loading-section,
 .success-message {
   border-radius: var(--panel-radius);
@@ -543,8 +617,8 @@ onActivated(async () => {
 
 .success-message {
   animation: fadeSlide 0.5s ease;
-  background: rgba(121, 255, 180, 0.16);
-  border-color: rgba(121, 255, 180, 0.35);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
 .success-content {
@@ -563,159 +637,6 @@ onActivated(async () => {
 
 .success-message p { color: var(--muted); }
 
-.action-buttons {
-  margin-top: 26px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  position: relative;
-  z-index: 1;
-}
-
-.primary-action {
-  width: 100%;
-  padding: 18px;
-  border-radius: 18px;
-  border: none;
-  font-size: 0.95rem;
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
-  background: linear-gradient(120deg, var(--accent), var(--accent-strong));
-  color: var(--accent-contrast);
-  box-shadow: 0 18px 40px rgba(215, 255, 31, 0.35);
-}
-
-.primary-action.ghost {
-  background: transparent;
-  border: 1px solid var(--line-soft);
-  color: var(--fg);
-  box-shadow: none;
-}
-
-.primary-action.ghost:hover {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.recent-section {
-  padding-bottom: calc(140px + var(--safe-bottom));
-}
-
-.feedback-section {
-  max-width: 720px;
-  margin: 0 auto;
-  width: 100%;
-}
-
-.feedback-card {
-  border-radius: var(--panel-radius);
-  border: 1px solid color-mix(in srgb, var(--accent) 18%, var(--line-soft));
-  padding: clamp(18px, 3vw, 24px);
-}
-
-.feedback-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.feedback-title {
-  margin: 0;
-  font-size: 0.95rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-
-.feedback-btn {
-  background: color-mix(in srgb, var(--accent) 10%, var(--bg-elevated));
-  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line-soft));
-  border-radius: 999px;
-  padding: 10px 14px;
-  min-height: 42px;
-  color: var(--fg);
-  cursor: pointer;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  font-size: 0.78rem;
-}
-
-.feedback-btn:hover {
-  filter: brightness(1.04);
-}
-
-.feedback-btn:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
-}
-
-.feedback-preview {
-  margin-top: 14px;
-  border: 1px solid var(--line-soft);
-  border-radius: 16px;
-  padding: 12px 14px;
-  background: color-mix(in srgb, var(--bg-elevated) 92%, transparent);
-}
-
-.preview-top {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: center;
-}
-
-.preview-workout {
-  min-width: 0;
-  display: flex;
-  gap: 10px;
-  align-items: baseline;
-}
-
-.preview-workout strong {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.preview-meta {
-  color: var(--muted);
-  font-size: 0.8rem;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.preview-time {
-  color: var(--muted);
-  font-size: 0.82rem;
-  white-space: nowrap;
-}
-
-.preview-text {
-  margin-top: 10px;
-  color: color-mix(in srgb, var(--fg) 92%, var(--muted));
-  font-size: 0.95rem;
-  display: -webkit-box;
-  line-clamp: 2;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.preview-sender {
-  color: color-mix(in srgb, var(--accent) 75%, var(--fg));
-  font-weight: 700;
-  margin-right: 6px;
-}
-
-@media (min-width: 768px) {
-  .action-buttons {
-    flex-direction: row;
-  }
-
-  .primary-action {
-    flex: 1;
-  }
-}
 
 @keyframes fadeSlide {
   0% { opacity: 0; transform: translateY(-12px); }

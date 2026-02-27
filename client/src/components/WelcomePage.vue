@@ -13,12 +13,13 @@ defineProps({
     handleChangeDisplay: { type: Function, default: null }
 })
 
-const { signInWithGoogle, signInWithAppleRedirect, signInWithEmail, signUpWithEmail, resetPassword, getCurrentUser, getIdToken, resendVerification, requestVerificationLink } = useFirebaseAuth()
+const { signInWithGoogle, signInWithApple, signInWithAppleRedirect, signInWithEmail, signUpWithEmail, resetPassword, getCurrentUser, getIdToken, resendVerification, requestVerificationLink } = useFirebaseAuth()
 const router = useRouter()
 const route = useRoute()
 const { t } = useI18n()
 const authStore = useAuthStore()
 const isSignedIn = computed(() => authStore.isAuthenticated)
+const offlineExpired = computed(() => route.query?.reason === 'offline-expired')
 
 // Persist pending verification across reloads until verified
 const PENDING_EMAIL_KEY = 'pendingVerificationEmail'
@@ -353,6 +354,39 @@ async function handleGoogleLogin() {
     }
 }
 
+async function handleAppleLogin() {
+    authError.value = ''
+    authLoading.value = true
+    try {
+        await initFirebaseAuth()
+
+        const platform = Capacitor?.getPlatform?.() ?? Capacitor?.platform ?? 'unknown'
+        const native = platform !== 'web'
+        logger.debug('[WelcomePage] Apple login start', { platform, native })
+
+        await signInWithApple()
+
+        const token = await getIdToken()
+        const user = getCurrentUser()
+        if (user && token) {
+            const target = getRedirectTarget()
+            showMotivation.value = false
+            try { document.activeElement?.blur() } catch {}
+            await new Promise((res) => setTimeout(res, 0))
+            logger.debug('[WelcomePage] Navigating after confirmed token to:', target)
+            await router.replace(target)
+        } else {
+            logger.debug('[WelcomePage] Waiting for auth state; no immediate navigation')
+        }
+    } catch (err) {
+        logger.error('[WelcomePage] Apple login failed:', err?.message || err, err)
+        authError.value = err.message || 'Apple Login fehlgeschlagen'
+    } finally {
+        logger.debug('[WelcomePage] Apple login finished, resetting loading state')
+        authLoading.value = false
+    }
+}
+
 // Deaktiviere Motivation-Overlay im nativen Flow; Navigation erfolgt direkt im Login-Handler
 watch(isSignedIn, async (loggedIn) => {
     logger.debug('[WelcomePage] watch isSignedIn ->', loggedIn, 'route:', router.currentRoute?.value?.fullPath)
@@ -403,6 +437,9 @@ watch(() => route.query?.emailVerified, (val) => {
     <div class="welcome-page">
         <!-- Nicht eingeloggt: Sign-In -->
         <div v-if="!isSignedIn" class="sign-in-container">
+            <div v-if="offlineExpired" class="info-banner">
+                <p>Deine Offline‑Sitzung ist abgelaufen. Bitte einmal online anmelden.</p>
+            </div>
             <h2>{{ t('welcome.title') }}</h2>
             <p>{{ t('welcome.signInPrompt') }}</p>
             
@@ -482,7 +519,7 @@ watch(() => route.query?.emailVerified, (val) => {
                     </svg>
                     Google
                 </button>
-                <button class="apple-btn" @click="signInWithAppleRedirect" :disabled="authLoading">
+                <button class="apple-btn" @click="handleAppleLogin" :disabled="authLoading">
                     <svg class="apple-icon" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                         <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
                     </svg>

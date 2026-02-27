@@ -2,7 +2,7 @@
   <div class="recent-workouts glass">
     <div class="header">
       <h3>{{ t('recent.title') }}</h3>
-      <router-link to="/stats" class="view-all">{{ t('recent.viewAll') }}</router-link>
+      <router-link v-if="showViewAll" to="/stats" class="view-all">{{ t('recent.viewAll') }}</router-link>
     </div>
     
     <div v-if="recentWorkouts.length === 0" class="empty-state">
@@ -173,9 +173,9 @@
             </div>
           </div>
           
-          <div v-if="workout.notes" class="workout-notes">
+          <div v-if="getWorkoutNotes(workout)" class="workout-notes">
             <h5>{{ t('recent.notes') }}:</h5>
-            <p>{{ workout.notes }}</p>
+            <p>{{ getWorkoutNotes(workout) }}</p>
           </div>
           
           <div class="workout-stats">
@@ -200,11 +200,16 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 import { logger } from '@/utils/logger'
+import { resolveWorkoutNotes } from '@/utils/workoutNotes'
 
 const props = defineProps({
   workouts: {
     type: Array,
     default: () => []
+  },
+  showViewAll: {
+    type: Boolean,
+    default: true
   }
 })
 
@@ -213,11 +218,16 @@ const { t, locale } = useI18n()
 const { getTranslatedExerciseName } = useExerciseTranslation()
 const expandedWorkout = ref(null)
 const showAllExercises = ref(false)
+const getWorkoutNotes = (workout) => resolveWorkoutNotes(workout, { maxItems: 8, maxLength: 600 })
 
 // Die letzten 3 Workouts (keine Drafts)
 const recentWorkouts = computed(() => {
   return props.workouts
-    .filter(w => !w.isDraft)
+    .filter(w => !(w?.isDraft || w?._isDraft))
+    .map(w => ({
+      ...w,
+      notes: resolveWorkoutNotes(w, { maxItems: 8, maxLength: 600 })
+    }))
     .sort((a, b) => new Date(b.date || b.updatedAt) - new Date(a.date || a.updatedAt))
     .slice(0, 3)
 })

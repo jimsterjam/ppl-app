@@ -26,8 +26,8 @@
             <div class="plan-header">
               <h3>Pro</h3>
               <div class="plan-price">
-                <span class="price">€{{ billingCycle === 'yearly' ? '4.17' : '4.99' }}</span>
-                <span class="period">/{{ billingCycle === 'yearly' ? t('upgrade.month') : t('upgrade.month') }}</span>
+                <span class="price">€{{ billingCycle === 'yearly' ? '49.99' : '4.99' }}</span>
+                <span class="period">/{{ billingCycle === 'yearly' ? t('upgrade.yearly') : t('upgrade.monthly') }}</span>
               </div>
               <div v-if="billingCycle === 'yearly'" class="savings">{{ t('upgrade.save2Months') }}</div>
             </div>
@@ -46,8 +46,8 @@
             <div class="plan-header">
               <h3>Elite</h3>
               <div class="plan-price">
-                <span class="price">€{{ billingCycle === 'yearly' ? '8.33' : '9.99' }}</span>
-                <span class="period">/{{ t('upgrade.month') }}</span>
+                <span class="price">€{{ billingCycle === 'yearly' ? '99.99' : '9.99' }}</span>
+                <span class="period">/{{ billingCycle === 'yearly' ? t('upgrade.yearly') : t('upgrade.monthly') }}</span>
               </div>
               <div v-if="billingCycle === 'yearly'" class="savings">{{ t('upgrade.save2Months') }}</div>
             </div>
@@ -291,7 +291,8 @@ const handleUpgrade = async () => {
   cursor: pointer;
   transition: all 0.3s ease;
   position: relative;
-  background: color-mix(in srgb, var(--bg-secondary) 40%, transparent);
+  background: color-mix(in srgb, var(--bg-secondary) 40%,  #fff 82%);
+  color:  #fff 82%;
 }
 
 .plan-card:hover {
@@ -301,7 +302,8 @@ const handleUpgrade = async () => {
 
 .plan-card.selected {
   border-color: var(--accent-color);
-  background: color-mix(in srgb, var(--accent-color) 10%, transparent);
+  background: color-mix(in srgb, var(--accent-color) 18%, #fff 82%);
+  color: #222;
 }
 
 .plan-header {
@@ -313,7 +315,7 @@ const handleUpgrade = async () => {
   margin: 0 0 8px;
   font-size: 1.25rem;
   font-weight: 700;
-  color: var(--text-primary);
+  color: #222;
 }
 
 .plan-price {
@@ -331,18 +333,19 @@ const handleUpgrade = async () => {
 }
 
 .period {
-  color: var(--text-secondary);
+  color: #555;
   font-size: 0.9rem;
 }
 
 .savings {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  color: #fff;
   padding: 4px 12px;
   border-radius: 12px;
   font-size: 0.8rem;
   font-weight: 600;
   display: inline-block;
+  box-shadow: 0 1px 4px rgba(102,126,234,0.12);
 }
 
 .plan-features {
@@ -405,7 +408,8 @@ const handleUpgrade = async () => {
 
 .toggle-option.active {
   background: var(--accent-color);
-  color: white;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(102,126,234,0.08);
 }
 
 .discount {
@@ -451,9 +455,9 @@ const handleUpgrade = async () => {
 }
 
 .continue-free-btn {
-  background: none;
-  border: 1px solid color-mix(in srgb, var(--border-color) 50%, transparent);
-  color: var(--text-secondary);
+  background: #fff;
+  border: 1px solid var(--accent-color);
+  color: #222;
   padding: 12px 24px;
   border-radius: 12px;
   cursor: pointer;
@@ -461,8 +465,9 @@ const handleUpgrade = async () => {
 }
 
 .continue-free-btn:hover {
-  border-color: var(--border-color);
-  color: var(--text-primary);
+  border-color: var(--accent-color);
+  color: #111;
+  background: color-mix(in srgb, var(--accent-color) 8%, #fff 92%);
 }
 
 .trust-signals {

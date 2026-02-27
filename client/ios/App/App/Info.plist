@@ -67,6 +67,14 @@
 		<true/>
 		<key>NSExceptionDomains</key>
 		<dict>
+			<!-- NOTE: Temporary HTTP exception for dev CDN. Switch to HTTPS before going live. -->
+			<key>push-pull-legs.de</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<true/>
+			</dict>
 			<key>192.168.178.26</key>
 			<dict>
 				<key>NSExceptionAllowsInsecureHTTPLoads</key>
@@ -135,6 +143,8 @@
 	</dict>
 	<key>NSCameraUsageDescription</key>
 	<string>Camera-Zugriff wird benötigt, um Trainingsbilder aufzunehmen und Übungen zu dokumentieren.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Fotos werden genutzt, um dein Profilbild auszuwählen und anzuzeigen.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Lokales Netzwerk wird benötigt, um die lokale API im Heimnetz zu erreichen.</string>
 </dict>

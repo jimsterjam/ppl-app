@@ -2,7 +2,7 @@
   <teleport to="body">
     <div v-if="modelValue" class="modal-overlay" role="presentation" @click.self="overlayClick">
       <div
-        class="modal glass-strong"
+        :class="['modal', 'glass-strong', type]"
         role="dialog"
         aria-modal="true"
         :aria-labelledby="title ? 'modal-title' : null"
@@ -99,6 +99,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 .btn:hover { filter: brightness(1.02); }
 .btn:active { transform: translateY(1px); }
 
+.modal.info .modal-body p {
+  background: var(--surface-strong);
+  border: 1px solid var(--card-border);
+  padding: 10px 12px;
+  border-radius: 10px;
+}
+
 /* Light-Theme: höhere Lesbarkeit für Glas-Modal */
 [data-theme="light"] .modal.glass-strong {
   background: rgba(255, 255, 255, 0.85);
@@ -109,4 +116,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 }
 [data-theme="light"] .modal-header { border-bottom-color: rgba(0, 0, 0, 0.06); }
 [data-theme="light"] .modal-body { color: var(--fg); }
+[data-theme="light"] .modal.info .modal-body p {
+  background: var(--surface);
+  border-color: var(--card-border);
+}
 </style>

@@ -497,6 +497,9 @@ router.get("/:id", firebaseAuthMiddleware, async (req, res) => {
 router.post("/", firebaseAuthMiddleware, async (req, res) => {
   try {
     const { userId } = req.auth;
+    // TEMP LOGGING: Request-Body und userId
+    logger.info("[POST /api/workouts] Request-Body:", req.body);
+    logger.info("[POST /api/workouts] userId:", userId);
     // Debug: Logge die Notizen der Übungen, falls vorhanden
     if (Array.isArray(req.body.exercises)) {
       console.log('📝 Notizen der Übungen beim POST /workouts:');
@@ -510,8 +513,10 @@ router.post("/", firebaseAuthMiddleware, async (req, res) => {
       ...req.body,
       userId
     });
+    logger.info("[POST /api/workouts] Workout erfolgreich gespeichert:", workout);
     res.status(201).json(workout);
   } catch (err) {
+    logger.error("[POST /api/workouts] Fehler beim Speichern:", err);
     res.status(400).json({ error: err.message });
   }
 });
@@ -1116,12 +1121,6 @@ Gib AUSSCHLIESSLICH ein JSON-Array zurück (keine andere Erklärung), mit dieser
 ]
 
 ANFORDERUNGEN:
-- Kategorien: Push = Brust/Schultern/Trizeps, Pull = Rücken/Bizeps/Trapez, Legs = Beine/Gesäß
-- EXAKT 45 verschiedene Übungen
-- Jede Übung UNIQUE und sinnvoll
-- Deutsche Übungsnamen
-- Realistisches und professionelles Equipment
-- Keine Duplikate
 
 Generiere jetzt 45 ${category}-Übungen:`;
 

@@ -1,41 +1,42 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
-import WelcomeView from '../views/WelcomeView.vue'
-// Funnel view (optional): redirects browser users to app stores
-import GetTheAppView from '../views/GetTheAppView.vue'
-import AuthLayout from '../layouts/AuthLayout.vue'
-import DashboardView from '../views/DashboardView.vue'
-import StatsView from '../views/StatsView.vue'
-import ExercisesView from '../views/ExercisesView.vue'
-import SettingsView from '../views/SettingsView.vue'
-import WorkoutBuilder from '../components/WorkoutBuilder.vue'
-import WorkoutDetailView from '../views/WorkoutDetailView.vue'
-import FeedbackInboxView from '../views/FeedbackInboxView.vue'
-import FaqsView from '../views/FaqsView.vue'
-import FeaturesTestView from '../views/FeaturesTestView.vue'
-
-import LegalNoticeView from '../views/LegalNoticeView.vue'
 import { useAuthStore } from '@/stores/authStore'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { logger } from '@/utils/logger'
+import { isOnline } from '@/utils/offlineStorage'
+
+const WelcomeView = () => import('../views/WelcomeView.vue')
+const GetTheAppView = () => import('../views/GetTheAppView.vue')
+const AuthLayout = () => import('../layouts/AuthLayout.vue')
+const DashboardView = () => import('../views/DashboardView.vue')
+const StatsView = () => import('../views/StatsView.vue')
+const ExercisesView = () => import('../views/ExercisesView.vue')
+const SettingsView = () => import('../views/SettingsView.vue')
+const WorkoutBuilder = () => import('../components/WorkoutBuilder.vue')
+const WorkoutDetailView = () => import('../views/WorkoutDetailView.vue')
+const FeedbackInboxView = () => import('../views/FeedbackInboxView.vue')
+const FaqsView = () => import('../views/FaqsView.vue')
+const FeaturesTestView = () => import('../views/FeaturesTestView.vue')
+const LegalNoticeView = () => import('../views/LegalNoticeView.vue')
 
 const routes = [
   {
     path: '/',
     name: 'welcome',
     component: WelcomeView,
-    meta: { requiresAuth: false }
+    meta: { requiresAuth: false, layout: 'public' }
   },
   {
     path: '/get-the-app',
     name: 'get-the-app',
     component: GetTheAppView,
-    meta: { requiresAuth: false }
+    meta: { requiresAuth: false, layout: 'public' }
   },
   // Geschützte Routen unter AuthLayout, mit identischen (absoluten) Pfaden
   {
     path: '/',
     component: AuthLayout,
+    meta: { layout: 'auth' },
     children: [
       { path: 'dashboard', name: 'dashboard', component: DashboardView },
       { path: 'stats', name: 'stats', component: StatsView },
@@ -98,7 +99,7 @@ router.beforeEach(async (to, from, next) => {
     const currentUser = getCurrentUser()
     if (currentUser) {
       logger.debug('[router] restoring auth state from Firebase user')
-      const token = await getIdToken().catch(() => null)
+      const token = isOnline() ? await getIdToken().catch(() => null) : null
       authStore.setUser({
         uid: currentUser.uid,
         email: currentUser.email,
@@ -127,6 +128,15 @@ router.beforeEach(async (to, from, next) => {
   }
 
   // Defense-in-depth: Wenn Store sagt eingeloggt, aber kein echter Firebase-User/Token vorhanden, zurück zur Welcome
+  if (!isOnline()) {
+    if (!authStore.isOfflineSessionValid) {
+      logger.warn('[router] offline session expired or missing token, redirecting to welcome')
+      authStore.clearUser()
+      return next({ name: 'welcome', query: { redirect: to.fullPath, reason: 'offline-expired' } })
+    }
+    return next()
+  }
+
   const realUser = getCurrentUser()
   let token = null
   try {

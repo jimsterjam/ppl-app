@@ -49,8 +49,8 @@ function handleNavigation(displayType) {
   position: absolute;
   inset: 0;
   opacity: 0;
-  transform: translate3d(0, 12px, 0);
-  transition: opacity 1700ms ease, transform 1700ms cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translate3d(0, 28px, 0);
+  transition: opacity 1200ms ease, transform 1200ms cubic-bezier(0.16, 1, 0.3, 1);
   will-change: transform, opacity;
   backface-visibility: hidden;
   transform-origin: 50% 50%;

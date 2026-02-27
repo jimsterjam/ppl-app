@@ -1,13 +1,12 @@
 import { getAllExercisesOffline } from '@/utils/offlineStorage'
-import allExercisesData from '@/data/default-exercises.json'
-import { normalizeDefaultExercises } from '@/utils/normalizeDefaultExercises'
+import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
 
 // Merge offline exercises with JSON defaults, dedupe by name+equipment, optional equipment filter,
 // and sort alphabetically by first three letters, then full name
 export async function getMergedSortedExercises({ category = '', equipment = '', locale = '' } = {}) {
   // Build quick lookup by both DE and EN names from defaults
   const normalize = (s) => (s || '').trim().toLowerCase()
-  const defaults = normalizeDefaultExercises(allExercisesData)
+  const defaults = await loadDefaultExercises()
   const nameIndex = new Map()
   for (const d of defaults) {
     const de = normalize(d.name)

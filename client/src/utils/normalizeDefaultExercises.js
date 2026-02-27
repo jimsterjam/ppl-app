@@ -76,6 +76,7 @@ function mapEquipment(existing, equipmentEn) {
 }
 
 export function normalizeDefaultExercise(exercise = {}) {
+  const cdnBase = (import.meta.env.VITE_ASSET_CDN_BASE || '').replace(/\/+$/, '')
   const rawId = exercise.id ? String(exercise.id).trim() : ''
   const derivedId = exercise._id || (rawId ? `ex_${rawId}` : undefined)
   const name = exercise.name || exercise.name_en || ''
@@ -88,13 +89,24 @@ export function normalizeDefaultExercise(exercise = {}) {
   const equipment = mapEquipment(exercise.equipment, equipment_en)
   const description = exercise.description || exercise.description_en || ''
   const description_en = exercise.description_en || exercise.description || ''
-  const imageUrl = exercise.imageUrl || (rawId ? `/exercises/360/${rawId}.gif` : undefined)
-  const thumbnailUrl = exercise.thumbnailUrl || (rawId ? `/exercises/180/${rawId}.gif` : undefined)
-  const thumbnailStaticUrl = exercise.thumbnailStaticUrl || (rawId ? `/exercises/static/180/${rawId}.jpg` : undefined)
+  const numericId = rawId && /^\d+$/.test(rawId) ? rawId.padStart(4, '0') : rawId
+  const mediaId = exercise.mediaId || numericId || derivedId
+  const mediaVersion = exercise.mediaVersion || exercise.version || 'v1'
+  let imageUrl = exercise.imageUrl || undefined
+  let thumbnailUrl = exercise.thumbnailUrl || undefined
+  const thumbnailStaticUrl = exercise.thumbnailStaticUrl || (numericId ? `/exercises/static/180/${numericId}.jpg` : undefined)
+
+  if (imageUrl && thumbnailUrl && imageUrl.includes('/180/') && thumbnailUrl.includes('/360/')) {
+    const tmp = imageUrl
+    imageUrl = thumbnailUrl
+    thumbnailUrl = tmp
+  }
 
   const normalized = {
     ...exercise,
     _id: derivedId,
+    mediaId,
+    mediaVersion,
     name,
     name_en,
     category,

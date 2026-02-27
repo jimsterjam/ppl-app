@@ -1,135 +1,107 @@
 <template>
-  <div class="workout-card" :class="normalizedType">
-    <div class="header">
-      <h2>{{ heading }}</h2>
-      <span>{{ formattedDate }}</span>
-    </div>
-
-    <ul class="exercise-list">
-      <li v-for="(ex, i) in (workout.exercises || [])" :key="i">
-        <strong>{{ getTranslatedExerciseName(ex.name) }}</strong>
-        <span>{{ (ex.sets ?? (ex.setDetails?.length || 0)) }}×{{ (ex.reps ?? ex.setDetails?.[0]?.reps ?? 0) }}</span>
-      </li>
-    </ul>
-
-  <button @click="$emit('start', workout)">Start</button>
+  <div class="workout-card" :class="{ active }">
+    <button class="card-hit" type="button" @click="onClick">
+      <span class="workout-label">{{ label }}</span>
+    </button>
+    <button
+      v-if="infoLabel"
+      class="info-btn"
+      type="button"
+      :aria-label="infoLabel"
+      @click.stop="onInfo"
+    >i</button>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { useExerciseTranslation } from '@/utils/exerciseTranslation'
+const emit = defineEmits(['click'])
 
 const props = defineProps({
-  workout: { type: Object, required: true }
-});
-const { getTranslatedExerciseName } = useExerciseTranslation()
-
-// Declare emitted events for linting/auto-complete
-defineEmits(['start'])
-
-const normalizedType = computed(() => {
-  const t = (props.workout?.type ?? '').toString().trim().toLowerCase();
-  if (["push", "pull", "legs", "leg"].includes(t)) return t === 'leg' ? 'legs' : t;
-  return 'unknown';
-});
-
-const workoutTitle = computed(() => {
-  const name = (props.workout?.name || '').toString().trim();
-  if (name) return name; // Bevorzugt den expliziten Namen, falls gesetzt
-  const t = normalizedType.value;
-  if (t === 'push') return 'Push Day';
-  if (t === 'pull') return 'Pull Day';
-  if (t === 'legs') return 'Leg Day';
-  return 'Workout';
-});
-
-const formattedDate = computed(() => {
-  const d = props.workout?.updatedAt || props.workout?.date
-  if (!d) return ''
-  try {
-    return new Date(d).toLocaleString('de-DE')
-  } catch {
-    return String(d)
-  }
-});
-
-const heading = computed(() => {
-  const dateStr = (props.workout?.date || '').toString()
-  const todayStr = new Date().toISOString().split('T')[0]
-  const isToday = dateStr.startsWith(todayStr)
-  return isToday ? `Heute: "${workoutTitle.value}"` : `Letztes Workout: "${workoutTitle.value}"`
+  label: { type: String, required: true },
+  active: { type: Boolean, default: false },
+  infoLabel: { type: String, default: '' }
 })
+
+const onClick = () => emit('click')
+const onInfo = () => emit('info', props.label)
 </script>
 
 <style scoped>
-.workout-card { background: var(--card-bg); border-radius: 16px; padding: 20px; color: var(--fg); margin-bottom: 16px; border: 1px solid var(--card-border); }
-.workout-card.push,
-.workout-card.pull,
-.workout-card.legs,
-.workout-card.unknown { border-left: 4px solid var(--accent-color); }
-
-.header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.header h2 {
-  margin: 0;
-  font-size: 1.25rem;
-  font-weight: 600;
-}
-
-.header span { font-size: 0.9rem; color: var(--muted); font-weight: 500; }
-
-.exercise-list {
-  list-style: none;
-  margin: 0 0 16px 0;
-  padding: 0;
-}
-
-.exercise-list li { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--card-border); font-size: 0.9rem; }
-
-.exercise-list li:last-child {
-  border-bottom: none;
-}
-
-.exercise-list strong { font-weight: 600; color: var(--fg); }
-
-.exercise-list span { color: var(--muted); font-size: 0.85rem; font-weight: 500; }
-
-button { background: var(--accent); color: var(--accent-contrast); border: none; padding: 12px 20px; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; width: 100%; transition: all 0.2s ease; -webkit-tap-highlight-color: transparent; }
-button:hover { filter: brightness(1.02); }
-button:active { transform: scale(0.98); }
-
-[data-theme="light"] .workout-card {
+.workout-card {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: calc(var(--panel-radius) - 16px);
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--line-strong));
   background: var(--bg-panel);
   box-shadow: var(--shadow-soft);
-  border-color: rgba(12, 16, 30, 0.12);
+  color: var(--fg-strong);
+  font-family: "Sora", "Space Grotesk", "SF Pro Display", sans-serif;
+  font-size: clamp(1.1rem, 2.4vw, 1.6rem);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
+  position: relative;
 }
 
-/* Tablet Styles */
-@media (min-width: 768px) {
+.card-hit {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-transform: inherit;
+  letter-spacing: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  cursor: pointer;
+}
+.info-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line-strong));
+  background: var(--bg-panel);
+  color: var(--fg-strong);
+  font-weight: 800;
+  font-size: 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: normal;
+}
+
+.info-btn:hover {
+  background: color-mix(in srgb, var(--bg-panel) 85%, var(--fg) 6%);
+}
+
+
+.workout-card:hover {
+  background: color-mix(in srgb, var(--card-bg) 85%, var(--fg) 5%);
+}
+
+.card-hit:active {
+  transform: scale(0.97);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 70%, transparent),
+    0 0 18px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.workout-card.active {
+  border: 2px solid var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent), var(--shadow-hard);
+}
+
+@media (prefers-reduced-motion: reduce) {
   .workout-card {
-    padding: 24px;
-    border-radius: 20px;
-  }
-  
-  .header h2 {
-    font-size: 1.5rem;
-  }
-  
-  .exercise-list li {
-    font-size: 1rem;
-    padding: 10px 0;
-  }
-  
-  button {
-    width: auto; min-width: 120px; padding: 14px 24px;
+    transition: none;
   }
 }
 </style>

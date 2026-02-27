@@ -18,9 +18,6 @@ import {
 import { logger } from './logger'
 import { createWorkout, updateWorkout, deleteWorkout } from '@/api/workouts'
 import { getAuthToken } from './authToken'
-import { useToastStore } from '@/stores/toastStore'
-// Silent Sync: keine Toasts für automatische Synchronisation
-const SILENT_SYNC = true
 
 // Max Retry Attempts für fehlgeschlagene Syncs
 const MAX_RETRY_ATTEMPTS = 3
@@ -122,27 +119,13 @@ export async function processSyncQueue() {
     // Speichere letzten Sync Timestamp
     await setMetadata('lastSyncTimestamp', Date.now())
     
-    logger.debug('✅ Sync Manager - Sync abgeschlossen', {
+    const result = {
       success: successCount,
       failed: failedCount,
       total: pending.length
-    })
-    
-    // Toast Notification (optional Zusammenfassung)
-    if (!SILENT_SYNC) {
-      const toast = useToastStore()
-      if (successCount > 0) {
-        toast.success(`${successCount} Änderung${successCount > 1 ? 'en' : ''} synchronisiert`, { duration: 3000 })
-      }
-      if (failedCount > 0) {
-        toast.error(`${failedCount} Sync fehlgeschlagen`, { duration: 5000 })
-      }
     }
-    
-    // Setze syncInProgress NACH den Toasts zurück
-    // damit der Indicator Zeit hat auf die neue pendingCount zu reagieren
+    logger.debug('✅ Sync Manager - Sync abgeschlossen', result)
     syncInProgress = false
-    logger.debug('📊 Sync Manager - Result:', result)
     return result
     
   } catch (error) {
@@ -248,12 +231,6 @@ export async function setupAutoSync() {
   window.addEventListener('online', async () => {
     logger.debug('📡 Sync Manager - Network reconnected, starte Auto-Sync')
 
-    // Optionaler Hinweis
-    if (!SILENT_SYNC) {
-      const toast = useToastStore()
-      toast.info('Verbindung wiederhergestellt, synchronisiere...', { duration: 2000 })
-    }
-
     // Warte kurz damit der Browser sich stabilisiert
     await new Promise(resolve => setTimeout(resolve, 1000))
 
@@ -263,11 +240,6 @@ export async function setupAutoSync() {
 
   window.addEventListener('offline', () => {
     logger.warn('📡 Sync Manager - Network lost, Offline Mode')
-
-    if (!SILENT_SYNC) {
-      const toast = useToastStore()
-      toast.warning('Keine Verbindung - Offline Mode aktiv', { duration: 3000 })
-    }
   })
 
   logger.debug('✅ Sync Manager - Auto-Sync aktiviert')
@@ -300,25 +272,7 @@ export async function setupAutoSync() {
  */
 export async function triggerManualSync() {
   logger.debug('🔄 Sync Manager - Manueller Sync gestartet')
-  
-  const toast = useToastStore()
-  if (!SILENT_SYNC) {
-    toast.info('Synchronisiere...', { duration: 1000 })
-  }
-  
-  const result = await processSyncQueue()
-  
-  if (!SILENT_SYNC) {
-    if (result.offline) {
-      toast.error('Keine Verbindung - bitte später versuchen', { duration: 3000 })
-    } else if (result.noAuth) {
-      toast.error('Nicht eingeloggt – bitte anmelden, um zu synchronisieren', { duration: 4000 })
-    } else if (result.total === 0) {
-      toast.success('Alles synchronisiert ✓', { duration: 2000 })
-    }
-  }
-  
-  return result
+  return processSyncQueue()
 }
 
 /**

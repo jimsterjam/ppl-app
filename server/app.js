@@ -1,74 +1,78 @@
+
 import express from "express";
-import mongoose from "mongoose";
 import cors from "cors";
-import dotenv from "dotenv";
 import path from "path";
 import { fileURLToPath } from "url";
-
-// Deine Routen und Middleware importieren
 import workoutRoutes from "./routes/workouts.js";
 import exerciseRoutes from "./routes/exercises.js";
 import subscriptionRoutes from "./routes/subscription.js";
 import accountRoutes from "./routes/account.js";
-// Clerk-Import entfernt
-
-// Utilities
-import { validateEnv } from './utils/validateEnv.js';
+import authRoutes from "./routes/auth.js";
 import { logger } from './utils/logger.js';
 
-// .env laden
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-dotenv.config({ path: path.join(__dirname, ".env") });
 
-// Validiere Env
-validateEnv();
-
-// Express App
 const app = express();
 
-// Clerk Middleware entfernt
-
-// CORS
-const allowedOrigins = new Set(["http://localhost:5173", "http://localhost:5174"]);
+// CORS (Schritt 3)
+const allowedOrigins = new Set([
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "capacitor://localhost",
+  "http://localhost",
+  "http://192.168.178.26",
+  "http://192.168.178.26:3001"
+]);
 app.use(cors({
   origin: (origin, cb) => {
     if (!origin) return cb(null, true);
-    if (allowedOrigins.has(origin)) return cb(null, true);
+    // Erlaube alle lokalen Netzwerke und capacitor
+    if (allowedOrigins.has(origin) || origin.startsWith("http://192.168.178.")) return cb(null, true);
     return cb(null, false);
   },
-  methods: ["GET", "POST", "PUT", "DELETE"],
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   credentials: true
 }));
 
 // JSON
 app.use(express.json());
 
-// Statische Dateien
-app.use('/uploads', express.static(path.join(__dirname, 'public', 'uploads')));
-
-// ... (alle Routen / Upload-Logik / GridFS etc. unverändert hier rein kopieren) ...
+// Statische Dateien (Rollback: gesamtes public-Verzeichnis)
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Routen einbinden
 app.use("/api/workouts", workoutRoutes);
 app.use("/api/exercises", exerciseRoutes);
 app.use("/api/subscription", subscriptionRoutes);
 app.use("/api/account", accountRoutes);
+app.use("/api/auth", authRoutes);
 
 // Healthcheck
 app.get('/api/health', (req, res) => {
-  const state = mongoose.connection?.readyState;
-  const map = { 0: 'disconnected', 1: 'connected', 2: 'connecting', 3: 'disconnecting' };
-  res.json({ status: 'ok', db: map[state] ?? 'unknown', readyState: state });
+  res.json({ status: 'ok' });
 });
 
-// Error Handler
+// Zentraler Error-Handler (Schritt 4)
 app.use((err, req, res, _next) => {
+  const isDev = process.env.NODE_ENV !== 'production';
   if (err && (err.message === "Unauthenticated" || err.status === 401 || err.code === "unauthenticated")) {
-    return res.status(401).json({ error: "Unauthenticated" });
+    logger.warn("401 Unauthenticated", { url: req.originalUrl, user: req.auth?.userId, error: err.message });
+    return res.status(401).json({
+      error: "Unauthenticated",
+      ...(isDev && err.stack ? { stack: err.stack } : {})
+    });
   }
-  if (err) logger.error("Unhandled error:", err);
-  res.status(500).json({ error: "Internal Server Error" });
+  logger.error("500 Internal Server Error", {
+    url: req.originalUrl,
+    user: req.auth?.userId,
+    error: err.message,
+    stack: isDev ? err.stack : undefined
+  });
+  res.status(500).json({
+    error: "Internal Server Error",
+    ...(isDev && err.stack ? { stack: err.stack } : {})
+  });
 });
 
 export default app;

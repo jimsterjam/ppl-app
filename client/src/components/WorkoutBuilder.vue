@@ -1,5 +1,5 @@
 <script setup>
-import ExercisePicker from '@/components/ExercisePicker.vue'
+import ExerciseList from '@/components/ExerciseList.vue'
 
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
@@ -12,11 +12,9 @@ import AppModal from '@/components/AppModal.vue';
 import StepIndicator from '@/components/StepIndicator.vue';
 import BottomNav from '@/components/BottomNav.vue';
 import UpgradeModal from '@/components/UpgradeModal.vue';
-import { getAllExercisesOffline } from '@/utils/offlineStorage';
+import { getAllExercisesOffline, saveWorkoutOffline } from '@/utils/offlineStorage';
 import { getMergedSortedExercises } from '@/utils/exerciseList';
-import { saveWorkoutOffline, getWorkoutOffline } from '@/utils/offlineStorage';
 import { logger } from '@/utils/logger'
-import { getAllWorkoutsOffline } from '@/utils/offlineStorage'
 
 
 // --- State & Stores ---
@@ -31,7 +29,6 @@ onAuthStateChanged((user) => {
   firebaseUser.value = user
   userStore.user = user ? { id: user.uid, email: user.email, displayName: user.displayName } : null
   if (user) {
-    loadDraft()
     loadExercises()
   }
 })
@@ -60,15 +57,14 @@ const showMobilePicker = ref(false)
 const draggingIndex = ref(null)
 const planRef = ref(null)
 // Equipment-Filter (dynamisch)
-import allExercisesData from '@/data/default-exercises.json'
-import { normalizeDefaultExercises } from '@/utils/normalizeDefaultExercises'
+import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
 const showEquipmentFilter = ref(false)
 const selectedEquipment = ref('')
 // Alle Equipment-Typen aus den Exercises extrahieren
-const normalizedExercises = normalizeDefaultExercises(allExercisesData)
+const normalizedExercises = ref([])
 const allEquipmentTypes = computed(() => {
 	const set = new Set()
-	normalizedExercises.forEach(e => {
+	normalizedExercises.value.forEach(e => {
 		if (e.equipment) set.add(e.equipment)
 	})
 	return Array.from(set)
@@ -103,7 +99,7 @@ const equipmentTranslation = (equip) => {
 	const translated = t(`exercises.equipment.${key}`)
 	if (translated && !translated.startsWith('exercises.equipment.')) return translated
 	// Fallback: Zeige englischen Namen aus default-exercises.json, falls vorhanden
-	const found = normalizedExercises.find(e => e.equipment === equip)
+	const found = normalizedExercises.value.find(e => e.equipment === equip)
 	if (found && found.equipment_en) return found.equipment_en
 	return equip
 }
@@ -117,41 +113,6 @@ function getDraftId() {
 	const currentUserId = userIdComputed.value || 'guest';
 	return `draft-${currentUserId}-${selectedType.value}`;
 }
-
-async function saveDraft() {
-  if (selectedExercises.value.length === 0) return;
-  const draft = {
-    _id: getDraftId(),
-    type: selectedType.value,
-    exercises: selectedExercises.value,
-    _isDraft: true,
-    updatedAt: Date.now(),
-    name: (selectedType.value ? `${selectedType.value.charAt(0).toUpperCase() + selectedType.value.slice(1)} Day` : 'Workout Draft')
-  };
-  await saveWorkoutOffline(draft);
-}
-
-async function loadDraft() {
-  const drafts = (await getAllWorkoutsOffline()).filter(w => w._isDraft === true);
-  const myDraft = drafts.find(d => d._id === getDraftId());
-  if (myDraft) {
-    if (myDraft.type) selectedType.value = myDraft.type;
-    if (Array.isArray(myDraft.exercises)) selectedExercises.value = myDraft.exercises;
-    return true;
-  }
-  return false;
-}
-
-function clearDraft() {
-  getAllWorkoutsOffline().then(workouts => {
-    const draftIds = workouts.filter(w => w._isDraft === true).map(w => w._id);
-    draftIds.forEach(id => deleteWorkoutOffline(id));
-  });
-}
-
-watch(selectedExercises, (val) => {
-  if (val.length > 0) saveDraft();
-});
 
 // --- Workout Types ---
 const workoutTypes = computed(() => [
@@ -172,6 +133,12 @@ const workoutTypes = computed(() => [
     label: t('builder.legsDay') !== 'builder.legsDay'
       ? t('builder.legsDay')
       : 'Leg Day'
+	},
+	{
+		value: 'fullbody',
+		label: t('builder.fullBodyDay') !== 'builder.fullBodyDay'
+			? t('builder.fullBodyDay')
+			: 'Ganzkörper'
   }
 ])
 const currentTypeLabel = computed(() => {
@@ -199,10 +166,14 @@ function continuePlan() {
 	try { localStorage.setItem(BELIEF_KEY, todayKey()) } catch {}
 }
 onMounted(async () => {
+	try {
+		normalizedExercises.value = await loadDefaultExercises()
+	} catch {}
 	// Übernehme Typ aus Query, falls vorhanden
 	const qType = String(route.query?.type || '').toLowerCase()
-	if (qType && ['push','pull','legs'].includes(qType)) {
+	if (qType && ['push','pull','legs','fullbody'].includes(qType)) {
 		selectedType.value = qType
+		if (qType === 'fullbody') selectedEquipment.value = ''
 	}
 	// Affirmation
 	const beliefsDe = [
@@ -231,7 +202,6 @@ onMounted(async () => {
 	logger.debug('WorkoutBuilder onMounted getCurrentUser:', currentUser)
 	if (currentUser) {
 		firebaseUser.value = currentUser
-		loadDraft()
 		await loadExercises()
 	}
 	// Falls noch nicht eingeloggt, markieren wir die View als bereit,
@@ -247,8 +217,11 @@ async function loadExercises() {
 			exercises.value = []
 			return
 		}
-		const categoryMap = { push: 'Push', pull: 'Pull', legs: 'Legs' }
-		const list = await getMergedSortedExercises({ category: categoryMap[selectedType.value], equipment: selectedEquipment.value, locale: String(locale.value) })
+		const categoryMap = { push: 'Push', pull: 'Pull', legs: 'Legs', fullbody: null }
+		const params = { equipment: selectedEquipment.value, locale: String(locale.value) }
+		const categoryKey = categoryMap[selectedType.value]
+		if (categoryKey) params.category = categoryKey
+		const list = await getMergedSortedExercises(params)
 		exercises.value = list
 	} catch {
 		exercises.value = []
@@ -266,6 +239,7 @@ const filteredExercises = computed(() => {
 	// preserve base ordering (already sorted by displayName in util)
 	return base
 })
+const selectedExerciseIds = computed(() => selectedExercises.value.map(e => e._id || e.exerciseId || e.id).filter(Boolean))
 
 function toggleExercise(exercise) {
 	const idx = selectedExercises.value.findIndex(e => e._id === exercise._id)
@@ -281,10 +255,6 @@ function toggleExercise(exercise) {
 		}
 		selectedExercises.value.push(sanitized)
 	}
-	saveDraft()
-}
-function isSelected(exercise) {
-	return selectedExercises.value.some(e => e._id === exercise._id)
 }
 function removeExercise(idx) {
 	selectedExercises.value.splice(idx, 1)
@@ -337,20 +307,63 @@ async function createWorkout() {
 		// Draft mit eindeutiger ID verwenden
 		const tempId = getDraftId();
 		const tempWorkout = { ...workoutData, _id: tempId, _isDraft: true };
+		logger.debug('[WorkoutBuilder] createWorkout start', {
+			tempId,
+			type: workoutData.type,
+			exercises: workoutData.exercises?.length || 0
+		})
 		await saveWorkoutOffline(tempWorkout);
-		router.push({ name: 'workout-detail', params: { id: tempId } });
+		logger.debug('[WorkoutBuilder] temp workout saved', { tempId })
+		await router.push({ name: 'workout-detail', params: { id: tempId } });
+		logger.debug('[WorkoutBuilder] navigated to temp workout detail', { tempId })
 		toast.success(t('builder.created'));
 		// Backend-Speichern im Hintergrund
 		userStore.createWorkout(workoutData, token).then(async created => {
 			if (created?._id) {
-				// Lösche Draft und speichere echtes Workout
-				await deleteWorkoutOffline(tempId);
-				// _isDraft entfernen, falls vorhanden
-				const cleanWorkout = { ...workoutData, _id: created._id };
-				delete cleanWorkout._isDraft;
+				logger.debug('[WorkoutBuilder] backend create resolved', {
+					tempId,
+					realId: created._id
+				})
+				try { sessionStorage.setItem(`workout_map_${tempId}`, String(created._id)) } catch {}
+				logger.debug('[WorkoutBuilder] temp->real mapping stored', { tempId, realId: created._id })
+				// Workout bleibt bis zum Abschluss als Draft markiert
+				const cleanWorkout = { ...workoutData, _id: created._id, _isDraft: true, isDraft: true };
 				await saveWorkoutOffline(cleanWorkout);
+				logger.debug('[WorkoutBuilder] real workout cached offline', { realId: created._id })
+
+				try {
+					const idx = userStore.workouts.findIndex(w => String(w?._id || '') === String(created._id))
+					if (idx !== -1) {
+						userStore.workouts[idx] = { ...userStore.workouts[idx], _isDraft: true, isDraft: true, completed: false }
+					} else {
+						userStore.workouts.unshift({ ...created, _isDraft: true, isDraft: true, completed: false })
+					}
+				} catch {}
+
+				// Sofort auf echtes Workout umschalten (auch wenn Route noch nicht auf tempId aktualisiert wurde)
+				const currentRouteId = String(router.currentRoute.value?.params?.id || '')
+				const currentRouteName = String(router.currentRoute.value?.name || '')
+				logger.debug('[WorkoutBuilder] route state before replace', { currentRouteName, currentRouteId, tempId })
+				if (currentRouteId === tempId || currentRouteName === 'workout-builder') {
+					await router.replace({ name: 'workout-detail', params: { id: created._id }, query: { created: '1', realId: created._id } })
+					logger.debug('[WorkoutBuilder] replaced to real workout detail', { realId: created._id })
+				}
+
+				// Temp-Draft erst löschen, wenn es nicht mehr aktiv angezeigt wird
+				setTimeout(async () => {
+					try {
+						const activeId = String(router.currentRoute.value?.params?.id || '')
+						if (activeId !== tempId) {
+							await deleteWorkoutOffline(tempId)
+							logger.debug('[WorkoutBuilder] temp workout deleted after handover', { tempId, activeId })
+						} else {
+							logger.warn('[WorkoutBuilder] temp workout not deleted because it is still active', { tempId, activeId })
+						}
+					} catch {}
+				}, 1500)
 			}
 		}).catch((err) => {
+			logger.error('[WorkoutBuilder] backend create failed', { tempId, message: err?.message })
 			toast.error(t('builder.createFailed') + (err?.message ? ': ' + err.message : ''));
 		});
 	} catch (e) {
@@ -369,11 +382,16 @@ function goDashboard() { router.push({ name: 'dashboard' }) }
 function pickType(val) {
 	if (!val || val === selectedType.value) { showTypePicker.value = false; return }
 	selectedType.value = val
+	if (val === 'fullbody') selectedEquipment.value = ''
 	selectedExercises.value = []
 	showTypePicker.value = false
-	loadExercises()
 }
-watch(selectedType, loadExercises)
+watch(selectedType, (next) => {
+	if (next === 'fullbody' && selectedEquipment.value) {
+		selectedEquipment.value = ''
+	}
+	loadExercises()
+})
 // Draft wird nicht mehr automatisch gespeichert
 </script>
 
@@ -436,21 +454,21 @@ watch(selectedType, loadExercises)
 				<div class="search-row">
 					<input v-model="search" class="search-input" type="search" :placeholder="t('builder.searchPlaceholder')" />
 				</div>
-					<div v-if="loading && initialReady" class="exercises-grid">
-						<div v-for="n in 6" :key="n" class="exercise-item sk"></div>
-					</div>
-					<div v-else-if="!loading && filteredExercises.length === 0 && initialReady" class="empty-state">
-						<p>😅 Keine Übungen für diese Kategorie verfügbar</p>
-					</div>
-					<div v-else class="exercises-grid">
-						<div v-for="filteredExercise in filteredExercises" :key="filteredExercise._id" :class="{ selected: isSelected(filteredExercise) }" class="exercise-item" @click="toggleExercise(filteredExercise)">
-							<div class="ex-row">
-								<span class="title">{{ filteredExercise.displayName || filteredExercise.name }}</span>
-								<span class="sub">{{ filteredExercise.muscleGroup }}</span>
-								<span class="sub small">{{ filteredExercise.equipment || t('exercises.bodyweight') }}</span>
-							</div>
-						</div>
-					</div>
+				<div v-if="loading && initialReady" class="exercises-grid">
+					<div v-for="n in 6" :key="n" class="exercise-item sk"></div>
+				</div>
+				<div v-else-if="!loading && filteredExercises.length === 0 && initialReady" class="empty-state">
+					<p>😅 Keine Übungen für diese Kategorie verfügbar</p>
+				</div>
+				<ExerciseList
+					v-else
+					:show-title="false"
+					:show-controls="false"
+					:items="filteredExercises"
+					:selectable="true"
+					:selected-ids="selectedExerciseIds"
+					@toggle="toggleExercise"
+				/>
 			</template>
 			<div v-if="isMobile && showMobilePicker" class="picker-overlay" @click.self="showMobilePicker = false">
 				<div class="picker-sheet">
@@ -475,15 +493,15 @@ watch(selectedType, loadExercises)
 						<div v-if="loading" class="exercises-grid">
 							<div v-for="n in 6" :key="n" class="exercise-item sk"></div>
 						</div>
-						<div v-else class="exercises-grid">
-							<div v-for="filteredExercise in filteredExercises" :key="filteredExercise._id" :class="{ selected: isSelected(filteredExercise) }" class="exercise-item" @click="toggleExercise(filteredExercise)">
-								<div class="ex-row">
-									<span class="title">{{ filteredExercise.displayName || filteredExercise.name }}</span>
-									<span class="sub">{{ filteredExercise.muscleGroup }}</span>
-									<span class="sub small">{{ filteredExercise.equipment || t('exercises.bodyweight') }}</span>
-								</div>
-							</div>
-						</div>
+						<ExerciseList
+							v-else
+							:show-title="false"
+							:show-controls="false"
+							:items="filteredExercises"
+							:selectable="true"
+							:selected-ids="selectedExerciseIds"
+							@toggle="toggleExercise"
+						/>
 					</div>
 					<div class="picker-actions">
 						<button class="done-btn" @click="showMobilePicker = false">{{ t('builder.done') }}</button>
@@ -540,7 +558,7 @@ watch(selectedType, loadExercises)
 	color: var(--fg);
 }
 .remove-btn {
-	border: none;
+	border: 1px solid color-mix(in srgb, var(--danger-color) 65%, black 35%);
 	background: var(--danger-color, #dc2626);
 	color: #fff;
 	width: 32px;
@@ -552,7 +570,13 @@ watch(selectedType, loadExercises)
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	transition: opacity 0.15s ease;
+	transition: opacity 0.15s ease, transform 0.12s ease;
+}
+.remove-btn:hover {
+	opacity: 0.92;
+}
+.remove-btn:active {
+	transform: scale(0.97);
 }
 
 /* Section für Übungen optisch hervorheben */
@@ -581,7 +605,7 @@ watch(selectedType, loadExercises)
 	background: var(--bg);
 	color: var(--fg);
 	/* Safe-Area oben berücksichtigen (iPhone Notch) */
-	padding: calc(20px + var(--safe-top, 0px)) 20px 80px 20px;
+	padding: calc(20px + var(--safe-top, 0px)) clamp(14px, 3.5vw, 24px) 80px clamp(14px, 3.5vw, 24px);
 	padding-bottom: 80px;
 }
 .builder-topbar {
@@ -623,8 +647,8 @@ watch(selectedType, loadExercises)
 	cursor: pointer;
 	transition: all 0.2s ease;
 	min-height: 44px;
-	background: #374151;
-	color: white;
+	background: var(--bg-panel);
+	color: var(--fg-strong);
 }
 .push-btn, .type-item.push { background: #DC2626; }
 .pull-btn, .type-item.pull { background: #2563EB; }
@@ -645,11 +669,11 @@ watch(selectedType, loadExercises)
 	margin-bottom: 24px;
 }
 .exercise-item, .exercise-card {
-	background: var(--card-bg, #fff);
+	background: var(--card-bg);
 	border-radius: 12px;
 	padding: 16px;
-	border: 1px solid var(--card-border, #e5e7eb);
-	box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+	border: 1px solid var(--card-border);
+	box-shadow: var(--shadow-soft);
 	cursor: pointer;
 	transition: all 0.2s;
 	display: flex;
@@ -686,8 +710,8 @@ watch(selectedType, loadExercises)
 	justify-content: center;
 }
 .info-content {
-	background: var(--card-bg, #fff);
-	color: var(--fg, #222);
+	background: var(--card-bg);
+	color: var(--fg);
 	border-radius: 14px;
 	box-shadow: 0 4px 24px rgba(0,0,0,0.18);
 	padding: 28px 22px 18px 22px;
@@ -706,8 +730,8 @@ watch(selectedType, loadExercises)
 	margin-bottom: 18px;
 }
 .close-btn {
-	background: #2563EB;
-	color: #fff;
+	background: var(--accent);
+	color: var(--accent-contrast);
 	border: none;
 	border-radius: 8px;
 	padding: 7px 18px;
@@ -716,7 +740,7 @@ watch(selectedType, loadExercises)
 	font-weight: 600;
 	transition: background 0.15s;
 }
-.close-btn:hover { background: #1D4ED8; }
+.close-btn:hover { filter: brightness(1.03); }
 
 /* Sonstiges */
 .search-row { margin: 8px 0 16px; }
@@ -747,11 +771,14 @@ watch(selectedType, loadExercises)
 }
 .open-picker-btn { width: 100%; padding: 12px; border-radius: 10px; border: 1px solid var(--card-border); background: var(--surface); color: var(--fg); font-weight: 600; }
 .picker-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: flex; align-items: flex-start; z-index: 50; }
-.picker-sheet { background: var(--bg); border-radius: 0 0 12px 12px; width: 100%; max-height: 80vh; display: flex; flex-direction: column; border: 1px solid var(--card-border); }
+.picker-sheet { background: var(--bg); border-radius: 0 0 12px 12px; width: 100%; max-height: 80vh; display: flex; flex-direction: column; border: 1px solid var(--card-border); overflow: hidden; }
 .picker-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--card-border); }
 .picker-header h4 { margin: 0; }
 .close-picker { background: transparent; border: none; color: var(--fg); font-size: 1.1rem; cursor: pointer; }
-.picker-list { padding: 12px 16px; overflow: auto; }
+.picker-list { padding: 12px 16px; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+.picker-list :deep(.exercise-list-root),
+.picker-list :deep(.vue-recycle-scroller),
+.picker-list :deep(.vue-recycle-scroller__item-wrapper) { overflow: visible !important; }
 .ex-row {
   display: flex;
   align-items: center;
@@ -773,22 +800,22 @@ watch(selectedType, loadExercises)
 	border: none;
 	font-weight: 700;
 	font-size: 1.1rem;
-	background: #DC2626;
-	color: #fff;
-	box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+	background: var(--accent);
+	color: var(--accent-contrast);
+	box-shadow: var(--shadow-soft);
 	cursor: pointer;
 	transition: background 0.18s, transform 0.12s;
 	display: block;
 	margin: 0 auto;
 }
 .create-btn:disabled {
-	background: #fca5a5;
-	color: #fff;
+	background: color-mix(in srgb, var(--accent) 40%, var(--bg-panel));
+	color: var(--muted);
 	cursor: not-allowed;
 	opacity: 0.7;
 }
 .create-btn:hover:not(:disabled) {
-	background: #B91C1C;
+	background: color-mix(in srgb, var(--accent) 82%, black 18%);
 	transform: translateY(-1px) scale(1.03);
 }
 
@@ -800,6 +827,6 @@ watch(selectedType, loadExercises)
 }
 @media (min-width: 481px) { .mobile-ex-picker, .picker-overlay { display: none; } }
 .auth-gate { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
-.auth-gate-text { color: #fbbf24; margin: 0 0 12px 0; }
+.auth-gate-text { color: var(--warning-color); margin: 0 0 12px 0; }
 .error-hint { margin-top: 8px; color: var(--danger-color); font-size: 0.95rem; }
 </style>

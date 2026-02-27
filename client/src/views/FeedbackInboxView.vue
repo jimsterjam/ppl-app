@@ -51,7 +51,6 @@
       </section>
     </main>
 
-    <BottomNav />
   </div>
 </template>
 
@@ -60,7 +59,6 @@ import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import HeaderBar from '@/components/HeaderBar.vue'
-import BottomNav from '@/components/BottomNav.vue'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { isOnline } from '@/utils/offlineStorage'
 import { listWorkoutChatThreads } from '@/api/account'

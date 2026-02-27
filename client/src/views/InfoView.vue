@@ -36,14 +36,12 @@
       </section>
     </div>
 
-    <BottomNav />
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
 import HeaderBar from '@/components/HeaderBar.vue'
-import BottomNav from '@/components/BottomNav.vue'
 import pkg from '../../package.json'
 
 const version = computed(() => pkg?.version || '0.0.0')

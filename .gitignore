@@ -41,10 +41,33 @@ server/logs/
 server/.env
 server/.env.*
 server/serviceAccount.json
-
 # =========================
 # Coverage / Temp
 coverage/
 tmp/
 temp/
 .cache/
+
+# CDN asset staging
+assets-cdn/
+
+# Local upload staging
+uploads/
+
+# Sicherheitshinweis: Niemals sensible Keys oder serviceAccount.json ins Repo pushen!
+
+# =========================
+# Capacitor / iOS Build-Artefakte
+# =========================
+client/ios/App/App/public/
+client/ios/App/App/public*/
+client/ios/App/App/public */
+client/ios/App/Pods/
+client/ios/App/build/
+client/ios/App/Podfile *.lock
+client/ios/App/Podfile [0-9]*.lock
+
+# =========================
+# Lokale Backup-/Kopie-Dateien
+# =========================
+client/src/**/* copy.vue

@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { fetchAccountProfile, updateAccountProfile } from '@/api/account'
+import { logger } from '@/utils/logger'
 
 export const useSettingsStore = defineStore('settings', {
   state: () => ({
@@ -22,20 +23,32 @@ export const useSettingsStore = defineStore('settings', {
   actions: {
     async loadProfile(token) {
       if (!token) return null
-      const profile = await fetchAccountProfile(token)
-      const username = String(profile?.username ?? '').trim().slice(0, 24)
-      const avatarUrl = String(profile?.avatarUrl ?? '').trim()
-      this.username = username
-      this.avatarUrl = avatarUrl
       try {
-        if (username) localStorage.setItem('app-username', username)
-        else localStorage.removeItem('app-username')
-      } catch {}
-      try {
-        if (avatarUrl) localStorage.setItem('app-avatar-url', avatarUrl)
-        else localStorage.removeItem('app-avatar-url')
-      } catch {}
-      return profile
+        const profile = await fetchAccountProfile(token)
+        const username = String(profile?.username ?? '').trim().slice(0, 24)
+        const avatarUrl = String(profile?.avatarUrl ?? '').trim()
+        this.username = username
+        this.avatarUrl = avatarUrl
+        try {
+          if (username) localStorage.setItem('app-username', username)
+          else localStorage.removeItem('app-username')
+        } catch {}
+        try {
+          if (avatarUrl) localStorage.setItem('app-avatar-url', avatarUrl)
+          else localStorage.removeItem('app-avatar-url')
+        } catch {}
+        return profile
+      } catch (error) {
+        logger.warn('⚠️ [settingsStore] loadProfile fallback to cached local values:', {
+          message: error?.message,
+          statusCode: error?.statusCode || 0,
+          code: error?.context?.originalError?.code || null
+        })
+        return {
+          username: this.username || '',
+          avatarUrl: this.avatarUrl || ''
+        }
+      }
     },
 
     async saveUsername(token, name) {

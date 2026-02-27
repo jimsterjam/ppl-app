@@ -11,6 +11,8 @@ import { useAuthStore } from './stores/authStore'
 import { initFirebaseAuth, useFirebaseAuth } from './utils/firebaseAuth'
 import { App as CapacitorApp } from '@capacitor/app'
 import { logger } from '@/utils/logger'
+import { setCacheLimits } from '@/utils/assetCache'
+import { setDownloadConcurrency } from '@/utils/assetResolver'
 
 const app = createApp(App)
 const pinia = createPinia()
@@ -18,6 +20,15 @@ const i18n = createI18nInstance()
 app.use(pinia)
 app.use(router)
 app.use(i18n)
+
+// Asset-Cache Limits/Concurrency (optional via env)
+const maxBytesEnv = Number(import.meta.env.VITE_ASSET_CACHE_MAX_BYTES)
+const maxItemsEnv = Number(import.meta.env.VITE_ASSET_CACHE_MAX_ITEMS)
+setCacheLimits({
+  maxBytes: Number.isFinite(maxBytesEnv) ? maxBytesEnv : undefined,
+  maxItems: Number.isFinite(maxItemsEnv) ? maxItemsEnv : undefined
+})
+setDownloadConcurrency(import.meta.env.VITE_ASSET_DOWNLOAD_CONCURRENCY)
 
 // Async bootstrap für Firebase
 async function bootstrapAuth() {

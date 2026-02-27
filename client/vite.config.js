@@ -31,7 +31,6 @@ export default defineConfig({
       output: {
         manualChunks(id) {
           if (id.includes('node_modules')) {
-            if (id.includes('/vue/')) return 'vue';
             if (id.includes('vue-router')) return 'router';
             if (id.includes('pinia')) return 'pinia';
             if (id.includes('firebase')) return 'firebase';

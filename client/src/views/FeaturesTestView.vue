@@ -221,15 +221,14 @@ import { logger } from '@/utils/logger'
 const { t } = useI18n()
 
 // Dynamisches Mapping aus default-exercises.json
-import exercisesData from '@/data/default-exercises.json'
-import { normalizeDefaultExercises } from '@/utils/normalizeDefaultExercises'
+import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
 
-const normalizedExercises = normalizeDefaultExercises(exercisesData)
+const normalizedExercises = ref([])
 
 function getTranslatedMuscleGroup(muscleGroup, lang = 'de') {
   if (!muscleGroup) return ''
   // Suche nach erster Übung mit passender Muskelgruppe
-  const found = normalizedExercises.find(ex =>
+  const found = normalizedExercises.value.find(ex =>
     (lang === 'de' ? ex.muscleGroup : ex.muscleGroup_en) === muscleGroup
     || (lang === 'de' ? ex.muscleGroup_en : ex.muscleGroup) === muscleGroup
   )
@@ -239,7 +238,7 @@ function getTranslatedMuscleGroup(muscleGroup, lang = 'de') {
 
 function getTranslatedEquipment(equipment, lang = 'de') {
   if (!equipment) return ''
-  const found = normalizedExercises.find(ex =>
+  const found = normalizedExercises.value.find(ex =>
     (lang === 'de' ? ex.equipment : ex.equipment_en) === equipment
     || (lang === 'de' ? ex.equipment_en : ex.equipment) === equipment
   )
@@ -489,7 +488,10 @@ const resetConfig = () => {
 }
 
 // Lifecycle
-onMounted(() => {
+onMounted(async () => {
+  try {
+    normalizedExercises.value = await loadDefaultExercises()
+  } catch {}
   aiStore.initializeAI()
 })
 </script>

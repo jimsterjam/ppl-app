@@ -46,21 +46,19 @@
       </section>
     </div>
 
-    <BottomNav />
   </div>
 </template>
 
 <script setup>
 import { computed, ref } from 'vue'
 import HeaderBar from '@/components/HeaderBar.vue'
-import BottomNav from '@/components/BottomNav.vue'
 import pkg from '../../package.json'
 
 const version = computed(() => pkg?.version || '0.0.0')
 
 // FAQ modal state
 const selectedFaqKey = ref('')
-const baseKeys = ['gettingStarted', 'navigation', 'workouts', 'aiCoach', 'uploads', 'privacy']
+const baseKeys = ['gettingStarted', 'pushPullLegs', 'navigation', 'workouts', 'aiCoach', 'uploads', 'privacy']
 const items = computed(() => baseKeys.map(key => ({ key })))
 
 function openFaq(faqKey) {

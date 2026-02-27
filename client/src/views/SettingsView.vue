@@ -318,7 +318,7 @@
         <h3>{{ $t('settings.dangerZone') }}</h3>
         <p class="hint">{{ $t('settings.dangerZoneHint') }}</p>
         <button class="danger-btn" @click="showDeleteConfirm = true" :disabled="isDeleting">
-          <span v-if="isDeleting">🔄</span>
+          <span v-if="isDeleting" class="spinner" aria-hidden="true"></span>
           <span v-else>🗑️</span>
           {{ isDeleting ? $t('settings.deleting') : $t('settings.deleteAllData') }}
         </button>
@@ -498,7 +498,7 @@
             :disabled="confirmText.toLowerCase() !== $t('settings.deletePlaceholder').toLowerCase() || isDeleting"
             @click="confirmDelete"
           >
-            <span v-if="isDeleting">🔄</span>
+            <span v-if="isDeleting" class="spinner" aria-hidden="true"></span>
             <span v-else>🗑️</span>
             {{ isDeleting ? $t('settings.deleting') : $t('settings.deleteForever') }}
           </button>
@@ -606,14 +606,11 @@
         </div>
       </div>
     </Transition>
-
-    <BottomNav />
   </div>
 </template>
 
 <script setup>
 import HeaderBar from '../components/HeaderBar.vue'
-import BottomNav from '../components/BottomNav.vue'
 import { storeToRefs } from 'pinia'
 import { useThemeStore } from '@/stores/themeStore'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -629,6 +626,7 @@ import { Capacitor } from '@capacitor/core'
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera'
 import { logger } from '@/utils/logger'
 import { deleteAllWorkouts } from '@/api/workouts'
+import { isOnline, db } from '@/utils/offlineStorage'
 import {
   createCoachInvite,
   listOutgoingCoachInvites,
@@ -764,6 +762,11 @@ async function loadImageForCrop(url) {
 
 async function pickAvatarFromPhotos() {
   try {
+    const permissionOk = await ensurePhotoPermission()
+    if (!permissionOk) {
+      toast.show($t('settings.profilePicturePickFailed'), { type: 'error', duration: 2400 })
+      return
+    }
     const photo = await Camera.getPhoto({
       source: CameraSource.Photos,
       resultType: CameraResultType.Uri,
@@ -799,6 +802,20 @@ async function pickAvatarFromPhotos() {
     toast.show($t('settings.profilePicturePickFailed'), { type: 'error', duration: 2400 })
   } finally {
     avatarUploading.value = false
+  }
+}
+
+async function ensurePhotoPermission() {
+  try {
+    const status = await Camera.checkPermissions()
+    const current = status?.photos || status?.camera
+    if (current === 'granted' || current === 'limited') return true
+    const requested = await Camera.requestPermissions({ permissions: ['photos'] })
+    const next = requested?.photos || requested?.camera
+    return next === 'granted' || next === 'limited'
+  } catch (e) {
+    logger.warn('[SettingsView] photo permission check failed:', e?.message || e)
+    return false
   }
 }
 
@@ -1621,6 +1638,15 @@ const showDeleteAccountConfirm = ref(false)
 const confirmAccountText = ref('')
 const isDeletingAccount = ref(false)
 
+function withTimeout(promise, ms, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(`${label} timeout`)), ms)
+    })
+  ])
+}
+
 async function confirmDelete() {
   logger.debug('🔴 confirmDelete aufgerufen!')
   logger.debug('Eingabe:', confirmText.value)
@@ -1643,27 +1669,31 @@ async function confirmDelete() {
   try {
     logger.debug('🔄 Starte Löschvorgang...')
 
-    // 1. MongoDB: Alle Workouts des Users löschen
-    try {
-      logger.debug('🔑 Hole Auth-Token...')
-      const token = await getIdTokenSafe()
-      logger.debug('🔑 Token erhalten:', !!token, token ? `${token.substring(0,20)}...` : 'null')
-
-      if (token) {
-        logger.debug('🗑️ Lösche alle Workouts aus MongoDB...')
-        const result = await deleteAllWorkouts(token)
-        logger.debug('✅ MongoDB-Workouts gelöscht:', result)
-      } else {
-        logger.warn('⚠️ Kein Auth-Token - MongoDB-Löschung übersprungen')
-      }
-    } catch (error) {
-      // Fortfahren mit lokaler Löschung – Fehler hier ist unkritisch
+    // 1. MongoDB: Alle Workouts des Users löschen (nur online)
+    if (isOnline()) {
       try {
-        const msg = error?.message || JSON.stringify(error) || String(error)
-        logger.warn('⚠️ MongoDB-Löschung nicht durchgeführt (fahre fort):', msg)
-      } catch {
-        logger.warn('⚠️ MongoDB-Löschung nicht durchgeführt (fahre fort)')
+        logger.debug('🔑 Hole Auth-Token...')
+        const token = await getIdTokenSafe()
+        logger.debug('🔑 Token erhalten:', !!token, token ? `${token.substring(0,20)}...` : 'null')
+
+        if (token) {
+          logger.debug('🗑️ Lösche alle Workouts aus MongoDB...')
+          const result = await withTimeout(deleteAllWorkouts(token), 6000, 'deleteAllWorkouts')
+          logger.debug('✅ MongoDB-Workouts gelöscht:', result)
+        } else {
+          logger.warn('⚠️ Kein Auth-Token - MongoDB-Löschung übersprungen')
+        }
+      } catch (error) {
+        // Fortfahren mit lokaler Löschung – Fehler hier ist unkritisch
+        try {
+          const msg = error?.message || JSON.stringify(error) || String(error)
+          logger.warn('⚠️ MongoDB-Löschung nicht durchgeführt (fahre fort):', msg)
+        } catch {
+          logger.warn('⚠️ MongoDB-Löschung nicht durchgeführt (fahre fort)')
+        }
       }
+    } else {
+      logger.warn('⚠️ Offline: MongoDB-Löschung übersprungen')
     }
 
     logger.debug('🧹 Lösche lokale Daten (gezielt, ohne Logout)...')
@@ -1677,9 +1707,18 @@ async function confirmDelete() {
     // 3. LocalStorage: nur app-spezifische Daten löschen (ohne Auth/OAuth)
     try {
       logger.debug('🧹 Entferne App-Caches aus LocalStorage')
-      localStorage.removeItem('bro_split_workouts')
-      localStorage.removeItem('bro_split_stats')
-      localStorage.removeItem('wb_belief_last_shown')
+      const keys = Object.keys(localStorage)
+      keys.forEach((key) => {
+        if (
+          key.startsWith('bro_split_') ||
+          key.startsWith('wb_') ||
+          key === 'exercise_media_cache_index_v2' ||
+          key === 'app-lang' ||
+          key === 'enableDevTools'
+        ) {
+          localStorage.removeItem(key)
+        }
+      })
     } catch {}
 
     // 4. SessionStorage: gezielt Drafts/temporäres löschen
@@ -1689,13 +1728,24 @@ async function confirmDelete() {
       keys.forEach(k => { if (k.includes('workout_detail_draft')) sessionStorage.removeItem(k) })
     } catch {}
 
-    // 5. IndexedDB: lokale Workouts leeren
+    // 5. IndexedDB: lokale Workouts und Caches leeren
     try {
-      const { db } = await import('@/utils/offlineStorage')
       await db.workouts.clear()
+      await db.exercises.clear()
+      await db.syncQueue.clear()
+      await db.metadata.clear()
       logger.debug('🧹 IndexedDB Workouts geleert')
     } catch (e) {
       logger.warn('⚠️ Konnte IndexedDB Workouts nicht leeren:', e?.message || e)
+    }
+
+    // 6. Filesystem Cache: Exercise Media Cache löschen
+    try {
+      const { Filesystem, Directory } = await import('@capacitor/filesystem')
+      await Filesystem.rmdir({ path: 'exercise-media-v2', directory: Directory.Cache, recursive: true })
+      logger.debug('🧹 Exercise Media Cache gelöscht')
+    } catch (e) {
+      logger.warn('⚠️ Konnte Exercise Media Cache nicht löschen:', e?.message || e)
     }
 
     logger.debug('✅ Löschvorgang abgeschlossen')
@@ -1715,7 +1765,7 @@ async function confirmDelete() {
     try {
       const token = await getIdTokenSafe()
       logger.debug('[Delete] token len', token?.length, token?.slice(0,20));
-      await userStore.loadWorkouts(token, { force: true })
+      await withTimeout(userStore.loadWorkouts(token, { force: true }), 6000, 'loadWorkouts')
       logger.debug('✅ Workouts neu geladen')
     } catch (e) {
       // Bei Fehler: Store bleibt leer – UI ist bereits bereinigt
@@ -1832,6 +1882,21 @@ async function confirmDeleteAccount() {
   border: 1px solid var(--card-border);
   border-radius: 12px;
   padding: 16px;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 999px;
+  border: 2px solid color-mix(in srgb, var(--fg) 20%, transparent);
+  border-top-color: var(--fg-strong);
+  display: inline-block;
+  animation: spin 0.8s linear infinite;
+  margin-right: 8px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
 .card--app {

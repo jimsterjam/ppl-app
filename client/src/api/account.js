@@ -3,17 +3,36 @@ import { apiUrl } from './http'
 import { handleAPIError } from './errorHandler'
 
 const API_URL = apiUrl('account')
-const api = axios.create({ baseURL: API_URL })
+const PROFILE_TIMEOUT_MS = Number.parseInt(import.meta.env.VITE_PROFILE_TIMEOUT_MS || '', 10) || 12000
+const api = axios.create({ baseURL: API_URL, timeout: PROFILE_TIMEOUT_MS })
 
 function authConfig(token) {
   return token ? { headers: { Authorization: `Bearer ${token}` } } : {}
 }
 
 export async function fetchAccountProfile(token) {
+  const config = authConfig(token)
+  const shouldRetry = (error) => {
+    const code = String(error?.code || '')
+    const status = Number(error?.response?.status || 0)
+    if (code === 'ECONNABORTED' || code === 'ERR_NETWORK') return true
+    if (!error?.response) return true
+    return status === 502 || status === 503 || status === 504
+  }
+
   try {
-    const res = await api.get('/profile', authConfig(token))
+    const res = await api.get('/profile', config)
     return res.data || {}
   } catch (error) {
+    if (shouldRetry(error)) {
+      try {
+        await new Promise(resolve => setTimeout(resolve, 350))
+        const retryRes = await api.get('/profile', config)
+        return retryRes.data || {}
+      } catch (retryError) {
+        throw handleAPIError(retryError, 'Profil laden')
+      }
+    }
     throw handleAPIError(error, 'Profil laden')
   }
 }
@@ -31,13 +50,7 @@ export async function uploadProfileAvatar(token, file) {
   try {
     const form = new FormData()
     form.append('image', file)
-    const res = await api.post('/profile/avatar', form, {
-      ...authConfig(token),
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        'Content-Type': 'multipart/form-data'
-      }
-    })
+    const res = await api.post('/profile/avatar', form, authConfig(token))
     return res.data || {}
   } catch (error) {
     throw handleAPIError(error, 'Profilbild hochladen')

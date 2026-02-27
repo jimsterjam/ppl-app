@@ -10,6 +10,10 @@
 import Dexie from 'dexie'
 import { logger } from './logger'
 import { normalizeDefaultExercises } from './normalizeDefaultExercises'
+import { ensureWorkoutNotes } from './workoutNotes'
+
+export const OFFLINE_WORKOUTS_UPDATED_EVENT = 'offline-workouts-updated'
+const MAX_OFFLINE_WORKOUTS = 400
 
 // Dexie Database Instance
 export const db = new Dexie('PPLAppDB')
@@ -27,6 +31,35 @@ db.version(1).stores({
 db.open().catch(err => {
   logger.error('❌ Offline Storage - Failed to open database:', err)
 })
+
+function emitOfflineWorkoutsUpdated(detail = {}) {
+  if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') return
+  try {
+    window.dispatchEvent(new CustomEvent(OFFLINE_WORKOUTS_UPDATED_EVENT, { detail }))
+  } catch (error) {
+    logger.warn('⚠️ Offline Storage - Event dispatch failed:', error)
+  }
+}
+
+async function enforceWorkoutHistoryLimit() {
+  try {
+    const all = await db.workouts.toArray()
+    const nonDrafts = all.filter(item => !(item?._isDraft))
+    if (nonDrafts.length <= MAX_OFFLINE_WORKOUTS) return
+    const sorted = [...nonDrafts].sort((a, b) => {
+      const aDate = new Date(a.updatedAt || a.date || a.createdAt || a._syncedAt || 0).getTime()
+      const bDate = new Date(b.updatedAt || b.date || b.createdAt || b._syncedAt || 0).getTime()
+      return bDate - aDate
+    })
+    const stale = sorted.slice(MAX_OFFLINE_WORKOUTS)
+    const staleIds = stale.map(item => item._id).filter(Boolean)
+    if (staleIds.length === 0) return
+    await db.workouts.bulkDelete(staleIds)
+    emitOfflineWorkoutsUpdated({ type: 'trim', removed: staleIds.length })
+  } catch (error) {
+    logger.warn('⚠️ Offline Storage - Konnte Verlaufslimit nicht anwenden:', error)
+  }
+}
 
 // ============================================================================
 // WORKOUTS - Offline Storage
@@ -81,13 +114,15 @@ export async function saveWorkoutOffline(workout) {
   try {
     // Sanitize workout vor dem Speichern (entfernt Vue Proxies, Funktionen, etc.)
     const cleanWorkout = sanitizeForIndexedDB(workout)
+    ensureWorkoutNotes(cleanWorkout)
     // Draft-Workouts niemals in die Sync-Queue aufnehmen
-    if (cleanWorkout._id === 'draft') {
+    if (cleanWorkout._isDraft) {
       await db.workouts.put({
         ...cleanWorkout,
         _syncedAt: Date.now()
       })
       logger.debug('💾 Offline Storage - Draft gespeichert (kein Sync!):', cleanWorkout._id)
+      emitOfflineWorkoutsUpdated({ type: 'draft-save', id: cleanWorkout._id })
       return cleanWorkout._id
     }
     // Normale Workouts wie gehabt speichern
@@ -96,6 +131,21 @@ export async function saveWorkoutOffline(workout) {
       _syncedAt: Date.now()
     })
     logger.debug('💾 Offline Storage - Workout gespeichert:', cleanWorkout._id)
+    emitOfflineWorkoutsUpdated({ type: 'save', id: cleanWorkout._id })
+
+    // Draft nach Save eines echten Workouts entfernen
+    try {
+      // Lösche alle Workouts mit _isDraft === true
+      const drafts = await db.workouts.filter(w => w._isDraft === true).toArray()
+      if (drafts.length > 0) {
+        const draftIds = drafts.map(d => d._id)
+        await db.workouts.bulkDelete(draftIds)
+        logger.debug('🗑️ Draft-Workouts nach Save gelöscht:', draftIds)
+      }
+    } catch (e) {
+      logger.warn('Draft-Workout konnte nicht gelöscht werden:', e)
+    }
+    await enforceWorkoutHistoryLimit()
     return cleanWorkout._id
   } catch (error) {
     logger.error('❌ Offline Storage - Fehler beim Speichern:', error, workout)
@@ -160,6 +210,7 @@ export async function deleteWorkoutOffline(id) {
   try {
     await db.workouts.delete(id)
     logger.debug('🗑️ Offline Storage - Workout gelöscht:', id)
+    emitOfflineWorkoutsUpdated({ type: 'delete', id })
   } catch (error) {
     logger.error('❌ Offline Storage - Fehler beim Löschen:', error)
     throw error
@@ -174,7 +225,11 @@ export async function deleteWorkoutOffline(id) {
 export async function cacheWorkouts(workouts) {
   try {
     // Sanitize alle Workouts
-    const cleanWorkouts = workouts.map(w => sanitizeForIndexedDB(w))
+    const cleanWorkouts = workouts.map(w => {
+      const sanitized = sanitizeForIndexedDB(w)
+      ensureWorkoutNotes(sanitized)
+      return sanitized
+    })
     
     const workoutsWithTimestamp = cleanWorkouts.map(w => ({
       ...w,
@@ -182,6 +237,8 @@ export async function cacheWorkouts(workouts) {
     }))
     await db.workouts.bulkPut(workoutsWithTimestamp)
     logger.debug('💾 Offline Storage - Workouts cached:', workouts.length)
+    emitOfflineWorkoutsUpdated({ type: 'cache', count: workouts.length })
+    await enforceWorkoutHistoryLimit()
     return workouts.length
   } catch (error) {
     logger.error('❌ Offline Storage - Fehler beim Cachen:', error)
@@ -339,7 +396,7 @@ export async function queueAction(action, entityType, data) {
     // Sanitize data vor dem Speichern (entfernt Vue Proxies, Funktionen, etc.)
     const cleanData = sanitizeForIndexedDB(data)
     // Draft-Workouts niemals in die Sync-Queue aufnehmen
-    if (entityType === 'workout' && cleanData._id === 'draft') {
+    if (entityType === 'workout' && cleanData._isDraft) {
       logger.debug('📝 Sync Queue - Draft-Workout NICHT zur Queue hinzugefügt')
       return null
     }

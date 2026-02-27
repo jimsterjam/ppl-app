@@ -5,8 +5,7 @@
 
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import defaultExercises from '@/data/default-exercises.json'
-import { normalizeDefaultExercises } from '@/utils/normalizeDefaultExercises'
+import { loadDefaultExercises, getCachedDefaultExercises } from '@/utils/defaultExercisesLoader'
 
 /**
  * Composable für Übungsübersetzungen
@@ -14,8 +13,12 @@ import { normalizeDefaultExercises } from '@/utils/normalizeDefaultExercises'
  */
 export function useExerciseTranslation() {
   const { locale, t } = useI18n()
-  // Immer synchron und offlinefähig
-  const exercisesData = ref(normalizeDefaultExercises(defaultExercises))
+  const exercisesData = ref(getCachedDefaultExercises())
+  loadDefaultExercises()
+    .then((data) => {
+      exercisesData.value = data
+    })
+    .catch(() => {})
 
   // Übersetzungsfunktion, die aus der JSON sucht
   function normalize(str) {

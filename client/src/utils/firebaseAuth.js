@@ -23,6 +23,7 @@ import { Capacitor } from '@capacitor/core'
 import { logger } from '@/utils/logger'
 import { clearAllOfflineData } from '@/utils/offlineStorage'
 import { GoogleAuth } from '@southdevs/capacitor-google-auth'
+import { SignInWithApple } from '@capacitor-community/apple-sign-in'
 
 /* -------------------------------- CONFIG -------------------------------- */
 
@@ -61,6 +62,35 @@ function resolveContinueUrl() {
 const isNative = () => {
   const platform = Capacitor?.getPlatform?.()
   return platform && platform !== 'web'
+}
+
+const NONCE_CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+
+function createRandomNonce(length = 32) {
+  const bytes = new Uint8Array(length)
+  if (globalThis.crypto?.getRandomValues) {
+    globalThis.crypto.getRandomValues(bytes)
+  } else {
+    for (let i = 0; i < length; i += 1) {
+      bytes[i] = Math.floor(Math.random() * 256)
+    }
+  }
+  let nonce = ''
+  for (let i = 0; i < bytes.length; i += 1) {
+    nonce += NONCE_CHARS[bytes[i] % NONCE_CHARS.length]
+  }
+  return nonce
+}
+
+async function sha256Hex(input) {
+  if (!globalThis.crypto?.subtle) {
+    throw new Error('Web Crypto API not available for SHA-256')
+  }
+  const data = new TextEncoder().encode(input)
+  const hashBuffer = await globalThis.crypto.subtle.digest('SHA-256', data)
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
 }
 
 let auth = null
@@ -200,7 +230,41 @@ export function useFirebaseAuth() {
     return userCred
   }
 
-  const signInWithApple = () => signInWithRedirect(auth, appleProvider)
+  const signInWithAppleNative = async () => {
+    const rawNonce = createRandomNonce()
+    const hashedNonce = await sha256Hex(rawNonce)
+    const appleClientId = import.meta.env.VITE_APPLE_SERVICE_ID || import.meta.env.VITE_APPLE_CLIENT_ID
+    const appleRedirectUrl = import.meta.env.VITE_APPLE_REDIRECT_URL
+
+    if (!appleClientId || !appleRedirectUrl) {
+      throw new Error('Apple Sign-In ist nicht konfiguriert (VITE_APPLE_SERVICE_ID und VITE_APPLE_REDIRECT_URL fehlen).')
+    }
+
+    const options = {
+      clientId: appleClientId,
+      redirectURI: appleRedirectUrl,
+      scopes: 'email name',
+      nonce: hashedNonce
+    }
+    const result = await SignInWithApple.authorize(options)
+    const idToken = result?.response?.identityToken
+
+    if (!idToken) {
+      throw new Error('No Apple identity token returned')
+    }
+
+    const credential = appleProvider.credential({ idToken, rawNonce })
+    return signInWithCredential(auth, credential)
+  }
+
+  const signInWithApple = () => {
+    if (!isNative()) {
+      return signInWithRedirect(auth, appleProvider)
+    }
+    return signInWithAppleNative()
+  }
+
+  const signInWithAppleRedirect = () => signInWithRedirect(auth, appleProvider)
   const signInWithEmail = async (email, password) => {
     try {
       const userCred = await signInWithEmailAndPassword(auth, email, password)
@@ -325,6 +389,7 @@ export function useFirebaseAuth() {
 
     signInWithGoogle,
     signInWithApple,
+    signInWithAppleRedirect,
     signInWithEmail,
     signUpWithEmail,
     resetPassword,
