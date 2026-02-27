@@ -144,6 +144,9 @@
       :title="$t('dashboard.quickGenFormTitle')"
       :confirm-text="isGeneratingQuickWorkout ? $t('dashboard.quickGenGenerating') : $t('dashboard.quickGenGenerateNow')"
       :cancel-text="$t('common.cancel')"
+      :show-cancel="!isGeneratingQuickWorkout"
+      :persistent="isGeneratingQuickWorkout"
+      :close-on-confirm="false"
       type="info"
       @confirm="generateQuickWorkout"
     >
@@ -197,6 +200,7 @@
         </label>
       </div>
       <p class="quick-form-hint">{{ $t('dashboard.quickGenRemaining', { count: quickGenerationsRemainingLabel }) }}</p>
+      <p v-if="quickFormError" class="quick-form-error">{{ quickFormError }}</p>
     </AppModal>
 
     <UpgradeModal
@@ -209,7 +213,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onActivated, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onActivated, onUnmounted, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
@@ -251,6 +255,7 @@ const showQuickLastHintModal = ref(false)
 const showUpgradeModal = ref(false)
 const pendingWorkoutType = ref('push')
 const isGeneratingQuickWorkout = ref(false)
+const quickFormError = ref('')
 const QUICK_PREFILL_KEY = 'quick_workout_prefill'
 const quickGeneratorForm = ref({
   durationMinutes: 45,
@@ -510,9 +515,9 @@ function onManualSelected() {
 }
 
 function onGenerateSelected() {
-  setTimeout(() => {
+  nextTick(() => {
     showQuickIntroModal.value = true
-  }, 0)
+  })
 }
 
 function onQuickIntroConfirmed() {
@@ -524,6 +529,7 @@ function openUpgrade() {
 }
 
 function openQuickGeneratorForm() {
+  quickFormError.value = ''
   if (!subscriptionStore.canUseQuickGenerator) {
     showQuickLimitModal.value = true
     return
@@ -539,6 +545,7 @@ async function generateQuickWorkout() {
   if (isGeneratingQuickWorkout.value) return
   isGeneratingQuickWorkout.value = true
   try {
+    quickFormError.value = ''
     const token = await getIdToken().catch(async () => {
       const currentUser = getCurrentUser()
       if (!currentUser?.getIdToken) return null
@@ -593,9 +600,11 @@ async function generateQuickWorkout() {
     } catch {}
 
     subscriptionStore.trackQuickGeneration()
+    showQuickFormModal.value = false
     router.push({ name: 'workout-builder', query: { type: pendingWorkoutType.value, quick: '1' } })
   } catch (error) {
     logger.error('Quick generator failed', error)
+    quickFormError.value = $t('dashboard.quickGenRequestFailed')
     infoMessage.value = $t('dashboard.quickGenRequestFailed')
     showInfoModal.value = true
   } finally {
@@ -927,6 +936,13 @@ onActivated(async () => {
   margin: 10px 0 0;
   color: var(--muted);
   font-size: 0.8rem;
+}
+
+.quick-form-error {
+  margin: 10px 0 0;
+  color: var(--danger-color);
+  font-size: 0.82rem;
+  font-weight: 700;
 }
 
 :deep(.modal.quick-cta-modal .btn) {

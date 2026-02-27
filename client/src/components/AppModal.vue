@@ -38,7 +38,8 @@ const props = defineProps({
   type: { type: String, default: 'danger' }, // danger | warning | info
   modalClass: { type: String, default: '' },
   showCancel: { type: Boolean, default: true },
-  persistent: { type: Boolean, default: false }
+  persistent: { type: Boolean, default: false },
+  closeOnConfirm: { type: Boolean, default: true }
 })
 
 const emit = defineEmits(['update:modelValue', 'confirm', 'cancel'])
@@ -48,7 +49,10 @@ const confirmBtn = ref(null)
 
 function close() { emit('update:modelValue', false) }
 function onCancel() { emit('cancel'); close() }
-function onConfirm() { emit('confirm'); close() }
+function onConfirm() {
+  emit('confirm')
+  if (props.closeOnConfirm) close()
+}
 
 function overlayClick() {
   if (!props.persistent) onCancel()
