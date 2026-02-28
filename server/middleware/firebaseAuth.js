@@ -3,12 +3,27 @@ import { admin } from '../utils/firebaseAdmin.js';
 
 export function firebaseAuthMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ error: 'No auth token' });
+  if (!authHeader) {
+    try {
+      console.error('[firebaseAuth] missing Authorization header', {
+        method: req?.method,
+        path: req?.originalUrl || req?.url
+      });
+    } catch (e) {}
+    return res.status(401).json({ error: 'No auth token' });
+  }
 
   const token = authHeader.replace('Bearer ', '');
   admin.auth().verifyIdToken(token)
     .then((decodedToken) => {
       req.auth = { userId: decodedToken.uid, token: decodedToken };
+      try {
+        console.log('[firebaseAuth] verified token', {
+          uid: decodedToken.uid,
+          method: req?.method,
+          path: req?.originalUrl || req?.url
+        });
+      } catch (e) {}
       next();
     })
     .catch((err) => {

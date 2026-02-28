@@ -13,6 +13,7 @@ import { App as CapacitorApp } from '@capacitor/app'
 import { logger } from '@/utils/logger'
 import { setCacheLimits } from '@/utils/assetCache'
 import { setDownloadConcurrency } from '@/utils/assetResolver'
+import { setupAutoSync, processSyncQueue } from '@/utils/syncManager'
 
 const app = createApp(App)
 const pinia = createPinia()
@@ -52,6 +53,23 @@ async function bootstrapAuth() {
         displayName: user.displayName,
         photoURL: user.photoURL,
       }, token)
+
+      if (token) {
+        logger.debug('[main] Trigger processSyncQueue after auth', {
+          uid: user.uid,
+          hasToken: !!token
+        })
+        processSyncQueue(token).catch((error) => {
+          logger.warn('[main] processSyncQueue after auth failed:', error)
+        })
+      } else {
+        logger.warn('[main] No token after auth state change, starte trotzdem Sync-Versuch', {
+          uid: user.uid
+        })
+        processSyncQueue().catch((error) => {
+          logger.warn('[main] processSyncQueue without initial token failed:', error)
+        })
+      }
       // If the app currently shows the welcome page, navigate to target immediately to avoid race conditions
       try {
         const current = router.currentRoute.value
@@ -103,5 +121,9 @@ themeStore.applyCurrent()
 // Subscription Status beim App-Start laden
 const subscriptionStore = useSubscriptionStore()
 subscriptionStore.checkSubscription()
+
+setupAutoSync().catch((error) => {
+  logger.warn('[main] setupAutoSync failed:', error)
+})
 
 app.mount('#app')

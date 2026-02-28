@@ -17,20 +17,36 @@ import {
 } from './offlineStorage'
 import { logger } from './logger'
 import { createWorkout, updateWorkout, deleteWorkout } from '@/api/workouts'
-import { getAuthToken } from './authToken'
+import { clearTokenCache, getAuthToken } from './authToken'
 
 // Max Retry Attempts für fehlgeschlagene Syncs
 const MAX_RETRY_ATTEMPTS = 3
+const NO_AUTH_RETRY_DELAY_MS = 3000
 
 // Sync Status
 let isSyncing = false
 let syncInProgress = false
+let noAuthRetryTimer = null
+
+function scheduleNoAuthRetry() {
+  if (noAuthRetryTimer) return
+  logger.warn('⏱️ Sync Manager - Plane Retry wegen fehlendem Auth Token', {
+    delayMs: NO_AUTH_RETRY_DELAY_MS
+  })
+  noAuthRetryTimer = setTimeout(async () => {
+    noAuthRetryTimer = null
+    if (isOnline() && !syncInProgress) {
+      logger.debug('🔁 Sync Manager - Starte geplanten Retry')
+      await processSyncQueue()
+    }
+  }, NO_AUTH_RETRY_DELAY_MS)
+}
 
 /**
  * Verarbeitet die Sync Queue
  * @returns {Promise<Object>} Sync Results { success, failed, total }
  */
-export async function processSyncQueue() {
+export async function processSyncQueue(preferredToken = null) {
   // Verhindere parallele Syncs
   if (syncInProgress) {
     logger.debug('⏳ Sync Manager - Sync bereits aktiv, überspringe')
@@ -61,13 +77,18 @@ export async function processSyncQueue() {
     let failedCount = 0
     
     // Token holen für API Calls (robuste Helper-Funktion mit Fallbacks)
-    let token = null
+    let token = preferredToken || null
+    if (token) {
+      logger.debug('✅ Sync Manager - Verwende übergebenes Auth Token')
+    }
     try {
-      token = await getAuthToken()
-      if (token) {
-        logger.debug('✅ Sync Manager - Auth Token erhalten')
-      } else {
-        logger.warn('⚠️ Sync Manager - Kein gültiges Auth Token')
+      if (!token) {
+        token = await getAuthToken()
+        if (token) {
+          logger.debug('✅ Sync Manager - Auth Token erhalten')
+        } else {
+          logger.warn('⚠️ Sync Manager - Kein gültiges Auth Token')
+        }
       }
     } catch (error) {
       logger.error('❌ Sync Manager - Token-Fehler:', error)
@@ -77,7 +98,7 @@ export async function processSyncQueue() {
     if (!token) {
       await new Promise(r => setTimeout(r, 600))
       try {
-        const retryToken = await getAuthToken()
+        const retryToken = preferredToken || await getAuthToken()
         if (retryToken) {
           token = retryToken
           logger.debug('✅ Sync Manager - Token beim 2. Versuch erhalten')
@@ -88,6 +109,7 @@ export async function processSyncQueue() {
     if (!token) {
       logger.warn('⚠️ Sync Manager - Kein Auth Token, überspringe Sync')
       syncInProgress = false
+      scheduleNoAuthRetry()
       return { success: 0, failed: 0, total: pending.length, noAuth: true }
     }
 
@@ -99,7 +121,28 @@ export async function processSyncQueue() {
         successCount++
         logger.debug('✅ Sync Manager - Action erfolgreich:', item.id, item.action)
       } catch (error) {
-        logger.error('❌ Sync Manager - Action fehlgeschlagen:', item.id, error.message)
+        const status = error?.response?.status || null
+        if (status === 401) {
+          logger.warn('🔐 Sync Manager - 401 bei Sync Action, Token-Cache wird geleert und Retry geplant', {
+            queueId: item?.id,
+            action: item?.action
+          })
+          clearTokenCache()
+          scheduleNoAuthRetry()
+        }
+
+        logger.error('❌ Sync Manager - Action fehlgeschlagen:', {
+          queueId: item?.id,
+          action: item?.action,
+          entityType: item?.entityType,
+          message: error?.message,
+          code: error?.code || null,
+          status,
+          method: error?.config?.method || null,
+          url: error?.config?.url || null,
+          baseURL: error?.config?.baseURL || null,
+          timeout: error?.config?.timeout || null
+        })
         
         // Erhöhe Retry Count
         await incrementRetryCount(item.id, error.message)
@@ -144,7 +187,14 @@ export async function processSyncQueue() {
 async function syncAction(item, token) {
   const { action, entityType, data } = item
   
-  logger.debug('🔄 Sync Manager - Synce Action:', action, entityType, data._id || 'new')
+  logger.debug('🔄 Sync Manager - Synce Action', {
+    queueId: item?.id,
+    action,
+    entityType,
+    dataId: data?._id || 'new',
+    hasToken: !!token,
+    retryCount: item?.retryCount || 0
+  })
   
   // Route zur richtigen API basierend auf Entity Type
   if (entityType === 'workout') {
@@ -181,10 +231,11 @@ async function syncWorkoutAction(action, data, token) {
       logger.debug('🔄 Sync - Bereinigte Daten für API:', {
         hasId: !!createData._id,
         name: createData.name,
-        type: createData.type
+        type: createData.type,
+        exercises: Array.isArray(createData?.exercises) ? createData.exercises.length : 0
       })
       
-      const createdWorkout = await createWorkout(createData, token)
+      const createdWorkout = await createWorkout(createData, token, { skipOfflineQueue: true })
       logger.debug('✅ Sync - Workout erstellt mit neuer _id:', createdWorkout._id)
       
       // TODO: Optional - Update lokales Workout mit echter _id
@@ -204,7 +255,7 @@ async function syncWorkoutAction(action, data, token) {
       if (data._id && typeof data._id === 'string' && data._id.startsWith('offline_')) {
         logger.warn('⚠️ Sync - Update mit offline_id gefunden, konvertiere zu Create')
         delete updateData._id
-        const createdWorkout = await createWorkout(updateData, token)
+        const createdWorkout = await createWorkout(updateData, token, { skipOfflineQueue: true })
         logger.debug('✅ Sync - Workout als Create erstellt:', createdWorkout._id)
       } else {
         await updateWorkout(data._id, updateData, token)

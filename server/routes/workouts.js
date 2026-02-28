@@ -551,11 +551,21 @@ router.get("/:id", firebaseAuthMiddleware, async (req, res) => {
 
 // Neues Workout anlegen
 router.post("/", firebaseAuthMiddleware, async (req, res) => {
+  const requestId = `save_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   try {
     const { userId } = req.auth;
+    const readyState = (await import('mongoose')).default.connection?.readyState;
+    const beforeCount = await Workout.countDocuments({ userId });
     // TEMP LOGGING: Request-Body und userId
-    logger.info("[POST /api/workouts] Request-Body:", req.body);
-    logger.info("[POST /api/workouts] userId:", userId);
+    logger.info("[POST /api/workouts] incoming", {
+      requestId,
+      userId,
+      readyState,
+      beforeCount,
+      type: req.body?.type,
+      name: req.body?.name,
+      exercises: Array.isArray(req.body?.exercises) ? req.body.exercises.length : 0
+    });
     // Debug: Logge die Notizen der Übungen, falls vorhanden
     if (Array.isArray(req.body.exercises)) {
       console.log('📝 Notizen der Übungen beim POST /workouts:');
@@ -569,10 +579,21 @@ router.post("/", firebaseAuthMiddleware, async (req, res) => {
       ...req.body,
       userId
     });
-    logger.info("[POST /api/workouts] Workout erfolgreich gespeichert:", workout);
+    const afterCount = await Workout.countDocuments({ userId });
+    logger.info("[POST /api/workouts] saved", {
+      requestId,
+      workoutId: workout?._id,
+      userId,
+      beforeCount,
+      afterCount
+    });
     res.status(201).json(workout);
   } catch (err) {
-    logger.error("[POST /api/workouts] Fehler beim Speichern:", err);
+    logger.error("[POST /api/workouts] Fehler beim Speichern", {
+      requestId,
+      message: err?.message,
+      stack: err?.stack
+    });
     res.status(400).json({ error: err.message });
   }
 });

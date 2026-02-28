@@ -14,7 +14,8 @@ import { logger } from "@/utils/logger";
 
 // API Basis-URL
 const API_URL = apiUrl('workouts');
-const api = axios.create({ baseURL: API_URL });
+const WORKOUTS_TIMEOUT_MS = Number.parseInt(import.meta.env.VITE_WORKOUTS_TIMEOUT_MS || '', 10) || 12000
+const api = axios.create({ baseURL: API_URL, timeout: WORKOUTS_TIMEOUT_MS });
 
 // ---------------------------
 // Workouts abrufen
@@ -77,29 +78,75 @@ export async function fetchWorkout(workoutId, token = null) {
 }
 
 // Neues Workout erstellen / offline fallback
-export async function createWorkout(workoutData, token = null) {
+export async function createWorkout(workoutData, token = null, options = {}) {
+  const skipOfflineQueue = options?.skipOfflineQueue === true
+  const requestId = `cw_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+
+  logger.debug('📤 Workouts API - createWorkout start', {
+    requestId,
+    skipOfflineQueue,
+    online: isOnline(),
+    hasToken: !!token,
+    type: workoutData?.type,
+    exercises: Array.isArray(workoutData?.exercises) ? workoutData.exercises.length : 0
+  })
+
+  if (skipOfflineQueue) {
+    const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+    const res = await api.post("", workoutData, config)
+    logger.debug('✅ Workouts API - createWorkout direct success', {
+      requestId,
+      status: res?.status || null,
+      id: res?.data?._id || null
+    })
+    return res.data
+  }
+
   // Immer zuerst lokal speichern und in die Queue legen
   const tempId = `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   let offlineWorkout = { ...workoutData, _id: tempId, _offlineCreated: true, createdAt: new Date().toISOString() };
   await saveWorkoutOffline(offlineWorkout);
   await queueAction('create', 'workout', offlineWorkout);
-  logger.debug('💾 Workouts API - Workout offline erstellt/gequeued:', tempId);
+  logger.debug('💾 Workouts API - Workout offline erstellt/gequeued', {
+    requestId,
+    tempId
+  });
 
   // Versuche Online-POST, falls online
   if (isOnline()) {
     try {
       const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
       const res = await api.post("", workoutData, config);
+      logger.debug('📥 Workouts API - createWorkout online response', {
+        requestId,
+        status: res?.status || null,
+        hasData: !!res?.data,
+        id: res?.data?._id || null
+      })
       if (res.data && res.data._id) {
         // Update lokalen Eintrag mit echter DB-ID
         const syncedWorkout = { ...offlineWorkout, ...res.data, _offlineCreated: false, _syncedAt: new Date().toISOString() };
         await saveWorkoutOffline(syncedWorkout);
-        logger.debug('✅ Workouts API - Workout online gespeichert & lokal aktualisiert:', res.data._id);
+        logger.debug('✅ Workouts API - Workout online gespeichert & lokal aktualisiert', {
+          requestId,
+          realId: res.data._id,
+          tempId
+        });
         return syncedWorkout;
       }
       // Falls keine Daten zurückkommen, bleibt offline-Objekt bestehen
     } catch (error) {
-      logger.error('❌ Workouts API - Fehler beim Online-Speichern, bleibt offline:', error.message);
+      logger.error('❌ Workouts API - Fehler beim Online-Speichern, bleibt offline:', {
+        requestId,
+        message: error?.message,
+        code: error?.code || null,
+        status: error?.response?.status || null,
+        method: error?.config?.method || null,
+        url: error?.config?.url || null,
+        baseURL: error?.config?.baseURL || null,
+        timeout: error?.config?.timeout || null,
+        serverError: error?.response?.data || null
+      });
       // offlineWorkout bleibt bestehen, wird später gesynct
     }
   }
