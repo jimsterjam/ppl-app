@@ -26,6 +26,7 @@ pnpm-debug.log*
 # Frontend (client: Vue + Vite)
 client/node_modules/
 client/dist/
+client/dist 2/
 client/.vite/
 client/.cache/
 client/.output/

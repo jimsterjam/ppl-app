@@ -223,6 +223,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { isOnline, deleteWorkoutOffline, getWorkoutOffline } from '@/utils/offlineStorage'
 import { http } from '@/api/http'
+import { loadDefaultExercises, getCachedDefaultExercises } from '@/utils/defaultExercisesLoader'
 
 import HeaderBar from "../components/HeaderBar.vue";
 import WorkoutCard from "../components/WorkoutCard.vue";
@@ -541,6 +542,84 @@ function openQuickGeneratorForm() {
   showQuickFormModal.value = true
 }
 
+async function buildLocalQuickFallback(type, context) {
+  const requestedType = ['push', 'pull', 'legs', 'fullbody'].includes(String(type)) ? String(type) : 'fullbody'
+  const strength = context?.goal === 'strength'
+  const requestedCategory = requestedType === 'fullbody'
+    ? 'Full Body'
+    : requestedType.charAt(0).toUpperCase() + requestedType.slice(1)
+
+  let localPool = []
+  try {
+    const defaults = await loadDefaultExercises()
+    const byType = requestedType === 'fullbody'
+      ? defaults
+      : defaults.filter((exercise) => String(exercise?.category || '').toLowerCase() === requestedCategory.toLowerCase())
+
+    const byEquipment = context?.equipmentMode === 'gym_only'
+      ? byType.filter((exercise) => String(exercise?.equipment || '').toLowerCase() !== 'körpergewicht')
+      : byType
+
+    localPool = (byEquipment.length ? byEquipment : byType)
+      .filter((exercise) => typeof exercise?.name === 'string' && exercise.name.trim())
+      .slice(0, 8)
+      .map((exercise) => ({
+        name: exercise.name,
+        sets: strength ? 4 : 3,
+        reps: strength ? 6 : 10,
+        weight: 0,
+        rest: strength ? 120 : 90,
+        category: requestedType,
+        muscleGroup: exercise.muscleGroup || requestedType,
+        exerciseId: exercise._id || null,
+        _id: exercise._id || null
+      }))
+  } catch {
+    const cached = getCachedDefaultExercises()
+    const byType = requestedType === 'fullbody'
+      ? cached
+      : cached.filter((exercise) => String(exercise?.category || '').toLowerCase() === requestedCategory.toLowerCase())
+
+    const byEquipment = context?.equipmentMode === 'gym_only'
+      ? byType.filter((exercise) => String(exercise?.equipment || '').toLowerCase() !== 'körpergewicht')
+      : byType
+
+    localPool = (byEquipment.length ? byEquipment : byType)
+      .filter((exercise) => typeof exercise?.name === 'string' && exercise.name.trim())
+      .slice(0, 8)
+      .map((exercise) => ({
+        name: exercise.name,
+        sets: strength ? 4 : 3,
+        reps: strength ? 6 : 10,
+        weight: 0,
+        rest: strength ? 120 : 90,
+        category: requestedType,
+        muscleGroup: exercise.muscleGroup || requestedType,
+        exerciseId: exercise._id || null,
+        _id: exercise._id || null
+      }))
+  }
+
+  const list = localPool.slice(0, 5).map((exercise, index) => ({
+    ...exercise,
+    reps: strength ? Math.min(Number(exercise.reps) || 10, 8) : Number(exercise.reps) || 10,
+    sets: strength ? Math.max(Number(exercise.sets) || 3, 4) : Number(exercise.sets) || 3,
+    _id: exercise._id || `quick_local_${index}`,
+    category: requestedType,
+    muscleGroup: exercise.muscleGroup || requestedType,
+    setDetails: [{
+      reps: strength ? Math.min(Number(exercise.reps) || 10, 8) : Number(exercise.reps) || 10,
+      weight: Number(exercise.weight) || 0
+    }]
+  }))
+
+  return {
+    workoutName: `${requestedType === 'fullbody' ? 'Full Body' : requestedType.toUpperCase()} ${strength ? 'Strength' : 'Quick'} Session`,
+    type: requestedType,
+    exercises: list
+  }
+}
+
 async function generateQuickWorkout() {
   if (isGeneratingQuickWorkout.value) return
   isGeneratingQuickWorkout.value = true
@@ -604,9 +683,16 @@ async function generateQuickWorkout() {
     router.push({ name: 'workout-builder', query: { type: pendingWorkoutType.value, quick: '1' } })
   } catch (error) {
     logger.error('Quick generator failed', error)
-    quickFormError.value = $t('dashboard.quickGenRequestFailed')
-    infoMessage.value = $t('dashboard.quickGenRequestFailed')
+    const localFallback = await buildLocalQuickFallback(pendingWorkoutType.value, quickGeneratorForm.value)
+    try {
+      sessionStorage.setItem(QUICK_PREFILL_KEY, JSON.stringify(localFallback))
+    } catch {}
+
+    quickFormError.value = $t('dashboard.quickGenFallbackUsed')
+    infoMessage.value = $t('dashboard.quickGenFallbackUsed')
     showInfoModal.value = true
+    showQuickFormModal.value = false
+    router.push({ name: 'workout-builder', query: { type: pendingWorkoutType.value, quick: '1' } })
   } finally {
     isGeneratingQuickWorkout.value = false
   }

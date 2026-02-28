@@ -130,6 +130,7 @@ export const messages = {
   ,quickGenEquipmentBodyweight: 'Studio + Bodyweight'
   ,quickGenRemaining: 'Verbleibende Generierungen diesen Monat: {count}'
   ,quickGenRequestFailed: 'Workout konnte gerade nicht generiert werden. Bitte erneut versuchen.'
+  ,quickGenFallbackUsed: 'AI aktuell nicht erreichbar – wir haben ein lokales Workout für dich erstellt.'
     },
     settings: {
       title: 'Einstellungen',
@@ -828,6 +829,7 @@ export const messages = {
   ,quickGenEquipmentBodyweight: 'Gym + bodyweight'
   ,quickGenRemaining: 'Remaining generations this month: {count}'
   ,quickGenRequestFailed: 'Could not generate workout right now. Please try again.'
+  ,quickGenFallbackUsed: 'AI is currently unavailable — we created a local workout for you.'
     },
     settings: {
       title: 'Settings',
