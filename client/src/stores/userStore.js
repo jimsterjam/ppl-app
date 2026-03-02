@@ -17,6 +17,56 @@ import {
   updateWorkout as updateWorkoutApi
 } from '@/api/workouts'
 
+const DRAFT_TOMBSTONES_KEY = 'deleted_draft_ids_v1'
+
+function isDraftLike(workout) {
+  const id = String(workout?._id || '')
+  return workout?._isDraft === true || workout?.isDraft === true || id === 'draft' || id.startsWith('draft-')
+}
+
+function readDraftTombstones() {
+  try {
+    const raw = localStorage.getItem(DRAFT_TOMBSTONES_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeDraftTombstones(map) {
+  try {
+    localStorage.setItem(DRAFT_TOMBSTONES_KEY, JSON.stringify(map || {}))
+  } catch {}
+}
+
+function markDraftsDeleted(ids = []) {
+  const valid = [...new Set((ids || []).map(v => String(v || '').trim()).filter(Boolean))]
+  if (!valid.length) return
+  const next = readDraftTombstones()
+  const now = Date.now()
+  valid.forEach((id) => {
+    next[id] = now
+  })
+  writeDraftTombstones(next)
+}
+
+function isDraftDeleted(id) {
+  if (!id) return false
+  const map = readDraftTombstones()
+  return Boolean(map[String(id)])
+}
+
+function filterOutDeletedDrafts(list = [], source = 'unknown') {
+  const items = Array.isArray(list) ? list : []
+  const removed = items.filter(w => isDraftLike(w) && isDraftDeleted(w?._id))
+  if (removed.length) {
+    logger.debug('🛡️ [DraftIntegrity] Blocked tombstoned drafts from source:', source, removed.map(w => String(w?._id || '')))
+  }
+  return items.filter(w => !(isDraftLike(w) && isDraftDeleted(w?._id)))
+}
+
 
 export const useUserStore = defineStore("user", {
   state: () => ({
@@ -167,7 +217,7 @@ export const useUserStore = defineStore("user", {
 
     applyWorkoutLimit(list, limit = 3) {
       const items = Array.isArray(list) ? list : []
-      const drafts = items.filter(w => (w?._isDraft === true || w?.isDraft === true) && w?.completed !== true)
+      const drafts = items.filter(w => isDraftLike(w) && w?.completed !== true && !isDraftDeleted(w?._id))
       const regular = items.filter(w => !((w?._isDraft === true || w?.isDraft === true) && w?.completed !== true))
       const sorted = [...regular].sort((a, b) => {
         const ad = new Date(a.updatedAt || a.date || 0).getTime()
@@ -193,12 +243,12 @@ export const useUserStore = defineStore("user", {
         try {
           const cachedWorkouts = await getAllWorkoutsOffline();
           if (Array.isArray(cachedWorkouts) && cachedWorkouts.length) {
-            this.workouts = cachedWorkouts.map(w => ({
+            this.workouts = filterOutDeletedDrafts(cachedWorkouts.map(w => ({
               ...w,
               completed: w.completed !== undefined ? w.completed : false,
               _isDraft: w._isDraft === true || w?.isDraft === true,
               isDraft: w._isDraft === true || w?.isDraft === true
-            }));
+            })), 'offline-cache-bootstrap');
             this.workoutsLoaded = true;
             this.workoutsLoadedAt = Date.now();
           }
@@ -209,10 +259,11 @@ export const useUserStore = defineStore("user", {
         if (online) {
           const previousDrafts = (this.workouts || [])
             .filter(w => (w?._isDraft === true || w?.isDraft === true) && w?.completed !== true)
+            .filter(w => !isDraftDeleted(w?._id))
             .map(w => ({ ...w, _isDraft: true, isDraft: true, completed: false }))
 
           const workouts = await fetchWorkouts(token);
-          this.workouts = Array.isArray(workouts) ? workouts : [];
+          this.workouts = filterOutDeletedDrafts(Array.isArray(workouts) ? workouts : [], 'server-fetch');
           // Setze completed: false für Workouts ohne completed Feld (Migration)
           this.workouts = this.workouts.map(w => ({
             ...w,
@@ -236,6 +287,7 @@ export const useUserStore = defineStore("user", {
             });
 
             previousDrafts.forEach((draft) => {
+              if (isDraftDeleted(draft?._id)) return
               const idx = this.workouts.findIndex(w => String(w?._id || '') === String(draft?._id || ''))
               if (idx !== -1) {
                 this.workouts[idx] = { ...this.workouts[idx], ...draft, _isDraft: true, isDraft: true, completed: false }
@@ -244,7 +296,10 @@ export const useUserStore = defineStore("user", {
               }
             })
 
-            const offlineDrafts = offlineAll.filter(w => (w?._isDraft === true || w?.isDraft === true) && w?.completed !== true)
+            const offlineDrafts = filterOutDeletedDrafts(
+              offlineAll.filter(w => (w?._isDraft === true || w?.isDraft === true) && w?.completed !== true),
+              'offline-drafts-merge'
+            )
             offlineDrafts.forEach((draft) => {
               const idx = this.workouts.findIndex(w => String(w?._id || '') === String(draft?._id || ''))
               const normalizedDraft = { ...draft, _isDraft: true, isDraft: true, completed: false }
@@ -271,7 +326,7 @@ export const useUserStore = defineStore("user", {
 
         // Offline: Workouts aus IndexedDB laden
         const offlineWorkouts = await getAllWorkoutsOffline();
-        this.workouts = Array.isArray(offlineWorkouts) ? offlineWorkouts : [];
+        this.workouts = filterOutDeletedDrafts(Array.isArray(offlineWorkouts) ? offlineWorkouts : [], 'offline-load');
         this.workouts = this.workouts.map(w => ({
           ...w,
           completed: w.completed !== undefined ? w.completed : false,
@@ -298,6 +353,7 @@ export const useUserStore = defineStore("user", {
                 isDraft: w._isDraft === true || w?.isDraft === true
               }))
             : [];
+          this.workouts = filterOutDeletedDrafts(this.workouts, 'offline-fallback-catch')
           this.workouts = this.applyWorkoutLimit(this.workouts, 3)
           if (this.workouts.length) this.error = null;
         } catch (e) {
@@ -541,18 +597,49 @@ export const useUserStore = defineStore("user", {
     },
 
     async clearDraft() {
+      const collectDraftIds = new Set(
+        (this.workouts || [])
+          .filter(w => isDraftLike(w) && w?.completed !== true)
+          .map(w => String(w?._id || '').trim())
+          .filter(Boolean)
+      )
+
       try {
         const offline = await getAllWorkoutsOffline()
-        const draftIds = offline
-          .filter(w => w._isDraft === true || w?.isDraft === true)
-          .map(w => w._id)
-        await Promise.all(draftIds.map(id => deleteWorkoutOffline(id)))
+        offline
+          .filter(w => isDraftLike(w) && w?.completed !== true)
+          .forEach((w) => {
+            const id = String(w?._id || '').trim()
+            if (id) collectDraftIds.add(id)
+          })
+
+        const draftIds = [...collectDraftIds]
+        if (draftIds.length) {
+          try {
+            await db.workouts.bulkDelete(draftIds)
+          } catch {}
+          await Promise.all(draftIds.map(id => deleteWorkoutOffline(id).catch(() => null)))
+          markDraftsDeleted(draftIds)
+          logger.debug('🧹 [DraftIntegrity] Tombstoned draft IDs after delete:', draftIds)
+        }
       } catch (e) {
         logger.warn('⚠️ [userStore] Konnte Offline-Drafts nicht löschen:', e)
       }
+
+      try {
+        const detailKey = 'workout_detail_draft'
+        sessionStorage.removeItem(detailKey)
+        const allKeys = Object.keys(sessionStorage)
+        allKeys.forEach((key) => {
+          if (key.startsWith('workout_detail_draft_') || key.startsWith('workout_map_')) {
+            sessionStorage.removeItem(key)
+          }
+        })
+      } catch {}
+
       try {
         const before = this.workouts.length
-        this.workouts = this.workouts.filter(w => !(w?._isDraft === true || w?.isDraft === true))
+        this.workouts = this.workouts.filter(w => !(isDraftLike(w) && w?.completed !== true))
         const after = this.workouts.length
         logger.debug('🧹 [userStore] Drafts aus Store entfernt. Workouts:', before, '→', after)
       } catch (e) {

@@ -4,18 +4,16 @@
 
     <!-- Filter wie im WorkoutBuilder -->
     <div v-if="showControls" class="filter-row">
-      <button
-        v-for="cat in quickCategories"
-        :key="cat.value"
-        class="filter-btn"
-        :class="{ active: selectedCategory === cat.value }"
-        @click="setCategory(cat.value)"
-      >
-        {{ cat.label }}
-      </button>
-      <button class="filter-btn ghost" @click="resetFilters">
-        {{ t('exercises.filters.reset') }}
-      </button>
+      <div class="equipment-filter-wrap">
+        <label for="type-filter-select" class="equipment-filter-label">
+          {{ t('exercises.filters.type') !== 'exercises.filters.type' ? t('exercises.filters.type') : 'Typ' }}
+        </label>
+        <select id="type-filter-select" v-model="selectedCategory" @change="setCategory($event.target.value)" class="equipment-filter-select">
+          <option :value="''">{{ t('exercises.filters.all') || 'Alle' }}</option>
+          <option v-for="cat in quickCategories" :key="cat.value" :value="cat.value">{{ cat.label }}</option>
+        </select>
+      </div>
+
       <div class="equipment-filter-wrap">
         <label for="equipment-filter-select" class="equipment-filter-label">
           {{ t('builder.filterEquipment') !== 'builder.filterEquipment' ? t('builder.filterEquipment') : 'Equipment filtern' }}
@@ -25,25 +23,31 @@
           <option v-for="equip in allEquipmentTypes" :key="equip" :value="equip">{{ equipmentTranslation(equip) }}</option>
         </select>
       </div>
-    </div>
-    <div v-if="showControls" class="filter-row secondary">
-      <label class="filter-label">{{ t('exercises.filters.muscleGroup') }}:</label>
-      <select
-        v-model="selectedMuscleGroup"
-        class="filter-select"
-        @change="loadExercises"
-      >
-        <option value="">{{ t('exercises.filters.all') }}</option>
-        <option v-for="group in muscleGroups" :key="group" :value="group">
-          {{ group }}
-        </option>
-      </select>
+
+      <div class="equipment-filter-wrap">
+        <label for="muscle-group-select" class="equipment-filter-label">{{ t('exercises.filters.muscleGroup') }}</label>
+        <select
+          id="muscle-group-select"
+          v-model="selectedMuscleGroup"
+          class="equipment-filter-select"
+          @change="loadExercises"
+        >
+          <option value="">{{ t('exercises.filters.all') }}</option>
+          <option v-for="group in muscleGroups" :key="group" :value="group">
+            {{ group }}
+          </option>
+        </select>
+      </div>
+
+      <button class="filter-btn ghost" @click="resetFilters">
+        {{ t('exercises.filters.reset') }}
+      </button>
     </div>
 
     <div v-if="showControls" class="search-row">
       <input
         v-model="searchQuery"
-        class="search-input"
+        class="equipment-filter-select search-input"
         type="search"
         :placeholder="t('exercises.searchPlaceholder') || 'Suchen…'"
         @input="onSearchInput"
@@ -108,6 +112,7 @@
           :alt="mediaExercise.name"
           class="media-image"
         />
+        <p class="media-disclaimer">Visualisierung dient nur zur Orientierung. Keine Garantie für technisch korrekte Ausführung.</p>
         <button class="close-btn" @click="closeMedia">OK</button>
       </div>
     </div>
@@ -409,14 +414,16 @@ function closeMedia() {
   flex-wrap: wrap;
   gap: 12px;
   margin-bottom: 14px;
-  justify-content: center;
+  justify-content: flex-start;
+  align-items: flex-end;
 }
 .equipment-filter-wrap {
-  width: 100%;
+  width: auto;
   display: flex;
-  gap: 10px;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  justify-content: flex-start;
 }
 .equipment-filter-label {
   font-weight: 600;
@@ -430,14 +437,14 @@ function closeMedia() {
   color: var(--fg);
 }
 .filter-row.secondary {
-  align-items: center;
-  justify-content: center;
+  width: auto;
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  justify-content: flex-start;
 }
 .filter-label {
-  font-size: 0.85rem;
-  color: var(--muted);
-  min-width: 130px;
-  text-align: right;
+  font-weight: 600;
 }
 .filter-btn {
   padding: 10px 16px;
@@ -467,13 +474,18 @@ function closeMedia() {
   color: var(--fg);
 }
 .search-row {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
   margin-bottom: 18px;
 }
 .search-input {
-  width: 100%;
-  padding: 12px 14px;
-  border-radius: 12px;
-  border: 1px solid var(--line-strong);
+  width: min(420px, 100%);
+  padding: 7px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--card-border);
   background: var(--bg-panel);
   color: var(--fg);
 }
@@ -586,6 +598,13 @@ function closeMedia() {
   border-radius: 12px;
   background: #0b1220;
   border: 1px solid var(--card-border, #1f2937);
+}
+.media-disclaimer {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  text-align: center;
 }
 /* Mobile: Thumbnail rechts und größer */
 @media (max-width: 480px) {

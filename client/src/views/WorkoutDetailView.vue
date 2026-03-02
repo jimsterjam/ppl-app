@@ -31,6 +31,9 @@
               <button class="primary add-exercise-btn" type="button" @click="showAddExerciseModal = true">
                 + {{ t('workoutDetail.addExercise') }}
               </button>
+              <button class="primary timer-config-btn" type="button" @click="showTimerConfig = true">
+                ⏱ Timer einstellen
+              </button>
               <button class="reorder-toggle" type="button" :aria-pressed="isReordering" @click="toggleReorder">
                 {{ isReordering ? t('workoutDetail.done') : t('workoutDetail.editOrder') }}
               </button>
@@ -51,7 +54,7 @@
         <ExerciseList
           v-else
           :show-title="false"
-          :show-controls="false"
+          :show-controls="true"
           :items="allExercises"
           :selectable="true"
           :selected-ids="selectedModalExerciseIds"
@@ -97,7 +100,17 @@
                   @click="openExerciseMedia(ex)"
                 />
                 <div class="ex-text">
-                  <strong>{{ getTranslatedExerciseName(ex.name) }}</strong>
+                  <div class="ex-title-row">
+                    <strong>{{ getTranslatedExerciseName(ex.name) }}</strong>
+                    <button
+                      class="remove-exercise-btn"
+                      type="button"
+                      :title="t('common.remove')"
+                      @click="removeExercise(i)"
+                    >
+                      🗑️
+                    </button>
+                  </div>
                   <small>{{ getTranslatedMuscleGroup ? getTranslatedMuscleGroup(ex.muscleGroup) : ex.muscleGroup }}</small>
 
                   <!-- Notiz-Button und Feld -->
@@ -140,6 +153,7 @@
                         :alt="mediaExercise.name"
                         class="media-image"
                       />
+                      <p class="media-disclaimer">Visualisierung dient nur zur Orientierung. Keine Garantie für technisch korrekte Ausführung.</p>
                       <button class="close-btn" @click="closeExerciseMedia">OK</button>
                     </div>
                   </div>
@@ -264,10 +278,18 @@
           </div>
 
           <div class="actions">
-            <button class="primary" :disabled="saving" @click="saveWorkout">
+            <button
+              v-if="isReordering"
+              class="primary"
+              type="button"
+              @click="toggleReorder"
+            >
+              {{ t('workoutDetail.done') }}
+            </button>
+            <button v-else class="primary" :disabled="saving" @click="saveWorkout">
               {{ saving ? t('workoutDetail.saving') : t('workoutDetail.save') }}
             </button>
-            <small v-if="saveMsg" class="save-msg" :class="{ error: saveError }">{{ saveMsg }}</small>
+            <small v-if="saveMsg && !isReordering" class="save-msg" :class="{ error: saveError }">{{ saveMsg }}</small>
           </div>
         </div>
 
@@ -303,6 +325,9 @@
       type="warning"
       @confirm="confirmLeave"
     />
+
+    <WorkoutTimerConfig v-if="showTimerConfig" @close="showTimerConfig = false" />
+    <WorkoutTimerBar v-if="showTimerBar" @close="timerStore.reset()" />
   </div>
 </template>
 
@@ -397,18 +422,32 @@ import HeaderBar from '@/components/HeaderBar.vue'
 import BottomNav from '@/components/BottomNav.vue'
 import AppModal from '@/components/AppModal.vue'
 import ExerciseList from '@/components/ExerciseList.vue'
+import WorkoutTimerBar from '@/components/timer/WorkoutTimerBar.vue'
+import WorkoutTimerConfig from '@/components/timer/WorkoutTimerConfig.vue'
 import { useToastStore } from '@/stores/toastStore'
+import { useTimerStore } from '@/stores/timerStore'
 import { useI18n } from 'vue-i18n'
 import { logger } from '@/utils/logger'
 import { buildWorkoutNotesSummary } from '@/utils/workoutNotes'
 
 const userStore = useUserStore()
 function getDetailDraftKey() {
-  const userId = userStore?.user?.id || userStore?.user?._id || 'guest'
-  return `workout_detail_draft_${userId}`
+  return 'workout_detail_draft'
+}
+function readDetailDraftRaw() {
+  try {
+    const direct = sessionStorage.getItem(getDetailDraftKey())
+    if (direct) return direct
+    const legacyKeys = Object.keys(sessionStorage).filter((key) => key.startsWith('workout_detail_draft_'))
+    if (!legacyKeys.length) return null
+    return sessionStorage.getItem(legacyKeys[0])
+  } catch {
+    return null
+  }
 }
 function clearAllDetailDraftSnapshots() {
   try {
+    sessionStorage.removeItem(getDetailDraftKey())
     const keys = Object.keys(sessionStorage)
     keys.forEach((key) => {
       if (key.includes('workout_detail_draft_')) {
@@ -463,6 +502,7 @@ const getTranslatedMuscleGroup = (mg) => mg
 
 const store = userStore
 const toast = useToastStore()
+const timerStore = useTimerStore()
 const workout = ref(null)
 const loading = ref(false)
 const error = ref('')
@@ -492,6 +532,8 @@ const exListRef = ref(null)
 const didAutoScroll = ref(false)
 let initialSnapshot = ''
 const showLeaveModal = ref(false)
+const showTimerConfig = ref(false)
+const showTimerBar = computed(() => timerStore.isActive)
 
 // Notiz-Logik
 const showNote = ref([])
@@ -669,7 +711,7 @@ async function loadWorkout() {
       const draftKey = getDetailDraftKey()
       // 1. Versuche aus sessionStorage zu laden (Resume aus Dashboard)
       let draft = null
-      const raw = sessionStorage.getItem(draftKey)
+      const raw = readDetailDraftRaw()
       if (raw) {
         try {
           const parsed = JSON.parse(raw)
@@ -969,6 +1011,18 @@ function confirmLeave() {
 
 function toggleReorder() { isReordering.value = !isReordering.value }
 
+function removeExercise(exIndex) {
+  if (!workout.value?.exercises || !Array.isArray(workout.value.exercises)) return
+  if (exIndex < 0 || exIndex >= workout.value.exercises.length) return
+
+  workout.value.exercises.splice(exIndex, 1)
+  if (Array.isArray(showNote.value)) showNote.value.splice(exIndex, 1)
+  if (Array.isArray(exerciseNotes.value)) exerciseNotes.value.splice(exIndex, 1)
+
+  try { triggerAutoSave() } catch {}
+  toast.show('Übung entfernt', { type: 'success', duration: 1500 })
+}
+
 function ensureSetDetailsStructure() {
   if (!workout.value || !Array.isArray(workout.value.exercises)) return
   workout.value.exercises = workout.value.exercises.map(ex => ({
@@ -1170,10 +1224,15 @@ async function saveWorkout() {
     saving.value = true
     const id = route.params.id
     const w = workout.value || {}
+    const timerElapsedSeconds = Math.max(0, Math.round((Number(timerStore.elapsedMs) || 0) / 1000))
+    const timerDurationMinutes = timerElapsedSeconds > 0 ? Math.max(1, Math.round(timerElapsedSeconds / 60)) : 0
+    const existingDuration = Number(w.duration) || 0
+    const finalDurationMinutes = timerDurationMinutes > 0 ? timerDurationMinutes : existingDuration
     const normalized = {
       name: w.name,
       type: w.type,
       date: w.date,
+      duration: finalDurationMinutes,
       completed: true,
       _isDraft: false,
       isDraft: false,
@@ -1194,7 +1253,7 @@ async function saveWorkout() {
       if (realId) {
         let token = await getIdToken().catch(() => null)
         await store.updateWorkout(realId, normalized, token)
-        saveMsg.value = 'Gespeichert.'
+        saveMsg.value = finalDurationMinutes > 0 ? `Gespeichert. Dauer: ${finalDurationMinutes} min` : 'Gespeichert.'
         saveError.value = false
         initialSnapshot = snapshotCore({ ...normalized, _id: realId })
         try { await db.workouts.delete(id) } catch {}
@@ -1207,7 +1266,7 @@ async function saveWorkout() {
         store.workouts[idx] = { ...store.workouts[idx], ...normalized }
       }
       await saveWorkoutOffline({ ...normalized, _id: id, _isDraft: false, completed: true, updatedAt: Date.now() })
-      saveMsg.value = 'Gespeichert.'
+      saveMsg.value = finalDurationMinutes > 0 ? `Gespeichert. Dauer: ${finalDurationMinutes} min` : 'Gespeichert.'
       saveError.value = false
       initialSnapshot = snapshotCore({ ...(idx !== -1 ? store.workouts[idx] : normalized), _id: id })
       await postSaveCleanup()
@@ -1217,7 +1276,7 @@ async function saveWorkout() {
 
     let token = await getIdToken().catch(() => null)
     await store.updateWorkout(id, normalized, token)
-    saveMsg.value = 'Gespeichert.'
+    saveMsg.value = finalDurationMinutes > 0 ? `Gespeichert. Dauer: ${finalDurationMinutes} min` : 'Gespeichert.'
     saveError.value = false
     initialSnapshot = snapshotCore({ ...w, ...normalized })
     await postSaveCleanup()
@@ -1649,6 +1708,13 @@ onBeforeUnmount(() => {
   background: var(--surface);
   border: 1px solid var(--card-border);
 }
+.media-disclaimer {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  text-align: center;
+}
 .drag-handle { background: transparent; border: none; color: var(--muted); cursor: grab; font-size: 16px; margin-right: 4px; padding: 0; }
 .ex-sets { margin-top: 6px; }
 .set-row { display: grid; grid-template-columns: 50px 1fr 1fr 60px; gap: 8px; align-items: center; padding: 4px 0; }
@@ -1669,11 +1735,20 @@ onBeforeUnmount(() => {
 .primary { width: 100%; padding: 12px; border-radius: 10px; border: none; cursor: pointer; background: var(--accent); color: var(--accent-contrast); font-weight: 600; }
 .add-exercise-btn {
   background: transparent;
+  color: #4b82ff;
+  border: 2px solid #4b82ff;
+  font-weight: 700;
+}
+.add-exercise-btn:hover {
+  background: color-mix(in srgb, #4b82ff 14%, transparent);
+}
+.timer-config-btn {
+  background: transparent;
   color: var(--accent);
   border: 2px solid var(--accent);
   font-weight: 700;
 }
-.add-exercise-btn:hover {
+.timer-config-btn:hover {
   background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 .link.danger {
@@ -1697,6 +1772,19 @@ onBeforeUnmount(() => {
 .ex-name-only { font-size: 1rem; font-weight: 600; }
 .ex-thumb { width: 56px; height: 56px; flex-shrink: 0; object-fit: contain; background: var(--surface); border: 1px solid var(--card-border); border-radius: 8px; padding: 4px; cursor: pointer; }
 .ex-text { flex: 1; min-width: 0; }
+.ex-title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .ex-text strong { display: block; color: var(--fg); font-size: 0.95rem; }
 .ex-text small { display: block; color: var(--muted); font-size: 0.8rem; margin-top: 2px; }
+.remove-exercise-btn {
+  border: 1px solid color-mix(in srgb, var(--danger-color) 50%, transparent);
+  background: color-mix(in srgb, var(--danger-color) 14%, transparent);
+  color: var(--danger-color);
+  border-radius: 8px;
+  padding: 2px 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.remove-exercise-btn:hover {
+  background: color-mix(in srgb, var(--danger-color) 20%, transparent);
+}
 </style>

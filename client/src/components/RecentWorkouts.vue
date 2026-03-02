@@ -122,12 +122,6 @@
               
               <div v-if="workout.exercises.length > 4" class="more-exercises-detailed">
                 <span class="more-text">+{{ workout.exercises.length - 4 }} {{ t('recent.moreExercises') }}</span>
-                <button 
-                  class="show-all-btn"
-                  @click.stop="showAllExercises = !showAllExercises"
-                >
-                  {{ showAllExercises ? t('recent.showLess') : t('recent.showAll') }}
-                </button>
               </div>
               
               <!-- Show remaining exercises if expanded -->
@@ -169,6 +163,15 @@
                     {{ t('recent.noSetData') }}
                   </div>
                 </div>
+              </div>
+
+              <div v-if="workout.exercises.length > 4" class="show-all-wrap">
+                <button
+                  class="show-all-btn"
+                  @click.stop="showAllExercises = !showAllExercises"
+                >
+                  {{ showAllExercises ? t('recent.showLess') : t('recent.showAll') }}
+                </button>
               </div>
             </div>
           </div>
@@ -616,6 +619,8 @@ function editWorkout(workout) {
 .more-exercises-detailed { display: flex; justify-content: space-between; align-items: center; padding: 12px; background: rgba(255,255,255,0.02); border-radius: 12px; margin-top: 8px; border: 1px solid var(--card-border); }
 
 .more-text { color: var(--muted); font-size: 0.85rem; font-style: italic; }
+
+.show-all-wrap { display: flex; justify-content: flex-end; margin-top: 8px; }
 
 .show-all-btn { background: var(--accent); color: var(--accent-contrast); border: none; border-radius: 8px; padding: 6px 12px; font-size: 0.8rem; font-weight: 600; cursor: pointer; transition: all 0.2s ease; }
 .show-all-btn:hover { transform: scale(1.05); }

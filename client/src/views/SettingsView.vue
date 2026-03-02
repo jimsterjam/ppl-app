@@ -21,6 +21,23 @@
       </section>
 
       <section class="card card--app">
+        <h3>{{ $t('settings.colorMode') }}</h3>
+        <p class="hint">{{ $t('settings.colorModeHint') }}</p>
+        <div class="theme-options">
+          <label v-for="mode in colorModeOptions" :key="mode.value" class="opt">
+            <input
+              type="radio"
+              name="color-mode"
+              :value="mode.value"
+              :checked="colorMode === mode.value"
+              @change="setColorMode(mode.value)"
+            />
+            <span>{{ mode.label }}</span>
+          </label>
+        </div>
+      </section>
+
+      <section class="card card--app">
         <h3>{{ $t('settings.weeklyGoal') }}</h3>
         <p class="hint">{{ $t('settings.weeklyGoalHint') }}</p>
         <div class="goal-row">
@@ -644,8 +661,15 @@ import {
 } from '@/api/account'
 
 const themeStore = useThemeStore()
-const { theme } = storeToRefs(themeStore)
+const { theme, colorMode } = storeToRefs(themeStore)
 const set = (t) => themeStore.setTheme(t)
+const setColorMode = (mode) => themeStore.setColorMode(mode)
+const colorModeOptions = computed(() => ([
+  { value: 'lime', label: $t('settings.colorModeLime') },
+  { value: 'ocean', label: $t('settings.colorModeOcean') },
+  { value: 'violet', label: $t('settings.colorModeViolet') },
+  { value: 'sunset', label: $t('settings.colorModeSunset') }
+]))
 
 // Wochenziel
 const settings = useSettingsStore()
@@ -2304,7 +2328,7 @@ async function confirmDeleteAccount() {
   resize: vertical;
 }
 
-.theme-options { display: flex; gap: 12px; align-items: center; }
+.theme-options { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 .opt { display: inline-flex; gap: 8px; align-items: center; background: var(--surface); border: 1px solid var(--card-border); padding: 8px 10px; border-radius: 10px; }
 .toggle { margin-left: auto; background: var(--accent); color: #fff; border: none; border-radius: 10px; padding: 10px 12px; }
 

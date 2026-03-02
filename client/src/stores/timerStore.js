@@ -184,6 +184,22 @@ export const useTimerStore = defineStore('timer', {
       this.pausedTotalMs = 0
       setKeepAwake(false)
     },
+    prepare(config = null) {
+      const cfg = config ? { ...DEFAULT_CONFIG, ...config } : this.config
+      this.config = cfg
+      this.stopTick()
+      this.status = 'paused'
+      this.startedAt = null
+      this.pausedAt = null
+      this.pausedTotalMs = 0
+      this.nowMs = Date.now()
+      this.setCountdownOverlay(null)
+      this.countdownLastSecond = null
+      this.prepLastSecond = null
+      this.startFlashUntil = null
+      setKeepAwake(false)
+      return true
+    },
     startTick() {
       this.stopTick()
       tickHandle = setInterval(() => this.tickNow(), TICK_MS)

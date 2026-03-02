@@ -101,6 +101,75 @@ html {
   --danger-bg: rgba(212, 58, 58, 0.18);
 }
 
+:root[data-accent="ocean"] {
+  --accent: #58b8ff;
+  --accent-strong: #8bd0ff;
+  --accent-contrast: #051421;
+  --accent-soft: rgba(88, 184, 255, 0.2);
+  --accent-color: #58b8ff;
+  --accent-color-strong: #8bd0ff;
+  --accent-color-contrast: #051421;
+}
+
+:root[data-accent="violet"] {
+  --accent: #b394ff;
+  --accent-strong: #c8adff;
+  --accent-contrast: #120a24;
+  --accent-soft: rgba(179, 148, 255, 0.22);
+  --accent-color: #b394ff;
+  --accent-color-strong: #c8adff;
+  --accent-color-contrast: #120a24;
+}
+
+:root[data-accent="sunset"] {
+  --accent: #ff9a6a;
+  --accent-strong: #ffb590;
+  --accent-contrast: #2a0d00;
+  --accent-soft: rgba(255, 154, 106, 0.22);
+  --accent-color: #ff9a6a;
+  --accent-color-strong: #ffb590;
+  --accent-color-contrast: #2a0d00;
+}
+
+[data-theme="light"][data-accent="lime"] {
+  --accent: #bede27;
+  --accent-strong: #f5ff80;
+  --accent-soft: rgba(190, 222, 39, 0.2);
+  --accent-color: #506400;
+  --accent-color-strong: #6a8700;
+  --accent-color-contrast: #ffffff;
+}
+
+[data-theme="light"][data-accent="ocean"] {
+  --accent: #3d8ee6;
+  --accent-strong: #6faeef;
+  --accent-contrast: #ffffff;
+  --accent-soft: rgba(61, 142, 230, 0.2);
+  --accent-color: #21548b;
+  --accent-color-strong: #2f6aa8;
+  --accent-color-contrast: #ffffff;
+}
+
+[data-theme="light"][data-accent="violet"] {
+  --accent: #8863d7;
+  --accent-strong: #a58ae6;
+  --accent-contrast: #ffffff;
+  --accent-soft: rgba(136, 99, 215, 0.2);
+  --accent-color: #56378f;
+  --accent-color-strong: #6947a8;
+  --accent-color-contrast: #ffffff;
+}
+
+[data-theme="light"][data-accent="sunset"] {
+  --accent: #df6f3f;
+  --accent-strong: #ef916a;
+  --accent-contrast: #ffffff;
+  --accent-soft: rgba(223, 111, 63, 0.2);
+  --accent-color: #8a3e1e;
+  --accent-color-strong: #a44c27;
+  --accent-color-contrast: #ffffff;
+}
+
 body {
   min-height: 100vh;
   font-family: 'Sora', 'Space Grotesk', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;

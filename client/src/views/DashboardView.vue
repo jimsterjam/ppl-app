@@ -299,6 +299,23 @@ const quickResetDateLabel = computed(() => {
 const quickLimitText = computed(() => $t('dashboard.quickGenLimitText', { date: quickResetDateLabel.value }))
 const quickLastHintText = computed(() => $t('dashboard.quickGenLastHintText', { date: quickResetDateLabel.value }))
 
+const DRAFT_TOMBSTONES_KEY = 'deleted_draft_ids_v1'
+function readDraftTombstones() {
+  try {
+    const raw = localStorage.getItem(DRAFT_TOMBSTONES_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+function isDraftDeleted(id) {
+  if (!id) return false
+  const map = readDraftTombstones()
+  return Boolean(map[String(id)])
+}
+
 function logDraftSourceOnce() {
   if (draftSourceLogged.value) return
   const storeDrafts = (store.workouts || []).filter(w => w?._isDraft === true || w?.isDraft === true)
@@ -360,13 +377,37 @@ const avatarInitials = computed(() => {
 })
 
 function getDetailDraftKey() {
-  const userId = store?.user?.id || store?.user?._id || authStore?.user?.id || authStore?.user?._id || 'guest'
-  return `workout_detail_draft_${userId}`
+  return 'workout_detail_draft'
+}
+
+function getLegacyDetailDraftKeys() {
+  try {
+    return Object.keys(sessionStorage).filter((key) => key.startsWith('workout_detail_draft_'))
+  } catch {
+    return []
+  }
+}
+
+function readDetailDraftRaw() {
+  try {
+    const direct = sessionStorage.getItem(getDetailDraftKey())
+    if (direct) return direct
+    const legacyKeys = getLegacyDetailDraftKeys()
+    if (!legacyKeys.length) return null
+    const latestKey = legacyKeys.sort((a, b) => {
+      const ta = Number((sessionStorage.getItem(a) && JSON.parse(sessionStorage.getItem(a))?.timestamp) || 0)
+      const tb = Number((sessionStorage.getItem(b) && JSON.parse(sessionStorage.getItem(b))?.timestamp) || 0)
+      return tb - ta
+    })[0]
+    return latestKey ? sessionStorage.getItem(latestKey) : null
+  } catch {
+    return null
+  }
 }
 
 async function readDetailDraft() {
   try {
-    const raw = sessionStorage.getItem(getDetailDraftKey())
+    const raw = readDetailDraftRaw()
     if (!raw) {
       detailDraft.value = null
       logDraftSourceOnce()
@@ -381,6 +422,18 @@ async function readDetailDraft() {
       return
     }
     const draftId = String(data._id)
+    if (isDraftDeleted(draftId)) {
+      logger.debug('🛡️ [DraftIntegrity] Ignoring tombstoned session draft:', draftId)
+      detailDraft.value = null
+      try { sessionStorage.removeItem(getDetailDraftKey()) } catch {}
+      try {
+        Object.keys(sessionStorage)
+          .filter((key) => key.startsWith('workout_detail_draft_'))
+          .forEach((key) => sessionStorage.removeItem(key))
+      } catch {}
+      logDraftSourceOnce()
+      return
+    }
     const isDraftLike = data?._isDraft === true || data?.isDraft === true || draftId === 'draft' || draftId.startsWith('draft-')
     if (!isDraftLike) {
       detailDraft.value = null
@@ -391,6 +444,12 @@ async function readDetailDraft() {
     const mappedRealId = draftId.startsWith('draft-')
       ? String(sessionStorage.getItem(`workout_map_${draftId}`) || '')
       : ''
+    if (mappedRealId && isDraftDeleted(mappedRealId)) {
+      detailDraft.value = null
+      try { sessionStorage.removeItem(getDetailDraftKey()) } catch {}
+      logDraftSourceOnce()
+      return
+    }
     if (mappedRealId) {
       const mappedFromStore = (store.workouts || []).find(w => String(w?._id || '') === mappedRealId) || null
       const mappedFromOffline = mappedFromStore ? null : (await getWorkoutOffline(mappedRealId).catch(() => null))
@@ -651,7 +710,15 @@ async function generateQuickWorkout() {
       requestedType: pendingWorkoutType.value
     }
 
-    const { data } = await http.post('/workouts/quick-generator', payload, { headers })
+    // Add timeout to prevent hanging
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('API timeout after 20s')), 20000)
+    )
+    
+    const { data } = await Promise.race([
+      http.post('/workouts/quick-generator', payload, { headers }),
+      timeoutPromise
+    ])
     const exercises = Array.isArray(data?.exercises) ? data.exercises : []
 
     const prefill = {
@@ -1009,6 +1076,11 @@ onActivated(async () => {
   font-size: 0.85rem;
 }
 
+.quick-form-field label {
+  color: var(--fg-strong);
+  font-weight: 600;
+}
+
 .quick-form-field select,
 .quick-form-field input {
   border: 1px solid var(--line-soft);
@@ -1016,6 +1088,14 @@ onActivated(async () => {
   background: var(--bg-panel);
   color: var(--fg);
   padding: 8px 10px;
+  font-size: 0.9rem;
+}
+
+.quick-form-field select:focus,
+.quick-form-field input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+  border-color: var(--accent);
 }
 
 .quick-form-hint {
@@ -1031,18 +1111,36 @@ onActivated(async () => {
   font-weight: 700;
 }
 
+:deep(.modal.quick-cta-modal) {
+  --modal-text: var(--fg-strong);
+  --modal-bg: var(--bg-panel);
+}
+
+:deep(.modal.quick-cta-modal .modal-title) {
+  color: var(--fg-strong);
+  font-weight: 700;
+}
+
+:deep(.modal.quick-cta-modal .modal-message) {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
 :deep(.modal.quick-cta-modal .btn) {
   font-weight: 800;
   padding: 11px 16px;
 }
 
 :deep(.modal.quick-cta-modal .btn.primary) {
+  background: var(--accent);
+  color: var(--bg);
+  border-color: var(--accent);
   box-shadow: 0 8px 18px color-mix(in srgb, var(--accent) 30%, transparent);
-  border-color: color-mix(in srgb, var(--accent) 52%, transparent);
 }
 
 :deep(.modal.quick-cta-modal .btn.secondary) {
   border-color: var(--line-strong);
+  color: var(--fg);
 }
 
 @media (max-width: 560px) {
