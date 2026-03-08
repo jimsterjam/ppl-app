@@ -186,10 +186,7 @@ const equipmentTranslation = (equip) => {
     'Dumbbell': 'dumbbell',
     'Cable': 'cable',
     'Machine': 'machine',
-    'Band': 'band',
-    'Kettlebell': 'kettlebell',
     'Medicineball': 'medicineball',
-    'Sandbag': 'sandbag',
   }
   const key = keyMap[equip] || equip.toLowerCase()
   const translated = t(`exercises.equipment.${key}`)

@@ -213,7 +213,7 @@ async function syncAction(item, token) {
  */
 async function syncWorkoutAction(action, data, token) {
   switch (action) {
-    case 'create':
+    case 'create': {
       // Bei offline erstellten Workouts: Entferne temporäre _id UND offline flags
       const createData = { ...data }
       // Entferne offline-spezifische Felder
@@ -241,8 +241,9 @@ async function syncWorkoutAction(action, data, token) {
       // TODO: Optional - Update lokales Workout mit echter _id
       // await saveWorkoutOffline({ ...createData, _id: createdWorkout._id })
       break
+    }
       
-    case 'update':
+    case 'update': {
       // Bereinige Update-Daten
       const updateData = { ...data }
       delete updateData._offlineCreated
@@ -262,6 +263,7 @@ async function syncWorkoutAction(action, data, token) {
         logger.debug('✅ Sync - Workout aktualisiert:', data._id)
       }
       break
+    }
       
     case 'delete':
       await deleteWorkout(data._id, token)

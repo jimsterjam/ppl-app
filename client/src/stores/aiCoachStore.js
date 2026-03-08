@@ -371,13 +371,9 @@ export const useAICoachStore = defineStore('aiCoach', () => {
       recordUsage('remote', false)
       error.value = remoteError
       if (featureFlags.demoFallbackEnabled) {
-        try {
-          const fallback = await generateWorkoutSuggestion(context)
-          fallback.metadata = { ...fallback.metadata, fallbackReason: remoteError.message }
-          return fallback
-        } catch (fallbackError) {
-          throw fallbackError
-        }
+        const fallback = await generateWorkoutSuggestion(context)
+        fallback.metadata = { ...fallback.metadata, fallbackReason: remoteError.message }
+        return fallback
       }
       throw remoteError
     } finally {

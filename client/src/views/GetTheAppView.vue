@@ -4,7 +4,7 @@
       <h1>Lade die App herunter</h1>
       <p>Diese App ist nur als mobile Anwendung verfügbar.</p>
       <div class="stores">
-        <a class="store-btn ios" :href="appStoreUrl" target="_blank" rel="noopener">Zum App Store</a>
+        <a class="store-btn ios" :href="appStoreUrl" target="_blank" rel="noopener">Zum App Store</a>
       </div>
     </div>
   </div>

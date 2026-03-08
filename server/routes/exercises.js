@@ -215,7 +215,11 @@ router.post('/:id/image', firebaseAuthMiddleware, upload.single('image'), async 
         .toFile(thumbPath);
     } catch {
       // Fallback: Kopiere Hauptbild
-      try { fs.copyFileSync(outPath, thumbPath); } catch {}
+      try {
+        fs.copyFileSync(outPath, thumbPath);
+      } catch {
+        fs.writeFileSync(thumbPath, req.file.buffer);
+      }
     }
 
     // URLs aktualisieren

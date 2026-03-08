@@ -9,6 +9,8 @@ export default [
   {
     ignores: [
       'client/dist/**',
+      'client/ios/App/App/public/**',
+      'future-features/**',
       'client/node_modules/**',
       'server/node_modules/**',
       '**/node_modules/**',
@@ -62,7 +64,8 @@ export default [
     },
     rules: {
       'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
-      'unused-imports/no-unused-imports': 'warn'
+      'unused-imports/no-unused-imports': 'warn',
+      'no-empty': ['warn', { allowEmptyCatch: true }]
     }
   },
   // Node-specific files outside server folder
@@ -76,6 +79,42 @@ export default [
         console: 'readonly',
         __dirname: 'readonly'
       }
+    }
+  },
+  {
+    files: ['client/scripts/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: {
+        ...globals.node,
+        console: 'readonly',
+        process: 'readonly',
+        fetch: 'readonly',
+        URLSearchParams: 'readonly',
+        setTimeout: 'readonly'
+      }
+    },
+    rules: {
+      'no-empty': ['warn', { allowEmptyCatch: true }]
+    }
+  },
+  {
+    files: ['server/scripts/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: {
+        ...globals.node,
+        console: 'readonly',
+        process: 'readonly',
+        fetch: 'readonly',
+        URL: 'readonly',
+        URLSearchParams: 'readonly'
+      }
+    },
+    rules: {
+      'no-empty': ['warn', { allowEmptyCatch: true }]
     }
   },
   {

@@ -35,7 +35,9 @@ if (!admin.apps.length) {
   try {
     const opts = admin.apps[0]?.options || {};
     console.log('[firebaseAdmin] Initialized for projectId:', opts.projectId || projectIdFromSa);
-  } catch {}
+  } catch (_err) {
+    void _err;
+  }
 }
 
 export { admin };

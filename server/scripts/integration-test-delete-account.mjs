@@ -9,7 +9,7 @@ try {
     const mod = await import('node-fetch');
     fetchImpl = mod.default || mod;
   }
-} catch (e) {
+} catch {
   // If node-fetch isn't installed, rely on global fetch (Node 18+)
   fetchImpl = globalThis.fetch;
 }

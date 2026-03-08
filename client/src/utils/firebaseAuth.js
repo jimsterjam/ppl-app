@@ -183,17 +183,12 @@ export function useFirebaseAuth() {
     const ok = await initGooglePlugin()
     if (!ok) return signInWithRedirect(auth, googleProvider)
 
-    let result
-    try {
-      result = await GoogleAuth.signIn({
-        scopes: ['profile', 'email'],
-        iosClientId: googleConfig.iosClientId,
-        serverClientId: googleConfig.webClientId,
-        forceCodeForRefreshToken: true
-      })
-    } catch (err) {
-      throw err
-    }
+    const result = await GoogleAuth.signIn({
+      scopes: ['profile', 'email'],
+      iosClientId: googleConfig.iosClientId,
+      serverClientId: googleConfig.webClientId,
+      forceCodeForRefreshToken: true
+    })
 
     // Normalize result shape: some plugin versions return tokens at result.authentication
     const idToken = result?.idToken || result?.authentication?.idToken

@@ -13,7 +13,9 @@ export async function processImageBuffers(fileBuffer) {
       .resize({ width: 1280, height: 1280, fit: 'inside', withoutEnlargement: true })
       .jpeg({ quality: 82, chromaSubsampling: '4:4:4' })
       .toBuffer();
-  } catch {}
+  } catch {
+    mainBuffer = fileBuffer;
+  }
   let thumbBuffer = fileBuffer;
   try {
     thumbBuffer = await sharp(fileBuffer, { failOnError: false })
@@ -21,7 +23,9 @@ export async function processImageBuffers(fileBuffer) {
       .resize({ width: 256, height: 256, fit: 'cover' })
       .jpeg({ quality: 78 })
       .toBuffer();
-  } catch {}
+  } catch {
+    thumbBuffer = fileBuffer;
+  }
   return { mainBuffer, thumbBuffer };
 }
 
@@ -54,7 +58,9 @@ export async function processAndStoreWorkoutImage(fileBuffer, baseName) {
       .jpeg({ quality: 82, chromaSubsampling: '4:4:4' })
       .toFile(outPath);
     wroteMain = true;
-  } catch {}
+  } catch {
+    wroteMain = false;
+  }
   if (!wroteMain) {
     fs.writeFileSync(outPath, fileBuffer);
   }
@@ -63,7 +69,13 @@ export async function processAndStoreWorkoutImage(fileBuffer, baseName) {
     await thumb.rotate().resize({ width: 256, height: 256, fit: 'cover' })
       .jpeg({ quality: 78 })
       .toFile(thumbPath);
-  } catch { try { fs.copyFileSync(outPath, thumbPath); } catch {} }
+  } catch {
+    try {
+      fs.copyFileSync(outPath, thumbPath);
+    } catch {
+      fs.writeFileSync(thumbPath, fileBuffer);
+    }
+  }
   return {
     imageUrl: `/uploads/workouts/${baseName}.jpg`,
     thumbnailUrl: `/uploads/workouts/${baseName}_thumb.jpg`

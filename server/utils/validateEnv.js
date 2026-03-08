@@ -75,12 +75,13 @@ const validateFormat = (varName, value) => {
       }
       break
     
-    case 'PORT':
+    case 'PORT': {
       const port = parseInt(value)
       if (isNaN(port) || port < 1 || port > 65535) {
         return 'Muss eine Zahl zwischen 1 und 65535 sein'
       }
       break
+    }
   }
   
   return null // Valid

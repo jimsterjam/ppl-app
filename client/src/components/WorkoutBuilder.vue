@@ -12,7 +12,7 @@ import AppModal from '@/components/AppModal.vue';
 import StepIndicator from '@/components/StepIndicator.vue';
 import BottomNav from '@/components/BottomNav.vue';
 import UpgradeModal from '@/components/UpgradeModal.vue';
-import { getAllExercisesOffline, saveWorkoutOffline } from '@/utils/offlineStorage';
+import { getAllExercisesOffline, saveWorkoutOffline, deleteWorkoutOffline } from '@/utils/offlineStorage';
 import { getMergedSortedExercises } from '@/utils/exerciseList';
 import { searchAndRankExercises } from '@/utils/exerciseSearch'
 import { logger } from '@/utils/logger'
@@ -92,10 +92,7 @@ const equipmentTranslation = (equip) => {
 		'Dumbbell': 'dumbbell',
 		'Cable': 'cable',
 		'Machine': 'machine',
-		'Band': 'band',
-		'Kettlebell': 'kettlebell',
 		'Medicineball': 'medicineball',
-		'Sandbag': 'sandbag',
 	}
 	const key = keyMap[equip] || equip.toLowerCase()
 	// Fallback: Zeige deutschen Namen, falls keine Übersetzung vorhanden
@@ -433,7 +430,7 @@ async function createWorkout() {
 	} catch (e) {
 		let hint = '';
 		if (e && typeof e.message === 'string' && /Cannot access 'te' before initialization/.test(e.message)) {
-			hint = '\nHinweis: Im Template wird vermutlich eine Variable (z.B. v-for=\"t in ...\") verwendet, die die Übersetzungsfunktion t() überschattet. Bitte prüfe die v-for-Schleifen und benenne die Variable um.';
+			hint = '\nHinweis: Im Template wird vermutlich eine Variable (z.B. v-for="t in ...") verwendet, die die Übersetzungsfunktion t() überschattet. Bitte prüfe die v-for-Schleifen und benenne die Variable um.';
 		}
 		errorMsg.value = t('builder.createFailed') + (e?.message ? ': ' + e.message : (e?.toString() ? ': ' + e.toString() : '')) + hint;
 	} finally {
