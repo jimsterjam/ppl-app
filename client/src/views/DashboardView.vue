@@ -33,7 +33,7 @@
       </section>
 
       <section class="quick-start">
-        <div class="quick-grid">
+        <div v-if="!showStartOptions" class="quick-grid">
           <WorkoutCard
             label="Push"
             :active="lastWorkoutType === 'push'"
@@ -64,6 +64,64 @@
           />
         </div>
 
+        <div v-else class="quick-mode-panel">
+          <div class="quick-mode-head">
+            <strong>{{ $t('dashboard.startModeTypeTitle', { type: pendingWorkoutTypeLabel }) }}</strong>
+            <button class="cta-inline" type="button" @click="closeStartModePanel">{{ $t('common.back') }}</button>
+          </div>
+
+          <template v-if="!showFavoritesSelection">
+            <button class="quick-mode-btn" type="button" @click="onManualSelected">
+              {{ $t('dashboard.startModeManual') }}
+            </button>
+            <button class="quick-mode-btn" type="button" @click="onGenerateSelected">
+              {{ $t('dashboard.startModeGenerate') }}
+            </button>
+            <button class="quick-mode-btn" type="button" @click="openFavoritesForType">
+              {{ $t('dashboard.startModeFavorites') }}
+            </button>
+          </template>
+
+          <p v-if="favoriteInfoText" class="quick-mode-info">{{ favoriteInfoText }}</p>
+
+          <div v-if="showFavoritesSelection" class="favorite-list">
+            <div class="favorite-list-head">
+              <button class="cta-inline" type="button" @click="closeFavoritesSelection">{{ $t('common.back') }}</button>
+            </div>
+            <p class="quick-mode-info">{{ $t('dashboard.favoritesHint') }}</p>
+
+            <div v-if="!favoriteWorkouts.length" class="favorite-empty">
+              {{ $t('dashboard.favoritesEmpty') }}
+            </div>
+
+            <div v-for="favorite in favoriteWorkouts" :key="favorite.id" class="favorite-item">
+              <div class="favorite-top">
+                <div class="favorite-name">{{ favorite.name }}</div>
+                <div class="favorite-date">{{ formatFavoriteDate(favorite.updatedAt || favorite.createdAt) }}</div>
+              </div>
+
+              <div v-if="renamingFavoriteId === favorite.id" class="favorite-rename-row">
+                <input
+                  v-model="favoriteRenameInput"
+                  class="favorite-rename-input"
+                  type="text"
+                  maxlength="40"
+                  :placeholder="$t('dashboard.favoriteNamePlaceholder')"
+                />
+                <button class="cta-inline" type="button" @click="confirmRenameFavorite(favorite)">{{ $t('common.save') }}</button>
+                <button class="cta-inline" type="button" @click="cancelRenameFavorite">{{ $t('common.cancel') }}</button>
+              </div>
+
+              <div v-else class="favorite-actions">
+                <button class="cta-inline" type="button" @click="startFavoriteWorkout(favorite)">{{ $t('dashboard.favoriteStart') }}</button>
+                <button class="cta-inline" type="button" @click="adjustFavoriteWorkout(favorite)">{{ $t('dashboard.favoriteAdjust') }}</button>
+                <button class="cta-inline" type="button" @click="beginRenameFavorite(favorite)">{{ $t('dashboard.favoriteRename') }}</button>
+                <button class="cta-inline danger" type="button" @click="removeFavorite(favorite)">{{ $t('dashboard.favoriteDelete') }}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div v-if="hasDraft" class="draft-note">
           <span>{{ $t('dashboard.draftAvailable') }}</span>
           <div class="draft-actions">
@@ -89,18 +147,6 @@
       :show-cancel="false"
       :confirm-text="$t('common.confirm')"
       type="info"
-    />
-
-    <AppModal
-      v-model="showStartModeModal"
-      modal-class="quick-cta-modal"
-      :title="$t('dashboard.startModeTitle')"
-      :message="$t('dashboard.startModeText')"
-      :cancel-text="$t('dashboard.startModeManual')"
-      :confirm-text="$t('dashboard.startModeGenerate')"
-      type="info"
-      @cancel="onManualSelected"
-      @confirm="onGenerateSelected"
     />
 
     <AppModal
@@ -187,7 +233,19 @@
           <span>{{ $t('dashboard.quickGenLevel') }}</span>
           <select v-model="quickGeneratorForm.level">
             <option value="beginner">{{ $t('dashboard.quickGenLevelBeginner') }}</option>
+            <option value="intermediate">{{ $t('dashboard.quickGenLevelIntermediate') }}</option>
             <option value="advanced">{{ $t('dashboard.quickGenLevelAdvanced') }}</option>
+          </select>
+        </label>
+
+        <label class="quick-form-field">
+          <span>{{ $t('dashboard.quickGenFrequency') }}</span>
+          <select v-model.number="quickGeneratorForm.trainingFrequencyPerWeek">
+            <option :value="2">2x / Woche</option>
+            <option :value="3">3x / Woche</option>
+            <option :value="4">4x / Woche</option>
+            <option :value="5">5x / Woche</option>
+            <option :value="6">6x / Woche</option>
           </select>
         </label>
 
@@ -196,7 +254,89 @@
           <select v-model="quickGeneratorForm.equipmentMode">
             <option value="gym_only">{{ $t('dashboard.quickGenEquipmentGymOnly') }}</option>
             <option value="gym_plus_bodyweight">{{ $t('dashboard.quickGenEquipmentBodyweight') }}</option>
+            <option value="bodyweight_only">{{ $t('dashboard.quickGenEquipmentBodyweightOnly') }}</option>
           </select>
+        </label>
+
+        <div class="quick-form-field quick-form-field--full">
+          <span>{{ $t('dashboard.quickGenEquipmentAvailable') }}</span>
+          <div class="quick-form-check-grid">
+            <label class="quick-form-check">
+              <input v-model="quickGeneratorForm.equipmentAvailability" type="checkbox" value="barbell" />
+              <span>{{ $t('dashboard.quickGenEquipBarbell') }}</span>
+            </label>
+            <label class="quick-form-check">
+              <input v-model="quickGeneratorForm.equipmentAvailability" type="checkbox" value="dumbbells" />
+              <span>{{ $t('dashboard.quickGenEquipDumbbells') }}</span>
+            </label>
+            <label class="quick-form-check">
+              <input v-model="quickGeneratorForm.equipmentAvailability" type="checkbox" value="machines" />
+              <span>{{ $t('dashboard.quickGenEquipMachines') }}</span>
+            </label>
+            <label class="quick-form-check">
+              <input v-model="quickGeneratorForm.equipmentAvailability" type="checkbox" value="cable_station" />
+              <span>{{ $t('dashboard.quickGenEquipCable') }}</span>
+            </label>
+            <label class="quick-form-check">
+              <input v-model="quickGeneratorForm.equipmentAvailability" type="checkbox" value="pull_up_bar" />
+              <span>{{ $t('dashboard.quickGenEquipPullupBar') }}</span>
+            </label>
+          </div>
+        </div>
+
+        <label class="quick-form-field">
+          <span>{{ $t('dashboard.quickGenMaxPullups') }}</span>
+          <input v-model.number="quickGeneratorForm.maxStrictPullups" type="number" min="0" max="50" step="1" />
+        </label>
+
+        <label class="quick-form-field">
+          <span>{{ $t('dashboard.quickGenMaxDips') }}</span>
+          <input v-model.number="quickGeneratorForm.maxStrictDips" type="number" min="0" max="50" step="1" />
+        </label>
+
+        <label class="quick-form-field">
+          <span>{{ $t('dashboard.quickGenMaxPushups') }}</span>
+          <input v-model.number="quickGeneratorForm.maxStrictPushups" type="number" min="0" max="100" step="1" />
+        </label>
+
+        <label class="quick-form-field">
+          <span>{{ $t('dashboard.quickGenSquat1RM') }}</span>
+          <input v-model.number="quickGeneratorForm.squat1RM" type="number" min="0" max="500" step="1" />
+        </label>
+
+        <label class="quick-form-field">
+          <span>{{ $t('dashboard.quickGenBench1RM') }}</span>
+          <input v-model.number="quickGeneratorForm.bench1RM" type="number" min="0" max="400" step="1" />
+        </label>
+
+        <label class="quick-form-field">
+          <span>{{ $t('dashboard.quickGenDeadlift1RM') }}</span>
+          <input v-model.number="quickGeneratorForm.deadlift1RM" type="number" min="0" max="500" step="1" />
+        </label>
+
+        <label class="quick-form-field">
+          <span>{{ $t('dashboard.quickGenSquat5RM') }}</span>
+          <input v-model.number="quickGeneratorForm.squat5RM" type="number" min="0" max="450" step="1" />
+        </label>
+
+        <label class="quick-form-field">
+          <span>{{ $t('dashboard.quickGenBench5RM') }}</span>
+          <input v-model.number="quickGeneratorForm.bench5RM" type="number" min="0" max="350" step="1" />
+        </label>
+
+        <label class="quick-form-field">
+          <span>{{ $t('dashboard.quickGenDeadlift5RM') }}</span>
+          <input v-model.number="quickGeneratorForm.deadlift5RM" type="number" min="0" max="450" step="1" />
+        </label>
+
+        <label class="quick-form-field quick-form-field--full">
+          <span>{{ $t('dashboard.quickGenRestrictions') }}</span>
+          <input v-model="quickGeneratorForm.restrictions" type="text" maxlength="180" :placeholder="$t('dashboard.quickGenRestrictionsPlaceholder')" />
+        </label>
+
+        <label class="quick-form-field quick-form-field--full">
+          <span>{{ $t('dashboard.quickGenInjuries') }}</span>
+          <input v-model="quickGeneratorForm.injuries" type="text" maxlength="180" :placeholder="$t('dashboard.quickGenInjuriesPlaceholder')" />
         </label>
       </div>
       <p class="quick-form-hint">{{ $t('dashboard.quickGenRemaining', { count: quickGenerationsRemainingLabel }) }}</p>
@@ -224,6 +364,14 @@ import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { isOnline, deleteWorkoutOffline, getWorkoutOffline } from '@/utils/offlineStorage'
 import { http } from '@/api/http'
 import { loadDefaultExercises, getCachedDefaultExercises } from '@/utils/defaultExercisesLoader'
+import {
+  getFavoritesByType,
+  renameFavoriteWorkout,
+  deleteFavoriteWorkout,
+  getFavoriteLimitPerType,
+  getFavoriteNameValidationError,
+  normalizeWorkoutType
+} from '@/utils/workoutFavorites'
 
 import HeaderBar from "../components/HeaderBar.vue";
 import WorkoutCard from "../components/WorkoutCard.vue";
@@ -248,13 +396,18 @@ const detailDraft = ref(null)
 const showInfoModal = ref(false)
 const infoMessage = ref('')
 const draftSourceLogged = ref(false)
-const showStartModeModal = ref(false)
 const showQuickIntroModal = ref(false)
 const showQuickFormModal = ref(false)
 const showQuickLimitModal = ref(false)
 const showQuickLastHintModal = ref(false)
 const showUpgradeModal = ref(false)
 const pendingWorkoutType = ref('push')
+const showStartOptions = ref(false)
+const showFavoritesSelection = ref(false)
+const favoriteWorkouts = ref([])
+const favoriteInfoText = ref('')
+const renamingFavoriteId = ref(null)
+const favoriteRenameInput = ref('')
 const isGeneratingQuickWorkout = ref(false)
 const quickFormError = ref('')
 const QUICK_PREFILL_KEY = 'quick_workout_prefill'
@@ -264,16 +417,79 @@ const quickGeneratorForm = ref({
   gender: 'male',
   bodyweightKg: 80,
   level: 'beginner',
-  equipmentMode: 'gym_plus_bodyweight'
+  trainingFrequencyPerWeek: 3,
+  equipmentMode: 'gym_plus_bodyweight',
+  equipmentAvailability: ['barbell', 'dumbbells', 'machines', 'cable_station', 'pull_up_bar'],
+  maxStrictPullups: 5,
+  maxStrictDips: 8,
+  maxStrictPushups: 20,
+  squat1RM: null,
+  bench1RM: null,
+  deadlift1RM: null,
+  squat5RM: null,
+  bench5RM: null,
+  deadlift5RM: null,
+  restrictions: '',
+  injuries: ''
 })
 
+function normalizeQuickEquipmentMode(mode) {
+  const value = String(mode || '').toLowerCase()
+  if (value === 'gym_only' || value === 'gym_plus_bodyweight' || value === 'bodyweight_only') return value
+  return 'gym_plus_bodyweight'
+}
+
+function normalizeEquipmentAvailabilitySelection(list) {
+  const allowed = ['barbell', 'dumbbells', 'machines', 'cable_station', 'pull_up_bar', 'none']
+  if (!Array.isArray(list)) return []
+  const normalized = [...new Set(list
+    .map((entry) => String(entry || '').toLowerCase().trim())
+    .filter((entry) => allowed.includes(entry)))]
+  return normalized
+}
+
+function hasQuickGeneratorRequiredInputs() {
+  const form = quickGeneratorForm.value
+  if (!form) return false
+  if (!Number(form.durationMinutes)) return false
+  if (!form.goal || !form.level || !form.equipmentMode) return false
+  if (!Array.isArray(form.equipmentAvailability) || form.equipmentAvailability.length === 0) return false
+  if (form.maxStrictPullups === null || form.maxStrictPullups === undefined || form.maxStrictPullups === '') return false
+  if (form.maxStrictDips === null || form.maxStrictDips === undefined || form.maxStrictDips === '') return false
+  if (form.maxStrictPushups === null || form.maxStrictPushups === undefined || form.maxStrictPushups === '') return false
+  return true
+}
+
+function normalizeOptionalMetricInput(value) {
+  if (value === null || value === undefined || value === '') return null
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed < 0) return null
+  return parsed
+}
+
+
+function resolveDetailDraftTargetId() {
+  const currentDraftId = String(detailDraft.value?._id || '')
+  if (!currentDraftId) return ''
+  if (!currentDraftId.startsWith('draft-')) return currentDraftId
+  try {
+    const mappedId = String(sessionStorage.getItem(`workout_map_${currentDraftId}`) || '').trim()
+    if (mappedId && !isDraftDeleted(mappedId)) return mappedId
+  } catch {}
+  return currentDraftId
+}
+
+function isOpenDraftWorkout(workout) {
+  return (workout?._isDraft === true || workout?.isDraft === true) && workout?.completed !== true
+}
 
 const hasDraft = computed(() => {
-  const storeHasDraft = (store.workouts || []).some(w => (w?._isDraft === true || w?.isDraft === true) && w?.completed !== true)
-  return storeHasDraft || Boolean(detailDraft.value)
+  const storeHasDraft = (store.workouts || []).some(isOpenDraftWorkout)
+  return storeHasDraft || Boolean(resolveDetailDraftTargetId())
 })
 const draftId = computed(() => {
-  return store.workouts.find(w => (w?._isDraft === true || w?.isDraft === true) && w?.completed !== true)?._id || detailDraft.value?._id
+  const storeDraft = store.workouts.find(isOpenDraftWorkout)?._id
+  return storeDraft || resolveDetailDraftTargetId()
 })
 const quickGenerationsRemainingLabel = computed(() => {
   const remaining = subscriptionStore.quickGenerationsRemaining
@@ -298,8 +514,34 @@ const quickResetDateLabel = computed(() => {
 })
 const quickLimitText = computed(() => $t('dashboard.quickGenLimitText', { date: quickResetDateLabel.value }))
 const quickLastHintText = computed(() => $t('dashboard.quickGenLastHintText', { date: quickResetDateLabel.value }))
+const pendingWorkoutTypeLabel = computed(() => {
+  const type = normalizeWorkoutType(pendingWorkoutType.value)
+  if (type === 'fullbody') return $t('dashboard.fullBodyLabel')
+  return type.charAt(0).toUpperCase() + type.slice(1)
+})
+
+function getCurrentFavoritesUserId() {
+  return String(getCurrentUser?.()?.uid || authStore.user?.id || 'guest')
+}
+
+function loadFavoriteWorkoutsForCurrentType() {
+  const userId = getCurrentFavoritesUserId()
+  const type = normalizeWorkoutType(pendingWorkoutType.value)
+  favoriteWorkouts.value = getFavoritesByType(userId, type)
+}
+
+function formatFavoriteDate(value) {
+  const date = value ? new Date(value) : null
+  if (!date || Number.isNaN(date.getTime())) return ''
+  return date.toLocaleDateString(String(locale.value || '').startsWith('en') ? 'en-US' : 'de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  })
+}
 
 const DRAFT_TOMBSTONES_KEY = 'deleted_draft_ids_v1'
+const DRAFT_TOMBSTONE_TTL_MS = 6 * 60 * 60 * 1000
 function readDraftTombstones() {
   try {
     const raw = localStorage.getItem(DRAFT_TOMBSTONES_KEY)
@@ -313,7 +555,13 @@ function readDraftTombstones() {
 function isDraftDeleted(id) {
   if (!id) return false
   const map = readDraftTombstones()
-  return Boolean(map[String(id)])
+  const entry = map[String(id)]
+  if (!entry) return false
+  const timestamp = Number(typeof entry === 'object' ? (entry?.timestamp || entry?.deletedAt || 0) : entry)
+  if (Number.isFinite(timestamp) && timestamp > 0) {
+    return (Date.now() - timestamp) <= DRAFT_TOMBSTONE_TTL_MS
+  }
+  return Boolean(entry)
 }
 
 function logDraftSourceOnce() {
@@ -483,12 +731,21 @@ async function readDetailDraft() {
     }
     const offlineDraft = await getWorkoutOffline(draftId)
     if (!offlineDraft) {
-      detailDraft.value = null
-      try { sessionStorage.removeItem(getDetailDraftKey()) } catch {}
+      detailDraft.value = {
+        ...data,
+        _isDraft: true,
+        isDraft: true,
+        completed: false
+      }
       logDraftSourceOnce()
       return
     }
-    detailDraft.value = data
+    detailDraft.value = {
+      ...data,
+      _isDraft: true,
+      isDraft: true,
+      completed: false
+    }
     logDraftSourceOnce()
   } catch {
     detailDraft.value = null
@@ -567,17 +824,131 @@ function startQuick(type) {
 
 function openStartMode(type) {
   pendingWorkoutType.value = typeof type === 'string' && type.length > 0 ? type : 'push'
-  showStartModeModal.value = true
+  showStartOptions.value = true
+  showFavoritesSelection.value = false
+  favoriteInfoText.value = ''
+  renamingFavoriteId.value = null
+  favoriteRenameInput.value = ''
+}
+
+function closeStartModePanel() {
+  showStartOptions.value = false
+  showFavoritesSelection.value = false
+  favoriteInfoText.value = ''
+  renamingFavoriteId.value = null
+  favoriteRenameInput.value = ''
 }
 
 function onManualSelected() {
+  closeStartModePanel()
   startQuick(pendingWorkoutType.value)
 }
 
 function onGenerateSelected() {
+  closeStartModePanel()
   nextTick(() => {
     showQuickIntroModal.value = true
   })
+}
+
+function openFavoritesForType() {
+  showFavoritesSelection.value = true
+  renamingFavoriteId.value = null
+  favoriteRenameInput.value = ''
+  loadFavoriteWorkoutsForCurrentType()
+  const max = getFavoriteLimitPerType()
+  favoriteInfoText.value = $t('dashboard.favoritesLimitHint', { count: max })
+}
+
+function closeFavoritesSelection() {
+  showFavoritesSelection.value = false
+  favoriteInfoText.value = ''
+  renamingFavoriteId.value = null
+  favoriteRenameInput.value = ''
+}
+
+function openFavoriteInBuilder(favorite, { autoStart = false } = {}) {
+  const fav = favorite?.workout || {}
+  const type = normalizeWorkoutType(favorite?.type || pendingWorkoutType.value)
+  const exercises = Array.isArray(fav.exercises) ? fav.exercises : []
+  const prefill = {
+    workoutName: favorite?.name || fav.workoutName || 'Favorite Workout',
+    type,
+    notes: typeof fav.notes === 'string' ? fav.notes : '',
+    exercises
+  }
+  sessionStorage.setItem(QUICK_PREFILL_KEY, JSON.stringify(prefill))
+  closeStartModePanel()
+  router.push({
+    name: 'workout-builder',
+    query: {
+      type,
+      quick: '1',
+      ...(autoStart ? { favoriteStart: '1' } : {})
+    }
+  })
+}
+
+function startFavoriteWorkout(favorite) {
+  try {
+    openFavoriteInBuilder(favorite, { autoStart: true })
+  } catch {
+    favoriteInfoText.value = $t('dashboard.favoriteStartFailed')
+  }
+}
+
+function adjustFavoriteWorkout(favorite) {
+  try {
+    openFavoriteInBuilder(favorite, { autoStart: false })
+  } catch {
+    favoriteInfoText.value = $t('dashboard.favoriteAdjustFailed')
+  }
+}
+
+function beginRenameFavorite(favorite) {
+  renamingFavoriteId.value = favorite?.id || null
+  favoriteRenameInput.value = String(favorite?.name || '')
+}
+
+function cancelRenameFavorite() {
+  renamingFavoriteId.value = null
+  favoriteRenameInput.value = ''
+}
+
+function confirmRenameFavorite(favorite) {
+  const validationError = getFavoriteNameValidationError(favoriteRenameInput.value)
+  if (validationError) {
+    favoriteInfoText.value = validationError
+    return
+  }
+  const result = renameFavoriteWorkout({
+    userId: getCurrentFavoritesUserId(),
+    type: normalizeWorkoutType(favorite?.type || pendingWorkoutType.value),
+    id: favorite?.id,
+    name: favoriteRenameInput.value
+  })
+  if (!result.success) {
+    favoriteInfoText.value = result.message || $t('dashboard.favoriteRenameFailed')
+    return
+  }
+  renamingFavoriteId.value = null
+  favoriteRenameInput.value = ''
+  favoriteInfoText.value = ''
+  loadFavoriteWorkoutsForCurrentType()
+}
+
+function removeFavorite(favorite) {
+  const result = deleteFavoriteWorkout({
+    userId: getCurrentFavoritesUserId(),
+    type: normalizeWorkoutType(favorite?.type || pendingWorkoutType.value),
+    id: favorite?.id
+  })
+  if (!result.success) {
+    favoriteInfoText.value = result.message || $t('dashboard.favoriteDeleteFailed')
+    return
+  }
+  favoriteInfoText.value = ''
+  loadFavoriteWorkoutsForCurrentType()
 }
 
 function onQuickIntroConfirmed() {
@@ -615,9 +986,12 @@ async function buildLocalQuickFallback(type, context) {
       ? defaults
       : defaults.filter((exercise) => String(exercise?.category || '').toLowerCase() === requestedCategory.toLowerCase())
 
-    const byEquipment = context?.equipmentMode === 'gym_only'
+    const equipmentMode = normalizeQuickEquipmentMode(context?.equipmentMode)
+    const byEquipment = equipmentMode === 'gym_only'
       ? byType.filter((exercise) => String(exercise?.equipment || '').toLowerCase() !== 'körpergewicht')
-      : byType
+      : equipmentMode === 'bodyweight_only'
+        ? byType.filter((exercise) => String(exercise?.equipment || '').toLowerCase() === 'körpergewicht')
+        : byType
 
     localPool = (byEquipment.length ? byEquipment : byType)
       .filter((exercise) => typeof exercise?.name === 'string' && exercise.name.trim())
@@ -639,9 +1013,12 @@ async function buildLocalQuickFallback(type, context) {
       ? cached
       : cached.filter((exercise) => String(exercise?.category || '').toLowerCase() === requestedCategory.toLowerCase())
 
-    const byEquipment = context?.equipmentMode === 'gym_only'
+    const equipmentMode = normalizeQuickEquipmentMode(context?.equipmentMode)
+    const byEquipment = equipmentMode === 'gym_only'
       ? byType.filter((exercise) => String(exercise?.equipment || '').toLowerCase() !== 'körpergewicht')
-      : byType
+      : equipmentMode === 'bodyweight_only'
+        ? byType.filter((exercise) => String(exercise?.equipment || '').toLowerCase() === 'körpergewicht')
+        : byType
 
     localPool = (byEquipment.length ? byEquipment : byType)
       .filter((exercise) => typeof exercise?.name === 'string' && exercise.name.trim())
@@ -684,6 +1061,12 @@ async function generateQuickWorkout() {
   isGeneratingQuickWorkout.value = true
   try {
     quickFormError.value = ''
+
+    if (!hasQuickGeneratorRequiredInputs()) {
+      quickFormError.value = $t('dashboard.quickGenMissingRequired')
+      return
+    }
+
     const token = await getIdToken().catch(async () => {
       const currentUser = getCurrentUser()
       if (!currentUser?.getIdToken) return null
@@ -706,8 +1089,22 @@ async function generateQuickWorkout() {
       gender: quickGeneratorForm.value.gender,
       bodyweightKg: Number(quickGeneratorForm.value.bodyweightKg) || 80,
       level: quickGeneratorForm.value.level,
-      equipmentMode: quickGeneratorForm.value.equipmentMode,
-      requestedType: pendingWorkoutType.value
+      trainingFrequencyPerWeek: Number(quickGeneratorForm.value.trainingFrequencyPerWeek) || 3,
+      equipmentMode: normalizeQuickEquipmentMode(quickGeneratorForm.value.equipmentMode),
+      equipmentAvailability: normalizeEquipmentAvailabilitySelection(quickGeneratorForm.value.equipmentAvailability),
+      maxStrictPullups: Number(quickGeneratorForm.value.maxStrictPullups),
+      maxStrictDips: Number(quickGeneratorForm.value.maxStrictDips),
+      maxStrictPushups: Number(quickGeneratorForm.value.maxStrictPushups),
+      squat1RM: normalizeOptionalMetricInput(quickGeneratorForm.value.squat1RM),
+      bench1RM: normalizeOptionalMetricInput(quickGeneratorForm.value.bench1RM),
+      deadlift1RM: normalizeOptionalMetricInput(quickGeneratorForm.value.deadlift1RM),
+      squat5RM: normalizeOptionalMetricInput(quickGeneratorForm.value.squat5RM),
+      bench5RM: normalizeOptionalMetricInput(quickGeneratorForm.value.bench5RM),
+      deadlift5RM: normalizeOptionalMetricInput(quickGeneratorForm.value.deadlift5RM),
+      restrictions: String(quickGeneratorForm.value.restrictions || '').trim(),
+      injuries: String(quickGeneratorForm.value.injuries || '').trim(),
+      requestedType: pendingWorkoutType.value,
+      requireCompleteInput: true
     }
 
     // Add timeout to prevent hanging
@@ -719,17 +1116,26 @@ async function generateQuickWorkout() {
       http.post('/workouts/quick-generator', payload, { headers }),
       timeoutPromise
     ])
+    const responseRequestedType = ['push', 'pull', 'legs', 'fullbody'].includes(String(data?.requestedType))
+      ? String(data?.requestedType)
+      : pendingWorkoutType.value || 'fullbody'
     const exercises = Array.isArray(data?.exercises) ? data.exercises : []
+    const aiUsageMeta = data?.metadata?.aiUsage || null
+    if (aiUsageMeta) {
+      subscriptionStore.applyAiUsageSnapshot(aiUsageMeta)
+    }
 
     const prefill = {
       workoutName: data?.workoutName || 'Quick Workout',
-      type: pendingWorkoutType.value || 'fullbody',
+      type: responseRequestedType,
+      notes: typeof data?.notes === 'string' ? data.notes : '',
+      metadata: data?.metadata || {},
       exercises: exercises.map((exercise, index) => ({
         _id: exercise._id || `quick_${index}`,
         exerciseId: exercise.exerciseId || exercise._id || null,
         name: exercise.name,
-        category: exercise.category || pendingWorkoutType.value || 'fullbody',
-        muscleGroup: exercise.muscleGroup || pendingWorkoutType.value || 'fullbody',
+        category: exercise.category || responseRequestedType,
+        muscleGroup: exercise.muscleGroup || responseRequestedType,
         setDetails: [{
           reps: Number(exercise.reps) || 10,
           weight: Number(exercise.weight) || 0
@@ -745,9 +1151,11 @@ async function generateQuickWorkout() {
       sessionStorage.setItem(QUICK_PREFILL_KEY, JSON.stringify(prefill))
     } catch {}
 
-    subscriptionStore.trackQuickGeneration()
+    if (!aiUsageMeta) {
+      subscriptionStore.trackQuickGeneration()
+    }
     showQuickFormModal.value = false
-    router.push({ name: 'workout-builder', query: { type: pendingWorkoutType.value, quick: '1' } })
+    router.push({ name: 'workout-builder', query: { type: responseRequestedType, quick: '1' } })
   } catch (error) {
     logger.error('Quick generator failed', error)
     const localFallback = await buildLocalQuickFallback(pendingWorkoutType.value, quickGeneratorForm.value)
@@ -779,7 +1187,6 @@ async function discardDraft() {
     await store.clearDraft()
     // Draft aus Pinia-Store entfernen
     store.workouts = store.workouts.filter(w => !(w?._isDraft === true || w?.isDraft === true))
-    store.hasDraft = false
   } catch {}
   detailDraft.value = null
   try { sessionStorage.removeItem(getDetailDraftKey()) } catch {}
@@ -855,6 +1262,7 @@ onUnmounted(() => {
 
 onActivated(async () => {
   draftSourceLogged.value = false
+  await readDetailDraft()
   if (isSignedIn.value || (!isOnline() && authStore.isOfflineSessionValid)) {
     logger.debug('📥 DashboardView - Route aktiviert, lade Workouts neu')
     await loadWorkoutsData(true)
@@ -969,6 +1377,122 @@ onActivated(async () => {
   gap: 8px;
 }
 
+.quick-mode-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  border-radius: var(--panel-radius);
+  border: 1px solid var(--line-strong);
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-soft);
+}
+
+.quick-mode-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--fg-strong);
+}
+
+.quick-mode-btn {
+  width: 100%;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--panel-radius);
+  background: var(--card-bg);
+  color: var(--fg-strong);
+  font-weight: 800;
+  padding: 24px 14px;
+  min-height: 72px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.quick-mode-btn:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--card-bg));
+}
+
+.quick-mode-info {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.favorite-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: calc(100dvh - var(--header-height, 64px) - 220px - env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+  padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+}
+
+.favorite-list-head {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.favorite-empty {
+  border: 1px dashed var(--line-soft);
+  border-radius: var(--panel-radius);
+  padding: 10px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.favorite-item {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--panel-radius);
+  background: var(--card-soft);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.favorite-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.favorite-name {
+  color: var(--fg-strong);
+  font-weight: 800;
+}
+
+.favorite-date {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.favorite-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.favorite-rename-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.favorite-rename-input {
+  flex: 1 1 180px;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: var(--bg-panel);
+  color: var(--fg);
+  padding: 8px 10px;
+  font-size: 0.9rem;
+}
+
 .draft-note {
   display: flex;
   align-items: center;
@@ -1076,6 +1600,10 @@ onActivated(async () => {
   font-size: 0.85rem;
 }
 
+.quick-form-field--full {
+  grid-column: 1 / -1;
+}
+
 .quick-form-field label {
   color: var(--fg-strong);
   font-weight: 600;
@@ -1096,6 +1624,24 @@ onActivated(async () => {
   outline: 2px solid var(--accent);
   outline-offset: 0;
   border-color: var(--accent);
+}
+
+.quick-form-check-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.quick-form-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--fg);
+  font-size: 0.82rem;
+}
+
+.quick-form-check input {
+  accent-color: var(--accent);
 }
 
 .quick-form-hint {
@@ -1145,6 +1691,10 @@ onActivated(async () => {
 
 @media (max-width: 560px) {
   .quick-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .quick-form-check-grid {
     grid-template-columns: 1fr;
   }
 }

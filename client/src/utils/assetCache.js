@@ -119,12 +119,19 @@ async function blobToBase64(blob) {
 export async function getCachedAssetUri(cacheKey) {
   const path = toCachePath(cacheKey)
   if (!path) return null
+  const index = readIndex()
+  if (!index[cacheKey]) return null
   try {
-    const stat = await Filesystem.stat({ path, directory: Directory.Cache })
-    updateIndexEntry(cacheKey, stat?.size || 0, Date.now())
     const uri = await Filesystem.getUri({ path, directory: Directory.Cache })
+    const knownSize = Number(index?.[cacheKey]?.size) || 0
+    updateIndexEntry(cacheKey, knownSize, Date.now())
     return toPlayableUri(uri?.uri || null)
   } catch {
+    // Stale index entry: file no longer exists in cache.
+    if (index[cacheKey]) {
+      delete index[cacheKey]
+      writeIndex(index)
+    }
     return null
   }
 }

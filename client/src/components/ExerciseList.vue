@@ -104,7 +104,6 @@
           muted
           loop
           playsinline
-          controls
         ></video>
         <img
           v-else
@@ -125,7 +124,8 @@ import { useI18n } from 'vue-i18n'
 import { logger } from '@/utils/logger'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 import { resolveExerciseMedia, getExerciseThumb, preloadExerciseMedia, buildExerciseMediaUrl } from '@/utils/assetResolver'
-import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
+import { loadDefaultExercises, getCachedDefaultExercises } from '@/utils/defaultExercisesLoader'
+import { searchAndRankExercises } from '@/utils/exerciseSearch'
 
 const props = defineProps({
   showTitle: {
@@ -237,7 +237,9 @@ const muscleGroups = [
 async function loadExercises() {
   loading.value = true;
   try {
-    const source = Array.isArray(props.items) ? props.items : await loadDefaultExercises()
+    const source = Array.isArray(props.items)
+      ? props.items
+      : (getCachedDefaultExercises().length ? getCachedDefaultExercises() : await loadDefaultExercises())
     let allExercises = Array.isArray(source) ? [...source] : []
     if (selectedCategory.value) {
       allExercises = allExercises.filter(ex => ex.category === selectedCategory.value)
@@ -285,13 +287,20 @@ watch(() => props.items, () => {
 
 const filteredExercises = computed(() => {
   const list = Array.isArray(exercises.value) ? exercises.value : []
-  const q = searchQuery.value.trim().toLowerCase()
+  const q = searchQuery.value.trim()
   if (!q) return list
-  return list.filter(ex => {
-    const name = String(getTranslatedExerciseName(ex?.name_en || ex?.name || '')).toLowerCase()
-    const muscle = String(getTranslatedMuscleGroup(ex?.muscleGroup || (ex?.muscleGroups?.[0] || ''))).toLowerCase()
-    const equipment = String(getTranslatedEquipment(ex?.equipment || '')).toLowerCase()
-    return name.includes(q) || muscle.includes(q) || equipment.includes(q)
+
+  const safeText = (value) => String(value || '')
+
+  return searchAndRankExercises(list, q, {
+    getPrimaryText: (exercise) => safeText(getTranslatedExerciseName(exercise?.name_en || exercise?.name || '')),
+    getSecondaryTexts: (exercise) => [
+      safeText(exercise?.name || ''),
+      safeText(exercise?.name_en || ''),
+      safeText(getTranslatedMuscleGroup(exercise?.muscleGroup || (exercise?.muscleGroups?.[0] || ''))),
+      safeText(getTranslatedEquipment(exercise?.equipment || '')),
+      safeText(getTranslatedCategory(exercise?.category || ''))
+    ]
   })
 })
 

@@ -102,14 +102,28 @@ export const messages = {
   ,startModeText: 'Möchtest du dein Workout selbst zusammenstellen oder generieren lassen?'
   ,startModeManual: 'Selbst zusammenstellen'
   ,startModeGenerate: 'Generieren lassen'
+  ,startModeFavorites: 'Favorit auswählen'
+  ,startModeTypeTitle: '{type} auswählen'
+  ,favoritesHint: 'Wähle einen Favoriten, um direkt zu starten oder anzupassen.'
+  ,favoritesEmpty: 'Noch keine Favoriten für diesen Typ gespeichert.'
+  ,favoritesLimitHint: 'Du kannst pro Typ maximal {count} Favoriten speichern.'
+  ,favoriteStart: 'Starten'
+  ,favoriteAdjust: 'Anpassen'
+  ,favoriteRename: 'Namen ändern'
+  ,favoriteDelete: 'Löschen'
+  ,favoriteNamePlaceholder: 'Nur Buchstaben und Zahlen'
+  ,favoriteStartFailed: 'Favorit konnte nicht gestartet werden.'
+  ,favoriteAdjustFailed: 'Favorit konnte nicht geöffnet werden.'
+  ,favoriteRenameFailed: 'Favoritenname konnte nicht aktualisiert werden.'
+  ,favoriteDeleteFailed: 'Favorit konnte nicht gelöscht werden.'
   ,quickGenIntroTitle: 'Quick Workout Generator'
-  ,quickGenIntroText: 'Erstelle dir mit einem Klick ein neues Workout direkt vom Dashboard aus.\n\nDer Quick Workout Generator erstellt dir ein vollständiges Training basierend auf deinen aktuellen Einstellungen wie Ziel, Trainingsart und verfügbarem Equipment.\n\nIn der kostenlosen Version kannst du den Generator bis zu 3 Mal pro Monat nutzen.\n\nDer Quick Generator erstellt eigenständige Workouts ohne langfristige Analyse oder Anpassung an deinen Trainingsverlauf.\n\nMit einem Pro-Abo erhältst du Zugriff auf den vollständigen AI Coach. Dieser analysiert deine bisherigen Trainings, erkennt Muster, passt deine Progression an und erstellt personalisierte Empfehlungen.'
+  ,quickGenIntroText: 'Erstelle dir mit einem Klick ein neues Workout direkt vom Dashboard aus.\n\nDer Quick Workout Generator erstellt dir ein vollständiges Training basierend auf deinen aktuellen Einstellungen wie Ziel, Trainingsart und verfügbarem Equipment.\n\nIn der kostenlosen Version kannst du den Generator 1 Mal pro Woche nutzen.\n\nDer Quick Generator erstellt eigenständige Workouts ohne langfristige Analyse oder Anpassung an deinen Trainingsverlauf.\n\nMit einem Pro-Abo erhältst du Zugriff auf den vollständigen AI Coach. Dieser analysiert deine bisherigen Trainings, erkennt Muster, passt deine Progression an und erstellt personalisierte Empfehlungen.'
   ,quickGenLearnPro: 'Mehr über Pro erfahren'
   ,quickGenGenerateNow: 'Workout generieren'
-  ,quickGenLimitTitle: 'Monatslimit erreicht'
-  ,quickGenLimitText: 'Du hast dein monatliches Kontingent für den Quick Workout Generator aufgebraucht.\n\nFreischaltung am: {date}.\n\nMit Pro erhältst du unbegrenzte Generierungen sowie personalisierte Trainingsanalyse und automatische Anpassungen.'
+  ,quickGenLimitTitle: 'Wochenlimit erreicht'
+  ,quickGenLimitText: 'Du hast dein wöchentliches Kontingent für den Quick Workout Generator aufgebraucht.\n\nFreischaltung am: {date}.\n\nMit Pro erhältst du unbegrenzte Generierungen sowie personalisierte Trainingsanalyse und automatische Anpassungen.'
   ,quickGenLastHintTitle: 'Nur noch 1 freie Generierung'
-  ,quickGenLastHintText: 'Du kannst den Quick Workout Generator nur noch einmal kostenlos nutzen.\n\nFreischaltung am: {date}.\n\nMöchtest du lieber jetzt auf Pro upgraden?'
+  ,quickGenLastHintText: 'Du kannst den Quick Workout Generator nur noch einmal kostenlos diese Woche nutzen.\n\nFreischaltung am: {date}.\n\nMöchtest du lieber jetzt auf Pro upgraden?'
   ,quickGenContinueFree: 'Letzte freie Nutzung starten'
   ,quickGenFormTitle: 'Quick Workout Generator'
   ,quickGenGenerating: 'Workout wird generiert...'
@@ -124,11 +138,34 @@ export const messages = {
   ,quickGenBodyweight: 'Körpergewicht (kg)'
   ,quickGenLevel: 'Trainingslevel'
   ,quickGenLevelBeginner: 'Anfänger'
+  ,quickGenLevelIntermediate: 'Mittelstufe'
   ,quickGenLevelAdvanced: 'Fortgeschrittener'
+  ,quickGenFrequency: 'Trainingsfrequenz / Woche'
   ,quickGenEquipment: 'Equipment'
   ,quickGenEquipmentGymOnly: 'Nur Studio Equipment'
   ,quickGenEquipmentBodyweight: 'Studio + Bodyweight'
-  ,quickGenRemaining: 'Verbleibende Generierungen diesen Monat: {count}'
+  ,quickGenEquipmentBodyweightOnly: 'Nur Bodyweight'
+  ,quickGenEquipmentAvailable: 'Verfügbare Geräte'
+  ,quickGenEquipBarbell: 'Langhantel'
+  ,quickGenEquipDumbbells: 'Kurzhanteln'
+  ,quickGenEquipMachines: 'Maschinen'
+  ,quickGenEquipCable: 'Kabelzug'
+  ,quickGenEquipPullupBar: 'Klimmzugstange'
+  ,quickGenMaxPullups: 'Max. strikte Klimmzüge'
+  ,quickGenMaxDips: 'Max. strikte Dips'
+  ,quickGenMaxPushups: 'Max. strikte Liegestütze'
+  ,quickGenSquat1RM: 'Squat 1RM (optional, kg)'
+  ,quickGenBench1RM: 'Bench 1RM (optional, kg)'
+  ,quickGenDeadlift1RM: 'Deadlift 1RM (optional, kg)'
+  ,quickGenSquat5RM: 'Squat 5RM (optional, kg)'
+  ,quickGenBench5RM: 'Bench 5RM (optional, kg)'
+  ,quickGenDeadlift5RM: 'Deadlift 5RM (optional, kg)'
+  ,quickGenRestrictions: 'Bewegungseinschränkungen (optional)'
+  ,quickGenRestrictionsPlaceholder: 'z. B. keine Overhead-Bewegungen'
+  ,quickGenInjuries: 'Verletzungen (optional)'
+  ,quickGenInjuriesPlaceholder: 'z. B. Schulterreizung rechts'
+  ,quickGenRemaining: 'Verbleibende Generierungen diese Woche: {count}'
+  ,quickGenMissingRequired: 'Bitte fülle alle Pflichtfelder aus (inkl. Benchmarks und Equipment-Verfügbarkeit).'
   ,quickGenRequestFailed: 'Workout konnte gerade nicht generiert werden. Bitte erneut versuchen.'
   ,quickGenFallbackUsed: 'AI aktuell nicht erreichbar – wir haben ein lokales Workout für dich erstellt.'
     },
@@ -427,6 +464,11 @@ export const messages = {
       reorderHint: 'Ziehen und ablegen, um die Reihenfolge zu ändern.',
       dragToReorder: 'Ziehen zum Umordnen',
       save: 'Speichern',
+      saveAsFavorite: 'Als Favorit speichern',
+      favoriteNameTitle: 'Favorit speichern',
+      favoriteNamePlaceholder: 'Favoritenname (Buchstaben und Zahlen)',
+      favoriteSaved: 'Favorit gespeichert.',
+      favoriteSaveFailed: 'Favorit konnte nicht gespeichert werden.',
       saving: 'Speichere…',
       cancel: 'Abbrechen',
       leaveConfirm: 'Du hast ungespeicherte Änderungen. Wirklich zum Dashboard zurückkehren?',
@@ -601,7 +643,10 @@ export const messages = {
       completed: 'Abgeschlossen',
       repeatTitle: 'Workout wiederholen',
       editTitle: 'Workout bearbeiten',
+      deleteTitle: 'Workout löschen',
       detailsTitle: 'Details anzeigen',
+      deleteConfirm: 'Workout "{name}" wirklich löschen?',
+      deleteFailed: 'Workout konnte nicht gelöscht werden.',
       unknownDuration: 'Dauer unbekannt'
     },
     welcome: {
@@ -807,14 +852,28 @@ export const messages = {
   ,startModeText: 'Do you want to build your workout manually or generate one?'
   ,startModeManual: 'Build manually'
   ,startModeGenerate: 'Generate workout'
+  ,startModeFavorites: 'Choose favorite'
+  ,startModeTypeTitle: 'Choose {type}'
+  ,favoritesHint: 'Select a favorite to start immediately or adjust it.'
+  ,favoritesEmpty: 'No favorites saved for this type yet.'
+  ,favoritesLimitHint: 'You can save up to {count} favorites per type.'
+  ,favoriteStart: 'Start'
+  ,favoriteAdjust: 'Adjust'
+  ,favoriteRename: 'Rename'
+  ,favoriteDelete: 'Delete'
+  ,favoriteNamePlaceholder: 'Letters and numbers only'
+  ,favoriteStartFailed: 'Could not start favorite workout.'
+  ,favoriteAdjustFailed: 'Could not open favorite workout.'
+  ,favoriteRenameFailed: 'Could not rename favorite workout.'
+  ,favoriteDeleteFailed: 'Could not delete favorite workout.'
   ,quickGenIntroTitle: 'Quick Workout Generator'
-  ,quickGenIntroText: 'Create a new workout with one click directly from the dashboard.\n\nThe Quick Workout Generator builds a complete session based on your current settings like goal, workout mode and available equipment.\n\nIn the free version you can use the generator up to 3 times per month.\n\nThe Quick Generator creates standalone workouts without long-term analysis or adaptation to your training history.\n\nWith Pro you get access to the full AI Coach. It analyzes your previous sessions, detects patterns, adjusts progression and creates personalized recommendations.'
+  ,quickGenIntroText: 'Create a new workout with one click directly from the dashboard.\n\nThe Quick Workout Generator builds a complete session based on your current settings like goal, workout mode and available equipment.\n\nIn the free version you can use the generator once per week.\n\nThe Quick Generator creates standalone workouts without long-term analysis or adaptation to your training history.\n\nWith Pro you get access to the full AI Coach. It analyzes your previous sessions, detects patterns, adjusts progression and creates personalized recommendations.'
   ,quickGenLearnPro: 'Learn more about Pro'
   ,quickGenGenerateNow: 'Generate workout'
-  ,quickGenLimitTitle: 'Monthly limit reached'
-  ,quickGenLimitText: 'You have used up your monthly quota for the Quick Workout Generator.\n\nUnlocked again on: {date}.\n\nWith Pro you get unlimited generations plus personalized training analysis and automatic adjustments.'
+  ,quickGenLimitTitle: 'Weekly limit reached'
+  ,quickGenLimitText: 'You have used up your weekly quota for the Quick Workout Generator.\n\nUnlocked again on: {date}.\n\nWith Pro you get unlimited generations plus personalized training analysis and automatic adjustments.'
   ,quickGenLastHintTitle: 'Only 1 free generation left'
-  ,quickGenLastHintText: 'You can use the Quick Workout Generator only one more time for free.\n\nUnlocked again on: {date}.\n\nWould you rather upgrade to Pro now?'
+  ,quickGenLastHintText: 'You can use the Quick Workout Generator only one more time for free this week.\n\nUnlocked again on: {date}.\n\nWould you rather upgrade to Pro now?'
   ,quickGenContinueFree: 'Use last free generation'
   ,quickGenFormTitle: 'Quick Workout Generator'
   ,quickGenGenerating: 'Generating workout...'
@@ -829,11 +888,34 @@ export const messages = {
   ,quickGenBodyweight: 'Bodyweight (kg)'
   ,quickGenLevel: 'Training level'
   ,quickGenLevelBeginner: 'Beginner'
+  ,quickGenLevelIntermediate: 'Intermediate'
   ,quickGenLevelAdvanced: 'Advanced'
+  ,quickGenFrequency: 'Training frequency / week'
   ,quickGenEquipment: 'Equipment'
   ,quickGenEquipmentGymOnly: 'Gym equipment only'
   ,quickGenEquipmentBodyweight: 'Gym + bodyweight'
-  ,quickGenRemaining: 'Remaining generations this month: {count}'
+  ,quickGenEquipmentBodyweightOnly: 'Bodyweight only'
+  ,quickGenEquipmentAvailable: 'Available equipment'
+  ,quickGenEquipBarbell: 'Barbell'
+  ,quickGenEquipDumbbells: 'Dumbbells'
+  ,quickGenEquipMachines: 'Machines'
+  ,quickGenEquipCable: 'Cable station'
+  ,quickGenEquipPullupBar: 'Pull-up bar'
+  ,quickGenMaxPullups: 'Max strict pull-ups'
+  ,quickGenMaxDips: 'Max strict dips'
+  ,quickGenMaxPushups: 'Max strict push-ups'
+  ,quickGenSquat1RM: 'Squat 1RM (optional, kg)'
+  ,quickGenBench1RM: 'Bench 1RM (optional, kg)'
+  ,quickGenDeadlift1RM: 'Deadlift 1RM (optional, kg)'
+  ,quickGenSquat5RM: 'Squat 5RM (optional, kg)'
+  ,quickGenBench5RM: 'Bench 5RM (optional, kg)'
+  ,quickGenDeadlift5RM: 'Deadlift 5RM (optional, kg)'
+  ,quickGenRestrictions: 'Movement restrictions (optional)'
+  ,quickGenRestrictionsPlaceholder: 'e.g. no overhead pressing'
+  ,quickGenInjuries: 'Injuries (optional)'
+  ,quickGenInjuriesPlaceholder: 'e.g. right shoulder irritation'
+  ,quickGenRemaining: 'Remaining generations this week: {count}'
+  ,quickGenMissingRequired: 'Please fill all required fields (including benchmarks and equipment availability).'
   ,quickGenRequestFailed: 'Could not generate workout right now. Please try again.'
   ,quickGenFallbackUsed: 'AI is currently unavailable — we created a local workout for you.'
     },
@@ -1110,6 +1192,11 @@ export const messages = {
       reorderHint: 'Drag and drop to change the order.',
       dragToReorder: 'Drag to reorder',
       save: 'Save',
+      saveAsFavorite: 'Save as favorite',
+      favoriteNameTitle: 'Save favorite',
+      favoriteNamePlaceholder: 'Favorite name (letters and numbers)',
+      favoriteSaved: 'Favorite saved.',
+      favoriteSaveFailed: 'Could not save favorite.',
       saving: 'Saving…',
       cancel: 'Cancel',
       leaveConfirm: 'You have unsaved changes. Really go back to dashboard?',
@@ -1266,7 +1353,10 @@ export const messages = {
       completed: 'Completed',
       repeatTitle: 'Repeat workout',
       editTitle: 'Edit workout',
+      deleteTitle: 'Delete workout',
       detailsTitle: 'Show details',
+      deleteConfirm: 'Do you really want to delete "{name}"?',
+      deleteFailed: 'Workout could not be deleted.',
       unknownDuration: 'Unknown duration'
     },
     welcome: {

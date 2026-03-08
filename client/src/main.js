@@ -14,6 +14,108 @@ import { logger } from '@/utils/logger'
 import { setCacheLimits } from '@/utils/assetCache'
 import { setDownloadConcurrency } from '@/utils/assetResolver'
 import { setupAutoSync, processSyncQueue } from '@/utils/syncManager'
+import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
+
+const APP_RESUME_STATE_KEY = 'app_resume_state_v1'
+const APP_RESUME_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
+
+function isRouteEligibleForResume(route) {
+  const name = String(route?.name || '')
+  if (!name) return false
+  if (name === 'welcome' || name === 'get-the-app') return false
+  return true
+}
+
+function saveResumeSnapshot(route, source = 'unknown') {
+  try {
+    if (!isRouteEligibleForResume(route)) return
+    const fullPath = String(route?.fullPath || '').trim()
+    if (!fullPath || !fullPath.startsWith('/')) return
+
+    localStorage.setItem(APP_RESUME_STATE_KEY, JSON.stringify({
+      fullPath,
+      name: String(route?.name || ''),
+      source,
+      timestamp: Date.now()
+    }))
+  } catch {}
+}
+
+function readResumeSnapshot() {
+  try {
+    const raw = localStorage.getItem(APP_RESUME_STATE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return null
+    const fullPath = String(parsed.fullPath || '').trim()
+    const timestamp = Number(parsed.timestamp || 0)
+    if (!fullPath || !fullPath.startsWith('/')) return null
+    if (!Number.isFinite(timestamp) || timestamp <= 0) return null
+    if (Date.now() - timestamp > APP_RESUME_MAX_AGE_MS) return null
+    return { fullPath, timestamp, name: String(parsed.name || '') }
+  } catch {
+    return null
+  }
+}
+
+function clearResumeSnapshot() {
+  try { localStorage.removeItem(APP_RESUME_STATE_KEY) } catch {}
+}
+
+function warmupExercisesArea() {
+  const runWarmup = () => {
+    // Route-/Component-Chunk vorladen, damit der Wechsel in den Übungen-Bereich direkter wirkt.
+    Promise.all([
+      import('./views/ExercisesView.vue'),
+      import('./components/ExerciseList.vue'),
+      loadDefaultExercises().catch(() => null)
+    ]).catch(() => null)
+  }
+
+  if (typeof window === 'undefined') {
+    runWarmup()
+    return
+  }
+
+  if (typeof window.requestIdleCallback === 'function') {
+    window.requestIdleCallback(() => runWarmup(), { timeout: 1500 })
+    return
+  }
+
+  setTimeout(runWarmup, 350)
+}
+
+async function tryRestoreLastRoute(reason = 'unknown') {
+  const snapshot = readResumeSnapshot()
+  if (!snapshot) return false
+
+  const current = router.currentRoute.value
+  const currentPath = String(current?.fullPath || '')
+  const currentName = String(current?.name || '')
+
+  // Nicht in laufende Navigation eingreifen; nur von "Start"-Routen zurücksetzen.
+  const canOverrideCurrent = currentName === 'welcome' || currentName === 'dashboard' || currentPath === '/'
+  if (!canOverrideCurrent) return false
+  if (currentPath === snapshot.fullPath) return false
+
+  try {
+    await router.replace(snapshot.fullPath)
+    logger.debug('[main] Restored last route', {
+      reason,
+      from: currentPath,
+      to: snapshot.fullPath,
+      ageMs: Date.now() - snapshot.timestamp
+    })
+    return true
+  } catch (error) {
+    logger.warn('[main] Route restore failed', {
+      reason,
+      to: snapshot.fullPath,
+      message: error?.message || String(error)
+    })
+    return false
+  }
+}
 
 const app = createApp(App)
 const pinia = createPinia()
@@ -21,6 +123,12 @@ const i18n = createI18nInstance()
 app.use(pinia)
 app.use(router)
 app.use(i18n)
+
+// Letzten Navigationszustand fortlaufend speichern, damit die App nach Background/Screen-Off
+// oder Process-Restart an derselben Stelle weiterlaufen kann.
+router.afterEach((to) => {
+  saveResumeSnapshot(to, 'afterEach')
+})
 
 // Asset-Cache Limits/Concurrency (optional via env)
 const maxBytesEnv = Number(import.meta.env.VITE_ASSET_CACHE_MAX_BYTES)
@@ -75,15 +183,23 @@ async function bootstrapAuth() {
         const current = router.currentRoute.value
         if (current && current.name === 'welcome') {
           const redirect = current.query?.redirect
-          const target = (typeof redirect === 'string' && redirect.startsWith('/')) ? redirect : '/dashboard'
+          const restored = await tryRestoreLastRoute('auth-state-welcome')
+          const target = (typeof redirect === 'string' && redirect.startsWith('/'))
+            ? redirect
+            : (restored ? null : '/dashboard')
           logger.debug('[main] User signed in and current route is welcome — navigating to', target)
-          router.replace(target).catch(() => {})
+          if (target) {
+            router.replace(target).catch(() => {})
+          }
+        } else {
+          await tryRestoreLastRoute('auth-state-general')
         }
       } catch (e) {
         logger.warn('[main] auto-redirect after sign-in failed:', e)
       }
     } else {
       authStore.clearUser()
+      clearResumeSnapshot()
     }
   })
 
@@ -114,6 +230,31 @@ async function bootstrapAuth() {
 
 bootstrapAuth()
 
+// App-Lifecycle: Beim Verlassen Zustand sichern, beim Zurückkehren ggf. wiederherstellen.
+CapacitorApp.addListener('appStateChange', async ({ isActive }) => {
+  try {
+    if (!isActive) {
+      saveResumeSnapshot(router.currentRoute.value, 'appState-inactive')
+      return
+    }
+    await tryRestoreLastRoute('appState-active')
+  } catch {}
+})
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      saveResumeSnapshot(router.currentRoute.value, 'visibility-hidden')
+    }
+  })
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', () => {
+    saveResumeSnapshot(router.currentRoute.value, 'beforeunload')
+  })
+}
+
 // Theme initial anwenden
 const themeStore = useThemeStore()
 themeStore.applyCurrent()
@@ -124,6 +265,12 @@ subscriptionStore.checkSubscription()
 
 setupAutoSync().catch((error) => {
   logger.warn('[main] setupAutoSync failed:', error)
+})
+
+router.isReady().then(() => {
+  // Startwiederherstellung ohne Auth-Zwang: Router-Guards entscheiden final über Zugriff.
+  tryRestoreLastRoute('router-ready').catch(() => {})
+  warmupExercisesArea()
 })
 
 app.mount('#app')

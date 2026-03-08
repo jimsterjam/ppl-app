@@ -203,9 +203,11 @@ export async function completeWorkout(workoutId, completedAt = null, token = nul
 
 // Workout löschen
 export async function deleteWorkout(workoutId, token = null) {
-  if (!isOnline()) {
+  const id = String(workoutId || '').trim()
+  const isLocalOnlyId = id.startsWith('offline_') || id.startsWith('draft-') || id === 'draft' || id === 'workout_detail_draft'
+
+  if (!isOnline() || isLocalOnlyId) {
     await deleteWorkoutOffline(workoutId);
-    await queueAction('delete', 'workout', { _id: workoutId });
     logger.debug('🗑️ Workouts API - Workout offline gelöscht:', workoutId);
     return { success: true, _id: workoutId };
   }
@@ -216,7 +218,26 @@ export async function deleteWorkout(workoutId, token = null) {
     await deleteWorkoutOffline(workoutId);
     return res.data;
   } catch (error) {
-    throw handleAPIError(error, 'Workout löschen');
+    const status = Number(error?.response?.status || 0)
+    if (status === 404 || status === 410) {
+      logger.debug('🗑️ Workouts API - Workout serverseitig bereits gelöscht, räume lokal auf:', workoutId)
+      await deleteWorkoutOffline(workoutId)
+      return { success: true, _id: workoutId, alreadyDeleted: true }
+    }
+
+    logger.warn('⚠️ Workouts API - Delete online fehlgeschlagen, fallback auf offline queue', {
+      workoutId,
+      message: error?.message,
+      code: error?.code || null,
+      status: status || null
+    })
+    try {
+      await deleteWorkoutOffline(workoutId)
+      await queueAction('delete', 'workout', { _id: workoutId, _failedOnlineDelete: true })
+      return { success: true, _id: workoutId, offlineFallback: true }
+    } catch {
+      throw handleAPIError(error, 'Workout löschen')
+    }
   }
 }
 

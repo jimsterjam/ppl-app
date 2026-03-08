@@ -56,7 +56,6 @@
           muted
           loop
           playsinline
-          controls
         ></video>
         <img
           v-else
@@ -73,6 +72,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { resolveExerciseMedia, getExerciseThumb, buildExerciseMediaUrl } from '@/utils/assetResolver'
+import { searchAndRankExercises } from '@/utils/exerciseSearch'
 
 const props = defineProps({
   exercises: { type: Array, default: () => [] },
@@ -101,7 +101,7 @@ const mediaRequestId = ref(0)
 const isVideoUrl = (url) => typeof url === 'string' && /\.mp4($|[?#])/i.test(url)
 
 const filtered = computed(() => {
-  const q = search.value.trim().toLowerCase()
+  const q = search.value.trim()
   const list = Array.isArray(props.exercises) ? props.exercises : []
 
   const safeTranslate = (fn, val) => {
@@ -115,10 +115,14 @@ const filtered = computed(() => {
 
   if (!q) return list
 
-  return list.filter(ex => {
-    const name = safeTranslate(props.translateName, ex?.name).toLowerCase()
-    const muscle = safeTranslate(props.translateMuscle, ex?.muscleGroup).toLowerCase()
-    return name.includes(q) || muscle.includes(q)
+  return searchAndRankExercises(list, q, {
+    getPrimaryText: (exercise) => safeTranslate(props.translateName, exercise?.name),
+    getSecondaryTexts: (exercise) => [
+      safeTranslate(props.translateName, exercise?.name_en || ''),
+      safeTranslate(props.translateMuscle, exercise?.muscleGroup),
+      safeTranslate(props.translateCategory, exercise?.category),
+      safeTranslate(props.translateEquipment, exercise?.equipment)
+    ]
   })
 })
 

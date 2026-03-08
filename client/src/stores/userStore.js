@@ -18,6 +18,7 @@ import {
 } from '@/api/workouts'
 
 const DRAFT_TOMBSTONES_KEY = 'deleted_draft_ids_v1'
+const DRAFT_TOMBSTONE_TTL_MS = 6 * 60 * 60 * 1000
 
 function isDraftLike(workout) {
   const id = String(workout?._id || '')
@@ -55,7 +56,13 @@ function markDraftsDeleted(ids = []) {
 function isDraftDeleted(id) {
   if (!id) return false
   const map = readDraftTombstones()
-  return Boolean(map[String(id)])
+  const entry = map[String(id)]
+  if (!entry) return false
+  const timestamp = Number(typeof entry === 'object' ? (entry?.timestamp || entry?.deletedAt || 0) : entry)
+  if (Number.isFinite(timestamp) && timestamp > 0) {
+    return (Date.now() - timestamp) <= DRAFT_TOMBSTONE_TTL_MS
+  }
+  return Boolean(entry)
 }
 
 function filterOutDeletedDrafts(list = [], source = 'unknown') {
@@ -73,6 +80,7 @@ export const useUserStore = defineStore("user", {
     user: null,
     workouts: [],
     stats: null,
+    statsErrorCode: null,
     // Separate Lade-Flags und Cache-Metadaten
     loadingWorkouts: false,
     loadingStats: false,
@@ -367,6 +375,7 @@ export const useUserStore = defineStore("user", {
     async loadStats(token = null, params = {}) {
       this.loadingStats = true;
       this.error = null;
+      this.statsErrorCode = null;
       const readCachedStats = () => {
         try {
           const cached = localStorage.getItem('bro_split_stats');
@@ -418,6 +427,7 @@ export const useUserStore = defineStore("user", {
         return this.stats;
       } catch (error) {
         logger.error('❌ [API] Fehler beim Laden der Progress Stats:', error);
+        this.statsErrorCode = Number(error?.statusCode || error?.response?.status || error?.context?.originalError?.response?.status || 0) || null;
         this.error = error?.message || 'Fehler beim Laden der Progress Stats';
         this.stats = readCachedStats();
         if (this.stats) this.error = null;

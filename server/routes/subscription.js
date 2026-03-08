@@ -22,8 +22,48 @@
  */
 import express from 'express'
 import { firebaseAuthMiddleware } from '../middleware/firebaseAuth.js';
+import UserProfile from '../models/UserProfile.js'
+import Workout from '../models/Workout.js'
 
 const router = express.Router()
+
+const FREE_AI_WEEKLY_LIMIT = 1
+
+function startOfIsoWeek(dateInput) {
+  const date = new Date(dateInput)
+  const isoDay = date.getUTCDay() === 0 ? 7 : date.getUTCDay()
+  date.setUTCDate(date.getUTCDate() - isoDay + 1)
+  date.setUTCHours(0, 0, 0, 0)
+  return date
+}
+
+function isPaidPlan(plan = 'free') {
+  return plan === 'pro' || plan === 'elite'
+}
+
+async function getOrCreateUserProfile(uid) {
+  if (!uid) return null
+  let profile = await UserProfile.findOne({ uid })
+  if (profile) return profile
+  profile = await UserProfile.create({ uid })
+  return profile
+}
+
+function getAiWeeklyUsage(profile) {
+  const weekWindowStart = startOfIsoWeek(new Date())
+  const savedStartRaw = profile?.aiUsage?.weekWindowStart
+  const savedStart = savedStartRaw ? startOfIsoWeek(savedStartRaw) : null
+  const isCurrentWindow = savedStart && savedStart.getTime() === weekWindowStart.getTime()
+  const weeklyCount = isCurrentWindow ? Math.max(0, Number(profile?.aiUsage?.weeklyCount) || 0) : 0
+  return {
+    weekWindowStart,
+    weeklyCount,
+    weeklyLimit: isPaidPlan(profile?.subscription?.plan || 'free') ? null : FREE_AI_WEEKLY_LIMIT,
+    weeklyRemaining: isPaidPlan(profile?.subscription?.plan || 'free')
+      ? null
+      : Math.max(0, FREE_AI_WEEKLY_LIMIT - weeklyCount)
+  }
+}
 
 /**
  * GET /api/subscription/status
@@ -35,27 +75,46 @@ const router = express.Router()
 router.get('/status', firebaseAuthMiddleware, async (req, res) => {
   try {
     const userId = req.auth?.userId
-    
-    // In realer App: Aus Datenbank laden
-    // Hier: Mock für Demo
+    const profile = await getOrCreateUserProfile(userId)
+    const plan = profile?.subscription?.plan || 'free'
+    const paidPlan = isPaidPlan(plan)
+    const aiUsage = getAiWeeklyUsage(profile)
+
     const subscription = {
-      plan: 'free', // 'free', 'pro', 'elite'
-      status: 'active',
-      expiresAt: null,
-      features: []
+      plan,
+      status: profile?.subscription?.status || 'active',
+      billingCycle: profile?.subscription?.billingCycle || null,
+      expiresAt: profile?.subscription?.expiresAt || null,
+      features: paidPlan
+        ? [
+            'unlimited_workouts',
+            'ai_coach',
+            'advanced_stats',
+            'workout_sharing',
+            'custom_templates'
+          ]
+        : []
     }
     
-    // Usage aus Workout-Daten berechnen
+    // Usage aus DB berechnen
     const now = new Date()
-    const weekStart = new Date(now.setDate(now.getDate() - now.getDay()))
+    const weekStart = startOfIsoWeek(now)
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-    
-    // Hier würdest du echte DB-Queries machen
+
+    const [workoutsThisWeek, workoutsThisMonth, totalWorkouts, lastWorkout] = await Promise.all([
+      Workout.countDocuments({ userId, date: { $gte: weekStart } }),
+      Workout.countDocuments({ userId, date: { $gte: monthStart } }),
+      Workout.countDocuments({ userId }),
+      Workout.findOne({ userId }).sort({ date: -1 }).select({ date: 1 }).lean()
+    ])
+
     const usage = {
-      workoutsThisWeek: 2, // aus MongoDB zählen
-      workoutsThisMonth: 8,
-      totalWorkouts: 45,
-      lastWorkoutDate: new Date().toISOString()
+      workoutsThisWeek,
+      workoutsThisMonth,
+      totalWorkouts,
+      lastWorkoutDate: lastWorkout?.date || null,
+      ai: aiUsage,
+      analyticsEnabled: paidPlan
     }
     
     res.json({
@@ -72,19 +131,32 @@ router.get('/status', firebaseAuthMiddleware, async (req, res) => {
 router.post('/upgrade', firebaseAuthMiddleware, async (req, res) => {
   try {
     const userId = req.auth?.userId
-    const { plan, paymentMethod } = req.body
+    const { plan, paymentMethod, cycle } = req.body
     
     // Validate plan
     if (!['pro', 'elite'].includes(plan)) {
       return res.status(400).json({ error: 'Invalid plan' })
     }
     
-    // In realer App: Stripe/Paddle Integration
-    // Hier: Mock für Demo
+    const billingCycle = cycle === 'yearly' ? 'yearly' : 'monthly'
+    const expiresAt = new Date()
+    expiresAt.setMonth(expiresAt.getMonth() + (billingCycle === 'yearly' ? 12 : 1))
+
+    const profile = await getOrCreateUserProfile(userId)
+    profile.subscription = {
+      plan,
+      status: 'active',
+      billingCycle,
+      expiresAt
+    }
+    profile.analyticsEnabled = true
+    await profile.save()
+
     const subscription = {
       plan,
       status: 'active',
-      expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 Tage
+      billingCycle,
+      expiresAt,
       features: plan === 'pro' ? [
         'unlimited_workouts',
         'ai_coach',
@@ -102,8 +174,6 @@ router.post('/upgrade', firebaseAuthMiddleware, async (req, res) => {
         'priority_support'
       ]
     }
-    
-    // Save to database hier...
     
     res.json({
       subscription,

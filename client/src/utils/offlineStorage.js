@@ -133,18 +133,8 @@ export async function saveWorkoutOffline(workout) {
     logger.debug('💾 Offline Storage - Workout gespeichert:', cleanWorkout._id)
     emitOfflineWorkoutsUpdated({ type: 'save', id: cleanWorkout._id })
 
-    // Draft nach Save eines echten Workouts entfernen
-    try {
-      // Lösche alle Workouts mit _isDraft === true
-      const drafts = await db.workouts.filter(w => w._isDraft === true).toArray()
-      if (drafts.length > 0) {
-        const draftIds = drafts.map(d => d._id)
-        await db.workouts.bulkDelete(draftIds)
-        logger.debug('🗑️ Draft-Workouts nach Save gelöscht:', draftIds)
-      }
-    } catch (e) {
-      logger.warn('Draft-Workout konnte nicht gelöscht werden:', e)
-    }
+    // WICHTIG: Drafts nicht global löschen.
+    // Das führte zu Race-Conditions, bei denen neue Drafts im Dashboard kurz verschwanden.
     await enforceWorkoutHistoryLimit()
     return cleanWorkout._id
   } catch (error) {

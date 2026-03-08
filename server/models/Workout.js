@@ -6,6 +6,7 @@ function normalizeType(input, name, firstExerciseCategory) {
     .map(v => (v ?? '').toString().toLowerCase())
     .find(s => s && s.trim().length > 0) || '';
 
+  if (src.includes('full') || src.includes('ganz') || src.includes('freestyle')) return 'fullbody';
   if (src.includes('push')) return 'push';
   if (src.includes('pull')) return 'pull';
   if (src.includes('leg')) return 'legs';
@@ -13,6 +14,7 @@ function normalizeType(input, name, firstExerciseCategory) {
   if (src.includes('brust') || src.includes('schulter') || src.includes('trizeps')) return 'push';
   if (src.includes('rücken') || src.includes('bizeps')) return 'pull';
   if (src.includes('bein') || src.includes('quadrizeps') || src.includes('hamstrings') || src.includes('waden')) return 'legs';
+  if (src.includes('core') || src.includes('bauch') || src.includes('cardio')) return 'fullbody';
   return 'push';
 }
 
@@ -28,10 +30,10 @@ const workoutSchema = new mongoose.Schema({
     required: true,
     default: 'Neues Workout'
   },
-  // Kanonischer Workout-Typ (push|pull|legs)
+  // Kanonischer Workout-Typ (push|pull|legs|fullbody)
   type: {
     type: String,
-    enum: ['push', 'pull', 'legs'],
+    enum: ['push', 'pull', 'legs', 'fullbody'],
     set: function(v) {
       // Versuche zusätzlich aus Name/Exercise-Kategorie abzuleiten
       const firstCat = Array.isArray(this.exercises) && this.exercises[0]?.category

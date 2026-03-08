@@ -145,7 +145,6 @@
                         muted
                         loop
                         playsinline
-                        controls
                       ></video>
                       <img
                         v-else
@@ -173,18 +172,22 @@
                 v-for="(row, rIdx) in (ex.setDetails || [])"
                 :key="`${ex.exerciseId || i}-row-${rIdx}`"
                 class="set-row"
+                :data-set-index="rIdx"
               >
                 <span class="col set">{{ rIdx + 1 }}</span>
                 <span class="col reps">
                   <div class="number-with-spinner">
                       <input
                         v-model.number="row.reps"
+                        data-field="reps"
                         type="number"
                         min="1"
                         max="500"
                         step="1"
                         inputmode="numeric"
                         :readonly="isMobile"
+                        @focus="trackFieldAnchor(i, rIdx, 'reps')"
+                        @click="trackFieldAnchor(i, rIdx, 'reps')"
                         @input="() => { clampRowValue(row, 'reps', 1, 500, 1); triggerAutoSave() }"
                         @wheel.prevent="onNumberWheel($event, row, 'reps', 1, 1, 500)"
                         @keydown="onNumberKeyDown($event, false)"
@@ -224,12 +227,15 @@
                       <div class="number-with-spinner">
                       <input
                         v-model.number="row.weight"
+                        data-field="weight"
                         type="number"
                         min="0"
                         max="1000"
                         step="2.5"
                         inputmode="decimal"
                         :readonly="isMobile"
+                        @focus="trackFieldAnchor(i, rIdx, 'weight')"
+                        @click="trackFieldAnchor(i, rIdx, 'weight')"
                         @input="() => { clampRowValue(row, 'weight', 0, 1000, 2.5); triggerAutoSave() }"
                         @wheel.prevent="onNumberWheel($event, row, 'weight', 2.5, 0, 1000)"
                         @keydown="onNumberKeyDown($event, true)"
@@ -289,6 +295,15 @@
             <button v-else class="primary" :disabled="saving" @click="saveWorkout">
               {{ saving ? t('workoutDetail.saving') : t('workoutDetail.save') }}
             </button>
+            <button
+              v-if="!isReordering"
+              class="secondary favorite-save"
+              type="button"
+              :disabled="favoriteSaving"
+              @click="openFavoriteNameModal"
+            >
+              {{ favoriteSaving ? t('workoutDetail.saving') : t('workoutDetail.saveAsFavorite') }}
+            </button>
             <small v-if="saveMsg && !isReordering" class="save-msg" :class="{ error: saveError }">{{ saveMsg }}</small>
           </div>
         </div>
@@ -325,6 +340,28 @@
       type="warning"
       @confirm="confirmLeave"
     />
+
+    <AppModal
+      v-model="showFavoriteNameModal"
+      :title="t('workoutDetail.favoriteNameTitle')"
+      :confirm-text="favoriteSaving ? t('workoutDetail.saving') : t('common.save')"
+      :cancel-text="t('common.cancel')"
+      :close-on-confirm="false"
+      :persistent="favoriteSaving"
+      type="info"
+      @confirm="confirmFavoriteSave"
+    >
+      <label class="favorite-modal-field">
+        <span>{{ t('workoutDetail.favoriteNamePlaceholder') }}</span>
+        <input
+          v-model="favoriteName"
+          class="favorite-modal-input"
+          type="text"
+          maxlength="40"
+          :placeholder="t('workoutDetail.favoriteNamePlaceholder')"
+        />
+      </label>
+    </AppModal>
 
     <WorkoutTimerConfig v-if="showTimerConfig" @close="showTimerConfig = false" />
     <WorkoutTimerBar v-if="showTimerBar" @close="timerStore.reset()" />
@@ -429,6 +466,12 @@ import { useTimerStore } from '@/stores/timerStore'
 import { useI18n } from 'vue-i18n'
 import { logger } from '@/utils/logger'
 import { buildWorkoutNotesSummary } from '@/utils/workoutNotes'
+import {
+  saveFavoriteWorkout,
+  getFavoriteNameValidationError,
+  normalizeFavoriteName,
+  normalizeWorkoutType
+} from '@/utils/workoutFavorites'
 
 const userStore = useUserStore()
 function getDetailDraftKey() {
@@ -477,7 +520,7 @@ async function postSaveCleanup() {
 
 const route = useRoute()
 const router = useRouter()
-const { getIdToken } = useFirebaseAuth()
+const { getIdToken, getCurrentUser } = useFirebaseAuth()
 
 const { t, locale } = useI18n()
 const { getTranslatedExerciseName } = useExerciseTranslation()
@@ -509,6 +552,12 @@ const error = ref('')
 const saving = ref(false)
 const saveMsg = ref('')
 const saveError = ref(false)
+const WORKOUT_DETAIL_VIEW_STATE_KEY = 'workout_detail_view_state_v1'
+const lastFieldAnchor = ref(null)
+let viewStatePersistTimer = null
+const favoriteName = ref('')
+const favoriteSaving = ref(false)
+const showFavoriteNameModal = ref(false)
 const suppressDraftPersistence = ref(false)
 const mediaExercise = ref(null)
 const mediaUrl = ref('')
@@ -593,7 +642,7 @@ const triggerAutoSave = async () => {
     if (id === 'draft') {
       const draftKey = getDetailDraftKey()
       await saveWorkoutOffline({ ...w, _id: draftKey, _isDraft: true, isDraft: true, updatedAt: Date.now() })
-      saveMsg.value = 'Auto-gespeichert (Entwurf lokal).'
+      saveMsg.value = ''
       saveError.value = false
       initialSnapshot = snapshotCore({ ...w })
       logger.debug('Draft gespeichert (draft):', { ...w, _id: 'draft' })
@@ -602,7 +651,7 @@ const triggerAutoSave = async () => {
       if (realId) {
         const token = await getIdToken().catch(() => null)
         await store.updateWorkout(realId, w, token)
-        saveMsg.value = 'Auto-gespeichert.'
+        saveMsg.value = ''
         saveError.value = false
         initialSnapshot = snapshotCore({ ...w, _id: realId })
       } else {
@@ -614,7 +663,7 @@ const triggerAutoSave = async () => {
         } else {
           initialSnapshot = snapshotCore({ ...w, _id: id })
         }
-        saveMsg.value = 'Auto-gespeichert (Entwurf lokal).'
+        saveMsg.value = ''
         saveError.value = false
       }
     } else {
@@ -623,15 +672,104 @@ const triggerAutoSave = async () => {
       const payload = { ...w, _isDraft: keepDraft, isDraft: keepDraft }
       await store.updateWorkout(route.params.id, payload, token)
       try { await saveWorkoutOffline({ ...payload, _id: route.params.id, updatedAt: Date.now() }) } catch {}
-      saveMsg.value = 'Auto-gespeichert.'
+      saveMsg.value = ''
       saveError.value = false
       initialSnapshot = snapshotCore({ ...payload })
     }
   } catch (e) {
     logger.error('Auto-Save fehlgeschlagen:', e)
-    saveMsg.value = 'Auto-Save fehlgeschlagen.'
-    saveError.value = true
+    saveMsg.value = ''
+    saveError.value = false
   }
+}
+
+function getViewStateWorkoutId() {
+  const routeId = String(route.params.id || '').trim()
+  const workoutId = String(workout.value?._id || '').trim()
+  return workoutId || routeId
+}
+
+function readDetailViewState() {
+  try {
+    const raw = localStorage.getItem(WORKOUT_DETAIL_VIEW_STATE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function writeDetailViewState(reason = 'unknown') {
+  try {
+    const workoutId = getViewStateWorkoutId()
+    if (!workoutId) return
+    const scrollY = typeof window !== 'undefined' ? Math.max(0, Math.round(window.scrollY || 0)) : 0
+    const anchor = lastFieldAnchor.value && typeof lastFieldAnchor.value === 'object'
+      ? {
+          exIndex: Number(lastFieldAnchor.value.exIndex) || 0,
+          setIndex: Number(lastFieldAnchor.value.setIndex) || 0,
+          field: String(lastFieldAnchor.value.field || '')
+        }
+      : null
+
+    localStorage.setItem(WORKOUT_DETAIL_VIEW_STATE_KEY, JSON.stringify({
+      workoutId,
+      scrollY,
+      anchor,
+      reason,
+      timestamp: Date.now()
+    }))
+  } catch {}
+}
+
+function scheduleViewStatePersist(reason = 'unknown') {
+  if (viewStatePersistTimer) clearTimeout(viewStatePersistTimer)
+  viewStatePersistTimer = setTimeout(() => {
+    writeDetailViewState(reason)
+    viewStatePersistTimer = null
+  }, 120)
+}
+
+function trackFieldAnchor(exIndex, setIndex, field) {
+  lastFieldAnchor.value = {
+    exIndex: Number(exIndex) || 0,
+    setIndex: Number(setIndex) || 0,
+    field: String(field || '')
+  }
+  scheduleViewStatePersist('field-anchor')
+}
+
+function restoreDetailViewState() {
+  try {
+    const state = readDetailViewState()
+    if (!state) return
+    const workoutId = getViewStateWorkoutId()
+    if (!workoutId || String(state.workoutId || '') !== workoutId) return
+
+    const scrollY = Number(state.scrollY || 0)
+    if (typeof window !== 'undefined' && Number.isFinite(scrollY) && scrollY > 0) {
+      window.scrollTo({ top: scrollY, left: 0, behavior: 'auto' })
+    }
+
+    const anchor = state.anchor
+    const field = String(anchor?.field || '')
+    if (!anchor || (field !== 'reps' && field !== 'weight')) return
+
+    const exIndex = Number(anchor.exIndex)
+    const setIndex = Number(anchor.setIndex)
+    if (!Number.isFinite(exIndex) || !Number.isFinite(setIndex)) return
+
+    nextTick(() => {
+      try {
+        const selector = `[data-ex-index="${exIndex}"] [data-set-index="${setIndex}"] input[data-field="${field}"]`
+        const input = typeof document !== 'undefined' ? document.querySelector(selector) : null
+        if (!input || typeof input.focus !== 'function') return
+        input.focus({ preventScroll: true })
+      } catch {}
+    })
+  } catch {}
 }
 // Initialisiere Notiz-Arrays, wenn Workout geladen wird
 watch(workout, (w) => {
@@ -1291,6 +1429,87 @@ async function saveWorkout() {
   }
 }
 
+function getFavoriteUserId() {
+  return String(getCurrentUser?.()?.uid || userStore.user?.id || 'guest')
+}
+
+function buildFavoriteSourceWorkout() {
+  const source = workout.value || {}
+  return {
+    name: source.name,
+    type: source.type,
+    notes: buildWorkoutNotesSummary(source.exercises || []),
+    exercises: (source.exercises || []).map((exercise) => ({
+      _id: exercise._id || exercise.exerciseId || null,
+      exerciseId: exercise.exerciseId || exercise._id || null,
+      name: exercise.name,
+      muscleGroup: exercise.muscleGroup,
+      category: exercise.category || source.type,
+      sets: Number(exercise.sets) || Number(exercise.setDetails?.length) || 3,
+      reps: Number(exercise.reps) || Number(exercise.setDetails?.[0]?.reps) || 10,
+      weight: Number(exercise.weight) || Number(exercise.setDetails?.[0]?.weight) || 0,
+      rest: Number(exercise.rest) || 90,
+      setDetails: Array.isArray(exercise.setDetails) && exercise.setDetails.length
+        ? exercise.setDetails
+        : [{
+            reps: Number(exercise.reps) || 10,
+            weight: Number(exercise.weight) || 0
+          }]
+    }))
+  }
+}
+
+function saveAsFavorite() {
+  const nameCandidate = normalizeFavoriteName(favoriteName.value || workout.value?.name || '')
+  const validationError = getFavoriteNameValidationError(nameCandidate)
+  if (validationError) {
+    saveMsg.value = validationError
+    saveError.value = true
+    return false
+  }
+
+  favoriteSaving.value = true
+  try {
+    const sourceWorkout = buildFavoriteSourceWorkout()
+    const type = normalizeWorkoutType(sourceWorkout.type || route.query.type || 'push')
+    const result = saveFavoriteWorkout({
+      userId: getFavoriteUserId(),
+      type,
+      name: nameCandidate,
+      workout: sourceWorkout
+    })
+
+    if (!result.success) {
+      saveMsg.value = result.message || t('workoutDetail.favoriteSaveFailed')
+      saveError.value = true
+      return false
+    }
+
+    favoriteName.value = ''
+    saveMsg.value = t('workoutDetail.favoriteSaved')
+    saveError.value = false
+    return true
+  } catch {
+    saveMsg.value = t('workoutDetail.favoriteSaveFailed')
+    saveError.value = true
+    return false
+  } finally {
+    favoriteSaving.value = false
+  }
+}
+
+function openFavoriteNameModal() {
+  favoriteName.value = normalizeFavoriteName(favoriteName.value || workout.value?.name || '')
+  showFavoriteNameModal.value = true
+}
+
+function confirmFavoriteSave() {
+  const ok = saveAsFavorite()
+  if (ok) {
+    showFavoriteNameModal.value = false
+  }
+}
+
 function onDragStart(index) { if (!isReordering.value) return; draggingIndex.value = index }
 function onDragOver(index) { if (!isReordering.value) return; dropTargetIndex.value = index }
 function onDragLeave(index) { if (!isReordering.value) return; if (dropTargetIndex.value === index) dropTargetIndex.value = null }
@@ -1526,19 +1745,26 @@ async function persistInProgressDraft(reason = '') {
 function onVisibilityChange() {
   try {
     if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+      writeDetailViewState('visibility-hidden')
       persistInProgressDraft('visibility-hidden').catch(() => {})
     }
   } catch {}
 }
 
 function onPageHide() {
+  writeDetailViewState('pagehide')
   persistInProgressDraft('pagehide').catch(() => {})
+}
+
+function onWindowScroll() {
+  scheduleViewStatePersist('scroll')
 }
 
 // Watchers for auto-scroll and dirty tracking
 onMounted(async () => {
   window.addEventListener('beforeunload', beforeUnloadHandler)
   window.addEventListener('pagehide', onPageHide)
+  window.addEventListener('scroll', onWindowScroll, { passive: true })
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', onVisibilityChange)
   }
@@ -1553,6 +1779,7 @@ onMounted(async () => {
     setTimeout(scrollToExercises, 50)
     didAutoScroll.value = true
   }
+  restoreDetailViewState()
 })
 
 watch(() => workout.value?.exercises?.length || 0, async (len) => {
@@ -1582,6 +1809,7 @@ function beforeUnloadHandler(e) {
   if (!workout.value || workout.value.completed === true) return
   if (!(shouldKeepAsDraft(workout.value) || isDirty.value)) return
   try {
+    writeDetailViewState('beforeunload')
     writeDraftSessionSnapshot()
     logger.debug('beforeunload snapshot saved to sessionStorage (detail)')
   } catch (err) {
@@ -1592,6 +1820,7 @@ function beforeUnloadHandler(e) {
 }
 
 onBeforeRouteLeave(async () => {
+  writeDetailViewState('route-leave')
   await persistInProgressDraft('route-leave')
   return true
 })
@@ -1599,8 +1828,14 @@ onBeforeRouteLeave(async () => {
 onBeforeUnmount(() => {
   window.removeEventListener('beforeunload', beforeUnloadHandler)
   window.removeEventListener('pagehide', onPageHide)
+  window.removeEventListener('scroll', onWindowScroll)
   if (typeof document !== 'undefined') {
     document.removeEventListener('visibilitychange', onVisibilityChange)
+  }
+  writeDetailViewState('before-unmount')
+  if (viewStatePersistTimer) {
+    clearTimeout(viewStatePersistTimer)
+    viewStatePersistTimer = null
   }
   if (!suppressDraftPersistence.value) {
     persistInProgressDraft('before-unmount').catch(() => {})
@@ -1656,7 +1891,12 @@ onBeforeUnmount(() => {
 .picker-list { padding: 8px 4px; }
 .picker-loading { text-align: center; padding: 16px; color: var(--muted); }
 /* styles unchanged (same as provided) */
-.workout-detail { min-height: 100vh; background: var(--bg); color: var(--fg); padding-bottom: 80px; }
+.workout-detail {
+  min-height: 100vh;
+  background: var(--bg);
+  color: var(--fg);
+  padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px));
+}
 .content { padding: 0 clamp(14px, 3.5vw, 24px); }
 .loading, .empty, .error { text-align: center; color: var(--muted); padding: 40px 0; }
 .workout-header { margin-bottom: 16px; }
@@ -1733,6 +1973,16 @@ onBeforeUnmount(() => {
 .spin-btn:active { transform: scale(0.98); }
 .actions { margin-top: 12px; display: flex; gap: 8px; }
 .primary { width: 100%; padding: 12px; border-radius: 10px; border: none; cursor: pointer; background: var(--accent); color: var(--accent-contrast); font-weight: 600; }
+.secondary { padding: 12px; border-radius: 10px; border: 1px solid var(--line-strong); cursor: pointer; background: var(--bg-panel); color: var(--fg-strong); font-weight: 600; }
+.favorite-save {
+  border-color: color-mix(in srgb, var(--accent) 60%, var(--line-strong));
+  color: var(--accent);
+}
+.favorite-save:hover {
+  background: color-mix(in srgb, var(--accent) 10%, var(--bg-panel));
+}
+.favorite-modal-field { display: flex; flex-direction: column; gap: 6px; color: var(--fg-strong); font-size: 0.85rem; }
+.favorite-modal-input { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line-soft); background: var(--bg-panel); color: var(--fg); }
 .add-exercise-btn {
   background: transparent;
   color: #4b82ff;

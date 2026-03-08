@@ -14,6 +14,7 @@ import BottomNav from '@/components/BottomNav.vue';
 import UpgradeModal from '@/components/UpgradeModal.vue';
 import { getAllExercisesOffline, saveWorkoutOffline } from '@/utils/offlineStorage';
 import { getMergedSortedExercises } from '@/utils/exerciseList';
+import { searchAndRankExercises } from '@/utils/exerciseSearch'
 import { logger } from '@/utils/logger'
 
 
@@ -61,6 +62,7 @@ import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
 const showEquipmentFilter = ref(false)
 const selectedEquipment = ref('')
 const QUICK_PREFILL_KEY = 'quick_workout_prefill'
+const favoriteAutostartTriggered = ref(false)
 // Alle Equipment-Typen aus den Exercises extrahieren
 const normalizedExercises = ref([])
 const allEquipmentTypes = computed(() => {
@@ -132,7 +134,9 @@ function consumeQuickPrefill() {
 // --- Draft-Logik ---
 function getDraftId() {
 	const currentUserId = userIdComputed.value || 'guest';
-	return `draft-${currentUserId}-${selectedType.value}`;
+	const type = String(selectedType.value || 'push')
+	const nonce = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+	return `draft-${currentUserId}-${type}-${nonce}`;
 }
 
 // --- Workout Types ---
@@ -197,6 +201,14 @@ onMounted(async () => {
 		if (qType === 'fullbody') selectedEquipment.value = ''
 	}
 	consumeQuickPrefill()
+	if (String(route.query?.favoriteStart || '') === '1' && !favoriteAutostartTriggered.value) {
+		favoriteAutostartTriggered.value = true
+		setTimeout(() => {
+			if (selectedExercises.value.length > 0 && !creating.value) {
+				createWorkout()
+			}
+		}, 0)
+	}
 	// Affirmation
 	const beliefsDe = [
 		'Jede Wiederholung bringt dich deinem Ziel näher.',
@@ -253,13 +265,16 @@ async function loadExercises() {
 }
 const filteredExercises = computed(() => {
 	const term = search.value.trim().toLowerCase()
-	const base = !term ? exercises.value : exercises.value.filter(e =>
-		(e.displayName || e.name || '').toLowerCase().includes(term) ||
-		(e.muscleGroup || '').toLowerCase().includes(term) ||
-		(e.equipment || '').toLowerCase().includes(term)
-	)
-	// preserve base ordering (already sorted by displayName in util)
-	return base
+	const list = Array.isArray(exercises.value) ? exercises.value : []
+	return searchAndRankExercises(list, term, {
+		getPrimaryText: (exercise) => exercise?.displayName || exercise?.name || '',
+		getSecondaryTexts: (exercise) => [
+			exercise?.name_en || '',
+			exercise?.muscleGroup || '',
+			exercise?.equipment || '',
+			exercise?.category || ''
+		]
+	})
 })
 const selectedExerciseIds = computed(() => selectedExercises.value.map(e => e._id || e.exerciseId || e.id).filter(Boolean))
 
@@ -321,23 +336,43 @@ async function createWorkout() {
 			date: new Date().toISOString(),
 			completed: false
 		};
+		const tempId = getDraftId();
+		const tempWorkout = {
+			...workoutData,
+			_id: tempId,
+			_isDraft: true,
+			isDraft: true,
+			completed: false,
+			updatedAt: Date.now()
+		};
+		await saveWorkoutOffline(tempWorkout);
+		try {
+			sessionStorage.setItem('workout_detail_draft', JSON.stringify({
+				...tempWorkout,
+				timestamp: Date.now()
+			}))
+		} catch {}
+		const existingIdx = userStore.workouts.findIndex(w => String(w?._id || '') === String(tempId))
+		if (existingIdx !== -1) {
+			userStore.workouts[existingIdx] = { ...userStore.workouts[existingIdx], ...tempWorkout }
+		} else {
+			userStore.workouts.unshift(tempWorkout)
+		}
+		logger.debug('[WorkoutBuilder] immediate temp draft prepared', { tempId })
+		await router.push({ name: 'workout-detail', params: { id: tempId } });
+		logger.debug('[WorkoutBuilder] navigated to temp workout detail', { tempId })
+
 		let token = await getIdToken();
 		if (!token) {
 			errorMsg.value = t('builder.authLoading');
+			toast.success(t('builder.created'))
 			return;
 		}
-		// Draft mit eindeutiger ID verwenden
-		const tempId = getDraftId();
-		const tempWorkout = { ...workoutData, _id: tempId, _isDraft: true };
 		logger.debug('[WorkoutBuilder] createWorkout start', {
 			tempId,
 			type: workoutData.type,
 			exercises: workoutData.exercises?.length || 0
 		})
-		await saveWorkoutOffline(tempWorkout);
-		logger.debug('[WorkoutBuilder] temp workout saved', { tempId })
-		await router.push({ name: 'workout-detail', params: { id: tempId } });
-		logger.debug('[WorkoutBuilder] navigated to temp workout detail', { tempId })
 		toast.success(t('builder.created'));
 		// Backend-Speichern im Hintergrund
 		userStore.createWorkout(workoutData, token).then(async created => {
@@ -351,6 +386,13 @@ async function createWorkout() {
 				// Workout bleibt bis zum Abschluss als Draft markiert
 				const cleanWorkout = { ...workoutData, _id: created._id, _isDraft: true, isDraft: true };
 				await saveWorkoutOffline(cleanWorkout);
+				try {
+					sessionStorage.setItem('workout_detail_draft', JSON.stringify({
+						...cleanWorkout,
+						completed: false,
+						timestamp: Date.now()
+					}))
+				} catch {}
 				logger.debug('[WorkoutBuilder] real workout cached offline', { realId: created._id })
 
 				try {

@@ -35,6 +35,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { logger } from '@/utils/logger'
 import { getAuthToken } from '@/utils/authToken'
+import { fetchSubscriptionStatus, upgradeSubscriptionRequest } from '@/api/subscription'
 // Avoid calling useClerk/useAuth here: Pinia stores run outside a component setup
 // context and calling useClerk() may throw. We will rely on getAuthToken()
 // which falls back to window.Clerk or cached tokens.
@@ -45,6 +46,7 @@ export const useSubscriptionStore = defineStore('subscription', () => {
   const subscription = ref({
     plan: 'free',
     status: 'active',
+    billingCycle: null,
     expiresAt: null,
     features: []
   })
@@ -54,6 +56,9 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     workoutsThisMonth: 0,
     totalWorkouts: 0,
     lastWorkoutDate: null,
+    aiWeeklyCount: 0,
+    aiWeeklyLimit: 1,
+    aiWeekWindowStart: null,
     quickGenerationsThisMonth: 0,
     quickGenerationMonth: null
   })
@@ -120,6 +125,7 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     return {
       plan: validPlan,
       status: 'active',
+      billingCycle: validPlan === 'free' ? null : 'monthly',
       expiresAt: validPlan === 'free' ? null : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
       features: []
     }
@@ -150,9 +156,46 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     const savedSubscription = localStorage.getItem('bro_split_subscription')
     if (savedSubscription) {
       subscription.value = JSON.parse(savedSubscription)
-      logger.debug('🧪 Demo Mode: Loaded subscription from localStorage:', subscription.value.plan)
     } else {
       applyPlan(planOverride || 'free', { persist: true, reason: 'bootstrap' })
+    }
+
+    try {
+      const token = await getAuthToken()
+      if (token) {
+        const remote = await fetchSubscriptionStatus(token)
+        const remoteSub = remote?.subscription || null
+        const remoteUsage = remote?.usage || null
+
+        if (remoteSub && remoteSub.plan) {
+          subscription.value = {
+            plan: remoteSub.plan,
+            status: remoteSub.status || 'active',
+            billingCycle: remoteSub.billingCycle || null,
+            expiresAt: remoteSub.expiresAt || null,
+            features: Array.isArray(remoteSub.features) ? remoteSub.features : []
+          }
+          localStorage.setItem('bro_split_subscription', JSON.stringify(subscription.value))
+        }
+
+        if (remoteUsage) {
+          usage.value = {
+            ...usage.value,
+            workoutsThisWeek: Number(remoteUsage.workoutsThisWeek) || 0,
+            workoutsThisMonth: Number(remoteUsage.workoutsThisMonth) || 0,
+            totalWorkouts: Number(remoteUsage.totalWorkouts) || 0,
+            lastWorkoutDate: remoteUsage.lastWorkoutDate || null,
+            aiWeeklyCount: Number(remoteUsage?.ai?.weeklyCount) || 0,
+            aiWeeklyLimit: Number.isFinite(Number(remoteUsage?.ai?.weeklyLimit))
+              ? Number(remoteUsage?.ai?.weeklyLimit)
+              : -1,
+            aiWeekWindowStart: remoteUsage?.ai?.weekWindowStart || null
+          }
+          persistUsage()
+        }
+      }
+    } catch (error) {
+      logger.warn('⚠️ Subscription status fallback to local cache:', error?.message)
     }
 
     const effectiveOverride = planOverride || devPlanOverride.value
@@ -172,11 +215,30 @@ export const useSubscriptionStore = defineStore('subscription', () => {
   }
   
   // Upgrade zu Pro/Elite
-  // Offline/Demo: Upgrade nur lokal simulieren
   const upgradeSubscription = async (planType, paymentMethod) => {
-    logger.debug('🧪 Demo Mode: Simulating upgrade to', planType)
-    const snapshot = applyPlan(planType, { persist: true, reason: 'upgrade' })
-    logger.debug('🧪 Demo Mode: Upgrade completed and saved to localStorage')
+    const cycle = paymentMethod?.cycle === 'yearly' ? 'yearly' : 'monthly'
+    const token = await getAuthToken()
+
+    if (!token) {
+      const snapshot = applyPlan(planType, { persist: true, reason: 'upgrade-offline-fallback' })
+      return { subscription: snapshot, success: true, demo: true }
+    }
+
+    const result = await upgradeSubscriptionRequest(token, { plan: planType, cycle })
+    const remoteSub = result?.subscription
+    if (remoteSub?.plan) {
+      subscription.value = {
+        plan: remoteSub.plan,
+        status: remoteSub.status || 'active',
+        billingCycle: remoteSub.billingCycle || cycle,
+        expiresAt: remoteSub.expiresAt || null,
+        features: Array.isArray(remoteSub.features) ? remoteSub.features : []
+      }
+      localStorage.setItem('bro_split_subscription', JSON.stringify(subscription.value))
+      return { ...result, success: true }
+    }
+
+    const snapshot = applyPlan(planType, { persist: true, reason: 'upgrade-response-fallback' })
     return { subscription: snapshot, success: true, demo: true }
   }
 
@@ -207,6 +269,18 @@ export const useSubscriptionStore = defineStore('subscription', () => {
   const trackQuickGeneration = () => {
     ensureQuickGeneratorMonthWindow()
     usage.value.quickGenerationsThisMonth += 1
+    usage.value.aiWeeklyCount = (Number(usage.value.aiWeeklyCount) || 0) + 1
+    persistUsage()
+  }
+
+  const applyAiUsageSnapshot = (ai = null) => {
+    if (!ai || typeof ai !== 'object') return
+    usage.value = {
+      ...usage.value,
+      aiWeeklyCount: Number(ai.weeklyCount) || 0,
+      aiWeeklyLimit: Number.isFinite(Number(ai.weeklyLimit)) ? Number(ai.weeklyLimit) : -1,
+      aiWeekWindowStart: ai.weekWindowStart || usage.value.aiWeekWindowStart
+    }
     persistUsage()
   }
   
@@ -243,32 +317,33 @@ export const useSubscriptionStore = defineStore('subscription', () => {
   })
 
   const canUseQuickGenerator = computed(() => {
-    ensureQuickGeneratorMonthWindow()
-    const currentLimits = limits.value[subscription.value.plan]
-    if (currentLimits.maxQuickGenerationsPerMonth === -1) return true
-    return usage.value.quickGenerationsThisMonth < currentLimits.maxQuickGenerationsPerMonth
+    if (subscription.value.plan !== 'free') return true
+    const limit = Number(usage.value.aiWeeklyLimit)
+    if (!Number.isFinite(limit) || limit < 0) return true
+    return (Number(usage.value.aiWeeklyCount) || 0) < limit
   })
 
   const quickGenerationsRemaining = computed(() => {
-    ensureQuickGeneratorMonthWindow()
-    const currentLimits = limits.value[subscription.value.plan]
-    if (currentLimits.maxQuickGenerationsPerMonth === -1) return Infinity
-    return Math.max(0, currentLimits.maxQuickGenerationsPerMonth - usage.value.quickGenerationsThisMonth)
+    if (subscription.value.plan !== 'free') return Infinity
+    const limit = Number(usage.value.aiWeeklyLimit)
+    if (!Number.isFinite(limit) || limit < 0) return Infinity
+    return Math.max(0, limit - (Number(usage.value.aiWeeklyCount) || 0))
   })
 
   const quickGeneratorResetDate = computed(() => {
-    ensureQuickGeneratorMonthWindow()
-    const [year, month] = String(usage.value.quickGenerationMonth || getMonthKey()).split('-').map((part) => Number(part))
-    if (!Number.isFinite(year) || !Number.isFinite(month)) {
-      const now = new Date()
-      return new Date(now.getFullYear(), now.getMonth() + 1, 1)
+    const startRaw = usage.value.aiWeekWindowStart
+    const start = startRaw ? new Date(startRaw) : null
+    if (start && !Number.isNaN(start.getTime())) {
+      const end = new Date(start)
+      end.setUTCDate(end.getUTCDate() + 7)
+      return end
     }
-    return new Date(year, month, 1)
+    const now = new Date()
+    return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7)
   })
 
   const quickGenerationsUsedThisMonth = computed(() => {
-    ensureQuickGeneratorMonthWindow()
-    return usage.value.quickGenerationsThisMonth
+    return Number(usage.value.aiWeeklyCount) || 0
   })
   
   const shouldShowUpgrade = computed(() => {
@@ -319,6 +394,7 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     upgradeSubscription,
     trackWorkoutCreated,
     trackQuickGeneration,
+    applyAiUsageSnapshot,
     resetToFree,
     setDevPlanOverride,
     clearDevPlanOverride,

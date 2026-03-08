@@ -4,7 +4,7 @@
 
     <main class="stats-content">
       <section class="section">
-        <RecentWorkouts :workouts="recentWorkoutsSource" :show-view-all="false" />
+        <RecentWorkouts :workouts="recentWorkoutsSource" :show-view-all="false" @delete="handleDeleteRecentWorkout" />
       </section>
 
       <section v-if="!isPro" class="pro-banner">
@@ -59,6 +59,14 @@
             <span class="summary-sub">bester Satz</span>
           </div>
         </div>
+      </section>
+
+      <section v-if="analyticsLocked" class="panel milestone">
+        <div>
+          <h3>Erweiterte Analyse ist Pro-Feature</h3>
+          <p>Für Langzeit-Progression und Trainingsanalysen brauchst du Pro. Basis-Stats bleiben weiterhin sichtbar.</p>
+        </div>
+        <button class="cta-inline" type="button" @click="openUpgrade('general')">Pro freischalten</button>
       </section>
 
       <div v-if="showLoading" class="loading-section">
@@ -226,23 +234,33 @@ import EmptyState from '@/components/EmptyState.vue'
 import UpgradeModal from '@/components/UpgradeModal.vue'
 import RecentWorkouts from '@/components/RecentWorkouts.vue'
 import { logger } from '@/utils/logger'
-import { isOnline, getAllWorkoutsOffline, OFFLINE_WORKOUTS_UPDATED_EVENT } from '@/utils/offlineStorage'
+import { isOnline, getAllWorkoutsOffline, deleteWorkoutOffline, OFFLINE_WORKOUTS_UPDATED_EVENT } from '@/utils/offlineStorage'
 import { resolveWorkoutNotes } from '@/utils/workoutNotes'
+import { deleteWorkout as deleteWorkoutApi } from '@/api/workouts'
 
 const { t, locale } = useI18n()
 const store = useUserStore()
 const settings = useSettingsStore()
-const { getIdToken, onAuthStateChanged } = useFirebaseAuth()
+const { getIdToken, onAuthStateChanged, getCurrentUser } = useFirebaseAuth()
 const authStore = useAuthStore()
 const subscriptionStore = useSubscriptionStore()
 
 const loading = ref(true)
 const offlineWorkouts = ref([])
 const authToken = ref(null)
+
+function getWorkoutIdentifier(workout) {
+  const candidates = [workout?._id, workout?.id, workout?.workoutId]
+  const resolved = candidates
+    .map((value) => String(value || '').trim())
+    .find(Boolean)
+  return resolved || ''
+}
+
 const statsWorkouts = computed(() => {
   const list = Array.isArray(offlineWorkouts.value) ? offlineWorkouts.value : []
   return list
-    .filter(item => !(item?._isDraft))
+    .filter(item => !(item?._isDraft || item?.isDraft))
     .map(item => ({
       ...item,
       notes: resolveWorkoutNotes(item)
@@ -267,6 +285,7 @@ const activeStats = computed(() => derivedStats.value || progressStats.value || 
 const statsWeeks = computed(() => Array.isArray(activeStats.value?.weeks) ? activeStats.value.weeks : [])
 const weeklyGoal = computed(() => Number(settings.weeklyGoal) || 0)
 const isPro = computed(() => subscriptionStore.hasFeature('hasAdvancedStats'))
+const analyticsLocked = computed(() => !isPro.value && Number(store.statsErrorCode) === 403)
 const showUpgradeModal = ref(false)
 const selectedRangeDays = ref(30)
 
@@ -494,9 +513,13 @@ async function loadData() {
         .catch((err) => logger.debug('[Stats] Hintergrund-Sync fehlgeschlagen', err))
     }
 
-    store.loadStats(token, { rangeDays: selectedRangeDays.value }).catch((err) => {
-      logger.warn('[Stats] Laden der Progress-Stats fehlgeschlagen', err)
-    })
+    if (isPro.value) {
+      store.loadStats(token, { rangeDays: selectedRangeDays.value }).catch((err) => {
+        logger.warn('[Stats] Laden der Progress-Stats fehlgeschlagen', err)
+      })
+    } else {
+      store.stats = null
+    }
   } catch (error) {
     logger.error('Fehler beim Laden der Stats', error)
   } finally {
@@ -518,7 +541,7 @@ function handleOfflineWorkoutsUpdated() {
 }
 
 watch(selectedRangeDays, async (next) => {
-  if (!isOnline()) return
+  if (!isOnline() || !isPro.value) return
   const token = await getIdToken().catch(() => null)
   await store.loadStats(token, { rangeDays: next })
 })
@@ -544,6 +567,56 @@ function handleLockedClick() {
 function handleUpgraded() {
   if (selectedRangeDays.value !== 30) return
   selectedRangeDays.value = 90
+  loadData()
+}
+
+async function handleDeleteRecentWorkout(workout) {
+  const workoutId = getWorkoutIdentifier(workout)
+  if (!workoutId) return
+  const isLocalOnlyId = workoutId.startsWith('offline_') || workoutId.startsWith('draft-') || workoutId === 'draft' || workoutId === 'workout_detail_draft'
+
+  const workoutTitle = String(workout?.name || '').trim() || t('recent.title')
+  const confirmed = typeof window !== 'undefined'
+    ? window.confirm(t('recent.deleteConfirm', { name: workoutTitle }))
+    : true
+  if (!confirmed) return
+
+  try {
+    // Sofort aus der UI entfernen, damit der Delete direkt sichtbar ist.
+    offlineWorkouts.value = (offlineWorkouts.value || []).filter(item => getWorkoutIdentifier(item) !== workoutId)
+
+    let token = null
+    if (isOnline() && !isLocalOnlyId) {
+      token = authToken.value || await getIdToken().catch(() => null)
+      if (!token) {
+        const currentUser = getCurrentUser ? getCurrentUser() : null
+        if (currentUser?.getIdToken) {
+          token = await currentUser.getIdToken(true).catch(() => null)
+        }
+      }
+    }
+    await deleteWorkoutApi(workoutId, token)
+    await loadOfflineWorkouts()
+    if (isOnline()) {
+      store.loadWorkouts(token, { force: true })
+        .then(() => loadOfflineWorkouts())
+        .catch((err) => logger.debug('[Stats] Hintergrund-Sync nach Delete fehlgeschlagen', err))
+    }
+    if (isPro.value) {
+      store.loadStats(token, { rangeDays: selectedRangeDays.value })
+        .catch((err) => logger.debug('[Stats] Stats-Refresh nach Delete fehlgeschlagen', err))
+    }
+  } catch (error) {
+    logger.error('[Stats] Workout löschen fehlgeschlagen', error)
+    try {
+      await deleteWorkoutOffline(workoutId)
+      await loadOfflineWorkouts()
+      return
+    } catch {}
+    if (typeof window !== 'undefined') {
+      window.alert(t('recent.deleteFailed'))
+    }
+  }
 }
 
 function calcWorkoutVolume(workout) {

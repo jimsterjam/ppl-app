@@ -5,6 +5,7 @@ import { firebaseAuthMiddleware } from '../middleware/firebaseAuth.js';
 import { OpenAI } from 'openai';
 import exercises from '../data/exercises.js';
 import Exercise from '../models/Exercise.js';
+import UserProfile from '../models/UserProfile.js';
 import { logger } from '../utils/logger.js';
 
 const router = express.Router();
@@ -75,6 +76,7 @@ const exerciseNameMapping = {
 
 const DEFAULT_PROGRESS_RANGE_DAYS = 120;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const FREE_AI_WEEKLY_LIMIT = 1;
 const muscleLabelMap = {
   push: 'Push',
   pull: 'Pull',
@@ -82,6 +84,80 @@ const muscleLabelMap = {
   core: 'Core',
   cardio: 'Cardio'
 };
+
+function isPaidPlan(plan = 'free') {
+  return plan === 'pro' || plan === 'elite';
+}
+
+async function getOrCreateUserProfile(uid) {
+  if (!uid) return null;
+  let profile = await UserProfile.findOne({ uid });
+  if (profile) return profile;
+  profile = await UserProfile.create({ uid });
+  return profile;
+}
+
+async function getEntitlements(userId) {
+  const profile = await getOrCreateUserProfile(userId);
+  const plan = profile?.subscription?.plan || 'free';
+  const paid = isPaidPlan(plan);
+  return {
+    profile,
+    plan,
+    paid,
+    canUseAnalytics: paid,
+    weeklyAiLimit: paid ? Number.POSITIVE_INFINITY : FREE_AI_WEEKLY_LIMIT
+  };
+}
+
+function getCurrentAiWeekWindowStart() {
+  return startOfIsoWeek(new Date());
+}
+
+function getAiWeekState(profile) {
+  const nowWindow = getCurrentAiWeekWindowStart();
+  const savedWindowRaw = profile?.aiUsage?.weekWindowStart;
+  const savedWindow = savedWindowRaw ? startOfIsoWeek(savedWindowRaw) : null;
+  if (!savedWindow || savedWindow.getTime() !== nowWindow.getTime()) {
+    return { weekWindowStart: nowWindow, weeklyCount: 0 };
+  }
+  return {
+    weekWindowStart: savedWindow,
+    weeklyCount: Math.max(0, Number(profile?.aiUsage?.weeklyCount) || 0)
+  };
+}
+
+function canUseAiThisWeek(entitlements) {
+  if (!entitlements?.profile) return false;
+  if (!Number.isFinite(entitlements.weeklyAiLimit)) return true;
+  const usage = getAiWeekState(entitlements.profile);
+  return usage.weeklyCount < entitlements.weeklyAiLimit;
+}
+
+async function markAiUse(entitlements) {
+  if (!entitlements?.profile) return;
+  if (!Number.isFinite(entitlements.weeklyAiLimit)) return;
+  const usage = getAiWeekState(entitlements.profile);
+  entitlements.profile.aiUsage = {
+    weekWindowStart: usage.weekWindowStart,
+    weeklyCount: usage.weeklyCount + 1
+  };
+  await entitlements.profile.save();
+}
+
+function getAiLimitSnapshot(entitlements) {
+  if (!entitlements?.profile) return null;
+  const usage = getAiWeekState(entitlements.profile);
+  const limit = entitlements.weeklyAiLimit;
+  const remaining = Number.isFinite(limit) ? Math.max(0, limit - usage.weeklyCount) : null;
+  return {
+    plan: entitlements.plan,
+    weekWindowStart: usage.weekWindowStart,
+    weeklyCount: usage.weeklyCount,
+    weeklyLimit: Number.isFinite(limit) ? limit : null,
+    weeklyRemaining: remaining
+  };
+}
 
 function startOfIsoWeek(dateInput) {
   const date = new Date(dateInput);
@@ -348,15 +424,68 @@ function sanitizeQuickGeneratorRequest(body) {
     return allowed.includes(normalized) ? normalized : fallback;
   };
 
+  const normalizeOptionalNumber = (value) => {
+    if (value === null || value === undefined || value === '') return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
+  };
+
+  const normalizeEquipmentAvailability = (value) => {
+    const allowed = ['barbell', 'dumbbells', 'machines', 'cable_station', 'pull_up_bar', 'none'];
+    if (!Array.isArray(value)) return [];
+    return [...new Set(value
+      .map((entry) => (typeof entry === 'string' ? entry.trim().toLowerCase() : ''))
+      .filter((entry) => allowed.includes(entry)))];
+  };
+
   return {
     durationMinutes: clampNumber(body.durationMinutes, 45, 20, 120),
-    goal: normalizeEnum(body.goal, ['muscle_building', 'strength'], 'muscle_building'),
+    goal: normalizeEnum(body.goal, ['muscle_building', 'hypertrophy', 'strength'], 'muscle_building'),
     gender: normalizeEnum(body.gender, ['male', 'female', 'diverse'], 'male'),
     bodyweightKg: clampNumber(body.bodyweightKg, 80, 35, 250),
-    level: normalizeEnum(body.level, ['beginner', 'advanced'], 'beginner'),
-    equipmentMode: normalizeEnum(body.equipmentMode, ['gym_only', 'gym_plus_bodyweight'], 'gym_plus_bodyweight'),
-    requestedType: normalizeEnum(body.requestedType, ['push', 'pull', 'legs', 'fullbody'], 'fullbody')
+    level: normalizeEnum(body.level, ['beginner', 'intermediate', 'advanced'], 'beginner'),
+    trainingFrequencyPerWeek: clampNumber(body.trainingFrequencyPerWeek, 3, 1, 14),
+    equipmentMode: normalizeEnum(body.equipmentMode, ['gym_only', 'gym_plus_bodyweight', 'bodyweight_only'], 'gym_plus_bodyweight'),
+    requestedType: normalizeEnum(body.requestedType, ['push', 'pull', 'legs', 'fullbody'], 'fullbody'),
+    equipmentAvailability: normalizeEquipmentAvailability(body.equipmentAvailability),
+    performance: {
+      maxStrictPullups: normalizeOptionalNumber(body.maxStrictPullups),
+      maxStrictDips: normalizeOptionalNumber(body.maxStrictDips),
+      maxStrictPushups: normalizeOptionalNumber(body.maxStrictPushups),
+      squat1RM: normalizeOptionalNumber(body.squat1RM),
+      bench1RM: normalizeOptionalNumber(body.bench1RM),
+      deadlift1RM: normalizeOptionalNumber(body.deadlift1RM),
+      squat5RM: normalizeOptionalNumber(body.squat5RM),
+      bench5RM: normalizeOptionalNumber(body.bench5RM),
+      deadlift5RM: normalizeOptionalNumber(body.deadlift5RM)
+    },
+    injuries: typeof body.injuries === 'string' ? body.injuries.trim() : '',
+    restrictions: typeof body.restrictions === 'string' ? body.restrictions.trim() : '',
+    requireCompleteInput: body.requireCompleteInput === true
   };
+}
+
+function getQuickGeneratorMissingInputs(rawBody = {}, context = {}) {
+  const missing = [];
+  if (!rawBody.goal) missing.push('goal');
+  if (!rawBody.level) missing.push('level');
+  if (!rawBody.requestedType) missing.push('requestedType');
+  if (!rawBody.equipmentMode) missing.push('equipmentMode');
+  if (!rawBody.durationMinutes) missing.push('durationMinutes');
+  if (!rawBody.trainingFrequencyPerWeek && !context.trainingFrequencyPerWeek) missing.push('trainingFrequencyPerWeek');
+  if (!Array.isArray(rawBody.equipmentAvailability) || rawBody.equipmentAvailability.length === 0) {
+    missing.push('equipmentAvailability');
+  }
+  if (rawBody.maxStrictPullups === undefined || rawBody.maxStrictPullups === null || rawBody.maxStrictPullups === '') {
+    missing.push('maxStrictPullups');
+  }
+  if (rawBody.maxStrictDips === undefined || rawBody.maxStrictDips === null || rawBody.maxStrictDips === '') {
+    missing.push('maxStrictDips');
+  }
+  if (rawBody.maxStrictPushups === undefined || rawBody.maxStrictPushups === null || rawBody.maxStrictPushups === '') {
+    missing.push('maxStrictPushups');
+  }
+  return missing;
 }
 
 // Alle Workouts für den eingeloggten User holen
@@ -374,6 +503,14 @@ router.get("/", firebaseAuthMiddleware, async (req, res) => {
 router.get("/stats/progress", firebaseAuthMiddleware, async (req, res) => {
   try {
     const { userId } = req.auth;
+    const entitlements = await getEntitlements(userId);
+    if (!entitlements.canUseAnalytics) {
+      return res.status(403).json({
+        error: 'Progress analysis requires Pro subscription',
+        code: 'ANALYTICS_REQUIRES_PRO',
+        entitlement: { plan: entitlements.plan }
+      });
+    }
     const rangeDays = Math.min(
       365,
       Math.max(30, Number(req.query.rangeDays) || DEFAULT_PROGRESS_RANGE_DAYS)
@@ -472,13 +609,30 @@ router.get("/stats/progress", firebaseAuthMiddleware, async (req, res) => {
 router.post('/quick-generator', aiAuthMiddleware, async (req, res) => {
   const requestId = `quick_gen_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   try {
-    const context = sanitizeQuickGeneratorRequest(req.body || {});
+    const userId = req.auth?.userId || 'test_user';
+    const entitlements = await getEntitlements(userId);
+    const rawBody = req.body || {};
+    const context = sanitizeQuickGeneratorRequest(rawBody);
+    const missingRequiredInputs = getQuickGeneratorMissingInputs(rawBody, context);
+
+    if (context.requireCompleteInput && missingRequiredInputs.length > 0) {
+      return res.status(422).json({
+        error: 'Missing required input for professional workout generation',
+        code: 'WORKOUT_INPUT_INCOMPLETE',
+        missingRequiredInputs
+      });
+    }
+
     const openaiClient = await initializeOpenAI();
+    const aiAllowedForUser = canUseAiThisWeek(entitlements);
 
     let suggestion = null;
-    if (openaiClient) {
+    if (openaiClient && aiAllowedForUser) {
       try {
         suggestion = await generateQuickGeneratorWithOpenAI(context, openaiClient);
+        if (suggestion) {
+          await markAiUse(entitlements);
+        }
       } catch (error) {
         logger.error('❌ Quick generator OpenAI error', { requestId, message: error?.message });
       }
@@ -489,6 +643,18 @@ router.post('/quick-generator', aiAuthMiddleware, async (req, res) => {
     }
 
     const normalized = normalizeQuickGeneratorResponse(suggestion, context);
+    normalized.metadata = {
+      ...(normalized.metadata || {}),
+      aiUsage: getAiLimitSnapshot(entitlements),
+      generationMode: suggestion?.metadata?.mode || (aiAllowedForUser ? 'auto' : 'demo_quota_limited'),
+      missingRequiredInputs,
+      ruleset: {
+        professionalMode: true,
+        strictStructure: true,
+        performanceFiltersApplied: true,
+        timeAdaptationApplied: true
+      }
+    };
     return res.json(normalized);
   } catch (error) {
     logger.error('❌ Quick generator route error', { requestId, message: error?.message });
@@ -713,12 +879,14 @@ router.post("/ai-suggestion", aiAuthMiddleware, async (req, res) => {
 
   try {
     const userId = req.auth?.userId || 'test_user';
+    const entitlements = await getEntitlements(userId);
     const context = sanitizeWorkoutRequest(req.body || {});
     const requestedMode = (context.mode || req.header('x-ai-mode') || 'auto').toLowerCase();
     delete context.mode;
 
     const forceDemo = requestedMode === 'demo';
-    const tryRemote = !forceDemo && canUseRemoteAI(userId);
+    const aiAllowedForUser = canUseAiThisWeek(entitlements);
+    const tryRemote = !forceDemo && aiAllowedForUser && canUseRemoteAI(userId);
 
     logger.debug('🤖 AI Suggestion requested', {
       requestId,
@@ -760,6 +928,7 @@ router.post("/ai-suggestion", aiAuthMiddleware, async (req, res) => {
 
           responsePayload = aiSuggestion;
           modeUsed = 'remote';
+          await markAiUse(entitlements);
         } catch (aiError) {
           logger.error('❌ OpenAI Error:', { requestId, message: aiError.message });
         }
@@ -803,6 +972,24 @@ router.post("/ai-suggestion", aiAuthMiddleware, async (req, res) => {
       responsePayload = demoSuggestion;
       modeUsed = 'demo';
     }
+
+    responsePayload = enforceWorkoutProgrammingRules(
+      responsePayload,
+      {
+        requestedType: context.focus,
+        focus: context.focus,
+        goal: Number(context.intensity) >= 4 ? 'strength' : 'muscle_building',
+        intensity: context.intensity,
+        timeAvailable: context.timeAvailable
+      },
+      { source: 'ai-suggestion' }
+    );
+
+    responsePayload.metadata = {
+      ...(responsePayload.metadata || {}),
+      aiUsage: getAiLimitSnapshot(entitlements),
+      quotaLimited: !aiAllowedForUser && !isPaidPlan(entitlements.plan)
+    };
 
     logger.debug('✅ AI Suggestion fulfilled', {
       requestId,
@@ -951,6 +1138,13 @@ async function generateQuickGeneratorWithOpenAI(context, openaiClient) {
         role: 'system',
         content: `Erzeuge genau 1 Workout aus den gelieferten Parametern, zustandslos, ohne Historie, ohne Coaching-Stil.
 Nur JSON, kein Markdown, keine Zusatzschlüssel, keine Erklärtexte, kein Motivations-Text.
+      Regeln (streng):
+      - requestedType strikt einhalten (push|pull|legs|fullbody), kein Mix außerhalb des Splits.
+      - Reihenfolge strikt: Main Compound -> Secondary Compound -> Accessory -> optional Core/Finisher.
+      - Keine doppelte Hauptbewegung direkt hintereinander.
+      - 5-6 Übungen insgesamt, maximal 1 Core-Übung und nicht an Position 1.
+      - Für strength: Hauptübungen 3-6 Reps, längere Pausen; für hypertrophy: 6-12 Reps, moderate Pausen.
+      - equipmentMode strikt beachten (gym_only, gym_plus_bodyweight, bodyweight_only).
 Schema exakt:
 {"workoutName":"string","exercises":[{"name":"string","sets":3,"reps":10,"weight":0,"rest":90}],"estimatedDuration":45,"difficulty":"beginner|advanced","notes":"string"}
 Fallback auf sinnvolle Standardwerte bei fehlenden Parametern.`
@@ -960,7 +1154,7 @@ Fallback auf sinnvolle Standardwerte bei fehlenden Parametern.`
         content: prompt
       }
     ],
-    temperature: 0.7,
+    temperature: 0.2,
     max_tokens: 360,
     timeout: 15000,
     response_format: { type: 'json_object' }
@@ -971,13 +1165,97 @@ Fallback auf sinnvolle Standardwerte bei fehlenden Parametern.`
 }
 
 function createQuickGeneratorPrompt(context) {
-  return `durationMinutes=${context.durationMinutes}; goal=${context.goal}; gender=${context.gender}; bodyweightKg=${context.bodyweightKg}; level=${context.level}; equipmentMode=${context.equipmentMode}; requestedType=${context.requestedType}; constraint=exercises_must_match_requestedType_strictly`;
+  return [
+    `durationMinutes=${context.durationMinutes}`,
+    `goal=${context.goal}`,
+    `gender=${context.gender}`,
+    `bodyweightKg=${context.bodyweightKg}`,
+    `level=${context.level}`,
+    `trainingFrequencyPerWeek=${context.trainingFrequencyPerWeek}`,
+    `equipmentMode=${context.equipmentMode}`,
+    `equipmentAvailability=${(context.equipmentAvailability || []).join(',') || 'not_provided'}`,
+    `requestedType=${context.requestedType}`,
+    `maxStrictPullups=${context.performance?.maxStrictPullups ?? 'unknown'}`,
+    `maxStrictDips=${context.performance?.maxStrictDips ?? 'unknown'}`,
+    `maxStrictPushups=${context.performance?.maxStrictPushups ?? 'unknown'}`,
+    `squat1RM=${context.performance?.squat1RM ?? 'unknown'}`,
+    `bench1RM=${context.performance?.bench1RM ?? 'unknown'}`,
+    `deadlift1RM=${context.performance?.deadlift1RM ?? 'unknown'}`,
+    `injuries=${context.injuries || 'none'}`,
+    `restrictions=${context.restrictions || 'none'}`,
+    'constraint=professional_sc_programming_no_random_mixing'
+  ].join('; ');
 }
 
 function normalizeRequestedType(type) {
   const normalized = typeof type === 'string' ? type.trim().toLowerCase() : '';
   return ['push', 'pull', 'legs', 'fullbody'].includes(normalized) ? normalized : 'fullbody';
 }
+
+function normalizeGoal(goal) {
+  const normalized = String(goal || '').toLowerCase();
+  if (normalized.includes('strength')) return 'strength';
+  return 'hypertrophy';
+}
+
+function normalizeEquipmentMode(mode) {
+  const normalized = String(mode || '').toLowerCase();
+  if (normalized === 'gym_only' || normalized === 'gym_plus_bodyweight' || normalized === 'bodyweight_only') {
+    return normalized;
+  }
+  return 'gym_plus_bodyweight';
+}
+
+const WORKOUT_BLUEPRINTS = {
+  push: {
+    hypertrophy: {
+      gym_only: ['Bankdrücken', 'Schulterdrücken', 'Schrägbankdrücken', 'Dips', 'Seitheben'],
+      gym_plus_bodyweight: ['Kurzhantel Bankdrücken', 'Schulterdrücken', 'Liegestütze', 'Dips', 'Seitheben'],
+      bodyweight_only: ['Liegestütze', 'Pike Push-Ups', 'Dips', 'Enge Liegestütze', 'Plank']
+    },
+    strength: {
+      gym_only: ['Bankdrücken', 'Schulterdrücken', 'Schrägbankdrücken', 'Dips'],
+      gym_plus_bodyweight: ['Bankdrücken', 'Schulterdrücken', 'Dips', 'Liegestütze'],
+      bodyweight_only: ['Dips', 'Liegestütze', 'Pike Push-Ups', 'Enge Liegestütze']
+    }
+  },
+  pull: {
+    hypertrophy: {
+      gym_only: ['Rudern Langhantel', 'Latzug zur Brust', 'Kurzhantelrudern', 'Face Pulls', 'Kurzhantel Bizeps Curls'],
+      gym_plus_bodyweight: ['Klimmzüge', 'Rudern Kabelzug', 'Kurzhantelrudern', 'Face Pulls', 'Hammer Curls'],
+      bodyweight_only: ['Klimmzüge', 'Inverted Rows', 'Superman Hold', 'Reverse Snow Angels', 'Dead Bug']
+    },
+    strength: {
+      gym_only: ['Rudern Langhantel', 'Klimmzüge', 'Latzug zur Brust', 'Kurzhantelrudern'],
+      gym_plus_bodyweight: ['Klimmzüge', 'Rudern Langhantel', 'Rudern Kabelzug', 'Kurzhantelrudern'],
+      bodyweight_only: ['Klimmzüge', 'Inverted Rows', 'Superman Hold', 'Dead Bug']
+    }
+  },
+  legs: {
+    hypertrophy: {
+      gym_only: ['Kniebeugen Langhantel', 'Rumänisches Kreuzheben', 'Ausfallschritte Kurzhantel', 'Beinpresse', 'Wadenheben stehend'],
+      gym_plus_bodyweight: ['Kniebeugen Langhantel', 'Rumänisches Kreuzheben', 'Bulgarian Split Squats', 'Ausfallschritte Kurzhantel', 'Wadenheben stehend'],
+      bodyweight_only: ['Kniebeugen', 'Bulgarian Split Squats', 'Ausfallschritte', 'Glute Bridge', 'Wadenheben stehend']
+    },
+    strength: {
+      gym_only: ['Kniebeugen Langhantel', 'Rumänisches Kreuzheben', 'Bulgarian Split Squats', 'Beinpresse'],
+      gym_plus_bodyweight: ['Kniebeugen Langhantel', 'Rumänisches Kreuzheben', 'Bulgarian Split Squats', 'Ausfallschritte Kurzhantel'],
+      bodyweight_only: ['Bulgarian Split Squats', 'Kniebeugen', 'Ausfallschritte', 'Glute Bridge']
+    }
+  },
+  fullbody: {
+    hypertrophy: {
+      gym_only: ['Kniebeugen Langhantel', 'Kurzhantel Bankdrücken', 'Rudern Kabelzug', 'Rumänisches Kreuzheben', 'Plank'],
+      gym_plus_bodyweight: ['Kniebeugen Langhantel', 'Liegestütze', 'Klimmzüge', 'Ausfallschritte Kurzhantel', 'Plank'],
+      bodyweight_only: ['Kniebeugen', 'Liegestütze', 'Inverted Rows', 'Ausfallschritte', 'Plank']
+    },
+    strength: {
+      gym_only: ['Kniebeugen Langhantel', 'Bankdrücken', 'Rudern Langhantel', 'Rumänisches Kreuzheben'],
+      gym_plus_bodyweight: ['Kniebeugen Langhantel', 'Bankdrücken', 'Klimmzüge', 'Rumänisches Kreuzheben'],
+      bodyweight_only: ['Bulgarian Split Squats', 'Liegestütze', 'Klimmzüge', 'Ausfallschritte']
+    }
+  }
+};
 
 function inferExerciseType(name = '') {
   const normalized = String(name).toLowerCase();
@@ -992,6 +1270,326 @@ function inferExerciseType(name = '') {
   return 'fullbody';
 }
 
+function inferMovementPattern(name = '') {
+  const normalized = String(name).toLowerCase();
+  if (normalized.includes('bank') || normalized.includes('liegestütz') || normalized.includes('push-up')) return 'horizontal_push';
+  if (normalized.includes('schulterdr') || normalized.includes('military press') || normalized.includes('overhead')) return 'vertical_push';
+  if (normalized.includes('rudern') || normalized.includes('row') || normalized.includes('face pull')) return 'horizontal_pull';
+  if (normalized.includes('latzug') || normalized.includes('klimmzug') || normalized.includes('pull-up')) return 'vertical_pull';
+  if (normalized.includes('kniebeuge') || normalized.includes('beinpresse') || normalized.includes('split squat') || normalized.includes('ausfallschritt')) return 'squat';
+  if (normalized.includes('kreuzheben') || normalized.includes('deadlift') || normalized.includes('hip thrust') || normalized.includes('good morning')) return 'hinge';
+  if (normalized.includes('plank') || normalized.includes('core') || normalized.includes('bauch') || normalized.includes('abs')) return 'core';
+  return 'other';
+}
+
+function isIsolationExercise(name = '') {
+  const normalized = String(name).toLowerCase();
+  const isolationTerms = ['curl', 'heben', 'kickback', 'trizeps', 'bizeps', 'waden', 'fly', 'flys', 'extension', 'beinstrecker', 'beincurls'];
+  return isolationTerms.some((term) => normalized.includes(term));
+}
+
+function inferDemandTier(name = '') {
+  const pattern = inferMovementPattern(name);
+  if (['squat', 'hinge', 'horizontal_push', 'vertical_push', 'horizontal_pull', 'vertical_pull'].includes(pattern) && !isIsolationExercise(name)) {
+    return 'high';
+  }
+  if (pattern === 'core') return 'low';
+  return isIsolationExercise(name) ? 'low' : 'medium';
+}
+
+function getWorkoutBlueprint(type, goal, equipmentMode) {
+  return (
+    WORKOUT_BLUEPRINTS[type]?.[goal]?.[equipmentMode]
+    || WORKOUT_BLUEPRINTS[type]?.[goal]?.gym_plus_bodyweight
+    || []
+  );
+}
+
+function findExerciseByBlueprintName(pool, blueprintName) {
+  const normalizedBlueprint = String(blueprintName || '').toLowerCase();
+  return pool.find((exercise) => {
+    const normalizedName = String(exercise.name || '').toLowerCase();
+    return normalizedName === normalizedBlueprint
+      || normalizedName.includes(normalizedBlueprint)
+      || normalizedBlueprint.includes(normalizedName);
+  });
+}
+
+function buildBlueprintFallbackExercise(name, fallbackType, goal) {
+  const strength = goal === 'strength';
+  return {
+    name,
+    sets: strength ? 4 : 3,
+    reps: strength ? 6 : 10,
+    weight: 0,
+    rest: strength ? 120 : 90,
+    category: fallbackType,
+    movementPattern: inferMovementPattern(name),
+    targetType: inferExerciseType(name),
+    isIsolation: isIsolationExercise(name),
+    demandTier: inferDemandTier(name)
+  };
+}
+
+function normalizeExercise(exercise, fallbackType) {
+  const name = String(exercise?.name || '').trim();
+  if (!name) return null;
+  const movementPattern = inferMovementPattern(name);
+  const targetType = inferExerciseType(name);
+  return {
+    name,
+    sets: Math.min(6, Math.max(1, Number(exercise?.sets) || 3)),
+    reps: Math.min(20, Math.max(1, Number(exercise?.reps) || 10)),
+    weight: Math.max(0, Number(exercise?.weight) || 0),
+    rest: Math.min(240, Math.max(20, Number(exercise?.rest) || 90)),
+    category: fallbackType,
+    movementPattern,
+    targetType,
+    isIsolation: isIsolationExercise(name),
+    demandTier: inferDemandTier(name)
+  };
+}
+
+function getTimeAdjustedExerciseTarget(durationMinutes = 45, goal = 'hypertrophy') {
+  const duration = Number(durationMinutes) || 45;
+  if (duration <= 30) return goal === 'strength' ? 3 : 4;
+  if (duration <= 45) return goal === 'strength' ? 4 : 5;
+  return goal === 'strength' ? 5 : 6;
+}
+
+function isAssistedVariation(name = '') {
+  const normalized = String(name).toLowerCase();
+  return normalized.includes('assist') || normalized.includes('band') || normalized.includes('maschine');
+}
+
+function isPushupVariation(name = '') {
+  const normalized = String(name).toLowerCase();
+  return normalized.includes('liegestütz') || normalized.includes('push-up') || normalized.includes('push up') || normalized.includes('pushup');
+}
+
+function applyPerformanceSelectionRules(exercises = [], performance = {}) {
+  const maxStrictPullups = Number(performance?.maxStrictPullups);
+  const maxStrictDips = Number(performance?.maxStrictDips);
+  const maxStrictPushups = Number(performance?.maxStrictPushups);
+
+  let filtered = [...exercises];
+
+  if (Number.isFinite(maxStrictPullups) && maxStrictPullups >= 8) {
+    filtered = filtered.filter((exercise) => {
+      const name = String(exercise.name || '').toLowerCase();
+      const targetsPullPattern = inferMovementPattern(name) === 'vertical_pull' || name.includes('klimm');
+      return !(targetsPullPattern && isAssistedVariation(name));
+    });
+  }
+
+  if (Number.isFinite(maxStrictDips) && maxStrictDips >= 10) {
+    filtered = filtered.filter((exercise) => {
+      const name = String(exercise.name || '').toLowerCase();
+      const targetsDipPattern = name.includes('dip');
+      return !(targetsDipPattern && isAssistedVariation(name));
+    });
+  }
+
+  if (Number.isFinite(maxStrictPushups) && maxStrictPushups > 20) {
+    const nonPushupMain = filtered.find((exercise) => !isPushupVariation(exercise.name));
+    if (nonPushupMain) {
+      const pushupIndex = filtered.findIndex((exercise) => isPushupVariation(exercise.name));
+      const mainIndex = filtered.findIndex((exercise) => exercise.name === nonPushupMain.name);
+      if (pushupIndex !== -1 && mainIndex !== -1 && pushupIndex < mainIndex) {
+        const pushupExercise = filtered[pushupIndex];
+        filtered.splice(pushupIndex, 1);
+        filtered.splice(Math.min(filtered.length, 2), 0, pushupExercise);
+      }
+    }
+  }
+
+  return filtered;
+}
+
+function buildExerciseCoachingNote(exercise, goal, index) {
+  const primary = index < 2 && !isIsolationExercise(exercise.name);
+  if (goal === 'strength') {
+    if (primary) return 'Arbeite bei RPE 7-9, steigere Last progressiv bei sauberer Technik.';
+    return 'Kontrollierte Ausführung, Last konservativ steigern, vollständige ROM.';
+  }
+  if (primary) return 'Kontrollierte Exzentrik (2-3 Sek.) und saubere Technik priorisieren.';
+  return 'Fokus auf Mind-Muscle-Connection und konstante Spannungszeit.';
+}
+
+function pickExercisesByPattern(pool, preferredPatterns = [], maxCount = 6) {
+  const selected = [];
+  const used = new Set();
+
+  const take = (exercise) => {
+    if (!exercise) return;
+    const key = String(exercise.name).toLowerCase();
+    if (used.has(key) || selected.length >= maxCount) return;
+    used.add(key);
+    selected.push(exercise);
+  };
+
+  preferredPatterns.forEach((pattern) => {
+    const match = pool.find((exercise) => exercise.movementPattern === pattern && !used.has(String(exercise.name).toLowerCase()));
+    take(match);
+  });
+
+  pool.forEach((exercise) => take(exercise));
+
+  const noBackToBackSamePattern = [];
+  selected.forEach((exercise) => {
+    const prev = noBackToBackSamePattern[noBackToBackSamePattern.length - 1];
+    if (!prev || prev.movementPattern !== exercise.movementPattern) {
+      noBackToBackSamePattern.push(exercise);
+      return;
+    }
+    const swapIndex = selected.findIndex((candidate) => {
+      const candidateKey = String(candidate.name).toLowerCase();
+      return !noBackToBackSamePattern.some((s) => String(s.name).toLowerCase() === candidateKey)
+        && candidate.movementPattern !== prev.movementPattern;
+    });
+    if (swapIndex !== -1) {
+      noBackToBackSamePattern.push(selected[swapIndex]);
+    } else {
+      noBackToBackSamePattern.push(exercise);
+    }
+  });
+
+  return noBackToBackSamePattern.slice(0, maxCount);
+}
+
+function applyGoalRanges(exercises, goal) {
+  return exercises.map((exercise, index) => {
+    const primary = index < 2 && !exercise.isIsolation;
+    const accessory = exercise.isIsolation || exercise.demandTier === 'low';
+
+    if (goal === 'strength') {
+      const repsRange = primary ? [3, 6] : accessory ? [6, 12] : [3, 8];
+      const setsRange = primary ? [4, 5] : accessory ? [2, 3] : [3, 4];
+      const restRange = primary ? [120, 240] : accessory ? [60, 120] : [90, 180];
+      return {
+        ...exercise,
+        reps: Math.min(repsRange[1], Math.max(repsRange[0], exercise.reps)),
+        sets: Math.min(setsRange[1], Math.max(setsRange[0], exercise.sets)),
+        rest: Math.min(restRange[1], Math.max(restRange[0], exercise.rest))
+      };
+    }
+
+    const repsRange = primary ? [6, 12] : [8, 15];
+    const setsRange = [3, 4];
+    const restRange = primary ? [60, 120] : [45, 90];
+    return {
+      ...exercise,
+      reps: Math.min(repsRange[1], Math.max(repsRange[0], exercise.reps)),
+      sets: Math.min(setsRange[1], Math.max(setsRange[0], exercise.sets)),
+      rest: Math.min(restRange[1], Math.max(restRange[0], exercise.rest))
+    };
+  });
+}
+
+function enforceWorkoutProgrammingRules(payload, context = {}, options = {}) {
+  const requestedType = normalizeRequestedType(context.requestedType || context.focus);
+  const goal = normalizeGoal(context.goal || (Number(context.intensity) >= 4 ? 'strength' : 'muscle_building'));
+  const equipmentMode = normalizeEquipmentMode(context.equipmentMode || payload?.equipmentMode);
+  const targetExerciseCount = getTimeAdjustedExerciseTarget(context.durationMinutes || context.timeAvailable, goal);
+  const preferredBySplit = {
+    push: ['horizontal_push', 'vertical_push', 'horizontal_push', 'vertical_push', 'core'],
+    pull: ['horizontal_pull', 'vertical_pull', 'horizontal_pull', 'vertical_pull', 'core'],
+    legs: ['squat', 'hinge', 'squat', 'hinge', 'core'],
+    fullbody: ['squat', 'horizontal_push', 'horizontal_pull', 'hinge', 'core']
+  };
+
+  const inputExercises = Array.isArray(payload?.exercises) ? payload.exercises : [];
+  const normalized = inputExercises
+    .map((exercise) => normalizeExercise(exercise, requestedType))
+    .filter(Boolean)
+    .filter((exercise) => (requestedType === 'fullbody' ? true : matchesRequestedType(exercise.name, requestedType)));
+
+  const blueprint = getWorkoutBlueprint(requestedType, goal, equipmentMode);
+  const blueprintSelected = [];
+  const blueprintUsedNames = new Set();
+
+  blueprint.forEach((name) => {
+    const existing = findExerciseByBlueprintName(normalized, name);
+    const picked = existing || buildBlueprintFallbackExercise(name, requestedType, goal);
+    const key = String(picked.name || '').toLowerCase();
+    if (!blueprintUsedNames.has(key)) {
+      blueprintUsedNames.add(key);
+      blueprintSelected.push(picked);
+    }
+  });
+
+  const normalizedWithoutBlueprint = normalized.filter((exercise) => {
+    const key = String(exercise.name || '').toLowerCase();
+    return !blueprintUsedNames.has(key);
+  });
+
+  const orderedRemainder = pickExercisesByPattern(normalizedWithoutBlueprint, preferredBySplit[requestedType] || preferredBySplit.fullbody, 6);
+  const ordered = [...blueprintSelected, ...orderedRemainder].slice(0, 6);
+  const performanceFiltered = applyPerformanceSelectionRules(ordered, context.performance || {});
+
+  let reordered = performanceFiltered;
+  const firstCompoundIndex = reordered.findIndex((exercise) => !exercise.isIsolation);
+  if (firstCompoundIndex > 0) {
+    const firstCompound = reordered[firstCompoundIndex];
+    reordered = [firstCompound, ...reordered.filter((_, index) => index !== firstCompoundIndex)];
+  }
+
+  const goalAdjusted = applyGoalRanges(reordered, goal)
+    .slice(0, targetExerciseCount)
+    .map((exercise, index) => ({
+    name: exercise.name,
+    sets: exercise.sets,
+    reps: exercise.reps,
+    weight: exercise.weight,
+    rest: exercise.rest,
+    category: requestedType,
+    note: buildExerciseCoachingNote(exercise, goal, index)
+    }));
+
+  const fallbackName = requestedType === 'fullbody' ? 'Full Body Session' : `${requestedType.toUpperCase()} Session`;
+  const warmupHint = Number(context.durationMinutes || context.timeAvailable || 45) >= 30
+    ? `Warm-up: 5-8 min ${requestedType === 'legs' ? 'Mobilität + Ramp-Up Sets' : 'leichtes Cardio + Aktivierung'}.`
+    : 'Warm-up: 2-4 min Gelenkaktivierung + 1 leichter Ramp-up Satz.';
+
+  return {
+    workoutName: typeof payload?.workoutName === 'string' && payload.workoutName.trim()
+      ? payload.workoutName.trim()
+      : fallbackName,
+    exercises: goalAdjusted,
+    estimatedDuration: Math.min(120, Math.max(20, Number(payload?.estimatedDuration) || Number(context.durationMinutes) || Number(context.timeAvailable) || 45)),
+    difficulty: payload?.difficulty === 'advanced' ? 'advanced' : 'beginner',
+    warmup: warmupHint,
+    notes: [
+      warmupHint,
+      goal === 'strength'
+        ? 'Reihenfolge: Main Compound → Secondary Compound → Accessory. Pausen 2-4 min bei Hauptlifts.'
+        : 'Reihenfolge: Main Compound → Secondary Compound → Accessory. Kontrollierte Exzentrik und saubere Technik.'
+    ].join(' '),
+    goal,
+    requestedType,
+    equipmentMode,
+    metadata: {
+      ...(payload?.metadata || {}),
+      ruleEngine: {
+        enabled: true,
+        source: options.source || 'unknown',
+        goal,
+        requestedType,
+        equipmentMode,
+        blueprintLocked: true,
+        targetExerciseCount,
+        outputFormat: {
+          title: true,
+          goal: true,
+          environment: true,
+          warmup: true,
+          exerciseNotes: true
+        }
+      }
+    }
+  };
+}
+
 function matchesRequestedType(exerciseName, requestedType) {
   const type = normalizeRequestedType(requestedType);
   if (type === 'fullbody') return true;
@@ -1000,6 +1598,7 @@ function matchesRequestedType(exerciseName, requestedType) {
 
 function generateQuickGeneratorDemo(context) {
   const requestedType = normalizeRequestedType(context.requestedType);
+  const equipmentMode = context.equipmentMode === 'bodyweight_only' ? 'bodyweight_only' : context.equipmentMode;
   const plans = {
     push: {
       gym_only: [
@@ -1015,6 +1614,13 @@ function generateQuickGeneratorDemo(context) {
         { name: 'Dips', sets: 3, reps: 10, weight: 0, rest: 90 },
         { name: 'Seitheben', sets: 3, reps: 15, weight: 0, rest: 60 },
         { name: 'Trizeps-Kickbacks', sets: 3, reps: 12, weight: 0, rest: 60 }
+      ],
+      bodyweight_only: [
+        { name: 'Liegestütze', sets: 4, reps: 12, weight: 0, rest: 60 },
+        { name: 'Dips', sets: 4, reps: 8, weight: 0, rest: 75 },
+        { name: 'Pike Push-Ups', sets: 3, reps: 10, weight: 0, rest: 75 },
+        { name: 'Enge Liegestütze', sets: 3, reps: 12, weight: 0, rest: 60 },
+        { name: 'Plank', sets: 3, reps: 45, weight: 0, rest: 45 }
       ]
     },
     pull: {
@@ -1031,6 +1637,13 @@ function generateQuickGeneratorDemo(context) {
         { name: 'Kurzhantel Bizeps Curls', sets: 3, reps: 12, weight: 0, rest: 60 },
         { name: 'Hammer Curls', sets: 3, reps: 12, weight: 0, rest: 60 },
         { name: 'Umgekehrtes Flys', sets: 3, reps: 15, weight: 0, rest: 60 }
+      ],
+      bodyweight_only: [
+        { name: 'Klimmzüge', sets: 4, reps: 6, weight: 0, rest: 90 },
+        { name: 'Inverted Rows', sets: 4, reps: 10, weight: 0, rest: 75 },
+        { name: 'Superman Hold', sets: 3, reps: 40, weight: 0, rest: 45 },
+        { name: 'Reverse Snow Angels', sets: 3, reps: 12, weight: 0, rest: 60 },
+        { name: 'Dead Bug', sets: 3, reps: 12, weight: 0, rest: 45 }
       ]
     },
     legs: {
@@ -1047,6 +1660,13 @@ function generateQuickGeneratorDemo(context) {
         { name: 'Bulgarian Split Squats', sets: 3, reps: 10, weight: 0, rest: 90 },
         { name: 'Glute Bridge', sets: 3, reps: 15, weight: 0, rest: 60 },
         { name: 'Wadenheben sitzend', sets: 4, reps: 15, weight: 0, rest: 60 }
+      ],
+      bodyweight_only: [
+        { name: 'Kniebeugen', sets: 4, reps: 15, weight: 0, rest: 60 },
+        { name: 'Bulgarian Split Squats', sets: 4, reps: 10, weight: 0, rest: 75 },
+        { name: 'Ausfallschritte', sets: 3, reps: 12, weight: 0, rest: 60 },
+        { name: 'Glute Bridge', sets: 3, reps: 15, weight: 0, rest: 60 },
+        { name: 'Wadenheben stehend', sets: 4, reps: 20, weight: 0, rest: 45 }
       ]
     },
     fullbody: {
@@ -1063,15 +1683,24 @@ function generateQuickGeneratorDemo(context) {
         { name: 'Klimmzüge', sets: 3, reps: 8, weight: 0, rest: 90 },
         { name: 'Ausfallschritte Kurzhantel', sets: 3, reps: 10, weight: 0, rest: 75 },
         { name: 'Plank', sets: 3, reps: 45, weight: 0, rest: 45 }
+      ],
+      bodyweight_only: [
+        { name: 'Kniebeugen', sets: 4, reps: 15, weight: 0, rest: 60 },
+        { name: 'Liegestütze', sets: 4, reps: 12, weight: 0, rest: 60 },
+        { name: 'Inverted Rows', sets: 3, reps: 10, weight: 0, rest: 75 },
+        { name: 'Ausfallschritte', sets: 3, reps: 12, weight: 0, rest: 60 },
+        { name: 'Plank', sets: 3, reps: 45, weight: 0, rest: 45 }
       ]
     }
   };
 
   const strength = context.goal === 'strength';
   const selectedTypePlans = plans[requestedType] || plans.fullbody;
-  const exercises = context.equipmentMode === 'gym_only'
+  const exercises = equipmentMode === 'gym_only'
     ? selectedTypePlans.gym_only
-    : selectedTypePlans.gym_plus_bodyweight;
+    : equipmentMode === 'bodyweight_only'
+      ? selectedTypePlans.bodyweight_only
+      : selectedTypePlans.gym_plus_bodyweight;
 
   return {
     workoutName: `${requestedType === 'fullbody' ? 'Full Body' : requestedType.toUpperCase()} ${strength ? 'Strength' : 'Hypertrophy'} Session`,
@@ -1088,45 +1717,16 @@ function generateQuickGeneratorDemo(context) {
 }
 
 function normalizeQuickGeneratorResponse(payload, context) {
-  const requestedType = normalizeRequestedType(context.requestedType);
-  const exercises = Array.isArray(payload?.exercises) ? payload.exercises : [];
-  const sanitizedExercises = exercises
-    .filter((exercise) => typeof exercise?.name === 'string' && exercise.name.trim())
-    .filter((exercise) => matchesRequestedType(exercise.name, requestedType))
-    .slice(0, 8)
-    .map((exercise) => ({
-      name: String(exercise.name).trim(),
-      sets: Math.min(6, Math.max(1, Number(exercise.sets) || 3)),
-      reps: Math.min(20, Math.max(1, Number(exercise.reps) || 10)),
-      weight: Math.max(0, Number(exercise.weight) || 0),
-      rest: Math.min(240, Math.max(20, Number(exercise.rest) || 90)),
-      category: requestedType
-    }));
-
-  const fallbackExercises = generateQuickGeneratorDemo(context).exercises;
-  const finalExercises = sanitizedExercises.length >= 3
-    ? sanitizedExercises
-    : fallbackExercises;
-
-  return {
-    workoutName: typeof payload?.workoutName === 'string' && payload.workoutName.trim()
-      ? payload.workoutName.trim()
-      : 'Quick Workout',
-    exercises: finalExercises,
-    estimatedDuration: Math.min(120, Math.max(20, Number(payload?.estimatedDuration) || context.durationMinutes || 45)),
-    difficulty: payload?.difficulty === 'advanced' ? 'advanced' : 'beginner',
-    notes: typeof payload?.notes === 'string' && payload.notes.trim()
-      ? payload.notes.trim().slice(0, 220)
-      : 'Standardisiertes Quick Workout.',
-    requestedType
-  };
+  const safePayload = payload && Array.isArray(payload.exercises) && payload.exercises.length >= 3
+    ? payload
+    : generateQuickGeneratorDemo(context);
+  return enforceWorkoutProgrammingRules(safePayload, context, { source: 'quick-generator' });
 }
 
 function createWorkoutPrompt(context) {
   const timestamp = Date.now();
-  const randomSeed = Math.random().toString(36).substr(2, 9);
   
-  return `Erstelle ein EINZIGARTIGES Workout für Anfrage #${timestamp}-${randomSeed}:
+  return `Erstelle ein strukturiertes Workout für Anfrage #${timestamp}:
   
   Erfahrungslevel: ${context.experienceLevel || 'unbekannt'}
   Verfügbare Zeit: ${context.timeAvailable || '45'} Minuten
@@ -1134,18 +1734,18 @@ function createWorkoutPrompt(context) {
   Letzte Workouts: ${context.recentWorkouts || 'keine Daten'}
   Verletzungen: ${context.injuries || 'keine'}
   
-  WICHTIG: Erstelle eine NEUE, ANDERE Variation als vorherige Anfragen.
-  Variiere Übungsreihenfolge, Rep-Ranges, oder Fokus-Bereiche.
-  Jedes Workout sollte einzigartig und frisch sein.
+  WICHTIG: Priorisiere klare Struktur vor Variation.
+  Reihenfolge: Main Compound -> Secondary Compound -> Accessory -> optional Core.
+  requestedType muss strikt eingehalten werden.
   
-  Bitte erstelle ein sicheres, effektives und ABWECHSLUNGSREICHES Workout.`;
+  Bitte erstelle ein sicheres, effektives und zielgerichtetes Workout.`;
 }
 
 async function generateDemoSuggestion(context) {
   const timestamp = Date.now();
-  const randomVariation = Math.floor(Math.random() * 3); // 0, 1, oder 2
   const focus = context.focus || 'push';
   const level = context.experienceLevel || 'intermediate';
+  const normalizedGoal = normalizeGoal(context.goal || (Number(context.intensity) >= 4 ? 'strength' : 'muscle_building'));
   
   // Fokus-spezifische Workout-Variationen
   const workoutVariations = {
@@ -1249,7 +1849,8 @@ async function generateDemoSuggestion(context) {
   
   // Fallback für andere Fokus-Typen
   const availableVariations = workoutVariations[focus] || workoutVariations.push;
-  const selectedWorkout = availableVariations[randomVariation];
+  const variationIndex = normalizedGoal === 'strength' ? 2 : 1;
+  const selectedWorkout = availableVariations[variationIndex] || availableVariations[0];
   
   // Mappe Exercise-Namen zu Datenbank-IDs (asynchron, daher async function nötig)
   const exercisesWithIds = await Promise.all(
@@ -1291,7 +1892,7 @@ async function generateDemoSuggestion(context) {
     metadata: {
       source: 'demo',
       isDemoData: true,
-      variation: randomVariation + 1,
+      variation: variationIndex + 1,
       recommendationId: `demo_${timestamp}_${Math.random().toString(36).substr(2, 9)}`
     }
   };

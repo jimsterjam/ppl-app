@@ -54,6 +54,13 @@
             >
               ✏️
             </button>
+            <button
+              class="action-btn delete"
+              :title="t('recent.deleteTitle')"
+              @click.stop="deleteWorkoutItem(workout)"
+            >
+              🗑️
+            </button>
             <button 
               class="action-btn expand"
               :class="{ 'expanded': expandedWorkout === workout._id }"
@@ -215,6 +222,7 @@ const props = defineProps({
     default: true
   }
 })
+const emit = defineEmits(['delete'])
 
 const router = useRouter()
 const { t, locale } = useI18n()
@@ -403,6 +411,10 @@ function repeatWorkout(workout) {
 function editWorkout(workout) {
   logger.debug('📝 Navigiere zur Workout-Bearbeitung:', workout._id);
   router.push(`/workouts/${workout._id}`);
+}
+
+function deleteWorkoutItem(workout) {
+  emit('delete', workout)
 }
 </script>
 

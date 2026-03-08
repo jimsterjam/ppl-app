@@ -17,6 +17,7 @@
     "cap:copy": "cap copy",
     "cap:sync": "npm run clean:ios:web && cap sync",
     "ios": "cap open ios",
+    "ios:fast": "npm run build && npm run cap:copy -- ios && npm run ios",
     "ios:refresh": "npm run build && npm run cap:sync -- ios && npm run ios",
     "thumbs:generate": "node scripts/generate-static-thumbs.mjs",
     "cap:serve:auto": "node scripts/toggle-cap-server.mjs enable auto",
