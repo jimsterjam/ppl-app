@@ -8,9 +8,10 @@ const MUSCLE_GROUP_VALUES = new Set([
 ])
 const EQUIPMENT_VALUES = new Set([
   'Hanteln', 'Langhantel', 'Kurzhanteln',
-  'Kabelzug', 'Maschine', 'Körpergewicht',
+  'Kabelzug', 'Körpergewicht',
   'Kettlebell', 'Resistance Band', 'Cardio-Gerät',
-  'Medizinball', 'Sandbag', 'Band'
+  'Medizinball', 'Sandbag', 'Band',
+  'machine'
 ])
 
 const normalizeStr = (value) => String(value || '').trim().toLowerCase()
@@ -65,7 +66,7 @@ function mapEquipment(existing, equipmentEn) {
   if (eq.includes('barbell') || eq.includes('ez bar') || eq.includes('trap bar')) return 'Langhantel'
   if (eq.includes('dumbbell')) return 'Kurzhanteln'
   if (eq.includes('cable')) return 'Kabelzug'
-  if (eq.includes('machine') || eq.includes('smith')) return 'Maschine'
+  if (eq.includes('machine') || eq.includes('smith') || eq.includes('maschine')) return 'machine'
   if (eq.includes('body weight') || eq.includes('bodyweight')) return 'Körpergewicht'
   if (eq.includes('kettlebell')) return 'Kettlebell'
   if (eq.includes('resistance band') || eq === 'band') return 'Resistance Band'

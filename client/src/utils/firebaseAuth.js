@@ -93,6 +93,18 @@ async function sha256Hex(input) {
     .join('')
 }
 
+function withTimeout(promise, timeoutMs, label = 'operation') {
+  let timeoutId
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`${label} timed out`))
+    }, timeoutMs)
+  })
+  return Promise.race([promise, timeoutPromise]).finally(() => {
+    if (timeoutId) clearTimeout(timeoutId)
+  })
+}
+
 let auth = null
 let initPromise = null
 
@@ -163,15 +175,36 @@ export function useFirebaseAuth() {
     if (!isNative()) return true
 
     try {
-      await GoogleAuth.initialize({
-        scopes: ['profile', 'email'],
-        iosClientId: googleConfig.iosClientId,
-        serverClientId: googleConfig.webClientId, // MUST be Firebase Web Client ID
-        forceCodeForRefreshToken: true
-      })
+      await withTimeout(
+        GoogleAuth.initialize({
+          scopes: ['profile', 'email'],
+          iosClientId: googleConfig.iosClientId,
+          serverClientId: googleConfig.webClientId, // MUST be Firebase Web Client ID
+          forceCodeForRefreshToken: true
+        }),
+        8000,
+        'GoogleAuth.initialize'
+      )
       return true
     } catch (err) {
+      logger.warn('[firebaseAuth] GoogleAuth.initialize failed:', err?.message || err)
       return false
+    }
+  }
+
+  const resetGoogleNativeSession = async () => {
+    if (!isNative()) return
+    try {
+      await withTimeout(GoogleAuth.signOut(), 3000, 'GoogleAuth.signOut')
+    } catch (err) {
+      logger.debug('[firebaseAuth] GoogleAuth.signOut skipped/failed:', err?.message || err)
+    }
+    try {
+      if (typeof GoogleAuth.disconnect === 'function') {
+        await withTimeout(GoogleAuth.disconnect(), 3000, 'GoogleAuth.disconnect')
+      }
+    } catch (err) {
+      logger.debug('[firebaseAuth] GoogleAuth.disconnect skipped/failed:', err?.message || err)
     }
   }
 
@@ -181,14 +214,24 @@ export function useFirebaseAuth() {
     }
 
     const ok = await initGooglePlugin()
-    if (!ok) return signInWithRedirect(auth, googleProvider)
+    if (!ok) {
+      throw new Error('Google Login konnte nicht initialisiert werden')
+    }
 
-    const result = await GoogleAuth.signIn({
-      scopes: ['profile', 'email'],
-      iosClientId: googleConfig.iosClientId,
-      serverClientId: googleConfig.webClientId,
-      forceCodeForRefreshToken: true
-    })
+    // Wichtig fuer Account-Wechsel auf iOS: alte Google-Plugin-Session loesen,
+    // sonst wird oft derselbe Account stillschweigend erneut verwendet.
+    await resetGoogleNativeSession()
+
+    const result = await withTimeout(
+      GoogleAuth.signIn({
+        scopes: ['profile', 'email'],
+        iosClientId: googleConfig.iosClientId,
+        serverClientId: googleConfig.webClientId,
+        forceCodeForRefreshToken: true
+      }),
+      25000,
+      'Google native sign-in'
+    )
 
     // Normalize result shape: some plugin versions return tokens at result.authentication
     const idToken = result?.idToken || result?.authentication?.idToken
@@ -201,6 +244,24 @@ export function useFirebaseAuth() {
       throw new Error('No idToken or serverAuthCode returned from GoogleAuth')
     }
 
+    // Primärer Pfad: Direkt mit Google idToken bei Firebase anmelden.
+    // Dadurch vermeiden wir zusätzliche Backend-Abhängigkeit und Netzwerkfehler
+    // beim /api/auth/google-native Exchange auf iOS.
+    if (idToken) {
+      try {
+        const credential = GoogleAuthProvider.credential(idToken)
+        const userCred = await withTimeout(
+          signInWithCredential(auth, credential),
+          15000,
+          'Firebase Google credential sign-in'
+        )
+        await userCred.user?.getIdToken(true).catch(() => null)
+        return userCred
+      } catch (directErr) {
+        logger.warn('[firebaseAuth] Direct Firebase Google sign-in failed, fallback to backend exchange:', directErr?.message || directErr)
+      }
+    }
+
     // Backend-Exchange: serverAuthCode -> Firebase Custom Token
     const apiBase = import.meta.env.VITE_API_BASE || ''
     const endpoint = (apiBase.replace(/\/$/, '') || '') + '/api/auth/google-native'
@@ -209,18 +270,25 @@ export function useFirebaseAuth() {
     if (idToken) body.idToken = idToken
     if (serverAuthCode) body.serverAuthCode = serverAuthCode
 
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 15000)
     const resp = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    })
+      body: JSON.stringify(body),
+      signal: controller.signal
+    }).finally(() => clearTimeout(timeoutId))
 
     const json = await resp.json().catch(() => ({}))
     if (!resp.ok || !json?.customToken) {
-      throw new Error('Backend exchange failed')
+      const serverMessage = json?.message || json?.error || ''
+      throw new Error(serverMessage ? `Backend exchange failed: ${serverMessage}` : 'Backend exchange failed')
     }
 
     const userCred = await signInWithCustomToken(auth, json.customToken)
+
+    // Erzwingt frischen Token nach Custom-Token-Login und reduziert Auth-Race-Conditions.
+    await userCred.user?.getIdToken(true).catch(() => null)
 
     return userCred
   }
@@ -228,7 +296,7 @@ export function useFirebaseAuth() {
   const signInWithAppleNative = async () => {
     const rawNonce = createRandomNonce()
     const hashedNonce = await sha256Hex(rawNonce)
-    const appleClientId = import.meta.env.VITE_APPLE_SERVICE_ID || import.meta.env.VITE_APPLE_CLIENT_ID
+    const appleClientId = import.meta.env.VITE_APPLE_IOS_CLIENT_ID || import.meta.env.VITE_APPLE_SERVICE_ID || import.meta.env.VITE_APPLE_CLIENT_ID
     const appleRedirectUrl = import.meta.env.VITE_APPLE_REDIRECT_URL
 
     if (!appleClientId || !appleRedirectUrl) {
@@ -295,8 +363,8 @@ export function useFirebaseAuth() {
         const actionCodeSettings = continueUrl ? { url: continueUrl, handleCodeInApp: false } : undefined
         await sendEmailVerification(userCred.user, actionCodeSettings)
         // After sending verification, sign out to prevent unverified users from gaining access
-        try { await signOut(auth) } catch (e) { /* ignore signOut failures */ }
-      } catch (e) {
+        try { await signOut(auth) } catch { /* ignore signOut failures */ }
+      } catch {
         // ignore failure to send email here; surface generic message below
       }
       // Keep user signed in but require verification before granting access
@@ -314,7 +382,7 @@ export function useFirebaseAuth() {
       const actionCodeSettings = continueUrl ? { url: continueUrl, handleCodeInApp: false } : undefined
       await sendEmailVerification(user, actionCodeSettings)
       return true
-    } catch (e) {
+    } catch {
       throw new Error('Fehler beim Senden der Bestätigungs‑E‑Mail')
     }
   }
@@ -333,8 +401,14 @@ export function useFirebaseAuth() {
   const handleRedirectResult = () => getRedirectResult(auth)
 
   const logout = async () => {
-    if (!auth.currentUser) return
-    await signOut(auth)
+    const hadUser = Boolean(auth.currentUser)
+    if (hadUser) {
+      await signOut(auth)
+    }
+    await resetGoogleNativeSession().catch(() => {})
+    // WICHTIG: Keine pauschale Löschung von local/offline Daten beim normalen Logout,
+    // sonst gehen offline erstellte Workouts verloren, wenn der Server temporär nicht erreichbar war.
+    // Auth-bezogene States werden über authStore/main.js beim onAuthStateChanged bereinigt.
   }
 
   const deleteAccount = async (confirmationText) => {
@@ -346,7 +420,7 @@ export function useFirebaseAuth() {
 
     // DEBUG: collect token result and log claims to help diagnose auth issues on device
     // avoid logging token details in production; keep silent on success
-    try { await auth.currentUser.getIdTokenResult(true) } catch (e) { /* ignore */ }
+    try { await auth.currentUser.getIdTokenResult(true) } catch { /* ignore */ }
 
     const token = await auth.currentUser.getIdToken(true)
 
@@ -364,7 +438,7 @@ export function useFirebaseAuth() {
 
     const respText = await res.text().catch(() => null)
     let respJson = null
-    try { respJson = respText ? JSON.parse(respText) : null } catch (e) { respJson = respText }
+    try { respJson = respText ? JSON.parse(respText) : null } catch { respJson = respText }
     // keep no verbose network logs here
 
     if (!res.ok) {
@@ -373,8 +447,8 @@ export function useFirebaseAuth() {
     }
 
     await signOut(auth)
-    try { localStorage.clear(); sessionStorage.clear() } catch(e) {}
-    try { await clearAllOfflineData() } catch(e) { logger.warn('[firebaseAuth] clearAllOfflineData failed', e) }
+    try { localStorage.clear(); sessionStorage.clear() } catch {}
+    try { await clearAllOfflineData() } catch (err) { logger.warn('[firebaseAuth] clearAllOfflineData failed', err) }
   }
 
   return {

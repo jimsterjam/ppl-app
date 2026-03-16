@@ -46,7 +46,7 @@
 
     <div v-if="showControls" class="search-row">
       <input
-        v-model="searchQuery"
+        v-model="searchDraft"
         class="equipment-filter-select search-input"
         type="search"
         :placeholder="t('exercises.searchPlaceholder') || 'Suchen…'"
@@ -61,32 +61,42 @@
     </div>
 
     <!-- Übungsliste -->
-    <div v-else class="exercise-grid">
-      <div
-        v-for="(ex, index) in filteredExercises"
-        :key="ex?._id || ex?.exerciseId || ex?.id || index"
-        class="exercise-card"
-        :class="{ selected: selectable && isSelected(ex) }"
-        @click="onCardClick(ex)"
-      >
-        <div class="thumb-row">
-          <img
-            :src="getExerciseListImage(ex)"
-            :alt="t('common.image')"
-            class="thumb"
-            loading="lazy"
-            decoding="async"
-            @error="onImgError($event, ex)"
-            @click.stop="openMedia(ex)"
-          />
-          <div class="meta">
-            <h2 class="title">{{ getTranslatedExerciseName(ex.name_en || ex.name) }}</h2>
-            <p class="sub">{{ getTranslatedCategory(ex.category) }} · {{ getTranslatedMuscleGroup(ex.muscleGroup || (ex.muscleGroups?.[0] || '')) }}</p>
-          </div>
-        </div>
-        <p class="desc">{{ getLocalizedDescription(ex) }}</p>
-        <p class="equip">{{ t('exercises.equipment') }}: {{ getTranslatedEquipment(ex.equipment) }}</p>
+    <div v-else>
+      <div class="result-toolbar">
+        <span class="result-count">{{ visibleExercises.length }} / {{ filteredExercises.length }}</span>
       </div>
+
+      <div class="exercise-grid">
+        <div
+          v-for="(ex, index) in visibleExercises"
+          :key="ex?._id || ex?.exerciseId || ex?.id || index"
+          class="exercise-card"
+          :class="{ selected: selectable && isSelected(ex) }"
+          @click="onCardClick(ex)"
+        >
+          <div class="thumb-row">
+            <img
+              :src="getExerciseListImage(ex)"
+              :alt="t('common.image')"
+              class="thumb"
+              loading="lazy"
+              decoding="async"
+              @error="onImgError($event, ex)"
+              @click.stop="openMedia(ex)"
+            />
+            <div class="meta">
+              <h2 class="title">{{ ex.renderedName || ex.name }}</h2>
+              <p class="sub">{{ ex.renderedCategory || ex.category }} · {{ ex.renderedMuscle || ex.muscleGroup || (ex.muscleGroups?.[0] || '') }}</p>
+            </div>
+          </div>
+          <p class="desc">{{ ex.renderedDescription }}</p>
+          <p class="equip">{{ t('exercises.equipment') }}: {{ ex.renderedEquipment || ex.equipment }}</p>
+        </div>
+      </div>
+
+      <button v-if="canLoadMore" class="load-more-btn" type="button" @click="loadMore">
+        Mehr Übungen laden
+      </button>
     </div>
 
     <!-- Keine Ergebnisse -->
@@ -119,7 +129,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, computed } from 'vue';
+import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue';
 import { useI18n } from 'vue-i18n'
 import { logger } from '@/utils/logger'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
@@ -151,7 +161,7 @@ const props = defineProps({
 })
 const emit = defineEmits(['toggle'])
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const showTitle = computed(() => props.showTitle)
 const showControls = computed(() => props.showControls)
 const selectable = computed(() => props.selectable)
@@ -159,6 +169,7 @@ const selectable = computed(() => props.selectable)
 // Reaktive Variablen
 const exercises = ref([]);
 const searchQuery = ref('');
+const searchDraft = ref('')
 const selectedEquipment = ref('');
 const normalizedExercises = ref([])
 const allEquipmentTypes = computed(() => {
@@ -208,6 +219,8 @@ const mediaExercise = ref(null)
 const mediaUrl = ref('')
 const mediaRequestId = ref(0)
 const isVideoUrl = (url) => typeof url === 'string' && /\.mp4($|[?#])/i.test(url)
+const visibleCount = ref(80)
+let searchDebounceTimer = null
 
 const {
   getTranslatedExerciseName,
@@ -230,6 +243,31 @@ const muscleGroups = [
   'Waden'
 ];
 
+function normalizeSearchText(value) {
+  return String(value || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+}
+
+function dedupeExercises(list = []) {
+  const normalizeKey = (value) => String(value || '').trim().toLowerCase()
+  const seen = new Set()
+  const unique = []
+
+  for (const exercise of Array.isArray(list) ? list : []) {
+    if (!exercise) continue
+    const canonicalName = normalizeKey(exercise.displayName || exercise.name || exercise.name_en)
+    if (!canonicalName) continue
+    if (seen.has(canonicalName)) continue
+    seen.add(canonicalName)
+    unique.push(exercise)
+  }
+
+  return unique
+}
+
 // Lädt Übungen aus props.items oder aus default-exercises
 async function loadExercises() {
   loading.value = true;
@@ -247,7 +285,7 @@ async function loadExercises() {
     if (selectedEquipment.value) {
       allExercises = allExercises.filter(ex => ex.equipment === selectedEquipment.value)
     }
-    exercises.value = allExercises
+    exercises.value = dedupeExercises(allExercises)
     logger.debug(`✅ ExerciseList loaded ${exercises.value.length} Übungen`)
   } catch (err) {
     logger.error('ExerciseList Fehler beim Laden der Übungen:', err)
@@ -261,6 +299,11 @@ async function loadExercises() {
 function resetFilters() {
   selectedCategory.value = '';
   selectedMuscleGroup.value = '';
+  selectedEquipment.value = '';
+  searchQuery.value = '';
+  searchDraft.value = '';
+  searchError.value = '';
+  visibleCount.value = 80
   loadExercises();
 }
 
@@ -278,28 +321,76 @@ onMounted(async () => {
   loadExercises()
 });
 
+onBeforeUnmount(() => {
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
+})
+
 watch(() => props.items, () => {
   loadExercises()
 }, { deep: true })
 
-const filteredExercises = computed(() => {
+watch([exercises, searchQuery], () => {
+  visibleCount.value = searchQuery.value.trim() ? 120 : 80
+})
+
+const preparedExercises = computed(() => {
   const list = Array.isArray(exercises.value) ? exercises.value : []
+  const mapped = list.map((exercise) => {
+    const translationSourceName = String(locale.value || '').toLowerCase().startsWith('de')
+      ? (exercise?.name || exercise?.name_en || '')
+      : (exercise?.name_en || exercise?.name || '')
+    const renderedName = String(getTranslatedExerciseName(translationSourceName))
+    const renderedCategory = String(getTranslatedCategory(exercise?.category || ''))
+    const renderedMuscle = String(getTranslatedMuscleGroup(exercise?.muscleGroup || (exercise?.muscleGroups?.[0] || '')))
+    const renderedEquipment = String(getTranslatedEquipment(exercise?.equipment || ''))
+    const renderedDescription = String(getLocalizedDescription(exercise) || '')
+
+    return {
+      ...exercise,
+      renderedName,
+      renderedCategory,
+      renderedMuscle,
+      renderedEquipment,
+      renderedDescription,
+      _searchPrimary: normalizeSearchText(renderedName),
+      _searchSecondary: [
+        normalizeSearchText(exercise?.name || ''),
+        normalizeSearchText(exercise?.name_en || ''),
+        normalizeSearchText(renderedMuscle),
+        normalizeSearchText(renderedEquipment),
+        normalizeSearchText(renderedCategory),
+        normalizeSearchText(renderedDescription)
+      ]
+    }
+  })
+
+  // Final UI dedupe by translated/visible name to avoid duplicate-looking cards.
+  const seenRenderedNames = new Set()
+  const unique = []
+  for (const exercise of mapped) {
+    const key = normalizeSearchText(exercise?.renderedName || exercise?.name || '')
+    if (!key) continue
+    if (seenRenderedNames.has(key)) continue
+    seenRenderedNames.add(key)
+    unique.push(exercise)
+  }
+
+  return unique
+})
+
+const filteredExercises = computed(() => {
+  const list = preparedExercises.value
   const q = searchQuery.value.trim()
   if (!q) return list
 
-  const safeText = (value) => String(value || '')
-
   return searchAndRankExercises(list, q, {
-    getPrimaryText: (exercise) => safeText(getTranslatedExerciseName(exercise?.name_en || exercise?.name || '')),
-    getSecondaryTexts: (exercise) => [
-      safeText(exercise?.name || ''),
-      safeText(exercise?.name_en || ''),
-      safeText(getTranslatedMuscleGroup(exercise?.muscleGroup || (exercise?.muscleGroups?.[0] || ''))),
-      safeText(getTranslatedEquipment(exercise?.equipment || '')),
-      safeText(getTranslatedCategory(exercise?.category || ''))
-    ]
+    getPrimaryText: (exercise) => exercise?._searchPrimary || '',
+    getSecondaryTexts: (exercise) => exercise?._searchSecondary || []
   })
 })
+
+const visibleExercises = computed(() => filteredExercises.value.slice(0, visibleCount.value))
+const canLoadMore = computed(() => filteredExercises.value.length > visibleCount.value)
 
 watch(exercises, (list) => {
   if (!Array.isArray(list) || list.length === 0) return
@@ -314,14 +405,19 @@ function getSearchErrorMessage() {
 
 function onSearchInput(event) {
   const raw = event?.target?.value ?? ''
-  const sanitized = String(raw).replace(/[^A-Za-zÄÖÜäöüß\s-]/g, '')
-  if (raw !== sanitized) {
-    searchError.value = getSearchErrorMessage()
-  } else {
-    searchError.value = ''
-  }
-  searchQuery.value = sanitized
+  const sanitized = String(raw).replace(/\s+/g, ' ').replace(/^\s+/, '')
+  searchError.value = ''
+  searchDraft.value = sanitized
   if (event?.target) event.target.value = sanitized
+  if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
+  searchDebounceTimer = setTimeout(() => {
+    searchQuery.value = sanitized
+    visibleCount.value = sanitized ? 120 : 80
+  }, 40)
+}
+
+function loadMore() {
+  visibleCount.value += searchQuery.value.trim() ? 120 : 80
 }
 
 // Anzeige-Labels für Schnellfilter (Werte bleiben API-kompatibel)
@@ -500,6 +596,15 @@ function closeMedia() {
   color: var(--danger-text);
   font-size: 0.85rem;
 }
+.result-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+.result-count {
+  color: var(--muted);
+  font-size: 0.84rem;
+}
 .empty-hint {
   text-align: center;
   color: var(--muted);
@@ -567,6 +672,17 @@ function closeMedia() {
   display: grid;
   gap: 20px;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+.load-more-btn {
+  display: block;
+  margin: 18px auto 0;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--card-border);
+  background: var(--bg-panel);
+  color: var(--fg);
+  font-weight: 700;
+  cursor: pointer;
 }
 .meta { display: flex; flex-direction: column; min-width: 0; }
 .title {

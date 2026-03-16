@@ -15,8 +15,8 @@ if (typeof window !== 'undefined') {
   logger.info('[ExercisesAPI] baseURL =', API_URL);
 }
 
-// Axios-Instance für Exercises
-const api = axios.create({ baseURL: API_URL });
+// Axios-Instance für Exercises (timeout für offline-first: schnell aufgeben, Fallback nutzen)
+const api = axios.create({ baseURL: API_URL, timeout: 5000 });
 
 // Alle Übungen abrufen – optional mit einfachen Query-Filtern
 export async function fetchExercises(filters = {}) {

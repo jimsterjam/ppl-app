@@ -381,37 +381,43 @@ router.post('/google-native', async (req, res) => {
       return res.status(401).json({ error: 'google-id-mismatch' });
     }
 
-    const uid = payload?.sub;
-    if (!uid) {
+    const googleUid = payload?.sub;
+    if (!googleUid) {
       return res.status(401).json({ error: 'missing-google-sub' });
     }
 
+    const resolvedEmail = payload?.email ?? email ?? null;
+    const canonicalUid = googleUid;
+
     const additionalClaims = {
-      email: payload?.email ?? email ?? null,
+      email: resolvedEmail,
       emailVerified: !!payload?.email_verified,
       authProvider: 'google-native'
     };
 
-    const customToken = await admin.auth().createCustomToken(uid, additionalClaims);
+    const customToken = await admin.auth().createCustomToken(canonicalUid, additionalClaims);
 
     res.json({
       customToken,
-      firebaseUid: uid,
-      email: payload?.email ?? email ?? null,
+      firebaseUid: canonicalUid,
+      originalGoogleUid: googleUid,
+      email: resolvedEmail,
       picture: payload?.picture ?? null,
       locale: payload?.locale ?? null,
       expiresIn: 3600,
       googleProfile: {
-        email: payload?.email ?? email ?? null,
+        email: resolvedEmail,
         name: payload?.name ?? null,
         givenName: payload?.given_name ?? null,
         familyName: payload?.family_name ?? null,
         picture: payload?.picture ?? null,
-        id: uid
+        id: canonicalUid
       },
       debug: {
         receivedAccessToken: Boolean(accessToken),
-        receivedServerAuthCode: Boolean(serverAuthCode)
+        receivedServerAuthCode: Boolean(serverAuthCode),
+        uidReconciled: false,
+        movedWorkouts: 0
       }
     });
   } catch (err) {

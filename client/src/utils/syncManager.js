@@ -10,6 +10,7 @@
 import { 
   getPendingSyncActions, 
   markActionSynced, 
+  markActionFailed,
   incrementRetryCount,
   clearSyncedActions,
   setMetadata,
@@ -27,6 +28,21 @@ const NO_AUTH_RETRY_DELAY_MS = 3000
 let isSyncing = false
 let syncInProgress = false
 let noAuthRetryTimer = null
+
+function parseUidFromToken(token) {
+  const raw = String(token || '').trim()
+  if (!raw) return ''
+  const parts = raw.split('.')
+  if (parts.length < 2) return ''
+  try {
+    const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const decoded = atob(payload.padEnd(payload.length + (4 - payload.length % 4) % 4, '='))
+    const json = JSON.parse(decoded)
+    return String(json?.user_id || json?.uid || json?.sub || '').trim()
+  } catch {
+    return ''
+  }
+}
 
 function scheduleNoAuthRetry() {
   if (noAuthRetryTimer) return
@@ -75,6 +91,7 @@ export async function processSyncQueue(preferredToken = null) {
     
     let successCount = 0
     let failedCount = 0
+    let skippedCount = 0
     
     // Token holen für API Calls (robuste Helper-Funktion mit Fallbacks)
     let token = preferredToken || null
@@ -113,8 +130,33 @@ export async function processSyncQueue(preferredToken = null) {
       return { success: 0, failed: 0, total: pending.length, noAuth: true }
     }
 
+    const currentUid = parseUidFromToken(token)
+
     // Verarbeite jede Action sequentiell
     for (const item of pending) {
+      if (item?.entityType === 'workout' && (item?.action === 'create' || item?.action === 'update')) {
+        const queuedUserId = String(item?.data?.userId || '').trim()
+        if (!queuedUserId) {
+          skippedCount++
+          logger.warn('🟡 Sync Manager - Überspringe Workout-Queue-Eintrag ohne userId', {
+            queueId: item?.id,
+            action: item?.action,
+            dataId: item?.data?._id || null
+          })
+          continue
+        }
+        if (currentUid && queuedUserId !== currentUid) {
+          skippedCount++
+          logger.warn('🟡 Sync Manager - Überspringe fremden Workout-Queue-Eintrag', {
+            queueId: item?.id,
+            action: item?.action,
+            queuedUserId,
+            currentUid
+          })
+          continue
+        }
+      }
+
       try {
         await syncAction(item, token)
         await markActionSynced(item.id)
@@ -144,12 +186,13 @@ export async function processSyncQueue(preferredToken = null) {
           timeout: error?.config?.timeout || null
         })
         
-        // Erhöhe Retry Count
-        await incrementRetryCount(item.id, error.message)
-        
+        // Erhöhe Retry Count (atomar in IndexedDB)
+        const nextRetryCount = await incrementRetryCount(item.id, error.message)
+
         // Bei zu vielen Retries: Markiere als failed
-        if (item.retryCount >= MAX_RETRY_ATTEMPTS) {
+        if (nextRetryCount >= MAX_RETRY_ATTEMPTS) {
           logger.error('🚫 Sync Manager - Max Retries erreicht, gebe auf:', item.id)
+          await markActionFailed(item.id, error?.message || 'max-retries-reached')
         }
         
         failedCount++
@@ -165,6 +208,7 @@ export async function processSyncQueue(preferredToken = null) {
     const result = {
       success: successCount,
       failed: failedCount,
+      skipped: skippedCount,
       total: pending.length
     }
     logger.debug('✅ Sync Manager - Sync abgeschlossen', result)

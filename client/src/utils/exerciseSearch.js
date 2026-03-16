@@ -71,6 +71,20 @@ function scoreTokenMatch(primary, secondary, token) {
   return score
 }
 
+function startsWithWholeWord(text, query) {
+  if (!text || !query) return false
+  if (text === query) return true
+  return text.startsWith(`${query} `)
+}
+
+function hasWord(text, token) {
+  if (!text || !token) return false
+  return text === token
+    || text.startsWith(`${token} `)
+    || text.includes(` ${token} `)
+    || text.endsWith(` ${token}`)
+}
+
 export function searchAndRankExercises(items, query, options = {}) {
   const list = Array.isArray(items) ? items : []
   const rawQuery = String(query || '').trim()
@@ -113,6 +127,18 @@ export function searchAndRankExercises(items, query, options = {}) {
       else if (primary.startsWith(queryNormalized)) score += 850
       else if (primary.includes(queryNormalized)) score += 620
 
+      // Prioritize literal search intent: exact leading word beats fuzzy/alias matches.
+      if (startsWithWholeWord(primary, queryNormalized)) {
+        score += 500
+      }
+
+      // If user explicitly searches "klimmzug", prefer literal "klimmzug" hits over alias-only pull-up hits.
+      if (hasWord(queryNormalized, 'klimmzug')) {
+        const hasLiteralKlimmzug = hasWord(primary, 'klimmzug') || secondary.some((text) => hasWord(text, 'klimmzug'))
+        if (hasLiteralKlimmzug) score += 560
+        else score -= 240
+      }
+
       expandedTokens.forEach((token) => {
         score += scoreTokenMatch(primary, secondary, token)
       })
@@ -147,5 +173,16 @@ export function searchAndRankExercises(items, query, options = {}) {
       return a.index - b.index
     })
 
-  return ranked.map((entry) => entry.item)
+  const deduped = []
+  const seenPrimary = new Set()
+  for (const entry of ranked) {
+    const item = entry.item
+    const primaryKey = normalizeText(getPrimaryText(item)) || normalizeText(item?.name || '')
+    if (!primaryKey) continue
+    if (seenPrimary.has(primaryKey)) continue
+    seenPrimary.add(primaryKey)
+    deduped.push(item)
+  }
+
+  return deduped
 }

@@ -82,6 +82,22 @@ const isNativePlatform = () => {
   return false
 }
 
+async function waitForAuthHydration(authStore, getCurrentUser, timeoutMs = 1800) {
+  if (authStore.initialized || authStore.isAuthenticated || getCurrentUser()) return
+
+  await new Promise((resolve) => {
+    const startedAt = Date.now()
+    const tick = () => {
+      if (authStore.initialized || authStore.isAuthenticated || getCurrentUser() || Date.now() - startedAt >= timeoutMs) {
+        resolve()
+        return
+      }
+      setTimeout(tick, 100)
+    }
+    tick()
+  })
+}
+
 router.beforeEach((to, from, next) => {
   const funnelEnabled = import.meta.env?.VITE_ENABLE_WEB_FUNNEL === '1'
   if (funnelEnabled && !isNativePlatform() && to.name !== 'get-the-app') {
@@ -94,6 +110,10 @@ router.beforeEach((to, from, next) => {
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
   const { getCurrentUser, getIdToken } = useFirebaseAuth()
+
+  if (to.meta.requiresAuth !== false) {
+    await waitForAuthHydration(authStore, getCurrentUser)
+  }
 
   if (!authStore.isAuthenticated) {
     const currentUser = getCurrentUser()

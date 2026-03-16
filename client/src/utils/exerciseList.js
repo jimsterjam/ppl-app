@@ -1,12 +1,21 @@
 import { getAllExercisesOffline } from '@/utils/offlineStorage'
 import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
+import { fetchExercises } from '@/api/exercises'
 
 // Merge offline exercises with JSON defaults, dedupe by name+equipment, optional equipment filter,
 // and sort alphabetically by first three letters, then full name
-export async function getMergedSortedExercises({ category = '', equipment = '', locale = '' } = {}) {
+export async function getMergedSortedExercises({ category = '', equipment = '', locale = '', includeRemote = true } = {}) {
   // Build quick lookup by both DE and EN names from defaults
   const normalize = (s) => (s || '').trim().toLowerCase()
-  const defaults = await loadDefaultExercises()
+  const isGermanLocale = String(locale || '').toLowerCase().startsWith('de')
+  let defaults = []
+  try {
+    defaults = await loadDefaultExercises()
+  } catch (err) {
+    console.warn('[ExerciseList] loadDefaultExercises failed:', err?.message || err)
+  }
+  if (!Array.isArray(defaults)) defaults = []
+  console.debug('[ExerciseList] defaults loaded:', defaults.length, '| category:', category || '(all)')
   const nameIndex = new Map()
   for (const d of defaults) {
     const de = normalize(d.name)
@@ -15,10 +24,13 @@ export async function getMergedSortedExercises({ category = '', equipment = '', 
     if (en) nameIndex.set(en, d)
   }
 
-  const pickDisplayName = (rawName) => {
-    const d = nameIndex.get(normalize(rawName))
-    if (d) return String(locale).toLowerCase().startsWith('de') ? (d.name || rawName) : (d.name_en || d.name || rawName)
-    return rawName || ''
+  const pickDisplayName = (exercise = {}) => {
+    const rawName = exercise?.name || ''
+    const d = nameIndex.get(normalize(rawName)) || nameIndex.get(normalize(exercise?.name_en))
+    if (isGermanLocale) {
+      return d?.name || exercise?.names?.de || exercise?.name_de || rawName || exercise?.name_en || ''
+    }
+    return d?.name_en || d?.name || exercise?.name_en || rawName || ''
   }
   const canonNameKey = (rawName) => {
     const d = nameIndex.get(normalize(rawName))
@@ -37,7 +49,7 @@ export async function getMergedSortedExercises({ category = '', equipment = '', 
     const filteredDefaults = category ? defaults.filter(ex => (ex.category || '') === category) : defaults
     const mappedDefaults = filteredDefaults.map(ex => ({
       ...ex,
-      displayName: pickDisplayName(ex.name),
+      displayName: pickDisplayName(ex),
       __canonKey: `${canonNameKey(ex.name)}__${canonEquipKey(ex.equipment, ex.name)}`,
       _id: ex._id || `json_${normalize(ex.name)}_${normalize(ex.equipment || 'bodyweight')}`
     }))
@@ -45,12 +57,23 @@ export async function getMergedSortedExercises({ category = '', equipment = '', 
   } catch {
     list = []
   }
+  if (includeRemote) {
+    try {
+      const remote = await fetchExercises({ category, equipment })
+      const mappedRemote = (Array.isArray(remote) ? remote : []).map(ex => ({
+        ...ex,
+        displayName: pickDisplayName(ex),
+        __canonKey: `${canonNameKey(ex.name)}__${canonEquipKey(ex.equipment, ex.name)}`
+      }))
+      list = [...list, ...mappedRemote]
+    } catch {}
+  }
   try {
     // Append offline stored exercises with optional category filter
     const offline = await getAllExercisesOffline({ category })
     const mappedOffline = (Array.isArray(offline) ? offline : []).map(ex => ({
       ...ex,
-      displayName: pickDisplayName(ex.name),
+      displayName: pickDisplayName(ex),
       __canonKey: `${canonNameKey(ex.name)}__${canonEquipKey(ex.equipment, ex.name)}`
     }))
     list = [...list, ...mappedOffline]
@@ -66,7 +89,9 @@ export async function getMergedSortedExercises({ category = '', equipment = '', 
   const seen = new Set()
   const unique = []
   for (const ex of list) {
-    const key = ex.__canonKey || `${normalize(ex.name)}__${normalize(ex.equipment || 'bodyweight')}`
+    const key = isGermanLocale
+      ? normalize(ex.displayName || ex.name || ex.name_en)
+      : (ex.__canonKey || `${normalize(ex.name)}__${normalize(ex.equipment || 'bodyweight')}`)
     if (!seen.has(key)) { seen.add(key); unique.push(ex) }
   }
 
@@ -79,5 +104,6 @@ export async function getMergedSortedExercises({ category = '', equipment = '', 
     return an.localeCompare(bn)
   })
 
+  console.debug('[ExerciseList] final sorted result:', sorted.length, '| unique:', unique.length)
   return sorted
 }

@@ -26,10 +26,7 @@ if (!MONGO_URI) {
   process.exit(1);
 }
 
-mongoose.connect(MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-}).then(() => {
+mongoose.connect(MONGO_URI).then(() => {
   logger.info("MongoDB verbunden");
   app.listen(PORT, HOST, () => {
     logger.info(`Server läuft auf http://${HOST}:${PORT}`);

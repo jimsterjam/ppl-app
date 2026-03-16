@@ -7,6 +7,25 @@
       </header>
 
       <div class="timer-config-body">
+        <div class="mode-switch" role="tablist" aria-label="Timer-Modus">
+          <button
+            class="mode-btn"
+            :class="{ active: mode === 'interval' }"
+            type="button"
+            @click="mode = 'interval'"
+          >
+            {{ t('timer.modeInterval') || 'Intervall' }}
+          </button>
+          <button
+            class="mode-btn"
+            :class="{ active: mode === 'stopwatch' }"
+            type="button"
+            @click="mode = 'stopwatch'"
+          >
+            {{ t('timer.modeStopwatch') || 'Stoppuhr' }}
+          </button>
+        </div>
+
         <div class="config-grid">
           <!-- Stunden-Eingabe entfernt -->
           <label>
@@ -43,7 +62,26 @@
           </label>
         </div>
 
-        <div class="config-grid">
+        <div class="mode-switch" role="tablist" aria-label="Zeitrichtung">
+          <button
+            class="mode-btn"
+            :class="{ active: countDirection === 'down' }"
+            type="button"
+            @click="countDirection = 'down'"
+          >
+            {{ t('timer.directionDown') || 'Runter' }}
+          </button>
+          <button
+            class="mode-btn"
+            :class="{ active: countDirection === 'up' }"
+            type="button"
+            @click="countDirection = 'up'"
+          >
+            {{ t('timer.directionUp') || 'Hoch' }}
+          </button>
+        </div>
+
+        <div v-if="mode === 'interval'" class="config-grid">
           <label>
             <span>{{ t('timer.restSeconds') }}</span>
             <div class="number-with-spinner">
@@ -95,17 +133,10 @@
         </div>
 
         <div class="toggle-grid">
-          <label class="toggle">
-            <input v-model="countdownSound" type="checkbox" :disabled="speechEnabled" />
+          <label class="toggle slider-toggle" :class="{ on: countdownSound }">
             <span>{{ t('timer.countdownSound') }}</span>
-          </label>
-          <label class="toggle">
-            <input v-model="speechEnabled" type="checkbox" />
-            <span>{{ t('timer.speech') }}</span>
-          </label>
-          <label class="toggle">
-            <input v-model="vibration" type="checkbox" />
-            <span>{{ t('timer.vibration') }}</span>
+            <input v-model="countdownSound" type="checkbox" class="sr-only" />
+            <span class="slider" aria-hidden="true"><span class="knob" /></span>
           </label>
         </div>
       </div>
@@ -138,23 +169,21 @@
 import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useTimerStore } from '@/stores/timerStore'
-import { useToastStore } from '@/stores/toastStore'
 import NumberPicker from '@/components/NumberPicker.vue'
 
 const emit = defineEmits(['close'])
 const { t, locale } = useI18n()
 const timerStore = useTimerStore()
-const toast = useToastStore()
 
 // Stunden-Eingabe entfernt
+const mode = ref(String(timerStore.config.mode || 'interval') === 'stopwatch' ? 'stopwatch' : 'interval')
+const countDirection = ref(String(timerStore.config.countDirection || 'down') === 'up' ? 'up' : 'down')
 const minutes = ref(timerStore.config.minutes)
 const seconds = ref(timerStore.config.seconds)
 const prepSeconds = ref(timerStore.config.prepSeconds ?? 0)
 const restSeconds = ref(timerStore.config.restSeconds)
 const intervals = ref(timerStore.config.intervals)
 const countdownSound = ref(timerStore.config.countdownSound)
-const speechEnabled = ref(timerStore.config.speechEnabled)
-const vibration = ref(timerStore.config.vibration)
 
 const isMobile = ref(typeof window !== 'undefined' && ('ontouchstart' in window || window.innerWidth <= 768))
 const pickerVisible = ref(false)
@@ -221,6 +250,7 @@ function onPickerCancel() {
 }
 
 const isValid = computed(() => {
+  if (mode.value === 'stopwatch') return true
   const totalSeconds = (minutes.value * 60) + seconds.value
   return totalSeconds > 0
 })
@@ -232,25 +262,20 @@ function close() {
 function saveAndStart() {
   if (!isValid.value) return
   timerStore.unlockAudio()
-  timerStore.unlockSpeech()
   timerStore.start({
+    mode: mode.value,
+    countDirection: countDirection.value,
     // hours entfernt
     minutes: minutes.value,
     seconds: seconds.value,
     prepSeconds: prepSeconds.value,
-    restSeconds: restSeconds.value,
-    intervals: intervals.value,
-    countdown: true,
-    countdownSound: speechEnabled.value ? false : countdownSound.value,
-    speechEnabled: speechEnabled.value,
-    speechLocale: String(locale?.value || 'de-DE'),
-    vibration: vibration.value
+    restSeconds: mode.value === 'interval' ? restSeconds.value : 0,
+    intervals: mode.value === 'interval' ? intervals.value : 1,
+    countdown: mode.value === 'interval' ? true : (countDirection.value === 'down'),
+    countdownSound: countdownSound.value,
+    speechEnabled: false,
+    speechLocale: String(locale?.value || 'de-DE')
   })
-  if (speechEnabled.value) {
-    const backend = timerStore.ttsBackend()
-    const label = backend === 'native' ? 'Native TTS' : backend === 'web' ? 'Web Speech' : 'No TTS'
-    toast.info(`TTS: ${label}`, { duration: 2500 })
-  }
   emit('close')
 }
 </script>
@@ -305,6 +330,31 @@ function saveAndStart() {
   display: grid;
   gap: 16px;
   overflow-y: auto;
+}
+
+.mode-switch {
+  display: inline-flex;
+  gap: 8px;
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--card-border) 70%, transparent);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+}
+
+.mode-btn {
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  padding: 8px 12px;
+  border-radius: 9px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mode-btn.active {
+  color: var(--fg);
+  border-color: color-mix(in srgb, var(--accent-color) 45%, transparent);
+  background: color-mix(in srgb, var(--accent-color) 16%, transparent);
 }
 
 .config-grid {
@@ -375,9 +425,52 @@ select {
 .toggle {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
+  gap: 12px;
   color: var(--fg);
   font-size: 0.9rem;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  border: 0;
+  padding: 0;
+  clip: rect(0 0 0 0);
+  overflow: hidden;
+}
+
+.slider-toggle .slider {
+  width: 52px;
+  height: 30px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--card-border) 75%, transparent);
+  border: 1px solid color-mix(in srgb, var(--card-border) 80%, transparent);
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.slider-toggle .knob {
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.32);
+  transition: transform 0.2s ease;
+}
+
+.slider-toggle.on .slider {
+  background: color-mix(in srgb, var(--accent) 55%, #0d1117 45%);
+  border-color: color-mix(in srgb, var(--accent) 65%, transparent);
+}
+
+.slider-toggle.on .knob {
+  transform: translateX(22px);
 }
 
 .timer-config-footer {

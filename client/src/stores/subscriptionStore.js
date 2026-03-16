@@ -40,6 +40,16 @@ import { fetchSubscriptionStatus, upgradeSubscriptionRequest } from '@/api/subsc
 // context and calling useClerk() may throw. We will rely on getAuthToken()
 // which falls back to window.Clerk or cached tokens.
 
+const TRANSIENT_REQUEST_COOLDOWN_MS = 15000
+let subscriptionCheckPromise = null
+let subscriptionCooldownUntil = 0
+
+function isTransientRequestError(error) {
+  const status = Number(error?.statusCode || error?.response?.status || error?.context?.originalError?.response?.status || 0)
+  const code = String(error?.code || error?.context?.originalError?.code || '')
+  return status === 0 || [502, 503, 504].includes(status) || code === 'ECONNABORTED' || code === 'ERR_NETWORK'
+}
+
 export const useSubscriptionStore = defineStore('subscription', () => {
   const DEV_PLAN_KEY = 'bro_split_dev_plan'
   const USAGE_KEY = 'bro_split_usage'
@@ -142,7 +152,9 @@ export const useSubscriptionStore = defineStore('subscription', () => {
   }
 
   // Subscription Status checken
-  const checkSubscription = async (planOverride = null) => {
+  const checkSubscription = async (planOverride = null, options = {}) => {
+    const force = options?.force === true
+
     try {
       const savedUsage = localStorage.getItem(USAGE_KEY)
       if (savedUsage) {
@@ -160,50 +172,74 @@ export const useSubscriptionStore = defineStore('subscription', () => {
       applyPlan(planOverride || 'free', { persist: true, reason: 'bootstrap' })
     }
 
-    try {
-      const token = await getAuthToken()
-      if (token) {
-        const remote = await fetchSubscriptionStatus(token)
-        const remoteSub = remote?.subscription || null
-        const remoteUsage = remote?.usage || null
+    if (subscriptionCheckPromise) {
+      return subscriptionCheckPromise
+    }
 
-        if (remoteSub && remoteSub.plan) {
-          subscription.value = {
-            plan: remoteSub.plan,
-            status: remoteSub.status || 'active',
-            billingCycle: remoteSub.billingCycle || null,
-            expiresAt: remoteSub.expiresAt || null,
-            features: Array.isArray(remoteSub.features) ? remoteSub.features : []
-          }
-          localStorage.setItem('bro_split_subscription', JSON.stringify(subscription.value))
-        }
-
-        if (remoteUsage) {
-          usage.value = {
-            ...usage.value,
-            workoutsThisWeek: Number(remoteUsage.workoutsThisWeek) || 0,
-            workoutsThisMonth: Number(remoteUsage.workoutsThisMonth) || 0,
-            totalWorkouts: Number(remoteUsage.totalWorkouts) || 0,
-            lastWorkoutDate: remoteUsage.lastWorkoutDate || null,
-            aiWeeklyCount: Number(remoteUsage?.ai?.weeklyCount) || 0,
-            aiWeeklyLimit: Number.isFinite(Number(remoteUsage?.ai?.weeklyLimit))
-              ? Number(remoteUsage?.ai?.weeklyLimit)
-              : -1,
-            aiWeekWindowStart: remoteUsage?.ai?.weekWindowStart || null
-          }
-          persistUsage()
-        }
+    if (!force && subscriptionCooldownUntil > Date.now()) {
+      const effectiveOverride = planOverride || devPlanOverride.value
+      if (effectiveOverride && limits.value[effectiveOverride]) {
+        applyPlan(effectiveOverride, { persist: false, reason: 'dev-override' })
       }
-    } catch (error) {
-      logger.warn('⚠️ Subscription status fallback to local cache:', error?.message)
+      ensureQuickGeneratorMonthWindow()
+      return subscription.value
     }
 
-    const effectiveOverride = planOverride || devPlanOverride.value
-    if (effectiveOverride && limits.value[effectiveOverride]) {
-      applyPlan(effectiveOverride, { persist: false, reason: 'dev-override' })
-    }
+    subscriptionCheckPromise = (async () => {
+      try {
+        const token = await getAuthToken()
+        if (token) {
+          const remote = await fetchSubscriptionStatus(token)
+          const remoteSub = remote?.subscription || null
+          const remoteUsage = remote?.usage || null
 
-    ensureQuickGeneratorMonthWindow()
+          if (remoteSub && remoteSub.plan) {
+            subscription.value = {
+              plan: remoteSub.plan,
+              status: remoteSub.status || 'active',
+              billingCycle: remoteSub.billingCycle || null,
+              expiresAt: remoteSub.expiresAt || null,
+              features: Array.isArray(remoteSub.features) ? remoteSub.features : []
+            }
+            localStorage.setItem('bro_split_subscription', JSON.stringify(subscription.value))
+          }
+
+          if (remoteUsage) {
+            usage.value = {
+              ...usage.value,
+              workoutsThisWeek: Number(remoteUsage.workoutsThisWeek) || 0,
+              workoutsThisMonth: Number(remoteUsage.workoutsThisMonth) || 0,
+              totalWorkouts: Number(remoteUsage.totalWorkouts) || 0,
+              lastWorkoutDate: remoteUsage.lastWorkoutDate || null,
+              aiWeeklyCount: Number(remoteUsage?.ai?.weeklyCount) || 0,
+              aiWeeklyLimit: Number.isFinite(Number(remoteUsage?.ai?.weeklyLimit))
+                ? Number(remoteUsage?.ai?.weeklyLimit)
+                : -1,
+              aiWeekWindowStart: remoteUsage?.ai?.weekWindowStart || null
+            }
+            persistUsage()
+          }
+          subscriptionCooldownUntil = 0
+        }
+      } catch (error) {
+        if (isTransientRequestError(error)) {
+          subscriptionCooldownUntil = Date.now() + TRANSIENT_REQUEST_COOLDOWN_MS
+        }
+        logger.warn('⚠️ Subscription status fallback to local cache:', error?.message)
+      }
+
+      const effectiveOverride = planOverride || devPlanOverride.value
+      if (effectiveOverride && limits.value[effectiveOverride]) {
+        applyPlan(effectiveOverride, { persist: false, reason: 'dev-override' })
+      }
+
+      ensureQuickGeneratorMonthWindow()
+      return subscription.value
+    })().finally(() => {
+      subscriptionCheckPromise = null
+    })
+
+    return subscriptionCheckPromise
   }
   
   // Demo-Reset Funktion für Testing

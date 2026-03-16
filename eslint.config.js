@@ -9,6 +9,7 @@ export default [
   {
     ignores: [
       'client/dist/**',
+      'client/dist */**',
       'client/ios/App/App/public/**',
       'future-features/**',
       'client/node_modules/**',

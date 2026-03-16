@@ -2,6 +2,17 @@ import { defineStore } from 'pinia'
 import { fetchAccountProfile, updateAccountProfile } from '@/api/account'
 import { logger } from '@/utils/logger'
 
+const PROFILE_REQUEST_COOLDOWN_MS = 15000
+let profileLoadPromise = null
+let profileLoadPromiseToken = ''
+let profileCooldownUntil = 0
+
+function isTransientRequestError(error) {
+  const statusCode = Number(error?.statusCode || error?.response?.status || error?.context?.originalError?.response?.status || 0)
+  const code = String(error?.code || error?.context?.originalError?.code || '')
+  return statusCode === 0 || [502, 503, 504].includes(statusCode) || code === 'ECONNABORTED' || code === 'ERR_NETWORK'
+}
+
 export const useSettingsStore = defineStore('settings', {
   state: () => ({
     language: (() => {
@@ -21,34 +32,66 @@ export const useSettingsStore = defineStore('settings', {
     })()
   }),
   actions: {
-    async loadProfile(token) {
-      if (!token) return null
-      try {
-        const profile = await fetchAccountProfile(token)
-        const username = String(profile?.username ?? '').trim().slice(0, 24)
-        const avatarUrl = String(profile?.avatarUrl ?? '').trim()
-        this.username = username
-        this.avatarUrl = avatarUrl
-        try {
-          if (username) localStorage.setItem('app-username', username)
-          else localStorage.removeItem('app-username')
-        } catch {}
-        try {
-          if (avatarUrl) localStorage.setItem('app-avatar-url', avatarUrl)
-          else localStorage.removeItem('app-avatar-url')
-        } catch {}
-        return profile
-      } catch (error) {
-        logger.warn('⚠️ [settingsStore] loadProfile fallback to cached local values:', {
-          message: error?.message,
-          statusCode: error?.statusCode || 0,
-          code: error?.context?.originalError?.code || null
-        })
+    async loadProfile(token, options = {}) {
+      if (!token) {
         return {
           username: this.username || '',
           avatarUrl: this.avatarUrl || ''
         }
       }
+
+      const force = options?.force === true
+      const tokenKey = String(token).slice(-16)
+
+      if (profileLoadPromise && profileLoadPromiseToken === tokenKey) {
+        return profileLoadPromise
+      }
+
+      if (!force && profileCooldownUntil > Date.now()) {
+        return {
+          username: this.username || '',
+          avatarUrl: this.avatarUrl || ''
+        }
+      }
+
+      profileLoadPromiseToken = tokenKey
+      profileLoadPromise = (async () => {
+        try {
+          const profile = await fetchAccountProfile(token)
+          const username = String(profile?.username ?? '').trim().slice(0, 24)
+          const avatarUrl = String(profile?.avatarUrl ?? '').trim()
+          this.username = username
+          this.avatarUrl = avatarUrl
+          profileCooldownUntil = 0
+          try {
+            if (username) localStorage.setItem('app-username', username)
+            else localStorage.removeItem('app-username')
+          } catch {}
+          try {
+            if (avatarUrl) localStorage.setItem('app-avatar-url', avatarUrl)
+            else localStorage.removeItem('app-avatar-url')
+          } catch {}
+          return profile
+        } catch (error) {
+          if (isTransientRequestError(error)) {
+            profileCooldownUntil = Date.now() + PROFILE_REQUEST_COOLDOWN_MS
+          }
+          logger.warn('⚠️ [settingsStore] loadProfile fallback to cached local values:', {
+            message: error?.message,
+            statusCode: error?.statusCode || 0,
+            code: error?.context?.originalError?.code || null
+          })
+          return {
+            username: this.username || '',
+            avatarUrl: this.avatarUrl || ''
+          }
+        }
+      })().finally(() => {
+        profileLoadPromise = null
+        profileLoadPromiseToken = ''
+      })
+
+      return profileLoadPromise
     },
 
     async saveUsername(token, name) {

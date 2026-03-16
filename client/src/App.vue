@@ -2,6 +2,7 @@
 import { onMounted } from 'vue'
 import { RouterView } from 'vue-router'
 import ToastHost from './components/ToastHost.vue'
+import TimerPortal from './components/timer/TimerPortal.vue'
 import { setupAutoSync } from './utils/syncManager'
 import { initializeDefaultExercises } from './utils/offlineStorage'
 import { logger } from './utils/logger'
@@ -21,11 +22,12 @@ onMounted(async () => {
   <div id="app">
     <RouterView v-slot="{ Component, route }">
       <Transition name="page-fade" mode="out-in" appear>
-        <div class="route-view" :key="route.meta.layout || route.matched[0]?.name || route.path">
+        <div :key="route.meta.layout || route.matched[0]?.name || route.path" class="route-view">
           <component :is="Component" />
         </div>
       </Transition>
     </RouterView>
+    <TimerPortal />
     <ToastHost />
   </div>
 </template>

@@ -14,7 +14,7 @@
           :key="pulseKey" 
           class="timer-pulse" 
           aria-hidden="true" />
-    <div class="timer-main">
+    <div class="timer-main" role="button" tabindex="0" @click="toggleExpandedFromMain" @keydown.enter.prevent="toggleExpandedFromMain" @keydown.space.prevent="toggleExpandedFromMain">
       <div class="timer-status">
         <span class="status-text">{{ statusLabel }}</span>
         <span v-if="intervalLabel" class="interval-text">{{ intervalLabel }}</span>
@@ -63,8 +63,6 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useTimerStore } from '@/stores/timerStore'
 
-const emit = defineEmits(['close'])
-
 const { t } = useI18n()
 const timerStore = useTimerStore()
 
@@ -94,12 +92,18 @@ const isPrepPhase = computed(() => prepRemainingMs.value > 0)
 
 // Labels
 const statusLabel = computed(() => {
-  if (isPrepPhase.value) return 'PREP'
+  if (isPrepPhase.value) return t('timer.prepTime') || 'Prep Time'
+  if (timerStore.isCompleted) return t('timer.statusCompleted') || 'Fertig'
+  if (timerStore.isArmed) return t('timer.statusArmed') || 'Bereit'
+  if (timerStore.isStopwatchMode) {
+    return timerStore.isPaused ? t('timer.statusPaused') : (t('timer.modeStopwatch') || 'Stoppuhr')
+  }
   if (timerStore.isPaused) return t('timer.statusPaused')
   if (isRest.value) return t('timer.statusRest')
   return t('timer.statusRunning')
 })
 const intervalLabel = computed(() => {
+  if (timerStore.isStopwatchMode) return ''
   if (isPrepPhase.value) return ''
   if (phaseInfo.value.intervalTotal <= 1) return ''
   return t('timer.intervalLabel', {
@@ -129,6 +133,17 @@ const visualElapsedMs = computed(() => {
 })
 
 const visualPhase = computed(() => {
+  if (timerStore.isStopwatchMode) {
+    const startMs = Math.max(0, (Number(timerStore.config.minutes || 0) * 60 + Number(timerStore.config.seconds || 0)) * 1000)
+    const direction = String(timerStore.config.countDirection || 'down') === 'up' ? 'up' : 'down'
+    if (direction === 'down') {
+      return {
+        phaseElapsed: Math.min(startMs, visualElapsedMs.value),
+        phaseDuration: startMs
+      }
+    }
+    return { phaseElapsed: visualElapsedMs.value, phaseDuration: 0 }
+  }
   const work = timerStore.workMs
   const rest = timerStore.restMs
   const intervals = Math.max(1, timerStore.config.intervals)
@@ -145,6 +160,13 @@ const visualPhase = computed(() => {
 
 const displayMs = computed(() => {
   if (isPrepPhase.value) return prepRemainingMs.value
+  if (timerStore.isStopwatchMode) {
+    const startMs = Math.max(0, (Number(timerStore.config.minutes || 0) * 60 + Number(timerStore.config.seconds || 0)) * 1000)
+    const direction = String(timerStore.config.countDirection || 'down') === 'up' ? 'up' : 'down'
+    return direction === 'down'
+      ? Math.max(0, startMs - visualElapsedMs.value)
+      : (startMs + visualElapsedMs.value)
+  }
   if (!timerStore.config.countdown) return visualPhase.value.phaseElapsed
   return Math.max(0, visualPhase.value.phaseDuration - visualPhase.value.phaseElapsed)
 })
@@ -156,6 +178,14 @@ const progressWidth = computed(() => {
     if (!prepTotalMs) return '0%'
     const prepElapsed = Math.max(0, prepTotalMs - prepRemainingMs.value)
     return `${Math.min(100, (prepElapsed / prepTotalMs) * 100).toFixed(2)}%`
+  }
+  if (timerStore.isStopwatchMode) {
+    const direction = String(timerStore.config.countDirection || 'down') === 'up' ? 'up' : 'down'
+    if (direction === 'up') return '0%'
+    const duration = visualPhase.value.phaseDuration
+    if (!duration) return '0%'
+    const percent = (visualPhase.value.phaseElapsed / duration) * 100
+    return `${Math.min(100, percent).toFixed(2)}%`
   }
   const duration = visualPhase.value.phaseDuration
   if (!duration) return '0%'
@@ -200,7 +230,6 @@ onBeforeUnmount(() => {
 // Timer Controls
 function toggleRun() {
   timerStore.unlockAudio()
-  timerStore.unlockSpeech()
 
   if (timerStore.isRunning) {
     timerStore.pause()
@@ -213,13 +242,15 @@ function toggleRun() {
 
 function resetTimer() {
   timerStore.unlockAudio()
-  timerStore.unlockSpeech()
   timerStore.prepare({ ...timerStore.config })
 }
 
 function closeTimer() {
   timerStore.reset()
-  emit('close')
+}
+
+function toggleExpandedFromMain() {
+  isExpanded.value = !isExpanded.value
 }
 
 
@@ -235,8 +266,9 @@ function updateOrientation() {
   if (typeof window === 'undefined') return
   const media = window.matchMedia?.('(orientation: landscape)')
   isLandscape.value = media ? media.matches : window.innerWidth > window.innerHeight
+  // In Landscape always start in fullscreen-like expanded mode for readability.
   if (isLandscape.value) {
-    isExpanded.value = false
+    isExpanded.value = true
   }
 }
 </script>
@@ -250,10 +282,10 @@ function updateOrientation() {
   z-index: 3000;
   --timer-time-base: 2.2rem;
   --timer-time-size: var(--timer-time-base);
-  --timer-icon-size: 44px;
-  --timer-icon-primary-size: 56px;
-  --timer-glyph-size: 24px;
-  --timer-glyph-primary-size: 28px;
+  --timer-icon-size: 62px;
+  --timer-icon-primary-size: 76px;
+  --timer-glyph-size: 36px;
+  --timer-glyph-primary-size: 42px;
   --timer-controls-gap: 12px;
   display: grid;
   gap: 6px;
@@ -298,6 +330,7 @@ function updateOrientation() {
   --timer-controls-gap: 14px;
   padding: 12px 14px 12px;
   background: color-mix(in srgb, var(--bg-panel) 96%, black 4%);
+  min-height: min(52vh, 460px);
 }
 
 .timer-accent {
@@ -325,6 +358,7 @@ function updateOrientation() {
 .timer-main {
   display: grid;
   gap: 4px;
+  cursor: pointer;
 }
 
 .timer-status {
@@ -413,14 +447,14 @@ function updateOrientation() {
   width: var(--timer-icon-size);
   height: var(--timer-icon-size);
   border-radius: 12px;
-  border: 1px solid color-mix(in srgb, var(--accent) 70%, transparent);
-  background: transparent;
+  border: 2px solid color-mix(in srgb, var(--accent) 85%, transparent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
   color: var(--accent);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
 }
 
 .timer-bar.expanded .timer-icon {
@@ -433,6 +467,8 @@ function updateOrientation() {
   height: var(--timer-icon-primary-size);
   background: var(--accent);
   color: var(--accent-contrast);
+  border-color: color-mix(in srgb, var(--accent) 92%, black 8%);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 }
 
 .timer-bar.expanded .timer-icon.primary {
@@ -448,12 +484,16 @@ function updateOrientation() {
 .timer-icon .icon {
   width: var(--timer-glyph-size);
   height: var(--timer-glyph-size);
-  stroke-width: 2.25;
+  stroke-width: 3.1;
 }
 
 .timer-icon.primary .icon {
   width: var(--timer-glyph-primary-size);
   height: var(--timer-glyph-primary-size);
+}
+
+.timer-icon:active {
+  transform: translateY(1px);
 }
 
 .timer-bar.expanded .timer-icon .icon {
@@ -494,10 +534,10 @@ function updateOrientation() {
   .timer-bar {
     --timer-time-base: 2rem;
     --timer-time-size: var(--timer-time-base);
-    --timer-icon-size: 44px;
-    --timer-icon-primary-size: 54px;
-    --timer-glyph-size: 24px;
-    --timer-glyph-primary-size: 28px;
+    --timer-icon-size: 64px;
+    --timer-icon-primary-size: 80px;
+    --timer-glyph-size: 38px;
+    --timer-glyph-primary-size: 44px;
     --timer-controls-gap: 10px;
   }
   .timer-bar.expanded {
@@ -530,7 +570,7 @@ function updateOrientation() {
     display: none;
   }
 
-  .timer-bar {
+  .timer-bar.expanded {
     position: fixed;
     inset: 0;
     width: 100vw;
@@ -557,10 +597,6 @@ function updateOrientation() {
     display: none;
   }
 
-  .timer-icon.expand {
-    display: none;
-  }
-
   /* Alles ausblenden */
   .timer-accent,
   .timer-pulse,
@@ -568,7 +604,7 @@ function updateOrientation() {
     display: none !important;
   }
 
-  .timer-status {
+  .timer-bar.expanded .timer-status {
     display: flex !important;
     margin-bottom: 18px;
     font-size: clamp(1.2rem, 2.2vw, 2rem);
@@ -576,13 +612,13 @@ function updateOrientation() {
     color: color-mix(in srgb, var(--fg) 88%, transparent);
   }
 
-  .interval-text {
+  .timer-bar.expanded .interval-text {
     font-size: 0.74em;
     color: color-mix(in srgb, var(--fg) 72%, transparent);
   }
 
   /* Zeit riesig */
-  .timer-time {
+  .timer-bar.expanded .timer-time {
     font-size: clamp(100px, 20vw, 280px);
     font-weight: 700;
     letter-spacing: 0.08em;
@@ -597,14 +633,14 @@ function updateOrientation() {
   }
 
   /* Controls */
-  .timer-controls {
+  .timer-bar.expanded .timer-controls {
     display: flex;
     justify-content: center;
     align-items: center;
     gap: 36px;
   }
 
-  .timer-icon {
+  .timer-bar.expanded .timer-icon {
     width: 110px;
     height: 110px;
     border-radius: 20px;
@@ -618,7 +654,7 @@ function updateOrientation() {
     color: var(--accent);
   }
 
-  .timer-icon.primary {
+  .timer-bar.expanded .timer-icon.primary {
     width: 140px;
     height: 140px;
     border-radius: 26px;
@@ -628,12 +664,12 @@ function updateOrientation() {
     border: none;
   }
 
-  .timer-icon .icon {
+  .timer-bar.expanded .timer-icon .icon {
     width: 48px;
     height: 48px;
   }
 
-  .timer-icon.primary .icon {
+  .timer-bar.expanded .timer-icon.primary .icon {
     width: 60px;
     height: 60px;
   }

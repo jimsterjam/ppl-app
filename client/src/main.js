@@ -8,6 +8,8 @@ import { createI18nInstance } from './i18n'
 import { useThemeStore } from './stores/themeStore'
 import { useSubscriptionStore } from './stores/subscriptionStore'
 import { useAuthStore } from './stores/authStore'
+import { useUserStore } from './stores/userStore'
+import { useTimerStore } from './stores/timerStore'
 import { initFirebaseAuth, useFirebaseAuth } from './utils/firebaseAuth'
 import { App as CapacitorApp } from '@capacitor/app'
 import { logger } from '@/utils/logger'
@@ -18,6 +20,27 @@ import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
 
 const APP_RESUME_STATE_KEY = 'app_resume_state_v1'
 const APP_RESUME_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
+
+function setupGlobalDoubleTapZoomBlock() {
+  if (typeof document === 'undefined') return
+
+  let lastTouchEndAt = 0
+
+  // Block browser-level zoom gesture on quick double taps.
+  document.addEventListener('touchend', (event) => {
+    const now = Date.now()
+    if (now - lastTouchEndAt <= 320) {
+      event.preventDefault()
+    }
+    lastTouchEndAt = now
+  }, { passive: false })
+
+  document.addEventListener('dblclick', (event) => {
+    event.preventDefault()
+  }, { passive: false })
+}
+
+setupGlobalDoubleTapZoomBlock()
 
 function isRouteEligibleForResume(route) {
   const name = String(route?.name || '')
@@ -123,6 +146,8 @@ const i18n = createI18nInstance()
 app.use(pinia)
 app.use(router)
 app.use(i18n)
+const timerStore = useTimerStore(pinia)
+timerStore.restoreState('main-init')
 
 // Letzten Navigationszustand fortlaufend speichern, damit die App nach Background/Screen-Off
 // oder Process-Restart an derselben Stelle weiterlaufen kann.
@@ -145,12 +170,18 @@ async function bootstrapAuth() {
 
   const { onAuthStateChanged, getIdToken, getCurrentUser, handleRedirectResult } = useFirebaseAuth()
   const authStore = useAuthStore(pinia)
+  const userStore = useUserStore(pinia)
+  let lastUid = authStore.uid || null
 
   logger.debug('[main] Initializing auth listener, store auth state:', authStore.isAuthenticated)
 
   onAuthStateChanged(async (user) => {
     logger.debug('[main] Firebase auth state changed:', user ? user.uid : 'null')
     if (user) {
+      if (lastUid && lastUid !== user.uid) {
+        userStore.$reset()
+      }
+      lastUid = user.uid
       const token = await getIdToken().catch((err) => {
         logger.warn('[main] Failed to fetch ID token:', err)
         return null
@@ -198,7 +229,9 @@ async function bootstrapAuth() {
         logger.warn('[main] auto-redirect after sign-in failed:', e)
       }
     } else {
+      lastUid = null
       authStore.clearUser()
+      userStore.$reset()
       clearResumeSnapshot()
     }
   })
@@ -233,18 +266,25 @@ bootstrapAuth()
 // App-Lifecycle: Beim Verlassen Zustand sichern, beim Zurückkehren ggf. wiederherstellen.
 CapacitorApp.addListener('appStateChange', async ({ isActive }) => {
   try {
+    timerStore.setAppActive(isActive)
     if (!isActive) {
       saveResumeSnapshot(router.currentRoute.value, 'appState-inactive')
+      timerStore.persistState(true, 'appState-inactive')
       return
     }
     await tryRestoreLastRoute('appState-active')
+    timerStore.restoreState('appState-active')
   } catch {}
 })
 
 if (typeof document !== 'undefined') {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
+      timerStore.setAppActive(false)
       saveResumeSnapshot(router.currentRoute.value, 'visibility-hidden')
+      timerStore.persistState(true, 'visibility-hidden')
+    } else {
+      timerStore.setAppActive(true)
     }
   })
 }
@@ -252,6 +292,7 @@ if (typeof document !== 'undefined') {
 if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', () => {
     saveResumeSnapshot(router.currentRoute.value, 'beforeunload')
+    timerStore.persistState(true, 'beforeunload')
   })
 }
 

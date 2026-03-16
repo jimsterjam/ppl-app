@@ -14,6 +14,8 @@ import { ensureWorkoutNotes } from './workoutNotes'
 
 export const OFFLINE_WORKOUTS_UPDATED_EVENT = 'offline-workouts-updated'
 const MAX_OFFLINE_WORKOUTS = 400
+const DELETED_WORKOUT_TOMBSTONES_KEY = 'deleted_workout_ids_v1'
+const DELETED_WORKOUT_TOMBSTONE_TTL_MS = 24 * 60 * 60 * 1000
 
 // Dexie Database Instance
 export const db = new Dexie('PPLAppDB')
@@ -39,6 +41,49 @@ function emitOfflineWorkoutsUpdated(detail = {}) {
   } catch (error) {
     logger.warn('⚠️ Offline Storage - Event dispatch failed:', error)
   }
+}
+
+function readDeletedWorkoutTombstones() {
+  if (typeof localStorage === 'undefined') return {}
+  try {
+    const raw = localStorage.getItem(DELETED_WORKOUT_TOMBSTONES_KEY)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function writeDeletedWorkoutTombstones(map) {
+  if (typeof localStorage === 'undefined') return
+  try {
+    localStorage.setItem(DELETED_WORKOUT_TOMBSTONES_KEY, JSON.stringify(map || {}))
+  } catch {}
+}
+
+export function markWorkoutDeleted(id) {
+  const normalizedId = String(id || '').trim()
+  if (!normalizedId) return
+  const next = readDeletedWorkoutTombstones()
+  next[normalizedId] = Date.now()
+  writeDeletedWorkoutTombstones(next)
+}
+
+export function isWorkoutDeleted(id) {
+  const normalizedId = String(id || '').trim()
+  if (!normalizedId) return false
+  const map = readDeletedWorkoutTombstones()
+  const entry = map[normalizedId]
+  if (!entry) return false
+  const timestamp = Number(typeof entry === 'object' ? (entry?.timestamp || entry?.deletedAt || 0) : entry)
+  if (!Number.isFinite(timestamp) || timestamp <= 0) return true
+  return (Date.now() - timestamp) <= DELETED_WORKOUT_TOMBSTONE_TTL_MS
+}
+
+export function filterDeletedWorkouts(list = []) {
+  const items = Array.isArray(list) ? list : []
+  return items.filter((item) => !isWorkoutDeleted(item?._id || item?.id || item?.workoutId))
 }
 
 async function enforceWorkoutHistoryLimit() {
@@ -111,35 +156,48 @@ function sanitizeForIndexedDB(obj) {
  * @returns {Promise<string>} Workout ID
  */
 export async function saveWorkoutOffline(workout) {
-  try {
-    // Sanitize workout vor dem Speichern (entfernt Vue Proxies, Funktionen, etc.)
-    const cleanWorkout = sanitizeForIndexedDB(workout)
-    ensureWorkoutNotes(cleanWorkout)
-    // Draft-Workouts niemals in die Sync-Queue aufnehmen
-    if (cleanWorkout._isDraft) {
+  // Kurzer Retry bei transienten IndexedDB-Abbrüchen (iOS/Safari ist hier empfindlich).
+  const RETRIES = 2
+  for (let attempt = 0; attempt <= RETRIES; attempt++) {
+    try {
+      // Sanitize workout vor dem Speichern (entfernt Vue Proxies, Funktionen, etc.)
+      const cleanWorkout = sanitizeForIndexedDB(workout)
+      ensureWorkoutNotes(cleanWorkout)
+      // Draft-Workouts niemals in die Sync-Queue aufnehmen
+      if (cleanWorkout._isDraft) {
+        await db.workouts.put({
+          ...cleanWorkout,
+          _syncedAt: Date.now()
+        })
+        logger.debug('💾 Offline Storage - Draft gespeichert (kein Sync!):', cleanWorkout._id)
+        emitOfflineWorkoutsUpdated({ type: 'draft-save', id: cleanWorkout._id })
+        return cleanWorkout._id
+      }
+      // Normale Workouts wie gehabt speichern
       await db.workouts.put({
         ...cleanWorkout,
         _syncedAt: Date.now()
       })
-      logger.debug('💾 Offline Storage - Draft gespeichert (kein Sync!):', cleanWorkout._id)
-      emitOfflineWorkoutsUpdated({ type: 'draft-save', id: cleanWorkout._id })
-      return cleanWorkout._id
-    }
-    // Normale Workouts wie gehabt speichern
-    await db.workouts.put({
-      ...cleanWorkout,
-      _syncedAt: Date.now()
-    })
-    logger.debug('💾 Offline Storage - Workout gespeichert:', cleanWorkout._id)
-    emitOfflineWorkoutsUpdated({ type: 'save', id: cleanWorkout._id })
+      logger.debug('💾 Offline Storage - Workout gespeichert:', cleanWorkout._id)
+      emitOfflineWorkoutsUpdated({ type: 'save', id: cleanWorkout._id })
 
-    // WICHTIG: Drafts nicht global löschen.
-    // Das führte zu Race-Conditions, bei denen neue Drafts im Dashboard kurz verschwanden.
-    await enforceWorkoutHistoryLimit()
-    return cleanWorkout._id
-  } catch (error) {
-    logger.error('❌ Offline Storage - Fehler beim Speichern:', error, workout)
-    throw error
+      // WICHTIG: Drafts nicht global löschen.
+      // Das führte zu Race-Conditions, bei denen neue Drafts im Dashboard kurz verschwanden.
+      await enforceWorkoutHistoryLimit()
+      return cleanWorkout._id
+    } catch (error) {
+      const isRetryable = error?.name === 'AbortError' || error?.name === 'UnknownError'
+      if (isRetryable && attempt < RETRIES) {
+        logger.warn('⚠️ Offline Storage - Retry nach transientem IndexedDB-Fehler', {
+          attempt: attempt + 1,
+          error: error?.name || 'unknown'
+        })
+        await new Promise((resolve) => setTimeout(resolve, 40 * (attempt + 1)))
+        continue
+      }
+      logger.error('❌ Offline Storage - Fehler beim Speichern:', error, workout)
+      throw error
+    }
   }
 }
 
@@ -150,6 +208,7 @@ export async function saveWorkoutOffline(workout) {
  */
 export async function getWorkoutOffline(id) {
   try {
+    if (isWorkoutDeleted(id)) return null
     const workout = await db.workouts.get(id)
     if (workout) {
       logger.debug('📦 Offline Storage - Workout geladen:', id)
@@ -182,7 +241,7 @@ export async function getAllWorkoutsOffline(filters = {}) {
       query = query.filter(w => w.completed === filters.completed)
     }
     
-    const workouts = await query.toArray()
+    const workouts = filterDeletedWorkouts(await query.toArray())
     logger.debug('📦 Offline Storage - Workouts geladen:', workouts.length)
     return workouts
   } catch (error) {
@@ -198,6 +257,7 @@ export async function getAllWorkoutsOffline(filters = {}) {
  */
 export async function deleteWorkoutOffline(id) {
   try {
+    markWorkoutDeleted(id)
     await db.workouts.delete(id)
     logger.debug('🗑️ Offline Storage - Workout gelöscht:', id)
     emitOfflineWorkoutsUpdated({ type: 'delete', id })
@@ -215,7 +275,7 @@ export async function deleteWorkoutOffline(id) {
 export async function cacheWorkouts(workouts) {
   try {
     // Sanitize alle Workouts
-    const cleanWorkouts = workouts.map(w => {
+    const cleanWorkouts = filterDeletedWorkouts(workouts).map(w => {
       const sanitized = sanitizeForIndexedDB(w)
       ensureWorkoutNotes(sanitized)
       return sanitized
@@ -343,13 +403,19 @@ export async function initializeDefaultExercises() {
     
     logger.info('📥 Lade Standard-Übungen...')
     
-    // Lade Standard-Übungen aus JSON-Datei
-    const response = await fetch('/data/default-exercises.json')
-    if (!response.ok) {
-      throw new Error('Default exercises nicht verfügbar')
+    // Lade Standard-Übungen (bundled import primary, fetch fallback)
+    let exercises = []
+    try {
+      const { loadDefaultExercises } = await import('@/utils/defaultExercisesLoader')
+      exercises = await loadDefaultExercises()
+    } catch {
+      const response = await fetch('/data/default-exercises.json')
+      if (!response.ok) throw new Error('Default exercises nicht verfügbar')
+      exercises = normalizeDefaultExercises(await response.json())
     }
-    
-    const exercises = normalizeDefaultExercises(await response.json())
+    if (!Array.isArray(exercises) || exercises.length === 0) {
+      throw new Error('Keine Übungen geladen')
+    }
     
     // Generiere IDs für die Übungen
     const exercisesWithIds = exercises.map((ex, idx) => ({
@@ -416,7 +482,7 @@ export async function getPendingSyncActions() {
     // .filter() statt .where() weil synced möglicherweise keinen Index hat
     const all = await db.syncQueue.toArray()
     const pending = all
-      .filter(action => !action.synced)
+      .filter(action => !action.synced && action.failed !== true)
       .sort((a, b) => a.timestamp - b.timestamp)
     
     logger.debug('📋 Sync Queue - Pending Actions:', pending.length)
@@ -445,6 +511,25 @@ export async function markActionSynced(id) {
 }
 
 /**
+ * Markiert eine Action als dauerhaft fehlgeschlagen (wird nicht weiter retried)
+ * @param {number} id - Queue Item ID
+ * @param {string} reason - Fehlergrund
+ * @returns {Promise<void>}
+ */
+export async function markActionFailed(id, reason = 'max-retries-reached') {
+  try {
+    await db.syncQueue.update(id, {
+      failed: true,
+      failedAt: Date.now(),
+      failReason: reason
+    })
+    logger.warn('🚫 Sync Queue - Action als failed markiert:', id, reason)
+  } catch (error) {
+    logger.error('❌ Sync Queue - Fehler beim Markieren als failed:', error)
+  }
+}
+
+/**
  * Erhöht den Retry Counter für eine fehlgeschlagene Action
  * @param {number} id - Queue Item ID
  * @param {string} error - Error Message
@@ -452,17 +537,21 @@ export async function markActionSynced(id) {
  */
 export async function incrementRetryCount(id, error) {
   try {
-    const item = await db.syncQueue.get(id)
-    if (item) {
-      await db.syncQueue.update(id, { 
-        retryCount: item.retryCount + 1,
-        error: error,
-        lastRetry: Date.now()
-      })
-      logger.warn('⚠️ Sync Queue - Retry Count erhöht:', id, 'Count:', item.retryCount + 1)
+    let nextCount = 0
+    await db.syncQueue.where('id').equals(id).modify((item) => {
+      const current = Number(item.retryCount || 0)
+      nextCount = current + 1
+      item.retryCount = nextCount
+      item.error = error
+      item.lastRetry = Date.now()
+    })
+    if (nextCount > 0) {
+      logger.warn('⚠️ Sync Queue - Retry Count erhöht:', id, 'Count:', nextCount)
     }
+    return nextCount
   } catch (error) {
     logger.error('❌ Sync Queue - Fehler beim Retry Count:', error)
+    return 0
   }
 }
 
@@ -475,7 +564,7 @@ export async function clearSyncedActions() {
     // .filter() statt .where() weil synced möglicherweise keinen Index hat
     const all = await db.syncQueue.toArray()
     const syncedIds = all
-      .filter(action => action.synced === true)
+      .filter(action => action.synced === true || action.failed === true)
       .map(action => action.id)
     
     await db.syncQueue.bulkDelete(syncedIds)

@@ -197,147 +197,176 @@
       @confirm="generateQuickWorkout"
     >
       <div class="quick-form-grid">
-        <label class="quick-form-field">
-          <span>{{ $t('dashboard.quickGenDuration') }}</span>
-          <select v-model.number="quickGeneratorForm.durationMinutes">
-            <option :value="30">30 min</option>
-            <option :value="45">45 min</option>
-            <option :value="60">60 min</option>
-            <option :value="75">75 min</option>
-          </select>
-        </label>
-
-        <label class="quick-form-field">
-          <span>{{ $t('dashboard.quickGenGoal') }}</span>
-          <select v-model="quickGeneratorForm.goal">
-            <option value="muscle_building">{{ $t('dashboard.quickGenGoalMuscle') }}</option>
-            <option value="strength">{{ $t('dashboard.quickGenGoalStrength') }}</option>
-          </select>
-        </label>
-
-        <label class="quick-form-field">
-          <span>{{ $t('dashboard.quickGenGender') }}</span>
-          <select v-model="quickGeneratorForm.gender">
-            <option value="male">{{ $t('dashboard.quickGenGenderMale') }}</option>
-            <option value="female">{{ $t('dashboard.quickGenGenderFemale') }}</option>
-            <option value="diverse">{{ $t('dashboard.quickGenGenderDiverse') }}</option>
-          </select>
-        </label>
-
-        <label class="quick-form-field">
-          <span>{{ $t('dashboard.quickGenBodyweight') }}</span>
-          <input v-model.number="quickGeneratorForm.bodyweightKg" type="number" min="35" max="250" step="1" />
-        </label>
-
-        <label class="quick-form-field">
-          <span>{{ $t('dashboard.quickGenLevel') }}</span>
-          <select v-model="quickGeneratorForm.level">
-            <option value="beginner">{{ $t('dashboard.quickGenLevelBeginner') }}</option>
-            <option value="intermediate">{{ $t('dashboard.quickGenLevelIntermediate') }}</option>
-            <option value="advanced">{{ $t('dashboard.quickGenLevelAdvanced') }}</option>
-          </select>
-        </label>
-
-        <label class="quick-form-field">
-          <span>{{ $t('dashboard.quickGenFrequency') }}</span>
-          <select v-model.number="quickGeneratorForm.trainingFrequencyPerWeek">
-            <option :value="2">2x / Woche</option>
-            <option :value="3">3x / Woche</option>
-            <option :value="4">4x / Woche</option>
-            <option :value="5">5x / Woche</option>
-            <option :value="6">6x / Woche</option>
-          </select>
-        </label>
-
-        <label class="quick-form-field">
-          <span>{{ $t('dashboard.quickGenEquipment') }}</span>
-          <select v-model="quickGeneratorForm.equipmentMode">
-            <option value="gym_only">{{ $t('dashboard.quickGenEquipmentGymOnly') }}</option>
-            <option value="gym_plus_bodyweight">{{ $t('dashboard.quickGenEquipmentBodyweight') }}</option>
-            <option value="bodyweight_only">{{ $t('dashboard.quickGenEquipmentBodyweightOnly') }}</option>
-          </select>
-        </label>
-
-        <div class="quick-form-field quick-form-field--full">
-          <span>{{ $t('dashboard.quickGenEquipmentAvailable') }}</span>
-          <div class="quick-form-check-grid">
-            <label class="quick-form-check">
-              <input v-model="quickGeneratorForm.equipmentAvailability" type="checkbox" value="barbell" />
-              <span>{{ $t('dashboard.quickGenEquipBarbell') }}</span>
+        <section class="quick-form-section quick-form-field--full">
+          <h4>Basics</h4>
+          <div class="quick-form-subgrid">
+            <label class="quick-form-field">
+              <span>{{ $t('dashboard.quickGenDuration') }}</span>
+              <select v-model.number="quickGeneratorForm.durationMinutes">
+                <option :value="30">30 min</option>
+                <option :value="45">45 min</option>
+                <option :value="60">60 min</option>
+                <option :value="75">75 min</option>
+              </select>
             </label>
-            <label class="quick-form-check">
-              <input v-model="quickGeneratorForm.equipmentAvailability" type="checkbox" value="dumbbells" />
-              <span>{{ $t('dashboard.quickGenEquipDumbbells') }}</span>
+
+            <label class="quick-form-field">
+              <span>{{ $t('dashboard.quickGenGoal') }}</span>
+              <select v-model="quickGeneratorForm.goal">
+                <option value="muscle_building">{{ $t('dashboard.quickGenGoalMuscle') }}</option>
+                <option value="strength">{{ $t('dashboard.quickGenGoalStrength') }}</option>
+              </select>
             </label>
-            <label class="quick-form-check">
-              <input v-model="quickGeneratorForm.equipmentAvailability" type="checkbox" value="machines" />
-              <span>{{ $t('dashboard.quickGenEquipMachines') }}</span>
+
+            <label class="quick-form-field">
+              <span>{{ $t('dashboard.quickGenLevel') }}</span>
+              <select v-model="quickGeneratorForm.level">
+                <option value="beginner">{{ $t('dashboard.quickGenLevelBeginner') }}</option>
+                <option value="intermediate">{{ $t('dashboard.quickGenLevelIntermediate') }}</option>
+                <option value="advanced">{{ $t('dashboard.quickGenLevelAdvanced') }}</option>
+              </select>
             </label>
-            <label class="quick-form-check">
-              <input v-model="quickGeneratorForm.equipmentAvailability" type="checkbox" value="cable_station" />
-              <span>{{ $t('dashboard.quickGenEquipCable') }}</span>
+
+            <label class="quick-form-field">
+              <span>{{ $t('dashboard.quickGenFrequency') }}</span>
+              <select v-model.number="quickGeneratorForm.trainingFrequencyPerWeek">
+                <option :value="2">2x / Woche</option>
+                <option :value="3">3x / Woche</option>
+                <option :value="4">4x / Woche</option>
+                <option :value="5">5x / Woche</option>
+                <option :value="6">6x / Woche</option>
+              </select>
             </label>
-            <label class="quick-form-check">
-              <input v-model="quickGeneratorForm.equipmentAvailability" type="checkbox" value="pull_up_bar" />
-              <span>{{ $t('dashboard.quickGenEquipPullupBar') }}</span>
+
+            <label class="quick-form-field">
+              <span>{{ $t('dashboard.quickGenGender') }}</span>
+              <select v-model="quickGeneratorForm.gender">
+                <option value="male">{{ $t('dashboard.quickGenGenderMale') }}</option>
+                <option value="female">{{ $t('dashboard.quickGenGenderFemale') }}</option>
+                <option value="diverse">{{ $t('dashboard.quickGenGenderDiverse') }}</option>
+              </select>
+            </label>
+
+            <label class="quick-form-field">
+              <span>{{ $t('dashboard.quickGenBodyweight') }}</span>
+              <input v-model.number="quickGeneratorForm.bodyweightKg" type="number" min="35" max="250" step="1" />
             </label>
           </div>
-        </div>
+        </section>
 
-        <label class="quick-form-field">
-          <span>{{ $t('dashboard.quickGenMaxPullups') }}</span>
-          <input v-model.number="quickGeneratorForm.maxStrictPullups" type="number" min="0" max="50" step="1" />
-        </label>
+        <section class="quick-form-section quick-form-field--full">
+          <h4>Equipment</h4>
+          <div class="quick-form-subgrid">
+            <label class="quick-form-field">
+              <span>{{ $t('dashboard.quickGenEquipment') }}</span>
+              <select v-model="quickGeneratorForm.equipmentMode">
+                <option value="gym_only">{{ $t('dashboard.quickGenEquipmentGymOnly') }}</option>
+                <option value="gym_plus_bodyweight">{{ $t('dashboard.quickGenEquipmentBodyweight') }}</option>
+                <option value="bodyweight_only">{{ $t('dashboard.quickGenEquipmentBodyweightOnly') }}</option>
+              </select>
+            </label>
+          </div>
 
-        <label class="quick-form-field">
-          <span>{{ $t('dashboard.quickGenMaxDips') }}</span>
-          <input v-model.number="quickGeneratorForm.maxStrictDips" type="number" min="0" max="50" step="1" />
-        </label>
+          <div class="quick-form-field quick-form-field--full">
+            <span>{{ $t('dashboard.quickGenEquipmentAvailable') }}</span>
+            <div class="quick-form-check-grid">
+              <label class="quick-form-check">
+                <input v-model="quickGeneratorForm.equipmentAvailability" type="checkbox" value="barbell" :disabled="quickGeneratorForm.equipmentMode === 'bodyweight_only'" />
+                <span>{{ $t('dashboard.quickGenEquipBarbell') }}</span>
+              </label>
+              <label class="quick-form-check">
+                <input v-model="quickGeneratorForm.equipmentAvailability" type="checkbox" value="dumbbells" :disabled="quickGeneratorForm.equipmentMode === 'bodyweight_only'" />
+                <span>{{ $t('dashboard.quickGenEquipDumbbells') }}</span>
+              </label>
+              <label class="quick-form-check">
+                <input v-model="quickGeneratorForm.equipmentAvailability" type="checkbox" value="machines" :disabled="quickGeneratorForm.equipmentMode === 'bodyweight_only'" />
+                <span>{{ $t('dashboard.quickGenEquipMachines') }}</span>
+              </label>
+              <label class="quick-form-check">
+                <input v-model="quickGeneratorForm.equipmentAvailability" type="checkbox" value="cable_station" :disabled="quickGeneratorForm.equipmentMode === 'bodyweight_only'" />
+                <span>{{ $t('dashboard.quickGenEquipCable') }}</span>
+              </label>
+              <label class="quick-form-check">
+                <input v-model="quickGeneratorForm.equipmentAvailability" type="checkbox" value="pull_up_bar" :disabled="quickGeneratorForm.equipmentMode === 'bodyweight_only'" />
+                <span>{{ $t('dashboard.quickGenEquipPullupBar') }}</span>
+              </label>
+            </div>
+            <p v-if="quickGeneratorForm.equipmentMode === 'bodyweight_only'" class="quick-form-inline-note">
+              Nur Bodyweight aktiviert.
+            </p>
+          </div>
+        </section>
 
-        <label class="quick-form-field">
-          <span>{{ $t('dashboard.quickGenMaxPushups') }}</span>
-          <input v-model.number="quickGeneratorForm.maxStrictPushups" type="number" min="0" max="100" step="1" />
-        </label>
+        <section class="quick-form-section quick-form-field--full">
+          <h4>Leistungswerte</h4>
+          <div class="quick-form-subgrid">
+            <label class="quick-form-field">
+              <span>{{ $t('dashboard.quickGenMaxPullups') }}</span>
+              <input v-model.number="quickGeneratorForm.maxStrictPullups" type="number" min="0" max="50" step="1" />
+            </label>
 
-        <label class="quick-form-field">
-          <span>{{ $t('dashboard.quickGenSquat1RM') }}</span>
-          <input v-model.number="quickGeneratorForm.squat1RM" type="number" min="0" max="500" step="1" />
-        </label>
+            <label class="quick-form-field">
+              <span>{{ $t('dashboard.quickGenMaxDips') }}</span>
+              <input v-model.number="quickGeneratorForm.maxStrictDips" type="number" min="0" max="50" step="1" />
+            </label>
 
-        <label class="quick-form-field">
-          <span>{{ $t('dashboard.quickGenBench1RM') }}</span>
-          <input v-model.number="quickGeneratorForm.bench1RM" type="number" min="0" max="400" step="1" />
-        </label>
+            <label class="quick-form-field">
+              <span>{{ $t('dashboard.quickGenMaxPushups') }}</span>
+              <input v-model.number="quickGeneratorForm.maxStrictPushups" type="number" min="0" max="100" step="1" />
+            </label>
+          </div>
 
-        <label class="quick-form-field">
-          <span>{{ $t('dashboard.quickGenDeadlift1RM') }}</span>
-          <input v-model.number="quickGeneratorForm.deadlift1RM" type="number" min="0" max="500" step="1" />
-        </label>
+          <button class="quick-form-advanced-toggle" type="button" @click="showQuickAdvancedMetrics = !showQuickAdvancedMetrics">
+            {{ showQuickAdvancedMetrics ? 'Erweiterte Kraftwerte ausblenden' : 'Erweiterte Kraftwerte (optional)' }}
+          </button>
 
-        <label class="quick-form-field">
-          <span>{{ $t('dashboard.quickGenSquat5RM') }}</span>
-          <input v-model.number="quickGeneratorForm.squat5RM" type="number" min="0" max="450" step="1" />
-        </label>
+          <div v-if="showQuickAdvancedMetrics" class="quick-form-subgrid quick-form-advanced-grid">
+            <label class="quick-form-field">
+              <span>{{ $t('dashboard.quickGenSquat1RM') }}</span>
+              <input v-model.number="quickGeneratorForm.squat1RM" type="number" min="0" max="500" step="1" />
+            </label>
 
-        <label class="quick-form-field">
-          <span>{{ $t('dashboard.quickGenBench5RM') }}</span>
-          <input v-model.number="quickGeneratorForm.bench5RM" type="number" min="0" max="350" step="1" />
-        </label>
+            <label class="quick-form-field">
+              <span>{{ $t('dashboard.quickGenBench1RM') }}</span>
+              <input v-model.number="quickGeneratorForm.bench1RM" type="number" min="0" max="400" step="1" />
+            </label>
 
-        <label class="quick-form-field">
-          <span>{{ $t('dashboard.quickGenDeadlift5RM') }}</span>
-          <input v-model.number="quickGeneratorForm.deadlift5RM" type="number" min="0" max="450" step="1" />
-        </label>
+            <label class="quick-form-field">
+              <span>{{ $t('dashboard.quickGenDeadlift1RM') }}</span>
+              <input v-model.number="quickGeneratorForm.deadlift1RM" type="number" min="0" max="500" step="1" />
+            </label>
 
-        <label class="quick-form-field quick-form-field--full">
-          <span>{{ $t('dashboard.quickGenRestrictions') }}</span>
-          <input v-model="quickGeneratorForm.restrictions" type="text" maxlength="180" :placeholder="$t('dashboard.quickGenRestrictionsPlaceholder')" />
-        </label>
+            <label class="quick-form-field">
+              <span>{{ $t('dashboard.quickGenSquat5RM') }}</span>
+              <input v-model.number="quickGeneratorForm.squat5RM" type="number" min="0" max="450" step="1" />
+            </label>
 
-        <label class="quick-form-field quick-form-field--full">
-          <span>{{ $t('dashboard.quickGenInjuries') }}</span>
-          <input v-model="quickGeneratorForm.injuries" type="text" maxlength="180" :placeholder="$t('dashboard.quickGenInjuriesPlaceholder')" />
-        </label>
+            <label class="quick-form-field">
+              <span>{{ $t('dashboard.quickGenBench5RM') }}</span>
+              <input v-model.number="quickGeneratorForm.bench5RM" type="number" min="0" max="350" step="1" />
+            </label>
+
+            <label class="quick-form-field">
+              <span>{{ $t('dashboard.quickGenDeadlift5RM') }}</span>
+              <input v-model.number="quickGeneratorForm.deadlift5RM" type="number" min="0" max="450" step="1" />
+            </label>
+          </div>
+        </section>
+
+        <section class="quick-form-section quick-form-field--full">
+          <h4>Hinweise</h4>
+          <div class="quick-form-subgrid">
+            <label class="quick-form-field quick-form-field--full">
+              <span>{{ $t('dashboard.quickGenRestrictions') }}</span>
+              <input v-model="quickGeneratorForm.restrictions" type="text" maxlength="180" :placeholder="$t('dashboard.quickGenRestrictionsPlaceholder')" />
+            </label>
+
+            <label class="quick-form-field quick-form-field--full">
+              <span>{{ $t('dashboard.quickGenInjuries') }}</span>
+              <input v-model="quickGeneratorForm.injuries" type="text" maxlength="180" :placeholder="$t('dashboard.quickGenInjuriesPlaceholder')" />
+            </label>
+          </div>
+        </section>
       </div>
       <p class="quick-form-hint">{{ $t('dashboard.quickGenRemaining', { count: quickGenerationsRemainingLabel }) }}</p>
       <p v-if="quickFormError" class="quick-form-error">{{ quickFormError }}</p>
@@ -353,7 +382,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onActivated, onUnmounted, nextTick } from 'vue'
+import { ref, computed, onMounted, onActivated, onUnmounted, nextTick, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
@@ -364,6 +393,7 @@ import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { isOnline, deleteWorkoutOffline, getWorkoutOffline } from '@/utils/offlineStorage'
 import { http } from '@/api/http'
 import { loadDefaultExercises, getCachedDefaultExercises } from '@/utils/defaultExercisesLoader'
+import { buildWorkoutBuilderRoute, normalizeBuilderWorkoutType, QUICK_PREFILL_KEY, saveWorkoutBuilderPrefill } from '@/utils/workoutBuilderFlow'
 import {
   getFavoritesByType,
   renameFavoriteWorkout,
@@ -402,15 +432,14 @@ const showQuickLimitModal = ref(false)
 const showQuickLastHintModal = ref(false)
 const showUpgradeModal = ref(false)
 const pendingWorkoutType = ref('push')
-const showStartOptions = ref(false)
-const showFavoritesSelection = ref(false)
+const startFlowStep = ref('idle')
 const favoriteWorkouts = ref([])
 const favoriteInfoText = ref('')
 const renamingFavoriteId = ref(null)
 const favoriteRenameInput = ref('')
 const isGeneratingQuickWorkout = ref(false)
 const quickFormError = ref('')
-const QUICK_PREFILL_KEY = 'quick_workout_prefill'
+const showQuickAdvancedMetrics = ref(false)
 const quickGeneratorForm = ref({
   durationMinutes: 45,
   goal: 'muscle_building',
@@ -514,8 +543,10 @@ const quickResetDateLabel = computed(() => {
 })
 const quickLimitText = computed(() => $t('dashboard.quickGenLimitText', { date: quickResetDateLabel.value }))
 const quickLastHintText = computed(() => $t('dashboard.quickGenLastHintText', { date: quickResetDateLabel.value }))
+const showStartOptions = computed(() => startFlowStep.value !== 'idle')
+const showFavoritesSelection = computed(() => startFlowStep.value === 'favorites')
 const pendingWorkoutTypeLabel = computed(() => {
-  const type = normalizeWorkoutType(pendingWorkoutType.value)
+  const type = normalizeBuilderWorkoutType(pendingWorkoutType.value)
   if (type === 'fullbody') return $t('dashboard.fullBodyLabel')
   return type.charAt(0).toUpperCase() + type.slice(1)
 })
@@ -811,29 +842,26 @@ function startWorkout(typeOrId) {
     logger.debug('🏁 [Dashboard] Navigating to workout-detail:', draftId.value)
     router.push({ name: 'workout-detail', params: { id: draftId.value } });
   } else {
-    const safeType = typeof typeOrId === 'string' && typeOrId.length > 0 ? typeOrId : 'push';
+    const safeType = normalizeBuilderWorkoutType(typeOrId);
     logger.debug('🏁 [Dashboard] Navigating to workout-builder with type:', safeType)
-    router.push({ name: 'workout-builder', query: { type: safeType } });
+    router.push(buildWorkoutBuilderRoute(safeType));
   }
 }
 
 function startQuick(type) {
-  const safeType = typeof type === 'string' && type.length > 0 ? type : 'push'
-  router.push({ name: 'workout-builder', query: { type: safeType } })
+  router.push(buildWorkoutBuilderRoute(normalizeBuilderWorkoutType(type)))
 }
 
 function openStartMode(type) {
-  pendingWorkoutType.value = typeof type === 'string' && type.length > 0 ? type : 'push'
-  showStartOptions.value = true
-  showFavoritesSelection.value = false
+  pendingWorkoutType.value = normalizeBuilderWorkoutType(type)
+  startFlowStep.value = 'mode'
   favoriteInfoText.value = ''
   renamingFavoriteId.value = null
   favoriteRenameInput.value = ''
 }
 
 function closeStartModePanel() {
-  showStartOptions.value = false
-  showFavoritesSelection.value = false
+  startFlowStep.value = 'idle'
   favoriteInfoText.value = ''
   renamingFavoriteId.value = null
   favoriteRenameInput.value = ''
@@ -852,7 +880,7 @@ function onGenerateSelected() {
 }
 
 function openFavoritesForType() {
-  showFavoritesSelection.value = true
+  startFlowStep.value = 'favorites'
   renamingFavoriteId.value = null
   favoriteRenameInput.value = ''
   loadFavoriteWorkoutsForCurrentType()
@@ -861,7 +889,7 @@ function openFavoritesForType() {
 }
 
 function closeFavoritesSelection() {
-  showFavoritesSelection.value = false
+  startFlowStep.value = 'mode'
   favoriteInfoText.value = ''
   renamingFavoriteId.value = null
   favoriteRenameInput.value = ''
@@ -869,7 +897,7 @@ function closeFavoritesSelection() {
 
 function openFavoriteInBuilder(favorite, { autoStart = false } = {}) {
   const fav = favorite?.workout || {}
-  const type = normalizeWorkoutType(favorite?.type || pendingWorkoutType.value)
+  const type = normalizeBuilderWorkoutType(favorite?.type || pendingWorkoutType.value)
   const exercises = Array.isArray(fav.exercises) ? fav.exercises : []
   const prefill = {
     workoutName: favorite?.name || fav.workoutName || 'Favorite Workout',
@@ -877,16 +905,9 @@ function openFavoriteInBuilder(favorite, { autoStart = false } = {}) {
     notes: typeof fav.notes === 'string' ? fav.notes : '',
     exercises
   }
-  sessionStorage.setItem(QUICK_PREFILL_KEY, JSON.stringify(prefill))
+  saveWorkoutBuilderPrefill(prefill)
   closeStartModePanel()
-  router.push({
-    name: 'workout-builder',
-    query: {
-      type,
-      quick: '1',
-      ...(autoStart ? { favoriteStart: '1' } : {})
-    }
-  })
+  router.push(buildWorkoutBuilderRoute(type, { quick: true, favoriteStart: autoStart }))
 }
 
 function startFavoriteWorkout(favorite) {
@@ -961,6 +982,7 @@ function openUpgrade() {
 
 function openQuickGeneratorForm() {
   quickFormError.value = ''
+  showQuickAdvancedMetrics.value = false
   if (!subscriptionStore.canUseQuickGenerator) {
     showQuickLimitModal.value = true
     return
@@ -971,6 +993,16 @@ function openQuickGeneratorForm() {
   }
   showQuickFormModal.value = true
 }
+
+watch(() => quickGeneratorForm.value.equipmentMode, (mode) => {
+  if (mode === 'bodyweight_only') {
+    quickGeneratorForm.value.equipmentAvailability = ['none']
+    return
+  }
+  const next = normalizeEquipmentAvailabilitySelection(quickGeneratorForm.value.equipmentAvailability)
+  const withoutNone = next.filter((item) => item !== 'none')
+  quickGeneratorForm.value.equipmentAvailability = withoutNone.length ? withoutNone : ['barbell', 'dumbbells', 'machines']
+})
 
 async function buildLocalQuickFallback(type, context) {
   const requestedType = ['push', 'pull', 'legs', 'fullbody'].includes(String(type)) ? String(type) : 'fullbody'
@@ -1148,26 +1180,26 @@ async function generateQuickWorkout() {
     }
 
     try {
-      sessionStorage.setItem(QUICK_PREFILL_KEY, JSON.stringify(prefill))
+      saveWorkoutBuilderPrefill(prefill)
     } catch {}
 
     if (!aiUsageMeta) {
       subscriptionStore.trackQuickGeneration()
     }
     showQuickFormModal.value = false
-    router.push({ name: 'workout-builder', query: { type: responseRequestedType, quick: '1' } })
+    router.push(buildWorkoutBuilderRoute(responseRequestedType, { quick: true }))
   } catch (error) {
     logger.error('Quick generator failed', error)
     const localFallback = await buildLocalQuickFallback(pendingWorkoutType.value, quickGeneratorForm.value)
     try {
-      sessionStorage.setItem(QUICK_PREFILL_KEY, JSON.stringify(localFallback))
+      saveWorkoutBuilderPrefill(localFallback)
     } catch {}
 
     quickFormError.value = $t('dashboard.quickGenFallbackUsed')
     infoMessage.value = $t('dashboard.quickGenFallbackUsed')
     showInfoModal.value = true
     showQuickFormModal.value = false
-    router.push({ name: 'workout-builder', query: { type: pendingWorkoutType.value, quick: '1' } })
+    router.push(buildWorkoutBuilderRoute(pendingWorkoutType.value, { quick: true }))
   } finally {
     isGeneratingQuickWorkout.value = false
   }
@@ -1588,6 +1620,25 @@ onActivated(async () => {
 
 .quick-form-grid {
   display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+.quick-form-section {
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--bg-panel) 94%, transparent);
+}
+
+.quick-form-section h4 {
+  margin: 0 0 10px;
+  font-size: 0.9rem;
+  color: var(--fg-strong);
+}
+
+.quick-form-subgrid {
+  display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
@@ -1617,6 +1668,27 @@ onActivated(async () => {
   color: var(--fg);
   padding: 8px 10px;
   font-size: 0.9rem;
+}
+
+.quick-form-inline-note {
+  margin: 8px 0 0;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.quick-form-advanced-toggle {
+  margin-top: 10px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--fg-strong);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.quick-form-advanced-grid {
+  margin-top: 10px;
 }
 
 .quick-form-field select:focus,
@@ -1690,7 +1762,7 @@ onActivated(async () => {
 }
 
 @media (max-width: 560px) {
-  .quick-form-grid {
+  .quick-form-subgrid {
     grid-template-columns: 1fr;
   }
 

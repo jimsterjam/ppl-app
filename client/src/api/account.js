@@ -11,28 +11,10 @@ function authConfig(token) {
 }
 
 export async function fetchAccountProfile(token) {
-  const config = authConfig(token)
-  const shouldRetry = (error) => {
-    const code = String(error?.code || '')
-    const status = Number(error?.response?.status || 0)
-    if (code === 'ECONNABORTED' || code === 'ERR_NETWORK') return true
-    if (!error?.response) return true
-    return status === 502 || status === 503 || status === 504
-  }
-
   try {
-    const res = await api.get('/profile', config)
+    const res = await api.get('/profile', authConfig(token))
     return res.data || {}
   } catch (error) {
-    if (shouldRetry(error)) {
-      try {
-        await new Promise(resolve => setTimeout(resolve, 350))
-        const retryRes = await api.get('/profile', config)
-        return retryRes.data || {}
-      } catch (retryError) {
-        throw handleAPIError(retryError, 'Profil laden')
-      }
-    }
     throw handleAPIError(error, 'Profil laden')
   }
 }

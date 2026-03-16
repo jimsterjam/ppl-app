@@ -78,7 +78,7 @@
         v-else-if="!hasCoreData"
         icon="📈"
         :title="t('stats.emptyTitle')"
-        :message="t('stats.emptyMsg')"
+        :message="dataStatusMessage || t('stats.emptyMsg')"
       />
 
       <template v-else>
@@ -218,6 +218,27 @@
       @upgraded="handleUpgraded"
     />
 
+    <AppModal
+      v-model="showDeleteModal"
+      :title="t('recent.deleteTitle')"
+      :message="deleteModalMessage"
+      :confirm-text="deletingRecentWorkout ? t('common.loading') : t('common.delete')"
+      :cancel-text="t('common.cancel')"
+      type="warning"
+      :persistent="deletingRecentWorkout"
+      :close-on-confirm="false"
+      @confirm="confirmDeleteRecentWorkout"
+    />
+
+    <AppModal
+      v-model="showDeleteErrorModal"
+      :title="t('recent.deleteTitle')"
+      :message="t('recent.deleteFailed')"
+      :confirm-text="t('common.confirm')"
+      :show-cancel="false"
+      type="warning"
+    />
+
   </div>
 </template>
 
@@ -231,12 +252,14 @@ import { useAuthStore } from '@/stores/authStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import HeaderBar from '@/components/HeaderBar.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import AppModal from '@/components/AppModal.vue'
 import UpgradeModal from '@/components/UpgradeModal.vue'
 import RecentWorkouts from '@/components/RecentWorkouts.vue'
 import { logger } from '@/utils/logger'
-import { isOnline, getAllWorkoutsOffline, deleteWorkoutOffline, OFFLINE_WORKOUTS_UPDATED_EVENT } from '@/utils/offlineStorage'
+import { isOnline, getAllWorkoutsOffline, deleteWorkoutOffline, filterDeletedWorkouts, OFFLINE_WORKOUTS_UPDATED_EVENT } from '@/utils/offlineStorage'
 import { resolveWorkoutNotes } from '@/utils/workoutNotes'
 import { deleteWorkout as deleteWorkoutApi } from '@/api/workouts'
+import { deleteWorkoutFromStats, getWorkoutIdentifier } from '@/utils/workoutDeletion'
 
 const { t, locale } = useI18n()
 const store = useUserStore()
@@ -248,14 +271,6 @@ const subscriptionStore = useSubscriptionStore()
 const loading = ref(true)
 const offlineWorkouts = ref([])
 const authToken = ref(null)
-
-function getWorkoutIdentifier(workout) {
-  const candidates = [workout?._id, workout?.id, workout?.workoutId]
-  const resolved = candidates
-    .map((value) => String(value || '').trim())
-    .find(Boolean)
-  return resolved || ''
-}
 
 const statsWorkouts = computed(() => {
   const list = Array.isArray(offlineWorkouts.value) ? offlineWorkouts.value : []
@@ -288,6 +303,26 @@ const isPro = computed(() => subscriptionStore.hasFeature('hasAdvancedStats'))
 const analyticsLocked = computed(() => !isPro.value && Number(store.statsErrorCode) === 403)
 const showUpgradeModal = ref(false)
 const selectedRangeDays = ref(30)
+const showDeleteModal = ref(false)
+const showDeleteErrorModal = ref(false)
+const pendingDeleteWorkout = ref(null)
+const deletingRecentWorkout = ref(false)
+
+const deleteModalMessage = computed(() => {
+  const workoutTitle = String(pendingDeleteWorkout.value?.name || '').trim() || t('recent.title')
+  return t('recent.deleteConfirm', { name: workoutTitle })
+})
+
+const dataStatusMessage = computed(() => {
+  if (loading.value) return ''
+  const uid = resolveActiveUid()
+  if (!uid && !authStore.isOfflineSessionValid) return 'Anmeldung erforderlich — bitte einloggen, um deine Workouts zu sehen.'
+  return ''
+})
+
+function resolveActiveUid() {
+  return String(authStore.uid || getCurrentUser?.()?.uid || '').trim()
+}
 
 const statusLabels = computed(() => ({
   good: t('stats.diagnostics.status.good'),
@@ -529,8 +564,13 @@ async function loadData() {
 
 async function loadOfflineWorkouts() {
   try {
-    const offline = await getAllWorkoutsOffline()
-    offlineWorkouts.value = Array.isArray(offline) ? offline : []
+    const activeUid = resolveActiveUid()
+    logger.debug('[Stats] loadOfflineWorkouts — uid:', activeUid || '(empty)')
+    const offline = activeUid
+      ? await getAllWorkoutsOffline({ userId: activeUid })
+      : []
+    offlineWorkouts.value = filterDeletedWorkouts(Array.isArray(offline) ? offline : [])
+    logger.debug('[Stats] loadOfflineWorkouts — final count:', offlineWorkouts.value.length)
   } catch (error) {
     logger.warn('[Stats] Offline workouts load failed', error)
   }
@@ -571,52 +611,39 @@ function handleUpgraded() {
 }
 
 async function handleDeleteRecentWorkout(workout) {
+  pendingDeleteWorkout.value = workout
+  showDeleteModal.value = true
+}
+
+async function confirmDeleteRecentWorkout() {
+  if (deletingRecentWorkout.value) return
+  const workout = pendingDeleteWorkout.value
   const workoutId = getWorkoutIdentifier(workout)
   if (!workoutId) return
-  const isLocalOnlyId = workoutId.startsWith('offline_') || workoutId.startsWith('draft-') || workoutId === 'draft' || workoutId === 'workout_detail_draft'
 
-  const workoutTitle = String(workout?.name || '').trim() || t('recent.title')
-  const confirmed = typeof window !== 'undefined'
-    ? window.confirm(t('recent.deleteConfirm', { name: workoutTitle }))
-    : true
-  if (!confirmed) return
+  // Sofort: UI aktualisieren + Modal schließen (offline-first)
+  offlineWorkouts.value = (offlineWorkouts.value || []).filter(item => getWorkoutIdentifier(item) !== workoutId)
+  store.workouts = (store.workouts || []).filter(item => getWorkoutIdentifier(item) !== workoutId)
+  showDeleteModal.value = false
+  pendingDeleteWorkout.value = null
 
-  try {
-    // Sofort aus der UI entfernen, damit der Delete direkt sichtbar ist.
-    offlineWorkouts.value = (offlineWorkouts.value || []).filter(item => getWorkoutIdentifier(item) !== workoutId)
-
-    let token = null
-    if (isOnline() && !isLocalOnlyId) {
-      token = authToken.value || await getIdToken().catch(() => null)
-      if (!token) {
-        const currentUser = getCurrentUser ? getCurrentUser() : null
-        if (currentUser?.getIdToken) {
-          token = await currentUser.getIdToken(true).catch(() => null)
-        }
-      }
-    }
-    await deleteWorkoutApi(workoutId, token)
-    await loadOfflineWorkouts()
-    if (isOnline()) {
-      store.loadWorkouts(token, { force: true })
-        .then(() => loadOfflineWorkouts())
-        .catch((err) => logger.debug('[Stats] Hintergrund-Sync nach Delete fehlgeschlagen', err))
-    }
-    if (isPro.value) {
-      store.loadStats(token, { rangeDays: selectedRangeDays.value })
-        .catch((err) => logger.debug('[Stats] Stats-Refresh nach Delete fehlgeschlagen', err))
-    }
-  } catch (error) {
-    logger.error('[Stats] Workout löschen fehlgeschlagen', error)
-    try {
-      await deleteWorkoutOffline(workoutId)
-      await loadOfflineWorkouts()
-      return
-    } catch {}
-    if (typeof window !== 'undefined') {
-      window.alert(t('recent.deleteFailed'))
-    }
-  }
+  // Hintergrund: IndexedDB + Server-Sync (fire-and-forget)
+  deleteWorkoutFromStats({
+    workout,
+    authToken: authToken.value,
+    online: isOnline(),
+    deleteWorkoutApi,
+    deleteWorkoutOffline,
+    getIdToken,
+    getCurrentUser,
+    loadOfflineWorkouts,
+    reloadWorkouts: (token) => store.loadWorkouts(token, { force: true }).then(() => loadOfflineWorkouts()),
+    reloadStats: isPro.value
+      ? (token) => store.loadStats(token, { rangeDays: selectedRangeDays.value })
+      : null,
+    onLocalRemove: () => {},
+    logger
+  }).catch(err => logger.warn('[Stats] Background delete sync failed', err))
 }
 
 function calcWorkoutVolume(workout) {
@@ -647,11 +674,21 @@ function formatKg(value) {
   return `${formatted} kg`
 }
 
-onMounted(() => {
+onMounted(async () => {
   if (typeof window !== 'undefined') {
     window.addEventListener(OFFLINE_WORKOUTS_UPDATED_EVENT, handleOfflineWorkoutsUpdated)
   }
+  // Sofort laden mit already-known authStore UID (offline-first)
+  logger.debug('[Stats] onMounted — authStore.uid:', authStore.uid, 'initialized:', authStore.initialized, 'online:', isOnline())
+  if (authStore.uid || authStore.isOfflineSessionValid) {
+    await loadData()
+  } else {
+    // Kein bekannter User — loading sofort beenden damit Empty-State sichtbar wird
+    loading.value = false
+  }
+  // Firebase callback für spätere Updates (z.B. Token wird verfügbar)
   onAuthStateChanged(async (user) => {
+    logger.debug('[Stats] onAuthStateChanged fired:', user?.uid || 'null')
     if (user) {
       await loadData()
     } else if (!isOnline() && authStore.isOfflineSessionValid) {

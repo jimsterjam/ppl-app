@@ -224,34 +224,34 @@
                 </span>
                 <span class="col weight">
                   <div class="weight-input">
-                      <div class="number-with-spinner">
+                    <div class="number-with-spinner">
                       <input
                         v-model.number="row.weight"
                         data-field="weight"
                         type="number"
                         min="0"
                         max="1000"
-                        step="2.5"
+                        step="0.25"
                         inputmode="decimal"
                         :readonly="isMobile"
                         @focus="trackFieldAnchor(i, rIdx, 'weight')"
                         @click="trackFieldAnchor(i, rIdx, 'weight')"
-                        @input="() => { clampRowValue(row, 'weight', 0, 1000, 2.5); triggerAutoSave() }"
-                        @wheel.prevent="onNumberWheel($event, row, 'weight', 2.5, 0, 1000)"
+                        @input="() => { clampRowValue(row, 'weight', 0, 1000, 0.25); triggerAutoSave() }"
+                        @wheel.prevent="onNumberWheel($event, row, 'weight', 0.25, 0, 1000)"
                         @keydown="onNumberKeyDown($event, true)"
-                        @focus.prevent="openPicker(row, 'weight', 2.5, 0, 1000)"
-                        @click.prevent="openPicker(row, 'weight', 2.5, 0, 1000)"
+                        @focus.prevent="openPicker(row, 'weight', 0.25, 0, 1000)"
+                        @click.prevent="openPicker(row, 'weight', 0.25, 0, 1000)"
                       />
                       <div v-if="!isMobile" class="spinner-vertical">
                         <button
                           type="button"
                           class="spin-btn up"
                           aria-label="increment weight"
-                          @click="adjustRowField(row, 'weight', 1, 2.5, 0, 1000)"
-                          @mousedown="startSpin(row, 'weight', 1, 2.5, 0, 1000)"
+                          @click="adjustRowField(row, 'weight', 1, 0.25, 0, 1000)"
+                          @mousedown="startSpin(row, 'weight', 1, 0.25, 0, 1000)"
                           @mouseup="stopSpin(row, 'weight')"
                           @mouseleave="stopSpin(row, 'weight')"
-                          @touchstart.prevent="startSpin(row, 'weight', 1, 2.5, 0, 1000)"
+                          @touchstart.prevent="startSpin(row, 'weight', 1, 0.25, 0, 1000)"
                           @touchend.prevent="stopSpin(row, 'weight')"
                           @touchcancel.prevent="stopSpin(row, 'weight')"
                         >▲</button>
@@ -259,11 +259,11 @@
                           type="button"
                           class="spin-btn down"
                           aria-label="decrement weight"
-                          @click="adjustRowField(row, 'weight', -1, 2.5, 0, 1000)"
-                          @mousedown="startSpin(row, 'weight', -1, 2.5, 0, 1000)"
+                          @click="adjustRowField(row, 'weight', -1, 0.25, 0, 1000)"
+                          @mousedown="startSpin(row, 'weight', -1, 0.25, 0, 1000)"
                           @mouseup="stopSpin(row, 'weight')"
                           @mouseleave="stopSpin(row, 'weight')"
-                          @touchstart.prevent="startSpin(row, 'weight', -1, 2.5, 0, 1000)"
+                          @touchstart.prevent="startSpin(row, 'weight', -1, 0.25, 0, 1000)"
                           @touchend.prevent="stopSpin(row, 'weight')"
                           @touchcancel.prevent="stopSpin(row, 'weight')"
                         >▼</button>
@@ -322,6 +322,8 @@
       :min="pickerConfig.min"
       :max="pickerConfig.max"
       :step="pickerConfig.step"
+      :split-decimals="pickerConfig.splitDecimals"
+      :decimal-options="pickerConfig.decimalOptions"
       :title="pickerConfig.title"
       :confirm-text="pickerConfig.confirmText"
       :cancel-text="pickerConfig.cancelText"
@@ -363,8 +365,24 @@
       </label>
     </AppModal>
 
+    <AppModal
+      v-model="showTimerActionModal"
+      title="Aktiver Timer"
+      confirm-text="Weiterlaufen"
+      cancel-text="Pausieren"
+      type="warning"
+      @confirm="onTimerDecision('continue')"
+      @cancel="onTimerDecision('pause')"
+    >
+      <div class="timer-decision-body">
+        <p>Der Timer ist noch aktiv. Wie soll fortgefahren werden?</p>
+        <button class="timer-stop-btn" type="button" @click="onTimerDecision('stop')">
+          Timer stoppen
+        </button>
+      </div>
+    </AppModal>
+
     <WorkoutTimerConfig v-if="showTimerConfig" @close="showTimerConfig = false" />
-    <WorkoutTimerBar v-if="showTimerBar" @close="timerStore.reset()" />
   </div>
 </template>
 
@@ -387,10 +405,10 @@ import { getMergedSortedExercises } from '@/utils/exerciseList'
 async function loadAllExercises() {
   exercisesLoading.value = true
   try {
-    const type = (workout.value?.type || '').toLowerCase()
-    const categoryMap = { push: 'Push', pull: 'Pull', legs: 'Legs' }
-    const category = categoryMap[type] || ''
-    const list = await getMergedSortedExercises({ category, locale: String(locale?.value || '') })
+    const list = await getMergedSortedExercises({
+      locale: String(locale?.value || ''),
+      includeRemote: false
+    })
     allExercises.value = list
   } catch (e) {
     allExercises.value = []
@@ -459,7 +477,6 @@ import HeaderBar from '@/components/HeaderBar.vue'
 import BottomNav from '@/components/BottomNav.vue'
 import AppModal from '@/components/AppModal.vue'
 import ExerciseList from '@/components/ExerciseList.vue'
-import WorkoutTimerBar from '@/components/timer/WorkoutTimerBar.vue'
 import WorkoutTimerConfig from '@/components/timer/WorkoutTimerConfig.vue'
 import { useToastStore } from '@/stores/toastStore'
 import { useTimerStore } from '@/stores/timerStore'
@@ -558,6 +575,9 @@ let viewStatePersistTimer = null
 const favoriteName = ref('')
 const favoriteSaving = ref(false)
 const showFavoriteNameModal = ref(false)
+const showTimerActionModal = ref(false)
+const pendingTimerAction = ref(null)
+const bypassTimerLeaveGuard = ref(false)
 const suppressDraftPersistence = ref(false)
 const mediaExercise = ref(null)
 const mediaUrl = ref('')
@@ -582,7 +602,6 @@ const didAutoScroll = ref(false)
 let initialSnapshot = ''
 const showLeaveModal = ref(false)
 const showTimerConfig = ref(false)
-const showTimerBar = computed(() => timerStore.isActive)
 
 // Notiz-Logik
 const showNote = ref([])
@@ -593,7 +612,16 @@ const isMobile = ref(typeof window !== 'undefined' && ('ontouchstart' in window 
 // Picker state
 const pickerVisible = ref(false)
 const pickerValue = ref(0)
-const pickerConfig = reactive({ min: 0, max: 1000, step: 1, title: '', confirmText: 'OK', cancelText: 'Abbrechen' })
+const pickerConfig = reactive({
+  min: 0,
+  max: 1000,
+  step: 1,
+  splitDecimals: false,
+  decimalOptions: [0, 0.25, 0.5, 0.75],
+  title: '',
+  confirmText: 'OK',
+  cancelText: 'Abbrechen'
+})
 let pickerTarget = null // { row, field }
 
 function shouldKeepAsDraft(workoutLike) {
@@ -613,6 +641,16 @@ function resolveRealIdFromDraftId(id) {
     } catch {}
   }
   return realId
+}
+
+function resolveActiveWorkoutUserId() {
+  return String(
+    workout.value?.userId
+    || getCurrentUser?.()?.uid
+    || store.user?.uid
+    || store.user?.id
+    || ''
+  ).trim()
 }
 
 // Debounce Hilfsfunktion
@@ -641,7 +679,14 @@ const triggerAutoSave = async () => {
   try {
     if (id === 'draft') {
       const draftKey = getDetailDraftKey()
-      await saveWorkoutOffline({ ...w, _id: draftKey, _isDraft: true, isDraft: true, updatedAt: Date.now() })
+      await saveWorkoutOffline({
+        ...w,
+        _id: draftKey,
+        userId: resolveActiveWorkoutUserId(),
+        _isDraft: true,
+        isDraft: true,
+        updatedAt: Date.now()
+      })
       saveMsg.value = ''
       saveError.value = false
       initialSnapshot = snapshotCore({ ...w })
@@ -655,7 +700,13 @@ const triggerAutoSave = async () => {
         saveError.value = false
         initialSnapshot = snapshotCore({ ...w, _id: realId })
       } else {
-        await saveWorkoutOffline({ ...w, _id: id, _isDraft: true, updatedAt: Date.now() })
+        await saveWorkoutOffline({
+          ...w,
+          _id: id,
+          userId: resolveActiveWorkoutUserId(),
+          _isDraft: true,
+          updatedAt: Date.now()
+        })
         const idx = store.workouts.findIndex(wi => wi._id === id)
         if (idx !== -1) {
           store.workouts[idx] = { ...store.workouts[idx], ...w }
@@ -671,7 +722,14 @@ const triggerAutoSave = async () => {
       const keepDraft = shouldKeepAsDraft(w) && w.completed !== true
       const payload = { ...w, _isDraft: keepDraft, isDraft: keepDraft }
       await store.updateWorkout(route.params.id, payload, token)
-      try { await saveWorkoutOffline({ ...payload, _id: route.params.id, updatedAt: Date.now() }) } catch {}
+      try {
+        await saveWorkoutOffline({
+          ...payload,
+          _id: route.params.id,
+          userId: resolveActiveWorkoutUserId(),
+          updatedAt: Date.now()
+        })
+      } catch {}
       saveMsg.value = ''
       saveError.value = false
       initialSnapshot = snapshotCore({ ...payload })
@@ -998,7 +1056,16 @@ async function loadWorkout() {
     if (workout.value && shouldKeepAsDraft(workout.value) && workout.value.completed !== true) {
       workout.value._isDraft = true
       workout.value.isDraft = true
-      try { await saveWorkoutOffline({ ...workout.value, _id: workout.value._id || id, _isDraft: true, isDraft: true, updatedAt: Date.now() }) } catch {}
+      try {
+        await saveWorkoutOffline({
+          ...workout.value,
+          _id: workout.value._id || id,
+          userId: resolveActiveWorkoutUserId(),
+          _isDraft: true,
+          isDraft: true,
+          updatedAt: Date.now()
+        })
+      } catch {}
       try {
         const idx = store.workouts.findIndex(w => String(w?._id || '') === String(workout.value?._id || id))
         if (idx !== -1) {
@@ -1111,6 +1178,8 @@ function openPicker(row, field, step = 1, min = 0, max = 1000, title = '') {
   pickerConfig.step = step
   pickerConfig.min = min
   pickerConfig.max = max
+  pickerConfig.splitDecimals = field === 'weight'
+  pickerConfig.decimalOptions = pickerConfig.splitDecimals ? [0, 0.25, 0.5, 0.75] : [0]
   pickerConfig.title = title || (field === 'weight' ? 'Gewicht (kg)' : 'Wiederholungen')
   pickerValue.value = Number(row[field]) || 0
   pickerVisible.value = true
@@ -1139,11 +1208,56 @@ function goDashboard() {
     showLeaveModal.value = true
     return
   }
+  if (timerStore.isRunningLike) {
+    pendingTimerAction.value = { kind: 'dashboard' }
+    showTimerActionModal.value = true
+    return
+  }
+  bypassTimerLeaveGuard.value = true
   router.push('/dashboard')
 }
 
 function confirmLeave() {
+  if (timerStore.isRunningLike) {
+    pendingTimerAction.value = { kind: 'dashboard' }
+    showTimerActionModal.value = true
+    return
+  }
+  bypassTimerLeaveGuard.value = true
   router.push('/dashboard')
+}
+
+async function applyPendingTimerAction() {
+  const action = pendingTimerAction.value
+  pendingTimerAction.value = null
+  if (!action) return
+
+  if (action.kind === 'save') {
+    await performSaveWorkout()
+    return
+  }
+
+  if (action.kind === 'dashboard') {
+    bypassTimerLeaveGuard.value = true
+    router.push('/dashboard')
+    return
+  }
+
+  if (action.kind === 'route-leave' && action.targetPath) {
+    bypassTimerLeaveGuard.value = true
+    router.push(action.targetPath)
+  }
+}
+
+async function onTimerDecision(mode) {
+  if (mode === 'pause' && timerStore.isRunning) {
+    timerStore.pause()
+  } else if (mode === 'stop') {
+    timerStore.reset()
+  }
+
+  showTimerActionModal.value = false
+  await applyPendingTimerAction()
 }
 
 
@@ -1356,7 +1470,7 @@ function stopSpin(row, field) {
   }
 }
 
-async function saveWorkout() {
+async function performSaveWorkout() {
   try {
     suppressDraftPersistence.value = true
     saving.value = true
@@ -1396,6 +1510,7 @@ async function saveWorkout() {
         initialSnapshot = snapshotCore({ ...normalized, _id: realId })
         try { await db.workouts.delete(id) } catch {}
         await postSaveCleanup()
+        bypassTimerLeaveGuard.value = true
         router.push('/dashboard')
         return
       }
@@ -1403,11 +1518,19 @@ async function saveWorkout() {
       if (idx !== -1) {
         store.workouts[idx] = { ...store.workouts[idx], ...normalized }
       }
-      await saveWorkoutOffline({ ...normalized, _id: id, _isDraft: false, completed: true, updatedAt: Date.now() })
+      await saveWorkoutOffline({
+        ...normalized,
+        _id: id,
+        userId: resolveActiveWorkoutUserId(),
+        _isDraft: false,
+        completed: true,
+        updatedAt: Date.now()
+      })
       saveMsg.value = finalDurationMinutes > 0 ? `Gespeichert. Dauer: ${finalDurationMinutes} min` : 'Gespeichert.'
       saveError.value = false
       initialSnapshot = snapshotCore({ ...(idx !== -1 ? store.workouts[idx] : normalized), _id: id })
       await postSaveCleanup()
+      bypassTimerLeaveGuard.value = true
       router.push('/dashboard')
       return
     }
@@ -1418,6 +1541,7 @@ async function saveWorkout() {
     saveError.value = false
     initialSnapshot = snapshotCore({ ...w, ...normalized })
     await postSaveCleanup()
+    bypassTimerLeaveGuard.value = true
     router.push('/dashboard')
   } catch (e) {
     suppressDraftPersistence.value = false
@@ -1427,6 +1551,15 @@ async function saveWorkout() {
   } finally {
     saving.value = false
   }
+}
+
+async function saveWorkout() {
+  if (timerStore.isRunningLike) {
+    pendingTimerAction.value = { kind: 'save' }
+    showTimerActionModal.value = true
+    return
+  }
+  await performSaveWorkout()
 }
 
 function getFavoriteUserId() {
@@ -1726,6 +1859,7 @@ async function persistInProgressDraft(reason = '') {
     const payload = {
       ...w,
       _id: effectiveId,
+      userId: resolveActiveWorkoutUserId(),
       _isDraft: true,
       isDraft: true,
       completed: false,
@@ -1819,9 +1953,21 @@ function beforeUnloadHandler(e) {
   e.returnValue = ''
 }
 
-onBeforeRouteLeave(async () => {
+onBeforeRouteLeave(async (to) => {
   writeDetailViewState('route-leave')
   await persistInProgressDraft('route-leave')
+
+  if (bypassTimerLeaveGuard.value) {
+    bypassTimerLeaveGuard.value = false
+    return true
+  }
+
+  if (timerStore.isRunningLike) {
+    pendingTimerAction.value = { kind: 'route-leave', targetPath: to?.fullPath || '/dashboard' }
+    showTimerActionModal.value = true
+    return false
+  }
+
   return true
 })
 
@@ -1863,6 +2009,19 @@ onBeforeUnmount(() => {
 .search-row.in-sheet { margin: 12px 16px; }
 .exercises-list { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 .exercise-item { background: var(--card-bg, #fff); border-radius: 12px; padding: 16px; border: 1px solid var(--card-border, #e5e7eb); box-shadow: 0 2px 8px rgba(0,0,0,0.04); cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; gap: 6px; }
+.timer-decision-body { display: flex; flex-direction: column; gap: 12px; }
+.timer-decision-body p { margin: 0; }
+.timer-stop-btn {
+  align-self: flex-end;
+  border: 1px solid color-mix(in srgb, var(--danger-color) 65%, black 35%);
+  background: var(--danger-color, #dc2626);
+  color: #fff;
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.timer-stop-btn:hover { opacity: 0.92; }
 .ex-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .exercise-item .title { font-weight: 700; color: var(--accent-color); font-size: 1.05rem; }
 .exercise-item .sub { color: var(--muted); font-size: 0.9rem; }

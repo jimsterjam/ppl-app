@@ -5,6 +5,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useUserStore } from '@/stores/userStore';
+import { useAuthStore } from '@/stores/authStore'
 import { useFirebaseAuth } from '@/utils/firebaseAuth';
 import { useSubscriptionStore } from '@/stores/subscriptionStore';
 import { useToastStore } from '@/stores/toastStore';
@@ -15,6 +16,7 @@ import UpgradeModal from '@/components/UpgradeModal.vue';
 import { getAllExercisesOffline, saveWorkoutOffline, deleteWorkoutOffline } from '@/utils/offlineStorage';
 import { getMergedSortedExercises } from '@/utils/exerciseList';
 import { searchAndRankExercises } from '@/utils/exerciseSearch'
+import { consumeWorkoutBuilderPrefill, normalizeBuilderWorkoutType, readWorkoutBuilderRouteState } from '@/utils/workoutBuilderFlow'
 import { logger } from '@/utils/logger'
 
 
@@ -23,6 +25,7 @@ import { logger } from '@/utils/logger'
 const router = useRouter()
 const route = useRoute()
 const userStore = useUserStore()
+const authStore = useAuthStore()
 const { auth, getCurrentUser, onAuthStateChanged, getIdToken } = useFirebaseAuth()
 const firebaseUser = ref(null)
 onAuthStateChanged((user) => {
@@ -36,10 +39,12 @@ onAuthStateChanged((user) => {
 const subscriptionStore = useSubscriptionStore()
 const toast = useToastStore()
 const { t, locale } = useI18n()
-const isLoaded = computed(() => !userStore.loading)
-const isSignedIn = computed(() => !!firebaseUser.value)
-const loadingUser = computed(() => userStore.loading)
-const userIdComputed = computed(() => firebaseUser.value?.uid || 'guest')
+const effectiveAuthUser = computed(() => firebaseUser.value || authStore.user || getCurrentUser?.() || null)
+const isLoaded = computed(() => authStore.initialized !== false)
+const isSignedIn = computed(() => !!effectiveAuthUser.value)
+const loadingUser = computed(() => authStore.initialized === false)
+const userIdComputed = computed(() => effectiveAuthUser.value?.uid || effectiveAuthUser.value?.id || 'guest')
+const canRenderBuilder = computed(() => initialReady.value || loadingUser.value || isSignedIn.value)
 
 const selectedType = ref('push')
 const selectedExercises = ref([])
@@ -61,7 +66,6 @@ const planRef = ref(null)
 import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
 const showEquipmentFilter = ref(false)
 const selectedEquipment = ref('')
-const QUICK_PREFILL_KEY = 'quick_workout_prefill'
 const favoriteAutostartTriggered = ref(false)
 // Alle Equipment-Typen aus den Exercises extrahieren
 const normalizedExercises = ref([])
@@ -109,23 +113,41 @@ function setEquipment(equip) {
 }
 
 function consumeQuickPrefill() {
-	if (String(route.query?.quick || '') !== '1') return
-	try {
-		const raw = sessionStorage.getItem(QUICK_PREFILL_KEY)
-		if (!raw) return
-		const parsed = JSON.parse(raw)
-		const list = Array.isArray(parsed?.exercises) ? parsed.exercises : []
-		if (!list.length) return
-		selectedExercises.value = list.map((exercise, index) => ({
-			...exercise,
-			_id: exercise._id || `quick_${index}`,
-			exerciseId: exercise.exerciseId || exercise._id || null,
-			setDetails: Array.isArray(exercise.setDetails) && exercise.setDetails.length > 0
-				? exercise.setDetails
-				: [{ reps: Number(exercise.reps) || 10, weight: Number(exercise.weight) || 0 }]
-		}))
-		sessionStorage.removeItem(QUICK_PREFILL_KEY)
-	} catch {}
+	const routeState = readWorkoutBuilderRouteState(route.query)
+	if (!routeState.quick) return
+	const parsed = consumeWorkoutBuilderPrefill()
+	const list = Array.isArray(parsed?.exercises) ? parsed.exercises : []
+	if (!list.length) return
+	selectedExercises.value = list.map((exercise, index) => ({
+		...exercise,
+		_id: exercise._id || `quick_${index}`,
+		exerciseId: exercise.exerciseId || exercise._id || null,
+		setDetails: Array.isArray(exercise.setDetails) && exercise.setDetails.length > 0
+			? exercise.setDetails
+			: [{ reps: Number(exercise.reps) || 10, weight: Number(exercise.weight) || 0 }]
+	}))
+}
+
+function syncTypeFromRoute() {
+	const routeState = readWorkoutBuilderRouteState(route.query)
+	const nextType = normalizeBuilderWorkoutType(routeState.type)
+	if (selectedType.value !== nextType) {
+		selectedType.value = nextType
+	}
+	if (nextType === 'fullbody' && selectedEquipment.value) {
+		selectedEquipment.value = ''
+	}
+}
+
+function maybeAutoStartFavorite() {
+	const routeState = readWorkoutBuilderRouteState(route.query)
+	if (!routeState.favoriteStart || favoriteAutostartTriggered.value) return
+	favoriteAutostartTriggered.value = true
+	setTimeout(() => {
+		if (selectedExercises.value.length > 0 && !creating.value) {
+			createWorkout()
+		}
+	}, 0)
 }
 
 // --- Draft-Logik ---
@@ -191,21 +213,10 @@ onMounted(async () => {
 	try {
 		normalizedExercises.value = await loadDefaultExercises()
 	} catch {}
-	// Übernehme Typ aus Query, falls vorhanden
-	const qType = String(route.query?.type || '').toLowerCase()
-	if (qType && ['push','pull','legs','fullbody'].includes(qType)) {
-		selectedType.value = qType
-		if (qType === 'fullbody') selectedEquipment.value = ''
-	}
+	syncTypeFromRoute()
 	consumeQuickPrefill()
-	if (String(route.query?.favoriteStart || '') === '1' && !favoriteAutostartTriggered.value) {
-		favoriteAutostartTriggered.value = true
-		setTimeout(() => {
-			if (selectedExercises.value.length > 0 && !creating.value) {
-				createWorkout()
-			}
-		}, 0)
-	}
+	maybeAutoStartFavorite()
+	await loadExercises()
 	// Affirmation
 	const beliefsDe = [
 		'Jede Wiederholung bringt dich deinem Ziel näher.',
@@ -234,6 +245,9 @@ onMounted(async () => {
 	if (currentUser) {
 		firebaseUser.value = currentUser
 		await loadExercises()
+	} else if (authStore.user) {
+		firebaseUser.value = authStore.user
+		await loadExercises()
 	}
 	// Falls noch nicht eingeloggt, markieren wir die View als bereit,
 	// damit der Nutzer nicht eine leere Sektion sieht
@@ -244,18 +258,38 @@ onMounted(async () => {
 async function loadExercises() {
 	loading.value = true
 	try {
-		if (!isSignedIn.value) {
-			exercises.value = []
-			return
-		}
 		const categoryMap = { push: 'Push', pull: 'Pull', legs: 'Legs', fullbody: null }
 		const params = { equipment: selectedEquipment.value, locale: String(locale.value) }
 		const categoryKey = categoryMap[selectedType.value]
 		if (categoryKey) params.category = categoryKey
-		const list = await getMergedSortedExercises(params)
-		exercises.value = list
+		logger.debug('[Builder] loadExercises start — type:', selectedType.value, 'category:', categoryKey, 'equipment:', selectedEquipment.value)
+		let list = await getMergedSortedExercises({ ...params, includeRemote: false })
+		logger.debug('[Builder] getMergedSortedExercises returned:', list?.length || 0)
+		// Fallback: wenn merge leer, lade Defaults direkt
+		if (!list || list.length === 0) {
+			logger.debug('[Builder] Merged list empty, trying defaults fallback...')
+			try {
+				const defaults = normalizedExercises.value?.length
+					? normalizedExercises.value
+					: await loadDefaultExercises()
+				logger.debug('[Builder] Defaults fallback count:', defaults?.length || 0)
+				list = categoryKey
+					? (defaults || []).filter(ex => (ex.category || '') === categoryKey)
+					: (defaults || [])
+			} catch (err) {
+				logger.warn('[Builder] Defaults fallback failed:', err?.message || err)
+			}
+		}
+		exercises.value = Array.isArray(list) ? list : []
+		logger.debug('[Builder] exercises.value set to:', exercises.value.length)
 	} catch {
-		exercises.value = []
+		// Letzter Fallback: normalizedExercises (schon in onMounted geladen)
+		const categoryMap = { push: 'Push', pull: 'Pull', legs: 'Legs', fullbody: null }
+		const categoryKey = categoryMap[selectedType.value]
+		const defaults = normalizedExercises.value || []
+		exercises.value = categoryKey
+			? defaults.filter(ex => (ex.category || '') === categoryKey)
+			: defaults
 	} finally {
 		loading.value = false
 	}
@@ -263,7 +297,20 @@ async function loadExercises() {
 const filteredExercises = computed(() => {
 	const term = search.value.trim().toLowerCase()
 	const list = Array.isArray(exercises.value) ? exercises.value : []
-	return searchAndRankExercises(list, term, {
+	const normalizeKey = (value) => String(value || '').trim().toLowerCase()
+	const deduped = []
+	const seen = new Set()
+
+	for (const exercise of list) {
+		if (!exercise) continue
+		const canonicalName = normalizeKey(exercise.displayName || exercise.name || exercise.name_en)
+		if (!canonicalName) continue
+		if (seen.has(canonicalName)) continue
+		seen.add(canonicalName)
+		deduped.push(exercise)
+	}
+
+	return searchAndRankExercises(deduped, term, {
 		getPrimaryText: (exercise) => exercise?.displayName || exercise?.name || '',
 		getSecondaryTexts: (exercise) => [
 			exercise?.name_en || '',
@@ -320,6 +367,7 @@ async function createWorkout() {
 		const workoutData = {
 			name: `${currentTypeLabel.value} - ${new Date().toLocaleDateString(String(locale.value).startsWith('de') ? 'de-DE' : 'en-US')}`,
 			type: selectedType.value,
+			userId: userIdComputed.value,
 			exercises: selectedExercises.value.map(ex => ({
 				exerciseId: ex.exerciseId || ex._id || ex.id || null,
 				name: ex.name,
@@ -337,6 +385,7 @@ async function createWorkout() {
 		const tempWorkout = {
 			...workoutData,
 			_id: tempId,
+			userId: userIdComputed.value,
 			_isDraft: true,
 			isDraft: true,
 			completed: false,
@@ -381,7 +430,13 @@ async function createWorkout() {
 				try { sessionStorage.setItem(`workout_map_${tempId}`, String(created._id)) } catch {}
 				logger.debug('[WorkoutBuilder] temp->real mapping stored', { tempId, realId: created._id })
 				// Workout bleibt bis zum Abschluss als Draft markiert
-				const cleanWorkout = { ...workoutData, _id: created._id, _isDraft: true, isDraft: true };
+				const cleanWorkout = {
+					...workoutData,
+					_id: created._id,
+					userId: created.userId || workoutData.userId || userIdComputed.value,
+					_isDraft: true,
+					isDraft: true
+				};
 				await saveWorkoutOffline(cleanWorkout);
 				try {
 					sessionStorage.setItem('workout_detail_draft', JSON.stringify({
@@ -453,6 +508,13 @@ watch(selectedType, (next) => {
 	}
 	loadExercises()
 })
+watch(() => route.query.type, () => {
+	syncTypeFromRoute()
+})
+watch(() => `${route.query.quick || ''}:${route.query.favoriteStart || ''}`, () => {
+	consumeQuickPrefill()
+	maybeAutoStartFavorite()
+})
 // Draft wird nicht mehr automatisch gespeichert
 </script>
 
@@ -470,7 +532,7 @@ watch(selectedType, (next) => {
 		<div v-else-if="!isSignedIn" class="auth-gate">
 			<p class="auth-gate-text">{{ t('builder.authGate') }}</p>
 		</div>
-		<div v-else-if="initialReady" class="type-select">
+		<div v-if="canRenderBuilder" class="type-select">
 			<label for="wb-type" class="type-label">{{ t('builder.stepType') }}</label>
 			<div v-if="isMobile" class="mobile-type-actions">
 				<button class="open-picker-btn" @click="showTypePicker = true">
@@ -478,7 +540,7 @@ watch(selectedType, (next) => {
 				</button>
 				<div class="mobile-secondary-actions">
 					<button class="open-picker-btn" @click="showMobilePicker = true">{{ t('builder.pickExercises') }}</button>
-					<button class="create-btn" :disabled="creating || selectedExercises.length === 0" @click="createWorkout">
+					<button class="create-btn" :disabled="creating || selectedExercises.length === 0 || !isSignedIn" @click="createWorkout">
 						{{ creating ? t('builder.creating') : `${t('builder.create')} (${selectedExercises.length})` }}
 					</button>
 				</div>
@@ -505,11 +567,14 @@ watch(selectedType, (next) => {
 				</div>
 			</div>
 		</div>
-		<div v-if="isSignedIn" class="exercises-section">
+		<div v-if="canRenderBuilder" class="exercises-section">
 			<div v-if="!isMobile" class="sticky-cta">
-				<button class="create-btn" :disabled="creating || selectedExercises.length === 0" @click="createWorkout">
+				<button class="create-btn" :disabled="creating || selectedExercises.length === 0 || !isSignedIn" @click="createWorkout">
 					{{ creating ? t('builder.creating') : `${t('builder.create')} (${selectedExercises.length})` }}
 				</button>
+			</div>
+			<div v-if="!isSignedIn" class="auth-gate compact">
+				<p class="auth-gate-text">{{ t('builder.authGate') }}</p>
 			</div>
 			<template v-if="!isMobile">
 				<div class="search-row">
@@ -888,6 +953,7 @@ watch(selectedType, (next) => {
 }
 @media (min-width: 481px) { .mobile-ex-picker, .picker-overlay { display: none; } }
 .auth-gate { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+.auth-gate.compact { margin-bottom: 0; }
 .auth-gate-text { color: var(--warning-color); margin: 0 0 12px 0; }
 .error-hint { margin-top: 8px; color: var(--danger-color); font-size: 0.95rem; }
 </style>

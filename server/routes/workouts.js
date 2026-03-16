@@ -10,6 +10,66 @@ import { logger } from '../utils/logger.js';
 
 const router = express.Router();
 
+const exerciseCatalog = Array.isArray(exercises) ? exercises : [];
+
+const METADATA_NAME_KEYS = ['name', 'name_en'];
+
+function normalizeLookupKey(value = '') {
+  return String(value || '').trim().toLowerCase();
+}
+
+function normalizeCompactKey(value = '') {
+  return normalizeLookupKey(value).replace(/[^a-z0-9äöüß]/g, '');
+}
+
+function buildExerciseMetadataLookup(source = []) {
+  const map = new Map();
+  source.forEach((entry) => {
+    if (!entry || typeof entry !== 'object') return;
+    const metadata = entry?.aiMetadata && typeof entry.aiMetadata === 'object' ? entry.aiMetadata : null;
+    if (!metadata) return;
+    METADATA_NAME_KEYS.forEach((key) => {
+      const normalized = normalizeLookupKey(entry[key]);
+      if (normalized) map.set(normalized, metadata);
+    });
+  });
+  return map;
+}
+
+const exerciseMetadataLookup = buildExerciseMetadataLookup(exerciseCatalog);
+const exerciseMetadataCandidates = exerciseCatalog
+  .filter((entry) => entry && typeof entry === 'object' && entry.aiMetadata)
+  .flatMap((entry) => METADATA_NAME_KEYS
+    .map((key) => normalizeLookupKey(entry[key]))
+    .filter(Boolean)
+    .map((key) => ({
+      key,
+      compactKey: normalizeCompactKey(key),
+      metadata: entry.aiMetadata
+    })));
+
+function resolveExerciseMetadata(name = '') {
+  const normalized = normalizeLookupKey(name);
+  if (!normalized) return null;
+
+  const exact = exerciseMetadataLookup.get(normalized);
+  if (exact) return exact;
+
+  const compact = normalizeCompactKey(normalized);
+  if (!compact) return null;
+
+  const compactExact = exerciseMetadataCandidates.find((candidate) => candidate.compactKey === compact);
+  if (compactExact) return compactExact.metadata;
+
+  // Toleriert leichte Abweichungen (Wortstellung/Sonderzeichen), ohne aggressiv falsch zuzuordnen.
+  const fuzzy = exerciseMetadataCandidates.find((candidate) => (
+    candidate.compactKey.length >= 8
+    && compact.length >= 8
+    && (candidate.compactKey.includes(compact) || compact.includes(candidate.compactKey))
+  ));
+  return fuzzy?.metadata || null;
+}
+
 // OpenAI Setup wird beim ersten API-Aufruf gemacht
 let openai = null;
 let openaiInitialized = false;
@@ -1297,6 +1357,193 @@ function inferDemandTier(name = '') {
   return isIsolationExercise(name) ? 'low' : 'medium';
 }
 
+function isMobilityOrWarmupExercise(name = '') {
+  const normalized = String(name).toLowerCase();
+  const blockedTerms = [
+    'warm-up',
+    'warm up',
+    'warmup',
+    'cooldown',
+    'mobility',
+    'beweglichkeit',
+    'stretch',
+    'stretching',
+    'streck',
+    'dehnen',
+    'dehnung',
+    'dehn',
+    'activation',
+    'aktivierung',
+    'foam roll',
+    'yoga',
+    'cat cow'
+  ];
+  return blockedTerms.some((term) => normalized.includes(term));
+}
+
+function isMachineHeavyExercise(name = '') {
+  const normalized = String(name).toLowerCase();
+  return [
+    'maschine',
+    'machine',
+    'beinpresse',
+    'kabelzug',
+    'latzug',
+    'smith'
+  ].some((term) => normalized.includes(term));
+}
+
+function isExternalLoadExercise(name = '') {
+  const normalized = String(name).toLowerCase();
+  return [
+    'langhantel',
+    'barbell',
+    'kurzhantel',
+    'dumbbell',
+    'kettlebell'
+  ].some((term) => normalized.includes(term));
+}
+
+function isAdvancedSkillExercise(name = '') {
+  const normalized = String(name).toLowerCase();
+  return [
+    'muscle-up',
+    'planche',
+    'pistol squat',
+    'handstand'
+  ].some((term) => normalized.includes(term));
+}
+
+function getExerciseRole(exercise = {}) {
+  if (exercise.exerciseType === 'core') return 'core';
+  if (exercise.exerciseType === 'compound') return 'main_compound';
+  if (exercise.exerciseType === 'isolation') return 'accessory';
+  const movementPattern = exercise.movementPattern || inferMovementPattern(exercise.name);
+  if (movementPattern === 'core') return 'core';
+  if (!exercise.isIsolation && exercise.demandTier === 'high') return 'main_compound';
+  if (!exercise.isIsolation) return 'secondary_compound';
+  return 'accessory';
+}
+
+function applyHardExerciseFilters(exercises = [], context = {}) {
+  const goal = normalizeGoal(context.goal);
+  const requestedType = normalizeRequestedType(context.requestedType || context.focus);
+  const equipmentMode = normalizeEquipmentMode(context.equipmentMode);
+  const level = String(context.level || context.experienceLevel || 'beginner').toLowerCase();
+
+  return exercises.filter((exercise) => {
+    const name = String(exercise.name || '').trim();
+    if (!name) return false;
+
+    if (isMobilityOrWarmupExercise(name)) return false;
+    if (requestedType !== 'fullbody' && !matchesRequestedType(name, requestedType)) return false;
+
+    if (exercise.exerciseType === 'mobility' || exercise.primaryPhase === 'warmup') {
+      return false;
+    }
+
+    if (exercise.disallowedGoals.includes(goal)) {
+      return false;
+    }
+
+    if ((goal === 'strength' || goal === 'hypertrophy') && isAssistedVariation(name)) {
+      return false;
+    }
+
+    if (equipmentMode === 'bodyweight_only' && (isMachineHeavyExercise(name) || isExternalLoadExercise(name))) {
+      return false;
+    }
+
+    if (exercise.allowedEquipmentModes && !exercise.allowedEquipmentModes.includes(equipmentMode)) {
+      return false;
+    }
+
+    if (level === 'beginner' && isAdvancedSkillExercise(name)) {
+      return false;
+    }
+
+    if (level === 'beginner' && exercise.minDifficulty !== 'beginner') {
+      return false;
+    }
+
+    if (level === 'intermediate' && exercise.minDifficulty === 'advanced') {
+      return false;
+    }
+
+    return true;
+  });
+}
+
+function sortByPatternPriority(exercises = [], patternPriority = []) {
+  const rank = new Map(patternPriority.map((pattern, index) => [pattern, index]));
+  return [...exercises].sort((a, b) => {
+    const aRank = rank.has(a.movementPattern) ? rank.get(a.movementPattern) : 99;
+    const bRank = rank.has(b.movementPattern) ? rank.get(b.movementPattern) : 99;
+    if (aRank !== bRank) return aRank - bRank;
+    return String(a.name).localeCompare(String(b.name));
+  });
+}
+
+function buildDeterministicExerciseOrder(exercises = [], context = {}, targetExerciseCount = 5) {
+  const requestedType = normalizeRequestedType(context.requestedType || context.focus);
+  const goal = normalizeGoal(context.goal);
+  const maxCount = Math.max(3, Math.min(6, Number(targetExerciseCount) || 5));
+
+  const preferredBySplit = {
+    push: ['horizontal_push', 'vertical_push', 'other'],
+    pull: ['horizontal_pull', 'vertical_pull', 'other'],
+    legs: ['squat', 'hinge', 'other'],
+    fullbody: ['squat', 'horizontal_push', 'horizontal_pull', 'hinge', 'other']
+  };
+
+  const unique = [];
+  const used = new Set();
+  exercises.forEach((exercise) => {
+    const key = String(exercise.name || '').toLowerCase().trim();
+    if (!key || used.has(key)) return;
+    used.add(key);
+    unique.push(exercise);
+  });
+
+  const compounds = sortByPatternPriority(
+    unique.filter((exercise) => {
+      const role = getExerciseRole(exercise);
+      return role === 'main_compound' || role === 'secondary_compound';
+    }),
+    preferredBySplit[requestedType] || preferredBySplit.fullbody
+  );
+  const accessories = sortByPatternPriority(
+    unique.filter((exercise) => getExerciseRole(exercise) === 'accessory'),
+    preferredBySplit[requestedType] || preferredBySplit.fullbody
+  );
+  const cores = sortByPatternPriority(
+    unique.filter((exercise) => getExerciseRole(exercise) === 'core'),
+    ['core', 'other']
+  );
+
+  const ordered = [];
+  compounds.slice(0, 2).forEach((exercise) => ordered.push(exercise));
+  compounds.slice(2).forEach((exercise) => ordered.push(exercise));
+  accessories.forEach((exercise) => ordered.push(exercise));
+
+  if (goal === 'hypertrophy') {
+    cores.slice(0, 1).forEach((exercise) => ordered.push(exercise));
+  } else if (requestedType === 'fullbody') {
+    cores.slice(0, 1).forEach((exercise) => ordered.push(exercise));
+  }
+
+  const fallback = [...cores, ...compounds, ...accessories];
+  fallback.forEach((exercise) => {
+    const key = String(exercise.name || '').toLowerCase().trim();
+    if (!key) return;
+    if (!ordered.some((item) => String(item.name || '').toLowerCase().trim() === key)) {
+      ordered.push(exercise);
+    }
+  });
+
+  return ordered.slice(0, maxCount);
+}
+
 function getWorkoutBlueprint(type, goal, equipmentMode) {
   return (
     WORKOUT_BLUEPRINTS[type]?.[goal]?.[equipmentMode]
@@ -1334,6 +1581,7 @@ function buildBlueprintFallbackExercise(name, fallbackType, goal) {
 function normalizeExercise(exercise, fallbackType) {
   const name = String(exercise?.name || '').trim();
   if (!name) return null;
+  const metadata = resolveExerciseMetadata(name);
   const movementPattern = inferMovementPattern(name);
   const targetType = inferExerciseType(name);
   return {
@@ -1346,7 +1594,13 @@ function normalizeExercise(exercise, fallbackType) {
     movementPattern,
     targetType,
     isIsolation: isIsolationExercise(name),
-    demandTier: inferDemandTier(name)
+    demandTier: inferDemandTier(name),
+    aiMetadata: metadata,
+    minDifficulty: metadata?.minDifficulty || 'beginner',
+    exerciseType: metadata?.exerciseType || null,
+    primaryPhase: metadata?.primaryPhase || null,
+    disallowedGoals: Array.isArray(metadata?.disallowedGoals) ? metadata.disallowedGoals : [],
+    allowedEquipmentModes: Array.isArray(metadata?.allowedEquipmentModes) ? metadata.allowedEquipmentModes : null
   };
 }
 
@@ -1359,7 +1613,17 @@ function getTimeAdjustedExerciseTarget(durationMinutes = 45, goal = 'hypertrophy
 
 function isAssistedVariation(name = '') {
   const normalized = String(name).toLowerCase();
-  return normalized.includes('assist') || normalized.includes('band') || normalized.includes('maschine');
+  return [
+    'assist',
+    'assisted',
+    'unterstützt',
+    'unterstuetzt',
+    'support',
+    'supported',
+    'gravitron',
+    'smith assisted',
+    'hilfe'
+  ].some((term) => normalized.includes(term));
 }
 
 function isPushupVariation(name = '') {
@@ -1525,9 +1789,24 @@ function enforceWorkoutProgrammingRules(payload, context = {}, options = {}) {
 
   const orderedRemainder = pickExercisesByPattern(normalizedWithoutBlueprint, preferredBySplit[requestedType] || preferredBySplit.fullbody, 6);
   const ordered = [...blueprintSelected, ...orderedRemainder].slice(0, 6);
-  const performanceFiltered = applyPerformanceSelectionRules(ordered, context.performance || {});
+  const hardFiltered = applyHardExerciseFilters(ordered, {
+    ...context,
+    requestedType,
+    goal,
+    equipmentMode
+  });
+  const performanceFiltered = applyPerformanceSelectionRules(hardFiltered, context.performance || {});
+  const deterministicOrder = buildDeterministicExerciseOrder(
+    performanceFiltered,
+    {
+      ...context,
+      requestedType,
+      goal
+    },
+    targetExerciseCount
+  );
 
-  let reordered = performanceFiltered;
+  let reordered = deterministicOrder;
   const firstCompoundIndex = reordered.findIndex((exercise) => !exercise.isIsolation);
   if (firstCompoundIndex > 0) {
     const firstCompound = reordered[firstCompoundIndex];
