@@ -43318,7 +43318,7 @@
   {
     "_id": "ex_0533",
     "id": "0533",
-    "name": "Frontkniebeuge Kettlebell",
+    "name": "Kettlebell Frontkniebeuge",
     "name_en": "front squat kettlebell",
     "category": "Legs",
     "category_raw": "strength",
@@ -43368,7 +43368,7 @@
   {
     "_id": "ex_0534",
     "id": "0534",
-    "name": "Kettlebell-Becherkniebeuge",
+    "name": "Kettlebell goblet squat",
     "name_en": "kettlebell goblet squat",
     "category": "Legs",
     "category_raw": "strength",
@@ -43416,7 +43416,7 @@
   {
     "_id": "ex_0535",
     "id": "0535",
-    "name": "Kettlebell hängt sauber",
+    "name": "Kettlebell hang clean",
     "name_en": "kettlebell hang clean",
     "category": "Legs",
     "category_raw": "strength",
@@ -43466,7 +43466,7 @@
   {
     "_id": "ex_0536",
     "id": "0536",
-    "name": "Kettlebell-Ausfallschritt durchgehen",
+    "name": "Kettlebell Ausfallschritt",
     "name_en": "kettlebell lunge pass through",
     "category": "Legs",
     "category_raw": "strength",
@@ -43516,7 +43516,7 @@
   {
     "_id": "ex_0537",
     "id": "0537",
-    "name": "Kettlebell mit einem Arm sauber und ruckartig",
+    "name": "Kettlebell einarmig clean and jerk",
     "name_en": "kettlebell one arm clean and jerk",
     "category": "Push",
     "category_raw": "strength",
@@ -43663,7 +43663,7 @@
   {
     "_id": "ex_0539",
     "id": "0539",
-    "name": "Kettlebell, einarmiges Militärdrücken zur Seite",
+    "name": "Kettlebell einarmiges Militärdrücken zur Seite",
     "name_en": "kettlebell one arm military press to the side",
     "category": "Push",
     "category_raw": "strength",
@@ -43710,7 +43710,7 @@
   {
     "_id": "ex_0540",
     "id": "0540",
-    "name": "Kettlebell einarmiges Push-Press",
+    "name": "Kettlebell einarmiges Push Press",
     "name_en": "kettlebell one arm push press",
     "category": "Push",
     "category_raw": "strength",
@@ -43852,7 +43852,7 @@
   {
     "_id": "ex_0543",
     "id": "0543",
-    "name": "Kettlebell-Piraten-Abendessen-Beine",
+    "name": "Kettlebell pirate supper legs",
     "name_en": "kettlebell pirate supper legs",
     "category": "Push",
     "category_raw": "strength",
@@ -43901,8 +43901,8 @@
   {
     "_id": "ex_0544",
     "id": "0544",
-    "name": "Kettlebell-Pistolen-Kniebeuge",
-    "name_en": "kettlebell pistol squat",
+    "name": "Kettlebell pistol squat",
+    "name_en": "kettlebell",
     "category": "Legs",
     "category_raw": "strength",
     "muscleGroup": "Quadrizeps",
@@ -43950,7 +43950,7 @@
     "_id": "ex_0545",
     "id": "0545",
     "name": "Kettlebell Plyo Liegestütz",
-    "name_en": "kettlebell plyo push-up",
+    "name_en": "push-up kettlebell plyo",
     "category": "Push",
     "category_raw": "plyometrics",
     "muscleGroup": "Brust",
@@ -43997,7 +43997,7 @@
   {
     "_id": "ex_0546",
     "id": "0546",
-    "name": "Kettlebell-Sitzdrücken",
+    "name": "Kettlebell drücken sitzend",
     "name_en": "kettlebell seated press",
     "category": "Push",
     "category_raw": "strength",
@@ -44044,7 +44044,7 @@
   {
     "_id": "ex_1438",
     "id": "1438",
-    "name": "Kettlebell, zweiarmiges Militärdrücken im Sitzen",
+    "name": "Kettlebell zweiarmig military sitzend",
     "name_en": "kettlebell seated two arm military press",
     "category": "Push",
     "category_raw": "strength",
@@ -44091,7 +44091,7 @@
   {
     "_id": "ex_0547",
     "id": "0547",
-    "name": "Kettlebell-Wipppresse",
+    "name": "Kettlebell Wipppresse",
     "name_en": "kettlebell seesaw press",
     "category": "Push",
     "category_raw": "strength",
@@ -44188,7 +44188,7 @@
   {
     "_id": "ex_0549",
     "id": "0549",
-    "name": "Kettlebell-Schaukel",
+    "name": "Kettlebell Swing",
     "name_en": "kettlebell swing",
     "category": "Legs",
     "category_raw": "strength",
@@ -47428,7 +47428,7 @@
   {
     "_id": "ex_1349",
     "id": "1349",
-    "name": "Hebel umgekehrte T-Bar-Reihe",
+    "name": "Rudern T-Bar-Reihe",
     "name_en": "lever reverse t-bar row",
     "category": "Pull",
     "category_raw": "strength",
@@ -47479,8 +47479,8 @@
   {
     "_id": "ex_2315",
     "id": "2315",
-    "name": "Wadenpresse sitzend 45 Grad",
-    "name_en": "calf lever rotary",
+    "name": "Wadenpresse sitzend im Winkel",
+    "name_en": "calf press lever",
     "category": "Legs",
     "category_raw": "strength",
     "muscleGroup": "Waden",
@@ -47529,7 +47529,7 @@
     "_id": "ex_2335",
     "id": "2335",
     "name": "Wadenpresse mit Hebelsitz",
-    "name_en": "lever seated calf press",
+    "name_en": "calf press lever seated",
     "category": "Legs",
     "category_raw": "strength",
     "muscleGroup": "Waden",

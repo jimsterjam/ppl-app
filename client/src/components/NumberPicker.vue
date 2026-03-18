@@ -26,29 +26,39 @@
       </div>
 
       <div v-else class="picker-split">
-        <div class="split-col" ref="wholeListRef" @scroll="onWholeScroll">
-          <button
-            v-for="num in wholeValues"
-            :key="`w-${num}`"
-            type="button"
-            class="split-item"
-            :class="{ selected: num === selectedWhole }"
-            @click="selectWhole(num)"
-          >
-            {{ num }}
-          </button>
+        <div class="split-wheel" ref="wholeWheelRef">
+          <div class="wheel-virtual" ref="wholeListRef" @scroll="onWholeScroll">
+            <div class="wheel-spacer" :style="{ height: wholeTotalHeight + 'px' }"></div>
+            <div class="wheel-items">
+              <div
+                v-for="item in visibleWholeItems"
+                :key="`w-${item.value}`"
+                class="wheel-item"
+                :class="{ selected: item.value === selectedWhole }"
+                :style="{ transform: `translateY(${item.top}px)` }"
+                @click="selectWhole(item.value)"
+              >
+                {{ item.value }}
+              </div>
+            </div>
+          </div>
         </div>
-        <div class="split-col" ref="decimalListRef" @scroll="onDecimalScroll">
-          <button
-            v-for="opt in normalizedDecimalOptions"
-            :key="`d-${opt}`"
-            type="button"
-            class="split-item"
-            :class="{ selected: opt === selectedDecimal }"
-            @click="selectDecimal(opt)"
-          >
-            {{ decimalLabel(opt) }}
-          </button>
+        <div class="split-wheel" ref="decimalWheelRef">
+          <div class="wheel-virtual" ref="decimalListRef" @scroll="onDecimalScroll">
+            <div class="wheel-spacer" :style="{ height: decimalTotalHeight + 'px' }"></div>
+            <div class="wheel-items">
+              <div
+                v-for="item in visibleDecimalItems"
+                :key="`d-${item.value}`"
+                class="wheel-item"
+                :class="{ selected: item.value === selectedDecimal }"
+                :style="{ transform: `translateY(${item.top}px)` }"
+                @click="selectDecimal(item.value)"
+              >
+                {{ decimalLabel(item.value) }}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -84,71 +94,46 @@ const emit = defineEmits(['update:value', 'confirm', 'cancel'])
 const internalValue = ref(props.value)
 const wheelRef = ref(null)
 const listRef = ref(null)
+const wholeWheelRef = ref(null)
+const decimalWheelRef = ref(null)
 const wholeListRef = ref(null)
 const decimalListRef = ref(null)
 const selectedWhole = ref(0)
 const selectedDecimal = ref(0)
-const SPLIT_ITEM_HEIGHT = 42
-const SPLIT_STATE_KEY = 'number_picker_split_state_v1'
-let wholeScrollEndTimer = null
-let decimalScrollEndTimer = null
 const isSyncingSplitScroll = ref(false)
-
-function readPersistedSplitState() {
-  if (typeof window === 'undefined') return null
-  try {
-    const raw = localStorage.getItem(SPLIT_STATE_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    if (!parsed || typeof parsed !== 'object') return null
-    const whole = Number(parsed.whole)
-    const decimal = Number(parsed.decimal)
-    if (!Number.isFinite(whole) || !Number.isFinite(decimal)) return null
-    return { whole, decimal }
-  } catch {
-    return null
-  }
-}
-
-function persistSplitState() {
-  if (typeof window === 'undefined') return
-  try {
-    localStorage.setItem(SPLIT_STATE_KEY, JSON.stringify({
-      whole: selectedWhole.value,
-      decimal: selectedDecimal.value
-    }))
-  } catch {}
-}
+const splitContainerHeight = ref(0)
+const wholeScrollTop = ref(0)
+const decimalScrollTop = ref(0)
 
 watch(() => props.value, (v) => {
   internalValue.value = v
   syncSplitFromValue(v)
+  if (props.visible && props.splitDecimals) {
+    nextTick(() => scrollSplitToSelection(false))
+  }
 })
 
 // When the picker becomes visible, measure and initialize scrolling
 watch(() => props.visible, async (v) => {
   if (!v) return
   await nextTick()
-  if (props.splitDecimals) {
-    const persisted = readPersistedSplitState()
-    if (persisted) {
-      selectedWhole.value = Math.min(wholeMax.value, Math.max(wholeMin.value, persisted.whole))
-      const decimals = normalizedDecimalOptions.value
-      selectedDecimal.value = decimals.includes(persisted.decimal)
-        ? persisted.decimal
-        : decimals[0]
-      updateValueFromSplit()
-    } else {
-      syncSplitFromValue(internalValue.value)
-    }
-  } else {
-    syncSplitFromValue(internalValue.value)
-  }
+  syncSplitFromValue(internalValue.value)
   try {
     if (props.splitDecimals) {
-      nextTick(() => {
+      let attempts = 0
+      const ensureMeasure = () => {
+        attempts += 1
+        const wholeList = wholeListRef.value
+        const decimalList = decimalListRef.value
+        const measured = wholeList?.clientHeight || decimalList?.clientHeight || 0
+        splitContainerHeight.value = measured
+        if (!measured && attempts < 6) {
+          setTimeout(ensureMeasure, 80)
+          return
+        }
         scrollSplitToSelection(false)
-      })
+      }
+      nextTick(() => setTimeout(ensureMeasure, 30))
       return
     }
     const list = listRef.value
@@ -213,6 +198,25 @@ const visibleItems = computed(() => {
   return items
 })
 
+const wholeTotalCount = computed(() => wholeValues.value.length)
+const wholeTotalHeight = computed(() => wholeTotalCount.value * itemHeight)
+const decimalTotalCount = computed(() => normalizedDecimalOptions.value.length)
+const decimalTotalHeight = computed(() => decimalTotalCount.value * itemHeight)
+
+function buildSplitVisibleItems(values, scrollTopValue) {
+  const startIndex = Math.max(0, Math.floor(scrollTopValue / itemHeight) - buffer)
+  const visibleCount = Math.ceil((splitContainerHeight.value || 0) / itemHeight) + buffer * 2
+  const endIndex = Math.min(values.length - 1, startIndex + visibleCount - 1)
+  const items = []
+  for (let i = startIndex; i <= endIndex; i++) {
+    items.push({ index: i, value: values[i], top: i * itemHeight })
+  }
+  return items
+}
+
+const visibleWholeItems = computed(() => buildSplitVisibleItems(wholeValues.value, wholeScrollTop.value))
+const visibleDecimalItems = computed(() => buildSplitVisibleItems(normalizedDecimalOptions.value, decimalScrollTop.value))
+
 const normalizedDecimalOptions = computed(() => {
   const list = Array.isArray(props.decimalOptions) ? props.decimalOptions : [0]
   const normalized = [...new Set(list
@@ -267,21 +271,21 @@ function updateValueFromSplit() {
 function selectWhole(num) {
   selectedWhole.value = Number(num)
   updateValueFromSplit()
-  persistSplitState()
-  centerListOnIndex(wholeListRef.value, Math.max(0, selectedWhole.value - wholeMin.value), SPLIT_ITEM_HEIGHT, true)
+  scrollSplitToSelection(true)
 }
 
 function selectDecimal(num) {
   selectedDecimal.value = Number(num)
   updateValueFromSplit()
-  persistSplitState()
-  const idx = Math.max(0, normalizedDecimalOptions.value.findIndex((v) => v === selectedDecimal.value))
-  centerListOnIndex(decimalListRef.value, idx, SPLIT_ITEM_HEIGHT, true)
+  scrollSplitToSelection(true)
 }
 
-function centerListOnIndex(list, idx, itemPx = 42, smooth = true) {
+function centerSplitListOnIndex(list, idx, smooth = true) {
   if (!list) return
-  const target = Math.max(0, idx * itemPx - (list.clientHeight / 2) + (itemPx / 2))
+  const viewHeight = splitContainerHeight.value || list.clientHeight || 0
+  const target = Math.max(0, idx * itemHeight - (viewHeight / 2) + (itemHeight / 2))
+  if (list === wholeListRef.value) wholeScrollTop.value = target
+  if (list === decimalListRef.value) decimalScrollTop.value = target
   isSyncingSplitScroll.value = true
   list.scrollTo({ top: target, behavior: smooth ? 'smooth' : 'auto' })
   setTimeout(() => {
@@ -292,51 +296,20 @@ function centerListOnIndex(list, idx, itemPx = 42, smooth = true) {
 function scrollSplitToSelection(smooth = false) {
   const wholeIdx = Math.max(0, selectedWhole.value - wholeMin.value)
   const decimalIdx = Math.max(0, normalizedDecimalOptions.value.findIndex((v) => v === selectedDecimal.value))
-  centerListOnIndex(wholeListRef.value, wholeIdx, SPLIT_ITEM_HEIGHT, smooth)
-  centerListOnIndex(decimalListRef.value, decimalIdx, SPLIT_ITEM_HEIGHT, smooth)
-}
-
-function getCenteredIndex(list, itemPx, maxIndex) {
-  if (!list) return 0
-  const raw = (list.scrollTop + (list.clientHeight / 2) - (itemPx / 2)) / itemPx
-  const idx = Math.round(raw)
-  return Math.max(0, Math.min(maxIndex, idx))
+  centerSplitListOnIndex(wholeListRef.value, wholeIdx, smooth)
+  centerSplitListOnIndex(decimalListRef.value, decimalIdx, smooth)
 }
 
 function onWholeScroll() {
   if (isSyncingSplitScroll.value) return
-  const list = wholeListRef.value
-  if (!list || wholeValues.value.length === 0) return
-  const idx = getCenteredIndex(list, SPLIT_ITEM_HEIGHT, wholeValues.value.length - 1)
-  const nextWhole = wholeValues.value[idx]
-  if (Number.isFinite(nextWhole) && nextWhole !== selectedWhole.value) {
-    selectedWhole.value = nextWhole
-    updateValueFromSplit()
-    persistSplitState()
-  }
-
-  if (wholeScrollEndTimer) clearTimeout(wholeScrollEndTimer)
-  wholeScrollEndTimer = setTimeout(() => {
-    centerListOnIndex(list, idx, SPLIT_ITEM_HEIGHT, true)
-  }, 90)
+  if (!wholeListRef.value) return
+  wholeScrollTop.value = wholeListRef.value.scrollTop
 }
 
 function onDecimalScroll() {
   if (isSyncingSplitScroll.value) return
-  const list = decimalListRef.value
-  if (!list || normalizedDecimalOptions.value.length === 0) return
-  const idx = getCenteredIndex(list, SPLIT_ITEM_HEIGHT, normalizedDecimalOptions.value.length - 1)
-  const nextDecimal = normalizedDecimalOptions.value[idx]
-  if (Number.isFinite(nextDecimal) && nextDecimal !== selectedDecimal.value) {
-    selectedDecimal.value = nextDecimal
-    updateValueFromSplit()
-    persistSplitState()
-  }
-
-  if (decimalScrollEndTimer) clearTimeout(decimalScrollEndTimer)
-  decimalScrollEndTimer = setTimeout(() => {
-    centerListOnIndex(list, idx, SPLIT_ITEM_HEIGHT, true)
-  }, 90)
+  if (!decimalListRef.value) return
+  decimalScrollTop.value = decimalListRef.value.scrollTop
 }
 
 function select(v) {
@@ -360,7 +333,6 @@ function scrollToSelected(force = false) {
 }
 
 function onConfirm() {
-  if (props.splitDecimals) persistSplitState()
   emit('update:value', internalValue.value)
   emit('confirm', internalValue.value)
 }
@@ -434,6 +406,9 @@ onMounted(() => {
     if (typeof window !== 'undefined' && window.addEventListener) {
       const handler = () => {
         try { containerHeight.value = listRef.value ? listRef.value.clientHeight : 0 } catch {}
+        try {
+          splitContainerHeight.value = wholeListRef.value?.clientHeight || decimalListRef.value?.clientHeight || 0
+        } catch {}
       }
       window.addEventListener('resize', handler)
 
@@ -454,8 +429,6 @@ onMounted(() => {
 
       // cleanup on unmount
       onUnmounted(() => {
-        if (wholeScrollEndTimer) clearTimeout(wholeScrollEndTimer)
-        if (decimalScrollEndTimer) clearTimeout(decimalScrollEndTimer)
         try { window.removeEventListener('resize', handler) } catch {}
         try {
           const l = listRef.value
@@ -513,31 +486,9 @@ onMounted(() => {
   margin: 6px 0;
 }
 
-.split-col {
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  border: 1px solid var(--card-border);
-  border-radius: 10px;
-  background: var(--surface);
-  padding: 6px;
-}
-
-.split-item {
-  width: 100%;
-  border: none;
-  background: transparent;
-  color: var(--muted);
-  font-size: 1.1rem;
-  line-height: 1;
-  border-radius: 8px;
-  padding: 12px 6px;
-  text-align: center;
-}
-
-.split-item.selected {
-  color: var(--fg);
-  font-weight: 700;
-  background: color-mix(in srgb, var(--accent) 18%, transparent);
+.split-wheel {
+  height: 100%;
+  overflow: hidden;
 }
 
 .picker-footer { display:flex; align-items:center; justify-content:center; gap:12px; margin-top:8px }

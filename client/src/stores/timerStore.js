@@ -890,6 +890,7 @@ export const useTimerStore = defineStore('timer', {
       const isWorkPhase = !this.phaseInfo.isRest
       const phaseKey = `${intervalKey}:${Math.floor(phaseElapsed / 250)}`
       const phaseState = `${this.phaseInfo.intervalIndex}:${this.phaseInfo.isRest ? 'rest' : 'work'}`
+      const isWorkPhaseStartWindow = isWorkPhase && phaseElapsed <= TICK_MS + 120
 
       if (lastPhaseKey !== phaseKey) {
         lastPhaseKey = phaseKey
@@ -897,17 +898,19 @@ export const useTimerStore = defineStore('timer', {
 
       if (lastIntervalPhaseState !== phaseState) {
         if (isWorkPhase) {
-          emitTimerSignal({
-            eventKey: `phase-start:${phaseState}:${this.startedAt || 0}`,
-            soundEnabled: this.config.countdownSound,
-            kind: 'round-start'
-          })
+          if (isWorkPhaseStartWindow && lastRoundStartSignalKey !== intervalKey) {
+            emitTimerSignal({
+              eventKey: `phase-start:${phaseState}:${this.startedAt || 0}`,
+              soundEnabled: this.config.countdownSound,
+              kind: 'round-start'
+            })
+          }
+          lastRoundStartSignalKey = intervalKey
         }
         lastIntervalPhaseState = phaseState
       }
 
       if (isWorkPhase) {
-        lastRoundStartSignalKey = intervalKey
         lastWorkPhaseKey = intervalKey
       }
 
