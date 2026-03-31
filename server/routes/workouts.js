@@ -137,6 +137,19 @@ const exerciseNameMapping = {
 const DEFAULT_PROGRESS_RANGE_DAYS = 120;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const FREE_AI_WEEKLY_LIMIT = 1;
+const SUBSCRIPTION_FORCE_PLAN = String(process.env.SUBSCRIPTION_FORCE_PLAN || '').trim().toLowerCase();
+const SUBSCRIPTION_FORCE_SCOPE = String(process.env.SUBSCRIPTION_FORCE_SCOPE || 'all').trim().toLowerCase();
+const SUBSCRIPTION_FORCE_ALLOWLIST = String(process.env.SUBSCRIPTION_FORCE_ALLOWLIST || '')
+  .split(',')
+  .map((entry) => entry.trim())
+  .filter(Boolean);
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+const AI_OPENAI_TIMEOUT_MS = Math.max(5000, Number(process.env.AI_OPENAI_TIMEOUT_MS) || 15000);
+const AI_RETRY_ATTEMPTS = Math.max(0, Math.min(3, Number(process.env.AI_RETRY_ATTEMPTS) || 1));
+const AI_RETRY_BASE_DELAY_MS = Math.max(200, Number(process.env.AI_RETRY_BASE_DELAY_MS) || 700);
+const AI_BURST_LIMIT_WINDOW_MS = Math.max(1000, Number(process.env.AI_BURST_LIMIT_WINDOW_MS) || 60000);
+const AI_BURST_LIMIT_MAX_REQUESTS = Math.max(1, Number(process.env.AI_BURST_LIMIT_MAX_REQUESTS) || 6);
+const aiBurstRateBucket = new Map();
 const muscleLabelMap = {
   push: 'Push',
   pull: 'Pull',
@@ -149,6 +162,23 @@ function isPaidPlan(plan = 'free') {
   return plan === 'pro' || plan === 'elite';
 }
 
+function resolveEffectivePlan(profilePlan = 'free', userId = '') {
+  const normalizedProfilePlan = ['free', 'pro', 'elite'].includes(profilePlan) ? profilePlan : 'free';
+  const validForcedPlan = ['free', 'pro', 'elite'].includes(SUBSCRIPTION_FORCE_PLAN) ? SUBSCRIPTION_FORCE_PLAN : '';
+
+  if (IS_PRODUCTION || !validForcedPlan) {
+    return { effectivePlan: normalizedProfilePlan, planSource: 'db' };
+  }
+
+  if (SUBSCRIPTION_FORCE_SCOPE === 'allowlist') {
+    if (!userId || !SUBSCRIPTION_FORCE_ALLOWLIST.includes(userId)) {
+      return { effectivePlan: normalizedProfilePlan, planSource: 'db' };
+    }
+  }
+
+  return { effectivePlan: validForcedPlan, planSource: 'override' };
+}
+
 async function getOrCreateUserProfile(uid) {
   if (!uid) return null;
   let profile = await UserProfile.findOne({ uid });
@@ -159,15 +189,137 @@ async function getOrCreateUserProfile(uid) {
 
 async function getEntitlements(userId) {
   const profile = await getOrCreateUserProfile(userId);
-  const plan = profile?.subscription?.plan || 'free';
+  const persistedPlan = profile?.subscription?.plan || 'free';
+  const { effectivePlan, planSource } = resolveEffectivePlan(persistedPlan, userId);
+  const plan = effectivePlan;
   const paid = isPaidPlan(plan);
   return {
     profile,
+    persistedPlan,
+    planSource,
     plan,
     paid,
     canUseAnalytics: paid,
     weeklyAiLimit: paid ? Number.POSITIVE_INFINITY : FREE_AI_WEEKLY_LIMIT
   };
+}
+
+function classifyAiError(error) {
+  const status = Number(error?.status || error?.statusCode || error?.response?.status || 0);
+  const code = String(error?.code || '').toUpperCase();
+  const msg = String(error?.message || '').toLowerCase();
+
+  if (status === 429) return 'rate_limited';
+  if (status >= 500 && status < 600) return 'provider_server_error';
+  if (code.includes('TIMEOUT') || code === 'ABORT_ERR' || msg.includes('timeout')) return 'timeout';
+  if (msg.includes('json') && msg.includes('parse')) return 'invalid_json';
+  if (status >= 400 && status < 500) return 'provider_client_error';
+  return 'unknown';
+}
+
+function isRetryableAiError(error) {
+  const type = classifyAiError(error);
+  return type === 'timeout' || type === 'rate_limited' || type === 'provider_server_error';
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function withAiRetry(fn, { attempts = AI_RETRY_ATTEMPTS, baseDelayMs = AI_RETRY_BASE_DELAY_MS } = {}) {
+  let currentAttempt = 0;
+  let lastError;
+
+  while (currentAttempt <= attempts) {
+    try {
+      return await fn(currentAttempt);
+    } catch (error) {
+      lastError = error;
+      if (currentAttempt >= attempts || !isRetryableAiError(error)) {
+        throw error;
+      }
+      const delay = baseDelayMs * Math.pow(2, currentAttempt);
+      await sleep(delay);
+      currentAttempt += 1;
+    }
+  }
+
+  throw lastError;
+}
+
+function parseJsonSafely(rawPayload = '', { requestId = '', context = 'ai' } = {}) {
+  const source = String(rawPayload || '').trim();
+  if (!source) {
+    const err = new Error('Empty JSON payload');
+    err.code = 'AI_EMPTY_JSON';
+    throw err;
+  }
+
+  const candidates = [source];
+  const fenced = source.replace(/^```json\s*/i, '').replace(/^```/i, '').replace(/```$/i, '').trim();
+  if (fenced && fenced !== source) candidates.push(fenced);
+
+  const start = source.indexOf('{');
+  const end = source.lastIndexOf('}');
+  if (start >= 0 && end > start) {
+    const extracted = source.slice(start, end + 1);
+    if (extracted && extracted !== source) candidates.push(extracted);
+  }
+
+  for (const candidate of candidates) {
+    try {
+      return JSON.parse(candidate);
+    } catch {
+      // try next candidate
+    }
+  }
+
+  const err = new Error('Invalid JSON payload from AI provider');
+  err.code = 'AI_INVALID_JSON';
+  logger.error('❌ AI JSON parse failed', {
+    requestId,
+    context,
+    payloadPreview: source.slice(0, 400)
+  });
+  throw err;
+}
+
+function validateAiSuggestionPayload(payload) {
+  if (!payload || typeof payload !== 'object') {
+    const err = new Error('AI payload missing');
+    err.code = 'AI_INVALID_PAYLOAD';
+    throw err;
+  }
+
+  if (!Array.isArray(payload.exercises) || payload.exercises.length === 0) {
+    const err = new Error('AI payload has no exercises');
+    err.code = 'AI_INVALID_EXERCISES';
+    throw err;
+  }
+
+  if (payload.exercises.length > 8) {
+    payload.exercises = payload.exercises.slice(0, 8);
+  }
+
+  return payload;
+}
+
+function checkAiBurstLimit(userId = '') {
+  const now = Date.now();
+  const safeUser = userId || 'anonymous';
+  const history = (aiBurstRateBucket.get(safeUser) || []).filter((ts) => now - ts < AI_BURST_LIMIT_WINDOW_MS);
+
+  if (history.length >= AI_BURST_LIMIT_MAX_REQUESTS) {
+    const retryAfterMs = Math.max(0, AI_BURST_LIMIT_WINDOW_MS - (now - history[0]));
+    return {
+      allowed: false,
+      retryAfterSec: Math.max(1, Math.ceil(retryAfterMs / 1000))
+    };
+  }
+
+  history.push(now);
+  aiBurstRateBucket.set(safeUser, history);
+  return { allowed: true, retryAfterSec: 0 };
 }
 
 function getCurrentAiWeekWindowStart() {
@@ -564,23 +716,38 @@ router.get("/stats/progress", firebaseAuthMiddleware, async (req, res) => {
   try {
     const { userId } = req.auth;
     const entitlements = await getEntitlements(userId);
-    if (!entitlements.canUseAnalytics) {
-      return res.status(403).json({
-        error: 'Progress analysis requires Pro subscription',
-        code: 'ANALYTICS_REQUIRES_PRO',
-        entitlement: { plan: entitlements.plan }
-      });
-    }
+    const analyticsLocked = !entitlements.canUseAnalytics;
     const rangeDays = Math.min(
       365,
       Math.max(30, Number(req.query.rangeDays) || DEFAULT_PROGRESS_RANGE_DAYS)
     );
     const fromDate = new Date(Date.now() - rangeDays * MS_PER_DAY);
 
-    const workouts = await Workout.find({
+    const workoutsInRange = await Workout.find({
       userId,
       date: { $gte: fromDate }
     }).sort({ date: 1 }).lean();
+
+    // Alle Nutzer bekommen mindestens die letzten 3 Sessions als Basis-Stats,
+    // auch wenn im gewählten Zeitraum (noch) zu wenig Daten liegen.
+    let workouts = Array.isArray(workoutsInRange) ? [...workoutsInRange] : [];
+    let minimumSessionsApplied = false;
+    if (workouts.length < 3) {
+      const latest = await Workout.find({ userId })
+        .sort({ date: -1, updatedAt: -1, createdAt: -1 })
+        .limit(3)
+        .lean();
+
+      const seen = new Set(workouts.map((item) => String(item?._id || '')));
+      for (const item of latest) {
+        const key = String(item?._id || '');
+        if (!key || seen.has(key)) continue;
+        workouts.push(item);
+        seen.add(key);
+      }
+      workouts.sort((a, b) => new Date(a?.date || a?.updatedAt || a?.createdAt || 0) - new Date(b?.date || b?.updatedAt || b?.createdAt || 0));
+      minimumSessionsApplied = workouts.length > workoutsInRange.length;
+    }
 
     const weeksMap = new Map();
     const liftRecords = new Map();
@@ -632,19 +799,29 @@ router.get("/stats/progress", firebaseAuthMiddleware, async (req, res) => {
       ? Math.round((weeks.filter((week) => week.sessionCount >= 2).length / totalWeeks) * 100)
       : 0;
 
-    const topLifts = Array.from(liftRecords.values())
-      .sort((a, b) => b.weight - a.weight)
-      .slice(0, 5);
+    const topLifts = analyticsLocked
+      ? []
+      : Array.from(liftRecords.values())
+          .sort((a, b) => b.weight - a.weight)
+          .slice(0, 5);
 
-    const muscleBreakdown = Array.from(muscleMap.entries())
-      .map(([key, value]) => ({
-        key,
-        label: muscleLabelMap[key] || key,
-        volume: Math.round(value)
-      }))
-      .sort((a, b) => b.volume - a.volume);
+    const muscleBreakdown = analyticsLocked
+      ? []
+      : Array.from(muscleMap.entries())
+          .map(([key, value]) => ({
+            key,
+            label: muscleLabelMap[key] || key,
+            volume: Math.round(value)
+          }))
+          .sort((a, b) => b.volume - a.volume);
 
     res.json({
+      analyticsLocked,
+      minimumSessionsApplied,
+      entitlement: {
+        plan: entitlements.plan,
+        code: analyticsLocked ? 'ANALYTICS_REQUIRES_PRO' : null
+      },
       range: {
         start: fromDate,
         end: new Date()
@@ -670,6 +847,16 @@ router.post('/quick-generator', aiAuthMiddleware, async (req, res) => {
   const requestId = `quick_gen_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   try {
     const userId = req.auth?.userId || 'test_user';
+    const burst = checkAiBurstLimit(userId);
+    if (!burst.allowed) {
+      return res.status(429).json({
+        error: 'Too many AI requests in a short timeframe',
+        code: 'AI_RATE_LIMITED',
+        retryAfter: burst.retryAfterSec,
+        requestId
+      });
+    }
+
     const entitlements = await getEntitlements(userId);
     const rawBody = req.body || {};
     const context = sanitizeQuickGeneratorRequest(rawBody);
@@ -687,14 +874,22 @@ router.post('/quick-generator', aiAuthMiddleware, async (req, res) => {
     const aiAllowedForUser = canUseAiThisWeek(entitlements);
 
     let suggestion = null;
+    let usedRemote = false;
+    let errorType = null;
     if (openaiClient && aiAllowedForUser) {
       try {
-        suggestion = await generateQuickGeneratorWithOpenAI(context, openaiClient);
+        suggestion = await generateQuickGeneratorWithOpenAI(context, openaiClient, { requestId });
         if (suggestion) {
+          usedRemote = true;
           await markAiUse(entitlements);
         }
       } catch (error) {
-        logger.error('❌ Quick generator OpenAI error', { requestId, message: error?.message });
+        errorType = classifyAiError(error);
+        logger.error('❌ Quick generator OpenAI error', {
+          requestId,
+          message: error?.message,
+          errorType
+        });
       }
     }
 
@@ -707,6 +902,9 @@ router.post('/quick-generator', aiAuthMiddleware, async (req, res) => {
       ...(normalized.metadata || {}),
       aiUsage: getAiLimitSnapshot(entitlements),
       generationMode: suggestion?.metadata?.mode || (aiAllowedForUser ? 'auto' : 'demo_quota_limited'),
+      fallbackUsed: !usedRemote,
+      fallbackReason: errorType,
+      errorType,
       missingRequiredInputs,
       ruleset: {
         professionalMode: true,
@@ -723,7 +921,13 @@ router.post('/quick-generator', aiAuthMiddleware, async (req, res) => {
       exercises: [],
       estimatedDuration: 45,
       difficulty: 'beginner',
-      notes: 'Generierung fehlgeschlagen.'
+      notes: 'Generierung fehlgeschlagen.',
+      metadata: {
+        requestId,
+        errorType: classifyAiError(error),
+        fallbackUsed: true,
+        source: 'route_error'
+      }
     });
   }
 });
@@ -939,6 +1143,16 @@ router.post("/ai-suggestion", aiAuthMiddleware, async (req, res) => {
 
   try {
     const userId = req.auth?.userId || 'test_user';
+    const burst = checkAiBurstLimit(userId);
+    if (!burst.allowed) {
+      return res.status(429).json({
+        error: 'Too many AI requests in a short timeframe',
+        code: 'AI_RATE_LIMITED',
+        retryAfter: burst.retryAfterSec,
+        requestId
+      });
+    }
+
     const entitlements = await getEntitlements(userId);
     const context = sanitizeWorkoutRequest(req.body || {});
     const requestedMode = (context.mode || req.header('x-ai-mode') || 'auto').toLowerCase();
@@ -957,12 +1171,15 @@ router.post("/ai-suggestion", aiAuthMiddleware, async (req, res) => {
 
     let responsePayload = null;
     let modeUsed = 'demo';
+    let usedRemote = false;
+    let fallbackReason = null;
+    let errorType = null;
 
     if (tryRemote) {
       const openaiClient = await initializeOpenAI();
       if (openaiClient) {
         try {
-          const aiSuggestion = await generateGPT4Suggestion(context, openaiClient);
+          const aiSuggestion = await generateGPT4Suggestion(context, openaiClient, { requestId });
 
           if (aiSuggestion.exercises?.length > 0) {
             const exerciseNames = aiSuggestion.exercises.map(ex => ex.name);
@@ -987,13 +1204,21 @@ router.post("/ai-suggestion", aiAuthMiddleware, async (req, res) => {
           };
 
           responsePayload = aiSuggestion;
+          usedRemote = true;
           modeUsed = 'remote';
           await markAiUse(entitlements);
         } catch (aiError) {
-          logger.error('❌ OpenAI Error:', { requestId, message: aiError.message });
+          errorType = classifyAiError(aiError);
+          fallbackReason = errorType;
+          logger.error('❌ OpenAI Error:', {
+            requestId,
+            message: aiError.message,
+            errorType
+          });
         }
       } else {
         logger.debug('ℹ️ Remote AI nicht aktiv/kein API-Key', { requestId });
+        fallbackReason = 'remote_unavailable';
       }
     }
 
@@ -1001,6 +1226,8 @@ router.post("/ai-suggestion", aiAuthMiddleware, async (req, res) => {
       if (!aiFeatureConfig.allowDemoFallback && tryRemote) {
         return res.status(503).json({
           error: 'AI temporarily unavailable',
+          code: 'AI_TEMPORARILY_UNAVAILABLE',
+          errorType: errorType || fallbackReason || 'provider_unavailable',
           requestId
         });
       }
@@ -1026,7 +1253,9 @@ router.post("/ai-suggestion", aiAuthMiddleware, async (req, res) => {
         confidence: 0,
         isDemoData: true,
         exercisesValidated: true,
-        mode: 'demo'
+        mode: 'demo',
+        fallbackReason: fallbackReason || (aiAllowedForUser ? 'demo_mode' : 'weekly_quota_limited'),
+        errorType: errorType || null
       };
 
       responsePayload = demoSuggestion;
@@ -1048,7 +1277,14 @@ router.post("/ai-suggestion", aiAuthMiddleware, async (req, res) => {
     responsePayload.metadata = {
       ...(responsePayload.metadata || {}),
       aiUsage: getAiLimitSnapshot(entitlements),
-      quotaLimited: !aiAllowedForUser && !isPaidPlan(entitlements.plan)
+      quotaLimited: !aiAllowedForUser && !isPaidPlan(entitlements.plan),
+      fallbackUsed: !usedRemote,
+      fallbackReason,
+      errorType,
+      plan: entitlements.plan,
+      planSource: entitlements.planSource,
+      persistedPlan: entitlements.persistedPlan,
+      requestId
     };
 
     logger.debug('✅ AI Suggestion fulfilled', {
@@ -1060,10 +1296,12 @@ router.post("/ai-suggestion", aiAuthMiddleware, async (req, res) => {
     res.json(responsePayload);
 
   } catch (err) {
-    logger.error('❌ AI Suggestion Route Error:', { requestId, message: err.message });
+    const errorType = classifyAiError(err);
+    logger.error('❌ AI Suggestion Route Error:', { requestId, message: err.message, errorType });
     res.status(500).json({ 
       error: 'Interner Server-Fehler',
       message: err.message,
+      errorType,
       requestId
     });
   }
@@ -1130,14 +1368,15 @@ router.get("/ai-quality", firebaseAuthMiddleware, async (req, res) => {
 });
 
 // Helper Functions
-async function generateGPT4Suggestion(workoutContext, openaiClient) {
+async function generateGPT4Suggestion(workoutContext, openaiClient, options = {}) {
+  const requestId = options.requestId || '';
   if (!openaiClient) {
     throw new Error('OpenAI Client nicht verfügbar');
   }
 
   const prompt = createWorkoutPrompt(workoutContext);
-  
-  const completion = await openaiClient.chat.completions.create({
+
+  const completion = await withAiRetry(async () => openaiClient.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [
       {
@@ -1181,17 +1420,19 @@ async function generateGPT4Suggestion(workoutContext, openaiClient) {
     ],
     max_tokens: 1000,
     temperature: 0.8,
-    timeout: 15000
-  });
+    timeout: AI_OPENAI_TIMEOUT_MS
+  }));
 
-  const response = completion.choices[0].message.content;
-  return JSON.parse(response);
+  const response = completion?.choices?.[0]?.message?.content || '';
+  const parsed = parseJsonSafely(response, { requestId, context: 'ai-suggestion' });
+  return validateAiSuggestionPayload(parsed);
 }
 
-async function generateQuickGeneratorWithOpenAI(context, openaiClient) {
+async function generateQuickGeneratorWithOpenAI(context, openaiClient, options = {}) {
+  const requestId = options.requestId || '';
   const prompt = createQuickGeneratorPrompt(context);
 
-  const completion = await openaiClient.chat.completions.create({
+  const completion = await withAiRetry(async () => openaiClient.chat.completions.create({
     model: 'gpt-4o-mini',
     messages: [
       {
@@ -1216,12 +1457,13 @@ Fallback auf sinnvolle Standardwerte bei fehlenden Parametern.`
     ],
     temperature: 0.2,
     max_tokens: 360,
-    timeout: 15000,
+    timeout: AI_OPENAI_TIMEOUT_MS,
     response_format: { type: 'json_object' }
-  });
+  }));
 
   const raw = completion?.choices?.[0]?.message?.content || '{}';
-  return JSON.parse(raw);
+  const parsed = parseJsonSafely(raw, { requestId, context: 'quick-generator' });
+  return validateAiSuggestionPayload(parsed);
 }
 
 function createQuickGeneratorPrompt(context) {
@@ -1271,7 +1513,7 @@ const WORKOUT_BLUEPRINTS = {
     hypertrophy: {
       gym_only: ['Bankdrücken', 'Schulterdrücken', 'Schrägbankdrücken', 'Dips', 'Seitheben'],
       gym_plus_bodyweight: ['Kurzhantel Bankdrücken', 'Schulterdrücken', 'Liegestütze', 'Dips', 'Seitheben'],
-      bodyweight_only: ['Liegestütze', 'Pike Push-Ups', 'Dips', 'Enge Liegestütze', 'Plank']
+      bodyweight_only: ['Liegestütze', 'Pike Push-Ups', 'Dips', 'Enge Liegestütze', 'Diamond Push-Ups']
     },
     strength: {
       gym_only: ['Bankdrücken', 'Schulterdrücken', 'Schrägbankdrücken', 'Dips'],
@@ -1283,12 +1525,12 @@ const WORKOUT_BLUEPRINTS = {
     hypertrophy: {
       gym_only: ['Rudern Langhantel', 'Latzug zur Brust', 'Kurzhantelrudern', 'Face Pulls', 'Kurzhantel Bizeps Curls'],
       gym_plus_bodyweight: ['Klimmzüge', 'Rudern Kabelzug', 'Kurzhantelrudern', 'Face Pulls', 'Hammer Curls'],
-      bodyweight_only: ['Klimmzüge', 'Inverted Rows', 'Superman Hold', 'Reverse Snow Angels', 'Dead Bug']
+      bodyweight_only: ['Klimmzüge', 'Inverted Rows', 'Körpergewicht Rudern', 'Negative Klimmzüge', 'Isometrische Hang Holds']
     },
     strength: {
       gym_only: ['Rudern Langhantel', 'Klimmzüge', 'Latzug zur Brust', 'Kurzhantelrudern'],
       gym_plus_bodyweight: ['Klimmzüge', 'Rudern Langhantel', 'Rudern Kabelzug', 'Kurzhantelrudern'],
-      bodyweight_only: ['Klimmzüge', 'Inverted Rows', 'Superman Hold', 'Dead Bug']
+      bodyweight_only: ['Klimmzüge', 'Inverted Rows', 'Körpergewicht Rudern', 'Negative Klimmzüge']
     }
   },
   legs: {
@@ -1307,7 +1549,7 @@ const WORKOUT_BLUEPRINTS = {
     hypertrophy: {
       gym_only: ['Kniebeugen Langhantel', 'Kurzhantel Bankdrücken', 'Rudern Kabelzug', 'Rumänisches Kreuzheben', 'Plank'],
       gym_plus_bodyweight: ['Kniebeugen Langhantel', 'Liegestütze', 'Klimmzüge', 'Ausfallschritte Kurzhantel', 'Plank'],
-      bodyweight_only: ['Kniebeugen', 'Liegestütze', 'Inverted Rows', 'Ausfallschritte', 'Plank']
+      bodyweight_only: ['Kniebeugen', 'Liegestütze', 'Inverted Rows', 'Ausfallschritte', 'Glute Bridge']
     },
     strength: {
       gym_only: ['Kniebeugen Langhantel', 'Bankdrücken', 'Rudern Langhantel', 'Rumänisches Kreuzheben'],
@@ -1381,6 +1623,20 @@ function isMobilityOrWarmupExercise(name = '') {
   return blockedTerms.some((term) => normalized.includes(term));
 }
 
+function isRehabOrActivationExercise(name = '') {
+  const normalized = String(name).toLowerCase();
+  return [
+    'dead bug',
+    'bird dog',
+    'superman hold',
+    'reverse snow angel',
+    'cat cow',
+    'shoulder disloc',
+    'scapula',
+    'band pull apart'
+  ].some((term) => normalized.includes(term));
+}
+
 function isMachineHeavyExercise(name = '') {
   const normalized = String(name).toLowerCase();
   return [
@@ -1436,13 +1692,14 @@ function applyHardExerciseFilters(exercises = [], context = {}) {
     if (!name) return false;
 
     if (isMobilityOrWarmupExercise(name)) return false;
+    if ((goal === 'strength' || goal === 'hypertrophy') && isRehabOrActivationExercise(name)) return false;
     if (requestedType !== 'fullbody' && !matchesRequestedType(name, requestedType)) return false;
 
     if (exercise.exerciseType === 'mobility' || exercise.primaryPhase === 'warmup') {
       return false;
     }
 
-    if (exercise.disallowedGoals.includes(goal)) {
+    if (Array.isArray(exercise.disallowedGoals) && exercise.disallowedGoals.includes(goal)) {
       return false;
     }
 
@@ -1526,9 +1783,7 @@ function buildDeterministicExerciseOrder(exercises = [], context = {}, targetExe
   compounds.slice(2).forEach((exercise) => ordered.push(exercise));
   accessories.forEach((exercise) => ordered.push(exercise));
 
-  if (goal === 'hypertrophy') {
-    cores.slice(0, 1).forEach((exercise) => ordered.push(exercise));
-  } else if (requestedType === 'fullbody') {
+  if (requestedType === 'fullbody') {
     cores.slice(0, 1).forEach((exercise) => ordered.push(exercise));
   }
 
@@ -1756,10 +2011,10 @@ function enforceWorkoutProgrammingRules(payload, context = {}, options = {}) {
   const equipmentMode = normalizeEquipmentMode(context.equipmentMode || payload?.equipmentMode);
   const targetExerciseCount = getTimeAdjustedExerciseTarget(context.durationMinutes || context.timeAvailable, goal);
   const preferredBySplit = {
-    push: ['horizontal_push', 'vertical_push', 'horizontal_push', 'vertical_push', 'core'],
-    pull: ['horizontal_pull', 'vertical_pull', 'horizontal_pull', 'vertical_pull', 'core'],
-    legs: ['squat', 'hinge', 'squat', 'hinge', 'core'],
-    fullbody: ['squat', 'horizontal_push', 'horizontal_pull', 'hinge', 'core']
+    push: ['horizontal_push', 'vertical_push', 'horizontal_push', 'vertical_push', 'other'],
+    pull: ['horizontal_pull', 'vertical_pull', 'horizontal_pull', 'vertical_pull', 'other'],
+    legs: ['squat', 'hinge', 'squat', 'hinge', 'other'],
+    fullbody: ['squat', 'horizontal_push', 'horizontal_pull', 'hinge', 'other']
   };
 
   const inputExercises = Array.isArray(payload?.exercises) ? payload.exercises : [];
@@ -2282,8 +2537,11 @@ Generiere jetzt 45 ${category}-Übungen:`;
         const responseText = completion.choices[0].message.content;
         logger.debug(`📝 KI-Response Länge: ${responseText.length} Zeichen`);
         
-        // Versuche JSON zu parsen
-        const exercises = JSON.parse(responseText);
+        // Versuche JSON robust zu parsen
+        const exercises = parseJsonSafely(responseText, {
+          requestId: `admin_populate_${category.toLowerCase()}`,
+          context: 'admin-populate-db'
+        });
         
         if (!Array.isArray(exercises)) {
           throw new Error('KI hat kein Array zurückgegeben');

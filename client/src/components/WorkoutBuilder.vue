@@ -67,6 +67,7 @@ import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
 const showEquipmentFilter = ref(false)
 const selectedEquipment = ref('')
 const favoriteAutostartTriggered = ref(false)
+const favoriteContext = ref(null)
 // Alle Equipment-Typen aus den Exercises extrahieren
 const normalizedExercises = ref([])
 const allEquipmentTypes = computed(() => {
@@ -116,6 +117,16 @@ function consumeQuickPrefill() {
 	const routeState = readWorkoutBuilderRouteState(route.query)
 	if (!routeState.quick) return
 	const parsed = consumeWorkoutBuilderPrefill()
+	const favoriteId = String(parsed?.favoriteId || '').trim()
+	if (parsed?.favoriteSource && favoriteId) {
+		favoriteContext.value = {
+			favoriteId,
+			favoriteName: String(parsed?.favoriteName || '').trim(),
+			favoriteType: normalizeBuilderWorkoutType(parsed?.favoriteType || parsed?.type || selectedType.value)
+		}
+	} else {
+		favoriteContext.value = null
+	}
 	const list = Array.isArray(parsed?.exercises) ? parsed.exercises : []
 	if (!list.length) return
 	selectedExercises.value = list.map((exercise, index) => ({
@@ -126,6 +137,18 @@ function consumeQuickPrefill() {
 			? exercise.setDetails
 			: [{ reps: Number(exercise.reps) || 10, weight: Number(exercise.weight) || 0 }]
 	}))
+}
+
+function buildFavoriteDetailQuery(base = {}) {
+	const query = { ...base }
+	const ctx = favoriteContext.value
+	if (!ctx?.favoriteId) return query
+	query.favoriteSource = '1'
+	query.favoriteId = String(ctx.favoriteId)
+	if (ctx.favoriteName) query.favoriteName = String(ctx.favoriteName)
+	if (ctx.favoriteType) query.favoriteType = String(ctx.favoriteType)
+	if (String(route.query?.favoriteStart || '') === '1') query.favoriteStart = '1'
+	return query
 }
 
 function syncTypeFromRoute() {
@@ -405,7 +428,7 @@ async function createWorkout() {
 			userStore.workouts.unshift(tempWorkout)
 		}
 		logger.debug('[WorkoutBuilder] immediate temp draft prepared', { tempId })
-		await router.push({ name: 'workout-detail', params: { id: tempId } });
+		await router.push({ name: 'workout-detail', params: { id: tempId }, query: buildFavoriteDetailQuery() });
 		logger.debug('[WorkoutBuilder] navigated to temp workout detail', { tempId })
 
 		let token = await getIdToken();
@@ -461,7 +484,11 @@ async function createWorkout() {
 				const currentRouteName = String(router.currentRoute.value?.name || '')
 				logger.debug('[WorkoutBuilder] route state before replace', { currentRouteName, currentRouteId, tempId })
 				if (currentRouteId === tempId || currentRouteName === 'workout-builder') {
-					await router.replace({ name: 'workout-detail', params: { id: created._id }, query: { created: '1', realId: created._id } })
+					await router.replace({
+						name: 'workout-detail',
+						params: { id: created._id },
+						query: buildFavoriteDetailQuery({ created: '1', realId: created._id })
+					})
 					logger.debug('[WorkoutBuilder] replaced to real workout detail', { realId: created._id })
 				}
 

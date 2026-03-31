@@ -903,7 +903,11 @@ function openFavoriteInBuilder(favorite, { autoStart = false } = {}) {
     workoutName: favorite?.name || fav.workoutName || 'Favorite Workout',
     type,
     notes: typeof fav.notes === 'string' ? fav.notes : '',
-    exercises
+    exercises,
+    favoriteSource: true,
+    favoriteId: favorite?.id || null,
+    favoriteName: favorite?.name || fav.workoutName || '',
+    favoriteType: type
   }
   saveWorkoutBuilderPrefill(prefill)
   closeStartModePanel()
@@ -1190,6 +1194,15 @@ async function generateQuickWorkout() {
     router.push(buildWorkoutBuilderRoute(responseRequestedType, { quick: true }))
   } catch (error) {
     logger.error('Quick generator failed', error)
+    const status = Number(error?.response?.status || 0)
+    const message = String(error?.message || '').trim()
+    const isAuthError = message === 'NO_AUTH_TOKEN' || status === 401 || status === 403
+
+    if (isAuthError) {
+      quickFormError.value = $t('dashboard.quickGenAuthRequired')
+      return
+    }
+
     const localFallback = await buildLocalQuickFallback(pendingWorkoutType.value, quickGeneratorForm.value)
     try {
       saveWorkoutBuilderPrefill(localFallback)

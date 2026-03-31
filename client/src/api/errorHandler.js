@@ -101,6 +101,11 @@ const extractErrorMessage = (error) => {
   return 'Ein unbekannter Fehler ist aufgetreten.'
 }
 
+function isPrivateLanApiTarget(url = '') {
+  const raw = String(url || '')
+  return /^https?:\/\/(192\.168\.|10\.|172\.(1[6-9]|2\d|3[0-1])\.|localhost)/i.test(raw)
+}
+
 /**
  * Hauptfunktion: Behandelt API Errors einheitlich
  * 
@@ -206,9 +211,16 @@ export const handleAPIError = (error, context = '', options = {}) => {
   
   // 2. Request wurde gesendet, aber keine Antwort erhalten (Network Error)
   if (error.request) {
+    const baseURL = String(error?.config?.baseURL || '')
+    const fullUrl = `${baseURL}${String(error?.config?.url || '')}`
+    const code = String(error?.code || '').toUpperCase()
+    const lanHint = isPrivateLanApiTarget(fullUrl)
+
     logger.error(`Network Error [${context}]:`, error)
     throw new APIError(
-      'Netzwerkfehler: Keine Verbindung zum Server. Prüfe deine Internetverbindung.',
+      lanHint && (code === 'ERR_NETWORK' || code === 'ECONNABORTED')
+        ? 'Lokale API nicht erreichbar. Prüfe, ob iPhone und Mac im selben WLAN sind und der Server auf dem Mac läuft.'
+        : 'Netzwerkfehler: Keine Verbindung zum Server. Prüfe deine Internetverbindung.',
       0,
       { context, originalError: error, type: 'network' }
     )

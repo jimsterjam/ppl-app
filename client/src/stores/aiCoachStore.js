@@ -29,6 +29,46 @@ const featureFlags = {
   demoFallbackEnabled: import.meta.env.VITE_AI_DEMO_FALLBACK !== 'false'
 }
 
+const AI_REMOTE_RETRY_ATTEMPTS = 1
+const AI_REMOTE_RETRY_DELAY_MS = 600
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+
+const classifyRemoteError = (error) => {
+  const status = Number(error?.response?.status || error?.status || error?.statusCode || 0)
+  const code = String(error?.code || '').toUpperCase()
+  if (status === 429) return 'rate_limited'
+  if (status >= 500 && status < 600) return 'provider_server_error'
+  if (code.includes('TIMEOUT') || code === 'ECONNABORTED') return 'timeout'
+  if (status >= 400 && status < 500) return 'provider_client_error'
+  return 'unknown'
+}
+
+const isTransientRemoteError = (error) => {
+  const type = classifyRemoteError(error)
+  return type === 'timeout' || type === 'rate_limited' || type === 'provider_server_error'
+}
+
+const postAiSuggestionWithRetry = async (payload, headers) => {
+  let attempt = 0
+  let lastError = null
+
+  while (attempt <= AI_REMOTE_RETRY_ATTEMPTS) {
+    try {
+      return await http.post('/workouts/ai-suggestion', payload, { headers })
+    } catch (error) {
+      lastError = error
+      if (attempt >= AI_REMOTE_RETRY_ATTEMPTS || !isTransientRemoteError(error)) {
+        throw error
+      }
+      await sleep(AI_REMOTE_RETRY_DELAY_MS * Math.pow(2, attempt))
+      attempt += 1
+    }
+  }
+
+  throw lastError
+}
+
 const defaultUsageStats = () => ({
   totalRequests: 0,
   successCount: 0,
@@ -353,7 +393,7 @@ export const useAICoachStore = defineStore('aiCoach', () => {
       const headers = {}
       if (token) headers.Authorization = `Bearer ${token}`
 
-      const { data } = await http.post('/workouts/ai-suggestion', { ...context, mode: 'auto' }, { headers })
+      const { data } = await postAiSuggestionWithRetry({ ...context, mode: 'auto' }, headers)
       const normalized = normalizeRecommendation(data, 'remote')
       persistRecommendation(normalized)
       recommendations.value.unshift({ ...normalized, timestamp: new Date().toISOString() })
@@ -372,7 +412,11 @@ export const useAICoachStore = defineStore('aiCoach', () => {
       error.value = remoteError
       if (featureFlags.demoFallbackEnabled) {
         const fallback = await generateWorkoutSuggestion(context)
-        fallback.metadata = { ...fallback.metadata, fallbackReason: remoteError.message }
+        fallback.metadata = {
+          ...fallback.metadata,
+          fallbackReason: remoteError?.response?.data?.errorType || classifyRemoteError(remoteError),
+          fallbackMessage: remoteError?.message || 'remote_error'
+        }
         return fallback
       }
       throw remoteError

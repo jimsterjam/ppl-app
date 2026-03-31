@@ -19,7 +19,7 @@ const config: CapacitorConfig = {
   },
   plugins: {
     CapacitorHttp: {
-      enabled: true
+      enabled: String(process.env.VITE_CAP_HTTP_ENABLED || 'false').toLowerCase() === 'true'
     },
     GoogleAuth: {
       scopes: ['profile', 'email'],

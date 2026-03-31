@@ -69,6 +69,27 @@ Konfiguriert das Auto-Restart-Verhalten:
 - Frontend: `5173` (Vite)
 - Backend: `3001` (Express)
 
+### CORS-Konfiguration (wichtig für iOS + Production)
+
+Der Server liest eine env-gesteuerte Origin-Allowlist:
+
+- `CORS_ALLOWED_ORIGINS`: Komma-separierte, exakte Origins
+- `CORS_ALLOW_LAN`: erlaubt im Dev-Modus zusätzlich `http://192.168.x.x[:port]`
+
+**Empfohlen für Development (`server/.env`):**
+```bash
+NODE_ENV=development
+CORS_ALLOW_LAN=1
+CORS_ALLOWED_ORIGINS=capacitor://localhost,http://localhost:5173,http://localhost:5174,http://localhost
+```
+
+**Empfohlen für Production:**
+```bash
+NODE_ENV=production
+CORS_ALLOW_LAN=0
+CORS_ALLOWED_ORIGINS=https://app.push-pull-legs.de
+```
+
 ---
 
 ## 🐛 Troubleshooting

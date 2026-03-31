@@ -3,7 +3,6 @@ import { onMounted } from 'vue'
 import { RouterView } from 'vue-router'
 import ToastHost from './components/ToastHost.vue'
 import TimerPortal from './components/timer/TimerPortal.vue'
-import { setupAutoSync } from './utils/syncManager'
 import { initializeDefaultExercises } from './utils/offlineStorage'
 import { logger } from './utils/logger'
 
@@ -11,10 +10,9 @@ import { logger } from './utils/logger'
 onMounted(async () => {
   // Lade Standard-Übungen beim ersten Start
   await initializeDefaultExercises()
-  
-  // Setup Auto-Sync
-  await setupAutoSync()
-  logger.debug('✅ App - Offline Support aktiviert (inkl. Initial Sync)')
+
+  // Auto-Sync wird zentral in main.js initialisiert.
+  logger.debug('✅ App - Offline Support aktiviert')
 })
 </script>
 

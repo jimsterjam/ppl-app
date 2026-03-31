@@ -1,10 +1,19 @@
-import axios from 'axios'
-import { apiUrl } from './http'
+import { createResourceApi } from './http'
 import { handleAPIError } from './errorHandler'
+import { logger } from '@/utils/logger'
 
-const API_URL = apiUrl('account')
-const PROFILE_TIMEOUT_MS = Number.parseInt(import.meta.env.VITE_PROFILE_TIMEOUT_MS || '', 10) || 12000
-const api = axios.create({ baseURL: API_URL, timeout: PROFILE_TIMEOUT_MS })
+const PROFILE_TIMEOUT_MS = Number.parseInt(import.meta.env.VITE_PROFILE_TIMEOUT_MS || '', 10) || 25000
+const PROFILE_RETRY_DELAY_MS = Number.parseInt(import.meta.env.VITE_PROFILE_RETRY_DELAY_MS || '', 10) || 1000
+const api = createResourceApi('account', { timeout: PROFILE_TIMEOUT_MS })
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function isLikelyTransportError(error) {
+  const code = String(error?.code || '').toUpperCase()
+  return code === 'ERR_NETWORK' || code === 'ECONNABORTED' || !error?.response
+}
 
 function authConfig(token) {
   return token ? { headers: { Authorization: `Bearer ${token}` } } : {}
@@ -15,6 +24,23 @@ export async function fetchAccountProfile(token) {
     const res = await api.get('/profile', authConfig(token))
     return res.data || {}
   } catch (error) {
+    if (isLikelyTransportError(error)) {
+      try {
+        await sleep(PROFILE_RETRY_DELAY_MS)
+        const retryRes = await api.get('/profile', authConfig(token))
+        return retryRes.data || {}
+      } catch (retryError) {
+        if (isLikelyTransportError(retryError)) {
+          logger.warn('📡 Account API - Profil Netzwerk/Transportproblem, nutze lokalen Fallback', {
+            code: retryError?.code || null,
+            status: retryError?.response?.status || null
+          })
+          return {}
+        }
+        throw handleAPIError(retryError, 'Profil laden')
+      }
+    }
+
     throw handleAPIError(error, 'Profil laden')
   }
 }

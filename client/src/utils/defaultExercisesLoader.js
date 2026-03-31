@@ -1,9 +1,13 @@
 import { normalizeDefaultExercises } from '@/utils/normalizeDefaultExercises'
 import { logger } from '@/utils/logger'
+import { curateDefaultExercises } from '@/utils/exerciseCuration'
 import bundledDefaultExercises from '@/data/default-exercises.json'
 
 let cachedExercises = null
 let loadPromise = null
+
+const ENABLE_CURATION = String(import.meta.env.VITE_EXERCISE_CURATION_ENABLED || '1').trim() !== '0'
+const ENABLE_EXOTIC_FILTER = String(import.meta.env.VITE_EXERCISE_EXOTIC_FILTER_ENABLED || '1').trim() !== '0'
 
 export async function loadDefaultExercises() {
   if (cachedExercises) {
@@ -19,7 +23,11 @@ export async function loadDefaultExercises() {
       const raw = bundledDefaultExercises
       logger.debug('[DefaultExercises] Static bundle result:', Array.isArray(raw) ? raw.length : typeof raw)
       if (Array.isArray(raw) && raw.length > 0) {
-        cachedExercises = normalizeDefaultExercises(raw)
+        const curated = curateDefaultExercises(raw, {
+          enableCuration: ENABLE_CURATION,
+          enableExoticFilter: ENABLE_EXOTIC_FILTER
+        })
+        cachedExercises = normalizeDefaultExercises(curated)
         logger.debug('[DefaultExercises] Normalized from static bundle:', cachedExercises.length)
         return cachedExercises
       }
@@ -34,7 +42,11 @@ export async function loadDefaultExercises() {
       if (response.ok) {
         const json = await response.json()
         if (Array.isArray(json) && json.length > 0) {
-          cachedExercises = normalizeDefaultExercises(json)
+          const curated = curateDefaultExercises(json, {
+            enableCuration: ENABLE_CURATION,
+            enableExoticFilter: ENABLE_EXOTIC_FILTER
+          })
+          cachedExercises = normalizeDefaultExercises(curated)
           logger.debug('[DefaultExercises] Normalized from fetch:', cachedExercises.length)
           return cachedExercises
         }

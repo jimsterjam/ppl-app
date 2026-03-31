@@ -1,5 +1,4 @@
-import axios from "axios";
-import { apiUrl } from "./http";
+import { apiUrl, createResourceApi } from "./http";
 import { handleAPIError } from "./errorHandler";
 import { 
   cacheWorkouts, 
@@ -8,14 +7,48 @@ import {
   getWorkoutOffline,
   deleteWorkoutOffline,
   queueAction,
-  isOnline
+  isOnline,
+  purgeServerDeletedWorkouts
 } from "@/utils/offlineStorage";
 import { logger } from "@/utils/logger";
 
 // API Basis-URL
 const API_URL = apiUrl('workouts');
-const WORKOUTS_TIMEOUT_MS = Number.parseInt(import.meta.env.VITE_WORKOUTS_TIMEOUT_MS || '', 10) || 12000
-const api = axios.create({ baseURL: API_URL, timeout: WORKOUTS_TIMEOUT_MS });
+const WORKOUTS_TIMEOUT_MS = Number.parseInt(import.meta.env.VITE_WORKOUTS_TIMEOUT_MS || '', 10) || 25000
+const api = createResourceApi('workouts', { timeout: WORKOUTS_TIMEOUT_MS });
+
+const CREATE_RETRY_DELAY_MS = Number.parseInt(import.meta.env.VITE_WORKOUTS_CREATE_RETRY_DELAY_MS || '', 10) || 1200
+const STATS_RETRY_DELAY_MS = Number.parseInt(import.meta.env.VITE_WORKOUTS_STATS_RETRY_DELAY_MS || '', 10) || 1000
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function shouldUseOfflineCreateFallback(error) {
+  const status = Number(error?.response?.status || 0)
+  if (!status) return true
+  return [408, 425, 429, 500, 502, 503, 504].includes(status)
+}
+
+function shouldUseOfflineUpdateFallback(error) {
+  const status = Number(error?.response?.status || 0)
+  if (!status) return true
+  return [408, 425, 429, 500, 502, 503, 504].includes(status)
+}
+
+function shouldRetryCreateRequest(error) {
+  if (!error) return false
+  const status = Number(error?.response?.status || 0)
+  if ([408, 425, 429, 500, 502, 503, 504].includes(status)) return true
+  const code = String(error?.code || '').toUpperCase()
+  if (code === 'ERR_NETWORK' || code === 'ECONNABORTED') return true
+  return !error?.response
+}
+
+function isLikelyTransportError(error) {
+  const code = String(error?.code || '').toUpperCase()
+  return code === 'ERR_NETWORK' || code === 'ECONNABORTED' || !error?.response
+}
 
 function parseUidFromToken(token = null) {
   const raw = String(token || '').trim()
@@ -47,13 +80,26 @@ export async function fetchWorkouts(token = null, userId = null) {
 
     if (Array.isArray(res.data) && res.data.length > 0) {
       await cacheWorkouts(res.data);
+      // Fix #3: Lokale Workouts bereinigen, die der Server nicht mehr kennt
+      const serverIds = res.data.map(w => String(w?._id || '').trim()).filter(Boolean)
+      await purgeServerDeletedWorkouts(serverIds, userId || '').catch(() => {})
       logger.debug('💾 Workouts API - Cached:', res.data.length, 'workouts');
     }
 
     return Array.isArray(res.data) ? res.data : [];
   } catch (error) {
     if (!error.response || !isOnline()) {
-      logger.warn('📡 Workouts API - Offline, lade aus Cache');
+      const transportIssue = isLikelyTransportError(error) && isOnline()
+      logger.warn(
+        transportIssue
+          ? '📡 Workouts API - Netzwerk/Transportproblem, lade aus Cache'
+          : '📡 Workouts API - Offline, lade aus Cache',
+        {
+          code: error?.code || null,
+          status: error?.response?.status || null,
+          online: isOnline()
+        }
+      );
       const cached = userId
         ? await getAllWorkoutsOffline({ userId })
         : [];
@@ -61,6 +107,50 @@ export async function fetchWorkouts(token = null, userId = null) {
       return cached;
     }
     throw handleAPIError(error, 'Workouts laden', { showToast: false });
+  }
+}
+
+export async function fetchLatestWorkoutsForRecovery(token = null, userId = null, limit = 3) {
+  const safeLimit = Math.max(1, Math.min(10, Number(limit) || 3))
+  try {
+    const config = {
+      validateStatus: (status) => (status >= 200 && status < 300) || [404, 204, 500].includes(status)
+    }
+    if (token) config.headers = { Authorization: `Bearer ${token}` }
+
+    const res = await api.get("", config)
+    if (!res || [404, 204, 500].includes(res.status)) return []
+
+    const list = Array.isArray(res.data) ? res.data : []
+    const scoped = userId
+      ? list.filter((w) => String(w?.userId || '') === String(userId || '').trim())
+      : list
+
+    const latest = [...scoped]
+      .sort((a, b) => new Date(b?.updatedAt || b?.date || b?.createdAt || 0) - new Date(a?.updatedAt || a?.date || a?.createdAt || 0))
+      .slice(0, safeLimit)
+
+    await Promise.all(latest.map(async (workout) => {
+      try {
+        await saveWorkoutOffline({
+          ...workout,
+          _offlineCreated: false,
+          _syncedAt: new Date().toISOString()
+        })
+      } catch {}
+    }))
+
+    return latest
+  } catch (error) {
+    if (!error.response || !isOnline()) {
+      const cached = userId
+        ? await getAllWorkoutsOffline({ userId })
+        : []
+      return [...cached]
+        .sort((a, b) => new Date(b?.updatedAt || b?.date || b?.createdAt || 0) - new Date(a?.updatedAt || a?.date || a?.createdAt || 0))
+        .slice(0, safeLimit)
+    }
+    throw handleAPIError(error, 'Workouts Recovery laden', { showToast: false })
   }
 }
 
@@ -79,14 +169,22 @@ export async function fetchWorkout(workoutId, token = null) {
     })
     return res.data;
   } catch (error) {
+    const transportIssue = isLikelyTransportError(error) && isOnline()
     logger.warn('⚠️ Workouts API - fetchWorkout failed, checking offline fallback:', {
       workoutId,
       message: error?.message,
       status: error?.response?.status || null,
+      code: error?.code || null,
+      transportIssue,
       online: isOnline()
     })
     if (!error.response || !isOnline()) {
-      logger.warn('📡 Workouts API - Offline, lade Workout aus Cache:', workoutId);
+      logger.warn(
+        transportIssue
+          ? '📡 Workouts API - Netzwerk/Transportproblem, lade Workout aus Cache:'
+          : '📡 Workouts API - Offline, lade Workout aus Cache:',
+        workoutId
+      );
       const cached = await getWorkoutOffline(workoutId);
       if (cached) return cached;
     }
@@ -145,18 +243,54 @@ export async function createWorkout(workoutData, token = null, options = {}) {
       }
       // Falls keine Daten zurückkommen, fallback unten verwenden
     } catch (error) {
+      if (shouldRetryCreateRequest(error)) {
+        logger.warn('⚠️ Workouts API - createWorkout erster Versuch fehlgeschlagen, retrye einmal', {
+          requestId,
+          message: error?.message,
+          code: error?.code || null,
+          status: Number(error?.response?.status || 0) || null
+        })
+        try {
+          await sleep(CREATE_RETRY_DELAY_MS)
+          const retryConfig = token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+          const retryRes = await api.post("", workoutData, retryConfig)
+          if (retryRes?.data && retryRes.data._id) {
+            const retriedWorkout = {
+              ...retryRes.data,
+              userId: workoutData?.userId || retryRes.data?.userId || null,
+              _offlineCreated: false,
+              _syncedAt: new Date().toISOString()
+            }
+            await saveWorkoutOffline(retriedWorkout)
+            logger.debug('✅ Workouts API - createWorkout retry success', {
+              requestId,
+              id: retryRes.data._id
+            })
+            return retriedWorkout
+          }
+        } catch (retryError) {
+          error = retryError
+        }
+      }
+
+      const status = Number(error?.response?.status || 0)
       logger.error('❌ Workouts API - Fehler beim Online-Speichern, bleibt offline:', {
         requestId,
         message: error?.message,
         code: error?.code || null,
-        status: error?.response?.status || null,
+        status: status || null,
         method: error?.config?.method || null,
         url: error?.config?.url || null,
         baseURL: error?.config?.baseURL || null,
         timeout: error?.config?.timeout || null,
         serverError: error?.response?.data || null
       });
-      // Fallback unten: offline + queue
+
+      if (!shouldUseOfflineCreateFallback(error)) {
+        throw handleAPIError(error, 'Workout speichern', { showToast: false })
+      }
+
+      // Nur bei Netzwerk-/Transient-Fehlern offline fallbacken.
     }
   }
 
@@ -203,6 +337,10 @@ export async function updateWorkout(workoutId, workoutData, token = null) {
     if (res.data) await saveWorkoutOffline(res.data);
     return res.data;
   } catch (error) {
+    if (!shouldUseOfflineUpdateFallback(error)) {
+      throw handleAPIError(error, 'Workout aktualisieren', { showToast: false })
+    }
+
     logger.error('❌ Workouts API - Update fehlgeschlagen, nutze Offline-Fallback:', error.message);
     const existingWorkout = await getWorkoutOffline(workoutId);
     const offlineWorkout = {
@@ -304,13 +442,62 @@ export async function fetchWorkoutProgressStats(token = null, params = {}) {
   try {
     const config = {
       params,
-      validateStatus: (status) => (status >= 200 && status < 300) || [404, 204, 500].includes(status)
+      validateStatus: (status) => (status >= 200 && status < 300) || [403, 404, 204, 500].includes(status)
     };
     if (token) config.headers = { Authorization: `Bearer ${token}` };
     const res = await api.get("/stats/progress", config);
     if (!res || [404, 204, 500].includes(res.status)) return null;
+    if (res.status === 403) {
+      return {
+        __forbidden: true,
+        __status: 403,
+        code: String(res?.data?.code || ''),
+        entitlement: res?.data?.entitlement || null
+      }
+    }
     return res.data ?? null;
   } catch (error) {
+    if (shouldRetryCreateRequest(error)) {
+      try {
+        await sleep(STATS_RETRY_DELAY_MS)
+        const retryConfig = {
+          params,
+          validateStatus: (status) => (status >= 200 && status < 300) || [403, 404, 204, 500].includes(status)
+        }
+        if (token) retryConfig.headers = { Authorization: `Bearer ${token}` }
+        const retryRes = await api.get("/stats/progress", retryConfig)
+        if (!retryRes || [404, 204, 500].includes(retryRes.status)) return null
+        if (retryRes.status === 403) {
+          return {
+            __forbidden: true,
+            __status: 403,
+            code: String(retryRes?.data?.code || ''),
+            entitlement: retryRes?.data?.entitlement || null
+          }
+        }
+        return retryRes.data ?? null
+      } catch (retryError) {
+        if (isLikelyTransportError(retryError)) {
+          logger.warn('📡 Workouts API - Progress-Stats Netzwerk/Transportproblem, nutze Cache-Fallback', {
+            code: retryError?.code || null,
+            status: retryError?.response?.status || null,
+            online: isOnline()
+          })
+          return null
+        }
+        throw handleAPIError(retryError, 'Progress-Stats laden', { showToast: false })
+      }
+    }
+
+    if (isLikelyTransportError(error)) {
+      logger.warn('📡 Workouts API - Progress-Stats Netzwerk/Transportproblem, nutze Cache-Fallback', {
+        code: error?.code || null,
+        status: error?.response?.status || null,
+        online: isOnline()
+      })
+      return null
+    }
+
     throw handleAPIError(error, 'Progress-Stats laden', { showToast: false });
   }
 }

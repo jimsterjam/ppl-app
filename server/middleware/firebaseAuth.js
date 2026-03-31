@@ -1,7 +1,7 @@
 // server/middleware/firebaseAuth.js
 import { admin } from '../utils/firebaseAdmin.js';
 
-export function firebaseAuthMiddleware(req, res, next) {
+export async function firebaseAuthMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader) {
     try {
@@ -10,28 +10,30 @@ export function firebaseAuthMiddleware(req, res, next) {
         path: req?.originalUrl || req?.url
       });
     } catch (e) {}
-    return res.status(401).json({ error: 'No auth token' });
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
   const token = authHeader.replace('Bearer ', '');
-  admin.auth().verifyIdToken(token)
-    .then((decodedToken) => {
-      req.auth = { userId: decodedToken.uid, token: decodedToken };
-      try {
-        console.log('[firebaseAuth] verified token', {
-          uid: decodedToken.uid,
-          method: req?.method,
-          path: req?.originalUrl || req?.url
-        });
-      } catch (e) {}
-      next();
-    })
-    .catch((err) => {
-      // Verbose logging für Diagnose (keine sensiblen Tokens ins Log)
-      try {
-        console.error('[firebaseAuth] verifyIdToken failed:', err?.code || err?.message || err);
-        console.error('[firebaseAuth] Authorization header present:', Boolean(authHeader));
-      } catch (e) {}
-      return res.status(401).json({ error: 'Invalid auth token', message: err?.message || String(err) });
-    });
+  try {
+    const decodedToken = await admin.auth().verifyIdToken(token)
+    req.auth = { userId: decodedToken.uid, token: decodedToken };
+    try {
+      console.log('[firebaseAuth] verified token', {
+        uid: decodedToken.uid,
+        method: req?.method,
+        path: req?.originalUrl || req?.url
+      });
+    } catch (e) {}
+    return next()
+  } catch (err) {
+    // Für Clients nur generische Fehler, Details nur im Server-Log
+    try {
+      console.error('[firebaseAuth] verifyIdToken failed:', {
+        code: err?.code || null,
+        method: req?.method,
+        path: req?.originalUrl || req?.url
+      });
+    } catch (e) {}
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
 }

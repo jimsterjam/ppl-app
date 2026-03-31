@@ -1,5 +1,5 @@
 import axios from "axios";
-import { apiUrl } from "./http";
+import { apiUrl, createResourceApi } from "./http";
 import { 
   cacheExercises, 
   getAllExercisesOffline,
@@ -16,7 +16,12 @@ if (typeof window !== 'undefined') {
 }
 
 // Axios-Instance für Exercises (timeout für offline-first: schnell aufgeben, Fallback nutzen)
-const api = axios.create({ baseURL: API_URL, timeout: 5000 });
+const api = createResourceApi('exercises', { timeout: 5000 });
+
+function isLikelyTransportError(error) {
+  const code = String(error?.code || '').toUpperCase()
+  return code === 'ERR_NETWORK' || code === 'ECONNABORTED' || !error?.response
+}
 
 // Alle Übungen abrufen – optional mit einfachen Query-Filtern
 export async function fetchExercises(filters = {}) {
@@ -39,7 +44,17 @@ export async function fetchExercises(filters = {}) {
   } catch (error) {
     // Bei Netzwerkfehlern: Fallback zu Offline-Daten
     if (!error.response || !isOnline()) {
-      logger.warn('📡 Exercises API - Offline, lade aus Cache');
+      const transportIssue = isLikelyTransportError(error) && isOnline()
+      logger.warn(
+        transportIssue
+          ? '📡 Exercises API - Netzwerk/Transportproblem, lade aus Cache'
+          : '📡 Exercises API - Offline, lade aus Cache',
+        {
+          code: error?.code || null,
+          status: error?.response?.status || null,
+          online: isOnline()
+        }
+      );
       const cached = await getAllExercisesOffline(filters);
       logger.debug('📦 Exercises API - Offline Cache:', cached.length, 'exercises');
       return cached;
@@ -62,7 +77,13 @@ export async function fetchExercise(exerciseId) {
   } catch (error) {
     // Bei Netzwerkfehlern: Fallback zu Offline-Daten
     if (!error.response || !isOnline()) {
-      logger.warn('📡 Exercises API - Offline, lade Exercise aus Cache:', exerciseId);
+      const transportIssue = isLikelyTransportError(error) && isOnline()
+      logger.warn(
+        transportIssue
+          ? '📡 Exercises API - Netzwerk/Transportproblem, lade Exercise aus Cache:'
+          : '📡 Exercises API - Offline, lade Exercise aus Cache:',
+        exerciseId
+      );
       const cached = await getExerciseOffline(exerciseId);
       if (cached) {
         return cached;

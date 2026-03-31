@@ -28,6 +28,13 @@ import Workout from '../models/Workout.js'
 const router = express.Router()
 
 const FREE_AI_WEEKLY_LIMIT = 1
+const SUBSCRIPTION_FORCE_PLAN = String(process.env.SUBSCRIPTION_FORCE_PLAN || '').trim().toLowerCase()
+const SUBSCRIPTION_FORCE_SCOPE = String(process.env.SUBSCRIPTION_FORCE_SCOPE || 'all').trim().toLowerCase()
+const SUBSCRIPTION_FORCE_ALLOWLIST = String(process.env.SUBSCRIPTION_FORCE_ALLOWLIST || '')
+  .split(',')
+  .map((entry) => entry.trim())
+  .filter(Boolean)
+const IS_PRODUCTION = process.env.NODE_ENV === 'production'
 
 function startOfIsoWeek(dateInput) {
   const date = new Date(dateInput)
@@ -39,6 +46,23 @@ function startOfIsoWeek(dateInput) {
 
 function isPaidPlan(plan = 'free') {
   return plan === 'pro' || plan === 'elite'
+}
+
+function resolveEffectivePlan(profilePlan = 'free', userId = '') {
+  const normalizedProfilePlan = ['free', 'pro', 'elite'].includes(profilePlan) ? profilePlan : 'free'
+  const validForcedPlan = ['free', 'pro', 'elite'].includes(SUBSCRIPTION_FORCE_PLAN) ? SUBSCRIPTION_FORCE_PLAN : ''
+
+  if (IS_PRODUCTION || !validForcedPlan) {
+    return { effectivePlan: normalizedProfilePlan, planSource: 'db' }
+  }
+
+  if (SUBSCRIPTION_FORCE_SCOPE === 'allowlist') {
+    if (!userId || !SUBSCRIPTION_FORCE_ALLOWLIST.includes(userId)) {
+      return { effectivePlan: normalizedProfilePlan, planSource: 'db' }
+    }
+  }
+
+  return { effectivePlan: validForcedPlan, planSource: 'override' }
 }
 
 async function getOrCreateUserProfile(uid) {
@@ -76,12 +100,21 @@ router.get('/status', firebaseAuthMiddleware, async (req, res) => {
   try {
     const userId = req.auth?.userId
     const profile = await getOrCreateUserProfile(userId)
-    const plan = profile?.subscription?.plan || 'free'
-    const paidPlan = isPaidPlan(plan)
-    const aiUsage = getAiWeeklyUsage(profile)
+    const persistedPlan = profile?.subscription?.plan || 'free'
+    const { effectivePlan, planSource } = resolveEffectivePlan(persistedPlan, userId)
+    const paidPlan = isPaidPlan(effectivePlan)
+    const aiUsage = getAiWeeklyUsage({
+      ...profile?.toObject?.(),
+      subscription: {
+        ...(profile?.subscription || {}),
+        plan: effectivePlan
+      }
+    })
 
     const subscription = {
-      plan,
+      plan: effectivePlan,
+      persistedPlan,
+      planSource,
       status: profile?.subscription?.status || 'active',
       billingCycle: profile?.subscription?.billingCycle || null,
       expiresAt: profile?.subscription?.expiresAt || null,

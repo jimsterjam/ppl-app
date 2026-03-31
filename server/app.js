@@ -15,20 +15,28 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-// CORS (Schritt 3)
+const isProd = process.env.NODE_ENV === 'production'
+const envOrigins = String(process.env.CORS_ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean)
+
+// CORS
 const allowedOrigins = new Set([
-  "http://localhost:5173",
-  "http://localhost:5174",
-  "capacitor://localhost",
-  "http://localhost",
-  "http://192.168.178.26",
-  "http://192.168.178.26:3001"
-]);
+  'capacitor://localhost',
+  ...(!isProd ? ['http://localhost:5173', 'http://localhost:5174', 'http://localhost'] : []),
+  ...envOrigins
+])
+
+const allowLanInDev = !isProd && String(process.env.CORS_ALLOW_LAN || '1').trim() !== '0'
+
 app.use(cors({
   origin: (origin, cb) => {
     if (!origin) return cb(null, true);
-    // Erlaube alle lokalen Netzwerke und capacitor
-    if (allowedOrigins.has(origin) || origin.startsWith("http://192.168.178.")) return cb(null, true);
+    if (allowedOrigins.has(origin)) return cb(null, true);
+    if (allowLanInDev && /^http:\/\/192\.168\.[0-9]{1,3}\.[0-9]{1,3}(?::\d+)?$/.test(origin)) {
+      return cb(null, true)
+    }
     return cb(null, false);
   },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],

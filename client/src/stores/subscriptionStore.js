@@ -44,6 +44,10 @@ const TRANSIENT_REQUEST_COOLDOWN_MS = 15000
 let subscriptionCheckPromise = null
 let subscriptionCooldownUntil = 0
 
+const ENV_FORCE_PLAN = String(import.meta.env.VITE_FORCE_PLAN || '').trim().toLowerCase()
+const isValidForcedPlan = ['free', 'pro', 'elite'].includes(ENV_FORCE_PLAN)
+const DEV_PLAN_OVERRIDE_ENABLED = String(import.meta.env.VITE_ENABLE_DEV_PLAN_OVERRIDE || '0').trim() === '1'
+
 function isTransientRequestError(error) {
   const status = Number(error?.statusCode || error?.response?.status || error?.context?.originalError?.response?.status || 0)
   const code = String(error?.code || error?.context?.originalError?.code || '')
@@ -55,6 +59,8 @@ export const useSubscriptionStore = defineStore('subscription', () => {
   const USAGE_KEY = 'bro_split_usage'
   const subscription = ref({
     plan: 'free',
+    persistedPlan: 'free',
+    planSource: 'db',
     status: 'active',
     billingCycle: null,
     expiresAt: null,
@@ -134,6 +140,8 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     const validPlan = ['free', 'pro', 'elite'].includes(planType) ? planType : 'free'
     return {
       plan: validPlan,
+      persistedPlan: validPlan,
+      planSource: 'local',
       status: 'active',
       billingCycle: validPlan === 'free' ? null : 'monthly',
       expiresAt: validPlan === 'free' ? null : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString(),
@@ -154,6 +162,7 @@ export const useSubscriptionStore = defineStore('subscription', () => {
   // Subscription Status checken
   const checkSubscription = async (planOverride = null, options = {}) => {
     const force = options?.force === true
+    const effectiveForcedPlan = isValidForcedPlan ? ENV_FORCE_PLAN : null
 
     try {
       const savedUsage = localStorage.getItem(USAGE_KEY)
@@ -168,8 +177,11 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     const savedSubscription = localStorage.getItem('bro_split_subscription')
     if (savedSubscription) {
       subscription.value = JSON.parse(savedSubscription)
+      if (effectiveForcedPlan && limits.value[effectiveForcedPlan]) {
+        applyPlan(effectiveForcedPlan, { persist: false, reason: 'env-force-bootstrap' })
+      }
     } else {
-      applyPlan(planOverride || 'free', { persist: true, reason: 'bootstrap' })
+      applyPlan(effectiveForcedPlan || planOverride || 'free', { persist: true, reason: effectiveForcedPlan ? 'env-force-bootstrap' : 'bootstrap' })
     }
 
     if (subscriptionCheckPromise) {
@@ -177,9 +189,11 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     }
 
     if (!force && subscriptionCooldownUntil > Date.now()) {
-      const effectiveOverride = planOverride || devPlanOverride.value
-      if (effectiveOverride && limits.value[effectiveOverride]) {
-        applyPlan(effectiveOverride, { persist: false, reason: 'dev-override' })
+      const serverControlsPlan = subscription.value?.planSource === 'override'
+      const devOverride = DEV_PLAN_OVERRIDE_ENABLED ? devPlanOverride.value : null
+      const effectiveOverride = effectiveForcedPlan || planOverride || devOverride
+      if (!serverControlsPlan && effectiveOverride && limits.value[effectiveOverride]) {
+        applyPlan(effectiveOverride, { persist: false, reason: effectiveForcedPlan ? 'env-force' : 'dev-override' })
       }
       ensureQuickGeneratorMonthWindow()
       return subscription.value
@@ -196,6 +210,8 @@ export const useSubscriptionStore = defineStore('subscription', () => {
           if (remoteSub && remoteSub.plan) {
             subscription.value = {
               plan: remoteSub.plan,
+              persistedPlan: remoteSub.persistedPlan || remoteSub.plan,
+              planSource: remoteSub.planSource || 'db',
               status: remoteSub.status || 'active',
               billingCycle: remoteSub.billingCycle || null,
               expiresAt: remoteSub.expiresAt || null,
@@ -228,9 +244,11 @@ export const useSubscriptionStore = defineStore('subscription', () => {
         logger.warn('⚠️ Subscription status fallback to local cache:', error?.message)
       }
 
-      const effectiveOverride = planOverride || devPlanOverride.value
-      if (effectiveOverride && limits.value[effectiveOverride]) {
-        applyPlan(effectiveOverride, { persist: false, reason: 'dev-override' })
+      const serverControlsPlan = subscription.value?.planSource === 'override'
+      const devOverride = DEV_PLAN_OVERRIDE_ENABLED ? devPlanOverride.value : null
+      const effectiveOverride = effectiveForcedPlan || planOverride || devOverride
+      if (!serverControlsPlan && effectiveOverride && limits.value[effectiveOverride]) {
+        applyPlan(effectiveOverride, { persist: false, reason: effectiveForcedPlan ? 'env-force' : 'dev-override' })
       }
 
       ensureQuickGeneratorMonthWindow()
@@ -265,6 +283,8 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     if (remoteSub?.plan) {
       subscription.value = {
         plan: remoteSub.plan,
+        persistedPlan: remoteSub.persistedPlan || remoteSub.plan,
+        planSource: remoteSub.planSource || 'db',
         status: remoteSub.status || 'active',
         billingCycle: remoteSub.billingCycle || cycle,
         expiresAt: remoteSub.expiresAt || null,

@@ -65,6 +65,9 @@ Dann in Xcode:
 ## Hinweise
 
 - Backend muss per HTTPS erreichbar sein (ATS). Für Dev nur temporär Ausnahmen.
+- Für lokales iPhone-Testing muss der Server-CORS passend gesetzt sein:
+	- Dev: `NODE_ENV=development`, `CORS_ALLOW_LAN=1`
+	- Prod: `NODE_ENV=production`, `CORS_ALLOW_LAN=0`, nur explizite Domain in `CORS_ALLOWED_ORIGINS`
 - Auth (Clerk) im WebView testen. Falls OAuth-Redirects: Deep Link/Custom URL Scheme einrichten und ggf. `Capacitor Browser` verwenden.
 - Für Geräte (Live-Reload): ggf. Origins in Clerk freischalten (z. B. `http://<DEINE_LAN_IP>:5173`).
 - Kamera/Medien: Mit Capacitor-Plugins umsetzbar. Der Client unterstützt bereits Base64-Uploads (Data-URL), ideal für die Camera-API.

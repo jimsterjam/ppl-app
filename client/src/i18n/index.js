@@ -167,6 +167,7 @@ export const messages = {
   ,quickGenInjuriesPlaceholder: 'z. B. Schulterreizung rechts'
   ,quickGenRemaining: 'Verbleibende Generierungen diese Woche: {count}'
   ,quickGenMissingRequired: 'Bitte fülle alle Pflichtfelder aus (inkl. Benchmarks und Equipment-Verfügbarkeit).'
+  ,quickGenAuthRequired: 'Bitte melde dich erneut an, um den Quick Workout Generator zu nutzen.'
   ,quickGenRequestFailed: 'Workout konnte gerade nicht generiert werden. Bitte erneut versuchen.'
   ,quickGenFallbackUsed: 'AI aktuell nicht erreichbar – wir haben ein lokales Workout für dich erstellt.'
     },
@@ -916,6 +917,7 @@ export const messages = {
   ,quickGenInjuriesPlaceholder: 'e.g. right shoulder irritation'
   ,quickGenRemaining: 'Remaining generations this week: {count}'
   ,quickGenMissingRequired: 'Please fill all required fields (including benchmarks and equipment availability).'
+  ,quickGenAuthRequired: 'Please sign in again to use the Quick Workout Generator.'
   ,quickGenRequestFailed: 'Could not generate workout right now. Please try again.'
   ,quickGenFallbackUsed: 'AI is currently unavailable — we created a local workout for you.'
     },

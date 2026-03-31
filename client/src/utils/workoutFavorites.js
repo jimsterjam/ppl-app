@@ -147,6 +147,54 @@ export function saveFavoriteWorkout({ userId = 'guest', type = 'push', name, wor
   return { success: true, favorite }
 }
 
+export function updateFavoriteWorkout({ userId = 'guest', type = 'push', id, workout, name }) {
+  const favoriteId = String(id || '').trim()
+  if (!favoriteId) {
+    return { success: false, code: 'INVALID_ID', message: 'Favorit wurde nicht gefunden.' }
+  }
+
+  const store = readStore()
+  const bucket = getUserBucket(store, userId)
+  const normalizedType = normalizeWorkoutType(type)
+
+  const allTypes = ['push', 'pull', 'legs', 'fullbody']
+  let foundType = null
+  let foundIndex = -1
+
+  for (const key of allTypes) {
+    const idx = bucket[key].findIndex((entry) => String(entry?.id || '') === favoriteId)
+    if (idx !== -1) {
+      foundType = key
+      foundIndex = idx
+      break
+    }
+  }
+
+  if (foundIndex === -1 || !foundType) {
+    return { success: false, code: 'NOT_FOUND', message: 'Favorit wurde nicht gefunden.' }
+  }
+
+  const current = bucket[foundType][foundIndex] || {}
+  const sourceWorkout = workout && typeof workout === 'object' ? workout : current.workout
+  const payload = buildFavoriteWorkoutPayload(sourceWorkout, normalizedType || foundType)
+  const nextName = normalizeFavoriteName(name || current.name || '')
+  const nameError = getFavoriteNameValidationError(nextName)
+  if (nameError) {
+    return { success: false, code: 'INVALID_NAME', message: nameError }
+  }
+
+  bucket[foundType][foundIndex] = {
+    ...current,
+    type: foundType,
+    name: nextName,
+    workout: payload,
+    updatedAt: nowIso()
+  }
+
+  writeStore(store)
+  return { success: true, favorite: bucket[foundType][foundIndex] }
+}
+
 export function renameFavoriteWorkout({ userId = 'guest', type = 'push', id, name }) {
   const normalizedType = normalizeWorkoutType(type)
   const normalizedName = normalizeFavoriteName(name)
