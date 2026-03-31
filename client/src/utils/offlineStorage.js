@@ -15,7 +15,7 @@ import { ensureWorkoutNotes } from './workoutNotes'
 export const OFFLINE_WORKOUTS_UPDATED_EVENT = 'offline-workouts-updated'
 const MAX_OFFLINE_WORKOUTS = 400
 const DELETED_WORKOUT_TOMBSTONES_KEY = 'deleted_workout_ids_v1'
-const DELETED_WORKOUT_TOMBSTONE_TTL_MS = 24 * 60 * 60 * 1000
+const DELETED_WORKOUT_TOMBSTONE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
 // Dexie Database Instance
 export const db = new Dexie('PPLAppDB')
@@ -68,6 +68,25 @@ export function markWorkoutDeleted(id) {
   const next = readDeletedWorkoutTombstones()
   next[normalizedId] = Date.now()
   writeDeletedWorkoutTombstones(next)
+}
+
+/**
+ * Entfernt Tombstones für IDs die vom Server bestätigt wurden.
+ * Wenn der Server ein Workout zurückgibt, ist es definitiv nicht gelöscht.
+ * @param {string[]} ids
+ */
+export function clearWorkoutTombstones(ids = []) {
+  const toRemove = (ids || []).map(id => String(id || '').trim()).filter(Boolean)
+  if (!toRemove.length) return
+  const map = readDeletedWorkoutTombstones()
+  let changed = false
+  for (const id of toRemove) {
+    if (Object.prototype.hasOwnProperty.call(map, id)) {
+      delete map[id]
+      changed = true
+    }
+  }
+  if (changed) writeDeletedWorkoutTombstones(map)
 }
 
 export function isWorkoutDeleted(id) {
@@ -274,24 +293,78 @@ export async function deleteWorkoutOffline(id) {
  */
 export async function cacheWorkouts(workouts) {
   try {
-    // Sanitize alle Workouts
-    const cleanWorkouts = filterDeletedWorkouts(workouts).map(w => {
-      const sanitized = sanitizeForIndexedDB(w)
-      ensureWorkoutNotes(sanitized)
-      return sanitized
-    })
+    // Bestimme IDs mit ausstehenden Delete-Queue-Einträgen, um Re-Insert zu verhindern
+    let pendingDeleteIds = new Set()
+    try {
+      const allQueue = await db.syncQueue.toArray()
+      allQueue
+        .filter(item => item.action === 'delete' && item.entityType === 'workout' && !item.synced && item.failed !== true)
+        .forEach(item => {
+          const id = String(item?.data?._id || '').trim()
+          if (id) pendingDeleteIds.add(id)
+        })
+    } catch {}
+
+    // Sanitize alle Workouts — schließt tombstoned UND Queue-pending-deletes aus
+    const cleanWorkouts = filterDeletedWorkouts(workouts)
+      .filter(w => !pendingDeleteIds.has(String(w?._id || '').trim()))
+      .map(w => {
+        const sanitized = sanitizeForIndexedDB(w)
+        ensureWorkoutNotes(sanitized)
+        return sanitized
+      })
     
     const workoutsWithTimestamp = cleanWorkouts.map(w => ({
       ...w,
       _syncedAt: Date.now()
     }))
     await db.workouts.bulkPut(workoutsWithTimestamp)
-    logger.debug('💾 Offline Storage - Workouts cached:', workouts.length)
-    emitOfflineWorkoutsUpdated({ type: 'cache', count: workouts.length })
+    logger.debug('💾 Offline Storage - Workouts cached:', cleanWorkouts.length, '(von', workouts.length, 'nach Tombstone/Queue-Filter)')
+    emitOfflineWorkoutsUpdated({ type: 'cache', count: cleanWorkouts.length })
     await enforceWorkoutHistoryLimit()
-    return workouts.length
+    return cleanWorkouts.length
   } catch (error) {
     logger.error('❌ Offline Storage - Fehler beim Cachen:', error)
+    return 0
+  }
+}
+
+/**
+ * Löscht lokale Workouts die weder auf dem Server vorhanden noch offline erstellt sind.
+ * Dient zur Bereinigung nach Server-Fetch (Fix #3: fehlende bidirektionale Sync).
+ * @param {string[]} serverIds - Array aller _id-Strings aus dem API-Response
+ * @param {string} userId - Aktive User-ID (nur eigene Workouts bereinigen)
+ * @returns {Promise<number>} Anzahl entfernter Einträge
+ */
+export async function purgeServerDeletedWorkouts(serverIds = [], userId = '') {
+  try {
+    const serverIdSet = new Set((serverIds || []).map(id => String(id || '').trim()).filter(Boolean))
+    if (!serverIdSet.size) return 0
+
+    let query = db.workouts.toCollection()
+    if (userId) query = query.filter(w => w.userId === userId)
+    const localWorkouts = await query.toArray()
+
+    const toRemove = localWorkouts.filter(w => {
+      const id = String(w?._id || '').trim()
+      if (!id) return false
+      // Niemals offline-erstellte oder Draft-Workouts entfernen — die sind noch nicht synced
+      if (w?._offlineCreated || w?._isDraft || w?.isDraft) return false
+      // Entfernen wenn nicht mehr auf dem Server vorhanden
+      return !serverIdSet.has(id)
+    })
+
+    if (!toRemove.length) return 0
+
+    for (const w of toRemove) {
+      markWorkoutDeleted(w._id)
+      await db.workouts.delete(w._id)
+    }
+    logger.debug('🧹 Offline Storage - Server-seitig gelöschte Workouts bereinigt:', toRemove.map(w => w._id))
+    if (toRemove.length) emitOfflineWorkoutsUpdated({ type: 'purge', removed: toRemove.length })
+    return toRemove.length
+  } catch (error) {
+    logger.warn('⚠️ Offline Storage - purgeServerDeletedWorkouts fehlgeschlagen:', error)
     return 0
   }
 }
@@ -516,12 +589,14 @@ export async function markActionSynced(id) {
  * @param {string} reason - Fehlergrund
  * @returns {Promise<void>}
  */
-export async function markActionFailed(id, reason = 'max-retries-reached') {
+export async function markActionFailed(id, reason = 'max-retries-reached', options = {}) {
+  const terminal = options?.terminal === true
   try {
     await db.syncQueue.update(id, {
       failed: true,
       failedAt: Date.now(),
-      failReason: reason
+      failReason: reason,
+      failedTerminal: terminal
     })
     logger.warn('🚫 Sync Queue - Action als failed markiert:', id, reason)
   } catch (error) {
@@ -556,15 +631,54 @@ export async function incrementRetryCount(id, error) {
 }
 
 /**
- * Löscht alle bereits synchronisierten Actions (Cleanup)
+ * Ergänzt die userId in einem bestehenden Sync-Queue-Eintrag (falls fehlt)
+ * @param {number} id - Queue Item ID
+ * @param {string} userId - User ID
+ * @returns {Promise<boolean>} true wenn aktualisiert
+ */
+export async function backfillQueueActionUserId(id, userId) {
+  const normalizedUserId = String(userId || '').trim()
+  if (!normalizedUserId) return false
+  try {
+    const existing = await db.syncQueue.get(id)
+    if (!existing || !existing.data || typeof existing.data !== 'object') return false
+    const current = String(existing.data.userId || '').trim()
+    if (current) return false
+
+    await db.syncQueue.update(id, {
+      data: {
+        ...existing.data,
+        userId: normalizedUserId
+      }
+    })
+    logger.info('🛠️ Sync Queue - userId nachgetragen', { id, userId: normalizedUserId })
+    return true
+  } catch (error) {
+    logger.warn('⚠️ Sync Queue - Konnte userId nicht nachtragen', { id, error: error?.message || error })
+    return false
+  }
+}
+
+/**
+ * Löscht bereits synchronisierte Actions (und optional terminal failed Items)
+ * @param {{includeFailedTerminal?: boolean, maxRetryAttempts?: number}} options
  * @returns {Promise<number>} Anzahl gelöschter Items
  */
-export async function clearSyncedActions() {
+export async function clearSyncedActions(options = {}) {
+  const includeFailedTerminal = options?.includeFailedTerminal === true
+  const maxRetryAttempts = Math.max(0, Number(options?.maxRetryAttempts || 0))
   try {
     // .filter() statt .where() weil synced möglicherweise keinen Index hat
     const all = await db.syncQueue.toArray()
     const syncedIds = all
-      .filter(action => action.synced === true || action.failed === true)
+      .filter((action) => {
+        if (action.synced === true) return true
+        if (!includeFailedTerminal) return false
+        if (action.failed !== true) return false
+        if (action.failedTerminal !== true) return false
+        if (maxRetryAttempts <= 0) return true
+        return Number(action.retryCount || 0) >= maxRetryAttempts
+      })
       .map(action => action.id)
     
     await db.syncQueue.bulkDelete(syncedIds)

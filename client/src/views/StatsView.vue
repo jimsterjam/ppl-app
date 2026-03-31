@@ -274,12 +274,26 @@ const authToken = ref(null)
 
 const statsWorkouts = computed(() => {
   const list = Array.isArray(offlineWorkouts.value) ? offlineWorkouts.value : []
-  return list
+  const normalized = list
     .filter(item => !(item?._isDraft || item?.isDraft))
     .map(item => ({
       ...item,
       notes: resolveWorkoutNotes(item)
     }))
+  const deduped = new Map()
+  normalized.forEach((item) => {
+    const key = String(item?._id || item?.id || item?.workoutId || '').trim()
+      || `${String(item?.date || '')}|${String(item?.name || '').toLowerCase()}|${String(item?.type || '').toLowerCase()}`
+    const existing = deduped.get(key)
+    if (!existing) {
+      deduped.set(key, item)
+      return
+    }
+    const existingTs = new Date(existing?.updatedAt || existing?.date || existing?.createdAt || 0).getTime()
+    const nextTs = new Date(item?.updatedAt || item?.date || item?.createdAt || 0).getTime()
+    if (nextTs >= existingTs) deduped.set(key, item)
+  })
+  return Array.from(deduped.values())
     .sort((a, b) => new Date(b.updatedAt || b.date || b.createdAt || 0) - new Date(a.updatedAt || a.date || a.createdAt || 0))
 })
 
@@ -296,7 +310,17 @@ const derivedStats = computed(() => {
     return null
   }
 })
-const activeStats = computed(() => derivedStats.value || progressStats.value || null)
+const activeStats = computed(() => {
+  const api = progressStats.value
+  const derived = derivedStats.value
+  if (!api) return derived || null
+  if (!derived) return api
+  // Offline-first: lokale IndexedDB-Daten gewinnen bei gleicher oder höherer Session-Zahl
+  // (lokale Daten sind immer aktueller als der API-Cache)
+  const apiSessions = Number(api?.kpis?.sessions || 0)
+  const derivedSessions = Number(derived?.kpis?.sessions || 0)
+  return derivedSessions >= apiSessions ? derived : api
+})
 const statsWeeks = computed(() => Array.isArray(activeStats.value?.weeks) ? activeStats.value.weeks : [])
 const weeklyGoal = computed(() => Number(settings.weeklyGoal) || 0)
 const isPro = computed(() => subscriptionStore.hasFeature('hasAdvancedStats'))
@@ -315,13 +339,31 @@ const deleteModalMessage = computed(() => {
 
 const dataStatusMessage = computed(() => {
   if (loading.value) return ''
-  const uid = resolveActiveUid()
+  const uid = resolveActiveUid(authToken.value)
   if (!uid && !authStore.isOfflineSessionValid) return 'Anmeldung erforderlich — bitte einloggen, um deine Workouts zu sehen.'
   return ''
 })
 
-function resolveActiveUid() {
-  return String(authStore.uid || getCurrentUser?.()?.uid || '').trim()
+function resolveActiveUid(token) {
+  return String(
+    authStore.uid
+    || store.user?.uid
+    || getCurrentUser?.()?.uid
+    || _parseUidFromToken(token)
+    || ''
+  ).trim()
+}
+
+function _parseUidFromToken(token) {
+  const raw = String(token || '').trim()
+  if (!raw) return ''
+  try {
+    const parts = raw.split('.')
+    if (parts.length < 2) return ''
+    const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const decoded = atob(payload.padEnd(payload.length + (4 - payload.length % 4) % 4, '='))
+    return String(JSON.parse(decoded)?.user_id || JSON.parse(decoded)?.uid || '').trim()
+  } catch { return '' }
 }
 
 const statusLabels = computed(() => ({
@@ -543,13 +585,27 @@ async function loadData() {
     authToken.value = token
 
     if (online) {
-      store.loadWorkouts(token)
-        .then(() => loadOfflineWorkouts())
-        .catch((err) => logger.debug('[Stats] Hintergrund-Sync fehlgeschlagen', err))
+      // StatsView: immer force-fetch damit IndexedDB alle DB-Workouts enthält
+      try {
+        await store.loadWorkouts(token, { force: true })
+      } catch (err) {
+        logger.debug('[Stats] loadWorkouts fehlgeschlagen', err)
+      }
+      // Nach loadWorkouts nochmals mit gültigem Token laden
+      await loadOfflineWorkouts(token)
     }
 
-    if (isPro.value) {
-      store.loadStats(token, { rangeDays: selectedRangeDays.value }).catch((err) => {
+    // Stats-Cache immer invalidieren — StatsView zeigt immer den aktuellen Stand
+    store.invalidateStatsCache()
+
+    if (token) {
+      store.loadStats(token, { rangeDays: selectedRangeDays.value }).then(async () => {
+        if (Number(store.statsErrorCode || 0) === 403 && isPro.value) {
+          try {
+            await subscriptionStore.checkSubscription(null, { force: true })
+          } catch {}
+        }
+      }).catch((err) => {
         logger.warn('[Stats] Laden der Progress-Stats fehlgeschlagen', err)
       })
     } else {
@@ -562,13 +618,13 @@ async function loadData() {
   }
 }
 
-async function loadOfflineWorkouts() {
+async function loadOfflineWorkouts(token) {
   try {
-    const activeUid = resolveActiveUid()
+    const activeUid = resolveActiveUid(token || authToken.value)
     logger.debug('[Stats] loadOfflineWorkouts — uid:', activeUid || '(empty)')
     const offline = activeUid
       ? await getAllWorkoutsOffline({ userId: activeUid })
-      : []
+      : await getAllWorkoutsOffline()
     offlineWorkouts.value = filterDeletedWorkouts(Array.isArray(offline) ? offline : [])
     logger.debug('[Stats] loadOfflineWorkouts — final count:', offlineWorkouts.value.length)
   } catch (error) {
@@ -577,7 +633,8 @@ async function loadOfflineWorkouts() {
 }
 
 function handleOfflineWorkoutsUpdated() {
-  loadOfflineWorkouts()
+  // Token mitgeben damit resolveActiveUid zuverlässig die UID aus dem JWT lesen kann
+  loadOfflineWorkouts(authToken.value)
 }
 
 watch(selectedRangeDays, async (next) => {
@@ -624,6 +681,7 @@ async function confirmDeleteRecentWorkout() {
   // Sofort: UI aktualisieren + Modal schließen (offline-first)
   offlineWorkouts.value = (offlineWorkouts.value || []).filter(item => getWorkoutIdentifier(item) !== workoutId)
   store.workouts = (store.workouts || []).filter(item => getWorkoutIdentifier(item) !== workoutId)
+  store.invalidateStatsCache()
   showDeleteModal.value = false
   pendingDeleteWorkout.value = null
 
@@ -638,9 +696,7 @@ async function confirmDeleteRecentWorkout() {
     getCurrentUser,
     loadOfflineWorkouts,
     reloadWorkouts: (token) => store.loadWorkouts(token, { force: true }).then(() => loadOfflineWorkouts()),
-    reloadStats: isPro.value
-      ? (token) => store.loadStats(token, { rangeDays: selectedRangeDays.value })
-      : null,
+    reloadStats: (token) => store.loadStats(token, { rangeDays: selectedRangeDays.value }),
     onLocalRemove: () => {},
     logger
   }).catch(err => logger.warn('[Stats] Background delete sync failed', err))

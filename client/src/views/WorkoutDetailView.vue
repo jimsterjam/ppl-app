@@ -112,6 +112,9 @@
                     </button>
                   </div>
                   <small>{{ getTranslatedMuscleGroup ? getTranslatedMuscleGroup(ex.muscleGroup) : ex.muscleGroup }}</small>
+                  <p v-if="favoriteLastPerformanceByIndex[i]" class="last-performance-hint">
+                    Letztes Mal: {{ favoriteLastPerformanceByIndex[i].sets }} Sets · {{ favoriteLastPerformanceByIndex[i].reps }} Wdh · {{ favoriteLastPerformanceByIndex[i].weight }} kg
+                  </p>
 
                   <!-- Notiz-Button und Feld -->
                   <div style="margin-top: 6px;">
@@ -469,7 +472,7 @@ import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
 import { resolveExerciseMedia, buildExerciseMediaUrl } from '@/utils/assetResolver'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
-import { getWorkoutOffline, getExerciseOffline, getAllExercisesOffline, saveWorkoutOffline, db } from '@/utils/offlineStorage'
+import { getWorkoutOffline, getExerciseOffline, getAllExercisesOffline, getAllWorkoutsOffline, saveWorkoutOffline, db } from '@/utils/offlineStorage'
 import { fetchWorkout } from '@/api/workouts'
 // import { fetchExercise, fetchExercises } from '@/api/exercises'
 import { useUserStore } from '@/stores/userStore'
@@ -485,6 +488,7 @@ import { logger } from '@/utils/logger'
 import { buildWorkoutNotesSummary } from '@/utils/workoutNotes'
 import {
   saveFavoriteWorkout,
+  updateFavoriteWorkout,
   getFavoriteNameValidationError,
   normalizeFavoriteName,
   normalizeWorkoutType
@@ -579,6 +583,8 @@ const showTimerActionModal = ref(false)
 const pendingTimerAction = ref(null)
 const bypassTimerLeaveGuard = ref(false)
 const suppressDraftPersistence = ref(false)
+const favoritePrefillApplied = ref(false)
+const favoriteLastPerformanceByIndex = ref({})
 const mediaExercise = ref(null)
 const mediaUrl = ref('')
 const mediaRequestId = ref(0)
@@ -653,17 +659,223 @@ function resolveActiveWorkoutUserId() {
   ).trim()
 }
 
-// Debounce Hilfsfunktion
-function debounce(fn, delay) {
-  let timer = null
-  return function (...args) {
-    clearTimeout(timer)
-    timer = setTimeout(() => fn.apply(this, args), delay)
+function isFavoriteSourceRoute() {
+  return String(route.query?.favoriteSource || '') === '1' || String(route.query?.favoriteStart || '') === '1'
+}
+
+function getFavoriteSourceMeta() {
+  const favoriteId = String(route.query?.favoriteId || '').trim()
+  if (!favoriteId) return null
+  return {
+    favoriteId,
+    favoriteName: String(route.query?.favoriteName || '').trim(),
+    favoriteType: normalizeWorkoutType(route.query?.favoriteType || workout.value?.type || route.query?.type || 'push')
   }
 }
 
-// Debounced Auto-Save Funktion (muss vor Aufrufen deklariert sein)
-const triggerAutoSave = async () => {
+function getLastSetFromExercise(exercise = {}) {
+  const sets = Array.isArray(exercise?.setDetails) ? exercise.setDetails : []
+  if (sets.length) {
+    const last = sets[sets.length - 1] || {}
+    return {
+      reps: Number(last?.reps) || 0,
+      weight: Number(last?.weight) || 0,
+      sets: sets.length,
+      setDetails: sets.map((set) => ({ reps: Number(set?.reps) || 0, weight: Number(set?.weight) || 0 }))
+    }
+  }
+  return {
+    reps: Number(exercise?.reps) || 0,
+    weight: Number(exercise?.weight) || 0,
+    sets: Math.max(1, Number(exercise?.sets) || 1),
+    setDetails: [{ reps: Number(exercise?.reps) || 0, weight: Number(exercise?.weight) || 0 }]
+  }
+}
+
+function buildExerciseMatchKey(exercise = {}) {
+  const byId = String(exercise?.exerciseId || exercise?._id || '').trim()
+  if (byId) return `id:${byId}`
+  const name = String(exercise?.name || '').trim().toLowerCase()
+  const muscle = String(exercise?.muscleGroup || '').trim().toLowerCase()
+  return `name:${name}|muscle:${muscle}`
+}
+
+function extractHistoryMatchKey(exercise = {}) {
+  const byId = String(exercise?.exerciseId || exercise?._id || '').trim()
+  const name = String(exercise?.name || '').trim().toLowerCase()
+  const muscle = String(exercise?.muscleGroup || '').trim().toLowerCase()
+  return {
+    idKey: byId ? `id:${byId}` : '',
+    nameKey: `name:${name}|muscle:${muscle}`,
+    looseNameKey: `name:${name}`
+  }
+}
+
+function applyFavoritePrefillFromHistory(targetExercise = {}, historyExercise = {}) {
+  const perf = getLastSetFromExercise(historyExercise)
+  const sourceSetDetails = Array.isArray(perf.setDetails) && perf.setDetails.length
+    ? perf.setDetails
+    : [{ reps: Math.max(1, perf.reps || 10), weight: Math.max(0, perf.weight || 0) }]
+
+  const normalizedDetails = sourceSetDetails.map((set) => ({
+    reps: Math.max(1, Number(set?.reps) || 10),
+    weight: Math.max(0, Number(set?.weight) || 0)
+  }))
+
+  targetExercise.setDetails = normalizedDetails
+  targetExercise.sets = normalizedDetails.length
+  targetExercise.reps = normalizedDetails[0]?.reps || targetExercise.reps || 10
+  targetExercise.weight = normalizedDetails[0]?.weight || targetExercise.weight || 0
+
+  return {
+    reps: perf.reps,
+    weight: perf.weight,
+    sets: normalizedDetails.length
+  }
+}
+
+async function maybePrefillFromLastFavoritePerformance() {
+  if (!workout.value || favoritePrefillApplied.value) return
+  if (!isFavoriteSourceRoute()) return
+
+  const activeUserId = resolveActiveWorkoutUserId()
+  if (!activeUserId) return
+
+  const currentWorkoutId = String(workout.value?._id || route.params.id || '').trim()
+  const history = await getAllWorkoutsOffline({ userId: activeUserId }).catch(() => [])
+  if (!Array.isArray(history) || !history.length) return
+
+  const dedupedHistory = new Map()
+  history.forEach((entry) => {
+    const idKey = String(entry?._id || '').trim()
+    const fallbackKey = `${String(entry?.date || '').trim()}|${String(entry?.name || '').trim().toLowerCase()}|${String(entry?.type || '').trim().toLowerCase()}`
+    const key = idKey || fallbackKey
+    if (!key) return
+    const existing = dedupedHistory.get(key)
+    if (!existing) {
+      dedupedHistory.set(key, entry)
+      return
+    }
+    const existingTs = new Date(existing?.updatedAt || existing?.date || existing?.createdAt || 0).getTime()
+    const nextTs = new Date(entry?.updatedAt || entry?.date || entry?.createdAt || 0).getTime()
+    if (nextTs >= existingTs) dedupedHistory.set(key, entry)
+  })
+
+  const candidates = Array.from(dedupedHistory.values())
+    .filter((w) => w && String(w?._id || '').trim() !== currentWorkoutId)
+    .filter((w) => w?._isDraft !== true && w?.isDraft !== true)
+    .filter((w) => w?.completed === true || w?.completed === undefined)
+    .sort((a, b) => new Date(b?.updatedAt || b?.date || b?.createdAt || 0) - new Date(a?.updatedAt || a?.date || a?.createdAt || 0))
+
+  if (!candidates.length || !Array.isArray(workout.value?.exercises)) return
+
+  const hintMap = {}
+
+  for (let i = 0; i < workout.value.exercises.length; i++) {
+    const current = workout.value.exercises[i]
+    const targetKey = buildExerciseMatchKey(current)
+    const currentName = String(current?.name || '').trim().toLowerCase()
+    if (!targetKey && !currentName) continue
+
+    let matchedExercise = null
+    for (const prevWorkout of candidates) {
+      const prevExercises = Array.isArray(prevWorkout?.exercises) ? prevWorkout.exercises : []
+      for (const prevExercise of prevExercises) {
+        const keys = extractHistoryMatchKey(prevExercise)
+        const strictNameKey = `name:${currentName}|muscle:${String(current?.muscleGroup || '').trim().toLowerCase()}`
+        const isMatch =
+          (targetKey && keys.idKey && targetKey === keys.idKey) ||
+          (targetKey && targetKey.startsWith('name:') && targetKey === keys.nameKey) ||
+          (currentName && keys.looseNameKey === `name:${currentName}`) ||
+          (currentName && keys.nameKey === strictNameKey)
+        if (!isMatch) continue
+        const perf = getLastSetFromExercise(prevExercise)
+        if ((Number(perf?.reps) || 0) <= 0 && (Number(perf?.weight) || 0) <= 0) continue
+        matchedExercise = prevExercise
+        break
+      }
+      if (matchedExercise) break
+    }
+
+    if (!matchedExercise) continue
+    const applied = applyFavoritePrefillFromHistory(current, matchedExercise)
+    hintMap[i] = applied
+  }
+
+  if (!Object.keys(hintMap).length) {
+    favoritePrefillApplied.value = true
+    return
+  }
+
+  favoriteLastPerformanceByIndex.value = hintMap
+  ensureSetDetailsStructure()
+  favoritePrefillApplied.value = true
+  try { await triggerAutoSave() } catch {}
+}
+
+async function syncStartedFavoriteFromWorkout(workoutLike = null) {
+  if (!isFavoriteSourceRoute()) return
+  const favoriteMeta = getFavoriteSourceMeta()
+  if (!favoriteMeta?.favoriteId) return
+
+  const source = workoutLike && typeof workoutLike === 'object' ? workoutLike : workout.value
+  if (!source) return
+
+  const payloadWorkout = {
+    name: source.name,
+    type: source.type,
+    notes: buildWorkoutNotesSummary(source.exercises || []),
+    exercises: (source.exercises || []).map((exercise) => ({
+      _id: exercise._id || exercise.exerciseId || null,
+      exerciseId: exercise.exerciseId || exercise._id || null,
+      name: exercise.name,
+      muscleGroup: exercise.muscleGroup,
+      category: exercise.category || source.type,
+      sets: Number(exercise.sets) || Number(exercise.setDetails?.length) || 3,
+      reps: Number(exercise.reps) || Number(exercise.setDetails?.[0]?.reps) || 10,
+      weight: Number(exercise.weight) || Number(exercise.setDetails?.[0]?.weight) || 0,
+      rest: Number(exercise.rest) || 90,
+      setDetails: Array.isArray(exercise.setDetails) && exercise.setDetails.length
+        ? exercise.setDetails
+        : [{
+            reps: Number(exercise.reps) || 10,
+            weight: Number(exercise.weight) || 0
+          }]
+    }))
+  }
+
+  updateFavoriteWorkout({
+    userId: getFavoriteUserId(),
+    type: favoriteMeta.favoriteType,
+    id: favoriteMeta.favoriteId,
+    name: favoriteMeta.favoriteName || source.name || '',
+    workout: payloadWorkout
+  })
+}
+
+const AUTO_SAVE_DEBOUNCE_MS = Number.parseInt(import.meta.env.VITE_WORKOUT_AUTOSAVE_DEBOUNCE_MS || '', 10) || 350
+let autoSaveTimer = null
+let autoSaveWaiters = []
+
+function flushAutoSaveWaiters(result = false) {
+  const waiters = [...autoSaveWaiters]
+  autoSaveWaiters = []
+  waiters.forEach((resolve) => {
+    try { resolve(result) } catch {}
+  })
+}
+
+function cancelPendingAutoSave(reason = 'unknown') {
+  if (autoSaveTimer) {
+    clearTimeout(autoSaveTimer)
+    autoSaveTimer = null
+    logger.debug('[WorkoutDetail] pending auto-save abgebrochen', { reason })
+  }
+  flushAutoSaveWaiters(false)
+}
+
+async function runAutoSaveNow() {
+  if (saving.value || suppressDraftPersistence.value) return
   const id = route.params.id
   const w = workout.value || {}
 
@@ -739,6 +951,24 @@ const triggerAutoSave = async () => {
     saveMsg.value = ''
     saveError.value = false
   }
+}
+
+// Debounced Auto-Save Funktion (muss vor Aufrufen deklariert sein)
+const triggerAutoSave = () => {
+  if (saving.value || suppressDraftPersistence.value) return Promise.resolve(false)
+  return new Promise((resolve) => {
+    autoSaveWaiters.push(resolve)
+    if (autoSaveTimer) clearTimeout(autoSaveTimer)
+    autoSaveTimer = setTimeout(async () => {
+      autoSaveTimer = null
+      if (saving.value || suppressDraftPersistence.value) {
+        flushAutoSaveWaiters(false)
+        return
+      }
+      await runAutoSaveNow()
+      flushAutoSaveWaiters(true)
+    }, AUTO_SAVE_DEBOUNCE_MS)
+  })
 }
 
 function getViewStateWorkoutId() {
@@ -962,6 +1192,7 @@ async function loadWorkout() {
         workout.value = draft ? { ...draft, type } : { _id: 'draft', type, exercises: [] }
       }
       ensureSetDetailsStructure()
+      await maybePrefillFromLastFavoritePerformance()
       await enrichExerciseImages()
       initialSnapshot = snapshotCore(workout.value)
       return
@@ -1008,7 +1239,11 @@ async function loadWorkout() {
           }
           if (workout.value) {
             try { sessionStorage.removeItem(`workout_map_${String(id)}`) } catch {}
-            await router.replace({ name: 'workout-detail', params: { id: realId }, query: { created: '1', realId } }).catch(() => {})
+            await router.replace({
+              name: 'workout-detail',
+              params: { id: realId },
+              query: { ...route.query, created: '1', realId }
+            }).catch(() => {})
             logger.debug('[WorkoutDetail] replaced temp route with realId', { tempId: id, realId })
           }
         }
@@ -1021,6 +1256,7 @@ async function loadWorkout() {
         })
       }
       ensureSetDetailsStructure()
+      await maybePrefillFromLastFavoritePerformance()
       await enrichExerciseImages()
       initialSnapshot = snapshotCore(workout.value)
       return
@@ -1053,6 +1289,7 @@ async function loadWorkout() {
       })
     }
     ensureSetDetailsStructure()
+    await maybePrefillFromLastFavoritePerformance()
     if (workout.value && shouldKeepAsDraft(workout.value) && workout.value.completed !== true) {
       workout.value._isDraft = true
       workout.value.isDraft = true
@@ -1472,6 +1709,7 @@ function stopSpin(row, field) {
 
 async function performSaveWorkout() {
   try {
+    cancelPendingAutoSave('final-save')
     suppressDraftPersistence.value = true
     saving.value = true
     const id = route.params.id
@@ -1500,11 +1738,24 @@ async function performSaveWorkout() {
     }
     normalized.notes = buildWorkoutNotesSummary(normalized.exercises)
 
+    // Lokalen State sofort auf final setzen, damit kein spät ankommender Auto-Save
+    // das Workout erneut als Draft markiert.
+    if (workout.value) {
+      workout.value = {
+        ...workout.value,
+        ...normalized,
+        completed: true,
+        _isDraft: false,
+        isDraft: false
+      }
+    }
+
     if (String(id).startsWith('draft-')) {
       const realId = resolveRealIdFromDraftId(id)
       if (realId) {
         let token = await getIdToken().catch(() => null)
         await store.updateWorkout(realId, normalized, token)
+        syncStartedFavoriteFromWorkout({ ...normalized, _id: realId })
         saveMsg.value = finalDurationMinutes > 0 ? `Gespeichert. Dauer: ${finalDurationMinutes} min` : 'Gespeichert.'
         saveError.value = false
         initialSnapshot = snapshotCore({ ...normalized, _id: realId })
@@ -1526,6 +1777,8 @@ async function performSaveWorkout() {
         completed: true,
         updatedAt: Date.now()
       })
+      store.invalidateStatsCache()
+      syncStartedFavoriteFromWorkout({ ...normalized, _id: id })
       saveMsg.value = finalDurationMinutes > 0 ? `Gespeichert. Dauer: ${finalDurationMinutes} min` : 'Gespeichert.'
       saveError.value = false
       initialSnapshot = snapshotCore({ ...(idx !== -1 ? store.workouts[idx] : normalized), _id: id })
@@ -1537,6 +1790,7 @@ async function performSaveWorkout() {
 
     let token = await getIdToken().catch(() => null)
     await store.updateWorkout(id, normalized, token)
+    syncStartedFavoriteFromWorkout({ ...normalized, _id: id })
     saveMsg.value = finalDurationMinutes > 0 ? `Gespeichert. Dauer: ${finalDurationMinutes} min` : 'Gespeichert.'
     saveError.value = false
     initialSnapshot = snapshotCore({ ...w, ...normalized })
@@ -1972,6 +2226,7 @@ onBeforeRouteLeave(async (to) => {
 })
 
 onBeforeUnmount(() => {
+  cancelPendingAutoSave('before-unmount')
   window.removeEventListener('beforeunload', beforeUnloadHandler)
   window.removeEventListener('pagehide', onPageHide)
   window.removeEventListener('scroll', onWindowScroll)
@@ -2068,6 +2323,7 @@ onBeforeUnmount(() => {
 .ex-list button,
 .ex-list textarea {
   font-size: 16px;
+  color: var(--fg);
 }
 .ex-list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .ex-list-actions { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; width: 100%; }
@@ -2184,6 +2440,11 @@ onBeforeUnmount(() => {
 .ex-title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .ex-text strong { display: block; color: var(--fg); font-size: 0.95rem; }
 .ex-text small { display: block; color: var(--muted); font-size: 0.8rem; margin-top: 2px; }
+.last-performance-hint {
+  margin: 6px 0 0;
+  color: var(--fg-soft, #9fb0c2);
+  font-size: 0.78rem;
+}
 .remove-exercise-btn {
   border: 1px solid color-mix(in srgb, var(--danger-color) 50%, transparent);
   background: color-mix(in srgb, var(--danger-color) 14%, transparent);
