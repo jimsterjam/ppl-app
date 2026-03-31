@@ -30,3 +30,6 @@ services:
       - key: NODE_ENV
         sync: false
         value: production
+      - key: FIREBASE_ADMIN_CREDENTIAL_JSON
+        sync: false
+        value: ""
