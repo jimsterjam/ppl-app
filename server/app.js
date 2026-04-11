@@ -61,6 +61,11 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+// 404 Not Found - muss nach allen Routen stehen (Express v5)
+app.use((req, res) => {
+  res.status(404).json({ error: 'Not Found', path: req.originalUrl });
+});
+
 // Zentraler Error-Handler (Schritt 4)
 app.use((err, req, res, _next) => {
   const isDev = process.env.NODE_ENV !== 'production';

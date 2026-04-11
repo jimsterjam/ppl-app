@@ -2,7 +2,7 @@
     <div class="workout-detail">
       <HeaderBar title="Workout" />
 
-    <div class="content">
+    <div class="content" :class="{ 'timer-offset': hasTimerOverlay }">
       <div v-if="loading" class="loading">{{ t('workoutDetail.loading') }}</div>
 
       <div v-else-if="error" class="error">
@@ -106,7 +106,7 @@
                       class="remove-exercise-btn"
                       type="button"
                       :title="t('common.remove')"
-                      @click="removeExercise(i)"
+                      @click="askRemoveExercise(i)"
                     >
                       🗑️
                     </button>
@@ -115,7 +115,6 @@
                   <p v-if="favoriteLastPerformanceByIndex[i]" class="last-performance-hint">
                     Letztes Mal: {{ favoriteLastPerformanceByIndex[i].sets }} Sets · {{ favoriteLastPerformanceByIndex[i].reps }} Wdh · {{ favoriteLastPerformanceByIndex[i].weight }} kg
                   </p>
-
                   <!-- Notiz-Button und Feld -->
                   <div style="margin-top: 6px;">
                     <button class="link" @click="toggleNote(i)">
@@ -128,7 +127,7 @@
                     <button
                       class="link danger"
                       v-if="getNote(i)"
-                      @click="deleteNote(i)"
+                      @click="askDeleteNote(i)"
                       style="margin-left:8px;"
                     >
                       🗑️ löschen
@@ -164,124 +163,244 @@
             </div>
 
             <div class="ex-sets" v-if="!isReordering">
+
+              <!-- Aufwärmsätze -->
+              <div class="sets-section-label warmup-label">{{ t('workoutDetail.warmupSetsLabel') }}</div>
               <div class="set-row header">
                 <span class="col set">{{ t('workoutDetail.set') }}</span>
                 <span class="col reps">{{ t('workoutDetail.reps') }}</span>
                 <span class="col weight">{{ t('workoutDetail.weight') }}</span>
-                <span class="col actions">{{ t('workoutDetail.actions') }}</span>
+                <span class="col actions"></span>
               </div>
-
-              <div
+              <template
                 v-for="(row, rIdx) in (ex.setDetails || [])"
                 :key="`${ex.exerciseId || i}-row-${rIdx}`"
-                class="set-row"
-                :data-set-index="rIdx"
               >
-                <span class="col set">{{ rIdx + 1 }}</span>
-                <span class="col reps">
-                  <div class="number-with-spinner">
-                      <input
-                        v-model.number="row.reps"
-                        data-field="reps"
-                        type="number"
-                        min="1"
-                        max="500"
-                        step="1"
-                        inputmode="numeric"
-                        :readonly="isMobile"
-                        @focus="trackFieldAnchor(i, rIdx, 'reps')"
-                        @click="trackFieldAnchor(i, rIdx, 'reps')"
-                        @input="() => { clampRowValue(row, 'reps', 1, 500, 1); triggerAutoSave() }"
-                        @wheel.prevent="onNumberWheel($event, row, 'reps', 1, 1, 500)"
-                        @keydown="onNumberKeyDown($event, false)"
-                        @focus.prevent="openPicker(row, 'reps', 1, 1, 500)"
-                        @click.prevent="openPicker(row, 'reps', 1, 1, 500)"
-                      />
-                      <div v-if="!isMobile" class="spinner-vertical">
-                      <button
-                        type="button"
-                        class="spin-btn up"
-                        aria-label="increment reps"
-                        @click="adjustRowField(row, 'reps', 1, 1, 1, 500)"
-                        @mousedown="startSpin(row, 'reps', 1, 1, 1, 500)"
-                        @mouseup="stopSpin(row, 'reps')"
-                        @mouseleave="stopSpin(row, 'reps')"
-                        @touchstart.prevent="startSpin(row, 'reps', 1, 1, 1, 500)"
-                        @touchend.prevent="stopSpin(row, 'reps')"
-                        @touchcancel.prevent="stopSpin(row, 'reps')"
-                      >▲</button>
-                      <button
-                        type="button"
-                        class="spin-btn down"
-                        aria-label="decrement reps"
-                        @click="adjustRowField(row, 'reps', -1, 1, 1, 500)"
-                        @mousedown="startSpin(row, 'reps', -1, 1, 1, 500)"
-                        @mouseup="stopSpin(row, 'reps')"
-                        @mouseleave="stopSpin(row, 'reps')"
-                        @touchstart.prevent="startSpin(row, 'reps', -1, 1, 1, 500)"
-                        @touchend.prevent="stopSpin(row, 'reps')"
-                        @touchcancel.prevent="stopSpin(row, 'reps')"
-                      >▼</button>
-                    </div>
-                  </div>
-                </span>
-                <span class="col weight">
-                  <div class="weight-input">
+                <div v-if="row.isWarmup" class="set-row warmup-row" :data-set-index="rIdx">
+                  <span class="col set">{{ getSetLabel(ex.setDetails, rIdx) }}</span>
+                  <span class="col reps">
                     <div class="number-with-spinner">
-                      <input
-                        v-model.number="row.weight"
-                        data-field="weight"
-                        type="number"
-                        min="0"
-                        max="1000"
-                        step="0.25"
-                        inputmode="decimal"
-                        :readonly="isMobile"
-                        @focus="trackFieldAnchor(i, rIdx, 'weight')"
-                        @click="trackFieldAnchor(i, rIdx, 'weight')"
-                        @input="() => { clampRowValue(row, 'weight', 0, 1000, 0.25); triggerAutoSave() }"
-                        @wheel.prevent="onNumberWheel($event, row, 'weight', 0.25, 0, 1000)"
-                        @keydown="onNumberKeyDown($event, true)"
-                        @focus.prevent="openPicker(row, 'weight', 0.25, 0, 1000)"
-                        @click.prevent="openPicker(row, 'weight', 0.25, 0, 1000)"
-                      />
-                      <div v-if="!isMobile" class="spinner-vertical">
+                        <input
+                          v-model.number="row.reps"
+                          data-field="reps"
+                          type="number"
+                          min="1"
+                          max="500"
+                          step="1"
+                          inputmode="numeric"
+                          :readonly="isMobile"
+                          @focus="trackFieldAnchor(i, rIdx, 'reps')"
+                          @click="trackFieldAnchor(i, rIdx, 'reps')"
+                          @input="() => { clampRowValue(row, 'reps', 1, 500, 1); triggerAutoSave() }"
+                          @wheel.prevent="onNumberWheel($event, row, 'reps', 1, 1, 500)"
+                          @keydown="onNumberKeyDown($event, false)"
+                          @focus.prevent="openPicker(row, 'reps', 1, 1, 500)"
+                          @click.prevent="openPicker(row, 'reps', 1, 1, 500)"
+                        />
+                        <div v-if="!isMobile" class="spinner-vertical">
                         <button
                           type="button"
                           class="spin-btn up"
-                          aria-label="increment weight"
-                          @click="adjustRowField(row, 'weight', 1, 0.25, 0, 1000)"
-                          @mousedown="startSpin(row, 'weight', 1, 0.25, 0, 1000)"
-                          @mouseup="stopSpin(row, 'weight')"
-                          @mouseleave="stopSpin(row, 'weight')"
-                          @touchstart.prevent="startSpin(row, 'weight', 1, 0.25, 0, 1000)"
-                          @touchend.prevent="stopSpin(row, 'weight')"
-                          @touchcancel.prevent="stopSpin(row, 'weight')"
+                          aria-label="increment reps"
+                          @click="adjustRowField(row, 'reps', 1, 1, 1, 500)"
+                          @mousedown="startSpin(row, 'reps', 1, 1, 1, 500)"
+                          @mouseup="stopSpin(row, 'reps')"
+                          @mouseleave="stopSpin(row, 'reps')"
+                          @touchstart.prevent="startSpin(row, 'reps', 1, 1, 1, 500)"
+                          @touchend.prevent="stopSpin(row, 'reps')"
+                          @touchcancel.prevent="stopSpin(row, 'reps')"
                         >▲</button>
                         <button
                           type="button"
                           class="spin-btn down"
-                          aria-label="decrement weight"
-                          @click="adjustRowField(row, 'weight', -1, 0.25, 0, 1000)"
-                          @mousedown="startSpin(row, 'weight', -1, 0.25, 0, 1000)"
-                          @mouseup="stopSpin(row, 'weight')"
-                          @mouseleave="stopSpin(row, 'weight')"
-                          @touchstart.prevent="startSpin(row, 'weight', -1, 0.25, 0, 1000)"
-                          @touchend.prevent="stopSpin(row, 'weight')"
-                          @touchcancel.prevent="stopSpin(row, 'weight')"
+                          aria-label="decrement reps"
+                          @click="adjustRowField(row, 'reps', -1, 1, 1, 500)"
+                          @mousedown="startSpin(row, 'reps', -1, 1, 1, 500)"
+                          @mouseup="stopSpin(row, 'reps')"
+                          @mouseleave="stopSpin(row, 'reps')"
+                          @touchstart.prevent="startSpin(row, 'reps', -1, 1, 1, 500)"
+                          @touchend.prevent="stopSpin(row, 'reps')"
+                          @touchcancel.prevent="stopSpin(row, 'reps')"
                         >▼</button>
                       </div>
                     </div>
-                    <span class="unit">kg</span>
-                  </div>
-                </span>
-                <span class="col actions">
-                  <button class="remove-row-btn" :title="t('workoutDetail.removeSet')" @click="removeSetRow(i, rIdx)">−</button>
-                </span>
+                  </span>
+                  <span class="col weight">
+                    <div class="weight-input">
+                      <div class="number-with-spinner">
+                        <input
+                          v-model.number="row.weight"
+                          data-field="weight"
+                          type="number"
+                          min="0"
+                          max="1000"
+                          step="0.25"
+                          inputmode="decimal"
+                          :readonly="isMobile"
+                          @focus="trackFieldAnchor(i, rIdx, 'weight')"
+                          @click="trackFieldAnchor(i, rIdx, 'weight')"
+                          @input="() => { clampRowValue(row, 'weight', 0, 1000, 0.25); triggerAutoSave() }"
+                          @wheel.prevent="onNumberWheel($event, row, 'weight', 0.25, 0, 1000)"
+                          @keydown="onNumberKeyDown($event, true)"
+                          @focus.prevent="openPicker(row, 'weight', 0.25, 0, 1000)"
+                          @click.prevent="openPicker(row, 'weight', 0.25, 0, 1000)"
+                        />
+                        <div v-if="!isMobile" class="spinner-vertical">
+                          <button
+                            type="button"
+                            class="spin-btn up"
+                            aria-label="increment weight"
+                            @click="adjustRowField(row, 'weight', 1, 0.25, 0, 1000)"
+                            @mousedown="startSpin(row, 'weight', 1, 0.25, 0, 1000)"
+                            @mouseup="stopSpin(row, 'weight')"
+                            @mouseleave="stopSpin(row, 'weight')"
+                            @touchstart.prevent="startSpin(row, 'weight', 1, 0.25, 0, 1000)"
+                            @touchend.prevent="stopSpin(row, 'weight')"
+                            @touchcancel.prevent="stopSpin(row, 'weight')"
+                          >▲</button>
+                          <button
+                            type="button"
+                            class="spin-btn down"
+                            aria-label="decrement weight"
+                            @click="adjustRowField(row, 'weight', -1, 0.25, 0, 1000)"
+                            @mousedown="startSpin(row, 'weight', -1, 0.25, 0, 1000)"
+                            @mouseup="stopSpin(row, 'weight')"
+                            @mouseleave="stopSpin(row, 'weight')"
+                            @touchstart.prevent="startSpin(row, 'weight', -1, 0.25, 0, 1000)"
+                            @touchend.prevent="stopSpin(row, 'weight')"
+                            @touchcancel.prevent="stopSpin(row, 'weight')"
+                          >▼</button>
+                        </div>
+                      </div>
+                      <span class="unit">kg</span>
+                    </div>
+                  </span>
+                  <span class="col actions">
+                    <button class="remove-row-btn" :title="t('workoutDetail.removeWarmupSet')" @click="removeSetRow(i, rIdx)">−</button>
+                  </span>
+                </div>
+              </template>
+              <div class="row-actions warmup-actions">
+                <button class="add-warmup-btn" @click="addWarmupSetRow(i)">＋ {{ t('workoutDetail.addWarmupSet') }}</button>
               </div>
 
+              <!-- Arbeitssätze -->
+              <div class="sets-section-divider"></div>
+              <div class="sets-section-label working-label">{{ t('workoutDetail.workingSetsLabel') }}</div>
+              <template
+                v-for="(row, rIdx) in (ex.setDetails || [])"
+                :key="`${ex.exerciseId || i}-working-row-${rIdx}`"
+              >
+                <div v-if="!row.isWarmup" class="set-row" :data-set-index="rIdx">
+                  <span class="col set">
+                    {{ getSetLabel(ex.setDetails, rIdx) }}
+                    <span v-if="Number(row.reps) >= 6" class="weight-progress-hint" :title="t('workoutDetail.progressionHint')">&#8593;</span>
+                  </span>
+                  <span class="col reps">
+                    <div class="number-with-spinner">
+                        <input
+                          v-model.number="row.reps"
+                          data-field="reps"
+                          type="number"
+                          min="1"
+                          max="500"
+                          step="1"
+                          inputmode="numeric"
+                          :readonly="isMobile"
+                          @focus="trackFieldAnchor(i, rIdx, 'reps')"
+                          @click="trackFieldAnchor(i, rIdx, 'reps')"
+                          @input="() => { clampRowValue(row, 'reps', 1, 500, 1); triggerAutoSave() }"
+                          @wheel.prevent="onNumberWheel($event, row, 'reps', 1, 1, 500)"
+                          @keydown="onNumberKeyDown($event, false)"
+                          @focus.prevent="openPicker(row, 'reps', 1, 1, 500)"
+                          @click.prevent="openPicker(row, 'reps', 1, 1, 500)"
+                        />
+                        <div v-if="!isMobile" class="spinner-vertical">
+                        <button
+                          type="button"
+                          class="spin-btn up"
+                          aria-label="increment reps"
+                          @click="adjustRowField(row, 'reps', 1, 1, 1, 500)"
+                          @mousedown="startSpin(row, 'reps', 1, 1, 1, 500)"
+                          @mouseup="stopSpin(row, 'reps')"
+                          @mouseleave="stopSpin(row, 'reps')"
+                          @touchstart.prevent="startSpin(row, 'reps', 1, 1, 1, 500)"
+                          @touchend.prevent="stopSpin(row, 'reps')"
+                          @touchcancel.prevent="stopSpin(row, 'reps')"
+                        >▲</button>
+                        <button
+                          type="button"
+                          class="spin-btn down"
+                          aria-label="decrement reps"
+                          @click="adjustRowField(row, 'reps', -1, 1, 1, 500)"
+                          @mousedown="startSpin(row, 'reps', -1, 1, 1, 500)"
+                          @mouseup="stopSpin(row, 'reps')"
+                          @mouseleave="stopSpin(row, 'reps')"
+                          @touchstart.prevent="startSpin(row, 'reps', -1, 1, 1, 500)"
+                          @touchend.prevent="stopSpin(row, 'reps')"
+                          @touchcancel.prevent="stopSpin(row, 'reps')"
+                        >▼</button>
+                      </div>
+                    </div>
+                  </span>
+                  <span class="col weight">
+                    <div class="weight-input">
+                      <div class="number-with-spinner">
+                        <input
+                          v-model.number="row.weight"
+                          data-field="weight"
+                          type="number"
+                          min="0"
+                          max="1000"
+                          step="0.25"
+                          inputmode="decimal"
+                          :readonly="isMobile"
+                          @focus="trackFieldAnchor(i, rIdx, 'weight')"
+                          @click="trackFieldAnchor(i, rIdx, 'weight')"
+                          @input="() => { clampRowValue(row, 'weight', 0, 1000, 0.25); triggerAutoSave() }"
+                          @wheel.prevent="onNumberWheel($event, row, 'weight', 0.25, 0, 1000)"
+                          @keydown="onNumberKeyDown($event, true)"
+                          @focus.prevent="openPicker(row, 'weight', 0.25, 0, 1000)"
+                          @click.prevent="openPicker(row, 'weight', 0.25, 0, 1000)"
+                        />
+                        <div v-if="!isMobile" class="spinner-vertical">
+                          <button
+                            type="button"
+                            class="spin-btn up"
+                            aria-label="increment weight"
+                            @click="adjustRowField(row, 'weight', 1, 0.25, 0, 1000)"
+                            @mousedown="startSpin(row, 'weight', 1, 0.25, 0, 1000)"
+                            @mouseup="stopSpin(row, 'weight')"
+                            @mouseleave="stopSpin(row, 'weight')"
+                            @touchstart.prevent="startSpin(row, 'weight', 1, 0.25, 0, 1000)"
+                            @touchend.prevent="stopSpin(row, 'weight')"
+                            @touchcancel.prevent="stopSpin(row, 'weight')"
+                          >▲</button>
+                          <button
+                            type="button"
+                            class="spin-btn down"
+                            aria-label="decrement weight"
+                            @click="adjustRowField(row, 'weight', -1, 0.25, 0, 1000)"
+                            @mousedown="startSpin(row, 'weight', -1, 0.25, 0, 1000)"
+                            @mouseup="stopSpin(row, 'weight')"
+                            @mouseleave="stopSpin(row, 'weight')"
+                            @touchstart.prevent="startSpin(row, 'weight', -1, 0.25, 0, 1000)"
+                            @touchend.prevent="stopSpin(row, 'weight')"
+                            @touchcancel.prevent="stopSpin(row, 'weight')"
+                          >▼</button>
+                        </div>
+                      </div>
+                      <span class="unit">kg</span>
+                    </div>
+                  </span>
+                  <span class="col actions">
+                    <button class="remove-row-btn" :title="t('workoutDetail.removeSet')" @click="removeSetRow(i, rIdx)">−</button>
+                  </span>
+                </div>
+              </template>
+
               <div class="row-actions">
-                <button class="add-row-btn" :title="t('workoutDetail.addSet')" @click="addSetRow(i)">＋</button>
+                <button class="add-row-btn" :title="t('workoutDetail.addSet')" @click="addSetRow(i)">＋ {{ t('workoutDetail.addSet') }}</button>
               </div>
             </div>
           </div>
@@ -385,6 +504,26 @@
       </div>
     </AppModal>
 
+    <AppModal
+      v-model="showRemoveExerciseModal"
+      :title="t('workoutDetail.removeExerciseConfirmTitle')"
+      :message="t('workoutDetail.removeExerciseConfirmMsg')"
+      :confirm-text="t('common.remove')"
+      :cancel-text="t('common.cancel')"
+      type="warning"
+      @confirm="confirmRemoveExercise"
+    />
+
+    <AppModal
+      v-model="showDeleteNoteModal"
+      :title="t('workoutDetail.deleteNoteConfirmTitle')"
+      :message="t('workoutDetail.deleteNoteConfirmMsg')"
+      :confirm-text="t('common.remove')"
+      :cancel-text="t('common.cancel')"
+      type="warning"
+      @confirm="confirmDeleteNote"
+    />
+
     <WorkoutTimerConfig v-if="showTimerConfig" @close="showTimerConfig = false" />
   </div>
 </template>
@@ -473,7 +612,7 @@ import { resolveExerciseMedia, buildExerciseMediaUrl } from '@/utils/assetResolv
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { getWorkoutOffline, getExerciseOffline, getAllExercisesOffline, getAllWorkoutsOffline, saveWorkoutOffline, db } from '@/utils/offlineStorage'
-import { fetchWorkout } from '@/api/workouts'
+import { fetchWorkout, deleteWorkout as deleteWorkoutApi } from '@/api/workouts'
 // import { fetchExercise, fetchExercises } from '@/api/exercises'
 import { useUserStore } from '@/stores/userStore'
 import HeaderBar from '@/components/HeaderBar.vue'
@@ -533,7 +672,7 @@ function clearAllWorkoutMapKeys() {
 }
 
 async function postSaveCleanup() {
-  try { await store.clearDraft() } catch {}
+  // Kein globales Draft-Cleanup hier: verhindert Side-Effects auf andere offene Drafts.
   try { await db.workouts.delete('draft') } catch {}
   clearAllDetailDraftSnapshots()
   clearAllWorkoutMapKeys()
@@ -567,6 +706,7 @@ const getTranslatedMuscleGroup = (mg) => mg
 const store = userStore
 const toast = useToastStore()
 const timerStore = useTimerStore()
+const hasTimerOverlay = computed(() => Boolean(timerStore?.miniVisible && timerStore?.isActive))
 const workout = ref(null)
 const loading = ref(false)
 const error = ref('')
@@ -582,6 +722,10 @@ const showFavoriteNameModal = ref(false)
 const showTimerActionModal = ref(false)
 const pendingTimerAction = ref(null)
 const bypassTimerLeaveGuard = ref(false)
+const showRemoveExerciseModal = ref(false)
+const pendingRemoveExerciseIndex = ref(-1)
+const showDeleteNoteModal = ref(false)
+const pendingDeleteNoteIndex = ref(-1)
 const suppressDraftPersistence = ref(false)
 const favoritePrefillApplied = ref(false)
 const favoriteLastPerformanceByIndex = ref({})
@@ -657,6 +801,28 @@ function resolveActiveWorkoutUserId() {
     || store.user?.id
     || ''
   ).trim()
+}
+
+function parseUidFromToken(token = null) {
+  const raw = String(token || '').trim()
+  if (!raw) return ''
+  const parts = raw.split('.')
+  if (parts.length < 2) return ''
+  try {
+    const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const decoded = atob(payload.padEnd(payload.length + (4 - payload.length % 4) % 4, '='))
+    const json = JSON.parse(decoded)
+    return String(json?.user_id || json?.uid || json?.sub || '').trim()
+  } catch {
+    return ''
+  }
+}
+
+async function resolveActiveWorkoutUserIdForSave() {
+  const localUid = resolveActiveWorkoutUserId()
+  if (localUid) return localUid
+  const token = await getIdToken().catch(() => null)
+  return parseUidFromToken(token)
 }
 
 function isFavoriteSourceRoute() {
@@ -1118,6 +1284,34 @@ function snapshotCore(w) {
   }
 }
 
+function getWorkoutTimestamp(workoutLike) {
+  if (!workoutLike || typeof workoutLike !== 'object') return 0
+  const updatedAt = new Date(workoutLike.updatedAt || 0).getTime()
+  if (Number.isFinite(updatedAt) && updatedAt > 0) return updatedAt
+  const date = new Date(workoutLike.date || 0).getTime()
+  if (Number.isFinite(date) && date > 0) return date
+  const createdAt = new Date(workoutLike.createdAt || 0).getTime()
+  if (Number.isFinite(createdAt) && createdAt > 0) return createdAt
+  return 0
+}
+
+function pickPreferredLocalWorkout(storeWorkout, offlineWorkout) {
+  if (!storeWorkout) return offlineWorkout || null
+  if (!offlineWorkout) return storeWorkout || null
+
+  const storeIsDraft = storeWorkout?._isDraft === true || storeWorkout?.isDraft === true
+  const offlineIsDraft = offlineWorkout?._isDraft === true || offlineWorkout?.isDraft === true
+
+  // If one side is explicitly draft and the other isn't, keep the draft to avoid data loss.
+  if (offlineIsDraft !== storeIsDraft) {
+    return offlineIsDraft ? offlineWorkout : storeWorkout
+  }
+
+  const storeTs = getWorkoutTimestamp(storeWorkout)
+  const offlineTs = getWorkoutTimestamp(offlineWorkout)
+  return offlineTs >= storeTs ? offlineWorkout : storeWorkout
+}
+
 async function loadWorkout() {
   loading.value = true
   error.value = ''
@@ -1201,8 +1395,8 @@ async function loadWorkout() {
     // Offline-IDs (lokal gespeicherte Workouts)
     if (String(id).startsWith('draft-') || String(id).startsWith('offline_')) {
       const fromStore = store.workouts.find(w => w._id === id) || null
-      const fromOffline = fromStore ? null : (await getWorkoutOffline(id))
-      workout.value = fromStore || fromOffline || null
+      const fromOffline = await getWorkoutOffline(id).catch(() => null)
+      workout.value = pickPreferredLocalWorkout(fromStore, fromOffline)
       logger.debug('[WorkoutDetail] temp/offline lookup', {
         id,
         fromStore: !!fromStore,
@@ -1219,8 +1413,8 @@ async function loadWorkout() {
         logger.debug('[WorkoutDetail] temp realId fallback', { id, realId: realId || null })
         if (realId) {
           const mappedFromStore = store.workouts.find(w => w._id === realId) || null
-          const mappedFromOffline = mappedFromStore ? null : (await getWorkoutOffline(realId))
-          workout.value = mappedFromStore || mappedFromOffline || null
+          const mappedFromOffline = await getWorkoutOffline(realId).catch(() => null)
+          workout.value = pickPreferredLocalWorkout(mappedFromStore, mappedFromOffline)
           logger.debug('[WorkoutDetail] mapped realId lookup', {
             tempId: id,
             realId,
@@ -1264,8 +1458,8 @@ async function loadWorkout() {
 
     // Normale Workouts: offline-first, dann API-Fallback
     const normalFromStore = store.workouts.find(w => w._id === id) || null
-    const normalFromOffline = normalFromStore ? null : (await getWorkoutOffline(id))
-    workout.value = normalFromStore || normalFromOffline
+    const normalFromOffline = await getWorkoutOffline(id).catch(() => null)
+    workout.value = pickPreferredLocalWorkout(normalFromStore, normalFromOffline)
     logger.debug('[WorkoutDetail] normal lookup', {
       id,
       fromStore: !!normalFromStore,
@@ -1500,6 +1694,26 @@ async function onTimerDecision(mode) {
 
 function toggleReorder() { isReordering.value = !isReordering.value }
 
+function askRemoveExercise(exIndex) {
+  pendingRemoveExerciseIndex.value = exIndex
+  showRemoveExerciseModal.value = true
+}
+
+function confirmRemoveExercise() {
+  removeExercise(pendingRemoveExerciseIndex.value)
+  pendingRemoveExerciseIndex.value = -1
+}
+
+function askDeleteNote(idx) {
+  pendingDeleteNoteIndex.value = idx
+  showDeleteNoteModal.value = true
+}
+
+function confirmDeleteNote() {
+  deleteNote(pendingDeleteNoteIndex.value)
+  pendingDeleteNoteIndex.value = -1
+}
+
 function removeExercise(exIndex) {
   if (!workout.value?.exercises || !Array.isArray(workout.value.exercises)) return
   if (exIndex < 0 || exIndex >= workout.value.exercises.length) return
@@ -1514,31 +1728,62 @@ function removeExercise(exIndex) {
 
 function ensureSetDetailsStructure() {
   if (!workout.value || !Array.isArray(workout.value.exercises)) return
-  workout.value.exercises = workout.value.exercises.map(ex => ({
-    ...ex,
-    setDetails: Array.isArray(ex.setDetails) && ex.setDetails.length > 0
+  workout.value.exercises = workout.value.exercises.map(ex => {
+    let sets = Array.isArray(ex.setDetails) && ex.setDetails.length > 0
       ? ex.setDetails
       : [{ reps: ex.reps || 10, weight: ex.weight || 0 }]
-  }))
+    // Ensure at least 1 warmup set exists at the front
+    const hasWarmup = sets.some(s => s.isWarmup)
+    if (!hasWarmup) {
+      sets = [{ reps: 10, weight: 0, isWarmup: true }, ...sets]
+    }
+    return { ...ex, setDetails: sets }
+  })
+}
+
+// Returns display label for a set row, e.g. "W1", "W2", "1", "2"
+function getSetLabel(setDetails, rIdx) {
+  let warmupCount = 0
+  let workingCount = 0
+  for (let i = 0; i <= rIdx; i++) {
+    if (setDetails[i]?.isWarmup) warmupCount++
+    else workingCount++
+  }
+  return setDetails[rIdx]?.isWarmup ? `W${warmupCount}` : `${workingCount}`
 }
 
 function addSetRow(exIndex) {
   const ex = workout.value?.exercises?.[exIndex]
   if (!ex) return
   if (!Array.isArray(ex.setDetails)) ex.setDetails = []
-  const last = ex.setDetails.at(-1)
-  ex.setDetails.push({ reps: last?.reps || 10, weight: last?.weight || 0 })
-  logger.debug('addSetRow', 'exIndex:', exIndex, 'newLen:', ex.setDetails.length)
+  const lastWorking = [...ex.setDetails].reverse().find(s => !s.isWarmup)
+  ex.setDetails.push({ reps: lastWorking?.reps || 10, weight: lastWorking?.weight || 0, isWarmup: false })
+  try { triggerAutoSave() } catch {}
+}
+
+function addWarmupSetRow(exIndex) {
+  const ex = workout.value?.exercises?.[exIndex]
+  if (!ex) return
+  if (!Array.isArray(ex.setDetails)) ex.setDetails = []
+  // Insert after last existing warmup set
+  const lastWarmupIdx = ex.setDetails.map((s, i) => s.isWarmup ? i : -1).filter(i => i >= 0).at(-1) ?? -1
+  const prevWarmup = lastWarmupIdx >= 0 ? ex.setDetails[lastWarmupIdx] : null
+  ex.setDetails.splice(lastWarmupIdx + 1, 0, { reps: prevWarmup?.reps || 10, weight: prevWarmup?.weight || 0, isWarmup: true })
   try { triggerAutoSave() } catch {}
 }
 
 function removeSetRow(exIndex, rowIndex) {
   const ex = workout.value?.exercises?.[exIndex]
   if (!ex || !Array.isArray(ex.setDetails)) return
-  ex.setDetails.splice(rowIndex, 1)
-  if (ex.setDetails.length === 0) {
-    ex.setDetails.push({ reps: ex.reps || 10, weight: ex.weight || 0 })
+  const row = ex.setDetails[rowIndex]
+  if (row?.isWarmup) {
+    const warmupCount = ex.setDetails.filter(s => s.isWarmup).length
+    if (warmupCount <= 1) return // keep minimum 1 warmup
+  } else {
+    const workingCount = ex.setDetails.filter(s => !s.isWarmup).length
+    if (workingCount <= 1) return // keep minimum 1 working set
   }
+  ex.setDetails.splice(rowIndex, 1)
   logger.debug('removeSetRow', 'exIndex:', exIndex, 'rowIndex:', rowIndex, 'remaining:', ex.setDetails.length)
   try { triggerAutoSave() } catch {}
 }
@@ -1712,16 +1957,20 @@ async function performSaveWorkout() {
     cancelPendingAutoSave('final-save')
     suppressDraftPersistence.value = true
     saving.value = true
+    saveMsg.value = ''
+    saveError.value = false
     const id = route.params.id
     const w = workout.value || {}
     const timerElapsedSeconds = Math.max(0, Math.round((Number(timerStore.elapsedMs) || 0) / 1000))
     const timerDurationMinutes = timerElapsedSeconds > 0 ? Math.max(1, Math.round(timerElapsedSeconds / 60)) : 0
     const existingDuration = Number(w.duration) || 0
     const finalDurationMinutes = timerDurationMinutes > 0 ? timerDurationMinutes : existingDuration
+    const resolvedUserId = await resolveActiveWorkoutUserIdForSave()
     const normalized = {
       name: w.name,
       type: w.type,
       date: w.date,
+      userId: resolvedUserId || undefined,
       duration: finalDurationMinutes,
       completed: true,
       _isDraft: false,
@@ -1737,6 +1986,28 @@ async function performSaveWorkout() {
       }))
     }
     normalized.notes = buildWorkoutNotesSummary(normalized.exercises)
+
+    // Favorit-Anpassen: Nur Favorit aktualisieren, kein Stats-Eintrag
+    if (String(route.query?.favoriteAdjust || '') === '1') {
+      await syncStartedFavoriteFromWorkout(normalized)
+      // Draft-Workout entfernen (wurde nie als abgeschlossenes Workout gedacht)
+      const adjustId = String(id)
+      if (adjustId.startsWith('draft-')) {
+        const realId = resolveRealIdFromDraftId(adjustId)
+        if (realId) {
+          const tk = await getIdToken().catch(() => null)
+          await deleteWorkoutApi(realId, tk).catch(() => null)
+          try { await db.workouts.delete(adjustId) } catch {}
+        }
+      } else {
+        const tk = await getIdToken().catch(() => null)
+        await deleteWorkoutApi(adjustId, tk).catch(() => null)
+      }
+      toast.show(t('workout.adjustSaved') || 'Favorit aktualisiert', { type: 'success', duration: 2000 })
+      bypassTimerLeaveGuard.value = true
+      router.push('/dashboard')
+      return
+    }
 
     // Lokalen State sofort auf final setzen, damit kein spät ankommender Auto-Save
     // das Workout erneut als Draft markiert.
@@ -1765,23 +2036,54 @@ async function performSaveWorkout() {
         router.push('/dashboard')
         return
       }
-      const idx = store.workouts.findIndex(wi => wi._id === id)
-      if (idx !== -1) {
-        store.workouts[idx] = { ...store.workouts[idx], ...normalized }
-      }
-      await saveWorkoutOffline({
+      // Draft ohne realId: als neues Workout speichern, damit ein sauberer Create-/Sync-Pfad genutzt wird.
+      const createPayload = {
         ...normalized,
-        _id: id,
-        userId: resolveActiveWorkoutUserId(),
+        userId: normalized.userId || resolveActiveWorkoutUserId() || undefined,
         _isDraft: false,
-        completed: true,
-        updatedAt: Date.now()
-      })
+        isDraft: false,
+        completed: true
+      }
+      let token = await getIdToken().catch(() => null)
+      let savedWorkout = null
+      try {
+        savedWorkout = await store.createWorkout(createPayload, token)
+      } catch (createError) {
+        const status = Number(createError?.statusCode || createError?.response?.status || 0)
+        const code = String(createError?.code || '').toUpperCase()
+        const transient = !status || [408, 425, 429, 500, 502, 503, 504].includes(status) || code === 'ERR_NETWORK' || code === 'ECONNABORTED'
+        if (!transient) {
+          logger.warn('[WorkoutDetail] createWorkout nicht-retrybar fehlgeschlagen, bewahre Workout lokal auf', createError)
+          savedWorkout = await store.createWorkoutOptimistic({
+            ...createPayload,
+            _syncPendingAuth: status === 401 || status === 403
+          }, token).catch(() => null)
+          if (!savedWorkout) throw createError
+          saveMsg.value = status === 401 || status === 403
+            ? 'Lokal gespeichert. Sync startet nach erneuter Anmeldung.'
+            : 'Lokal gespeichert. Sync wird erneut versucht.'
+          saveError.value = false
+        } else {
+          logger.warn('[WorkoutDetail] createWorkout transient fehlgeschlagen, nutze optimistischen Fallback', createError)
+          savedWorkout = await store.createWorkoutOptimistic(createPayload, token).catch(() => null)
+          if (!savedWorkout) throw createError
+        }
+      }
+
+      // Lokalen Draft-Eintrag entfernen, damit kein Split-Brain zwischen draft-* und real/offline_* entsteht.
+      try { await db.workouts.delete(id) } catch {}
+      try {
+        const idx = store.workouts.findIndex(wi => String(wi?._id || '') === String(id))
+        if (idx !== -1) store.workouts.splice(idx, 1)
+      } catch {}
+
       store.invalidateStatsCache()
-      syncStartedFavoriteFromWorkout({ ...normalized, _id: id })
-      saveMsg.value = finalDurationMinutes > 0 ? `Gespeichert. Dauer: ${finalDurationMinutes} min` : 'Gespeichert.'
-      saveError.value = false
-      initialSnapshot = snapshotCore({ ...(idx !== -1 ? store.workouts[idx] : normalized), _id: id })
+      syncStartedFavoriteFromWorkout({ ...createPayload, _id: savedWorkout?._id || id })
+      if (!saveMsg.value) {
+        saveMsg.value = finalDurationMinutes > 0 ? `Gespeichert. Dauer: ${finalDurationMinutes} min` : 'Gespeichert.'
+        saveError.value = false
+      }
+      initialSnapshot = snapshotCore({ ...createPayload, _id: savedWorkout?._id || id })
       await postSaveCleanup()
       bypassTimerLeaveGuard.value = true
       router.push('/dashboard')
@@ -2312,6 +2614,9 @@ onBeforeUnmount(() => {
   padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px));
 }
 .content { padding: 0 clamp(14px, 3.5vw, 24px); }
+.content.timer-offset {
+  padding-top: clamp(68px, 10vh, 112px);
+}
 .loading, .empty, .error { text-align: center; color: var(--muted); padding: 40px 0; }
 .workout-header { margin-bottom: 16px; }
 .workout-header h2 { margin: 0 0 8px 0; font-size: 1.5rem; }
@@ -2378,7 +2683,17 @@ onBeforeUnmount(() => {
 .weight-input { position: relative; }
 .weight-input .unit { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 0.75rem; pointer-events: none; }
 .row-actions { padding: 4px 0; }
-.add-row-btn { background: var(--accent); color: var(--accent-contrast); border: none; border-radius: 6px; padding: 5px 10px; cursor: pointer; font-size: 0.9rem; }
+.add-row-btn {
+  background: color-mix(in srgb, var(--accent) 90%, black 10%);
+  color: var(--accent-contrast, #ffffff);
+  border: 1px solid color-mix(in srgb, var(--accent) 72%, black 28%);
+  border-radius: 8px;
+  padding: 7px 12px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+}
 .remove-row-btn { background: var(--danger-color); color: var(--accent-contrast); border: none; border-radius: 4px; width: 28px; height: 28px; cursor: pointer; font-size: 1rem; }
 .number-with-spinner { display: flex; align-items: center; gap: 6px; }
 .spinner-vertical { display: flex; flex-direction: column; gap: 2px; }
@@ -2387,7 +2702,17 @@ onBeforeUnmount(() => {
 .spin-btn.down { transform-origin: center; }
 .spin-btn:active { transform: scale(0.98); }
 .actions { margin-top: 12px; display: flex; gap: 8px; }
-.primary { width: 100%; padding: 12px; border-radius: 10px; border: none; cursor: pointer; background: var(--accent); color: var(--accent-contrast); font-weight: 600; }
+.primary {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 72%, black 28%);
+  cursor: pointer;
+  background: color-mix(in srgb, var(--accent) 92%, white 8%);
+  color: var(--accent-contrast, #ffffff);
+  font-weight: 700;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+}
 .secondary { padding: 12px; border-radius: 10px; border: 1px solid var(--line-strong); cursor: pointer; background: var(--bg-panel); color: var(--fg-strong); font-weight: 600; }
 .favorite-save {
   border-color: color-mix(in srgb, var(--accent) 60%, var(--line-strong));
@@ -2399,22 +2724,22 @@ onBeforeUnmount(() => {
 .favorite-modal-field { display: flex; flex-direction: column; gap: 6px; color: var(--fg-strong); font-size: 0.85rem; }
 .favorite-modal-input { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line-soft); background: var(--bg-panel); color: var(--fg); }
 .add-exercise-btn {
-  background: transparent;
-  color: #4b82ff;
-  border: 2px solid #4b82ff;
+  background: color-mix(in srgb, var(--accent) 16%, var(--bg-panel));
+  color: var(--fg-strong);
+  border: 2px solid color-mix(in srgb, var(--accent) 65%, var(--line-strong));
   font-weight: 700;
 }
 .add-exercise-btn:hover {
-  background: color-mix(in srgb, #4b82ff 14%, transparent);
+  background: color-mix(in srgb, var(--accent) 24%, var(--bg-panel));
 }
 .timer-config-btn {
-  background: transparent;
-  color: var(--accent);
-  border: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, var(--bg-panel));
+  color: var(--fg-strong);
+  border: 2px solid color-mix(in srgb, var(--accent) 65%, var(--line-strong));
   font-weight: 700;
 }
 .timer-config-btn:hover {
-  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  background: color-mix(in srgb, var(--accent) 24%, var(--bg-panel));
 }
 .link.danger {
   color: var(--danger-color);
@@ -2445,6 +2770,70 @@ onBeforeUnmount(() => {
   color: var(--fg-soft, #9fb0c2);
   font-size: 0.78rem;
 }
+.weight-progress-hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 4px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  border-radius: 50%;
+  flex-shrink: 0;
+  user-select: none;
+  cursor: default;
+  vertical-align: middle;
+}
+.col.set {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.sets-section-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding: 6px 0 2px;
+  color: var(--muted);
+}
+.warmup-label {
+  color: color-mix(in srgb, #f59e0b 65%, var(--muted));
+}
+.working-label {
+  padding-top: 2px;
+}
+.sets-section-divider {
+  height: 1px;
+  background: var(--line-soft, rgba(255,255,255,0.08));
+  margin: 8px 0 4px;
+}
+.set-row.warmup-row {
+  opacity: 0.7;
+}
+.row-actions.warmup-actions {
+  margin-bottom: 4px;
+}
+.add-warmup-btn {
+  background: transparent;
+  color: color-mix(in srgb, #f59e0b 70%, var(--muted));
+  border: 1px dashed color-mix(in srgb, #f59e0b 35%, var(--card-border, rgba(255,255,255,0.12)));
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+.add-warmup-btn:active {
+  opacity: 0.7;
+}
+.add-row-btn:hover,
+.add-warmup-btn:hover {
+  filter: brightness(1.08);
+}
 .remove-exercise-btn {
   border: 1px solid color-mix(in srgb, var(--danger-color) 50%, transparent);
   background: color-mix(in srgb, var(--danger-color) 14%, transparent);
@@ -2456,5 +2845,14 @@ onBeforeUnmount(() => {
 }
 .remove-exercise-btn:hover {
   background: color-mix(in srgb, var(--danger-color) 20%, transparent);
+}
+
+.actions .primary,
+.workout > .primary {
+  background: color-mix(in srgb, var(--accent) 92%, black 8%);
+  color: var(--accent-contrast, #ffffff);
+  border: 1px solid color-mix(in srgb, var(--accent) 72%, black 28%);
+  font-weight: 800;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
 }
 </style>

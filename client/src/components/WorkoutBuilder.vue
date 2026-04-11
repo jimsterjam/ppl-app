@@ -12,7 +12,6 @@ import { useToastStore } from '@/stores/toastStore';
 import AppModal from '@/components/AppModal.vue';
 import StepIndicator from '@/components/StepIndicator.vue';
 import BottomNav from '@/components/BottomNav.vue';
-import UpgradeModal from '@/components/UpgradeModal.vue';
 import { getAllExercisesOffline, saveWorkoutOffline, deleteWorkoutOffline } from '@/utils/offlineStorage';
 import { getMergedSortedExercises } from '@/utils/exerciseList';
 import { searchAndRankExercises } from '@/utils/exerciseSearch'
@@ -54,10 +53,6 @@ const initialReady = ref(false)
 const search = ref('')
 const creating = ref(false)
 const errorMsg = ref('')
-const showUpgradeModal = ref(false)
-const upgradeLimitType = ref('exercises')
-const showBelief = ref(true)
-const beliefText = ref('')
 const showTypePicker = ref(false)
 const showMobilePicker = ref(false)
 const draggingIndex = ref(null)
@@ -148,6 +143,7 @@ function buildFavoriteDetailQuery(base = {}) {
 	if (ctx.favoriteName) query.favoriteName = String(ctx.favoriteName)
 	if (ctx.favoriteType) query.favoriteType = String(ctx.favoriteType)
 	if (String(route.query?.favoriteStart || '') === '1') query.favoriteStart = '1'
+	if (String(route.query?.favoriteAdjust || '') === '1') query.favoriteAdjust = '1'
 	return query
 }
 
@@ -222,16 +218,6 @@ onMounted(() => {
 })
 onUnmounted(() => window.removeEventListener('resize', onResize))
 
-// --- Belief/Affirmation ---
-const BELIEF_KEY = 'wb_belief_last_shown'
-function todayKey() {
-	const d = new Date()
-	return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-}
-function continuePlan() {
-	showBelief.value = false
-	try { localStorage.setItem(BELIEF_KEY, todayKey()) } catch {}
-}
 onMounted(async () => {
 	try {
 		normalizedExercises.value = await loadDefaultExercises()
@@ -240,27 +226,6 @@ onMounted(async () => {
 	consumeQuickPrefill()
 	maybeAutoStartFavorite()
 	await loadExercises()
-	// Affirmation
-	const beliefsDe = [
-		'Jede Wiederholung bringt dich deinem Ziel näher.',
-		'Konstanz schlägt Intensität – heute zählt’s.',
-		'Kleiner Schritt, große Wirkung: jetzt starten.',
-		'Du bist stärker als deine Ausreden.',
-		'Fortschritt, nicht Perfektion.'
-	]
-	const beliefsEn = [
-		'Each rep gets you closer to your goal.',
-		'Consistency beats intensity — today counts.',
-		'Small step, big impact: start now.',
-		'You’re stronger than your excuses.',
-		'Progress, not perfection.'
-	]
-	const beliefs = String(locale.value).startsWith('de') ? beliefsDe : beliefsEn
-	beliefText.value = beliefs[Math.floor(Math.random() * beliefs.length)]
-	try {
-		const last = localStorage.getItem(BELIEF_KEY)
-		showBelief.value = last !== todayKey()
-	} catch { showBelief.value = true }
 
 	// Prüfe Auth-Status sofort
 	const currentUser = getCurrentUser()
@@ -381,8 +346,7 @@ async function createWorkout() {
 		return;
 	}
   if (!subscriptionStore.canCreateWorkout) {
-    upgradeLimitType.value = 'workouts';
-    showUpgradeModal.value = true;
+    errorMsg.value = t('builder.createFailed');
     return;
   }
   creating.value = true;
@@ -547,7 +511,6 @@ watch(() => `${route.query.quick || ''}:${route.query.favoriteStart || ''}`, () 
 
 <template>
 	<div class="workout-builder">
-		<AppModal v-model="showBelief" :title="t('builder.impulseTitle')" :message="beliefText" :confirm-text="t('builder.continue')" :show-cancel="false" :persistent="true" type="info" @confirm="continuePlan" />
 		<div class="builder-topbar">
 			<button class="back-top-btn" :title="t('builder.backToDashboardTitle')" @click="goDashboard">{{ t('builder.backToDashboard') }}</button>
 			<h2>{{ t('builder.createTitle') }}</h2>
@@ -673,7 +636,6 @@ watch(() => `${route.query.quick || ''}:${route.query.favoriteStart || ''}`, () 
 			</div>
 		</div>
 		<BottomNav />
-		<UpgradeModal v-model:show="showUpgradeModal" :limit-type="upgradeLimitType" @close="showUpgradeModal = false" @continue-free="showUpgradeModal = false" />
 	</div>
 </template>
 

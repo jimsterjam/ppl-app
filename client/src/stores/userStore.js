@@ -10,7 +10,6 @@ import {
   saveWorkoutOffline,
   queueAction,
   purgeServerDeletedWorkouts,
-  clearWorkoutTombstones,
   db
 } from '@/utils/offlineStorage'
 import {
@@ -21,84 +20,30 @@ import {
   updateWorkout as updateWorkoutApi
 } from '@/api/workouts'
 import { processSyncQueue } from '@/utils/syncManager'
+import { parseUidFromToken } from '@/utils/authToken'
+import {
+  DRAFT_TOMBSTONES_KEY,
+  DRAFT_TOMBSTONE_TTL_MS,
+  isDraftLike,
+  readDraftTombstones,
+  writeDraftTombstones,
+  markDraftsDeleted,
+  isDraftDeleted,
+  filterOutDeletedDrafts
+} from '@/utils/draftTombstones'
+import {
+  normalizeWorkoutFingerprint,
+  mergeWorkoutLists,
+  dedupeWorkoutsForStats
+} from '@/utils/workoutMerge'
 
-const DRAFT_TOMBSTONES_KEY = 'deleted_draft_ids_v1'
-const DRAFT_TOMBSTONE_TTL_MS = 6 * 60 * 60 * 1000
-
-function isDraftLike(workout) {
-  const id = String(workout?._id || '')
-  return workout?._isDraft === true || workout?.isDraft === true || id === 'draft' || id.startsWith('draft-')
-}
-
-function readDraftTombstones() {
-  try {
-    const raw = localStorage.getItem(DRAFT_TOMBSTONES_KEY)
-    if (!raw) return {}
-    const parsed = JSON.parse(raw)
-    return parsed && typeof parsed === 'object' ? parsed : {}
-  } catch {
-    return {}
-  }
-}
-
-function writeDraftTombstones(map) {
-  try {
-    localStorage.setItem(DRAFT_TOMBSTONES_KEY, JSON.stringify(map || {}))
-  } catch {}
-}
-
-function markDraftsDeleted(ids = []) {
-  const valid = [...new Set((ids || []).map(v => String(v || '').trim()).filter(Boolean))]
-  if (!valid.length) return
-  const next = readDraftTombstones()
-  const now = Date.now()
-  valid.forEach((id) => {
-    next[id] = now
-  })
-  writeDraftTombstones(next)
-}
-
-function isDraftDeleted(id) {
-  if (!id) return false
-  const map = readDraftTombstones()
-  const entry = map[String(id)]
-  if (!entry) return false
-  const timestamp = Number(typeof entry === 'object' ? (entry?.timestamp || entry?.deletedAt || 0) : entry)
-  if (Number.isFinite(timestamp) && timestamp > 0) {
-    return (Date.now() - timestamp) <= DRAFT_TOMBSTONE_TTL_MS
-  }
-  return Boolean(entry)
-}
-
-function filterOutDeletedDrafts(list = [], source = 'unknown') {
-  const items = Array.isArray(list) ? list : []
-  const removed = items.filter(w => isDraftLike(w) && isDraftDeleted(w?._id))
-  if (removed.length) {
-    logger.debug('🛡️ [DraftIntegrity] Blocked tombstoned drafts from source:', source, removed.map(w => String(w?._id || '')))
-  }
-  return items.filter(w => !(isDraftLike(w) && isDraftDeleted(w?._id)))
-}
+const WORKOUT_STORE_LIMIT = Math.max(0, Number.parseInt(import.meta.env.VITE_WORKOUTS_IN_MEMORY_LIMIT || '', 10) || 0)
 
 function filterByUserId(list = [], activeUid = '') {
   const items = Array.isArray(list) ? list : []
   const uid = String(activeUid || '').trim()
   if (!uid) return items
   return items.filter((w) => String(w?.userId || '') === uid)
-}
-
-function parseUidFromToken(token = null) {
-  const raw = String(token || '').trim()
-  if (!raw) return ''
-  const parts = raw.split('.')
-  if (parts.length < 2) return ''
-  try {
-    const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/')
-    const decoded = atob(payload.padEnd(payload.length + (4 - payload.length % 4) % 4, '='))
-    const json = JSON.parse(decoded)
-    return String(json?.user_id || json?.uid || json?.sub || '').trim()
-  } catch {
-    return ''
-  }
 }
 
 function resolveActiveUid(authStore, token = null, fallbackUser = null) {
@@ -110,103 +55,6 @@ function resolveActiveUid(authStore, token = null, fallbackUser = null) {
     || parseUidFromToken(token)
     || ''
   ).trim()
-}
-
-function normalizeWorkoutFingerprint(workout = {}) {
-  const date = String(workout?.date || '').trim()
-  const name = String(workout?.name || '').trim().toLowerCase()
-  const type = String(workout?.type || '').trim().toLowerCase()
-  const exercises = Array.isArray(workout?.exercises) ? workout.exercises : []
-  const exerciseCount = exercises.length
-  const volume = exercises.reduce((sum, ex) => {
-    if (Array.isArray(ex?.setDetails) && ex.setDetails.length) {
-      return sum + ex.setDetails.reduce((setSum, set) => {
-        const reps = Number(set?.reps) || 0
-        const weight = Number(set?.weight) || 0
-        return setSum + reps * weight
-      }, 0)
-    }
-    const sets = Number(ex?.sets) || 0
-    const reps = Number(ex?.reps) || 0
-    const weight = Number(ex?.weight) || 0
-    return sum + (sets * reps * weight)
-  }, 0)
-  return `${date}|${name}|${type}|${exerciseCount}|${Math.round(volume)}`
-}
-
-/**
- * Robuste Merge-Funktion für zwei Workout-Listen.
- * Regeln:
- *   - Server ist die autoritative Basis
- *   - Lokale offline-erstellte Workouts (_offlineCreated / offline_*) bleiben immer erhalten
- *   - Lokale Drafts overlay‑en ggf. einen passenden Server-Eintrag
- *   - Für Konflikte ohne Draft-Flag: last-write-wins (updatedAt)
- * @param {Object[]} serverList - Workouts vom Server
- * @param {Object[]} localList  - Workouts aus IndexedDB
- * @returns {Object[]}
- */
-function mergeWorkoutLists(serverList, localList) {
-  const map = new Map()
-
-  // Basis: alle Server-Workouts
-  for (const w of (serverList || [])) {
-    const id = String(w?._id || '').trim()
-    if (!id) continue
-    map.set(id, w)
-  }
-
-  // Overlay: lokale Workouts
-  for (const w of (localList || [])) {
-    const id = String(w?._id || '').trim()
-    if (!id) continue
-    const isDraft = w._isDraft === true || w.isDraft === true
-    const isOfflineCreated = w._offlineCreated === true || id.startsWith('offline_')
-
-    // Lokale Workouts ohne Server-Pendant → immer behalten
-    if (isOfflineCreated || isDraft) {
-      if (!map.has(id)) {
-        map.set(id, w)
-      } else if (isDraft) {
-        // Draft überlagert Server-Eintrag (User ist noch am Editieren)
-        const existing = map.get(id)
-        map.set(id, { ...existing, ...w, _isDraft: true, isDraft: true, completed: false })
-      }
-      continue
-    }
-
-    // Beides vorhanden: last-write-wins
-    if (!map.has(id)) {
-      map.set(id, w)
-      continue
-    }
-    const existing = map.get(id)
-    const existingTs = new Date(existing?.updatedAt || existing?.date || 0).getTime()
-    const localTs = new Date(w?.updatedAt || w?.date || 0).getTime()
-    if (localTs > existingTs) map.set(id, w)
-  }
-
-  return Array.from(map.values())
-}
-
-function dedupeWorkoutsForStats(list = []) {
-  const items = Array.isArray(list) ? list.filter(Boolean) : []
-  const byKey = new Map()
-
-  items.forEach((workout) => {
-    if (workout?._isDraft === true || workout?.isDraft === true) return
-    const uid = String(workout?._id || workout?.id || workout?.workoutId || '').trim()
-    const identity = uid || normalizeWorkoutFingerprint(workout)
-    const existing = byKey.get(identity)
-    if (!existing) {
-      byKey.set(identity, workout)
-      return
-    }
-    const existingTs = new Date(existing?.updatedAt || existing?.date || existing?.createdAt || 0).getTime()
-    const nextTs = new Date(workout?.updatedAt || workout?.date || workout?.createdAt || 0).getTime()
-    if (nextTs >= existingTs) byKey.set(identity, workout)
-  })
-
-  return Array.from(byKey.values())
 }
 
 function getStatsCacheKey(uid = '') {
@@ -374,7 +222,7 @@ export const useUserStore = defineStore("user", {
       }
     },
 
-    applyWorkoutLimit(list, limit = 3) {
+    applyWorkoutLimit(list) {
       const items = Array.isArray(list) ? list : []
       const drafts = items.filter(w => isDraftLike(w) && w?.completed !== true && !isDraftDeleted(w?._id))
       const regular = items.filter(w => !((w?._isDraft === true || w?.isDraft === true) && w?.completed !== true))
@@ -383,7 +231,8 @@ export const useUserStore = defineStore("user", {
         const bd = new Date(b.updatedAt || b.date || 0).getTime()
         return bd - ad
       })
-      return [...drafts, ...sorted.slice(0, limit)]
+      if (!WORKOUT_STORE_LIMIT) return [...drafts, ...sorted]
+      return [...drafts, ...sorted.slice(0, WORKOUT_STORE_LIMIT)]
     },
 
         async startWorkout(type, token = null) {
@@ -446,13 +295,7 @@ export const useUserStore = defineStore("user", {
           const serverIds = (Array.isArray(serverWorkouts) ? serverWorkouts : [])
             .map(w => String(w?._id || '').trim()).filter(Boolean)
 
-          // 2. Tombstones für Server-IDs aufheben — der Server ist autoritativ.
-          //    Wenn das Backend das Workout zurückgibt, darf kein lokaler Tombstone es blockieren.
-          if (serverIds.length) {
-            clearWorkoutTombstones(serverIds)
-          }
-
-          // 3. Lokalen Stand aus IndexedDB laden (enthält jetzt Server-Workouts +
+          // 2. Lokalen Stand aus IndexedDB laden (enthaelt jetzt Server-Workouts +
           //    Drafts + offline-erstellte Workouts, die noch nicht gesynct sind)
           let localAll = []
           try {
@@ -461,11 +304,11 @@ export const useUserStore = defineStore("user", {
             logger.warn('⚠️ [Sync] IndexedDB-Lesefehler beim Merge:', e)
           }
 
-          // 4. Merge: Server ist die Basis, lokale Einträge supplementieren
-          //    Server-Workouts werden NICHT durch filterDeletedWorkouts gefiltert —
-          //    die Tombstones wurden in Schritt 2 bereits bereinigt.
+          // 3. Merge: Server ist die Basis, lokale Eintraege supplementieren.
+          //    Wichtig: Loesch-Tombstones bleiben aktiv, damit bereits geloeschte
+          //    Eintraege nicht durch spaetere Fetches wieder sichtbar werden.
           const serverNormalized = filterOutDeletedDrafts(
-            filterByUserId(Array.isArray(serverWorkouts) ? serverWorkouts : [], activeUid),
+            filterDeletedWorkouts(filterByUserId(Array.isArray(serverWorkouts) ? serverWorkouts : [], activeUid)),
             'server-fetch'
           )
           const localFiltered = filterOutDeletedDrafts(
@@ -497,7 +340,7 @@ export const useUserStore = defineStore("user", {
             logger.warn('⚠️ [Sync] purgeServerDeletedWorkouts fehlgeschlagen:', e)
           }
 
-          this.workouts = this.applyWorkoutLimit(merged, 3)
+          this.workouts = this.applyWorkoutLimit(merged)
           this.workoutsLoaded = true
           this.workoutsLoadedAt = Date.now()
           logger.debug(`✅ [Sync] loadWorkouts — server: ${serverIds.length}, lokal: ${localAll.length}, merged: ${merged.length}, angezeigt: ${this.workouts.length}`)
@@ -519,7 +362,7 @@ export const useUserStore = defineStore("user", {
         this.error = this.workouts.length ? null : this.error;
         logger.debug(`✅ [Offline] Loaded ${this.workouts.length} workouts from IndexedDB`);
 
-        this.workouts = this.applyWorkoutLimit(this.workouts, 3)
+        this.workouts = this.applyWorkoutLimit(this.workouts)
 
         return this.workouts;
       } catch (error) {
@@ -538,7 +381,7 @@ export const useUserStore = defineStore("user", {
               }))
             : [];
           this.workouts = filterOutDeletedDrafts(this.workouts, 'offline-fallback-catch')
-          this.workouts = this.applyWorkoutLimit(this.workouts, 3)
+          this.workouts = this.applyWorkoutLimit(this.workouts)
           if (this.workouts.length) this.error = null;
         } catch {
           // Bewahre den aktuellen UI-Stand bei, statt bei Fehlern sofort zu leeren.
@@ -579,7 +422,7 @@ export const useUserStore = defineStore("user", {
       const recoverStatsFromLatestWorkouts = async () => {
         if (!token || !activeUid) return null
 
-        const latest = await fetchLatestWorkoutsForRecovery(token, activeUid, 3)
+        const latest = await fetchLatestWorkoutsForRecovery(token, activeUid, 7)
         if (!Array.isArray(latest) || latest.length === 0) return null
 
         const normalizedLatest = latest.map((w) => ({
@@ -589,13 +432,13 @@ export const useUserStore = defineStore("user", {
           isDraft: w?._isDraft === true || w?.isDraft === true
         }))
 
-        this.workouts = this.applyWorkoutLimit(normalizedLatest, 3)
+        this.workouts = this.applyWorkoutLimit(normalizedLatest)
 
         const derived = this.buildOfflineStatsFromWorkouts(normalizedLatest)
         if (!derived) return null
 
         localStorage.setItem(statsCacheKey, JSON.stringify(derived))
-        logger.debug('✅ [userStore] Stats-Recovery aktiv: letzte 3 Backend-Workouts lokal gesichert und Stats abgeleitet')
+        logger.debug('✅ [userStore] Stats-Recovery aktiv: letzte 7 Backend-Workouts lokal gesichert und Stats abgeleitet')
         return derived
       }
 
@@ -707,12 +550,19 @@ export const useUserStore = defineStore("user", {
           ...workoutData,
           userId: workoutData?.userId || authStore.uid || null
         }
+        if (!token) {
+          logger.warn('⚠️ [userStore] createWorkout ohne Token: speichere lokal und markiere Sync als ausstehend')
+          return await this.createWorkoutOptimistic({
+            ...enrichedWorkoutData,
+            _syncPendingAuth: true
+          })
+        }
         logger.debug('DEBUG: createWorkout token:', token ? 'present' : 'null', 'data:', enrichedWorkoutData)
         const newWorkout = await createWorkoutApi(enrichedWorkoutData, token);
         logger.debug('🏗️ [userStore] API returned:', newWorkout)
         if (newWorkout) {
           this.workouts.push(newWorkout);
-          this.workouts = this.applyWorkoutLimit(this.workouts, 3)
+          this.workouts = this.applyWorkoutLimit(this.workouts)
           if (newWorkout?._offlineCreated) {
             logger.warn('⚠️ [API] Workout offline erstellt und in Sync-Queue gelegt:', newWorkout._id)
             if (isOnline()) {
@@ -746,7 +596,7 @@ export const useUserStore = defineStore("user", {
 
       try { await saveWorkoutOffline(localWorkout) } catch {}
       this.workouts.unshift(localWorkout)
-      this.workouts = this.applyWorkoutLimit(this.workouts, 3)
+      this.workouts = this.applyWorkoutLimit(this.workouts)
 
       try { await queueAction('create', 'workout', localWorkout) } catch {}
 
@@ -771,7 +621,7 @@ export const useUserStore = defineStore("user", {
           } else {
             this.workouts.unshift(merged)
           }
-          this.workouts = this.applyWorkoutLimit(this.workouts, 3)
+          this.workouts = this.applyWorkoutLimit(this.workouts)
           if (updates.completed === true) {
             this.stats = null
             try { localStorage.removeItem(getStatsCacheKey(activeUid)) } catch {}
@@ -812,7 +662,7 @@ export const useUserStore = defineStore("user", {
           // Füge das neue Workout hinzu
             if (newWorkout) {
             this.workouts.push(newWorkout);
-            this.workouts = this.applyWorkoutLimit(this.workouts, 3)
+            this.workouts = this.applyWorkoutLimit(this.workouts)
             logger.debug('✅ [userStore] New workout created:', newWorkout._id, 'completed:', newWorkout.completed)
           }
           if (updates.completed === true) {
@@ -843,7 +693,7 @@ export const useUserStore = defineStore("user", {
         } else {
           this.workouts.unshift(optimisticWithTs)
         }
-        this.workouts = this.applyWorkoutLimit(this.workouts, 3)
+        this.workouts = this.applyWorkoutLimit(this.workouts)
         if (updates.completed === true) {
           this.stats = null
           try { localStorage.removeItem(getStatsCacheKey(activeUid)) } catch {}
@@ -865,7 +715,7 @@ export const useUserStore = defineStore("user", {
                 if (updates.completed !== undefined) {
                   this.workouts[lateIdx].completed = updates.completed
                 }
-                this.workouts = this.applyWorkoutLimit(this.workouts, 3)
+                this.workouts = this.applyWorkoutLimit(this.workouts)
               }
             })
             .catch(() => {})
@@ -879,7 +729,7 @@ export const useUserStore = defineStore("user", {
             this.workouts[updatedIdx].completed = updates.completed;
           }
         }
-        this.workouts = this.applyWorkoutLimit(this.workouts, 3)
+        this.workouts = this.applyWorkoutLimit(this.workouts)
         return updatedWorkout;
       } catch (error) {
         logger.error('❌ [userStore] Error updating workout:', error);
@@ -905,7 +755,7 @@ export const useUserStore = defineStore("user", {
             completed: true,
             completedAt: new Date().toISOString()
           }
-          this.workouts = this.applyWorkoutLimit(this.workouts, 3)
+          this.workouts = this.applyWorkoutLimit(this.workouts)
           localStorage.setItem('bro_split_workouts', JSON.stringify(this.workouts))
           logger.debug('✅ [Demo] Workout marked completed offline:', id)
           return this.workouts[idx]

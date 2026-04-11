@@ -20,7 +20,7 @@
           <div>
             <p class="eyebrow">Deine Trainingsstatistiken</p>
             <h2 class="hero-title">Fortschritt, der dich dranbleiben lässt</h2>
-            <p class="hero-sub">Deine Basis-Stats sind immer sichtbar. Pro schaltet Langzeit-Analysen frei.</p>
+            <p class="hero-sub">Erweiterte Analyse ist fuer alle freigeschaltet. Pro bleibt im Draft-Status.</p>
           </div>
           <div class="range-selector">
             <button
@@ -32,7 +32,7 @@
               @click="selectRange(range)"
             >
               <span>{{ range.label }}</span>
-              <span v-if="range.proOnly && !isPro" class="lock">Pro</span>
+              <span v-if="range.proOnly && !isPro" class="lock">Draft</span>
             </button>
           </div>
         </div>
@@ -63,8 +63,8 @@
 
       <section v-if="analyticsLocked" class="panel milestone">
         <div>
-          <h3>Erweiterte Analyse ist Pro-Feature</h3>
-          <p>Für Langzeit-Progression und Trainingsanalysen brauchst du Pro. Basis-Stats bleiben weiterhin sichtbar.</p>
+          <h3>Erweiterte Analyse ist freigeschaltet</h3>
+          <p>Die erweiterten Analysen sind fuer alle aktiv. Die Pro-Stufe wird derzeit als Draft gefuehrt.</p>
         </div>
         <button class="cta-inline" type="button" @click="openUpgrade('general')">Pro freischalten</button>
       </section>
@@ -161,7 +161,7 @@
               <span class="section-sub">Langzeit-Insights für echte Fortschritte</span>
             </div>
             <button class="cta-ghost" type="button" @click="openUpgrade('general')" v-if="!isPro">
-              Pro freischalten
+              Draft
             </button>
           </div>
 
@@ -176,7 +176,7 @@
             >
               <div class="card-head">
                 <h4>{{ card.title }}</h4>
-                <span class="badge pro">Pro</span>
+                <span class="badge pro">Draft</span>
               </div>
               <p class="card-sub">{{ card.subtitle }}</p>
               <div class="locked-chart" :class="{ blur: !isPro }">
@@ -184,7 +184,7 @@
               </div>
               <div v-if="!isPro" class="lock-overlay">
                 <span class="lock-icon">🔒</span>
-                <span>Schalte detaillierte Analyse mit Pro frei</span>
+                <span>Detaillierte Analyse ist fuer alle freigeschaltet</span>
               </div>
             </button>
           </div>
@@ -202,8 +202,8 @@
             </div>
             <div v-if="!isPro" class="panel insight-card locked">
               <span class="insight-icon">🔒</span>
-              <p>Mehr langfristige Insights mit Pro.</p>
-              <button class="cta-inline" type="button" @click="openUpgrade('general')">Jetzt Pro testen</button>
+              <p>Mehr langfristige Insights sind bereits aktiv.</p>
+              <button class="cta-inline" type="button" @click="openUpgrade('general')">Draft</button>
             </div>
           </div>
         </section>
@@ -256,7 +256,7 @@ import AppModal from '@/components/AppModal.vue'
 import UpgradeModal from '@/components/UpgradeModal.vue'
 import RecentWorkouts from '@/components/RecentWorkouts.vue'
 import { logger } from '@/utils/logger'
-import { isOnline, getAllWorkoutsOffline, deleteWorkoutOffline, filterDeletedWorkouts, OFFLINE_WORKOUTS_UPDATED_EVENT } from '@/utils/offlineStorage'
+import { isOnline, getAllWorkoutsOffline, deleteWorkoutOffline, saveWorkoutOffline, OFFLINE_WORKOUTS_UPDATED_EVENT } from '@/utils/offlineStorage'
 import { resolveWorkoutNotes } from '@/utils/workoutNotes'
 import { deleteWorkout as deleteWorkoutApi } from '@/api/workouts'
 import { deleteWorkoutFromStats, getWorkoutIdentifier } from '@/utils/workoutDeletion'
@@ -273,7 +273,9 @@ const offlineWorkouts = ref([])
 const authToken = ref(null)
 
 const statsWorkouts = computed(() => {
-  const list = Array.isArray(offlineWorkouts.value) ? offlineWorkouts.value : []
+  const offlineList = Array.isArray(offlineWorkouts.value) ? offlineWorkouts.value : []
+  const storeList = Array.isArray(store.workouts) ? store.workouts : []
+  const list = [...offlineList, ...storeList]
   const normalized = list
     .filter(item => !(item?._isDraft || item?.isDraft))
     .map(item => ({
@@ -323,8 +325,8 @@ const activeStats = computed(() => {
 })
 const statsWeeks = computed(() => Array.isArray(activeStats.value?.weeks) ? activeStats.value.weeks : [])
 const weeklyGoal = computed(() => Number(settings.weeklyGoal) || 0)
-const isPro = computed(() => subscriptionStore.hasFeature('hasAdvancedStats'))
-const analyticsLocked = computed(() => !isPro.value && Number(store.statsErrorCode) === 403)
+const isPro = computed(() => true)
+const analyticsLocked = computed(() => false)
 const showUpgradeModal = ref(false)
 const selectedRangeDays = ref(30)
 const showDeleteModal = ref(false)
@@ -378,15 +380,16 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000
 
 const hasStatsWindow = computed(() => statsWeeks.value.length > 0)
 const hasCoreData = computed(() => hasStatsWindow.value || statsWorkouts.value.length > 0)
-const recentWorkoutsSource = computed(() => statsWorkouts.value.slice(0, 3))
+// RecentWorkouts begrenzt selbst auf die letzten 7 Eintraege.
+const recentWorkoutsSource = computed(() => statsWorkouts.value)
 const showLoading = computed(() => (loading.value || statsLoading.value) && !hasCoreData.value)
-const showMilestoneUpgrade = computed(() => !isPro.value && totalSessions.value >= 6)
+const showMilestoneUpgrade = computed(() => false)
 
 const rangeOptions = computed(() => [
   { label: '30 Tage', days: 30, proOnly: false },
-  { label: '3 Monate', days: 90, proOnly: true },
-  { label: '6 Monate', days: 180, proOnly: true },
-  { label: '12 Monate', days: 365, proOnly: true }
+  { label: '3 Monate', days: 90, proOnly: false },
+  { label: '6 Monate', days: 180, proOnly: false },
+  { label: '12 Monate', days: 365, proOnly: false }
 ])
 
 const totalSessions = computed(() => {
@@ -528,7 +531,7 @@ const proInsights = computed(() => ([
   'Muskelgruppen-Balance: Pull liegt leicht hinter Push.'
 ]))
 
-const visibleInsights = computed(() => (isPro.value ? [...baseInsights.value, ...proInsights.value] : baseInsights.value))
+const visibleInsights = computed(() => ([...baseInsights.value, ...proInsights.value]))
 
 const sortedWeeks = computed(() => {
   if (!hasStatsWindow.value) return []
@@ -622,10 +625,33 @@ async function loadOfflineWorkouts(token) {
   try {
     const activeUid = resolveActiveUid(token || authToken.value)
     logger.debug('[Stats] loadOfflineWorkouts — uid:', activeUid || '(empty)')
-    const offline = activeUid
-      ? await getAllWorkoutsOffline({ userId: activeUid })
-      : await getAllWorkoutsOffline()
-    offlineWorkouts.value = filterDeletedWorkouts(Array.isArray(offline) ? offline : [])
+    const offline = await getAllWorkoutsOffline()
+    const allItems = Array.isArray(offline) ? offline : []
+
+    // Legacy-Fix: bereits gespeicherte Workouts ohne userId dem aktiven User zuordnen,
+    // damit sie in den Stats nicht durch UID-Filter verschwinden.
+    if (activeUid) {
+      const missingUserIdItems = allItems.filter((item) => {
+        const id = String(item?._id || item?.id || item?.workoutId || '').trim()
+        const itemUserId = String(item?.userId || '').trim()
+        return Boolean(id) && !itemUserId
+      })
+
+      if (missingUserIdItems.length) {
+        Promise.all(
+          missingUserIdItems.map((item) => saveWorkoutOffline({ ...item, userId: activeUid }))
+        ).catch((error) => {
+          logger.warn('[Stats] Backfill userId fuer Legacy-Workouts fehlgeschlagen', error)
+        })
+      }
+    }
+
+    offlineWorkouts.value = activeUid
+      ? allItems.filter((item) => {
+          const itemUserId = String(item?.userId || '').trim()
+          return !itemUserId || itemUserId === activeUid
+        })
+      : allItems
     logger.debug('[Stats] loadOfflineWorkouts — final count:', offlineWorkouts.value.length)
   } catch (error) {
     logger.warn('[Stats] Offline workouts load failed', error)
@@ -667,16 +693,20 @@ function handleUpgraded() {
   loadData()
 }
 
-async function handleDeleteRecentWorkout(workout) {
+function handleDeleteRecentWorkout(workout) {
   pendingDeleteWorkout.value = workout
   showDeleteModal.value = true
 }
 
 async function confirmDeleteRecentWorkout() {
   if (deletingRecentWorkout.value) return
+  deletingRecentWorkout.value = true
   const workout = pendingDeleteWorkout.value
   const workoutId = getWorkoutIdentifier(workout)
-  if (!workoutId) return
+  if (!workoutId) {
+    deletingRecentWorkout.value = false
+    return
+  }
 
   // Sofort: UI aktualisieren + Modal schließen (offline-first)
   offlineWorkouts.value = (offlineWorkouts.value || []).filter(item => getWorkoutIdentifier(item) !== workoutId)
@@ -699,7 +729,11 @@ async function confirmDeleteRecentWorkout() {
     reloadStats: (token) => store.loadStats(token, { rangeDays: selectedRangeDays.value }),
     onLocalRemove: () => {},
     logger
-  }).catch(err => logger.warn('[Stats] Background delete sync failed', err))
+  })
+    .catch(err => logger.warn('[Stats] Background delete sync failed', err))
+    .finally(() => {
+      deletingRecentWorkout.value = false
+    })
 }
 
 function calcWorkoutVolume(workout) {

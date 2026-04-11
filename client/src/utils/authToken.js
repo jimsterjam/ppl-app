@@ -145,3 +145,22 @@ export function clearTokenCache() {
   lastOfflineError = 0
   logger.debug('🧹 AuthToken: Cache gelöscht')
 }
+
+/**
+ * Liest die Firebase UID (user_id / uid / sub) direkt aus einem JWT-Token,
+ * ohne einen Netzwerkaufruf zu machen.
+ */
+export function parseUidFromToken(token) {
+  const raw = String(token || '').trim()
+  if (!raw) return ''
+  const parts = raw.split('.')
+  if (parts.length < 2) return ''
+  try {
+    const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const decoded = atob(payload.padEnd(payload.length + (4 - payload.length % 4) % 4, '='))
+    const json = JSON.parse(decoded)
+    return String(json?.user_id || json?.uid || json?.sub || '').trim()
+  } catch {
+    return ''
+  }
+}

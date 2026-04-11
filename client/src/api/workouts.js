@@ -110,8 +110,8 @@ export async function fetchWorkouts(token = null, userId = null) {
   }
 }
 
-export async function fetchLatestWorkoutsForRecovery(token = null, userId = null, limit = 3) {
-  const safeLimit = Math.max(1, Math.min(10, Number(limit) || 3))
+export async function fetchLatestWorkoutsForRecovery(token = null, userId = null, limit = 7) {
+  const safeLimit = Math.max(1, Math.min(10, Number(limit) || 7))
   try {
     const config = {
       validateStatus: (status) => (status >= 200 && status < 300) || [404, 204, 500].includes(status)

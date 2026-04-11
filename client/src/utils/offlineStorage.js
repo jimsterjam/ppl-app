@@ -15,7 +15,6 @@ import { ensureWorkoutNotes } from './workoutNotes'
 export const OFFLINE_WORKOUTS_UPDATED_EVENT = 'offline-workouts-updated'
 const MAX_OFFLINE_WORKOUTS = 400
 const DELETED_WORKOUT_TOMBSTONES_KEY = 'deleted_workout_ids_v1'
-const DELETED_WORKOUT_TOMBSTONE_TTL_MS = 7 * 24 * 60 * 60 * 1000
 
 // Dexie Database Instance
 export const db = new Dexie('PPLAppDB')
@@ -95,9 +94,10 @@ export function isWorkoutDeleted(id) {
   const map = readDeletedWorkoutTombstones()
   const entry = map[normalizedId]
   if (!entry) return false
-  const timestamp = Number(typeof entry === 'object' ? (entry?.timestamp || entry?.deletedAt || 0) : entry)
-  if (!Number.isFinite(timestamp) || timestamp <= 0) return true
-  return (Date.now() - timestamp) <= DELETED_WORKOUT_TOMBSTONE_TTL_MS
+  if (typeof entry === 'object' && entry !== null) {
+    return Boolean(entry?.timestamp || entry?.deletedAt || entry?.value || true)
+  }
+  return true
 }
 
 export function filterDeletedWorkouts(list = []) {
@@ -350,6 +350,8 @@ export async function purgeServerDeletedWorkouts(serverIds = [], userId = '') {
       if (!id) return false
       // Niemals offline-erstellte oder Draft-Workouts entfernen — die sind noch nicht synced
       if (w?._offlineCreated || w?._isDraft || w?.isDraft) return false
+      // Temp-IDs ebenfalls behalten: diese sind lokal erstellt und ggf. noch nicht im Backend.
+      if (id.startsWith('offline_') || id.startsWith('draft-')) return false
       // Entfernen wenn nicht mehr auf dem Server vorhanden
       return !serverIdSet.has(id)
     })

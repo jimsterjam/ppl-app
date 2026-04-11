@@ -63,7 +63,8 @@ const workoutSchema = new mongoose.Schema({
       reps: Number,
       weight: Number,
       restTime: Number, // in Sekunden
-      notes: String
+      notes: String,
+      isWarmup: { type: Boolean, default: false }
     }]
   }],
   date: {

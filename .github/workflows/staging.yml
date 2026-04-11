@@ -21,21 +21,17 @@ jobs:
           node-version: '20.19'
           cache: 'npm'
 
-      - name: Install & build server
+      - name: Install & test server
         working-directory: server
         run: |
           npm ci
-          # run server tests if present (do not fail workflow on test absence)
-          if [ -f package.json ] && npm run | grep -q "test"; then npm test || true; fi
-          # optional build step
-          if npm run | grep -q "build"; then npm run build || true; fi
+          npm test
 
-      - name: Install & build client
+      - name: Install, test & build client
         working-directory: client
         run: |
           npm ci
-          # lint if configured (don't fail pipeline for lint in staging)
-          if npm run | grep -q "lint"; then npm run lint || true; fi
+          npm test
           npm run build
 
       - name: Upload client build artifact

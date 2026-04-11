@@ -19,7 +19,7 @@ import {
 } from './offlineStorage'
 import { logger } from './logger'
 import { createWorkout, updateWorkout, deleteWorkout } from '@/api/workouts'
-import { clearTokenCache, getAuthToken } from './authToken'
+import { clearTokenCache, getAuthToken, parseUidFromToken } from './authToken'
 
 // Max Retry Attempts für fehlgeschlagene Syncs
 const MAX_RETRY_ATTEMPTS = 3
@@ -50,21 +50,6 @@ function isRetryableSyncError(error) {
   if ([408, 425, 429, 500, 502, 503, 504].includes(status)) return true
   if (code === 'ERR_NETWORK' || code === 'ECONNABORTED') return true
   return false
-}
-
-function parseUidFromToken(token) {
-  const raw = String(token || '').trim()
-  if (!raw) return ''
-  const parts = raw.split('.')
-  if (parts.length < 2) return ''
-  try {
-    const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/')
-    const decoded = atob(payload.padEnd(payload.length + (4 - payload.length % 4) % 4, '='))
-    const json = JSON.parse(decoded)
-    return String(json?.user_id || json?.uid || json?.sub || '').trim()
-  } catch {
-    return ''
-  }
 }
 
 function scheduleNoAuthRetry() {
@@ -341,6 +326,10 @@ async function syncWorkoutAction(action, data, token) {
         logger.debug('🔄 Sync - Entferne temporäre offline _id:', createData._id)
         delete createData._id
       }
+      if (createData._id && typeof createData._id === 'string' && createData._id.startsWith('draft-')) {
+        logger.debug('🔄 Sync - Entferne temporäre draft _id:', createData._id)
+        delete createData._id
+      }
       
       // Entferne offline Marker Flags
       delete createData._offlineCreated
@@ -371,10 +360,9 @@ async function syncWorkoutAction(action, data, token) {
       delete updateData._failedOnline
       delete updateData._syncedAt
       
-      // Bei offline erstellten Workouts die jetzt geupdated werden sollen:
-      // Diese sollten eigentlich als 'create' in der Queue sein, aber falls nicht:
-      if (data._id && typeof data._id === 'string' && data._id.startsWith('offline_')) {
-        logger.warn('⚠️ Sync - Update mit offline_id gefunden, konvertiere zu Create')
+      // Bei temporären lokalen IDs (offline_/draft-) muss ein Create passieren.
+      if (data._id && typeof data._id === 'string' && (data._id.startsWith('offline_') || data._id.startsWith('draft-'))) {
+        logger.warn('⚠️ Sync - Update mit temp_id gefunden, konvertiere zu Create', { id: data._id })
         delete updateData._id
         const createdWorkout = await createWorkout(updateData, token, { skipOfflineQueue: true })
         logger.debug('✅ Sync - Workout als Create erstellt:', createdWorkout._id)

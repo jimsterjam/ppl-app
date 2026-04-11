@@ -18,6 +18,9 @@ export function buildWorkoutBuilderRoute(type, options = {}) {
   if (options.favoriteStart === true) {
     query.favoriteStart = '1'
   }
+  if (options.favoriteAdjust === true) {
+    query.favoriteAdjust = '1'
+  }
 
   return {
     name: 'workout-builder',
@@ -50,6 +53,7 @@ export function readWorkoutBuilderRouteState(routeQuery = {}) {
   return {
     type: normalizeBuilderWorkoutType(routeQuery?.type),
     quick: String(routeQuery?.quick || '') === '1',
-    favoriteStart: String(routeQuery?.favoriteStart || '') === '1'
+    favoriteStart: String(routeQuery?.favoriteStart || '') === '1',
+    favoriteAdjust: String(routeQuery?.favoriteAdjust || '') === '1'
   }
 }

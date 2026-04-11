@@ -103,6 +103,18 @@ export function normalizeDefaultExercise(exercise = {}) {
     thumbnailUrl = tmp
   }
 
+  const isLegacyGifPath = (value) => {
+    const v = String(value || '').trim().toLowerCase()
+    if (!v) return false
+    return (v.includes('/exercises/180/') || v.includes('/exercises/360/')) && v.endsWith('.gif')
+  }
+
+  // In iOS/Capacitor builds fehlen die GIF-Pfade oft. Nutze dann die statische JPG-Variante.
+  if (thumbnailStaticUrl) {
+    if (!imageUrl || isLegacyGifPath(imageUrl)) imageUrl = thumbnailStaticUrl
+    if (!thumbnailUrl || isLegacyGifPath(thumbnailUrl)) thumbnailUrl = thumbnailStaticUrl
+  }
+
   const normalized = {
     ...exercise,
     _id: derivedId,

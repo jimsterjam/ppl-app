@@ -314,10 +314,10 @@ function setCategory(cat) {
 }
 
 // Lädt initial alle Übungen
-onMounted(async () => {
-  try {
-    normalizedExercises.value = await loadDefaultExercises()
-  } catch {}
+onMounted(() => {
+  const cached = getCachedDefaultExercises()
+  if (cached.length) normalizedExercises.value = cached
+  loadDefaultExercises().then(list => { normalizedExercises.value = list }).catch(() => {})
   loadExercises()
 });
 

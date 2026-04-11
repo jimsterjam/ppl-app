@@ -1,9 +1,8 @@
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { initFirebaseAuth, useFirebaseAuth } from '@/utils/firebaseAuth'
 import { useAuthStore } from '@/stores/authStore'
 import { useRouter, useRoute } from 'vue-router'
-import MotivationWidget from '@/components/MotivationWidget.vue'
 import { useI18n } from 'vue-i18n'
 import { Capacitor } from '@capacitor/core'
 import { logger } from '@/utils/logger'
@@ -45,47 +44,9 @@ const attemptedEmail = ref('')
 const pendingVerificationLink = ref('')
 const pendingVerificationLinkExpiresAt = ref(0)
 
-// Motivation-Overlay Steuerung (ohne Tages-Limit: bei jedem Login anzeigen)
-const showMotivation = ref(false)
-let redirectTimer = null
-
 function getRedirectTarget() {
     const q = route.query?.redirect
     return typeof q === 'string' && q.startsWith('/') ? q : '/dashboard'
-}
-
-function goNow() {
-    const target = getRedirectTarget()
-    logger.debug('[WelcomePage] Redirecting now to:', target, 'current route before:', router.currentRoute?.value?.fullPath)
-    router.replace(target)
-        .then(() => {
-            logger.debug('[WelcomePage] Redirect completed via goNow. Current route:', router.currentRoute?.value?.fullPath)
-        })
-        .catch((err) => {
-            logger.error('[WelcomePage] Redirect via goNow failed:', err)
-        })
-}
-
-function startMotivationFlow() {
-    logger.debug('[WelcomePage] startMotivationFlow triggered (route:', router.currentRoute?.value?.fullPath, ')')
-    showMotivation.value = true
-    // Sicherheits-Reset, falls bereits ein Timer existiert
-    if (redirectTimer) {
-        clearTimeout(redirectTimer)
-        redirectTimer = null
-    }
-    redirectTimer = setTimeout(() => {
-        goNow()
-    }, 5000)
-}
-
-function skipNow() {
-    logger.debug('[WelcomePage] skipNow invoked')
-    if (redirectTimer) {
-        clearTimeout(redirectTimer)
-        redirectTimer = null
-    }
-    goNow()
 }
 
 function syncStoredVerificationLink() {
@@ -170,20 +131,6 @@ async function handleOpenVerificationLink() {
     verificationMessage.value = opened
         ? 'Verifizierungslink wurde im Browser geöffnet.'
         : 'Link konnte nicht automatisch geöffnet werden. Bitte kopiere ihn in deinen Browser.'
-}
-
-onBeforeUnmount(() => {
-    if (redirectTimer) {
-        clearTimeout(redirectTimer)
-        redirectTimer = null
-    }
-})
-
-function maybeProceed() {
-    if (!isSignedIn.value) return
-    // Immer Motivation anzeigen
-    logger.debug('[WelcomePage] maybeProceed -> user is signed in, starting flow (route:', router.currentRoute?.value?.fullPath, ')')
-    startMotivationFlow()
 }
 
 onMounted(() => {
@@ -336,7 +283,6 @@ async function handleGoogleLogin() {
         // Wir triggern hier nur eine Navigation, wenn wirklich token vorhanden ist
         if (user && token) {
             const target = getRedirectTarget()
-            showMotivation.value = false
             try { document.activeElement?.blur() } catch {}
             await new Promise((res) => setTimeout(res, 0))
             logger.debug('[WelcomePage] Navigating after confirmed token to:', target)
@@ -370,7 +316,6 @@ async function handleAppleLogin() {
         const user = getCurrentUser()
         if (user && token) {
             const target = getRedirectTarget()
-            showMotivation.value = false
             try { document.activeElement?.blur() } catch {}
             await new Promise((res) => setTimeout(res, 0))
             logger.debug('[WelcomePage] Navigating after confirmed token to:', target)
@@ -387,7 +332,6 @@ async function handleAppleLogin() {
     }
 }
 
-// Deaktiviere Motivation-Overlay im nativen Flow; Navigation erfolgt direkt im Login-Handler
 watch(isSignedIn, async (loggedIn) => {
     logger.debug('[WelcomePage] watch isSignedIn ->', loggedIn, 'route:', router.currentRoute?.value?.fullPath)
     // If an auth action is in progress (signup/login), avoid auto-navigation
@@ -401,14 +345,12 @@ watch(isSignedIn, async (loggedIn) => {
         return
     }
     if (!loggedIn) {
-        showMotivation.value = false
         return
     }
     // Nur navigieren, wenn auch wirklich ein Token verfügbar ist
     const token = await getIdToken().catch(() => null)
     if (token) {
         const target = getRedirectTarget()
-        showMotivation.value = false
         try { document.activeElement?.blur() } catch {}
         await new Promise((res) => setTimeout(res, 0))
         logger.debug('[WelcomePage] Auth confirmed via watcher; navigating to:', target)
@@ -528,17 +470,9 @@ watch(() => route.query?.emailVerified, (val) => {
             </div>
         </div>
 
-        <!-- Eingeloggt: Motivation-Overlay -->
+        <!-- Eingeloggt -->
         <div v-else>
-            <div v-if="showMotivation" class="motivation-overlay">
-                <div class="motivation-card">
-                    <MotivationWidget />
-                    <button class="skip-btn" @click="skipNow">{{ t('welcome.skip') }}</button>
-                </div>
-            </div>
-
-            <!-- Fallback: kleiner Loader, während der Overlay-Start initialisiert -->
-            <div v-else class="loading-container">
+            <div class="loading-container">
                 <h2>{{ t('welcome.redirectingTitle') }}</h2>
                 <p>{{ t('welcome.redirectingMsg') }}</p>
                 <div class="spinner"></div>
@@ -811,42 +745,4 @@ watch(() => route.query?.emailVerified, (val) => {
         h2 { font-size: 2.2rem; }
     }
 
-        /* Motivation Overlay */
-        .motivation-overlay {
-            position: fixed;
-            inset: 0;
-            display: grid;
-            place-items: center;
-            background: color-mix(in oklab, var(--bg) 70%, transparent);
-            backdrop-filter: blur(6px);
-            z-index: 50;
-            padding: 16px;
-        }
-        .motivation-card {
-            width: min(620px, 100%);
-            border-radius: 16px;
-            padding: 16px;
-            background: color-mix(in oklab, var(--fg) 5%, transparent);
-            border: 1px solid var(--card-border);
-            box-shadow: 0 10px 30px color-mix(in oklab, #000 30%, transparent);
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            align-items: stretch;
-        }
-        .skip-btn {
-            align-self: center;
-            background: transparent;
-            color: var(--muted);
-            border: 1px solid color-mix(in oklab, var(--muted) 40%, transparent);
-            padding: 10px 16px;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all .2s ease;
-        }
-        .skip-btn:hover {
-            color: var(--fg);
-            border-color: var(--fg);
-            transform: translateY(-1px);
-        }
 </style>

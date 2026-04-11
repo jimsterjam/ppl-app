@@ -24,7 +24,7 @@
       </template>
     </HeaderBar>
 
-    <main class="dashboard-content">
+    <main class="dashboard-content" :class="{ 'has-draft': hasDraft }">
       <section class="hero">
         <div>
           <h2 class="hero-title">Bereit für dein Training?</h2>
@@ -36,32 +36,75 @@
         <div v-if="!showStartOptions" class="quick-grid">
           <WorkoutCard
             label="Push"
-            :active="lastWorkoutType === 'push'"
             :info-label="$t('dashboard.workoutTypeInfo')"
             @click="openStartMode('push')"
             @info="openWorkoutInfo('push')"
           />
           <WorkoutCard
             label="Pull"
-            :active="lastWorkoutType === 'pull'"
             :info-label="$t('dashboard.workoutTypeInfo')"
             @click="openStartMode('pull')"
             @info="openWorkoutInfo('pull')"
           />
           <WorkoutCard
             label="Legs"
-            :active="lastWorkoutType === 'legs'"
             :info-label="$t('dashboard.workoutTypeInfo')"
             @click="openStartMode('legs')"
             @info="openWorkoutInfo('legs')"
           />
           <WorkoutCard
             :label="$t('dashboard.fullBodyLabel')"
-            :active="lastWorkoutType === 'fullbody'"
             :info-label="$t('dashboard.workoutTypeInfo')"
             @click="openStartMode('fullbody')"
             @info="openWorkoutInfo('fullbody')"
           />
+          <button class="quick-fav-shortcut" type="button" @click="openAllFavorites">
+            ★ {{ $t('dashboard.allFavorites') }}
+          </button>
+          <button class="quick-timer-btn" type="button" @click="showTimerConfig = true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true" style="vertical-align:-2px;margin-right:5px"><circle cx="12" cy="13" r="8"/><polyline points="12 9 12 13 15 13"/><path d="M9 2h6M12 2v3"/></svg>
+            Timer
+          </button>
+          <WorkoutTimerConfig v-if="showTimerConfig" @close="showTimerConfig = false" />
+        </div>
+
+        <div v-else-if="showAllFavoritesPanel" class="quick-mode-panel">
+          <div class="quick-mode-head">
+            <strong>★ {{ $t('dashboard.allFavorites') }}</strong>
+            <button class="cta-inline" type="button" @click="closeAllFavoritesPanel">{{ $t('common.back') }}</button>
+          </div>
+          <p v-if="favoriteInfoText" class="quick-mode-info">{{ favoriteInfoText }}</p>
+          <div class="favorite-list">
+            <div v-if="!allFavoriteWorkouts.length" class="favorite-empty">
+              {{ $t('dashboard.allFavoritesEmpty') }}
+            </div>
+            <div v-for="favorite in allFavoriteWorkouts" :key="favorite.id" class="favorite-item">
+              <div class="favorite-top">
+                <div class="favorite-name">
+                  {{ favorite.name }}
+                  <span class="fav-type-badge">{{ favorite.type }}</span>
+                </div>
+                <div class="favorite-date">{{ formatFavoriteDate(favorite.updatedAt || favorite.createdAt) }}</div>
+              </div>
+              <div v-if="renamingFavoriteId === favorite.id" class="favorite-rename-row">
+                <input
+                  v-model="favoriteRenameInput"
+                  class="favorite-rename-input"
+                  type="text"
+                  maxlength="40"
+                  :placeholder="$t('dashboard.favoriteNamePlaceholder')"
+                />
+                <button class="cta-inline" type="button" @click="confirmRenameFavorite(favorite)">{{ $t('common.save') }}</button>
+                <button class="cta-inline" type="button" @click="cancelRenameFavorite">{{ $t('common.cancel') }}</button>
+              </div>
+              <div v-else class="favorite-actions">
+                <button class="cta-inline" type="button" @click="startFavoriteWorkout(favorite)">{{ $t('dashboard.favoriteStart') }}</button>
+                <button class="cta-inline" type="button" @click="adjustFavoriteWorkout(favorite)">{{ $t('dashboard.favoriteAdjust') }}</button>
+                <button class="cta-inline" type="button" @click="beginRenameFavorite(favorite)">{{ $t('dashboard.favoriteRename') }}</button>
+                <button class="cta-inline danger" type="button" @click="askRemoveFavorite(favorite)">{{ $t('dashboard.favoriteDelete') }}</button>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div v-else class="quick-mode-panel">
@@ -73,9 +116,6 @@
           <template v-if="!showFavoritesSelection">
             <button class="quick-mode-btn" type="button" @click="onManualSelected">
               {{ $t('dashboard.startModeManual') }}
-            </button>
-            <button class="quick-mode-btn" type="button" @click="onGenerateSelected">
-              {{ $t('dashboard.startModeGenerate') }}
             </button>
             <button class="quick-mode-btn" type="button" @click="openFavoritesForType">
               {{ $t('dashboard.startModeFavorites') }}
@@ -116,7 +156,7 @@
                 <button class="cta-inline" type="button" @click="startFavoriteWorkout(favorite)">{{ $t('dashboard.favoriteStart') }}</button>
                 <button class="cta-inline" type="button" @click="adjustFavoriteWorkout(favorite)">{{ $t('dashboard.favoriteAdjust') }}</button>
                 <button class="cta-inline" type="button" @click="beginRenameFavorite(favorite)">{{ $t('dashboard.favoriteRename') }}</button>
-                <button class="cta-inline danger" type="button" @click="removeFavorite(favorite)">{{ $t('dashboard.favoriteDelete') }}</button>
+                <button class="cta-inline danger" type="button" @click="askRemoveFavorite(favorite)">{{ $t('dashboard.favoriteDelete') }}</button>
               </div>
             </div>
           </div>
@@ -126,7 +166,7 @@
           <span>{{ $t('dashboard.draftAvailable') }}</span>
           <div class="draft-actions">
             <button class="cta-inline" type="button" @click="startWorkout(draftId)">Fortsetzen</button>
-            <button class="cta-inline danger" type="button" @click="discardDraft">{{ $t('dashboard.deleteDraft') }}</button>
+            <button class="cta-inline danger" type="button" @click="showDiscardDraftConfirm = true">{{ $t('dashboard.deleteDraft') }}</button>
           </div>
         </div>
       </section>
@@ -150,234 +190,27 @@
     />
 
     <AppModal
-      v-model="showQuickIntroModal"
-      modal-class="quick-cta-modal"
-      :title="$t('dashboard.quickGenIntroTitle')"
-      :message="$t('dashboard.quickGenIntroText')"
-      :cancel-text="$t('dashboard.quickGenLearnPro')"
-      :confirm-text="$t('dashboard.quickGenGenerateNow')"
-      type="info"
-      @cancel="openUpgrade"
-      @confirm="onQuickIntroConfirmed"
-    />
-
-    <AppModal
-      v-model="showQuickLimitModal"
-      modal-class="quick-cta-modal"
-      :title="$t('dashboard.quickGenLimitTitle')"
-      :message="quickLimitText"
-      :cancel-text="$t('dashboard.quickGenLearnPro')"
-      :confirm-text="$t('common.close')"
-      type="warning"
-      @cancel="openUpgrade"
-    />
-
-    <AppModal
-      v-model="showQuickLastHintModal"
-      modal-class="quick-cta-modal"
-      :title="$t('dashboard.quickGenLastHintTitle')"
-      :message="quickLastHintText"
-      :cancel-text="$t('dashboard.quickGenLearnPro')"
-      :confirm-text="$t('dashboard.quickGenContinueFree')"
-      type="warning"
-      @cancel="openUpgrade"
-      @confirm="showQuickFormModal = true"
-    />
-
-    <AppModal
-      v-model="showQuickFormModal"
-      modal-class="quick-cta-modal"
-      :title="$t('dashboard.quickGenFormTitle')"
-      :confirm-text="isGeneratingQuickWorkout ? $t('dashboard.quickGenGenerating') : $t('dashboard.quickGenGenerateNow')"
+      v-model="showFavoriteDeleteConfirm"
+      :title="$t('dashboard.favoriteDeleteConfirmTitle')"
+      :message="$t('dashboard.favoriteDeleteConfirmMsg')"
+      :confirm-text="$t('dashboard.favoriteDelete')"
       :cancel-text="$t('common.cancel')"
-      :show-cancel="!isGeneratingQuickWorkout"
-      :persistent="isGeneratingQuickWorkout"
-      :close-on-confirm="false"
-      type="info"
-      @confirm="generateQuickWorkout"
-    >
-      <div class="quick-form-grid">
-        <section class="quick-form-section quick-form-field--full">
-          <h4>Basics</h4>
-          <div class="quick-form-subgrid">
-            <label class="quick-form-field">
-              <span>{{ $t('dashboard.quickGenDuration') }}</span>
-              <select v-model.number="quickGeneratorForm.durationMinutes">
-                <option :value="30">30 min</option>
-                <option :value="45">45 min</option>
-                <option :value="60">60 min</option>
-                <option :value="75">75 min</option>
-              </select>
-            </label>
-
-            <label class="quick-form-field">
-              <span>{{ $t('dashboard.quickGenGoal') }}</span>
-              <select v-model="quickGeneratorForm.goal">
-                <option value="muscle_building">{{ $t('dashboard.quickGenGoalMuscle') }}</option>
-                <option value="strength">{{ $t('dashboard.quickGenGoalStrength') }}</option>
-              </select>
-            </label>
-
-            <label class="quick-form-field">
-              <span>{{ $t('dashboard.quickGenLevel') }}</span>
-              <select v-model="quickGeneratorForm.level">
-                <option value="beginner">{{ $t('dashboard.quickGenLevelBeginner') }}</option>
-                <option value="intermediate">{{ $t('dashboard.quickGenLevelIntermediate') }}</option>
-                <option value="advanced">{{ $t('dashboard.quickGenLevelAdvanced') }}</option>
-              </select>
-            </label>
-
-            <label class="quick-form-field">
-              <span>{{ $t('dashboard.quickGenFrequency') }}</span>
-              <select v-model.number="quickGeneratorForm.trainingFrequencyPerWeek">
-                <option :value="2">2x / Woche</option>
-                <option :value="3">3x / Woche</option>
-                <option :value="4">4x / Woche</option>
-                <option :value="5">5x / Woche</option>
-                <option :value="6">6x / Woche</option>
-              </select>
-            </label>
-
-            <label class="quick-form-field">
-              <span>{{ $t('dashboard.quickGenGender') }}</span>
-              <select v-model="quickGeneratorForm.gender">
-                <option value="male">{{ $t('dashboard.quickGenGenderMale') }}</option>
-                <option value="female">{{ $t('dashboard.quickGenGenderFemale') }}</option>
-                <option value="diverse">{{ $t('dashboard.quickGenGenderDiverse') }}</option>
-              </select>
-            </label>
-
-            <label class="quick-form-field">
-              <span>{{ $t('dashboard.quickGenBodyweight') }}</span>
-              <input v-model.number="quickGeneratorForm.bodyweightKg" type="number" min="35" max="250" step="1" />
-            </label>
-          </div>
-        </section>
-
-        <section class="quick-form-section quick-form-field--full">
-          <h4>Equipment</h4>
-          <div class="quick-form-subgrid">
-            <label class="quick-form-field">
-              <span>{{ $t('dashboard.quickGenEquipment') }}</span>
-              <select v-model="quickGeneratorForm.equipmentMode">
-                <option value="gym_only">{{ $t('dashboard.quickGenEquipmentGymOnly') }}</option>
-                <option value="gym_plus_bodyweight">{{ $t('dashboard.quickGenEquipmentBodyweight') }}</option>
-                <option value="bodyweight_only">{{ $t('dashboard.quickGenEquipmentBodyweightOnly') }}</option>
-              </select>
-            </label>
-          </div>
-
-          <div class="quick-form-field quick-form-field--full">
-            <span>{{ $t('dashboard.quickGenEquipmentAvailable') }}</span>
-            <div class="quick-form-check-grid">
-              <label class="quick-form-check">
-                <input v-model="quickGeneratorForm.equipmentAvailability" type="checkbox" value="barbell" :disabled="quickGeneratorForm.equipmentMode === 'bodyweight_only'" />
-                <span>{{ $t('dashboard.quickGenEquipBarbell') }}</span>
-              </label>
-              <label class="quick-form-check">
-                <input v-model="quickGeneratorForm.equipmentAvailability" type="checkbox" value="dumbbells" :disabled="quickGeneratorForm.equipmentMode === 'bodyweight_only'" />
-                <span>{{ $t('dashboard.quickGenEquipDumbbells') }}</span>
-              </label>
-              <label class="quick-form-check">
-                <input v-model="quickGeneratorForm.equipmentAvailability" type="checkbox" value="machines" :disabled="quickGeneratorForm.equipmentMode === 'bodyweight_only'" />
-                <span>{{ $t('dashboard.quickGenEquipMachines') }}</span>
-              </label>
-              <label class="quick-form-check">
-                <input v-model="quickGeneratorForm.equipmentAvailability" type="checkbox" value="cable_station" :disabled="quickGeneratorForm.equipmentMode === 'bodyweight_only'" />
-                <span>{{ $t('dashboard.quickGenEquipCable') }}</span>
-              </label>
-              <label class="quick-form-check">
-                <input v-model="quickGeneratorForm.equipmentAvailability" type="checkbox" value="pull_up_bar" :disabled="quickGeneratorForm.equipmentMode === 'bodyweight_only'" />
-                <span>{{ $t('dashboard.quickGenEquipPullupBar') }}</span>
-              </label>
-            </div>
-            <p v-if="quickGeneratorForm.equipmentMode === 'bodyweight_only'" class="quick-form-inline-note">
-              Nur Bodyweight aktiviert.
-            </p>
-          </div>
-        </section>
-
-        <section class="quick-form-section quick-form-field--full">
-          <h4>Leistungswerte</h4>
-          <div class="quick-form-subgrid">
-            <label class="quick-form-field">
-              <span>{{ $t('dashboard.quickGenMaxPullups') }}</span>
-              <input v-model.number="quickGeneratorForm.maxStrictPullups" type="number" min="0" max="50" step="1" />
-            </label>
-
-            <label class="quick-form-field">
-              <span>{{ $t('dashboard.quickGenMaxDips') }}</span>
-              <input v-model.number="quickGeneratorForm.maxStrictDips" type="number" min="0" max="50" step="1" />
-            </label>
-
-            <label class="quick-form-field">
-              <span>{{ $t('dashboard.quickGenMaxPushups') }}</span>
-              <input v-model.number="quickGeneratorForm.maxStrictPushups" type="number" min="0" max="100" step="1" />
-            </label>
-          </div>
-
-          <button class="quick-form-advanced-toggle" type="button" @click="showQuickAdvancedMetrics = !showQuickAdvancedMetrics">
-            {{ showQuickAdvancedMetrics ? 'Erweiterte Kraftwerte ausblenden' : 'Erweiterte Kraftwerte (optional)' }}
-          </button>
-
-          <div v-if="showQuickAdvancedMetrics" class="quick-form-subgrid quick-form-advanced-grid">
-            <label class="quick-form-field">
-              <span>{{ $t('dashboard.quickGenSquat1RM') }}</span>
-              <input v-model.number="quickGeneratorForm.squat1RM" type="number" min="0" max="500" step="1" />
-            </label>
-
-            <label class="quick-form-field">
-              <span>{{ $t('dashboard.quickGenBench1RM') }}</span>
-              <input v-model.number="quickGeneratorForm.bench1RM" type="number" min="0" max="400" step="1" />
-            </label>
-
-            <label class="quick-form-field">
-              <span>{{ $t('dashboard.quickGenDeadlift1RM') }}</span>
-              <input v-model.number="quickGeneratorForm.deadlift1RM" type="number" min="0" max="500" step="1" />
-            </label>
-
-            <label class="quick-form-field">
-              <span>{{ $t('dashboard.quickGenSquat5RM') }}</span>
-              <input v-model.number="quickGeneratorForm.squat5RM" type="number" min="0" max="450" step="1" />
-            </label>
-
-            <label class="quick-form-field">
-              <span>{{ $t('dashboard.quickGenBench5RM') }}</span>
-              <input v-model.number="quickGeneratorForm.bench5RM" type="number" min="0" max="350" step="1" />
-            </label>
-
-            <label class="quick-form-field">
-              <span>{{ $t('dashboard.quickGenDeadlift5RM') }}</span>
-              <input v-model.number="quickGeneratorForm.deadlift5RM" type="number" min="0" max="450" step="1" />
-            </label>
-          </div>
-        </section>
-
-        <section class="quick-form-section quick-form-field--full">
-          <h4>Hinweise</h4>
-          <div class="quick-form-subgrid">
-            <label class="quick-form-field quick-form-field--full">
-              <span>{{ $t('dashboard.quickGenRestrictions') }}</span>
-              <input v-model="quickGeneratorForm.restrictions" type="text" maxlength="180" :placeholder="$t('dashboard.quickGenRestrictionsPlaceholder')" />
-            </label>
-
-            <label class="quick-form-field quick-form-field--full">
-              <span>{{ $t('dashboard.quickGenInjuries') }}</span>
-              <input v-model="quickGeneratorForm.injuries" type="text" maxlength="180" :placeholder="$t('dashboard.quickGenInjuriesPlaceholder')" />
-            </label>
-          </div>
-        </section>
-      </div>
-      <p class="quick-form-hint">{{ $t('dashboard.quickGenRemaining', { count: quickGenerationsRemainingLabel }) }}</p>
-      <p v-if="quickFormError" class="quick-form-error">{{ quickFormError }}</p>
-    </AppModal>
-
-    <UpgradeModal
-      v-model:show="showUpgradeModal"
-      limit-type="general"
-      @close="showUpgradeModal = false"
-      @continue-free="showUpgradeModal = false"
+      type="warning"
+      @confirm="confirmRemoveFavorite"
     />
+
+    <AppModal
+      v-model="showDiscardDraftConfirm"
+      :title="$t('dashboard.discardDraftConfirmTitle')"
+      :message="$t('dashboard.discardDraftConfirmMsg')"
+      :confirm-text="$t('dashboard.deleteDraft')"
+      :cancel-text="$t('common.cancel')"
+      type="warning"
+      @confirm="discardDraft"
+    />
+
+    <!-- Quick Generator entfernt (AI-Feature, für spätere Reaktivierung erhalten) -->
+
   </div>
 </template>
 
@@ -389,8 +222,8 @@ import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { useUserStore } from "../stores/userStore";
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useAuthStore } from '@/stores/authStore'
-import { useSubscriptionStore } from '@/stores/subscriptionStore'
-import { isOnline, deleteWorkoutOffline, getWorkoutOffline } from '@/utils/offlineStorage'
+import { isOnline, deleteWorkoutOffline, getWorkoutOffline, saveWorkoutOffline } from '@/utils/offlineStorage'
+import { isDraftDeleted } from '@/utils/draftTombstones'
 import { http } from '@/api/http'
 import { loadDefaultExercises, getCachedDefaultExercises } from '@/utils/defaultExercisesLoader'
 import { buildWorkoutBuilderRoute, normalizeBuilderWorkoutType, QUICK_PREFILL_KEY, saveWorkoutBuilderPrefill } from '@/utils/workoutBuilderFlow'
@@ -406,12 +239,11 @@ import {
 import HeaderBar from "../components/HeaderBar.vue";
 import WorkoutCard from "../components/WorkoutCard.vue";
 import AppModal from "../components/AppModal.vue";
-import UpgradeModal from '@/components/UpgradeModal.vue'
+import WorkoutTimerConfig from '@/components/timer/WorkoutTimerConfig.vue'
 import { logger } from '@/utils/logger'
 
 const store = useUserStore()
 const settings = useSettingsStore()
-const subscriptionStore = useSubscriptionStore()
 const { t: $t, locale } = useI18n()
 const router = useRouter()
 const { getIdToken, onAuthStateChanged, getCurrentUser } = useFirebaseAuth()
@@ -422,79 +254,21 @@ const isSignedIn = ref(false)
 const selectedWorkoutType = ref('push')
 const isOffline = ref(!isOnline())
 const workoutCreated = ref(false)
+const showFavoriteDeleteConfirm = ref(false)
+const pendingFavoriteToDelete = ref(null)
+const showDiscardDraftConfirm = ref(false)
+const showTimerConfig = ref(false)
 const detailDraft = ref(null)
 const showInfoModal = ref(false)
 const infoMessage = ref('')
 const draftSourceLogged = ref(false)
-const showQuickIntroModal = ref(false)
-const showQuickFormModal = ref(false)
-const showQuickLimitModal = ref(false)
-const showQuickLastHintModal = ref(false)
-const showUpgradeModal = ref(false)
 const pendingWorkoutType = ref('push')
 const startFlowStep = ref('idle')
 const favoriteWorkouts = ref([])
+const allFavoriteWorkouts = ref([])
 const favoriteInfoText = ref('')
 const renamingFavoriteId = ref(null)
 const favoriteRenameInput = ref('')
-const isGeneratingQuickWorkout = ref(false)
-const quickFormError = ref('')
-const showQuickAdvancedMetrics = ref(false)
-const quickGeneratorForm = ref({
-  durationMinutes: 45,
-  goal: 'muscle_building',
-  gender: 'male',
-  bodyweightKg: 80,
-  level: 'beginner',
-  trainingFrequencyPerWeek: 3,
-  equipmentMode: 'gym_plus_bodyweight',
-  equipmentAvailability: ['barbell', 'dumbbells', 'machines', 'cable_station', 'pull_up_bar'],
-  maxStrictPullups: 5,
-  maxStrictDips: 8,
-  maxStrictPushups: 20,
-  squat1RM: null,
-  bench1RM: null,
-  deadlift1RM: null,
-  squat5RM: null,
-  bench5RM: null,
-  deadlift5RM: null,
-  restrictions: '',
-  injuries: ''
-})
-
-function normalizeQuickEquipmentMode(mode) {
-  const value = String(mode || '').toLowerCase()
-  if (value === 'gym_only' || value === 'gym_plus_bodyweight' || value === 'bodyweight_only') return value
-  return 'gym_plus_bodyweight'
-}
-
-function normalizeEquipmentAvailabilitySelection(list) {
-  const allowed = ['barbell', 'dumbbells', 'machines', 'cable_station', 'pull_up_bar', 'none']
-  if (!Array.isArray(list)) return []
-  const normalized = [...new Set(list
-    .map((entry) => String(entry || '').toLowerCase().trim())
-    .filter((entry) => allowed.includes(entry)))]
-  return normalized
-}
-
-function hasQuickGeneratorRequiredInputs() {
-  const form = quickGeneratorForm.value
-  if (!form) return false
-  if (!Number(form.durationMinutes)) return false
-  if (!form.goal || !form.level || !form.equipmentMode) return false
-  if (!Array.isArray(form.equipmentAvailability) || form.equipmentAvailability.length === 0) return false
-  if (form.maxStrictPullups === null || form.maxStrictPullups === undefined || form.maxStrictPullups === '') return false
-  if (form.maxStrictDips === null || form.maxStrictDips === undefined || form.maxStrictDips === '') return false
-  if (form.maxStrictPushups === null || form.maxStrictPushups === undefined || form.maxStrictPushups === '') return false
-  return true
-}
-
-function normalizeOptionalMetricInput(value) {
-  if (value === null || value === undefined || value === '') return null
-  const parsed = Number(value)
-  if (!Number.isFinite(parsed) || parsed < 0) return null
-  return parsed
-}
 
 
 function resolveDetailDraftTargetId() {
@@ -520,31 +294,9 @@ const draftId = computed(() => {
   const storeDraft = store.workouts.find(isOpenDraftWorkout)?._id
   return storeDraft || resolveDetailDraftTargetId()
 })
-const quickGenerationsRemainingLabel = computed(() => {
-  const remaining = subscriptionStore.quickGenerationsRemaining
-  return remaining === Infinity ? '∞' : String(remaining)
-})
-const quickGenerationsRemainingCount = computed(() => {
-  const remaining = subscriptionStore.quickGenerationsRemaining
-  return remaining === Infinity ? Number.MAX_SAFE_INTEGER : Number(remaining)
-})
-const quickResetDateLabel = computed(() => {
-  const dateValue = subscriptionStore.quickGeneratorResetDate
-  const date = dateValue instanceof Date ? dateValue : new Date(dateValue)
-  try {
-    return date.toLocaleDateString(String(locale.value || '').startsWith('en') ? 'en-US' : 'de-DE', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    })
-  } catch {
-    return date.toLocaleDateString('de-DE')
-  }
-})
-const quickLimitText = computed(() => $t('dashboard.quickGenLimitText', { date: quickResetDateLabel.value }))
-const quickLastHintText = computed(() => $t('dashboard.quickGenLastHintText', { date: quickResetDateLabel.value }))
 const showStartOptions = computed(() => startFlowStep.value !== 'idle')
 const showFavoritesSelection = computed(() => startFlowStep.value === 'favorites')
+const showAllFavoritesPanel = computed(() => startFlowStep.value === 'all-favorites')
 const pendingWorkoutTypeLabel = computed(() => {
   const type = normalizeBuilderWorkoutType(pendingWorkoutType.value)
   if (type === 'fullbody') return $t('dashboard.fullBodyLabel')
@@ -561,6 +313,14 @@ function loadFavoriteWorkoutsForCurrentType() {
   favoriteWorkouts.value = getFavoritesByType(userId, type)
 }
 
+function loadAllFavoriteWorkouts() {
+  const userId = getCurrentFavoritesUserId()
+  const types = ['push', 'pull', 'legs', 'fullbody']
+  const all = types.flatMap(type => getFavoritesByType(userId, type))
+  all.sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
+  allFavoriteWorkouts.value = all
+}
+
 function formatFavoriteDate(value) {
   const date = value ? new Date(value) : null
   if (!date || Number.isNaN(date.getTime())) return ''
@@ -569,30 +329,6 @@ function formatFavoriteDate(value) {
     month: '2-digit',
     year: 'numeric'
   })
-}
-
-const DRAFT_TOMBSTONES_KEY = 'deleted_draft_ids_v1'
-const DRAFT_TOMBSTONE_TTL_MS = 6 * 60 * 60 * 1000
-function readDraftTombstones() {
-  try {
-    const raw = localStorage.getItem(DRAFT_TOMBSTONES_KEY)
-    if (!raw) return {}
-    const parsed = JSON.parse(raw)
-    return parsed && typeof parsed === 'object' ? parsed : {}
-  } catch {
-    return {}
-  }
-}
-function isDraftDeleted(id) {
-  if (!id) return false
-  const map = readDraftTombstones()
-  const entry = map[String(id)]
-  if (!entry) return false
-  const timestamp = Number(typeof entry === 'object' ? (entry?.timestamp || entry?.deletedAt || 0) : entry)
-  if (Number.isFinite(timestamp) && timestamp > 0) {
-    return (Date.now() - timestamp) <= DRAFT_TOMBSTONE_TTL_MS
-  }
-  return Boolean(entry)
 }
 
 function logDraftSourceOnce() {
@@ -657,6 +393,39 @@ const avatarInitials = computed(() => {
 
 function getDetailDraftKey() {
   return 'workout_detail_draft'
+}
+
+function buildFavoriteDetailDraft(favorite) {
+  const fav = favorite?.workout || {}
+  const type = normalizeBuilderWorkoutType(favorite?.type || pendingWorkoutType.value)
+  const draftId = `draft-favorite-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  const userId = String(getCurrentUser?.()?.uid || authStore.user?.id || authStore.user?.uid || 'guest')
+  const exercises = (Array.isArray(fav.exercises) ? fav.exercises : []).map((exercise = {}) => {
+    const fallbackSetDetails = [{ reps: Number(exercise?.reps) || 10, weight: Number(exercise?.weight) || 0 }]
+    const setDetails = Array.isArray(exercise?.setDetails) && exercise.setDetails.length > 0
+      ? exercise.setDetails.map((set) => ({ reps: Number(set?.reps) || 0, weight: Number(set?.weight) || 0 }))
+      : fallbackSetDetails
+    return {
+      ...exercise,
+      exerciseId: exercise?.exerciseId || exercise?._id || null,
+      setDetails,
+      reps: Number(setDetails[0]?.reps) || 0,
+      weight: Number(setDetails[0]?.weight) || 0
+    }
+  })
+
+  return {
+    _id: draftId,
+    userId,
+    name: String(favorite?.name || fav.workoutName || 'Favorite Workout'),
+    type,
+    date: new Date().toISOString(),
+    completed: false,
+    _isDraft: true,
+    isDraft: true,
+    notes: typeof fav.notes === 'string' ? fav.notes : '',
+    exercises
+  }
 }
 
 function getLegacyDetailDraftKeys() {
@@ -872,13 +641,6 @@ function onManualSelected() {
   startQuick(pendingWorkoutType.value)
 }
 
-function onGenerateSelected() {
-  closeStartModePanel()
-  nextTick(() => {
-    showQuickIntroModal.value = true
-  })
-}
-
 function openFavoritesForType() {
   startFlowStep.value = 'favorites'
   renamingFavoriteId.value = null
@@ -890,6 +652,21 @@ function openFavoritesForType() {
 
 function closeFavoritesSelection() {
   startFlowStep.value = 'mode'
+  favoriteInfoText.value = ''
+  renamingFavoriteId.value = null
+  favoriteRenameInput.value = ''
+}
+
+function openAllFavorites() {
+  startFlowStep.value = 'all-favorites'
+  renamingFavoriteId.value = null
+  favoriteRenameInput.value = ''
+  favoriteInfoText.value = ''
+  loadAllFavoriteWorkouts()
+}
+
+function closeAllFavoritesPanel() {
+  startFlowStep.value = 'idle'
   favoriteInfoText.value = ''
   renamingFavoriteId.value = null
   favoriteRenameInput.value = ''
@@ -911,7 +688,31 @@ function openFavoriteInBuilder(favorite, { autoStart = false } = {}) {
   }
   saveWorkoutBuilderPrefill(prefill)
   closeStartModePanel()
-  router.push(buildWorkoutBuilderRoute(type, { quick: true, favoriteStart: autoStart }))
+  router.push(buildWorkoutBuilderRoute(type, { quick: true, favoriteStart: autoStart, favoriteAdjust: !autoStart }))
+}
+
+async function openFavoriteAdjustInDetail(favorite) {
+  const draft = buildFavoriteDetailDraft(favorite)
+  await saveWorkoutOffline(draft)
+  try {
+    sessionStorage.setItem(getDetailDraftKey(), JSON.stringify({ timestamp: Date.now(), workout: draft }))
+  } catch {}
+
+  const type = normalizeBuilderWorkoutType(favorite?.type || pendingWorkoutType.value)
+  const query = {
+    favoriteSource: '1',
+    favoriteAdjust: '1',
+    favoriteType: String(type)
+  }
+  if (favorite?.id) query.favoriteId = String(favorite.id)
+  if (favorite?.name) query.favoriteName = String(favorite.name)
+
+  closeStartModePanel()
+  await router.push({
+    name: 'workout-detail',
+    params: { id: draft._id },
+    query
+  })
 }
 
 function startFavoriteWorkout(favorite) {
@@ -922,9 +723,9 @@ function startFavoriteWorkout(favorite) {
   }
 }
 
-function adjustFavoriteWorkout(favorite) {
+async function adjustFavoriteWorkout(favorite) {
   try {
-    openFavoriteInBuilder(favorite, { autoStart: false })
+    await openFavoriteAdjustInDetail(favorite)
   } catch {
     favoriteInfoText.value = $t('dashboard.favoriteAdjustFailed')
   }
@@ -959,7 +760,18 @@ function confirmRenameFavorite(favorite) {
   renamingFavoriteId.value = null
   favoriteRenameInput.value = ''
   favoriteInfoText.value = ''
-  loadFavoriteWorkoutsForCurrentType()
+  if (startFlowStep.value === 'all-favorites') loadAllFavoriteWorkouts()
+  else loadFavoriteWorkoutsForCurrentType()
+}
+
+function askRemoveFavorite(favorite) {
+  pendingFavoriteToDelete.value = favorite
+  showFavoriteDeleteConfirm.value = true
+}
+
+function confirmRemoveFavorite() {
+  removeFavorite(pendingFavoriteToDelete.value)
+  pendingFavoriteToDelete.value = null
 }
 
 function removeFavorite(favorite) {
@@ -973,250 +785,11 @@ function removeFavorite(favorite) {
     return
   }
   favoriteInfoText.value = ''
-  loadFavoriteWorkoutsForCurrentType()
+  if (startFlowStep.value === 'all-favorites') loadAllFavoriteWorkouts()
+  else loadFavoriteWorkoutsForCurrentType()
 }
 
-function onQuickIntroConfirmed() {
-  openQuickGeneratorForm()
-}
-
-function openUpgrade() {
-  showUpgradeModal.value = true
-}
-
-function openQuickGeneratorForm() {
-  quickFormError.value = ''
-  showQuickAdvancedMetrics.value = false
-  if (!subscriptionStore.canUseQuickGenerator) {
-    showQuickLimitModal.value = true
-    return
-  }
-  if (subscriptionStore.subscription?.plan === 'free' && quickGenerationsRemainingCount.value === 1) {
-    showQuickLastHintModal.value = true
-    return
-  }
-  showQuickFormModal.value = true
-}
-
-watch(() => quickGeneratorForm.value.equipmentMode, (mode) => {
-  if (mode === 'bodyweight_only') {
-    quickGeneratorForm.value.equipmentAvailability = ['none']
-    return
-  }
-  const next = normalizeEquipmentAvailabilitySelection(quickGeneratorForm.value.equipmentAvailability)
-  const withoutNone = next.filter((item) => item !== 'none')
-  quickGeneratorForm.value.equipmentAvailability = withoutNone.length ? withoutNone : ['barbell', 'dumbbells', 'machines']
-})
-
-async function buildLocalQuickFallback(type, context) {
-  const requestedType = ['push', 'pull', 'legs', 'fullbody'].includes(String(type)) ? String(type) : 'fullbody'
-  const strength = context?.goal === 'strength'
-  const requestedCategory = requestedType === 'fullbody'
-    ? 'Full Body'
-    : requestedType.charAt(0).toUpperCase() + requestedType.slice(1)
-
-  let localPool = []
-  try {
-    const defaults = await loadDefaultExercises()
-    const byType = requestedType === 'fullbody'
-      ? defaults
-      : defaults.filter((exercise) => String(exercise?.category || '').toLowerCase() === requestedCategory.toLowerCase())
-
-    const equipmentMode = normalizeQuickEquipmentMode(context?.equipmentMode)
-    const byEquipment = equipmentMode === 'gym_only'
-      ? byType.filter((exercise) => String(exercise?.equipment || '').toLowerCase() !== 'körpergewicht')
-      : equipmentMode === 'bodyweight_only'
-        ? byType.filter((exercise) => String(exercise?.equipment || '').toLowerCase() === 'körpergewicht')
-        : byType
-
-    localPool = (byEquipment.length ? byEquipment : byType)
-      .filter((exercise) => typeof exercise?.name === 'string' && exercise.name.trim())
-      .slice(0, 8)
-      .map((exercise) => ({
-        name: exercise.name,
-        sets: strength ? 4 : 3,
-        reps: strength ? 6 : 10,
-        weight: 0,
-        rest: strength ? 120 : 90,
-        category: requestedType,
-        muscleGroup: exercise.muscleGroup || requestedType,
-        exerciseId: exercise._id || null,
-        _id: exercise._id || null
-      }))
-  } catch {
-    const cached = getCachedDefaultExercises()
-    const byType = requestedType === 'fullbody'
-      ? cached
-      : cached.filter((exercise) => String(exercise?.category || '').toLowerCase() === requestedCategory.toLowerCase())
-
-    const equipmentMode = normalizeQuickEquipmentMode(context?.equipmentMode)
-    const byEquipment = equipmentMode === 'gym_only'
-      ? byType.filter((exercise) => String(exercise?.equipment || '').toLowerCase() !== 'körpergewicht')
-      : equipmentMode === 'bodyweight_only'
-        ? byType.filter((exercise) => String(exercise?.equipment || '').toLowerCase() === 'körpergewicht')
-        : byType
-
-    localPool = (byEquipment.length ? byEquipment : byType)
-      .filter((exercise) => typeof exercise?.name === 'string' && exercise.name.trim())
-      .slice(0, 8)
-      .map((exercise) => ({
-        name: exercise.name,
-        sets: strength ? 4 : 3,
-        reps: strength ? 6 : 10,
-        weight: 0,
-        rest: strength ? 120 : 90,
-        category: requestedType,
-        muscleGroup: exercise.muscleGroup || requestedType,
-        exerciseId: exercise._id || null,
-        _id: exercise._id || null
-      }))
-  }
-
-  const list = localPool.slice(0, 5).map((exercise, index) => ({
-    ...exercise,
-    reps: strength ? Math.min(Number(exercise.reps) || 10, 8) : Number(exercise.reps) || 10,
-    sets: strength ? Math.max(Number(exercise.sets) || 3, 4) : Number(exercise.sets) || 3,
-    _id: exercise._id || `quick_local_${index}`,
-    category: requestedType,
-    muscleGroup: exercise.muscleGroup || requestedType,
-    setDetails: [{
-      reps: strength ? Math.min(Number(exercise.reps) || 10, 8) : Number(exercise.reps) || 10,
-      weight: Number(exercise.weight) || 0
-    }]
-  }))
-
-  return {
-    workoutName: `${requestedType === 'fullbody' ? 'Full Body' : requestedType.toUpperCase()} ${strength ? 'Strength' : 'Quick'} Session`,
-    type: requestedType,
-    exercises: list
-  }
-}
-
-async function generateQuickWorkout() {
-  if (isGeneratingQuickWorkout.value) return
-  isGeneratingQuickWorkout.value = true
-  try {
-    quickFormError.value = ''
-
-    if (!hasQuickGeneratorRequiredInputs()) {
-      quickFormError.value = $t('dashboard.quickGenMissingRequired')
-      return
-    }
-
-    const token = await getIdToken().catch(async () => {
-      const currentUser = getCurrentUser()
-      if (!currentUser?.getIdToken) return null
-      try {
-        return await currentUser.getIdToken(true)
-      } catch {
-        return null
-      }
-    })
-    if (!token) {
-      throw new Error('NO_AUTH_TOKEN')
-    }
-
-    const headers = {}
-    headers.Authorization = `Bearer ${token}`
-
-    const payload = {
-      durationMinutes: Number(quickGeneratorForm.value.durationMinutes) || 45,
-      goal: quickGeneratorForm.value.goal,
-      gender: quickGeneratorForm.value.gender,
-      bodyweightKg: Number(quickGeneratorForm.value.bodyweightKg) || 80,
-      level: quickGeneratorForm.value.level,
-      trainingFrequencyPerWeek: Number(quickGeneratorForm.value.trainingFrequencyPerWeek) || 3,
-      equipmentMode: normalizeQuickEquipmentMode(quickGeneratorForm.value.equipmentMode),
-      equipmentAvailability: normalizeEquipmentAvailabilitySelection(quickGeneratorForm.value.equipmentAvailability),
-      maxStrictPullups: Number(quickGeneratorForm.value.maxStrictPullups),
-      maxStrictDips: Number(quickGeneratorForm.value.maxStrictDips),
-      maxStrictPushups: Number(quickGeneratorForm.value.maxStrictPushups),
-      squat1RM: normalizeOptionalMetricInput(quickGeneratorForm.value.squat1RM),
-      bench1RM: normalizeOptionalMetricInput(quickGeneratorForm.value.bench1RM),
-      deadlift1RM: normalizeOptionalMetricInput(quickGeneratorForm.value.deadlift1RM),
-      squat5RM: normalizeOptionalMetricInput(quickGeneratorForm.value.squat5RM),
-      bench5RM: normalizeOptionalMetricInput(quickGeneratorForm.value.bench5RM),
-      deadlift5RM: normalizeOptionalMetricInput(quickGeneratorForm.value.deadlift5RM),
-      restrictions: String(quickGeneratorForm.value.restrictions || '').trim(),
-      injuries: String(quickGeneratorForm.value.injuries || '').trim(),
-      requestedType: pendingWorkoutType.value,
-      requireCompleteInput: true
-    }
-
-    // Add timeout to prevent hanging
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('API timeout after 20s')), 20000)
-    )
-    
-    const { data } = await Promise.race([
-      http.post('/workouts/quick-generator', payload, { headers }),
-      timeoutPromise
-    ])
-    const responseRequestedType = ['push', 'pull', 'legs', 'fullbody'].includes(String(data?.requestedType))
-      ? String(data?.requestedType)
-      : pendingWorkoutType.value || 'fullbody'
-    const exercises = Array.isArray(data?.exercises) ? data.exercises : []
-    const aiUsageMeta = data?.metadata?.aiUsage || null
-    if (aiUsageMeta) {
-      subscriptionStore.applyAiUsageSnapshot(aiUsageMeta)
-    }
-
-    const prefill = {
-      workoutName: data?.workoutName || 'Quick Workout',
-      type: responseRequestedType,
-      notes: typeof data?.notes === 'string' ? data.notes : '',
-      metadata: data?.metadata || {},
-      exercises: exercises.map((exercise, index) => ({
-        _id: exercise._id || `quick_${index}`,
-        exerciseId: exercise.exerciseId || exercise._id || null,
-        name: exercise.name,
-        category: exercise.category || responseRequestedType,
-        muscleGroup: exercise.muscleGroup || responseRequestedType,
-        setDetails: [{
-          reps: Number(exercise.reps) || 10,
-          weight: Number(exercise.weight) || 0
-        }],
-        sets: Number(exercise.sets) || 3,
-        reps: Number(exercise.reps) || 10,
-        weight: Number(exercise.weight) || 0,
-        rest: Number(exercise.rest) || 90
-      }))
-    }
-
-    try {
-      saveWorkoutBuilderPrefill(prefill)
-    } catch {}
-
-    if (!aiUsageMeta) {
-      subscriptionStore.trackQuickGeneration()
-    }
-    showQuickFormModal.value = false
-    router.push(buildWorkoutBuilderRoute(responseRequestedType, { quick: true }))
-  } catch (error) {
-    logger.error('Quick generator failed', error)
-    const status = Number(error?.response?.status || 0)
-    const message = String(error?.message || '').trim()
-    const isAuthError = message === 'NO_AUTH_TOKEN' || status === 401 || status === 403
-
-    if (isAuthError) {
-      quickFormError.value = $t('dashboard.quickGenAuthRequired')
-      return
-    }
-
-    const localFallback = await buildLocalQuickFallback(pendingWorkoutType.value, quickGeneratorForm.value)
-    try {
-      saveWorkoutBuilderPrefill(localFallback)
-    } catch {}
-
-    quickFormError.value = $t('dashboard.quickGenFallbackUsed')
-    infoMessage.value = $t('dashboard.quickGenFallbackUsed')
-    showInfoModal.value = true
-    showQuickFormModal.value = false
-    router.push(buildWorkoutBuilderRoute(pendingWorkoutType.value, { quick: true }))
-  } finally {
-    isGeneratingQuickWorkout.value = false
-  }
-}
+// Quick Generator entfernt (AI-Feature, für spätere Reaktivierung erhalten)
 
 function openWorkoutInfo(type) {
   if (type === 'push') infoMessage.value = $t('dashboard.pushInfo')
@@ -1251,7 +824,6 @@ onMounted(() => {
   window.addEventListener('online', onOnlineStatus)
   window.addEventListener('offline', onOfflineStatus)
   readDetailDraft()
-  subscriptionStore.checkSubscription()
 
   if (!isOnline() && authStore.isOfflineSessionValid) {
     user.value = authStore.user
@@ -1331,9 +903,15 @@ onActivated(async () => {
   flex-direction: column;
   gap: 12px;
   padding: 14px clamp(12px, 3vw, 32px);
-  padding-bottom: 0;
+  padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px));
   min-height: calc(100dvh - var(--header-height) - var(--safe-top) - 64px - var(--safe-bottom, 0px));
   font-family: "Sora", "Space Grotesk", "SF Pro Display", sans-serif;
+}
+
+.dashboard-content.has-draft {
+  gap: 8px;
+  padding-top: 10px;
+  padding-bottom: calc(78px + env(safe-area-inset-bottom, 0px));
 }
 
 .dashboard-avatar {
@@ -1392,6 +970,11 @@ onActivated(async () => {
   box-shadow: var(--shadow-soft);
 }
 
+.dashboard-content.has-draft .hero {
+  gap: 6px;
+  padding: 8px 10px;
+}
+
 .hero-title {
   margin: 6px 0 0;
   font-size: clamp(1.9rem, 3.6vw, 2.5rem);
@@ -1420,6 +1003,62 @@ onActivated(async () => {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+}
+
+.quick-grid :deep(.workout-card) {
+  aspect-ratio: 1.15 / 1;
+}
+
+.dashboard-content.has-draft .quick-grid :deep(.workout-card) {
+  aspect-ratio: 1.28 / 1;
+}
+
+.quick-fav-shortcut {
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line-strong));
+  border-radius: calc(var(--panel-radius) - 16px);
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-panel));
+  color: var(--fg-strong);
+  font-family: "Sora", "Space Grotesk", "SF Pro Display", sans-serif;
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: 0.05em;
+  padding: 20px 14px;
+  cursor: pointer;
+  text-align: center;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.quick-fav-shortcut:hover {
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-panel));
+  border-color: var(--accent);
+}
+
+.quick-fav-shortcut:active {
+  opacity: 0.8;
+}
+
+.quick-timer-btn {
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line-strong));
+  border-radius: calc(var(--panel-radius) - 16px);
+  background: color-mix(in srgb, var(--accent) 6%, var(--bg-panel));
+  color: var(--fg-strong);
+  font-family: "Sora", "Space Grotesk", "SF Pro Display", sans-serif;
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: 0.05em;
+  padding: 20px 14px;
+  cursor: pointer;
+  text-align: center;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.quick-timer-btn:hover {
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-panel));
+  border-color: var(--accent);
+}
+
+.quick-timer-btn:active {
+  opacity: 0.8;
 }
 
 .quick-mode-panel {
@@ -1452,6 +1091,11 @@ onActivated(async () => {
   min-height: 72px;
   text-align: left;
   cursor: pointer;
+}
+
+.dashboard-content.has-draft .quick-mode-btn {
+  padding: 14px 12px;
+  min-height: 56px;
 }
 
 .quick-mode-btn:hover {
@@ -1514,6 +1158,21 @@ onActivated(async () => {
   font-size: 0.75rem;
 }
 
+.fav-type-badge {
+  display: inline-block;
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line-strong));
+  color: color-mix(in srgb, var(--accent) 75%, var(--fg));
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  vertical-align: middle;
+  margin-left: 4px;
+}
+
 .favorite-actions {
   display: flex;
   align-items: center;
@@ -1549,6 +1208,13 @@ onActivated(async () => {
   background: var(--card-soft);
   font-size: 0.85rem;
   flex-wrap: wrap;
+  margin-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+}
+
+.dashboard-content.has-draft .draft-note {
+  position: sticky;
+  bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  z-index: 20;
 }
 
 .draft-actions {

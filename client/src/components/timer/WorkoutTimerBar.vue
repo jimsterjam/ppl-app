@@ -8,7 +8,7 @@
   >
     <span class="fullscreen-countdown-number">{{ fullscreenCountdownValue }}</span>
   </div>
-  <div class="timer-bar" :class="[timerStateClass, { expanded: isExpanded }]">
+  <div class="timer-bar" :class="[timerStateClass, { expanded: isExpanded, 'portrait-fullscreen': isExpanded && !isLandscape, 'landscape-fullscreen': isExpanded && isLandscape }]">
     <span class="timer-accent" aria-hidden="true" />
     <span v-if="timerStore.countdownOverlayNumber" 
           :key="pulseKey" 
@@ -56,18 +56,33 @@
       <span class="timer-progress-fill" :style="{ width: progressWidth }" />
     </div>
   </div>
+
+  <AppModal
+    v-model="showTimerConfirmModal"
+    :title="pendingTimerConfirmAction === 'close' ? t('timer.closeConfirmTitle') : t('timer.resetConfirmTitle')"
+    :message="pendingTimerConfirmAction === 'close' ? t('timer.closeConfirmMsg') : t('timer.resetConfirmMsg')"
+    :confirm-text="pendingTimerConfirmAction === 'close' ? t('timer.close') : t('timer.reset')"
+    :cancel-text="t('timer.pause')"
+    type="warning"
+    @confirm="confirmTimerAction"
+    @cancel="showTimerConfirmModal = false"
+  />
 </template>
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useTimerStore } from '@/stores/timerStore'
+import AppModal from '@/components/AppModal.vue'
 
 const { t } = useI18n()
 const timerStore = useTimerStore()
 
 const isExpanded = ref(false)
 const isLandscape = ref(false)
+const showTimerConfirmModal = ref(false)
+const pendingTimerConfirmAction = ref(null)
+const BODY_FULLSCREEN_CLASS = 'timer-landscape-fullscreen'
 
 // Overlay Pulse
 const pulseKey = computed(() => timerStore.countdownOverlayKey)
@@ -120,6 +135,7 @@ const timerStateClass = computed(() => ({
 
 const rafNow = ref(Date.now())
 let rafId = null
+let orientationPollId = null
 
 const visualElapsedMs = computed(() => {
   if (!timerStore.startedAt) return 0
@@ -218,13 +234,31 @@ onMounted(() => {
   updateOrientation()
   window.addEventListener('resize', updateOrientation)
   window.addEventListener('orientationchange', updateOrientation)
+  window.visualViewport?.addEventListener('resize', updateOrientation)
+  window.screen?.orientation?.addEventListener?.('change', updateOrientation)
+  // Fallback for environments where orientation events are flaky (e.g. iOS/Capacitor).
+  orientationPollId = window.setInterval(updateOrientation, 700)
 })
 
 onBeforeUnmount(() => {
   stopRaf()
   window.removeEventListener('resize', updateOrientation)
   window.removeEventListener('orientationchange', updateOrientation)
+  window.visualViewport?.removeEventListener('resize', updateOrientation)
+  window.screen?.orientation?.removeEventListener?.('change', updateOrientation)
+  if (orientationPollId) {
+    clearInterval(orientationPollId)
+    orientationPollId = null
+  }
+  if (typeof document !== 'undefined') {
+    document.body.classList.remove(BODY_FULLSCREEN_CLASS)
+  }
 })
+
+watch([isExpanded, isLandscape], ([expanded, landscape]) => {
+  if (typeof document === 'undefined') return
+  document.body.classList.toggle(BODY_FULLSCREEN_CLASS, expanded && landscape)
+}, { immediate: true })
 
 
 // Timer Controls
@@ -242,11 +276,31 @@ function toggleRun() {
 
 function resetTimer() {
   timerStore.unlockAudio()
+  if (timerStore.isRunning) {
+    pendingTimerConfirmAction.value = 'reset'
+    showTimerConfirmModal.value = true
+    return
+  }
   timerStore.prepare({ ...timerStore.config })
 }
 
 function closeTimer() {
+  if (timerStore.isRunning || timerStore.isPaused) {
+    pendingTimerConfirmAction.value = 'close'
+    showTimerConfirmModal.value = true
+    return
+  }
   timerStore.reset()
+}
+
+function confirmTimerAction() {
+  if (pendingTimerConfirmAction.value === 'close') {
+    timerStore.reset()
+  } else if (pendingTimerConfirmAction.value === 'reset') {
+    timerStore.prepare({ ...timerStore.config })
+  }
+  pendingTimerConfirmAction.value = null
+  showTimerConfirmModal.value = false
 }
 
 function toggleExpandedFromMain() {
@@ -265,7 +319,15 @@ function formatTime(ms) {
 function updateOrientation() {
   if (typeof window === 'undefined') return
   const media = window.matchMedia?.('(orientation: landscape)')
-  isLandscape.value = media ? media.matches : window.innerWidth > window.innerHeight
+  const mediaLandscape = Boolean(media?.matches)
+  const viewportWidth = Number(window.visualViewport?.width || window.innerWidth || 0)
+  const viewportHeight = Number(window.visualViewport?.height || window.innerHeight || 0)
+  const aspectLandscape = viewportWidth > viewportHeight
+  const screenType = String(window.screen?.orientation?.type || '')
+  const screenLandscape = screenType.includes('landscape')
+  const legacyOrientation = Number(window.orientation)
+  const legacyLandscape = legacyOrientation === 90 || legacyOrientation === -90
+  isLandscape.value = mediaLandscape || aspectLandscape || screenLandscape || legacyLandscape
   // In Landscape always start in fullscreen-like expanded mode for readability.
   if (isLandscape.value) {
     isExpanded.value = true
@@ -331,6 +393,95 @@ function updateOrientation() {
   padding: 12px 14px 12px;
   background: color-mix(in srgb, var(--bg-panel) 96%, black 4%);
   min-height: min(52vh, 460px);
+}
+
+.timer-bar.portrait-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 3200;
+  width: 100vw;
+  width: 100dvw;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 100dvh;
+  border-radius: 0;
+  border: none;
+  box-shadow: none;
+  background: color-mix(in srgb, var(--bg-panel) 97%, black 3%);
+  padding:
+    max(10px, env(safe-area-inset-top))
+    max(12px, env(safe-area-inset-right))
+    max(10px, env(safe-area-inset-bottom))
+    max(12px, env(safe-area-inset-left));
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: clamp(10px, 2.2vh, 22px);
+  align-content: stretch;
+}
+
+.timer-bar.portrait-fullscreen .timer-progress,
+.timer-bar.portrait-fullscreen .timer-accent,
+.timer-bar.portrait-fullscreen .timer-pulse {
+  display: none;
+}
+
+.timer-bar.portrait-fullscreen .timer-main {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  align-items: center;
+  justify-items: center;
+  gap: clamp(6px, 1.8vh, 16px);
+}
+
+.timer-bar.portrait-fullscreen .timer-status {
+  margin-bottom: 0;
+  font-size: clamp(0.95rem, 2.2vh, 1.35rem);
+}
+
+.timer-bar.portrait-fullscreen .timer-time {
+  font-size: clamp(84px, 30vw, 30dvh);
+  line-height: 1;
+  letter-spacing: clamp(0.02em, 0.15vw, 0.06em);
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  padding: 0 clamp(8px, 2.5vw, 20px);
+  box-sizing: border-box;
+}
+
+.timer-bar.portrait-fullscreen .timer-controls {
+  gap: clamp(10px, 2.6vw, 20px);
+  padding-bottom: max(4px, env(safe-area-inset-bottom));
+}
+
+.timer-bar.portrait-fullscreen .timer-icon {
+  width: clamp(62px, 14vw, 98px);
+  height: clamp(62px, 14vw, 98px);
+  border-radius: clamp(12px, 2.8vw, 20px);
+}
+
+.timer-bar.portrait-fullscreen .timer-icon.primary {
+  width: clamp(78px, 18vw, 124px);
+  height: clamp(78px, 18vw, 124px);
+  border-radius: clamp(14px, 3.2vw, 26px);
+}
+
+.timer-bar.portrait-fullscreen .timer-icon .icon {
+  width: clamp(28px, 6.6vw, 48px);
+  height: clamp(28px, 6.6vw, 48px);
+}
+
+.timer-bar.portrait-fullscreen .timer-icon.primary .icon {
+  width: clamp(34px, 8vw, 60px);
+  height: clamp(34px, 8vw, 60px);
 }
 
 .timer-accent {
@@ -399,13 +550,16 @@ function updateOrientation() {
   font-weight: 800;
   /* letter-spacing: 0.08em; */
   color: var(--accent);
+  text-shadow:
+    0 1px 0 color-mix(in srgb, white 22%, transparent),
+    0 2px 8px rgba(0, 0, 0, 0.32);
   text-align: center;
   font-variant-numeric: tabular-nums;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   transition: font-size 340ms ease-in-out, letter-spacing 340ms ease-in-out;
 }
 
-.timer-bar.expanded .timer-time {
+.timer-bar.expanded:not(.portrait-fullscreen):not(.landscape-fullscreen) .timer-time {
   font-size: var(--timer-time-size);
   line-height: 1;
   text-align: center;
@@ -423,12 +577,18 @@ function updateOrientation() {
   overflow: hidden;
 }
 
-.timer-bar.expanded .timer-status {
+.timer-bar.portrait-fullscreen .timer-time {
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+}
+
+.timer-bar.expanded:not(.portrait-fullscreen):not(.landscape-fullscreen) .timer-status {
   font-size: 1.22rem;
   margin-bottom: 4px;
 }
 
-.timer-bar.expanded .interval-text {
+.timer-bar.expanded:not(.portrait-fullscreen):not(.landscape-fullscreen) .interval-text {
   font-size: 0.88em;
 }
 
@@ -457,7 +617,7 @@ function updateOrientation() {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.3);
 }
 
-.timer-bar.expanded .timer-icon {
+.timer-bar.expanded:not(.portrait-fullscreen):not(.landscape-fullscreen) .timer-icon {
   width: var(--timer-icon-size);
   height: var(--timer-icon-size);
 }
@@ -471,7 +631,7 @@ function updateOrientation() {
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 }
 
-.timer-bar.expanded .timer-icon.primary {
+.timer-bar.expanded:not(.portrait-fullscreen):not(.landscape-fullscreen) .timer-icon.primary {
   width: var(--timer-icon-primary-size);
   height: var(--timer-icon-primary-size);
 }
@@ -492,16 +652,26 @@ function updateOrientation() {
   height: var(--timer-glyph-primary-size);
 }
 
+.timer-icon.close {
+  border-color: color-mix(in srgb, var(--danger-color, #dc2626) 78%, black 22%);
+  background: color-mix(in srgb, var(--danger-color, #dc2626) 16%, white 84%);
+  color: color-mix(in srgb, var(--danger-color, #dc2626) 88%, black 12%);
+}
+
+.timer-icon.close:hover {
+  background: color-mix(in srgb, var(--danger-color, #dc2626) 24%, white 76%);
+}
+
 .timer-icon:active {
   transform: translateY(1px);
 }
 
-.timer-bar.expanded .timer-icon .icon {
+.timer-bar.expanded:not(.portrait-fullscreen):not(.landscape-fullscreen) .timer-icon .icon {
   width: var(--timer-glyph-size);
   height: var(--timer-glyph-size);
 }
 
-.timer-bar.expanded .timer-icon.primary .icon {
+.timer-bar.expanded:not(.portrait-fullscreen):not(.landscape-fullscreen) .timer-icon.primary .icon {
   width: var(--timer-glyph-primary-size);
   height: var(--timer-glyph-primary-size);
 }
@@ -558,120 +728,109 @@ function updateOrientation() {
   }
 }
 
-@media (orientation: landscape) {
+:global(body.timer-landscape-fullscreen) {
+  background: #050505;
+  overflow: hidden;
+}
 
-  :global(body) {
-    background: #050505;
-    overflow: hidden;
-  }
+:global(body.timer-landscape-fullscreen .app-nav),
+:global(body.timer-landscape-fullscreen .header-bar) {
+  display: none;
+}
 
-  :global(.app-nav),
-  :global(.header-bar) {
-    display: none;
-  }
+.timer-bar.landscape-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 3200;
+  width: 100vw;
+  width: 100dvw;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 100dvh;
+  display: grid;
+  grid-template-rows: auto auto;
+  place-content: center;
+  place-items: center;
+  background: color-mix(in srgb, var(--bg-panel) 95%, black 5%);
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+  box-sizing: border-box;
+}
 
-  .timer-bar.expanded {
-    position: fixed;
-    inset: 0;
-    width: 100vw;
-    width: 100dvw;
-    height: 100vh;
-    height: 100dvh;
+.timer-bar.landscape-fullscreen .timer-handle {
+  display: none;
+}
 
-    display: grid;
-    grid-template-rows: auto auto;
-    place-content: center;
-    place-items: center;
+.timer-bar.landscape-fullscreen .timer-accent,
+.timer-bar.landscape-fullscreen .timer-pulse,
+.timer-bar.landscape-fullscreen .timer-progress {
+  display: none !important;
+}
 
-    /* gap: 48px; */
+.timer-bar.landscape-fullscreen .timer-status {
+  display: flex !important;
+  margin-bottom: 18px;
+  font-size: clamp(1.2rem, 2.2vw, 2rem);
+  letter-spacing: 0.08em;
+  color: color-mix(in srgb, var(--fg) 88%, transparent);
+}
 
-    background: color-mix(in srgb, var(--bg-panel) 95%, black 5%);
-    border: none;
-    border-radius: 0;
-    box-shadow: none;
-    padding: 0;
-    box-sizing: border-box;
-  }
+.timer-bar.landscape-fullscreen .interval-text {
+  font-size: 0.74em;
+  color: color-mix(in srgb, var(--fg) 72%, transparent);
+}
 
-  .timer-handle {
-    display: none;
-  }
+.timer-bar.landscape-fullscreen .timer-time {
+  font-size: clamp(100px, 20vw, 280px);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  text-align: center;
+  line-height: 1;
+  width: auto;
+  max-width: none;
+  height: auto;
+  margin: 0;
+  display: block;
+}
 
-  /* Alles ausblenden */
-  .timer-accent,
-  .timer-pulse,
-  .timer-progress {
-    display: none !important;
-  }
+.timer-bar.landscape-fullscreen .timer-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 36px;
+}
 
-  .timer-bar.expanded .timer-status {
-    display: flex !important;
-    margin-bottom: 18px;
-    font-size: clamp(1.2rem, 2.2vw, 2rem);
-    letter-spacing: 0.08em;
-    color: color-mix(in srgb, var(--fg) 88%, transparent);
-  }
+.timer-bar.landscape-fullscreen .timer-icon {
+  width: 110px;
+  height: 110px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--accent);
+  background: transparent;
+  color: var(--accent);
+}
 
-  .timer-bar.expanded .interval-text {
-    font-size: 0.74em;
-    color: color-mix(in srgb, var(--fg) 72%, transparent);
-  }
+.timer-bar.landscape-fullscreen .timer-icon.primary {
+  width: 140px;
+  height: 140px;
+  border-radius: 26px;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  border: none;
+}
 
-  /* Zeit riesig */
-  .timer-bar.expanded .timer-time {
-    font-size: clamp(100px, 20vw, 280px);
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    color: var(--accent);
-    text-align: center;
-    line-height: 1;
-    width: auto;
-    max-width: none;
-    height: auto;
-    margin: 0;
-    display: block;
-  }
+.timer-bar.landscape-fullscreen .timer-icon .icon {
+  width: 48px;
+  height: 48px;
+}
 
-  /* Controls */
-  .timer-bar.expanded .timer-controls {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 36px;
-  }
-
-  .timer-bar.expanded .timer-icon {
-    width: 110px;
-    height: 110px;
-    border-radius: 20px;
-
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    border: 2px solid var(--accent);
-    background: transparent;
-    color: var(--accent);
-  }
-
-  .timer-bar.expanded .timer-icon.primary {
-    width: 140px;
-    height: 140px;
-    border-radius: 26px;
-
-    background: var(--accent);
-    color: var(--accent-contrast);
-    border: none;
-  }
-
-  .timer-bar.expanded .timer-icon .icon {
-    width: 48px;
-    height: 48px;
-  }
-
-  .timer-bar.expanded .timer-icon.primary .icon {
-    width: 60px;
-    height: 60px;
-  }
+.timer-bar.landscape-fullscreen .timer-icon.primary .icon {
+  width: 60px;
+  height: 60px;
 }
 </style>

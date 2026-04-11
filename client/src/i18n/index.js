@@ -92,19 +92,21 @@ export const messages = {
   startNext: 'Starte nächstes Workout',
   lastSaved: 'Zuletzt gespeichert',
   resumeDraft: 'Letztes Workout fortsetzen?',
-  fullBodyLabel: 'Ganzkörper',
+  fullBodyLabel: 'Full Body',
   workoutTypeInfoTitle: 'Workout-Typ erklärt',
   workoutTypeInfo: 'Info zu diesem Workout-Typ',
   pushInfo: 'Push trainiert Brust, Schultern und Trizeps.',
   pullInfo: 'Pull trainiert Rücken und Bizeps.',
   legsInfo: 'Legs trainiert Beine und Gesäß.',
-  freestyleInfo: 'Ganzkörper trainiert den ganzen Körper in einer Einheit.'
+  freestyleInfo: 'Full Body trainiert den ganzen Körper in einer Einheit.'
   ,startModeTitle: 'Workout starten'
   ,startModeText: 'Möchtest du dein Workout selbst zusammenstellen oder generieren lassen?'
   ,startModeManual: 'Selbst zusammenstellen'
   ,startModeGenerate: 'Generieren lassen'
   ,startModeFavorites: 'Favorit auswählen'
   ,startModeTypeTitle: '{type} auswählen'
+  ,allFavorites: 'Favoriten'
+  ,allFavoritesEmpty: 'Noch keine Favoriten gespeichert.'
   ,favoritesHint: 'Wähle einen Favoriten, um direkt zu starten oder anzupassen.'
   ,favoritesEmpty: 'Noch keine Favoriten für diesen Typ gespeichert.'
   ,favoritesLimitHint: 'Du kannst pro Typ maximal {count} Favoriten speichern.'
@@ -112,6 +114,10 @@ export const messages = {
   ,favoriteAdjust: 'Anpassen'
   ,favoriteRename: 'Namen ändern'
   ,favoriteDelete: 'Löschen'
+  ,favoriteDeleteConfirmTitle: 'Favorit löschen?'
+  ,favoriteDeleteConfirmMsg: 'Möchtest du diesen Favoriten wirklich löschen?'
+  ,discardDraftConfirmTitle: 'Entwurf verwerfen?'
+  ,discardDraftConfirmMsg: 'Dein aktueller Entwurf wird unwiderruflich gelöscht.'
   ,favoriteNamePlaceholder: 'Nur Buchstaben und Zahlen'
   ,favoriteStartFailed: 'Favorit konnte nicht gestartet werden.'
   ,favoriteAdjustFailed: 'Favorit konnte nicht geöffnet werden.'
@@ -316,7 +322,11 @@ export const messages = {
       saveStart: 'Speichern & Starten',
       restoreHint: 'Tippen zum Maximieren',
       minimize: 'Minimieren',
-      close: 'Schließen'
+      close: 'Schließen',
+      closeConfirmTitle: 'Timer beenden?',
+      closeConfirmMsg: 'Der aktuelle Timer wird zurückgesetzt.',
+      resetConfirmTitle: 'Timer zurücksetzen?',
+      resetConfirmMsg: 'Zeit und Fortschritt werden zurückgesetzt.'
     },
     feedback: {
       title: 'Feedback',
@@ -447,7 +457,11 @@ export const messages = {
       addExercise: 'Übung hinzufügen',
       weight: 'Gewicht',
       removeSet: 'Satz entfernen',
-      addSet: 'Satz hinzufügen',
+      addSet: 'Arbeitssatz hinzufügen',
+      addWarmupSet: 'Aufwärmsatz hinzufügen',
+      removeWarmupSet: 'Aufwärmsatz entfernen',
+      warmupSetsLabel: 'Aufwärmen',
+      workingSetsLabel: 'Arbeitssätze',
       set: 'Satz',
       reps: 'Reps',
       actions: 'Aktion',
@@ -468,12 +482,18 @@ export const messages = {
       favoriteNameTitle: 'Favorit speichern',
       favoriteNamePlaceholder: 'Favoritenname (Buchstaben und Zahlen)',
       favoriteSaved: 'Favorit gespeichert.',
+      adjustSaved: 'Favorit wurde aktualisiert.',
       favoriteSaveFailed: 'Favorit konnte nicht gespeichert werden.',
       saving: 'Speichere…',
       cancel: 'Abbrechen',
       leaveConfirm: 'Du hast ungespeicherte Änderungen. Wirklich zum Dashboard zurückkehren?',
       leaveConfirmBack: 'Verwerfen und zurück',
       unsaved: 'Ungespeicherte Änderungen',
+      removeExerciseConfirmTitle: 'Übung entfernen?',
+      removeExerciseConfirmMsg: 'Alle Sätze dieser Übung werden unwiderruflich gelöscht.',
+      deleteNoteConfirmTitle: 'Notiz löschen?',
+      deleteNoteConfirmMsg: 'Die Notiz zu dieser Übung wird gelöscht.',
+      progressionHint: '↑ +2.5–5 kg',
       removePhotoTitle: 'Foto entfernen?',
       removePhotoMsg: 'Möchtest du das Foto wirklich entfernen?',
       removeFailedNoId: 'Bild konnte nicht entfernt werden (fehlende Übungs-ID).',
@@ -664,15 +684,15 @@ export const messages = {
       selectQuestion: 'Wähle eine Frage aus',
       selectToRead: 'Wähle eine Frage aus, um die Antwort zu sehen',
       gettingStarted: 'Erste Schritte',
-      gettingStartedText: 'Öffne den Startbereich und wähle Push, Pull, Legs oder Ganzkörper. Im Builder suchst du Übungen, tippst sie an und sortierst sie nach Wunsch.\n\nIn der Detailansicht loggst du Sätze, Wiederholungen und Gewicht. Speichern markiert das Workout als erledigt und aktualisiert deine Stats.',
+      gettingStartedText: 'Öffne den Startbereich und wähle Push, Pull, Legs oder Full Body. Im Builder suchst du Übungen, tippst sie an und sortierst sie nach Wunsch.\n\nIn der Detailansicht loggst du Sätze, Wiederholungen und Gewicht. Speichern markiert das Workout als erledigt und aktualisiert deine Stats.',
       pushPullLegs: 'Was ist Push/Pull/Legs?',
       pushPullLegsText: 'Push steht für Drückübungen (Brust, Schultern, Trizeps). Pull sind Zugübungen (Rücken, Bizeps). Legs umfasst Beine und Gesäß.\n\nDie App hilft dir, diesen Split schnell umzusetzen: Typ wählen, Übungen auswählen, Reihenfolge anpassen und anschließend alles sauber tracken.',
       navigation: 'Navigation',
       navigationText: 'Unten findest du die Hauptnavigation: Startbereich, Stats, Übungen, FAQ’s und Einstellungen. Der aktive Bereich ist immer hervorgehoben.\n\nAuf größeren Bildschirmen sitzt die Navigation als Seitenleiste links, damit mehr Platz für Inhalte bleibt.',
       workouts: 'Workflows',
       workoutsText: 'Du kannst Workouts als Entwurf starten und später fortsetzen – auch offline.\n\nIm Detail kannst du Reihenfolge per Drag & Drop ändern, Sätze hinzufügen und Notizen festhalten. Speichern sichert den Stand und aktualisiert deinen Fortschritt.',
-      aiCoach: 'AI Coach & Insights',
-      aiCoachText: '✨ **Dein persönlicher AI Coach**\n\nDer AI Coach erstellt dir in Sekunden komplette Push/Pull/Legs-Workouts – abgestimmt auf Ziel, Zeit und letzte Einheiten. Öffnen, auswählen, starten.\n\n🧠 **Struktur statt Zufall**\nDer Coach erkennt Lücken, Schwerpunkte und Wiederholungsmuster und schlägt passende Sessions vor – inklusive Varianten für kurze Tage.\n\n📊 **Verstehe deinen Fortschritt**\nIn den Stats siehst du klare Trends, ohne Zahlenchaos. So bleibst du motiviert und trainierst gezielt weiter.',
+      progression: 'Gewichtssteigerung – wann und wie?',
+      progressionText: 'Wenn du bei einem Satz **6 oder mehr Wiederholungen** schaffst, zeigt die App direkt in dieser Zeile einen kleinen **↑ Pfeil** an – als Hinweis, das Gewicht beim nächsten Training leicht zu erhöhen (typisch: +2,5–5 kg).\n\nDas Prinzip heißt **Progressive Overload**: Kleine, regelmäßige Steigerungen beim Gewicht oder den Wiederholungen sind der sicherste Weg, stärker zu werden und Muskeln aufzubauen.',
       uploads: 'Bilder & Uploads',
       uploadsText: 'Tippe auf ein Übungsbild, um eine Vorschau zu sehen oder ein eigenes Bild hochzuladen.\n\nBilder werden automatisch verkleinert, damit sie schnell laden und wenig Speicher brauchen.',
       privacy: 'Datenschutz',
@@ -855,6 +875,8 @@ export const messages = {
   ,startModeGenerate: 'Generate workout'
   ,startModeFavorites: 'Choose favorite'
   ,startModeTypeTitle: 'Choose {type}'
+  ,allFavorites: 'Favorites'
+  ,allFavoritesEmpty: 'No favorites saved yet.'
   ,favoritesHint: 'Select a favorite to start immediately or adjust it.'
   ,favoritesEmpty: 'No favorites saved for this type yet.'
   ,favoritesLimitHint: 'You can save up to {count} favorites per type.'
@@ -862,6 +884,10 @@ export const messages = {
   ,favoriteAdjust: 'Adjust'
   ,favoriteRename: 'Rename'
   ,favoriteDelete: 'Delete'
+  ,favoriteDeleteConfirmTitle: 'Delete favorite?'
+  ,favoriteDeleteConfirmMsg: 'Do you really want to delete this favorite?'
+  ,discardDraftConfirmTitle: 'Discard draft?'
+  ,discardDraftConfirmMsg: 'Your current draft will be permanently deleted.'
   ,favoriteNamePlaceholder: 'Letters and numbers only'
   ,favoriteStartFailed: 'Could not start favorite workout.'
   ,favoriteAdjustFailed: 'Could not open favorite workout.'
@@ -1066,7 +1092,11 @@ export const messages = {
       saveStart: 'Save & start',
       restoreHint: 'Tap to maximize',
       minimize: 'Minimize',
-      close: 'Close'
+      close: 'Close',
+      closeConfirmTitle: 'End timer?',
+      closeConfirmMsg: 'The current timer will be reset.',
+      resetConfirmTitle: 'Reset timer?',
+      resetConfirmMsg: 'Time and progress will be reset.'
     },
     feedback: {
       title: 'Feedback',
@@ -1193,7 +1223,11 @@ export const messages = {
       add: 'add',
       weight: 'Weight',
       removeSet: 'Remove set',
-      addSet: 'Add set',
+      addSet: 'Add working set',
+      addWarmupSet: 'Add warm-up set',
+      removeWarmupSet: 'Remove warm-up set',
+      warmupSetsLabel: 'Warm-up',
+      workingSetsLabel: 'Working sets',
       set: 'Set',
       reps: 'Reps',
       actions: 'Actions',
@@ -1206,12 +1240,18 @@ export const messages = {
       favoriteNameTitle: 'Save favorite',
       favoriteNamePlaceholder: 'Favorite name (letters and numbers)',
       favoriteSaved: 'Favorite saved.',
+      adjustSaved: 'Favorite updated.',
       favoriteSaveFailed: 'Could not save favorite.',
       saving: 'Saving…',
       cancel: 'Cancel',
       leaveConfirm: 'You have unsaved changes. Really go back to dashboard?',
       leaveConfirmBack: 'Discard and go back',
       unsaved: 'Unsaved changes',
+      removeExerciseConfirmTitle: 'Remove exercise?',
+      removeExerciseConfirmMsg: 'All sets of this exercise will be permanently deleted.',
+      deleteNoteConfirmTitle: 'Delete note?',
+      deleteNoteConfirmMsg: 'The note for this exercise will be deleted.',
+      progressionHint: '↑ +2.5–5 kg',
       removePhotoTitle: 'Remove photo?',
       removePhotoMsg: 'Do you really want to remove the photo?',
       removeFailedNoId: 'Could not remove image (missing exercise id).',
@@ -1391,8 +1431,8 @@ export const messages = {
       navigationText: 'Use the bottom navigation for the main areas: Launchpad, Stats, Exercises, FAQ’s, and Settings. The active section is always highlighted.\n\nOn larger screens, navigation moves to a left sidebar to keep content in focus.',
       workouts: 'Workflows',
       workoutsText: 'You can start workouts as drafts and continue later — even offline.\n\nIn the detail view, reorder with drag & drop, add sets, and leave notes. Saving updates your progress.',
-      aiCoach: 'AI Coach & Insights',
-      aiCoachText: '✨ **Your personal AI Coach**\n\nThe AI Coach builds full Push/Pull/Legs sessions in seconds, tuned to your goal, time, and recent workouts. Open, choose, train.\n\n🧠 **Structure instead of guessing**\nIt spots gaps, priorities, and patterns, then recommends sessions — including quick versions for busy days.\n\n📊 **Clear insights**\nStats stay simple and useful, so you know what to improve without getting lost in numbers.',
+      progression: 'Weight progression – when and how?',
+      progressionText: 'When you complete **6 or more reps** in a set, the app shows a small **↑ arrow** directly in that row — as a reminder to increase the weight slightly next time (typically +2.5–5 kg / +5–10 lbs).\n\nThis principle is called **Progressive Overload**: small, regular increases in weight or reps are the most reliable way to get stronger and build muscle.',
       uploads: 'Images & uploads',
       uploadsText: 'Tap an exercise image to preview it or upload your own.\n\nImages are resized automatically for fast loading and smaller storage use.',
       privacy: 'Privacy',

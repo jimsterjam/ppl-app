@@ -231,7 +231,7 @@ const expandedWorkout = ref(null)
 const showAllExercises = ref(false)
 const getWorkoutNotes = (workout) => resolveWorkoutNotes(workout, { maxItems: 8, maxLength: 600 })
 
-// Die letzten 3 Workouts (keine Drafts)
+// Die letzten 7 Workouts (keine Drafts)
 const recentWorkouts = computed(() => {
   return props.workouts
     .filter(w => !(w?.isDraft || w?._isDraft))
@@ -240,7 +240,7 @@ const recentWorkouts = computed(() => {
       notes: resolveWorkoutNotes(w, { maxItems: 8, maxLength: 600 })
     }))
     .sort((a, b) => new Date(b.date || b.updatedAt) - new Date(a.date || a.updatedAt))
-    .slice(0, 3)
+    .slice(0, 7)
 })
 
 function getWorkoutTitle(workout) {

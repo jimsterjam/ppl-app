@@ -7,6 +7,35 @@ import exercises from '../data/exercises.js';
 import Exercise from '../models/Exercise.js';
 import UserProfile from '../models/UserProfile.js';
 import { logger } from '../utils/logger.js';
+import {
+  startOfIsoWeek,
+  normalizeCategory,
+  calculateExerciseVolume,
+  getExerciseBestWeight,
+  computeWorkoutMetrics
+} from '../utils/workoutMetrics.js';
+import {
+  sanitizeWorkoutRequest,
+  sanitizeQuickGeneratorRequest,
+  getQuickGeneratorMissingInputs
+} from '../utils/workoutSanitizer.js';
+import {
+  classifyAiError,
+  isRetryableAiError,
+  sleep,
+  withAiRetry,
+  parseJsonSafely,
+  validateAiSuggestionPayload,
+  checkAiBurstLimit
+} from '../utils/aiUtils.js';
+import { z } from 'zod';
+import { validateQuery } from '../middleware/validateRequest.js';
+
+// Pagination-Schema für GET /api/workouts
+const workoutListQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(500).default(200)
+});
 
 const router = express.Router();
 
@@ -135,6 +164,7 @@ const exerciseNameMapping = {
 };
 
 const DEFAULT_PROGRESS_RANGE_DAYS = 120;
+const MIN_STATS_SESSIONS = 7;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const FREE_AI_WEEKLY_LIMIT = 1;
 const SUBSCRIPTION_FORCE_PLAN = String(process.env.SUBSCRIPTION_FORCE_PLAN || '').trim().toLowerCase();
@@ -145,11 +175,6 @@ const SUBSCRIPTION_FORCE_ALLOWLIST = String(process.env.SUBSCRIPTION_FORCE_ALLOW
   .filter(Boolean);
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const AI_OPENAI_TIMEOUT_MS = Math.max(5000, Number(process.env.AI_OPENAI_TIMEOUT_MS) || 15000);
-const AI_RETRY_ATTEMPTS = Math.max(0, Math.min(3, Number(process.env.AI_RETRY_ATTEMPTS) || 1));
-const AI_RETRY_BASE_DELAY_MS = Math.max(200, Number(process.env.AI_RETRY_BASE_DELAY_MS) || 700);
-const AI_BURST_LIMIT_WINDOW_MS = Math.max(1000, Number(process.env.AI_BURST_LIMIT_WINDOW_MS) || 60000);
-const AI_BURST_LIMIT_MAX_REQUESTS = Math.max(1, Number(process.env.AI_BURST_LIMIT_MAX_REQUESTS) || 6);
-const aiBurstRateBucket = new Map();
 const muscleLabelMap = {
   push: 'Push',
   pull: 'Pull',
@@ -199,127 +224,9 @@ async function getEntitlements(userId) {
     planSource,
     plan,
     paid,
-    canUseAnalytics: paid,
+    canUseAnalytics: true,
     weeklyAiLimit: paid ? Number.POSITIVE_INFINITY : FREE_AI_WEEKLY_LIMIT
   };
-}
-
-function classifyAiError(error) {
-  const status = Number(error?.status || error?.statusCode || error?.response?.status || 0);
-  const code = String(error?.code || '').toUpperCase();
-  const msg = String(error?.message || '').toLowerCase();
-
-  if (status === 429) return 'rate_limited';
-  if (status >= 500 && status < 600) return 'provider_server_error';
-  if (code.includes('TIMEOUT') || code === 'ABORT_ERR' || msg.includes('timeout')) return 'timeout';
-  if (msg.includes('json') && msg.includes('parse')) return 'invalid_json';
-  if (status >= 400 && status < 500) return 'provider_client_error';
-  return 'unknown';
-}
-
-function isRetryableAiError(error) {
-  const type = classifyAiError(error);
-  return type === 'timeout' || type === 'rate_limited' || type === 'provider_server_error';
-}
-
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function withAiRetry(fn, { attempts = AI_RETRY_ATTEMPTS, baseDelayMs = AI_RETRY_BASE_DELAY_MS } = {}) {
-  let currentAttempt = 0;
-  let lastError;
-
-  while (currentAttempt <= attempts) {
-    try {
-      return await fn(currentAttempt);
-    } catch (error) {
-      lastError = error;
-      if (currentAttempt >= attempts || !isRetryableAiError(error)) {
-        throw error;
-      }
-      const delay = baseDelayMs * Math.pow(2, currentAttempt);
-      await sleep(delay);
-      currentAttempt += 1;
-    }
-  }
-
-  throw lastError;
-}
-
-function parseJsonSafely(rawPayload = '', { requestId = '', context = 'ai' } = {}) {
-  const source = String(rawPayload || '').trim();
-  if (!source) {
-    const err = new Error('Empty JSON payload');
-    err.code = 'AI_EMPTY_JSON';
-    throw err;
-  }
-
-  const candidates = [source];
-  const fenced = source.replace(/^```json\s*/i, '').replace(/^```/i, '').replace(/```$/i, '').trim();
-  if (fenced && fenced !== source) candidates.push(fenced);
-
-  const start = source.indexOf('{');
-  const end = source.lastIndexOf('}');
-  if (start >= 0 && end > start) {
-    const extracted = source.slice(start, end + 1);
-    if (extracted && extracted !== source) candidates.push(extracted);
-  }
-
-  for (const candidate of candidates) {
-    try {
-      return JSON.parse(candidate);
-    } catch {
-      // try next candidate
-    }
-  }
-
-  const err = new Error('Invalid JSON payload from AI provider');
-  err.code = 'AI_INVALID_JSON';
-  logger.error('❌ AI JSON parse failed', {
-    requestId,
-    context,
-    payloadPreview: source.slice(0, 400)
-  });
-  throw err;
-}
-
-function validateAiSuggestionPayload(payload) {
-  if (!payload || typeof payload !== 'object') {
-    const err = new Error('AI payload missing');
-    err.code = 'AI_INVALID_PAYLOAD';
-    throw err;
-  }
-
-  if (!Array.isArray(payload.exercises) || payload.exercises.length === 0) {
-    const err = new Error('AI payload has no exercises');
-    err.code = 'AI_INVALID_EXERCISES';
-    throw err;
-  }
-
-  if (payload.exercises.length > 8) {
-    payload.exercises = payload.exercises.slice(0, 8);
-  }
-
-  return payload;
-}
-
-function checkAiBurstLimit(userId = '') {
-  const now = Date.now();
-  const safeUser = userId || 'anonymous';
-  const history = (aiBurstRateBucket.get(safeUser) || []).filter((ts) => now - ts < AI_BURST_LIMIT_WINDOW_MS);
-
-  if (history.length >= AI_BURST_LIMIT_MAX_REQUESTS) {
-    const retryAfterMs = Math.max(0, AI_BURST_LIMIT_WINDOW_MS - (now - history[0]));
-    return {
-      allowed: false,
-      retryAfterSec: Math.max(1, Math.ceil(retryAfterMs / 1000))
-    };
-  }
-
-  history.push(now);
-  aiBurstRateBucket.set(safeUser, history);
-  return { allowed: true, retryAfterSec: 0 };
 }
 
 function getCurrentAiWeekWindowStart() {
@@ -369,80 +276,6 @@ function getAiLimitSnapshot(entitlements) {
     weeklyLimit: Number.isFinite(limit) ? limit : null,
     weeklyRemaining: remaining
   };
-}
-
-function startOfIsoWeek(dateInput) {
-  const date = new Date(dateInput);
-  const isoDay = date.getUTCDay() === 0 ? 7 : date.getUTCDay();
-  date.setUTCDate(date.getUTCDate() - isoDay + 1);
-  date.setUTCHours(0, 0, 0, 0);
-  return date;
-}
-
-function normalizeCategory(input, workoutType) {
-  const source = (input || workoutType || 'push').toString().toLowerCase();
-  if (source.includes('pull') || source.includes('rück') || source.includes('back')) return 'pull';
-  if (source.includes('leg') || source.includes('bein')) return 'legs';
-  if (source.includes('core') || source.includes('abs') || source.includes('bauch')) return 'core';
-  if (source.includes('cardio')) return 'cardio';
-  return 'push';
-}
-
-function calculateExerciseVolume(exercise) {
-  if (!exercise) return 0;
-  if (Array.isArray(exercise.setDetails) && exercise.setDetails.length) {
-    return exercise.setDetails.reduce((sum, set) => {
-      const reps = Number(set?.reps ?? exercise.reps ?? 0);
-      const weight = Number(set?.weight ?? exercise.weight ?? 0);
-      return sum + Math.max(0, reps) * Math.max(0, weight);
-    }, 0);
-  }
-  const sets = Number(exercise.sets) || 1;
-  const reps = Number(exercise.reps) || 0;
-  const weight = Number(exercise.weight) || 0;
-  return Math.max(0, sets) * Math.max(0, reps) * Math.max(0, weight);
-}
-
-function getExerciseBestWeight(exercise) {
-  let best = Number(exercise?.weight) || 0;
-  if (Array.isArray(exercise?.setDetails)) {
-    exercise.setDetails.forEach((set) => {
-      const current = Number(set?.weight) || 0;
-      if (current > best) best = current;
-    });
-  }
-  return best;
-}
-
-function computeWorkoutMetrics(workout) {
-  const metrics = {
-    volume: 0,
-    bestLifts: [],
-    muscleVolume: new Map()
-  };
-
-  if (!Array.isArray(workout?.exercises)) {
-    return metrics;
-  }
-
-  workout.exercises.forEach((exercise) => {
-    const exerciseVolume = calculateExerciseVolume(exercise);
-    metrics.volume += exerciseVolume;
-
-    const category = normalizeCategory(exercise?.category, workout?.type);
-    metrics.muscleVolume.set(category, (metrics.muscleVolume.get(category) || 0) + exerciseVolume);
-
-    const peakWeight = getExerciseBestWeight(exercise);
-    if (peakWeight > 0 && exercise?.name) {
-      metrics.bestLifts.push({
-        name: exercise.name,
-        weight: peakWeight,
-        reps: Number(exercise.reps) || null
-      });
-    }
-  });
-
-  return metrics;
 }
 
 // 🎯 Automatische Übungs-Hinzufügung zur Datenbank
@@ -607,105 +440,17 @@ async function initializeOpenAI() {
   }
 }
 
-function sanitizeWorkoutRequest(body) {
-  const toNumber = (value, fallback) => {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-  };
-
-  return {
-    timeAvailable: toNumber(body.timeAvailable, 45),
-    experienceLevel: typeof body.experienceLevel === 'string' ? body.experienceLevel : 'intermediate',
-    intensity: toNumber(body.intensity, 3),
-    focus: typeof body.focus === 'string' ? body.focus : 'push',
-    recentWorkouts: Array.isArray(body.recentWorkouts) ? body.recentWorkouts.slice(0, 10) : null,
-    injuries: body.injuries || null,
-    mode: typeof body.mode === 'string' ? body.mode : undefined
-  };
-}
-
-function sanitizeQuickGeneratorRequest(body) {
-  const clampNumber = (value, fallback, min, max) => {
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed)) return fallback;
-    return Math.min(max, Math.max(min, parsed));
-  };
-
-  const normalizeEnum = (value, allowed, fallback) => {
-    const normalized = typeof value === 'string' ? value.trim().toLowerCase() : '';
-    return allowed.includes(normalized) ? normalized : fallback;
-  };
-
-  const normalizeOptionalNumber = (value) => {
-    if (value === null || value === undefined || value === '') return null;
-    const parsed = Number(value);
-    return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
-  };
-
-  const normalizeEquipmentAvailability = (value) => {
-    const allowed = ['barbell', 'dumbbells', 'machines', 'cable_station', 'pull_up_bar', 'none'];
-    if (!Array.isArray(value)) return [];
-    return [...new Set(value
-      .map((entry) => (typeof entry === 'string' ? entry.trim().toLowerCase() : ''))
-      .filter((entry) => allowed.includes(entry)))];
-  };
-
-  return {
-    durationMinutes: clampNumber(body.durationMinutes, 45, 20, 120),
-    goal: normalizeEnum(body.goal, ['muscle_building', 'hypertrophy', 'strength'], 'muscle_building'),
-    gender: normalizeEnum(body.gender, ['male', 'female', 'diverse'], 'male'),
-    bodyweightKg: clampNumber(body.bodyweightKg, 80, 35, 250),
-    level: normalizeEnum(body.level, ['beginner', 'intermediate', 'advanced'], 'beginner'),
-    trainingFrequencyPerWeek: clampNumber(body.trainingFrequencyPerWeek, 3, 1, 14),
-    equipmentMode: normalizeEnum(body.equipmentMode, ['gym_only', 'gym_plus_bodyweight', 'bodyweight_only'], 'gym_plus_bodyweight'),
-    requestedType: normalizeEnum(body.requestedType, ['push', 'pull', 'legs', 'fullbody'], 'fullbody'),
-    equipmentAvailability: normalizeEquipmentAvailability(body.equipmentAvailability),
-    performance: {
-      maxStrictPullups: normalizeOptionalNumber(body.maxStrictPullups),
-      maxStrictDips: normalizeOptionalNumber(body.maxStrictDips),
-      maxStrictPushups: normalizeOptionalNumber(body.maxStrictPushups),
-      squat1RM: normalizeOptionalNumber(body.squat1RM),
-      bench1RM: normalizeOptionalNumber(body.bench1RM),
-      deadlift1RM: normalizeOptionalNumber(body.deadlift1RM),
-      squat5RM: normalizeOptionalNumber(body.squat5RM),
-      bench5RM: normalizeOptionalNumber(body.bench5RM),
-      deadlift5RM: normalizeOptionalNumber(body.deadlift5RM)
-    },
-    injuries: typeof body.injuries === 'string' ? body.injuries.trim() : '',
-    restrictions: typeof body.restrictions === 'string' ? body.restrictions.trim() : '',
-    requireCompleteInput: body.requireCompleteInput === true
-  };
-}
-
-function getQuickGeneratorMissingInputs(rawBody = {}, context = {}) {
-  const missing = [];
-  if (!rawBody.goal) missing.push('goal');
-  if (!rawBody.level) missing.push('level');
-  if (!rawBody.requestedType) missing.push('requestedType');
-  if (!rawBody.equipmentMode) missing.push('equipmentMode');
-  if (!rawBody.durationMinutes) missing.push('durationMinutes');
-  if (!rawBody.trainingFrequencyPerWeek && !context.trainingFrequencyPerWeek) missing.push('trainingFrequencyPerWeek');
-  if (!Array.isArray(rawBody.equipmentAvailability) || rawBody.equipmentAvailability.length === 0) {
-    missing.push('equipmentAvailability');
-  }
-  if (rawBody.maxStrictPullups === undefined || rawBody.maxStrictPullups === null || rawBody.maxStrictPullups === '') {
-    missing.push('maxStrictPullups');
-  }
-  if (rawBody.maxStrictDips === undefined || rawBody.maxStrictDips === null || rawBody.maxStrictDips === '') {
-    missing.push('maxStrictDips');
-  }
-  if (rawBody.maxStrictPushups === undefined || rawBody.maxStrictPushups === null || rawBody.maxStrictPushups === '') {
-    missing.push('maxStrictPushups');
-  }
-  return missing;
-}
-
-// Alle Workouts für den eingeloggten User holen
-router.get("/", firebaseAuthMiddleware, async (req, res) => {
+// Alle Workouts für den eingeloggten User holen (mit optionaler Pagination)
+router.get("/", firebaseAuthMiddleware, validateQuery(workoutListQuerySchema), async (req, res) => {
   try {
     const { userId } = req.auth;
-    const workouts = await Workout.find({ userId })
-      .sort({ date: -1 }); // Neueste zuerst
+    const { page, limit } = req.validatedQuery;
+    const skip = (page - 1) * limit;
+    const [workouts, total] = await Promise.all([
+      Workout.find({ userId }).sort({ date: -1 }).skip(skip).limit(limit).lean(),
+      Workout.countDocuments({ userId })
+    ]);
+    res.set('X-Total-Count', String(total));
     res.json(workouts);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -728,14 +473,14 @@ router.get("/stats/progress", firebaseAuthMiddleware, async (req, res) => {
       date: { $gte: fromDate }
     }).sort({ date: 1 }).lean();
 
-    // Alle Nutzer bekommen mindestens die letzten 3 Sessions als Basis-Stats,
+    // Alle Nutzer bekommen mindestens die letzten 7 Sessions als Basis-Stats,
     // auch wenn im gewählten Zeitraum (noch) zu wenig Daten liegen.
     let workouts = Array.isArray(workoutsInRange) ? [...workoutsInRange] : [];
     let minimumSessionsApplied = false;
-    if (workouts.length < 3) {
+    if (workouts.length < MIN_STATS_SESSIONS) {
       const latest = await Workout.find({ userId })
         .sort({ date: -1, updatedAt: -1, createdAt: -1 })
-        .limit(3)
+        .limit(MIN_STATS_SESSIONS)
         .lean();
 
       const seen = new Set(workouts.map((item) => String(item?._id || '')));
@@ -820,6 +565,7 @@ router.get("/stats/progress", firebaseAuthMiddleware, async (req, res) => {
       minimumSessionsApplied,
       entitlement: {
         plan: entitlements.plan,
+        stage: 'draft',
         code: analyticsLocked ? 'ANALYTICS_REQUIRES_PRO' : null
       },
       range: {
@@ -957,6 +703,49 @@ router.get("/stats/overview", firebaseAuthMiddleware, async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// 🔍 AI QUALITY MONITORING – muss VOR /:id stehen (Express v5)
+router.get("/ai-quality", firebaseAuthMiddleware, async (req, res) => {
+  try {
+    const qualityReport = {
+      openaiAvailable: !!openai,
+      apiKeyConfigured: !!process.env.OPENAI_API_KEY,
+      timestamp: new Date().toISOString(),
+      status: openai ? 'operational' : 'demo_mode'
+    };
+    res.json(qualityReport);
+  } catch (err) {
+    logger.error('❌ AI Quality Report Error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 📊 EXERCISE DATABASE STATS – muss VOR /:id stehen (Express v5)
+router.get("/exercise-stats", async (req, res) => {
+  try {
+    const totalExercises = await Exercise.countDocuments();
+    const exercisesBySource = await Exercise.aggregate([
+      { $group: { _id: '$source', count: { $sum: 1 } } }
+    ]);
+    const exercisesByCategory = await Exercise.aggregate([
+      { $group: { _id: '$category', count: { $sum: 1 } } }
+    ]);
+    const sampleExercises = await Exercise.find({}).limit(10).select('name category source equipment');
+    res.json({
+      total: totalExercises,
+      bySource: exercisesBySource,
+      byCategory: exercisesByCategory,
+      sampleExercises,
+      lastSyncDate: new Date().toISOString()
+    });
+  } catch (err) {
+    logger.error('❌ Exercise Stats Error:', err);
+    res.status(500).json({
+      error: 'Fehler beim Abrufen der Übungsstatistiken',
+      message: err.message
+    });
   }
 });
 
@@ -1344,25 +1133,6 @@ router.post("/ai-feedback", firebaseAuthMiddleware, async (req, res) => {
 
   } catch (err) {
     logger.error('❌ AI Feedback Error:', err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// 🔍 AI QUALITY MONITORING (Vereinfacht)
-router.get("/ai-quality", firebaseAuthMiddleware, async (req, res) => {
-  try {
-    // Einfacher Status-Report
-    const qualityReport = {
-      openaiAvailable: !!openai,
-      apiKeyConfigured: !!process.env.OPENAI_API_KEY,
-      timestamp: new Date().toISOString(),
-      status: openai ? 'operational' : 'demo_mode'
-    };
-
-    res.json(qualityReport);
-
-  } catch (err) {
-    logger.error('❌ AI Quality Report Error:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -2691,37 +2461,6 @@ router.post("/sync-exercises", async (req, res) => {
     logger.error('❌ Exercise Sync Error:', err);
     res.status(500).json({ 
       error: 'Fehler beim Synchronisieren der Übungen',
-      message: err.message 
-    });
-  }
-});
-
-// 📊 EXERCISE DATABASE STATS (Public für Debug-Zwecke)
-router.get("/exercise-stats", async (req, res) => {
-  try {
-    const totalExercises = await Exercise.countDocuments();
-    const exercisesBySource = await Exercise.aggregate([
-      { $group: { _id: '$source', count: { $sum: 1 } } }
-    ]);
-    const exercisesByCategory = await Exercise.aggregate([
-      { $group: { _id: '$category', count: { $sum: 1 } } }
-    ]);
-    
-    // Zusätzlich: Zeige erste 10 Übungen als Sample
-    const sampleExercises = await Exercise.find({}).limit(10).select('name category source equipment');
-    
-    res.json({
-      total: totalExercises,
-      bySource: exercisesBySource,
-      byCategory: exercisesByCategory,
-      sampleExercises: sampleExercises,
-      lastSyncDate: new Date().toISOString()
-    });
-
-  } catch (err) {
-    logger.error('❌ Exercise Stats Error:', err);
-    res.status(500).json({ 
-      error: 'Fehler beim Abrufen der Übungsstatistiken',
       message: err.message 
     });
   }
