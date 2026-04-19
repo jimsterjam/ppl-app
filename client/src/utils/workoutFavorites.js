@@ -94,7 +94,8 @@ function buildFavoriteWorkoutPayload(workout, type) {
       setDetails: Array.isArray(exercise?.setDetails) && exercise.setDetails.length
         ? exercise.setDetails.map((set) => ({
             reps: Number(set?.reps) || 10,
-            weight: Number(set?.weight) || 0
+            weight: Number(set?.weight) || 0,
+            ...(set?.isWarmup ? { isWarmup: true } : {})
           }))
         : [{
             reps: Number(exercise?.reps) || 10,

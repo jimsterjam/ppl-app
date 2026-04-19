@@ -147,7 +147,20 @@ router.beforeEach(async (to, from, next) => {
     return next({ name: 'welcome', query: { redirect: to.fullPath } })
   }
 
-  // Defense-in-depth: Wenn Store sagt eingeloggt, aber kein echter Firebase-User/Token vorhanden, zurück zur Welcome
+  // Wenn bereits authentifiziert und Store initialisiert → kein erneuter Token-Check,
+  // um Navigation zwischen App-Seiten nicht mit async Firebase-Calls zu verzögern.
+  if (authStore.initialized && authStore.isAuthenticated) {
+    if (!isOnline()) {
+      if (!authStore.isOfflineSessionValid) {
+        logger.warn('[router] offline session expired or missing token, redirecting to welcome')
+        authStore.clearUser()
+        return next({ name: 'welcome', query: { redirect: to.fullPath, reason: 'offline-expired' } })
+      }
+    }
+    return next()
+  }
+
+  // Defense-in-depth: nur beim ersten Init oder wenn Store-Zustand unklar
   if (!isOnline()) {
     if (!authStore.isOfflineSessionValid) {
       logger.warn('[router] offline session expired or missing token, redirecting to welcome')

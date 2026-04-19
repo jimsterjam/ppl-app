@@ -31,7 +31,7 @@
               <button class="primary add-exercise-btn" type="button" @click="showAddExerciseModal = true">
                 + {{ t('workoutDetail.addExercise') }}
               </button>
-              <button class="primary timer-config-btn" type="button" @click="showTimerConfig = true">
+              <button v-if="!isFavoriteAdjustMode" class="primary timer-config-btn" type="button" @click="showTimerConfig = true">
                 ⏱ Timer einstellen
               </button>
               <button class="reorder-toggle" type="button" :aria-pressed="isReordering" @click="toggleReorder">
@@ -415,10 +415,10 @@
               {{ t('workoutDetail.done') }}
             </button>
             <button v-else class="primary" :disabled="saving" @click="saveWorkout">
-              {{ saving ? t('workoutDetail.saving') : t('workoutDetail.save') }}
+              {{ saving ? t('workoutDetail.saving') : (isFavoriteAdjustMode ? t('workoutDetail.adjustSave') : t('workoutDetail.save')) }}
             </button>
             <button
-              v-if="!isReordering"
+              v-if="!isReordering && !isFavoriteAdjustMode"
               class="secondary favorite-save"
               type="button"
               :disabled="favoriteSaving"
@@ -707,6 +707,7 @@ const store = userStore
 const toast = useToastStore()
 const timerStore = useTimerStore()
 const hasTimerOverlay = computed(() => Boolean(timerStore?.miniVisible && timerStore?.isActive))
+const isFavoriteAdjustMode = computed(() => String(route.query?.favoriteAdjust || '') === '1')
 const workout = ref(null)
 const loading = ref(false)
 const error = ref('')
@@ -903,13 +904,39 @@ function applyFavoritePrefillFromHistory(targetExercise = {}, historyExercise = 
 async function maybePrefillFromLastFavoritePerformance() {
   if (!workout.value || favoritePrefillApplied.value) return
   if (!isFavoriteSourceRoute()) return
+  // Beim Anpassen eines Favoriten (nur Template bearbeiten, kein echtes Workout starten)
+  // darf kein History-Prefill laufen: der User will den gespeicherten Favorit-Stand sehen,
+  // nicht die letzte gelebte Performance. Da favoriteAdjust-Saves kein Workout in die
+  // History schreiben, würde der Prefill bei jedem erneuten Öffnen die Änderungen verdecken.
+  if (String(route.query?.favoriteAdjust || '') === '1') {
+    favoritePrefillApplied.value = true
+    return
+  }
+
+  // currentWorkoutId früh ermitteln, damit der localStorage-Key geprüft werden kann, bevor
+  // wir die teuren History-Queries starten.
+  const currentWorkoutId = String(workout.value?._id || route.params.id || '').trim()
+  if (!currentWorkoutId) return
+  // Überlebt einen iOS-Prozess-Kill: Flag wurde beim ersten Durchlauf in localStorage gesetzt.
+  // Beim Wiederherstellen der Route durch tryRestoreLastRoute würde der Prefill sonst Änderungen
+  // des Users (aus IndexedDB) mit alten Historienwerten überschreiben.
+  const prefillStorageKey = `fav_prefill_applied_v1_${currentWorkoutId}`
+  try {
+    if (localStorage.getItem(prefillStorageKey) === '1') {
+      favoritePrefillApplied.value = true
+      return
+    }
+  } catch {}
 
   const activeUserId = resolveActiveWorkoutUserId()
   if (!activeUserId) return
 
-  const currentWorkoutId = String(workout.value?._id || route.params.id || '').trim()
   const history = await getAllWorkoutsOffline({ userId: activeUserId }).catch(() => [])
-  if (!Array.isArray(history) || !history.length) return
+  if (!Array.isArray(history) || !history.length) {
+    favoritePrefillApplied.value = true
+    try { localStorage.setItem(prefillStorageKey, '1') } catch {}
+    return
+  }
 
   const dedupedHistory = new Map()
   history.forEach((entry) => {
@@ -970,12 +997,14 @@ async function maybePrefillFromLastFavoritePerformance() {
 
   if (!Object.keys(hintMap).length) {
     favoritePrefillApplied.value = true
+    try { localStorage.setItem(prefillStorageKey, '1') } catch {}
     return
   }
 
   favoriteLastPerformanceByIndex.value = hintMap
   ensureSetDetailsStructure()
   favoritePrefillApplied.value = true
+  try { localStorage.setItem(prefillStorageKey, '1') } catch {}
   try { await triggerAutoSave() } catch {}
 }
 
@@ -1014,7 +1043,7 @@ async function syncStartedFavoriteFromWorkout(workoutLike = null) {
     userId: getFavoriteUserId(),
     type: favoriteMeta.favoriteType,
     id: favoriteMeta.favoriteId,
-    name: favoriteMeta.favoriteName || source.name || '',
+    name: favoriteMeta.favoriteName || '',
     workout: payloadWorkout
   })
 }
@@ -1635,6 +1664,12 @@ function shouldAutoScroll() {
 }
 
 function goDashboard() {
+  // Im Adjust-Modus: kein Dirty-/Timer-Guard. bypassTimerLeaveGuard NICHT setzen,
+  // damit onBeforeRouteLeave den Draft-Cleanup übernimmt.
+  if (isFavoriteAdjustMode.value) {
+    router.push('/dashboard')
+    return
+  }
   if (isDirty.value) {
     showLeaveModal.value = true
     return
@@ -1990,15 +2025,22 @@ async function performSaveWorkout() {
     // Favorit-Anpassen: Nur Favorit aktualisieren, kein Stats-Eintrag
     if (String(route.query?.favoriteAdjust || '') === '1') {
       await syncStartedFavoriteFromWorkout(normalized)
-      // Draft-Workout entfernen (wurde nie als abgeschlossenes Workout gedacht)
+      // Draft-Workout aus IndexedDB, Store UND sessionStorage entfernen.
+      // sessionStorage muss zwingend geleert werden, sonst zeigt Dashboard diesen
+      // Draft als "in Bearbeitung" an (readDetailDraft liest workout_detail_draft).
+      clearAllDetailDraftSnapshots()
       const adjustId = String(id)
       if (adjustId.startsWith('draft-')) {
         const realId = resolveRealIdFromDraftId(adjustId)
         if (realId) {
           const tk = await getIdToken().catch(() => null)
           await deleteWorkoutApi(realId, tk).catch(() => null)
-          try { await db.workouts.delete(adjustId) } catch {}
         }
+        try { await db.workouts.delete(adjustId) } catch {}
+        try {
+          const idx = store.workouts.findIndex(w => String(w?._id || '') === adjustId)
+          if (idx !== -1) store.workouts.splice(idx, 1)
+        } catch {}
       } else {
         const tk = await getIdToken().catch(() => null)
         await deleteWorkoutApi(adjustId, tk).catch(() => null)
@@ -2028,6 +2070,10 @@ async function performSaveWorkout() {
         await store.updateWorkout(realId, normalized, token)
         syncStartedFavoriteFromWorkout({ ...normalized, _id: realId })
         saveMsg.value = finalDurationMinutes > 0 ? `Gespeichert. Dauer: ${finalDurationMinutes} min` : 'Gespeichert.'
+        if (String(route.query?.favoriteStart || '') === '1') {
+          saveMsg.value += ' · Favorit aktualisiert'
+          try { localStorage.removeItem(`fav_prefill_applied_v1_${realId}`) } catch {}
+        }
         saveError.value = false
         initialSnapshot = snapshotCore({ ...normalized, _id: realId })
         try { await db.workouts.delete(id) } catch {}
@@ -2083,6 +2129,10 @@ async function performSaveWorkout() {
         saveMsg.value = finalDurationMinutes > 0 ? `Gespeichert. Dauer: ${finalDurationMinutes} min` : 'Gespeichert.'
         saveError.value = false
       }
+      if (String(route.query?.favoriteStart || '') === '1') {
+        saveMsg.value += ' · Favorit aktualisiert'
+        try { localStorage.removeItem(`fav_prefill_applied_v1_${savedWorkout?._id || id}`) } catch {}
+      }
       initialSnapshot = snapshotCore({ ...createPayload, _id: savedWorkout?._id || id })
       await postSaveCleanup()
       bypassTimerLeaveGuard.value = true
@@ -2094,6 +2144,10 @@ async function performSaveWorkout() {
     await store.updateWorkout(id, normalized, token)
     syncStartedFavoriteFromWorkout({ ...normalized, _id: id })
     saveMsg.value = finalDurationMinutes > 0 ? `Gespeichert. Dauer: ${finalDurationMinutes} min` : 'Gespeichert.'
+    if (String(route.query?.favoriteStart || '') === '1') {
+      saveMsg.value += ' · Favorit aktualisiert'
+      try { localStorage.removeItem(`fav_prefill_applied_v1_${id}`) } catch {}
+    }
     saveError.value = false
     initialSnapshot = snapshotCore({ ...w, ...normalized })
     await postSaveCleanup()
@@ -2110,7 +2164,8 @@ async function performSaveWorkout() {
 }
 
 async function saveWorkout() {
-  if (timerStore.isRunningLike) {
+  // Im Adjust-Modus läuft kein Workout, Timer-Guard nicht anwenden
+  if (!isFavoriteAdjustMode.value && timerStore.isRunningLike) {
     pendingTimerAction.value = { kind: 'save' }
     showTimerActionModal.value = true
     return
@@ -2384,6 +2439,7 @@ function findExerciseIndexAtPoint(x, y) {
 function writeDraftSessionSnapshot() {
   try {
     if (suppressDraftPersistence.value) return
+    if (isFavoriteAdjustMode.value) return // Adjust-Drafts nie als Workout-in-Progress speichern
     const w = workout.value
     if (!w || w.completed === true) return
     if (!(shouldKeepAsDraft(w) || isDirty.value)) return
@@ -2404,6 +2460,7 @@ function writeDraftSessionSnapshot() {
 
 async function persistInProgressDraft(reason = '') {
   if (suppressDraftPersistence.value) return
+  if (isFavoriteAdjustMode.value) return // Adjust-Drafts nie als Workout-in-Progress persistieren
   writeDraftSessionSnapshot()
   try {
     const w = workout.value
@@ -2483,6 +2540,20 @@ watch(() => workout.value?.exercises?.length || 0, async (len) => {
   }, 0)
 })
 
+// Wenn router.replace die Route von der Temp-ID auf die echte MongoDB-ID wechselt (WorkoutBuilder
+// erstellt das Workout im Hintergrund), den localStorage-Prefill-Key migrieren, damit er nach
+// einem iOS-Prozess-Kill mit der wiederhergestellten URL (realId) übereinstimmt.
+watch(() => String(route.params.id || ''), (newId, oldId) => {
+  if (!newId || !oldId || newId === oldId) return
+  try {
+    const oldKey = `fav_prefill_applied_v1_${oldId}`
+    if (localStorage.getItem(oldKey) === '1') {
+      localStorage.setItem(`fav_prefill_applied_v1_${newId}`, '1')
+      localStorage.removeItem(oldKey)
+    }
+  } catch {}
+})
+
 // Dirty-Tracking gegen initialen Snapshot & sofortiges Draft-Speichern
 watch(() => workout.value, (w) => {
   const current = snapshotCore(w || {})
@@ -2496,6 +2567,7 @@ watch(() => workout.value, (w) => {
 
 // Warnung beim Schließen/Reload
 function beforeUnloadHandler(e) {
+  if (isFavoriteAdjustMode.value) return // Adjust-Modus: kein Reload-Warndialog
   if (!workout.value || workout.value.completed === true) return
   if (!(shouldKeepAsDraft(workout.value) || isDirty.value)) return
   try {
@@ -2511,6 +2583,29 @@ function beforeUnloadHandler(e) {
 
 onBeforeRouteLeave(async (to) => {
   writeDetailViewState('route-leave')
+
+  // Adjust-Modus: Draft wird NIEMALS als Workout-in-Progress behandelt.
+  // Bei bypassTimerLeaveGuard (= nach performSaveWorkout) sind Cleanup-Schritte
+  // bereits in performSaveWorkout erledigt worden. Beim Verlassen ohne Speichern
+  // Draft explizit aus IndexedDB und Store entfernen.
+  if (isFavoriteAdjustMode.value) {
+    if (bypassTimerLeaveGuard.value) {
+      bypassTimerLeaveGuard.value = false
+      return true
+    }
+    // Verlassen ohne Speichern: Adjust-Draft verwerfen
+    const adjustId = String(route.params.id || '')
+    if (adjustId) {
+      try { await db.workouts.delete(adjustId) } catch {}
+      try {
+        const idx = store.workouts.findIndex(w => String(w?._id || '') === adjustId)
+        if (idx !== -1) store.workouts.splice(idx, 1)
+      } catch {}
+    }
+    clearAllDetailDraftSnapshots()
+    return true
+  }
+
   await persistInProgressDraft('route-leave')
 
   if (bypassTimerLeaveGuard.value) {

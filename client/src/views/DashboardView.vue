@@ -403,7 +403,7 @@ function buildFavoriteDetailDraft(favorite) {
   const exercises = (Array.isArray(fav.exercises) ? fav.exercises : []).map((exercise = {}) => {
     const fallbackSetDetails = [{ reps: Number(exercise?.reps) || 10, weight: Number(exercise?.weight) || 0 }]
     const setDetails = Array.isArray(exercise?.setDetails) && exercise.setDetails.length > 0
-      ? exercise.setDetails.map((set) => ({ reps: Number(set?.reps) || 0, weight: Number(set?.weight) || 0 }))
+      ? exercise.setDetails.map((set) => ({ reps: Number(set?.reps) || 0, weight: Number(set?.weight) || 0, ...(set?.isWarmup ? { isWarmup: true } : {}) }))
       : fallbackSetDetails
     return {
       ...exercise,

@@ -32,11 +32,6 @@
               </p>
             </div>
             
-            <div class="workout-type">
-              <span class="type-badge" :class="workout.type?.toLowerCase()">
-                {{ getTypeIcon(workout.type) }}
-              </span>
-            </div>
           </div>
           
           <div class="workout-actions">
@@ -211,6 +206,9 @@ import { useRouter } from 'vue-router'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 import { logger } from '@/utils/logger'
 import { resolveWorkoutNotes } from '@/utils/workoutNotes'
+import { useUserStore } from '@/stores/userStore'
+import { saveWorkoutOffline } from '@/utils/offlineStorage'
+import { useFirebaseAuth } from '@/utils/firebaseAuth'
 
 const props = defineProps({
   workouts: {
@@ -227,6 +225,8 @@ const emit = defineEmits(['delete'])
 const router = useRouter()
 const { t, locale } = useI18n()
 const { getTranslatedExerciseName } = useExerciseTranslation()
+const store = useUserStore()
+const { getCurrentUser } = useFirebaseAuth()
 const expandedWorkout = ref(null)
 const showAllExercises = ref(false)
 const getWorkoutNotes = (workout) => resolveWorkoutNotes(workout, { maxItems: 8, maxLength: 600 })
@@ -240,7 +240,7 @@ const recentWorkouts = computed(() => {
       notes: resolveWorkoutNotes(w, { maxItems: 8, maxLength: 600 })
     }))
     .sort((a, b) => new Date(b.date || b.updatedAt) - new Date(a.date || a.updatedAt))
-    .slice(0, 7)
+    .slice(0, 5)
 })
 
 function getWorkoutTitle(workout) {
@@ -252,16 +252,6 @@ function getWorkoutTitle(workout) {
     case 'pull': return 'Pull Day'
     case 'legs': return 'Leg Day'
     default: return 'Workout'
-  }
-}
-
-function getTypeIcon(type) {
-  const t = type?.toLowerCase()
-  switch (t) {
-    case 'push': return '💪'
-    case 'pull': return '🎯'
-    case 'legs': return '🦵'
-    default: return '🏋️'
   }
 }
 
@@ -403,9 +393,41 @@ function viewWorkout(workout) {
   router.push(`/workouts/${workout._id}`);
 }
 
-function repeatWorkout(workout) {
-  // Navigiere zur Workout-Detailansicht des gewählten Workouts
-  router.push({ name: 'workout-detail', params: { id: workout._id } })
+async function repeatWorkout(sourceWorkout) {
+  const draftId = `draft-repeat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  const userId = String(getCurrentUser?.()?.uid || store.user?.uid || store.user?.id || 'guest')
+
+  const exercises = (sourceWorkout.exercises || []).map((ex) => {
+    const setDetails = Array.isArray(ex.setDetails) && ex.setDetails.length
+      ? ex.setDetails.map(s => ({
+          reps: Number(s?.reps) || 0,
+          weight: Number(s?.weight) || 0,
+          ...(s?.isWarmup ? { isWarmup: true } : {})
+        }))
+      : [{ reps: Number(ex.reps) || 10, weight: Number(ex.weight) || 0 }]
+    return { ...ex, setDetails, reps: Number(setDetails[0]?.reps) || 0, weight: Number(setDetails[0]?.weight) || 0 }
+  })
+
+  const draft = {
+    _id: draftId,
+    userId,
+    name: sourceWorkout.name || '',
+    type: sourceWorkout.type || 'push',
+    date: new Date().toISOString(),
+    completed: false,
+    _isDraft: true,
+    isDraft: true,
+    exercises
+  }
+
+  try {
+    await saveWorkoutOffline(draft)
+    store.workouts.unshift(draft)
+  } catch (e) {
+    logger.warn('[RecentWorkouts] repeatWorkout: Draft konnte nicht gespeichert werden', e)
+  }
+
+  router.push({ name: 'workout-detail', params: { id: draftId } })
 }
 
 function editWorkout(workout) {
@@ -477,22 +499,6 @@ function deleteWorkoutItem(workout) {
 .workout-title { margin: 0 0 4px 0; font-size: 1rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .workout-meta { margin: 0; color: var(--muted); font-size: 0.82rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .exercise-count { color: var(--accent-color); }
-
-.type-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 14px;
-  font-size: 1rem;
-  border: 1px solid var(--card-border);
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.type-badge.push { border-color: rgba(255, 149, 128, 0.4); }
-.type-badge.pull { border-color: rgba(74, 209, 255, 0.35); }
-.type-badge.legs { border-color: rgba(88, 255, 178, 0.4); }
 
 .workout-actions {
   display: flex;
@@ -692,12 +698,6 @@ function deleteWorkoutItem(workout) {
   
   .workout-meta {
     font-size: 0.75rem;
-  }
-  
-  .type-badge {
-    width: 28px;
-    height: 28px;
-    font-size: 0.9rem;
   }
   
   .action-btn {

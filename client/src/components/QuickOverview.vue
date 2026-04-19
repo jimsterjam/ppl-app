@@ -82,7 +82,6 @@ const props = defineProps({
 })
 const { t, tm } = useI18n()
 
-const compactNumber = new Intl.NumberFormat('de-DE', { notation: 'compact', maximumFractionDigits: 1 })
 const statsKpis = computed(() => (props.stats && props.stats.kpis) ? props.stats.kpis : null)
 const hasStats = computed(() => !!statsKpis.value)
 const avgSessionsDisplay = computed(() => hasStats.value ? Number(statsKpis.value.avgSessionsPerWeek || 0).toFixed(1) : '—')
@@ -175,10 +174,7 @@ const lastWorkoutLabel = computed(() => {
 
 function formatKgValue(value) {
   const numeric = Number(value) || 0
-  if (numeric >= 1000) {
-    return compactNumber.format(numeric)
-  }
-  return Math.round(numeric).toString()
+  return new Intl.NumberFormat('de-DE', { maximumFractionDigits: 0 }).format(numeric)
 }
 </script>
 

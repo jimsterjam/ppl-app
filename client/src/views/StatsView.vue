@@ -142,10 +142,16 @@
               </div>
               <ul class="recent-list">
                 <li v-for="item in recentProgress" :key="item.id" class="recent-item">
-                  <div>
+                  <div class="recent-item-left">
                     <p class="recent-title">{{ item.title }}</p>
                     <span class="recent-sub">{{ item.subtitle }}</span>
                     <p v-if="item.note" class="recent-note">{{ item.note }}</p>
+                    <ul v-if="item.exercises?.length" class="ex-vol-list">
+                      <li v-for="ex in item.exercises" :key="ex.name" class="ex-vol-item">
+                        <span class="ex-vol-name">{{ ex.name }}</span>
+                        <span class="ex-vol-value">{{ formatKg(ex.volume) }}</span>
+                      </li>
+                    </ul>
                   </div>
                   <span class="recent-value">{{ item.value }}</span>
                 </li>
@@ -495,13 +501,28 @@ const recentProgress = computed(() => {
     .filter(w => !w.isDraft)
     .sort((a, b) => new Date(b.date) - new Date(a.date))
     .slice(0, 4)
-    .map((w) => ({
-      id: w._id,
-      title: w.name || 'Workout',
-      subtitle: new Date(w.date).toLocaleDateString(isDe.value ? 'de-DE' : 'en-US'),
-      note: typeof w.notes === 'string' ? w.notes.trim() : '',
-      value: formatKg(calcWorkoutVolume(w))
-    }))
+    .map((w) => {
+      const exercises = (w.exercises || []).flatMap((ex) => {
+        let vol = 0
+        if (Array.isArray(ex.setDetails) && ex.setDetails.length) {
+          ex.setDetails.forEach((set) => {
+            if (set?.isWarmup) return
+            vol += (Number(set.reps) || 0) * (Number(set.weight) || 0)
+          })
+        } else {
+          vol = (Number(ex.sets) || 1) * (Number(ex.reps) || 0) * (Number(ex.weight) || 0)
+        }
+        return vol > 0 ? [{ name: ex.name || '?', volume: vol }] : []
+      })
+      return {
+        id: w._id,
+        title: w.name || 'Workout',
+        subtitle: new Date(w.date).toLocaleDateString(isDe.value ? 'de-DE' : 'en-US'),
+        note: typeof w.notes === 'string' ? w.notes.trim() : '',
+        value: formatKg(calcWorkoutVolume(w)),
+        exercises
+      }
+    })
 })
 
 const advancedCards = computed(() => ([
@@ -742,6 +763,7 @@ function calcWorkoutVolume(workout) {
   ;(workout.exercises || []).forEach((ex) => {
     if (Array.isArray(ex.setDetails) && ex.setDetails.length) {
       ex.setDetails.forEach((set) => {
+        if (set?.isWarmup) return
         const reps = Number(set?.reps) || 0
         const weight = Number(set?.weight) || 0
         total += reps * weight
@@ -757,11 +779,11 @@ function calcWorkoutVolume(workout) {
 }
 
 function formatKg(value) {
+  const numeric = Number(value) || 0
   const formatted = new Intl.NumberFormat(isDe.value ? 'de-DE' : 'en-US', {
-    notation: 'compact',
-    maximumFractionDigits: 1
-  }).format(Number(value) || 0)
-  return `${formatted} kg`
+    maximumFractionDigits: 0
+  }).format(numeric)
+  return `${formatted}\u00a0kg`
 }
 
 onMounted(async () => {
@@ -1426,6 +1448,46 @@ function formatNumber(value, digits = 0) {
 
 .recent-value {
   font-weight: 700;
+  flex-shrink: 0;
+}
+
+.recent-item-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.ex-vol-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ex-vol-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.75rem;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.ex-vol-name {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 20ch;
+}
+
+.ex-vol-value {
+  color: var(--accent-color);
+  font-weight: 600;
+  flex-shrink: 0;
+  margin-left: 8px;
 }
 
 .pro-card {

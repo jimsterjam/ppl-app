@@ -89,7 +89,7 @@ const links = [
   min-height: 50px;
   box-sizing: border-box;
 }
-.nav-btn { background: none; border: none; color: var(--fg); opacity: 0.7; display: flex; flex-direction: column; align-items: center; font-size: 0.7rem; padding: 4px 8px; cursor: pointer; transition: all 0.2s ease; border-radius: 8px; min-height: 46px; min-width: 46px; -webkit-tap-highlight-color: transparent; }
+.nav-btn { background: none; border: none; color: var(--fg); opacity: 0.7; display: flex; flex-direction: column; align-items: center; font-size: 0.7rem; padding: 4px 8px; cursor: pointer; transition: color 0.15s ease, opacity 0.15s ease, background 0.15s ease; border-radius: 8px; min-height: 46px; min-width: 46px; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
 .nav-btn:hover, .nav-btn:active, .nav-btn.active { color: var(--accent-color); opacity: 1; background: color-mix(in srgb, var(--accent-color) 8%, transparent); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
 .icon { margin-bottom: 2px; line-height: 1; }
 .icon-svg { width: 20px; height: 20px; }
