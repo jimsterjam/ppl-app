@@ -165,7 +165,7 @@ const DEFAULT_CONFIG = {
   intervals: 1,
   countDirection: 'down',
   countdown: true,
-  countdownSound: true,
+  countdownSoundType: 'box-gong',
   speechEnabled: false,
   speechLocale: 'de-DE'
 }
@@ -553,7 +553,8 @@ export const useTimerStore = defineStore('timer', {
             if (safeRemaining !== this.prepLastSecond) {
               emitTimerSignal({
                 eventKey: `sw-prep-countdown:${safeRemaining}:${this.startedAt || 0}`,
-                soundEnabled: this.config.countdownSound,
+                soundEnabled: String(this.config.countdownSoundType ?? 'box-gong') !== 'none',
+                soundType: this.config.countdownSoundType || 'box-gong',
                 kind: `countdown-${safeRemaining}`
               })
             }
@@ -573,7 +574,8 @@ export const useTimerStore = defineStore('timer', {
         if (stopwatchElapsed <= TICK_MS + 30 && lastRoundStartSignalKey !== swKey) {
           emitTimerSignal({
             eventKey: `sw-start:${swKey}`,
-            soundEnabled: this.config.countdownSound,
+            soundEnabled: String(this.config.countdownSoundType ?? 'box-gong') !== 'none',
+            soundType: this.config.countdownSoundType || 'box-gong',
             kind: 'round-start'
           })
           lastRoundStartSignalKey = swKey
@@ -587,7 +589,8 @@ export const useTimerStore = defineStore('timer', {
             this.setCountdownOverlay(remainingSeconds)
             emitTimerSignal({
               eventKey: `sw-countdown:${swKey}:${remainingSeconds}`,
-              soundEnabled: this.config.countdownSound,
+              soundEnabled: String(this.config.countdownSoundType ?? 'box-gong') !== 'none',
+              soundType: this.config.countdownSoundType || 'box-gong',
               kind: `countdown-${remainingSeconds}`
             })
             this.countdownLastSecond = remainingSeconds
@@ -600,7 +603,8 @@ export const useTimerStore = defineStore('timer', {
             if (lastSessionEndSignalKey !== swKey) {
               emitTimerSignal({
                 eventKey: `sw-session-end:${swKey}`,
-                soundEnabled: this.config.countdownSound,
+                soundEnabled: String(this.config.countdownSoundType ?? 'box-gong') !== 'none',
+                soundType: this.config.countdownSoundType || 'box-gong',
                 kind: 'session-end'
               })
               lastSessionEndSignalKey = swKey
@@ -631,7 +635,8 @@ export const useTimerStore = defineStore('timer', {
           if (safeRemaining !== this.prepLastSecond) {
             emitTimerSignal({
               eventKey: `prep:${safeRemaining}:${this.startedAt || 0}`,
-              soundEnabled: this.config.countdownSound,
+              soundEnabled: String(this.config.countdownSoundType ?? 'box-gong') !== 'none',
+              soundType: this.config.countdownSoundType || 'box-gong',
               kind: `countdown-${safeRemaining}`
             })
           }
@@ -667,7 +672,8 @@ export const useTimerStore = defineStore('timer', {
           if (isWorkPhaseStartWindow && lastRoundStartSignalKey !== intervalKey) {
             emitTimerSignal({
               eventKey: `phase-start:${phaseState}:${this.startedAt || 0}`,
-              soundEnabled: this.config.countdownSound,
+              soundEnabled: String(this.config.countdownSoundType ?? 'box-gong') !== 'none',
+              soundType: this.config.countdownSoundType || 'box-gong',
               kind: 'round-start'
             })
           }
@@ -696,7 +702,8 @@ export const useTimerStore = defineStore('timer', {
             eventKey: inNoRestWorkCountdownWindow
               ? `countdown:norest:${this.phaseInfo.intervalIndex}:${remainingSeconds}`
               : `countdown:${intervalKey}:${remainingSeconds}`,
-            soundEnabled: this.config.countdownSound,
+            soundEnabled: String(this.config.countdownSoundType ?? 'box-gong') !== 'none',
+            soundType: this.config.countdownSoundType || 'box-gong',
             kind: `countdown-${remainingSeconds}`
           })
           this.countdownLastSecond = remainingSeconds
@@ -715,7 +722,8 @@ export const useTimerStore = defineStore('timer', {
         if (lastSessionEndSignalKey !== sessionEndKey) {
           emitTimerSignal({
             eventKey: `session-end:${sessionEndKey}`,
-            soundEnabled: this.config.countdownSound,
+            soundEnabled: String(this.config.countdownSoundType ?? 'box-gong') !== 'none',
+            soundType: this.config.countdownSoundType || 'box-gong',
             kind: 'session-end'
           })
           lastSessionEndSignalKey = sessionEndKey

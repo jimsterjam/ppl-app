@@ -353,7 +353,7 @@ function updateOrientation() {
   gap: 6px;
   padding: 10px 14px 10px;
   border-radius: 0 0 16px 16px;
-  background: color-mix(in srgb, var(--bg-panel) 92%, black 8%);
+  background: #07090d;
   border: none;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
   overflow: hidden;
@@ -391,7 +391,7 @@ function updateOrientation() {
   --timer-glyph-primary-size: 34px;
   --timer-controls-gap: 14px;
   padding: 12px 14px 12px;
-  background: color-mix(in srgb, var(--bg-panel) 96%, black 4%);
+  background: #07090d;
   min-height: min(52vh, 460px);
 }
 
@@ -407,7 +407,7 @@ function updateOrientation() {
   border-radius: 0;
   border: none;
   box-shadow: none;
-  background: color-mix(in srgb, var(--bg-panel) 97%, black 3%);
+  background: #050508;
   padding:
     max(10px, env(safe-area-inset-top))
     max(12px, env(safe-area-inset-right))
@@ -428,15 +428,15 @@ function updateOrientation() {
 .timer-bar.portrait-fullscreen .timer-main {
   min-height: 0;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) minmax(0, 2.5fr);
   align-items: center;
   justify-items: center;
-  gap: clamp(6px, 1.8vh, 16px);
+  gap: clamp(8px, 2vh, 20px);
 }
 
 .timer-bar.portrait-fullscreen .timer-status {
   margin-bottom: 0;
-  font-size: clamp(0.95rem, 2.2vh, 1.35rem);
+  font-size: clamp(1.1rem, 3.5vh, 2.4rem);
 }
 
 .timer-bar.portrait-fullscreen .timer-time {
@@ -584,7 +584,7 @@ function updateOrientation() {
 }
 
 .timer-bar.expanded:not(.portrait-fullscreen):not(.landscape-fullscreen) .timer-status {
-  font-size: 1.22rem;
+  font-size: 1.38rem;
   margin-bottom: 4px;
 }
 
@@ -608,8 +608,8 @@ function updateOrientation() {
   height: var(--timer-icon-size);
   border-radius: 12px;
   border: 2px solid color-mix(in srgb, var(--accent) 85%, transparent);
-  background: color-mix(in srgb, var(--accent) 18%, transparent);
-  color: var(--accent);
+  background: transparent;
+  color: #ffffff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -626,7 +626,7 @@ function updateOrientation() {
   width: var(--timer-icon-primary-size);
   height: var(--timer-icon-primary-size);
   background: var(--accent);
-  color: var(--accent-contrast);
+  color: #ffffff;
   border-color: color-mix(in srgb, var(--accent) 92%, black 8%);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 }
@@ -637,14 +637,13 @@ function updateOrientation() {
 }
 
 .timer-bar.running .timer-icon.primary {
-  background: var(--accent);
+  background: #07090d;
   border-color: var(--accent);
 }
 
 .timer-icon .icon {
   width: var(--timer-glyph-size);
   height: var(--timer-glyph-size);
-  stroke-width: 3.1;
 }
 
 .timer-icon.primary .icon {
@@ -653,13 +652,14 @@ function updateOrientation() {
 }
 
 .timer-icon.close {
-  border-color: color-mix(in srgb, var(--danger-color, #dc2626) 78%, black 22%);
-  background: color-mix(in srgb, var(--danger-color, #dc2626) 16%, white 84%);
-  color: color-mix(in srgb, var(--danger-color, #dc2626) 88%, black 12%);
+  border-color: #dc2626;
+  background: #dc2626;
+  color: #ffffff;
 }
 
 .timer-icon.close:hover {
-  background: color-mix(in srgb, var(--danger-color, #dc2626) 24%, white 76%);
+  background: #b91c1c;
+  border-color: #b91c1c;
 }
 
 .timer-icon:active {
@@ -724,7 +724,8 @@ function updateOrientation() {
   }
 
   .timer-bar.expanded .timer-status {
-    font-size: 1.08rem;
+    font-size: 2.08rem;
+    color: #ffffff;
   }
 }
 
@@ -751,7 +752,7 @@ function updateOrientation() {
   grid-template-rows: auto auto;
   place-content: center;
   place-items: center;
-  background: color-mix(in srgb, var(--bg-panel) 95%, black 5%);
+  background: #050508;
   border: none;
   border-radius: 0;
   box-shadow: none;
@@ -772,7 +773,7 @@ function updateOrientation() {
 .timer-bar.landscape-fullscreen .timer-status {
   display: flex !important;
   margin-bottom: 18px;
-  font-size: clamp(1.2rem, 2.2vw, 2rem);
+  font-size: clamp(1.4rem, 3vw, 2.6rem);
   letter-spacing: 0.08em;
   color: color-mix(in srgb, var(--fg) 88%, transparent);
 }
@@ -812,16 +813,22 @@ function updateOrientation() {
   justify-content: center;
   border: 2px solid var(--accent);
   background: transparent;
-  color: var(--accent);
+  color: #ffffff;
+}
+
+.timer-bar.landscape-fullscreen .timer-icon.close {
+  border-color: #dc2626;
+  background: #dc2626;
+  color: #ffffff;
 }
 
 .timer-bar.landscape-fullscreen .timer-icon.primary {
   width: 140px;
   height: 140px;
   border-radius: 26px;
-  background: var(--accent);
-  color: var(--accent-contrast);
-  border: none;
+  background: #07090d;
+  color: #ffffff;
+  border-color: var(--accent);
 }
 
 .timer-bar.landscape-fullscreen .timer-icon .icon {

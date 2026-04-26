@@ -224,6 +224,7 @@ import { useSettingsStore } from '@/stores/settingsStore'
 import { useAuthStore } from '@/stores/authStore'
 import { isOnline, deleteWorkoutOffline, getWorkoutOffline, saveWorkoutOffline } from '@/utils/offlineStorage'
 import { isDraftDeleted } from '@/utils/draftTombstones'
+import { deleteWorkout } from '@/api/workouts'
 import { http } from '@/api/http'
 import { loadDefaultExercises, getCachedDefaultExercises } from '@/utils/defaultExercisesLoader'
 import { buildWorkoutBuilderRoute, normalizeBuilderWorkoutType, QUICK_PREFILL_KEY, saveWorkoutBuilderPrefill } from '@/utils/workoutBuilderFlow'
@@ -401,10 +402,9 @@ function buildFavoriteDetailDraft(favorite) {
   const draftId = `draft-favorite-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
   const userId = String(getCurrentUser?.()?.uid || authStore.user?.id || authStore.user?.uid || 'guest')
   const exercises = (Array.isArray(fav.exercises) ? fav.exercises : []).map((exercise = {}) => {
-    const fallbackSetDetails = [{ reps: Number(exercise?.reps) || 10, weight: Number(exercise?.weight) || 0 }]
     const setDetails = Array.isArray(exercise?.setDetails) && exercise.setDetails.length > 0
       ? exercise.setDetails.map((set) => ({ reps: Number(set?.reps) || 0, weight: Number(set?.weight) || 0, ...(set?.isWarmup ? { isWarmup: true } : {}) }))
-      : fallbackSetDetails
+      : []
     return {
       ...exercise,
       exerciseId: exercise?.exerciseId || exercise?._id || null,
@@ -801,13 +801,58 @@ function openWorkoutInfo(type) {
 }
 
 async function discardDraft() {
+  // Sammle alle IDs die mit dem aktuellen Draft zusammenhängen können:
+  // 1. workout_map_{tempId} → realId (Server-Workout, vom WorkoutBuilder erzeugt)
+  // 2. detailDraft._id wenn echte ObjectId (nach router.replace)
+  // 3. draftId aus Store (kann direkt realId sein wenn Draft als solche markiert)
+  // Alle IDs werden BEDINGUNGSLOS gesammelt – wenn der Delete-Button sichtbar ist,
+  // kann kein completed Workout betroffen sein.
+  const serverDraftIds = new Set()
+  try {
+    Object.keys(sessionStorage)
+      .filter(k => k.startsWith('workout_map_'))
+      .forEach(k => {
+        const realId = String(sessionStorage.getItem(k) || '').trim()
+        if (realId && /^[a-f\d]{24}$/i.test(realId)) serverDraftIds.add(realId)
+      })
+    // detailDraft selbst kann bereits eine echte MongoDB-ID sein (nach router.replace)
+    const draftObjId = String(detailDraft.value?._id || '').trim()
+    if (draftObjId && /^[a-f\d]{24}$/i.test(draftObjId)) serverDraftIds.add(draftObjId)
+    // Alle Draft-Workouts im Store mit echter ObjectId ebenfalls erfassen
+    ;(store.workouts || [])
+      .filter(w => (w?._isDraft === true || w?.isDraft === true) && w?.completed !== true)
+      .forEach(w => {
+        const id = String(w?._id || '').trim()
+        if (id && /^[a-f\d]{24}$/i.test(id)) serverDraftIds.add(id)
+      })
+  } catch {}
+
   try {
     await store.clearDraft()
     // Draft aus Pinia-Store entfernen
     store.workouts = store.workouts.filter(w => !(w?._isDraft === true || w?.isDraft === true))
   } catch {}
+
+  // Server-seitige Draft-Workouts löschen (von WorkoutBuilder erstellt, bevor User abbricht)
+  if (serverDraftIds.size) {
+    try {
+      const token = await getIdToken().catch(() => null)
+      if (token) {
+        await Promise.all([...serverDraftIds].map(id => deleteWorkout(id, token).catch(() => null)))
+        // Auch aus dem Store entfernen (falls noch nicht durch clearDraft geschehen)
+        store.workouts = store.workouts.filter(w => !serverDraftIds.has(String(w?._id || '')))
+      }
+    } catch {}
+  }
+
   detailDraft.value = null
-  try { sessionStorage.removeItem(getDetailDraftKey()) } catch {}
+  try {
+    sessionStorage.removeItem(getDetailDraftKey())
+    // workout_map_* Keys auch bereinigen
+    Object.keys(sessionStorage)
+      .filter(k => k.startsWith('workout_map_'))
+      .forEach(k => { try { sessionStorage.removeItem(k) } catch {} })
+  } catch {}
   // Workouts neu laden, damit UI sofort aktualisiert
   await loadWorkoutsData(true)
 }

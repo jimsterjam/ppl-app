@@ -525,6 +525,16 @@
     />
 
     <WorkoutTimerConfig v-if="showTimerConfig" @close="showTimerConfig = false" />
+
+    <!-- Speichern-Overlay -->
+    <Transition name="save-fade">
+      <div v-if="saving" class="saving-overlay" role="status" aria-live="assertive" aria-busy="true">
+        <div class="saving-card">
+          <div class="saving-spinner" aria-hidden="true"></div>
+          <span class="saving-label">{{ t('workoutDetail.saving') }}…</span>
+        </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
@@ -848,7 +858,7 @@ function getLastSetFromExercise(exercise = {}) {
       reps: Number(last?.reps) || 0,
       weight: Number(last?.weight) || 0,
       sets: sets.length,
-      setDetails: sets.map((set) => ({ reps: Number(set?.reps) || 0, weight: Number(set?.weight) || 0 }))
+      setDetails: sets.map((set) => ({ reps: Number(set?.reps) || 0, weight: Number(set?.weight) || 0, ...(set?.isWarmup ? { isWarmup: true } : {}) }))
     }
   }
   return {
@@ -886,7 +896,8 @@ function applyFavoritePrefillFromHistory(targetExercise = {}, historyExercise = 
 
   const normalizedDetails = sourceSetDetails.map((set) => ({
     reps: Math.max(1, Number(set?.reps) || 10),
-    weight: Math.max(0, Number(set?.weight) || 0)
+    weight: Math.max(0, Number(set?.weight) || 0),
+    ...(set?.isWarmup ? { isWarmup: true } : {})
   }))
 
   targetExercise.setDetails = normalizedDetails
@@ -1071,6 +1082,7 @@ function cancelPendingAutoSave(reason = 'unknown') {
 
 async function runAutoSaveNow() {
   if (saving.value || suppressDraftPersistence.value) return
+  if (isFavoriteAdjustMode.value) return // Adjust-Drafts nie auto-speichern (kein Stats-Eintrag)
   const id = route.params.id
   const w = workout.value || {}
 
@@ -1102,7 +1114,8 @@ async function runAutoSaveNow() {
       const realId = resolveRealIdFromDraftId(id)
       if (realId) {
         const token = await getIdToken().catch(() => null)
-        await store.updateWorkout(realId, w, token)
+        const { _id: _draftId, ...wWithoutId } = w
+        await store.updateWorkout(realId, wWithoutId, token)
         saveMsg.value = ''
         saveError.value = false
         initialSnapshot = snapshotCore({ ...w, _id: realId })
@@ -1127,7 +1140,8 @@ async function runAutoSaveNow() {
     } else {
       let token = await getIdToken().catch(() => null)
       const keepDraft = shouldKeepAsDraft(w) && w.completed !== true
-      const payload = { ...w, _isDraft: keepDraft, isDraft: keepDraft }
+      const { _id: _wid, ...wWithoutId } = w
+      const payload = { ...wWithoutId, _isDraft: keepDraft, isDraft: keepDraft }
       await store.updateWorkout(route.params.id, payload, token)
       try {
         await saveWorkoutOffline({
@@ -1399,12 +1413,12 @@ async function loadWorkout() {
             return {
               ...dbEx,
               ...draftEx,
-              setDetails: Array.isArray(draftEx.setDetails) ? draftEx.setDetails.map(s => ({ reps: s.reps, weight: s.weight })) : [],
+              setDetails: Array.isArray(draftEx.setDetails) ? draftEx.setDetails.map(s => ({ reps: s.reps, weight: s.weight, ...(s.isWarmup ? { isWarmup: true } : {}) })) : [],
             }
           } else {
             return {
               ...draftEx,
-              setDetails: Array.isArray(draftEx.setDetails) ? draftEx.setDetails.map(s => ({ reps: s.reps, weight: s.weight })) : [],
+              setDetails: Array.isArray(draftEx.setDetails) ? draftEx.setDetails.map(s => ({ reps: s.reps, weight: s.weight, ...(s.isWarmup ? { isWarmup: true } : {}) })) : [],
             }
           }
         })
@@ -1664,9 +1678,14 @@ function shouldAutoScroll() {
 }
 
 function goDashboard() {
-  // Im Adjust-Modus: kein Dirty-/Timer-Guard. bypassTimerLeaveGuard NICHT setzen,
+  // Im Adjust-Modus: Timer-Guard entfällt, aber bei ungespeicherten Änderungen
+  // Bestätigungsdialog zeigen. bypassTimerLeaveGuard NICHT setzen,
   // damit onBeforeRouteLeave den Draft-Cleanup übernimmt.
   if (isFavoriteAdjustMode.value) {
+    if (isDirty.value) {
+      showLeaveModal.value = true
+      return
+    }
     router.push('/dashboard')
     return
   }
@@ -1684,6 +1703,13 @@ function goDashboard() {
 }
 
 function confirmLeave() {
+  // Im Adjust-Modus: bypassTimerLeaveGuard NICHT setzen, sonst überspringt
+  // onBeforeRouteLeave den Draft-Cleanup. Nur suppress setzen und navigieren.
+  if (isFavoriteAdjustMode.value) {
+    suppressDraftPersistence.value = true
+    router.push('/dashboard')
+    return
+  }
   if (timerStore.isRunningLike) {
     pendingTimerAction.value = { kind: 'dashboard' }
     showTimerActionModal.value = true
@@ -1764,14 +1790,9 @@ function removeExercise(exIndex) {
 function ensureSetDetailsStructure() {
   if (!workout.value || !Array.isArray(workout.value.exercises)) return
   workout.value.exercises = workout.value.exercises.map(ex => {
-    let sets = Array.isArray(ex.setDetails) && ex.setDetails.length > 0
+    const sets = Array.isArray(ex.setDetails) && ex.setDetails.length > 0
       ? ex.setDetails
-      : [{ reps: ex.reps || 10, weight: ex.weight || 0 }]
-    // Ensure at least 1 warmup set exists at the front
-    const hasWarmup = sets.some(s => s.isWarmup)
-    if (!hasWarmup) {
-      sets = [{ reps: 10, weight: 0, isWarmup: true }, ...sets]
-    }
+      : []
     return { ...ex, setDetails: sets }
   })
 }
@@ -1988,6 +2009,7 @@ function stopSpin(row, field) {
 }
 
 async function performSaveWorkout() {
+  if (saving.value) return // Guard gegen Doppel-Aufruf
   try {
     cancelPendingAutoSave('final-save')
     suppressDraftPersistence.value = true
@@ -2010,15 +2032,20 @@ async function performSaveWorkout() {
       completed: true,
       _isDraft: false,
       isDraft: false,
-      exercises: (w.exercises || []).map((ex, idx) => ({
-        exerciseId: ex.exerciseId,
-        name: ex.name,
-        muscleGroup: ex.muscleGroup,
-        reps: ex.setDetails?.[0]?.reps ?? ex.reps ?? 10,
-        weight: ex.setDetails?.[0]?.weight ?? ex.weight ?? 0,
-        setDetails: ex.setDetails || [],
-        note: (exerciseNotes.value && typeof exerciseNotes.value[idx] !== 'undefined') ? exerciseNotes.value[idx] : ''
-      }))
+      exercises: (w.exercises || []).map((ex, idx) => {
+        // Ersten Arbeitssatz (kein Warmup) als Referenzwert für reps/weight verwenden,
+        // damit Exercise-Level-Felder nicht die Warmup-Werte widerspiegeln.
+        const firstWorkingSet = (ex.setDetails || []).find(s => !s.isWarmup)
+        return {
+          exerciseId: ex.exerciseId,
+          name: ex.name,
+          muscleGroup: ex.muscleGroup,
+          reps: firstWorkingSet?.reps ?? ex.reps ?? 10,
+          weight: firstWorkingSet?.weight ?? ex.weight ?? 0,
+          setDetails: ex.setDetails || [],
+          note: (exerciseNotes.value && typeof exerciseNotes.value[idx] !== 'undefined') ? exerciseNotes.value[idx] : ''
+        }
+      })
     }
     normalized.notes = buildWorkoutNotesSummary(normalized.exercises)
 
@@ -2034,7 +2061,7 @@ async function performSaveWorkout() {
         const realId = resolveRealIdFromDraftId(adjustId)
         if (realId) {
           const tk = await getIdToken().catch(() => null)
-          await deleteWorkoutApi(realId, tk).catch(() => null)
+          deleteWorkoutApi(realId, tk).catch(() => null)
         }
         try { await db.workouts.delete(adjustId) } catch {}
         try {
@@ -2043,7 +2070,7 @@ async function performSaveWorkout() {
         } catch {}
       } else {
         const tk = await getIdToken().catch(() => null)
-        await deleteWorkoutApi(adjustId, tk).catch(() => null)
+        deleteWorkoutApi(adjustId, tk).catch(() => null)
       }
       toast.show(t('workout.adjustSaved') || 'Favorit aktualisiert', { type: 'success', duration: 2000 })
       bypassTimerLeaveGuard.value = true
@@ -2098,7 +2125,11 @@ async function performSaveWorkout() {
         const status = Number(createError?.statusCode || createError?.response?.status || 0)
         const code = String(createError?.code || '').toUpperCase()
         const transient = !status || [408, 425, 429, 500, 502, 503, 504].includes(status) || code === 'ERR_NETWORK' || code === 'ECONNABORTED'
-        if (!transient) {
+        if (transient) {
+          logger.warn('[WorkoutDetail] createWorkout transient fehlgeschlagen, nutze optimistischen Fallback', createError)
+          savedWorkout = await store.createWorkoutOptimistic(createPayload, token).catch(() => null)
+          if (!savedWorkout) throw createError
+        } else {
           logger.warn('[WorkoutDetail] createWorkout nicht-retrybar fehlgeschlagen, bewahre Workout lokal auf', createError)
           savedWorkout = await store.createWorkoutOptimistic({
             ...createPayload,
@@ -2109,10 +2140,6 @@ async function performSaveWorkout() {
             ? 'Lokal gespeichert. Sync startet nach erneuter Anmeldung.'
             : 'Lokal gespeichert. Sync wird erneut versucht.'
           saveError.value = false
-        } else {
-          logger.warn('[WorkoutDetail] createWorkout transient fehlgeschlagen, nutze optimistischen Fallback', createError)
-          savedWorkout = await store.createWorkoutOptimistic(createPayload, token).catch(() => null)
-          if (!savedWorkout) throw createError
         }
       }
 
@@ -2541,10 +2568,19 @@ watch(() => workout.value?.exercises?.length || 0, async (len) => {
 })
 
 // Wenn router.replace die Route von der Temp-ID auf die echte MongoDB-ID wechselt (WorkoutBuilder
-// erstellt das Workout im Hintergrund), den localStorage-Prefill-Key migrieren, damit er nach
-// einem iOS-Prozess-Kill mit der wiederhergestellten URL (realId) übereinstimmt.
+// erstellt das Workout im Hintergrund), den localStorage-Prefill-Key migrieren und workout._id
+// synchronisieren, damit Auto-Save nicht mehr die Draft-ID in den PUT-Body einschleust.
 watch(() => String(route.params.id || ''), (newId, oldId) => {
   if (!newId || !oldId || newId === oldId) return
+  // workout.value._id auf die neue (echte) ID aktualisieren, wenn wir von einer Draft-ID gewechselt haben
+  if (
+    workout.value &&
+    !newId.startsWith('draft-') &&
+    !newId.startsWith('offline_') &&
+    (String(workout.value._id || '') === oldId || String(workout.value._id || '').startsWith('draft-'))
+  ) {
+    workout.value = { ...workout.value, _id: newId }
+  }
   try {
     const oldKey = `fav_prefill_applied_v1_${oldId}`
     if (localStorage.getItem(oldKey) === '1') {
@@ -2950,4 +2986,31 @@ onBeforeUnmount(() => {
   font-weight: 800;
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
 }
+
+/* === Speichern-Overlay === */
+.saving-overlay {
+  position: fixed; inset: 0; z-index: 9900;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex; align-items: center; justify-content: center;
+}
+.saving-card {
+  display: flex; flex-direction: column; align-items: center; gap: 14px;
+  background: var(--bg-panel, #1c2330);
+  border: 1px solid var(--card-border, rgba(255,255,255,0.12));
+  border-radius: 16px; padding: 28px 40px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+.saving-spinner {
+  width: 38px; height: 38px;
+  border: 3px solid rgba(255, 255, 255, 0.18);
+  border-top-color: var(--accent, #6c9eff);
+  border-radius: 50%;
+  animation: workoutSpin 0.65s linear infinite;
+}
+@keyframes workoutSpin { to { transform: rotate(360deg); } }
+.saving-label {
+  color: var(--fg-strong, #fff); font-size: 0.95rem; font-weight: 600; opacity: 0.9;
+}
+.save-fade-enter-active, .save-fade-leave-active { transition: opacity 0.12s ease; }
+.save-fade-enter-from, .save-fade-leave-to { opacity: 0; }
 </style>

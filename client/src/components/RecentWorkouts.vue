@@ -89,9 +89,9 @@
                 
                 <!-- Sets Display -->
                 <div class="sets-display">
-                  <div v-if="exercise.setDetails?.length" class="sets-list">
+                  <div v-if="getWorkingSets(exercise).length" class="sets-list">
                     <div 
-                      v-for="(set, setIndex) in exercise.setDetails" 
+                      v-for="(set, setIndex) in getWorkingSets(exercise)" 
                       :key="setIndex"
                       class="set-item"
                     >
@@ -138,9 +138,9 @@
                     <span class="exercise-summary">{{ getExerciseSummary(exercise) }}</span>
                   </div>
                   
-                  <div v-if="exercise.setDetails?.length" class="sets-list">
+                  <div v-if="getWorkingSets(exercise).length" class="sets-list">
                     <div 
-                      v-for="(set, setIndex) in exercise.setDetails" 
+                      v-for="(set, setIndex) in getWorkingSets(exercise)" 
                       :key="setIndex"
                       class="set-item"
                     >
@@ -306,18 +306,25 @@ function formatDateTime(dateStr) {
   })
 }
 
+// Gibt nur Arbeitssätze (keine Warmup-Sets) zurück
+function getWorkingSets(exercise) {
+  if (!Array.isArray(exercise?.setDetails)) return []
+  return exercise.setDetails.filter(s => !s.isWarmup)
+}
+
 function getExerciseSummary(exercise) {
-  if (exercise.setDetails?.length) {
-    const totalSets = exercise.setDetails.length
-    const hasWeights = exercise.setDetails.some(set => set.weight)
-    const hasReps = exercise.setDetails.some(set => set.reps)
+  const workingSets = getWorkingSets(exercise)
+  if (workingSets.length) {
+    const totalSets = workingSets.length
+    const hasWeights = workingSets.some(set => set.weight)
+    const hasReps = workingSets.some(set => set.reps)
     
   let summary = `${totalSets} ${t('common.sets')}`
     
     if (hasWeights && hasReps) {
       // Zeige Gewichts- und Rep-Range
-      const weights = exercise.setDetails.filter(set => set.weight).map(set => parseFloat(set.weight))
-      const reps = exercise.setDetails.filter(set => set.reps).map(set => parseInt(set.reps))
+      const weights = workingSets.filter(set => set.weight).map(set => parseFloat(set.weight))
+      const reps = workingSets.filter(set => set.reps).map(set => parseInt(set.reps))
       
       if (weights.length > 0) {
         const minWeight = Math.min(...weights)
@@ -339,7 +346,7 @@ function getExerciseSummary(exercise) {
         }
       }
     } else if (hasWeights) {
-      const weights = exercise.setDetails.filter(set => set.weight).map(set => parseFloat(set.weight))
+      const weights = workingSets.filter(set => set.weight).map(set => parseFloat(set.weight))
       const minWeight = Math.min(...weights)
       const maxWeight = Math.max(...weights)
       if (minWeight === maxWeight) {
@@ -348,7 +355,7 @@ function getExerciseSummary(exercise) {
         summary += ` • ${minWeight}-${maxWeight}kg`
       }
     } else if (hasReps) {
-      const reps = exercise.setDetails.filter(set => set.reps).map(set => parseInt(set.reps))
+      const reps = workingSets.filter(set => set.reps).map(set => parseInt(set.reps))
       const minReps = Math.min(...reps)
       const maxReps = Math.max(...reps)
       if (minReps === maxReps) {

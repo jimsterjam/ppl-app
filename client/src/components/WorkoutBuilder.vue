@@ -13,6 +13,7 @@ import AppModal from '@/components/AppModal.vue';
 import StepIndicator from '@/components/StepIndicator.vue';
 import BottomNav from '@/components/BottomNav.vue';
 import { getAllExercisesOffline, saveWorkoutOffline, deleteWorkoutOffline } from '@/utils/offlineStorage';
+import { deleteWorkout as deleteServerWorkout } from '@/api/workouts';
 import { getMergedSortedExercises } from '@/utils/exerciseList';
 import { searchAndRankExercises } from '@/utils/exerciseSearch'
 import { consumeWorkoutBuilderPrefill, normalizeBuilderWorkoutType, readWorkoutBuilderRouteState } from '@/utils/workoutBuilderFlow'
@@ -130,7 +131,7 @@ function consumeQuickPrefill() {
 		exerciseId: exercise.exerciseId || exercise._id || null,
 		setDetails: Array.isArray(exercise.setDetails) && exercise.setDetails.length > 0
 			? exercise.setDetails
-			: [{ reps: Number(exercise.reps) || 10, weight: Number(exercise.weight) || 0 }]
+			: []
 	}))
 }
 
@@ -358,9 +359,9 @@ async function createWorkout() {
 			exercises: selectedExercises.value.map(ex => ({
 				exerciseId: ex.exerciseId || ex._id || ex.id || null,
 				name: ex.name,
-				sets: ex.setDetails?.length || 3,
-				reps: ex.setDetails?.[0]?.reps || 10,
-				weight: ex.setDetails?.[0]?.weight || 0,
+				sets: (ex.setDetails || []).filter(s => !s.isWarmup).length || ex.setDetails?.length || 3,
+				reps: (ex.setDetails || []).find(s => !s.isWarmup)?.reps ?? ex.reps ?? 10,
+				weight: (ex.setDetails || []).find(s => !s.isWarmup)?.weight ?? ex.weight ?? 0,
 				category: ex.category,
 				note: typeof ex.note === 'string' ? ex.note : '',
 				setDetails: ex.setDetails || []
@@ -410,6 +411,23 @@ async function createWorkout() {
 		// Backend-Speichern im Hintergrund
 		userStore.createWorkout(workoutData, token).then(async created => {
 			if (created?._id) {
+				// Wenn der User bereits weg navigiert ist, Server-Workout löschen statt Ghost-Draft anlegen
+				const currentRouteId = String(router.currentRoute.value?.params?.id || '')
+				const currentRouteName = String(router.currentRoute.value?.name || '')
+				if (currentRouteId !== tempId && currentRouteName !== 'workout-builder') {
+					logger.debug('[WorkoutBuilder] User hat Workout-Flow verlassen vor Create-Response – lösche Orphan:', created._id)
+					try {
+						// Aus Store entfernen (wurde in userStore.createWorkout als _isDraft:true eingetragen)
+						const orphanIdx = userStore.workouts.findIndex(w => String(w?._id || '') === String(created._id))
+						if (orphanIdx !== -1) userStore.workouts.splice(orphanIdx, 1)
+					} catch {}
+					try {
+						const tk = await getIdToken().catch(() => null)
+						if (tk) await deleteServerWorkout(created._id, tk).catch(() => null)
+						else await deleteWorkoutOffline(created._id).catch(() => null)
+					} catch {}
+					return
+				}
 				logger.debug('[WorkoutBuilder] backend create resolved', {
 					tempId,
 					realId: created._id
@@ -444,8 +462,7 @@ async function createWorkout() {
 				} catch {}
 
 				// Sofort auf echtes Workout umschalten (auch wenn Route noch nicht auf tempId aktualisiert wurde)
-				const currentRouteId = String(router.currentRoute.value?.params?.id || '')
-				const currentRouteName = String(router.currentRoute.value?.name || '')
+				// currentRouteId/currentRouteName wurden bereits oben für den Abort-Check gesetzt
 				logger.debug('[WorkoutBuilder] route state before replace', { currentRouteName, currentRouteId, tempId })
 				if (currentRouteId === tempId || currentRouteName === 'workout-builder') {
 					await router.replace({

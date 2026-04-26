@@ -308,6 +308,21 @@ setupAutoSync().catch((error) => {
   logger.warn('[main] setupAutoSync failed:', error)
 })
 
+// Reconciliation: wenn syncManager ein offline_xxx Workout erfolgreich zum Server pusht,
+// wird der lokale Store-Eintrag durch den echten Server-Eintrag ersetzt.
+if (typeof window !== 'undefined') {
+  window.addEventListener('workout-reconciled', (event) => {
+    const { tempId, workout } = event?.detail || {}
+    if (!tempId || !workout?._id) return
+    const userStore = useUserStore()
+    const idx = userStore.workouts.findIndex(w => String(w?._id || '') === String(tempId))
+    if (idx !== -1) {
+      userStore.workouts.splice(idx, 1, { ...workout, _offlineCreated: false })
+      logger.debug('[main] workout-reconciled: Store-Eintrag ersetzt', { tempId, realId: workout._id })
+    }
+  })
+}
+
 router.isReady().then(() => {
   // Startwiederherstellung ohne Auth-Zwang: Router-Guards entscheiden final über Zugriff.
   tryRestoreLastRoute('router-ready').catch(() => {})

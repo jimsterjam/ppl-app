@@ -98,38 +98,17 @@
           <div class="base-grid">
             <div class="panel chart-card">
               <div class="card-head">
-                <h4>Trainingsfrequenz pro Woche</h4>
-                <span class="badge">Basis</span>
-              </div>
-              <div class="bar-chart">
-                <div v-for="item in weeklyFrequency" :key="item.label" class="bar-item">
-                  <div class="bar" :style="{ height: item.height + '%' }"></div>
-                  <span class="bar-label">{{ item.label }}</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="panel chart-card">
-              <div class="card-head">
-                <h4>Trainingsvolumen Entwicklung</h4>
-                <span class="badge">Basis</span>
-              </div>
-              <div class="sparkline">
-                <div v-for="item in volumeTrend" :key="item.label" class="spark-bar" :style="{ height: item.height + '%' }"></div>
-              </div>
-              <div class="sparkline-labels">
-                <span>30 Tage</span>
-                <span>{{ totalVolumeLabel }}</span>
-              </div>
-            </div>
-
-            <div class="panel chart-card">
-              <div class="card-head">
                 <h4>Aktivitätstage</h4>
                 <span class="badge">Basis</span>
               </div>
               <div class="calendar-grid">
-                <div v-for="day in activityDays" :key="day.key" class="calendar-cell" :class="{ active: day.active }">
+                <div
+                  v-for="day in activityDays"
+                  :key="day.key"
+                  class="calendar-cell"
+                  :class="{ active: day.active, clickable: day.active }"
+                  @click="openDayOverlay(day)"
+                >
                   <span>{{ day.label }}</span>
                 </div>
               </div>
@@ -140,79 +119,82 @@
                 <h4>Letzte Trainingsfortschritte</h4>
                 <span class="badge">Basis</span>
               </div>
-              <ul class="recent-list">
-                <li v-for="item in recentProgress" :key="item.id" class="recent-item">
-                  <div class="recent-item-left">
-                    <p class="recent-title">{{ item.title }}</p>
-                    <span class="recent-sub">{{ item.subtitle }}</span>
-                    <p v-if="item.note" class="recent-note">{{ item.note }}</p>
-                    <ul v-if="item.exercises?.length" class="ex-vol-list">
-                      <li v-for="ex in item.exercises" :key="ex.name" class="ex-vol-item">
-                        <span class="ex-vol-name">{{ ex.name }}</span>
-                        <span class="ex-vol-value">{{ formatKg(ex.volume) }}</span>
-                      </li>
-                    </ul>
+              <div v-if="workoutComparisons.length === 0" class="cmp-empty">
+                <span>Noch nicht genug Daten – absolviere weitere Workouts, um Vergleiche zu sehen.</span>
+              </div>
+              <div v-else class="cmp-list">
+                <div v-for="cmp in workoutComparisons" :key="cmp.key" class="cmp-card">
+                  <div class="cmp-header">
+                    <div class="cmp-header-top">
+                      <span class="cmp-title">{{ cmp.title }}</span>
+                      <span class="cmp-status-badge" :class="cmp.overallStatus">{{ getStatusLabel(cmp.overallStatus) }}</span>
+                    </div>
+                    <div class="cmp-dates">
+                      <span class="cmp-date prev">{{ cmp.prevDate }}</span>
+                      <span class="cmp-arrow-sm">→</span>
+                      <span class="cmp-date curr">{{ cmp.currDate }}</span>
+                    </div>
+                    <p v-if="cmp.trainingFocus" class="cmp-focus">{{ cmp.trainingFocus }}</p>
                   </div>
-                  <span class="recent-value">{{ item.value }}</span>
-                </li>
-              </ul>
+                  <div class="cmp-rows">
+                    <div
+                      v-for="ex in cmp.exercises"
+                      :key="ex.name"
+                      class="cmp-row"
+                      :class="{
+                        'ex-only-prev': ex.type === 'prev',
+                        'ex-only-curr': ex.type === 'curr',
+                        'row-stronger': ex.type === 'both' && ex.progressStatus === 'stronger',
+                        'row-more-volume': ex.type === 'both' && ex.progressStatus === 'more_volume',
+                        'row-declined': ex.type === 'both' && ex.progressStatus === 'declined'
+                      }"
+                    >
+                      <span class="cmp-ex-name">{{ ex.name }}</span>
+                      <span class="cmp-vol prev">{{ ex.prevVol !== null ? formatKg(ex.prevVol) : '–' }}</span>
+                      <span class="cmp-sep">→</span>
+                      <span class="cmp-vol curr">{{ ex.currVol !== null ? formatKg(ex.currVol) : '–' }}</span>
+                      <span
+                        v-if="ex.type === 'both' && ex.deltaPercent !== null"
+                        class="cmp-delta-wrap"
+                      >
+                        <span
+                          class="cmp-delta"
+                          :class="ex.progressStatus === 'stronger' ? 'up' : ex.progressStatus === 'declined' ? 'down' : ex.progressStatus === 'more_volume' ? 'up-soft' : 'flat'"
+                        >{{ ex.delta > 0 ? '+' : '' }}{{ ex.deltaPercent }}%</span>
+                        <span
+                          v-if="ex.avgWDeltaPercent !== null && ex.prevAvgW > 0"
+                          class="cmp-delta-sub"
+                          :class="ex.avgWDeltaPercent > 0 ? 'up' : ex.avgWDeltaPercent < 0 ? 'down' : 'flat'"
+                        >Ø {{ ex.avgWDeltaPercent > 0 ? '+' : '' }}{{ ex.avgWDeltaPercent }}%</span>
+                      </span>
+                      <span v-else-if="ex.type === 'both'" class="cmp-delta flat">±0%</span>
+                      <span v-else-if="ex.type === 'curr'" class="cmp-delta flat">neu</span>
+                      <span v-else class="cmp-delta flat">alt</span>
+                    </div>
+                    <div class="cmp-row total">
+                      <span class="cmp-ex-name">Gesamt</span>
+                      <span class="cmp-vol prev">{{ formatKg(cmp.prevTotal) }}</span>
+                      <span class="cmp-sep">→</span>
+                      <span class="cmp-vol curr">{{ formatKg(cmp.currTotal) }}</span>
+                      <span class="cmp-delta-wrap">
+                        <span
+                          class="cmp-delta"
+                          :class="cmp.overallStatus === 'stronger' ? 'up' : cmp.overallStatus === 'declined' ? 'down' : cmp.overallStatus === 'more_volume' ? 'up-soft' : 'flat'"
+                        >{{ cmp.totalDelta > 0 ? '+' : '' }}{{ cmp.prevTotal > 0 ? Math.round((cmp.totalDelta / cmp.prevTotal) * 100) : 0 }}%</span>
+                        <span
+                          v-if="cmp.totalAvgWDeltaPercent !== null"
+                          class="cmp-delta-sub"
+                          :class="cmp.totalAvgWDeltaPercent > 0 ? 'up' : cmp.totalAvgWDeltaPercent < 0 ? 'down' : 'flat'"
+                        >Ø {{ cmp.totalAvgWDeltaPercent > 0 ? '+' : '' }}{{ cmp.totalAvgWDeltaPercent }}%</span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
 
-        <section class="section">
-          <div class="section-head">
-            <div>
-              <h3>Erweiterte Analyse</h3>
-              <span class="section-sub">Langzeit-Insights für echte Fortschritte</span>
-            </div>
-            <button class="cta-ghost" type="button" @click="openUpgrade('general')" v-if="!isPro">
-              Draft
-            </button>
-          </div>
-
-          <div class="pro-grid">
-            <button
-              v-for="card in advancedCards"
-              :key="card.title"
-              type="button"
-              class="panel pro-card"
-              :class="{ locked: !isPro }"
-              @click="handleLockedClick(card)"
-            >
-              <div class="card-head">
-                <h4>{{ card.title }}</h4>
-                <span class="badge pro">Draft</span>
-              </div>
-              <p class="card-sub">{{ card.subtitle }}</p>
-              <div class="locked-chart" :class="{ blur: !isPro }">
-                <div class="locked-bar" v-for="n in 6" :key="n"></div>
-              </div>
-              <div v-if="!isPro" class="lock-overlay">
-                <span class="lock-icon">🔒</span>
-                <span>Detaillierte Analyse ist fuer alle freigeschaltet</span>
-              </div>
-            </button>
-          </div>
-        </section>
-
-        <section class="section">
-          <div class="section-head">
-            <h3>Motivation & Insights</h3>
-            <span class="section-sub">Kurz, ehrlich, motivierend</span>
-          </div>
-          <div class="insight-grid">
-            <div v-for="insight in visibleInsights" :key="insight" class="panel insight-card">
-              <span class="insight-icon">✨</span>
-              <p>{{ insight }}</p>
-            </div>
-            <div v-if="!isPro" class="panel insight-card locked">
-              <span class="insight-icon">🔒</span>
-              <p>Mehr langfristige Insights sind bereits aktiv.</p>
-              <button class="cta-inline" type="button" @click="openUpgrade('general')">Draft</button>
-            </div>
-          </div>
-        </section>
       </template>
     </main>
 
@@ -244,6 +226,45 @@
       :show-cancel="false"
       type="warning"
     />
+
+    <!-- Kalender-Tag Overlay -->
+    <Transition name="modal">
+      <div v-if="calendarDayOverlay" class="day-overlay-backdrop" @click.self="closeDayOverlay">
+        <div class="day-overlay-panel glass">
+          <div class="day-overlay-header">
+            <h4 class="day-overlay-title">{{ formatDayOverlayDate(calendarDayOverlay.key) }}</h4>
+            <button class="day-overlay-close" type="button" @click="closeDayOverlay" aria-label="Schließen">&times;</button>
+          </div>
+          <div class="day-overlay-body">
+            <div
+              v-for="workout in calendarDayOverlay.workouts"
+              :key="workout._id || workout.id"
+              class="day-overlay-workout"
+            >
+              <div class="day-overlay-workout-name">{{ workout.name || 'Workout' }}</div>
+              <div
+                v-for="ex in (workout.exercises || []).slice(0, 8)"
+                :key="ex._id || ex.name"
+                class="day-overlay-exercise"
+              >
+                <span class="day-overlay-ex-name">{{ ex.name }}</span>
+                <div v-if="getWorkingSetsStat(ex).length" class="day-overlay-sets">
+                  <span
+                    v-for="(set, si) in getWorkingSetsStat(ex)"
+                    :key="si"
+                    class="day-overlay-set"
+                  >{{ si + 1 }}. <span v-if="set.weight">{{ set.weight }}kg</span><span v-if="set.reps"> &times; {{ set.reps }}</span></span>
+                </div>
+                <div v-else-if="ex.sets || ex.reps || ex.weight" class="day-overlay-sets">
+                  <span class="day-overlay-set">{{ ex.sets ? ex.sets + ' Sätze' : '' }}{{ ex.reps ? ' · ' + ex.reps + ' Wdh' : '' }}{{ ex.weight ? ' · ' + ex.weight + 'kg' : '' }}</span>
+                </div>
+              </div>
+              <p v-if="(workout.exercises || []).length > 8" class="day-overlay-more">+{{ workout.exercises.length - 8 }} weitere Übungen</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Transition>
 
   </div>
 </template>
@@ -427,6 +448,7 @@ const personalBest = computed(() => {
     ;(workout.exercises || []).forEach((ex) => {
       if (Array.isArray(ex.setDetails) && ex.setDetails.length) {
         ex.setDetails.forEach((set) => {
+          if (set?.isWarmup) return // Warmup-Gewichte nicht als Bestleistung werten
           const weight = Number(set?.weight) || 0
           if (weight > best) best = weight
         })
@@ -441,88 +463,276 @@ const personalBest = computed(() => {
 
 const personalBestLabel = computed(() => (personalBest.value > 0 ? `${personalBest.value} kg` : '—'))
 
-const weeklyFrequency = computed(() => {
-  const source = statsWeeks.value
-  const recent = source.slice(-6)
-  const maxVal = Math.max(1, ...recent.map(item => Number(item.sessionCount) || 0))
-  return recent.map((item) => {
-    const label = new Date(item.weekStart).toLocaleDateString(isDe.value ? 'de-DE' : 'en-US', { month: 'short', day: 'numeric' })
-    const value = Number(item.sessionCount) || 0
-    return {
-      label,
-      value,
-      height: Math.round((value / maxVal) * 100)
-    }
-  })
-})
-
-const volumeTrend = computed(() => {
-  const days = 30
-  const today = new Date()
-  const data = []
-  for (let i = days - 1; i >= 0; i -= 1) {
-    const date = new Date(today)
-    date.setDate(today.getDate() - i)
-    date.setHours(0, 0, 0, 0)
-    const key = date.toISOString().slice(0, 10)
-    const total = statsWorkouts.value.reduce((sum, w) => {
-      const wDate = new Date(w.date)
-      wDate.setHours(0, 0, 0, 0)
-      if (Number.isNaN(wDate.getTime())) return sum
-      return wDate.toISOString().slice(0, 10) === key ? sum + calcWorkoutVolume(w) : sum
-    }, 0)
-    data.push({ label: key, value: total })
-  }
-  const maxVal = Math.max(1, ...data.map(d => d.value))
-  return data.map(item => ({ ...item, height: Math.round((item.value / maxVal) * 100) }))
-})
-
 const activityDays = computed(() => {
   const days = 28
   const today = new Date()
   const list = []
+  const pad = n => String(n).padStart(2, '0')
+  const localKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
   for (let i = days - 1; i >= 0; i -= 1) {
     const date = new Date(today)
     date.setDate(today.getDate() - i)
     date.setHours(0, 0, 0, 0)
-    const key = date.toISOString().slice(0, 10)
-    const active = statsWorkouts.value.some((w) => {
+    const key = localKey(date)
+    const dayWorkouts = statsWorkouts.value.filter((w) => {
       const wDate = new Date(w.date)
       wDate.setHours(0, 0, 0, 0)
-      return !Number.isNaN(wDate.getTime()) && wDate.toISOString().slice(0, 10) === key
+      return !Number.isNaN(wDate.getTime()) && localKey(wDate) === key
     })
-    list.push({ key, label: date.getDate(), active })
+    list.push({ key, label: date.getDate(), active: dayWorkouts.length > 0, workouts: dayWorkouts })
   }
   return list
 })
 
-const recentProgress = computed(() => {
-  return [...statsWorkouts.value]
+// Kalender-Tag Overlay
+const calendarDayOverlay = ref(null) // { key, label, workouts }
+
+function openDayOverlay(day) {
+  if (!day.active) return
+  calendarDayOverlay.value = day
+}
+
+function closeDayOverlay() {
+  calendarDayOverlay.value = null
+}
+
+function getWorkingSetsStat(exercise) {
+  if (Array.isArray(exercise.setDetails)) {
+    return exercise.setDetails.filter(s => !s.isWarmup)
+  }
+  return []
+}
+
+function formatDayOverlayDate(key) {
+  return new Date(key + 'T00:00:00').toLocaleDateString(isDe.value ? 'de-DE' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' })
+}
+
+function getExerciseVolumes(w) {
+  return (w.exercises || []).flatMap((ex) => {
+    let vol = 0
+    let weightSum = 0
+    let weightCount = 0
+    if (Array.isArray(ex.setDetails) && ex.setDetails.length) {
+      ex.setDetails.forEach((set) => {
+        if (set?.isWarmup) return
+        const r = Number(set.reps) || 0
+        const kg = Number(set.weight) || 0
+        vol += r * kg
+        if (kg > 0) { weightSum += kg; weightCount++ }
+      })
+    } else {
+      vol = (Number(ex.sets) || 1) * (Number(ex.reps) || 0) * (Number(ex.weight) || 0)
+      weightSum = Number(ex.weight) || 0
+      weightCount = weightSum > 0 ? 1 : 0
+    }
+    const avgWeight = weightCount > 0 ? Math.round((weightSum / weightCount) * 10) / 10 : 0
+    return vol > 0 ? [{ name: ex.name || '?', volume: vol, avgWeight }] : []
+  })
+}
+
+function calcWorkoutAvgWeight(workout) {
+  let weightSum = 0
+  let weightCount = 0
+  ;(workout.exercises || []).forEach((ex) => {
+    if (Array.isArray(ex.setDetails) && ex.setDetails.length) {
+      ex.setDetails.forEach((set) => {
+        if (set?.isWarmup) return
+        const kg = Number(set.weight) || 0
+        if (kg > 0) { weightSum += kg; weightCount++ }
+      })
+    } else {
+      const kg = Number(ex.weight) || 0
+      if (kg > 0) { weightSum += kg; weightCount++ }
+    }
+  })
+  return weightCount > 0 ? Math.round((weightSum / weightCount) * 10) / 10 : 0
+}
+
+function getProgressStatus(avgWDeltaPercent, volDeltaPercent) {
+  const aw = avgWDeltaPercent ?? 0
+  const vp = volDeltaPercent ?? 0
+  if (aw > 2) return 'stronger'
+  if (vp > 3 && aw >= -2) return 'more_volume'
+  if (aw < -2 && vp < -3) return 'declined'
+  return 'flat'
+}
+
+function getStatusLabel(status) {
+  const labels = {
+    stronger: '🟢 Stärker geworden',
+    more_volume: '🟡 Mehr Volumen',
+    declined: '🔴 Leistung gesunken',
+    flat: '⚪ Gleichbleibend'
+  }
+  return labels[status] || labels.flat
+}
+
+const workoutComparisons = computed(() => {
+  const sevenDaysAgo = new Date()
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+
+  const allSorted = [...statsWorkouts.value]
     .filter(w => !w.isDraft)
     .sort((a, b) => new Date(b.date) - new Date(a.date))
-    .slice(0, 4)
-    .map((w) => {
-      const exercises = (w.exercises || []).flatMap((ex) => {
-        let vol = 0
-        if (Array.isArray(ex.setDetails) && ex.setDetails.length) {
-          ex.setDetails.forEach((set) => {
-            if (set?.isWarmup) return
-            vol += (Number(set.reps) || 0) * (Number(set.weight) || 0)
-          })
-        } else {
-          vol = (Number(ex.sets) || 1) * (Number(ex.reps) || 0) * (Number(ex.weight) || 0)
-        }
-        return vol > 0 ? [{ name: ex.name || '?', volume: vol }] : []
-      })
-      return {
-        id: w._id,
-        title: w.name || 'Workout',
-        subtitle: new Date(w.date).toLocaleDateString(isDe.value ? 'de-DE' : 'en-US'),
-        note: typeof w.notes === 'string' ? w.notes.trim() : '',
-        value: formatKg(calcWorkoutVolume(w)),
-        exercises
+
+  if (!allSorted.length) return []
+
+  const dateOpts = { day: '2-digit', month: '2-digit' }
+  const locale = isDe.value ? 'de-DE' : 'en-US'
+
+  function wId(w) {
+    return String(w._id || w.id || w.workoutId || '')
+  }
+
+  function buildComparison(curr, prev) {
+    const currExs = getExerciseVolumes(curr)
+    const prevExs = getExerciseVolumes(prev)
+    const exercises = []
+    for (const ce of currExs) {
+      const pe = prevExs.find(e => e.name === ce.name)
+      if (pe) {
+        const delta = ce.volume - pe.volume
+        const deltaPercent = pe.volume > 0 ? Math.round((delta / pe.volume) * 100) : null
+        const avgWDelta = ce.avgWeight - pe.avgWeight
+        const avgWDeltaPercent = pe.avgWeight > 0 ? Math.round((avgWDelta / pe.avgWeight) * 100) : null
+        const progressStatus = getProgressStatus(avgWDeltaPercent, deltaPercent)
+        exercises.push({
+          name: ce.name, prevVol: pe.volume, currVol: ce.volume,
+          delta, deltaPercent,
+          prevAvgW: pe.avgWeight, currAvgW: ce.avgWeight,
+          avgWDelta, avgWDeltaPercent,
+          progressStatus,
+          type: 'both'
+        })
+      } else {
+        exercises.push({ name: ce.name, prevVol: null, currVol: ce.volume, delta: null, deltaPercent: null, avgWDeltaPercent: null, progressStatus: 'flat', type: 'curr' })
       }
-    })
+    }
+    for (const pe of prevExs) {
+      if (!currExs.find(e => e.name === pe.name)) {
+        exercises.push({ name: pe.name, prevVol: pe.volume, currVol: null, delta: null, deltaPercent: null, avgWDeltaPercent: null, progressStatus: 'flat', type: 'prev' })
+      }
+    }
+
+    // Workout-level avg weight comparison
+    const currAvgW = calcWorkoutAvgWeight(curr)
+    const prevAvgW = calcWorkoutAvgWeight(prev)
+    const totalAvgWDelta = currAvgW - prevAvgW
+    const totalAvgWDeltaPercent = prevAvgW > 0 ? Math.round((totalAvgWDelta / prevAvgW) * 100) : null
+
+    // Overall status: majority vote over 'both' exercises, stronger wins if no declined
+    const bothExs = exercises.filter(e => e.type === 'both')
+    let overallStatus = 'flat'
+    if (bothExs.length > 0) {
+      const counts = { stronger: 0, more_volume: 0, declined: 0, flat: 0 }
+      bothExs.forEach(e => { counts[e.progressStatus] = (counts[e.progressStatus] || 0) + 1 })
+      if (counts.stronger > 0 && counts.declined === 0) overallStatus = 'stronger'
+      else if (counts.stronger >= counts.declined && counts.stronger > 0) overallStatus = 'stronger'
+      else if (counts.declined > counts.stronger && counts.declined > counts.more_volume) overallStatus = 'declined'
+      else if (counts.more_volume > 0) overallStatus = 'more_volume'
+    }
+
+    // Fallback: use workout-level avg weight if no exercise data
+    if (overallStatus === 'flat' && totalAvgWDeltaPercent !== null) {
+      const currTotal = calcWorkoutVolume(curr)
+      const prevTotal = calcWorkoutVolume(prev)
+      const volDeltaPercent = prevTotal > 0 ? Math.round(((currTotal - prevTotal) / prevTotal) * 100) : null
+      overallStatus = getProgressStatus(totalAvgWDeltaPercent, volDeltaPercent)
+    }
+
+    // Training focus string
+    const currTotal = calcWorkoutVolume(curr)
+    const prevTotal = calcWorkoutVolume(prev)
+    const volDeltaPercent = prevTotal > 0 ? Math.round(((currTotal - prevTotal) / prevTotal) * 100) : null
+    let trainingFocus = null
+    if (totalAvgWDeltaPercent !== null && volDeltaPercent !== null) {
+      const wUp = totalAvgWDeltaPercent > 2
+      const wDown = totalAvgWDeltaPercent < -2
+      const vUp = volDeltaPercent > 3
+      const vDown = volDeltaPercent < -3
+      if (wUp && vDown) trainingFocus = 'Fokus: höhere Intensität bei weniger Volumen'
+      else if (wUp && vUp) trainingFocus = 'Mehr Gewicht und mehr Volumen – starke Session'
+      else if (!wUp && !wDown && vUp) trainingFocus = 'Fokus: mehr Volumen bei gleichem Gewicht'
+    }
+
+    return {
+      key: wId(curr) || curr.name || 'cmp',
+      title: curr.name || 'Workout',
+      currDate: new Date(curr.date).toLocaleDateString(locale, dateOpts),
+      prevDate: new Date(prev.date).toLocaleDateString(locale, dateOpts),
+      exercises,
+      currTotal,
+      prevTotal,
+      totalDelta: currTotal - prevTotal,
+      totalAvgWDeltaPercent,
+      overallStatus,
+      trainingFocus
+    }
+  }
+
+  // Groups by name for Phase 1
+  const groups = new Map()
+  for (const w of allSorted) {
+    const key = (w.name || 'Workout').trim().toLowerCase()
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key).push(w)
+  }
+
+  const comparisons = []
+  const usedIds = new Set()
+  const seenNameKeys = new Set()
+
+  // Phase 1: exact name matching
+  for (const w of allSorted) {
+    if (comparisons.length >= 3) break
+    const key = (w.name || 'Workout').trim().toLowerCase()
+    if (seenNameKeys.has(key)) continue
+    seenNameKeys.add(key)
+    const group = groups.get(key)
+    if (!group || group.length < 2) continue
+    const curr = group[0]
+    const prev = group[1]
+    usedIds.add(wId(curr))
+    usedIds.add(wId(prev))
+    comparisons.push(buildComparison(curr, prev))
+  }
+
+  // Phase 2: exercise-overlap matching for workouts from last 7 days not yet paired
+  if (comparisons.length < 3) {
+    const recentCandidates = allSorted.filter(w => !usedIds.has(wId(w)) && new Date(w.date) >= sevenDaysAgo)
+    const prevPool = allSorted.filter(w => !usedIds.has(wId(w)))
+
+    for (const curr of recentCandidates) {
+      if (comparisons.length >= 3) break
+      const currId = wId(curr)
+      if (usedIds.has(currId)) continue
+      const currExNames = new Set(getExerciseVolumes(curr).map(e => e.name))
+      if (currExNames.size === 0) continue
+
+      let bestPrev = null
+      let bestOverlap = 0
+      for (const prev of prevPool) {
+        const prevId = wId(prev)
+        if (prevId === currId || usedIds.has(prevId)) continue
+        if (new Date(prev.date) >= new Date(curr.date)) continue
+        const prevExNames = getExerciseVolumes(prev).map(e => e.name)
+        const overlap = prevExNames.filter(n => currExNames.has(n)).length
+        const minSize = Math.min(currExNames.size, prevExNames.length)
+        if (overlap >= 2 && overlap / minSize >= 0.35 && overlap > bestOverlap) {
+          bestOverlap = overlap
+          bestPrev = prev
+        }
+      }
+
+      if (bestPrev) {
+        usedIds.add(currId)
+        usedIds.add(wId(bestPrev))
+        comparisons.push(buildComparison(curr, bestPrev))
+      }
+    }
+  }
+
+  return comparisons
 })
 
 const advancedCards = computed(() => ([
@@ -1069,6 +1279,7 @@ function collectMuscleSets(list) {
       if (!base[bucketKey]) base[bucketKey] = { sets: 0, reps: 0 }
       if (Array.isArray(exercise.setDetails) && exercise.setDetails.length) {
         exercise.setDetails.forEach(set => {
+          if (set?.isWarmup) return // Warmup-Sätze nicht in Muskelgruppen-Statistik zählen
           base[bucketKey].sets += 1
           base[bucketKey].reps += Number(set?.reps) || 0
         })
@@ -1409,6 +1620,131 @@ function formatNumber(value, digits = 0) {
   font-weight: 700;
 }
 
+.calendar-cell.clickable {
+  cursor: pointer;
+  transition: transform 0.1s, box-shadow 0.1s;
+}
+
+.calendar-cell.clickable:hover {
+  transform: scale(1.12);
+  box-shadow: 0 0 0 2px rgba(215, 255, 31, 0.7);
+}
+
+/* Kalender-Overlay */
+.day-overlay-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 3000;
+  padding: 0 0 24px;
+}
+
+.day-overlay-panel {
+  width: 100%;
+  max-width: 560px;
+  max-height: 94dvh;
+  overflow-y: auto;
+  border-radius: 24px 24px 16px 16px;
+  padding: 28px 24px 40px;
+  background: rgba(28, 28, 34, 0.97);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 -4px 40px rgba(0, 0, 0, 0.6);
+}
+
+.day-overlay-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22px;
+}
+
+.day-overlay-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+  text-transform: capitalize;
+}
+
+.day-overlay-close {
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: var(--text);
+  font-size: 1.8rem;
+  line-height: 1;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.day-overlay-body {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.day-overlay-workout {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 18px;
+  padding: 20px 22px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.day-overlay-workout-name {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.day-overlay-exercise {
+  margin-bottom: 14px;
+}
+
+.day-overlay-exercise:last-child {
+  margin-bottom: 0;
+}
+
+.day-overlay-ex-name {
+  display: block;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 7px;
+}
+
+.day-overlay-sets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.day-overlay-set {
+  font-size: 0.92rem;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.06);
+  padding: 4px 12px;
+  border-radius: 8px;
+}
+
+.day-overlay-more {
+  font-size: 0.92rem;
+  color: var(--muted);
+  margin: 12px 0 0;
+  text-align: center;
+}
+
 .recent-list {
   display: flex;
   flex-direction: column;
@@ -1488,6 +1824,268 @@ function formatNumber(value, digits = 0) {
   font-weight: 600;
   flex-shrink: 0;
   margin-left: 8px;
+}
+
+/* ── Workout-Vergleichskarten ─────────────────────── */
+.cmp-empty {
+  font-size: 0.82rem;
+  color: var(--muted);
+  text-align: center;
+  padding: 16px 0;
+}
+
+.cmp-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cmp-card {
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+.cmp-header {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  gap: 6px;
+}
+
+.cmp-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cmp-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cmp-dates {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.cmp-date {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+.cmp-date.prev {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+}
+
+.cmp-date.curr {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+  color: var(--accent);
+}
+
+.cmp-arrow-sm {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.cmp-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.cmp-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto auto;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  font-size: 0.78rem;
+}
+
+.cmp-row:nth-child(even) {
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.cmp-row.total {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 2px;
+  font-weight: 700;
+  font-size: 0.82rem;
+  padding-top: 7px;
+  padding-bottom: 7px;
+}
+
+.cmp-ex-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.cmp-row.total .cmp-ex-name {
+  color: var(--fg);
+}
+
+.cmp-vol {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.cmp-vol.prev {
+  color: var(--muted);
+}
+
+.cmp-vol.curr {
+  color: var(--fg);
+}
+
+.cmp-sep {
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.cmp-delta {
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 999px;
+  white-space: nowrap;
+  min-width: 4ch;
+  text-align: right;
+}
+
+.cmp-delta.up {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.cmp-delta.down {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.cmp-delta.flat {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--muted);
+}
+
+.cmp-delta.up-soft {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+}
+
+.cmp-delta-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.cmp-delta-sub {
+  font-size: 0.66rem;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 999px;
+  white-space: nowrap;
+  opacity: 0.85;
+}
+
+.cmp-delta-sub.up {
+  background: rgba(34, 197, 94, 0.12);
+  color: #22c55e;
+}
+
+.cmp-delta-sub.down {
+  background: rgba(239, 68, 68, 0.12);
+  color: #ef4444;
+}
+
+.cmp-delta-sub.flat {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--muted);
+}
+
+.cmp-status-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cmp-status-badge.stronger {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.cmp-status-badge.more_volume {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.cmp-status-badge.declined {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.cmp-status-badge.flat {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--muted);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.cmp-focus {
+  font-size: 0.72rem;
+  color: var(--muted);
+  font-style: italic;
+  margin: 0;
+  line-height: 1.3;
+}
+
+.cmp-row.ex-only-prev {
+  opacity: 0.45;
+}
+
+.cmp-row.row-stronger {
+  border-left: 3px solid rgba(34, 197, 94, 0.7);
+  padding-left: 9px;
+  background: rgba(34, 197, 94, 0.04);
+}
+
+.cmp-row.row-more-volume {
+  border-left: 3px solid rgba(59, 130, 246, 0.6);
+  padding-left: 9px;
+  background: rgba(59, 130, 246, 0.04);
+}
+
+.cmp-row.row-declined {
+  border-left: 3px solid rgba(239, 68, 68, 0.6);
+  padding-left: 9px;
+  background: rgba(239, 68, 68, 0.04);
+}
+
+.cmp-row.ex-only-curr .cmp-ex-name {
+  color: var(--fg);
 }
 
 .pro-card {

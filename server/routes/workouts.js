@@ -753,6 +753,9 @@ router.get("/exercise-stats", async (req, res) => {
 router.get("/:id", firebaseAuthMiddleware, async (req, res) => {
   try {
     const { userId } = req.auth;
+    if (!(await import('mongoose')).default.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Ungültige Workout-ID' });
+    }
     const workout = await Workout.findOne({ 
       _id: req.params.id, 
       userId 
@@ -774,37 +777,22 @@ router.post("/", firebaseAuthMiddleware, async (req, res) => {
   try {
     const { userId } = req.auth;
     const readyState = (await import('mongoose')).default.connection?.readyState;
-    const beforeCount = await Workout.countDocuments({ userId });
-    // TEMP LOGGING: Request-Body und userId
     logger.info("[POST /api/workouts] incoming", {
       requestId,
       userId,
       readyState,
-      beforeCount,
       type: req.body?.type,
       name: req.body?.name,
       exercises: Array.isArray(req.body?.exercises) ? req.body.exercises.length : 0
     });
-    // Debug: Logge die Notizen der Übungen, falls vorhanden
-    if (Array.isArray(req.body.exercises)) {
-      console.log('📝 Notizen der Übungen beim POST /workouts:');
-      req.body.exercises.forEach((ex, idx) => {
-        if (ex.note) {
-          console.log(`  Übung ${idx + 1}: ${ex.name || ''} | Notiz: ${ex.note}`);
-        }
-      });
-    }
     const workout = await Workout.create({
       ...req.body,
       userId
     });
-    const afterCount = await Workout.countDocuments({ userId });
     logger.info("[POST /api/workouts] saved", {
       requestId,
       workoutId: workout?._id,
-      userId,
-      beforeCount,
-      afterCount
+      userId
     });
     res.status(201).json(workout);
   } catch (err) {
@@ -821,9 +809,14 @@ router.post("/", firebaseAuthMiddleware, async (req, res) => {
 router.put("/:id", firebaseAuthMiddleware, async (req, res) => {
   try {
     const { userId } = req.auth;
+    if (!(await import('mongoose')).default.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Ungültige Workout-ID' });
+    }
+    // _id aus dem Body entfernen – der Identifikator kommt ausschließlich aus dem URL-Param
+    const { _id: _bodyId, ...updateBody } = req.body;
     const workout = await Workout.findOneAndUpdate(
       { _id: req.params.id, userId },
-      req.body,
+      updateBody,
       { new: true, runValidators: true }
     );
     
@@ -841,6 +834,9 @@ router.put("/:id", firebaseAuthMiddleware, async (req, res) => {
 router.delete("/:id", firebaseAuthMiddleware, async (req, res) => {
   try {
     const { userId } = req.auth;
+    if (!(await import('mongoose')).default.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ error: 'Ungültige Workout-ID' });
+    }
     const workout = await Workout.findOneAndDelete({ 
       _id: req.params.id, 
       userId 
