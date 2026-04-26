@@ -1,4 +1,4 @@
-import { apiUrl, createResourceApi } from "./http";
+import { createResourceApi } from "./http";
 import { handleAPIError } from "./errorHandler";
 import { 
   cacheWorkouts, 
@@ -13,11 +13,12 @@ import {
 import { logger } from "@/utils/logger";
 
 // API Basis-URL
-const API_URL = apiUrl('workouts');
 const WORKOUTS_TIMEOUT_MS = Number.parseInt(import.meta.env.VITE_WORKOUTS_TIMEOUT_MS || '', 10) || 25000
 const api = createResourceApi('workouts', { timeout: WORKOUTS_TIMEOUT_MS });
 
 const CREATE_RETRY_DELAY_MS = Number.parseInt(import.meta.env.VITE_WORKOUTS_CREATE_RETRY_DELAY_MS || '', 10) || 1200
+// Kürzerer Timeout speziell für Create-Requests: schneller Offline-Fallback statt 25s warten
+const WORKOUTS_CREATE_TIMEOUT_MS = Number.parseInt(import.meta.env.VITE_WORKOUTS_CREATE_TIMEOUT_MS || '', 10) || 8000
 const STATS_RETRY_DELAY_MS = Number.parseInt(import.meta.env.VITE_WORKOUTS_STATS_RETRY_DELAY_MS || '', 10) || 1000
 
 function sleep(ms) {
@@ -41,8 +42,11 @@ function shouldRetryCreateRequest(error) {
   const status = Number(error?.response?.status || 0)
   if ([408, 425, 429, 500, 502, 503, 504].includes(status)) return true
   const code = String(error?.code || '').toUpperCase()
-  if (code === 'ERR_NETWORK' || code === 'ECONNABORTED') return true
-  return !error?.response
+  // Nur echte Netzwerktrennung (ERR_NETWORK) darf retryen.
+  // ECONNABORTED = Timeout: Server hat den Request ggf. schon verarbeitet → kein Retry
+  // (würde Duplikate erzeugen). Stattdessen direkt Offline-Fallback.
+  if (code === 'ERR_NETWORK') return true
+  return false
 }
 
 function isLikelyTransportError(error) {
@@ -219,7 +223,10 @@ export async function createWorkout(workoutData, token = null, options = {}) {
   // Online zuerst direkt speichern, um doppelte Queue-Create-Einträge zu vermeiden.
   if (isOnline()) {
     try {
-      const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {};
+      const config = {
+        ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+        timeout: WORKOUTS_CREATE_TIMEOUT_MS
+      };
       const res = await api.post("", workoutData, config);
       logger.debug('📥 Workouts API - createWorkout online response', {
         requestId,
@@ -252,7 +259,10 @@ export async function createWorkout(workoutData, token = null, options = {}) {
         })
         try {
           await sleep(CREATE_RETRY_DELAY_MS)
-          const retryConfig = token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+          const retryConfig = {
+            ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+            timeout: WORKOUTS_CREATE_TIMEOUT_MS
+          }
           const retryRes = await api.post("", workoutData, retryConfig)
           if (retryRes?.data && retryRes.data._id) {
             const retriedWorkout = {

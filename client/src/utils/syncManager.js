@@ -15,7 +15,9 @@ import {
   backfillQueueActionUserId,
   clearSyncedActions,
   setMetadata,
-  isOnline
+  isOnline,
+  saveWorkoutOffline,
+  deleteWorkoutOffline
 } from './offlineStorage'
 import { logger } from './logger'
 import { createWorkout, updateWorkout, deleteWorkout } from '@/api/workouts'
@@ -319,24 +321,21 @@ async function syncAction(item, token) {
 async function syncWorkoutAction(action, data, token) {
   switch (action) {
     case 'create': {
-      // Bei offline erstellten Workouts: Entferne temporäre _id UND offline flags
       const createData = { ...data }
-      // Entferne offline-spezifische Felder
-      if (createData._id && typeof createData._id === 'string' && createData._id.startsWith('offline_')) {
-        logger.debug('🔄 Sync - Entferne temporäre offline _id:', createData._id)
+      // Temporäre _id für Reconciliation merken und entfernen
+      const tempId = (typeof createData._id === 'string' && (createData._id.startsWith('offline_') || createData._id.startsWith('draft-')))
+        ? createData._id
+        : null
+      if (tempId) {
+        logger.debug('🔄 Sync - Entferne temporäre _id:', createData._id)
         delete createData._id
       }
-      if (createData._id && typeof createData._id === 'string' && createData._id.startsWith('draft-')) {
-        logger.debug('🔄 Sync - Entferne temporäre draft _id:', createData._id)
-        delete createData._id
-      }
-      
-      // Entferne offline Marker Flags
+      // Offline-Marker Flags entfernen
       delete createData._offlineCreated
       delete createData._offlineUpdated
       delete createData._failedOnline
       delete createData._syncedAt
-      
+
       logger.debug('🔄 Sync - Bereinigte Daten für API:', {
         hasId: !!createData._id,
         name: createData.name,
@@ -346,9 +345,24 @@ async function syncWorkoutAction(action, data, token) {
       
       const createdWorkout = await createWorkout(createData, token, { skipOfflineQueue: true })
       logger.debug('✅ Sync - Workout erstellt mit neuer _id:', createdWorkout._id)
-      
-      // TODO: Optional - Update lokales Workout mit echter _id
-      // await saveWorkoutOffline({ ...createData, _id: createdWorkout._id })
+
+      // Reconciliation: offline_xxx durch echten Server-Eintrag ersetzen
+      if (tempId) {
+        try {
+          await deleteWorkoutOffline(tempId)
+          logger.debug('🔄 Sync - Temporäres offline Workout gelöscht:', tempId)
+        } catch {}
+        try {
+          await saveWorkoutOffline({ ...createdWorkout, _offlineCreated: false })
+          logger.debug('🔄 Sync - Echtes Workout lokal gecacht:', createdWorkout._id)
+        } catch {}
+        // Store-Update via CustomEvent (kein direkter Pinia-Import um Zirkularität zu vermeiden)
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('workout-reconciled', {
+            detail: { tempId, realId: createdWorkout._id, workout: createdWorkout }
+          }))
+        }
+      }
       break
     }
       

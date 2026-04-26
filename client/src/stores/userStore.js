@@ -19,7 +19,6 @@ import {
   createWorkout as createWorkoutApi,
   updateWorkout as updateWorkoutApi
 } from '@/api/workouts'
-import { processSyncQueue } from '@/utils/syncManager'
 import { parseUidFromToken } from '@/utils/authToken'
 import {
   DRAFT_TOMBSTONES_KEY,
@@ -171,6 +170,7 @@ export const useUserStore = defineStore("user", {
         ;(workout.exercises || []).forEach((ex) => {
           if (Array.isArray(ex.setDetails) && ex.setDetails.length) {
             ex.setDetails.forEach((set) => {
+              if (set?.isWarmup) return // Warmup-Sätze nicht ins Volumen einrechnen
               const reps = Number(set?.reps) || 0
               const weight = Number(set?.weight) || 0
               total += reps * weight
@@ -561,15 +561,26 @@ export const useUserStore = defineStore("user", {
         const newWorkout = await createWorkoutApi(enrichedWorkoutData, token);
         logger.debug('🏗️ [userStore] API returned:', newWorkout)
         if (newWorkout) {
-          this.workouts.push(newWorkout);
+          // Neu erstelltes Workout bleibt im Store als Draft markiert, bis performSaveWorkout
+          // es explizit auf completed setzt. Das verhindert, dass ein abgebrochenes Workout
+          // ohne Draft-Flag in den Stats auftaucht.
+          const newWorkoutAsDraft = {
+            ...newWorkout,
+            _isDraft: true,
+            isDraft: true,
+            completed: false
+          }
+          const existingIdx = this.workouts.findIndex(w => String(w?._id || '') === String(newWorkout._id))
+          if (existingIdx !== -1) {
+            this.workouts[existingIdx] = { ...this.workouts[existingIdx], ...newWorkoutAsDraft }
+          } else {
+            this.workouts.push(newWorkoutAsDraft);
+          }
           this.workouts = this.applyWorkoutLimit(this.workouts)
           if (newWorkout?._offlineCreated) {
             logger.warn('⚠️ [API] Workout offline erstellt und in Sync-Queue gelegt:', newWorkout._id)
-            if (isOnline()) {
-              processSyncQueue(token || null).catch((syncError) => {
-                logger.warn('⚠️ [API] Sofort-Sync nach offline Create fehlgeschlagen:', syncError?.message || syncError)
-              })
-            }
+            // Kein Sofort-Sync: würde Duplikat erzeugen wenn erster POST noch verarbeitet wird.
+            // Der periodische Auto-Sync (15s) in setupAutoSync übernimmt die Übertragung.
           } else {
             logger.debug('✅ [API] Workout created:', newWorkout._id)
           }
@@ -700,7 +711,7 @@ export const useUserStore = defineStore("user", {
           logger.debug('🔄 [userStore] Stats-Cache nach Workout-Save invalidiert (update path)')
         }
 
-        const timeoutMs = 4000
+        const timeoutMs = 2000
         const apiPromise = updateWorkoutApi(id, updates, token)
         const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), timeoutMs))
         const updatedWorkout = await Promise.race([apiPromise, timeoutPromise])
