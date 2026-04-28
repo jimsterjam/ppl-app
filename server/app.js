@@ -22,8 +22,11 @@ const envOrigins = String(process.env.CORS_ALLOWED_ORIGINS || '')
   .filter(Boolean)
 
 // CORS
+// Capacitor-App-Scheme aus client/capacitor.config.ts (ios.scheme)
+const CAP_APP_SCHEMES = ['capacitor://localhost', 'com.pushpulllegs.com://localhost']
+
 const allowedOrigins = new Set([
-  'capacitor://localhost',
+  ...CAP_APP_SCHEMES,
   ...(!isProd ? ['http://localhost:5173', 'http://localhost:5174', 'http://localhost'] : []),
   ...envOrigins
 ])

@@ -8,7 +8,8 @@ import {
   deleteWorkoutOffline,
   queueAction,
   isOnline,
-  purgeServerDeletedWorkouts
+  purgeServerDeletedWorkouts,
+  clearWorkoutTombstones
 } from "@/utils/offlineStorage";
 import { logger } from "@/utils/logger";
 
@@ -80,27 +81,40 @@ export async function fetchWorkouts(token = null, userId = null) {
     if (token) config.headers = { Authorization: `Bearer ${token}` };
 
     const res = await api.get("", config);
-    if (!res || [404, 204, 500].includes(res.status)) return [];
+    if (!res || [404, 204].includes(res.status)) return [];
+    if (res.status === 500) {
+      // Server-Fehler (z.B. Render Cold-Start / MongoDB nicht bereit) → lokalen Cache nutzen
+      logger.warn('⚠️ Workouts API - Server 500, lade aus lokalem Cache');
+      const cached = userId ? await getAllWorkoutsOffline({ userId }) : [];
+      logger.debug('📦 Workouts API - Server-Error Fallback Cache:', cached.length, 'workouts');
+      return cached;
+    }
 
     if (Array.isArray(res.data) && res.data.length > 0) {
       await cacheWorkouts(res.data);
       // Fix #3: Lokale Workouts bereinigen, die der Server nicht mehr kennt
       const serverIds = res.data.map(w => String(w?._id || '').trim()).filter(Boolean)
+      // Server hat diese IDs bestätigt → Tombstones entfernen falls fälschlicherweise gesetzt
+      clearWorkoutTombstones(serverIds)
       await purgeServerDeletedWorkouts(serverIds, userId || '').catch(() => {})
       logger.debug('💾 Workouts API - Cached:', res.data.length, 'workouts');
     }
 
     return Array.isArray(res.data) ? res.data : [];
   } catch (error) {
-    if (!error.response || !isOnline()) {
+    const errorStatus = Number(error?.response?.status || 0)
+    const isServerError = errorStatus >= 500 && errorStatus < 600
+    if (!error.response || !isOnline() || isServerError) {
       const transportIssue = isLikelyTransportError(error) && isOnline()
       logger.warn(
-        transportIssue
-          ? '📡 Workouts API - Netzwerk/Transportproblem, lade aus Cache'
-          : '📡 Workouts API - Offline, lade aus Cache',
+        isServerError
+          ? `⚠️ Workouts API - Server ${errorStatus}, lade aus Cache`
+          : transportIssue
+            ? '📡 Workouts API - Netzwerk/Transportproblem, lade aus Cache'
+            : '📡 Workouts API - Offline, lade aus Cache',
         {
           code: error?.code || null,
-          status: error?.response?.status || null,
+          status: errorStatus || null,
           online: isOnline()
         }
       );
@@ -123,7 +137,11 @@ export async function fetchLatestWorkoutsForRecovery(token = null, userId = null
     if (token) config.headers = { Authorization: `Bearer ${token}` }
 
     const res = await api.get("", config)
-    if (!res || [404, 204, 500].includes(res.status)) return []
+    if (!res || [404, 204].includes(res.status)) return []
+    if (res.status === 500) {
+      const cached = userId ? await getAllWorkoutsOffline({ userId }) : []
+      return cached.slice(0, safeLimit)
+    }
 
     const list = Array.isArray(res.data) ? res.data : []
     const scoped = userId
