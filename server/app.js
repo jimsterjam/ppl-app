@@ -74,6 +74,14 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+// Temporärer CORS-Diagnose-Endpunkt – kann nach Debugging entfernt werden
+app.get('/api/debug/origin', (req, res) => {
+  const origin = req.headers.origin || null;
+  const ua = (req.headers['user-agent'] || '').slice(0, 120);
+  logger.info('[debug/origin]', { origin, ua });
+  res.json({ origin, ua });
+});
+
 // 404 Not Found - muss nach allen Routen stehen (Express v5)
 app.use((req, res) => {
   res.status(404).json({ error: 'Not Found', path: req.originalUrl });
