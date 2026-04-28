@@ -451,6 +451,7 @@ router.get("/", firebaseAuthMiddleware, validateQuery(workoutListQuerySchema), a
       Workout.countDocuments({ userId })
     ]);
     res.set('X-Total-Count', String(total));
+    res.set('Cache-Control', 'no-store');
     res.json(workouts);
   } catch (err) {
     res.status(500).json({ error: err.message });
