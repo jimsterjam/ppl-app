@@ -35,11 +35,21 @@ const allowLanInDev = !isProd && String(process.env.CORS_ALLOW_LAN || '1').trim(
 
 app.use(cors({
   origin: (origin, cb) => {
+    // Kein Origin-Header (mobile/server-to-server) → erlaubt
     if (!origin) return cb(null, true);
+    // String "null" (WKWebView Custom Scheme verhält sich wie file://) → erlaubt
+    if (origin === 'null') { logger.info('[CORS] null-origin erlaubt (WKWebView custom scheme)'); return cb(null, true); }
+    // Jeder Non-HTTP-Scheme (capacitor://, com.pushpulllegs.com://, ionic://, etc.) → erlaubt
+    // Datenzugriff ist durch Firebase Auth Token gesichert, nicht durch CORS
+    if (!origin.startsWith('http://') && !origin.startsWith('https://')) {
+      logger.info('[CORS] custom-scheme erlaubt:', origin);
+      return cb(null, true);
+    }
     if (allowedOrigins.has(origin)) return cb(null, true);
     if (allowLanInDev && /^http:\/\/192\.168\.[0-9]{1,3}\.[0-9]{1,3}(?::\d+)?$/.test(origin)) {
       return cb(null, true)
     }
+    logger.warn('[CORS] blockiert:', origin)
     return cb(null, false);
   },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
