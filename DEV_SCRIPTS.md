@@ -1,57 +1,50 @@
-# Development Server Scripts
+# Development Scripts
 
-## 🚀 Verfügbare Modi
+## 🚀 Server starten
 
-### 1. **Empfohlen: Stabiler Modus mit Auto-Restart**
+### Empfohlen (Backend + Frontend parallel, mit Auto-Restart)
 ```bash
 npm run dev
-# oder direkt:
-./dev-stable.sh
+```
+Startet `dev-stable.sh`: nodemon für Server + Vite für Client, koordiniertes Beenden mit Ctrl+C.
+
+### Einzeln
+```bash
+npm run server     # Backend mit nodemon (Auto-Restart)
+npm run client     # Frontend (Vite)
+npm run server:prod  # Backend ohne nodemon (Production-Modus)
 ```
 
-**Features:**
-- ✅ Backend startet automatisch bei Code-Änderungen neu (nodemon)
-- ✅ Automatisches Cleanup bei Start
-- ✅ Sauberes Beenden mit Ctrl+C
-- ✅ Farbige Logs für bessere Übersicht
-
-**Wann nutzen:** Standard für Development, besonders bei häufigen Backend-Änderungen
+### Fallback (ohne nodemon)
+```bash
+npm run dev:old    # concurrently: Backend + Frontend
+npm run dev:basic  # dev.sh (legacy)
+```
 
 ---
 
-### 2. **Basis-Modus (alte Methode)**
+## 📱 iOS / Capacitor
+
+### Build & Xcode öffnen
 ```bash
-npm run dev:old
-# oder:
-npm run dev:basic
+cd client
+
+npm run ios:fast     # build + rsync → Xcode öffnen (schnell, ohne pod install)
+npm run ios:refresh  # build + cap sync + Xcode öffnen (vollständig)
+npm run ios          # nur Xcode öffnen (cap open ios)
 ```
 
-**Features:**
-- Concurrently startet beide Server parallel
-- Kein Auto-Restart bei Änderungen
-- Manueller Neustart nötig: `killall -9 node && npm run dev:old`
-
-**Wann nutzen:** Wenn nodemon Probleme macht oder nur Frontend-Änderungen
-
----
-
-### 3. **Einzelne Server starten**
-
-**Backend (mit Auto-Restart):**
+### Sync ohne Xcode öffnen
 ```bash
-npm run server
-# oder mit Watchdog (10 Auto-Restarts bei Crash):
-./watchdog-backend.sh
+npm run cap:sync                  # clean web + cap sync (alle Plattformen)
+npm run cap:sync:ios:stable       # clean + cap copy ios + pod install (empfohlen bei Pod-Fehlern)
 ```
 
-**Backend (ohne Auto-Restart):**
+### Build (nur Dist erstellen)
 ```bash
-npm run server:prod
-```
-
-**Frontend:**
-```bash
-npm run client
+npm run build
+# oder aus Root:
+cd .. && npm run build
 ```
 
 ---

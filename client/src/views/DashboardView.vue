@@ -227,7 +227,7 @@ import { isDraftDeleted } from '@/utils/draftTombstones'
 import { deleteWorkout } from '@/api/workouts'
 import { http } from '@/api/http'
 import { loadDefaultExercises, getCachedDefaultExercises } from '@/utils/defaultExercisesLoader'
-import { buildWorkoutBuilderRoute, normalizeBuilderWorkoutType, QUICK_PREFILL_KEY, saveWorkoutBuilderPrefill } from '@/utils/workoutBuilderFlow'
+import { buildWorkoutBuilderRoute, normalizeBuilderWorkoutType, QUICK_PREFILL_KEY, DETAIL_DRAFT_KEY, saveWorkoutBuilderPrefill } from '@/utils/workoutBuilderFlow'
 import {
   getFavoritesByType,
   renameFavoriteWorkout,
@@ -284,7 +284,9 @@ function resolveDetailDraftTargetId() {
 }
 
 function isOpenDraftWorkout(workout) {
-  return (workout?._isDraft === true || workout?.isDraft === true) && workout?.completed !== true
+  return (workout?._isDraft === true || workout?.isDraft === true)
+    && workout?.completed !== true
+    && workout?._adjustDraft !== true
 }
 
 const hasDraft = computed(() => {
@@ -305,7 +307,7 @@ const pendingWorkoutTypeLabel = computed(() => {
 })
 
 function getCurrentFavoritesUserId() {
-  return String(getCurrentUser?.()?.uid || authStore.user?.id || 'guest')
+  return String(getCurrentUser?.()?.uid || authStore.user?.uid || authStore.uid || 'guest')
 }
 
 function loadFavoriteWorkoutsForCurrentType() {
@@ -393,14 +395,14 @@ const avatarInitials = computed(() => {
 })
 
 function getDetailDraftKey() {
-  return 'workout_detail_draft'
+  return DETAIL_DRAFT_KEY
 }
 
 function buildFavoriteDetailDraft(favorite) {
   const fav = favorite?.workout || {}
   const type = normalizeBuilderWorkoutType(favorite?.type || pendingWorkoutType.value)
   const draftId = `draft-favorite-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-  const userId = String(getCurrentUser?.()?.uid || authStore.user?.id || authStore.user?.uid || 'guest')
+  const userId = String(getCurrentUser?.()?.uid || authStore.user?.uid || authStore.uid || 'guest')
   const exercises = (Array.isArray(fav.exercises) ? fav.exercises : []).map((exercise = {}) => {
     const setDetails = Array.isArray(exercise?.setDetails) && exercise.setDetails.length > 0
       ? exercise.setDetails.map((set) => ({ reps: Number(set?.reps) || 0, weight: Number(set?.weight) || 0, ...(set?.isWarmup ? { isWarmup: true } : {}) }))
@@ -423,6 +425,7 @@ function buildFavoriteDetailDraft(favorite) {
     completed: false,
     _isDraft: true,
     isDraft: true,
+    _adjustDraft: true,
     notes: typeof fav.notes === 'string' ? fav.notes : '',
     exercises
   }
@@ -462,6 +465,12 @@ async function readDetailDraft() {
       return
     }
     const parsed = JSON.parse(raw)
+    // Favorit-Anpassen-Drafts nicht als "in Bearbeitung" im Dashboard anzeigen
+    if (parsed?._adjustDraft) {
+      detailDraft.value = null
+      logDraftSourceOnce()
+      return
+    }
     const data = parsed?.workout || parsed
     if (!data || !data._id || data.completed) {
       detailDraft.value = null
@@ -695,14 +704,15 @@ async function openFavoriteAdjustInDetail(favorite) {
   const draft = buildFavoriteDetailDraft(favorite)
   await saveWorkoutOffline(draft)
   try {
-    sessionStorage.setItem(getDetailDraftKey(), JSON.stringify({ timestamp: Date.now(), workout: draft }))
+    sessionStorage.setItem(getDetailDraftKey(), JSON.stringify({ timestamp: Date.now(), workout: draft, _adjustDraft: true }))
   } catch {}
 
   const type = normalizeBuilderWorkoutType(favorite?.type || pendingWorkoutType.value)
   const query = {
     favoriteSource: '1',
     favoriteAdjust: '1',
-    favoriteType: String(type)
+    favoriteType: String(type),
+    favoriteUserId: getCurrentFavoritesUserId()
   }
   if (favorite?.id) query.favoriteId = String(favorite.id)
   if (favorite?.name) query.favoriteName = String(favorite.name)

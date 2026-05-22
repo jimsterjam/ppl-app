@@ -25,7 +25,10 @@ function readStore() {
 function writeStore(store) {
   try {
     localStorage.setItem(FAVORITES_KEY, JSON.stringify(store || {}))
-  } catch {}
+    return true
+  } catch {
+    return false
+  }
 }
 
 export function normalizeWorkoutType(type) {
@@ -144,7 +147,8 @@ export function saveFavoriteWorkout({ userId = 'guest', type = 'push', name, wor
   }
 
   list.push(favorite)
-  writeStore(store)
+  const saved = writeStore(store)
+  if (!saved) return { success: false, code: 'STORAGE_ERROR', message: 'Favorit konnte nicht gespeichert werden (Storage voll?).' }
   return { success: true, favorite }
 }
 
@@ -192,7 +196,8 @@ export function updateFavoriteWorkout({ userId = 'guest', type = 'push', id, wor
     updatedAt: nowIso()
   }
 
-  writeStore(store)
+  const saved = writeStore(store)
+  if (!saved) return { success: false, code: 'STORAGE_ERROR', message: 'Favorit konnte nicht aktualisiert werden (Storage voll?).' }
   return { success: true, favorite: bucket[foundType][foundIndex] }
 }
 

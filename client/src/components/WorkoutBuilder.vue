@@ -12,7 +12,7 @@ import { useToastStore } from '@/stores/toastStore';
 import AppModal from '@/components/AppModal.vue';
 import StepIndicator from '@/components/StepIndicator.vue';
 import BottomNav from '@/components/BottomNav.vue';
-import { getAllExercisesOffline, saveWorkoutOffline, deleteWorkoutOffline } from '@/utils/offlineStorage';
+import { getAllExercisesOffline, saveWorkoutOffline, deleteWorkoutOffline, getWorkoutOffline } from '@/utils/offlineStorage';
 import { deleteWorkout as deleteServerWorkout } from '@/api/workouts';
 import { getMergedSortedExercises } from '@/utils/exerciseList';
 import { searchAndRankExercises } from '@/utils/exerciseSearch'
@@ -434,7 +434,10 @@ async function createWorkout() {
 				})
 				try { sessionStorage.setItem(`workout_map_${tempId}`, String(created._id)) } catch {}
 				logger.debug('[WorkoutBuilder] temp->real mapping stored', { tempId, realId: created._id })
-				// Workout bleibt bis zum Abschluss als Draft markiert
+				// Workout bleibt bis zum Abschluss als Draft markiert.
+				// WICHTIG: Kein blindes Überschreiben von IndexedDB/sessionStorage mit dem
+				// Template-Stand (cleanWorkout). Der User könnte in WorkoutDetail bereits Werte
+				// geändert haben. Nur speichern wenn noch kein neuerer Eintrag existiert.
 				const cleanWorkout = {
 					...workoutData,
 					_id: created._id,
@@ -442,15 +445,23 @@ async function createWorkout() {
 					_isDraft: true,
 					isDraft: true
 				};
-				await saveWorkoutOffline(cleanWorkout);
-				try {
-					sessionStorage.setItem('workout_detail_draft', JSON.stringify({
-						...cleanWorkout,
-						completed: false,
-						timestamp: Date.now()
-					}))
-				} catch {}
-				logger.debug('[WorkoutBuilder] real workout cached offline', { realId: created._id })
+				const existingOffline = await getWorkoutOffline(created._id).catch(() => null)
+				if (!existingOffline) {
+					// Noch kein Eintrag unter dieser ID → erster Schreiber, sicher
+					await saveWorkoutOffline(cleanWorkout);
+					try {
+						sessionStorage.setItem('workout_detail_draft', JSON.stringify({
+							...cleanWorkout,
+							completed: false,
+							timestamp: Date.now()
+						}))
+					} catch {}
+					logger.debug('[WorkoutBuilder] real workout cached offline (initial)', { realId: created._id })
+				} else {
+					// WorkoutDetail hat die ID bereits übernommen und speichert aktuellere Daten –
+					// Template-Stand nicht zurückschreiben, damit User-Änderungen erhalten bleiben.
+					logger.debug('[WorkoutBuilder] real workout already in IndexedDB, skip overwrite', { realId: created._id })
+				}
 
 				try {
 					const idx = userStore.workouts.findIndex(w => String(w?._id || '') === String(created._id))

@@ -44,8 +44,32 @@ const isIOS = ref(false)
 const store = useUserStore()
 const route = useRoute()
 const activeWorkout = computed(() => {
-  const workout = store.hasDraft ? store.workouts.find(w => w.isDraft) : null
-  return workout
+  // 1. Pinia Store (reaktiv, in-session)
+  const storeDraft = store.workouts.find(w => (w._isDraft === true || w.isDraft === true) && w.completed !== true)
+  if (storeDraft) return storeDraft
+
+  // 2. sessionStorage-Fallback: sichtbar nach Page-Reload oder wenn User auf Nicht-Dashboard-Seite landet
+  // Favorit-Anpassen-Drafts sind keine "gestarteten Workouts" und werden ausgeblendet.
+  try {
+    const raw = sessionStorage.getItem('workout_detail_draft')
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      // Favorit-Anpassen-Drafts explizit ausblenden (Marker _adjustDraft oder draft-favorite- Präfix)
+      if (parsed?._adjustDraft) return null
+      const draft = parsed?.workout || parsed
+      const draftId = String(draft?._id || '')
+      if (
+        draftId &&
+        !draftId.startsWith('draft-favorite-') &&
+        draft.completed !== true &&
+        draft._isDraft !== false
+      ) {
+        return { _id: draftId, _isDraft: true, isDraft: true }
+      }
+    }
+  } catch {}
+
+  return null
 })
 
 onMounted(() => {

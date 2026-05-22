@@ -7,7 +7,7 @@ staticSites:
     name: ppl-app-client
     repo: https://github.com/jimsterjam/ppl-app.git
     branch: main
-    buildCommand: cd client && npm ci && npm run build
+    buildCommand: cd client && npm ci && npm test && npm run build
     publishPath: client/dist
 
 services:
@@ -16,7 +16,7 @@ services:
     runtime: node
     repo: https://github.com/jimsterjam/ppl-app.git
     branch: main
-    buildCommand: cd server && npm ci
+    buildCommand: cd server && npm ci && npm test
     startCommand: cd server && npm run start
     plan: free
     envVars:

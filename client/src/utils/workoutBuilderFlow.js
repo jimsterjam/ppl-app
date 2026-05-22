@@ -1,6 +1,7 @@
 const VALID_WORKOUT_TYPES = new Set(['push', 'pull', 'legs', 'fullbody'])
 
 export const QUICK_PREFILL_KEY = 'quick_workout_prefill'
+export const DETAIL_DRAFT_KEY = 'workout_detail_draft'
 
 export function normalizeBuilderWorkoutType(value) {
   const normalized = String(value || '').trim().toLowerCase()

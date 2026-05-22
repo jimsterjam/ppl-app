@@ -36,8 +36,9 @@ Quick checklist
 5. Deploy and verify
    - After import / manual creation, trigger a deploy or push to `main`.
    - Check service logs in Render for build and run output.
-   - Verify static site: `https://ppl-app-client.onrender.com` (URL provided by Render)
+   - Verify static site: `https://ppl-app-client.onrender.com` (or custom domain)
    - Verify API health: `https://ppl-app-server.onrender.com/api/health`
+   - Current production server: `https://ppl-app-server.onrender.com`
 
 6. Domains & DNS
    - If you use a custom domain, add it in Render and update DNS records (CNAME/ALIAS) as instructed by Render.

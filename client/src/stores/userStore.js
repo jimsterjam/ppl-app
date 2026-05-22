@@ -35,6 +35,7 @@ import {
   mergeWorkoutLists,
   dedupeWorkoutsForStats
 } from '@/utils/workoutMerge'
+import { DETAIL_DRAFT_KEY } from '@/utils/workoutBuilderFlow'
 
 const WORKOUT_STORE_LIMIT = Math.max(0, Number.parseInt(import.meta.env.VITE_WORKOUTS_IN_MEMORY_LIMIT || '', 10) || 0)
 
@@ -814,8 +815,7 @@ export const useUserStore = defineStore("user", {
       }
 
       try {
-        const detailKey = 'workout_detail_draft'
-        sessionStorage.removeItem(detailKey)
+        sessionStorage.removeItem(DETAIL_DRAFT_KEY)
         const allKeys = Object.keys(sessionStorage)
         allKeys.forEach((key) => {
           if (key.startsWith('workout_detail_draft_') || key.startsWith('workout_map_')) {

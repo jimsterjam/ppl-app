@@ -625,6 +625,7 @@ import { getWorkoutOffline, getExerciseOffline, getAllExercisesOffline, getAllWo
 import { fetchWorkout, deleteWorkout as deleteWorkoutApi } from '@/api/workouts'
 // import { fetchExercise, fetchExercises } from '@/api/exercises'
 import { useUserStore } from '@/stores/userStore'
+import { useAuthStore } from '@/stores/authStore'
 import HeaderBar from '@/components/HeaderBar.vue'
 import BottomNav from '@/components/BottomNav.vue'
 import AppModal from '@/components/AppModal.vue'
@@ -635,6 +636,7 @@ import { useTimerStore } from '@/stores/timerStore'
 import { useI18n } from 'vue-i18n'
 import { logger } from '@/utils/logger'
 import { buildWorkoutNotesSummary } from '@/utils/workoutNotes'
+import { DETAIL_DRAFT_KEY } from '@/utils/workoutBuilderFlow'
 import {
   saveFavoriteWorkout,
   updateFavoriteWorkout,
@@ -644,8 +646,9 @@ import {
 } from '@/utils/workoutFavorites'
 
 const userStore = useUserStore()
+const authStore = useAuthStore()
 function getDetailDraftKey() {
-  return 'workout_detail_draft'
+  return DETAIL_DRAFT_KEY
 }
 function readDetailDraftRaw() {
   try {
@@ -924,6 +927,21 @@ async function maybePrefillFromLastFavoritePerformance() {
     return
   }
 
+  // Wenn das Template direkt vor diesem Start angepasst wurde, soll der erste Start
+  // die Template-Daten verwenden – nicht die alte Performance-History.
+  // Das Flag wird von performSaveWorkout (Favorit-Anpassen) einmalig gesetzt und hier konsumiert.
+  const favoriteIdForFreshFlag = String(route.query?.favoriteId || '').trim()
+  if (favoriteIdForFreshFlag) {
+    const freshFlagKey = `fav_template_freshly_adjusted_${favoriteIdForFreshFlag}`
+    try {
+      if (localStorage.getItem(freshFlagKey) === '1') {
+        localStorage.removeItem(freshFlagKey)
+        favoritePrefillApplied.value = true
+        return
+      }
+    } catch {}
+  }
+
   // currentWorkoutId früh ermitteln, damit der localStorage-Key geprüft werden kann, bevor
   // wir die teuren History-Queries starten.
   const currentWorkoutId = String(workout.value?._id || route.params.id || '').trim()
@@ -1016,7 +1034,11 @@ async function maybePrefillFromLastFavoritePerformance() {
   ensureSetDetailsStructure()
   favoritePrefillApplied.value = true
   try { localStorage.setItem(prefillStorageKey, '1') } catch {}
-  try { await triggerAutoSave() } catch {}
+  // KEIN triggerAutoSave() hier: die Prefill-Funktion schreibt historische Performance-Werte
+  // als Hinweis ins Workout. Ein Auto-Save an dieser Stelle würde diese alten Werte in den
+  // Server schreiben und mit einem kurz darauf folgenden manuellen Save racen – der letzte
+  // Netzwerk-Request gewinnt, was zu falschen Stats führt.
+  // Der User-gesteuerte Auto-Save (Input-Events) übernimmt die Persistenz wenn der User tippt.
 }
 
 async function syncStartedFavoriteFromWorkout(workoutLike = null) {
@@ -1111,6 +1133,8 @@ async function runAutoSaveNow() {
       initialSnapshot = snapshotCore({ ...w })
       logger.debug('Draft gespeichert (draft):', { ...w, _id: 'draft' })
     } else if (String(id).startsWith('draft-')) {
+      // Nochmals prüfen: performSaveWorkout() könnte seit dem Entry-Guard gestartet haben.
+      if (saving.value || suppressDraftPersistence.value) return
       const realId = resolveRealIdFromDraftId(id)
       if (realId) {
         const token = await getIdToken().catch(() => null)
@@ -1138,8 +1162,13 @@ async function runAutoSaveNow() {
         saveError.value = false
       }
     } else {
+      // Nochmals prüfen: performSaveWorkout() könnte zwischen dem Entry-Guard-Check
+      // und diesem Punkt gestartet haben (JS interleaving an await-Punkten davor).
+      if (saving.value || suppressDraftPersistence.value) return
       let token = await getIdToken().catch(() => null)
-      const keepDraft = shouldKeepAsDraft(w) && w.completed !== true
+      // Auto-Save darf ein aktives Workout NIE als Non-Draft markieren.
+      // keepDraft ist immer true solange das Workout nicht explizit vom User gespeichert wurde.
+      const keepDraft = w.completed !== true
       const { _id: _wid, ...wWithoutId } = w
       const payload = { ...wWithoutId, _isDraft: keepDraft, isDraft: keepDraft }
       await store.updateWorkout(route.params.id, payload, token)
@@ -1526,7 +1555,9 @@ async function loadWorkout() {
       })
     }
     ensureSetDetailsStructure()
-    await maybePrefillFromLastFavoritePerformance()
+    // _isDraft MUSS vor maybePrefillFromLastFavoritePerformance gesetzt werden,
+    // damit der dort ausgelöste triggerAutoSave das Workout korrekt als Draft behandelt
+    // und nicht mit keepDraft=false in IndexedDB schreibt.
     if (workout.value && shouldKeepAsDraft(workout.value) && workout.value.completed !== true) {
       workout.value._isDraft = true
       workout.value.isDraft = true
@@ -1547,6 +1578,7 @@ async function loadWorkout() {
         }
       } catch {}
     }
+    await maybePrefillFromLastFavoritePerformance()
     await enrichExerciseImages()
     initialSnapshot = snapshotCore(workout.value)
   } catch (e) {
@@ -2010,10 +2042,13 @@ function stopSpin(row, field) {
 
 async function performSaveWorkout() {
   if (saving.value) return // Guard gegen Doppel-Aufruf
+  // Sofort setzen – schliesst das Race-Window zwischen Guard-Check und erstem await.
+  // triggerAutoSave() und runAutoSaveNow() prüfen saving.value als primären Guard,
+  // daher muss es vor cancelPendingAutoSave() und vor dem ersten await stehen.
+  saving.value = true
   try {
     cancelPendingAutoSave('final-save')
     suppressDraftPersistence.value = true
-    saving.value = true
     saveMsg.value = ''
     saveError.value = false
     const id = route.params.id
@@ -2051,7 +2086,65 @@ async function performSaveWorkout() {
 
     // Favorit-Anpassen: Nur Favorit aktualisieren, kein Stats-Eintrag
     if (String(route.query?.favoriteAdjust || '') === '1') {
-      await syncStartedFavoriteFromWorkout(normalized)
+      const favId = String(route.query?.favoriteId || '').trim()
+      const favName = String(route.query?.favoriteName || normalized.name || '').trim()
+      const favType = normalizeWorkoutType(route.query?.favoriteType || normalized.type || 'push')
+      const favUserId = getFavoriteUserId()
+      logger.debug('[WorkoutDetail] Favorit-Anpassen: Start', { favId, favName, favType, favUserId, exerciseCount: normalized.exercises?.length })
+      if (favId) {
+        let updateResult
+        try {
+          updateResult = updateFavoriteWorkout({
+            userId: favUserId,
+            type: favType,
+            id: favId,
+            name: favName,
+            workout: {
+              name: normalized.name,
+              type: normalized.type || favType,
+              exercises: normalized.exercises
+            }
+          })
+        } catch (updateErr) {
+          logger.warn('[WorkoutDetail] Favorit-Anpassen: updateFavoriteWorkout Ausnahme', updateErr)
+          toast.show('Fehler beim Aktualisieren des Favoriten', { type: 'error', duration: 4000 })
+          saving.value = false
+          suppressDraftPersistence.value = false
+          return
+        }
+        if (!updateResult?.success) {
+          logger.warn('[WorkoutDetail] Favorit-Anpassen: Update fehlgeschlagen', updateResult?.code, updateResult?.message)
+          if (updateResult?.code === 'NOT_FOUND') {
+            toast.show(t('workoutDetail.favoriteNotFound') || 'Favorit wurde nicht gefunden – wurde er gelöscht?', { type: 'error', duration: 4000 })
+            saving.value = false
+            suppressDraftPersistence.value = false
+            return
+          }
+          if (updateResult?.code === 'INVALID_NAME') {
+            toast.show(t('workoutDetail.favoriteNameInvalid') || 'Ungültiger Favoritenname', { type: 'error', duration: 4000 })
+            saving.value = false
+            suppressDraftPersistence.value = false
+            return
+          }
+          // Unbekannter Fehlercode: Nutzer informieren, nicht still verlieren
+          toast.show(`Favorit konnte nicht aktualisiert werden (${updateResult?.code || 'unbekannt'})`, { type: 'error', duration: 4000 })
+          saving.value = false
+          suppressDraftPersistence.value = false
+          return
+        } else {
+          logger.debug('[WorkoutDetail] Favorit erfolgreich aktualisiert', favId)
+          // Flag setzen: nächster Start soll die angepassten Template-Daten verwenden,
+          // nicht die alte Performance-History (maybePrefillFromLastFavoritePerformance
+          // würde sonst die geänderten setDetails sofort wieder überschreiben).
+          try { localStorage.setItem(`fav_template_freshly_adjusted_${favId}`, '1') } catch {}
+        }
+      } else {
+        logger.warn('[WorkoutDetail] Favorit-Anpassen: Keine favoriteId in Route – Update übersprungen')
+        toast.show('Favorit konnte nicht gespeichert werden: fehlende ID', { type: 'error', duration: 4000 })
+        saving.value = false
+        suppressDraftPersistence.value = false
+        return
+      }
       // Draft-Workout aus IndexedDB, Store UND sessionStorage entfernen.
       // sessionStorage muss zwingend geleert werden, sonst zeigt Dashboard diesen
       // Draft als "in Bearbeitung" an (readDetailDraft liest workout_detail_draft).
@@ -2072,7 +2165,7 @@ async function performSaveWorkout() {
         const tk = await getIdToken().catch(() => null)
         deleteWorkoutApi(adjustId, tk).catch(() => null)
       }
-      toast.show(t('workout.adjustSaved') || 'Favorit aktualisiert', { type: 'success', duration: 2000 })
+      toast.show(t('workoutDetail.adjustSaved') || 'Favorit aktualisiert', { type: 'success', duration: 2000 })
       bypassTimerLeaveGuard.value = true
       router.push('/dashboard')
       return
@@ -2201,7 +2294,12 @@ async function saveWorkout() {
 }
 
 function getFavoriteUserId() {
-  return String(getCurrentUser?.()?.uid || userStore.user?.id || 'guest')
+  // Primär: favoriteUserId aus Route-Query — vom Dashboard genau dann gesetzt,
+  // wenn die Favoriten geladen wurden (eliminiert userId-Ableitungsfehler)
+  const fromQuery = String(route.query?.favoriteUserId || '').trim()
+  if (fromQuery && fromQuery !== 'guest') return fromQuery
+  // Fallback: Firebase Auth / AuthStore
+  return String(getCurrentUser?.()?.uid || authStore.user?.uid || authStore.uid || 'guest')
 }
 
 function buildFavoriteSourceWorkout() {
@@ -2627,9 +2725,14 @@ onBeforeRouteLeave(async (to) => {
   if (isFavoriteAdjustMode.value) {
     if (bypassTimerLeaveGuard.value) {
       bypassTimerLeaveGuard.value = false
+      suppressDraftPersistence.value = true
       return true
     }
-    // Verlassen ohne Speichern: Adjust-Draft verwerfen
+    // Verlassen ohne Speichern: Adjust-Draft verwerfen.
+    // suppressDraftPersistence MUSS vor return gesetzt werden, weil onBeforeUnmount
+    // danach mit der bereits geänderten Route feuert (isFavoriteAdjustMode wäre dann false)
+    // und persistInProgressDraft den Draft sonst zurückschreiben würde.
+    suppressDraftPersistence.value = true
     const adjustId = String(route.params.id || '')
     if (adjustId) {
       try { await db.workouts.delete(adjustId) } catch {}

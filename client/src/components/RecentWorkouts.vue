@@ -45,7 +45,7 @@
             <button 
               class="action-btn edit"
               :title="t('recent.editTitle')"
-              @click.stop="editWorkout(workout)"
+              @click.stop="viewWorkout(workout)"
             >
               ✏️
             </button>
@@ -424,22 +424,22 @@ async function repeatWorkout(sourceWorkout) {
     completed: false,
     _isDraft: true,
     isDraft: true,
+    notes: sourceWorkout.notes || '',
     exercises
   }
 
   try {
     await saveWorkoutOffline(draft)
     store.workouts.unshift(draft)
+    // sessionStorage-Snapshot setzen, damit Dashboard den Draft nach App-Neustart findet
+    try {
+      sessionStorage.setItem('workout_detail_draft', JSON.stringify({ ...draft, timestamp: Date.now() }))
+    } catch {}
   } catch (e) {
     logger.warn('[RecentWorkouts] repeatWorkout: Draft konnte nicht gespeichert werden', e)
   }
 
   router.push({ name: 'workout-detail', params: { id: draftId } })
-}
-
-function editWorkout(workout) {
-  logger.debug('📝 Navigiere zur Workout-Bearbeitung:', workout._id);
-  router.push(`/workouts/${workout._id}`);
 }
 
 function deleteWorkoutItem(workout) {
