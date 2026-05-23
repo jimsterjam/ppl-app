@@ -139,6 +139,8 @@
 	<string>Camera-Zugriff wird benötigt, um Trainingsbilder aufzunehmen und Übungen zu dokumentieren.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Fotos werden genutzt, um dein Profilbild auszuwählen und anzuzeigen.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Fotos werden genutzt, um dein Profilbild in der Fotomediathek zu speichern.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Lokales Netzwerk wird benötigt, um die lokale API im Heimnetz zu erreichen.</string>
 </dict>
