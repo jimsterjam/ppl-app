@@ -792,49 +792,30 @@ async function pickAvatarFromPhotos() {
       toast.show($t('settings.profilePicturePickFailed'), { type: 'error', duration: 2400 })
       return
     }
+    // CameraResultType.DataUrl: Capacitor konvertiert HEIC/HDR automatisch zu JPEG.
+    // So ist das Bild Canvas-kompatibel und kann gecropped + gecacht werden.
     const photo = await Camera.getPhoto({
       source: CameraSource.Photos,
-      resultType: CameraResultType.Uri,
-      quality: 90,
+      resultType: CameraResultType.DataUrl,
+      quality: 88,
       allowEditing: false
     })
 
-    const webPath = String(photo?.webPath || '')
-    if (!webPath) throw new Error('No photo path')
+    const dataUrl = String(photo?.dataUrl || '')
+    if (!dataUrl.startsWith('data:')) throw new Error('No photo data')
 
-    const resp = await fetch(webPath)
+    // DataURL → Blob → File für das Crop-Modal
+    const resp = await fetch(dataUrl)
     const blob = await resp.blob()
-    // Wichtig: Auf iOS können HDR/HJPG Bilder in der WebView nicht decodiert werden.
-    // Deshalb hier KEIN Web-Preview/Crop, sondern direkt hochladen und danach das Server-JPEG anzeigen.
     const file = new File([blob], 'avatar.jpg', { type: 'image/jpeg' })
 
-    // Sofort-Preview via lokaler Blob-URL setzen – unabhängig von Server-URL und ATS.
-    try { avatarPreviewUrl.value = URL.createObjectURL(blob) } catch {}
-
-    avatarUploading.value = true
-    const token = await getIdTokenSafe()
-    if (!token) {
-      toast.show($t('auth.signIn'), { type: 'info', duration: 1800 })
-      return
-    }
-    const res = await uploadProfileAvatar(token, file)
-    const url = String(res?.avatarUrl || '').trim()
-    if (url) settings.setAvatarUrl(url)
-    // DataURL-Cache für Persistenz: übersteht Navigation + funktioniert offline
-    blobToThumbnailDataUrl(blob).then((dataUrl) => {
-      if (dataUrl) settings.setAvatarData(dataUrl)
-    }).catch(() => {})
-    toast.show($t('common.updated'), { type: 'success', duration: 1400 })
-    // sicherheitshalber Profil refresh
-    void settings.loadProfile(token).catch(() => null)
+    // Crop-Modal öffnen – gleicher Pfad wie Desktop-Upload
+    await openAvatarCrop(file)
+    // applyAvatarCrop() löst den Upload aus (isNativePlatform-Guard)
   } catch (e) {
-    // User cancelled etc.
     const msg = String(e?.message || '')
     if (msg && /cancel|canceled|cancelled/i.test(msg)) return
-    clearAvatarPreview() // Preview löschen wenn Upload fehlschlägt
     toast.show($t('settings.profilePicturePickFailed'), { type: 'error', duration: 2400 })
-  } finally {
-    avatarUploading.value = false
   }
 }
 
@@ -954,6 +935,9 @@ async function applyAvatarCrop() {
     const y = out / 2 - drawH / 2 + offsetOutY
     ctx.drawImage(img, x, y, drawW, drawH)
 
+    // DataURL direkt vom Canvas: Canvas-JPEG ist garantiert decodierbar + cachebar.
+    const cropDataUrl = canvas.toDataURL('image/jpeg', CROP_JPEG_QUALITY)
+
     const blob = await new Promise((resolve, reject) => {
       canvas.toBlob(
         (b) => (b ? resolve(b) : reject(new Error('toBlob failed'))),
@@ -964,15 +948,21 @@ async function applyAvatarCrop() {
 
     const file = new File([blob], 'avatar.jpg', { type: 'image/jpeg' })
     avatarFile.value = file
+
+    // DataURL als persistenter Cache speichern (übersteht Navigation, funktioniert offline)
+    settings.setAvatarData(cropDataUrl)
+
+    // Preview direkt via DataURL setzen – kein Blob-URL nötig, kein ATS-Problem
     clearAvatarPreview()
-    try {
-      avatarPreviewUrl.value = URL.createObjectURL(file)
-    } catch {
-      avatarPreviewUrl.value = ''
-    }
+    avatarPreviewUrl.value = cropDataUrl
 
     showAvatarCropModal.value = false
     cleanupCropResources()
+
+    // Auf nativer Plattform: automatisch hochladen (kein manueller Upload-Button sichtbar)
+    if (isNativePlatform.value) {
+      void uploadAvatar()
+    }
   } catch (e) {
     logger.warn('[SettingsView] applyAvatarCrop failed:', e?.message || e)
     toast.show(e?.message || $t('common.error'), { type: 'error', duration: 2200 })
@@ -1071,7 +1061,8 @@ async function uploadAvatar() {
     try {
       if (avatarFileInput.value) avatarFileInput.value.value = ''
     } catch {}
-    clearAvatarPreview()
+    // Preview NICHT löschen – avatarPreviewUrl (DataURL) bleibt bis zur Navigation
+    // sichtbar; settingsAvatarData ist bereits gecacht.
     // Keep username/coach list etc stable, but refresh profile in background
     void settings.loadProfile(token).catch(() => null)
   } catch (e) {
