@@ -807,6 +807,9 @@ async function pickAvatarFromPhotos() {
     // Deshalb hier KEIN Web-Preview/Crop, sondern direkt hochladen und danach das Server-JPEG anzeigen.
     const file = new File([blob], 'avatar.jpg', { type: 'image/jpeg' })
 
+    // Sofort-Preview via lokaler Blob-URL setzen – unabhängig von Server-URL und ATS.
+    try { avatarPreviewUrl.value = URL.createObjectURL(blob) } catch {}
+
     avatarUploading.value = true
     const token = await getIdTokenSafe()
     if (!token) {
