@@ -24,6 +24,9 @@ export const useSettingsStore = defineStore('settings', {
     avatarUrl: (() => {
       try { return localStorage.getItem('app-avatar-url') || '' } catch { return '' }
     })(),
+    avatarData: (() => {
+      try { return localStorage.getItem('app-avatar-data') || '' } catch { return '' }
+    })(),
     weeklyGoal: (() => {
       const envDefault = Number.parseInt(import.meta.env.VITE_DEFAULT_WEEKLY_GOAL || '', 10)
       const fallback = Number.isFinite(envDefault) && envDefault > 0 ? envDefault : 4
@@ -119,6 +122,20 @@ export const useSettingsStore = defineStore('settings', {
       try {
         if (clean) localStorage.setItem('app-avatar-url', clean)
         else localStorage.removeItem('app-avatar-url')
+      } catch {}
+      // Gecachte DataURL löschen wenn Avatar zurückgesetzt wird
+      if (!clean) {
+        this.avatarData = ''
+        try { localStorage.removeItem('app-avatar-data') } catch {}
+      }
+    },
+
+    setAvatarData(dataUrl) {
+      const clean = String(dataUrl ?? '').trim()
+      this.avatarData = clean
+      try {
+        if (clean) localStorage.setItem('app-avatar-data', clean)
+        else localStorage.removeItem('app-avatar-data')
       } catch {}
     },
 

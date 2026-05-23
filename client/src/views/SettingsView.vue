@@ -78,8 +78,8 @@
         <p class="hint">{{ $t('settings.profilePictureHint') }}</p>
 
         <div class="avatar-row">
-          <div class="avatar-preview" :class="{ empty: !avatarPreviewUrl && !settingsAvatarUrl }">
-            <img v-if="avatarPreviewUrl || settingsAvatarUrl" :src="avatarPreviewUrl || settingsAvatarUrl" alt="" />
+          <div class="avatar-preview" :class="{ empty: !avatarPreviewUrl && !settingsAvatarData && !settingsAvatarUrl }">
+            <img v-if="avatarPreviewUrl || settingsAvatarData || settingsAvatarUrl" :src="avatarPreviewUrl || settingsAvatarData || settingsAvatarUrl" alt="" />
             <span v-else>{{ $t('settings.profilePictureEmpty') }}</span>
           </div>
 
@@ -718,6 +718,7 @@ const CROP_OUTPUT_SIZE = 512
 const CROP_JPEG_QUALITY = 0.86
 
 const settingsAvatarUrl = computed(() => settings.avatarUrl || '')
+const settingsAvatarData = computed(() => settings.avatarData || '')
 
 const cropImgStyle = computed(() => {
   const scale = (cropBaseScale.value || 1) * (Number(cropZoom.value) || 1)
@@ -795,7 +796,7 @@ async function pickAvatarFromPhotos() {
       source: CameraSource.Photos,
       resultType: CameraResultType.Uri,
       quality: 90,
-      allowEditing: true
+      allowEditing: false
     })
 
     const webPath = String(photo?.webPath || '')
@@ -819,6 +820,10 @@ async function pickAvatarFromPhotos() {
     const res = await uploadProfileAvatar(token, file)
     const url = String(res?.avatarUrl || '').trim()
     if (url) settings.setAvatarUrl(url)
+    // DataURL-Cache für Persistenz: übersteht Navigation + funktioniert offline
+    blobToThumbnailDataUrl(blob).then((dataUrl) => {
+      if (dataUrl) settings.setAvatarData(dataUrl)
+    }).catch(() => {})
     toast.show($t('common.updated'), { type: 'success', duration: 1400 })
     // sicherheitshalber Profil refresh
     void settings.loadProfile(token).catch(() => null)
@@ -826,6 +831,7 @@ async function pickAvatarFromPhotos() {
     // User cancelled etc.
     const msg = String(e?.message || '')
     if (msg && /cancel|canceled|cancelled/i.test(msg)) return
+    clearAvatarPreview() // Preview löschen wenn Upload fehlschlägt
     toast.show($t('settings.profilePicturePickFailed'), { type: 'error', duration: 2400 })
   } finally {
     avatarUploading.value = false
@@ -1050,9 +1056,16 @@ async function uploadAvatar() {
       toast.show($t('auth.signIn'), { type: 'info', duration: 1800 })
       return
     }
-    const res = await uploadProfileAvatar(token, avatarFile.value)
+    const fileToCache = avatarFile.value
+    const res = await uploadProfileAvatar(token, fileToCache)
     const url = String(res?.avatarUrl || '').trim()
     if (url) settings.setAvatarUrl(url)
+    // DataURL-Cache für Persistenz
+    if (fileToCache) {
+      blobToThumbnailDataUrl(fileToCache).then((dataUrl) => {
+        if (dataUrl) settings.setAvatarData(dataUrl)
+      }).catch(() => {})
+    }
     toast.show($t('common.updated'), { type: 'success', duration: 1400 })
     avatarFile.value = null
     try {
