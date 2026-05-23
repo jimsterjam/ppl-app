@@ -1,4 +1,4 @@
-import { createResourceApi } from './http'
+import { createResourceApi, resolveServerMediaUrl } from './http'
 import { handleAPIError } from './errorHandler'
 import { logger } from '@/utils/logger'
 
@@ -19,16 +19,23 @@ function authConfig(token) {
   return token ? { headers: { Authorization: `Bearer ${token}` } } : {}
 }
 
+function normalizeProfileData(data) {
+  if (!data) return {}
+  const out = { ...data }
+  if (out.avatarUrl) out.avatarUrl = resolveServerMediaUrl(out.avatarUrl)
+  return out
+}
+
 export async function fetchAccountProfile(token) {
   try {
     const res = await api.get('/profile', authConfig(token))
-    return res.data || {}
+    return normalizeProfileData(res.data)
   } catch (error) {
     if (isLikelyTransportError(error)) {
       try {
         await sleep(PROFILE_RETRY_DELAY_MS)
         const retryRes = await api.get('/profile', authConfig(token))
-        return retryRes.data || {}
+        return normalizeProfileData(retryRes.data)
       } catch (retryError) {
         if (isLikelyTransportError(retryError)) {
           logger.warn('📡 Account API - Profil Netzwerk/Transportproblem, nutze lokalen Fallback', {
@@ -59,7 +66,7 @@ export async function uploadProfileAvatar(token, file) {
     const form = new FormData()
     form.append('image', file)
     const res = await api.post('/profile/avatar', form, authConfig(token))
-    return res.data || {}
+    return normalizeProfileData(res.data)
   } catch (error) {
     throw handleAPIError(error, 'Profilbild hochladen')
   }

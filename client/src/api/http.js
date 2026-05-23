@@ -127,3 +127,14 @@ export function createResourceApi(resource, options = {}) {
 export function createApiBase(resource) {
   return apiUrl(resource)
 }
+
+// Wandelt server-relative Pfade (z. B. /uploads/avatars/x.jpg) in absolute URLs um.
+// Wenn VITE_API_BASE gesetzt ist (Capacitor / Cross-Origin), wird der API-Server-Origin vorangestellt.
+// Ohne VITE_API_BASE (same-origin dev) bleibt der Pfad relativ — der Browser löst ihn korrekt auf.
+export function resolveServerMediaUrl(relativePath) {
+  const p = String(relativePath || '').trim()
+  if (!p || p.startsWith('http://') || p.startsWith('https://') || p.startsWith('data:')) return p
+  const apiBase = normalizeBase(import.meta.env?.VITE_API_BASE || '')
+  if (!apiBase) return p
+  return `${apiBase}${p.startsWith('/') ? '' : '/'}${p}`
+}
