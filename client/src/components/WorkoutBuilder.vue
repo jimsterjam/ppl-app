@@ -12,7 +12,7 @@ import { useToastStore } from '@/stores/toastStore';
 import AppModal from '@/components/AppModal.vue';
 import StepIndicator from '@/components/StepIndicator.vue';
 import BottomNav from '@/components/BottomNav.vue';
-import { getAllExercisesOffline, saveWorkoutOffline, deleteWorkoutOffline, getWorkoutOffline } from '@/utils/offlineStorage';
+import { getAllExercisesOffline, saveWorkoutOffline, deleteWorkoutOffline, getWorkoutOffline, setMetadata } from '@/utils/offlineStorage';
 import { deleteWorkout as deleteServerWorkout } from '@/api/workouts';
 import { getMergedSortedExercises } from '@/utils/exerciseList';
 import { searchAndRankExercises } from '@/utils/exerciseSearch'
@@ -433,6 +433,8 @@ async function createWorkout() {
 					realId: created._id
 				})
 				try { sessionStorage.setItem(`workout_map_${tempId}`, String(created._id)) } catch {}
+				// Mapping auch in IndexedDB persistieren (überlebt iOS App-Kill, sessionStorage nicht)
+				setMetadata(`workout_map_${tempId}`, String(created._id)).catch(() => {})
 				logger.debug('[WorkoutBuilder] temp->real mapping stored', { tempId, realId: created._id })
 				// Workout bleibt bis zum Abschluss als Draft markiert.
 				// WICHTIG: Kein blindes Überschreiben von IndexedDB/sessionStorage mit dem

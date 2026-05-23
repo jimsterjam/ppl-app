@@ -745,6 +745,12 @@ export async function getMetadata(key) {
   }
 }
 
+export async function deleteMetadata(key) {
+  try {
+    await db.metadata.delete(key)
+  } catch {}
+}
+
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================

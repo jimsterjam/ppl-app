@@ -621,7 +621,7 @@ import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
 import { resolveExerciseMedia, buildExerciseMediaUrl } from '@/utils/assetResolver'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
-import { getWorkoutOffline, getExerciseOffline, getAllExercisesOffline, getAllWorkoutsOffline, saveWorkoutOffline, db } from '@/utils/offlineStorage'
+import { getWorkoutOffline, getExerciseOffline, getAllExercisesOffline, getAllWorkoutsOffline, saveWorkoutOffline, db, getMetadata, deleteMetadata } from '@/utils/offlineStorage'
 import { fetchWorkout, deleteWorkout as deleteWorkoutApi } from '@/api/workouts'
 // import { fetchExercise, fetchExercises } from '@/api/exercises'
 import { useUserStore } from '@/stores/userStore'
@@ -689,6 +689,13 @@ async function postSaveCleanup() {
   try { await db.workouts.delete('draft') } catch {}
   clearAllDetailDraftSnapshots()
   clearAllWorkoutMapKeys()
+  // IndexedDB-Mappings bereinigen (workout_map_<tempId> → realId)
+  try {
+    const routeId = String(route.params.id || '')
+    if (routeId.startsWith('draft-')) {
+      await deleteMetadata(`workout_map_${routeId}`)
+    }
+  } catch {}
 }
 
 const route = useRoute()
@@ -796,12 +803,20 @@ function shouldKeepAsDraft(workoutLike) {
   return workoutLike._isDraft === true || workoutLike.isDraft === true
 }
 
-function resolveRealIdFromDraftId(id) {
+async function resolveRealIdFromDraftId(id) {
   if (!String(id || '').startsWith('draft-')) return ''
+  // 1. Route-Query (schnellster Pfad, immer synchron verfügbar)
   let realId = String(route.query?.realId || '')
+  // 2. sessionStorage (überlebt keinen iOS-Kill, aber deckt den Normal-Fall)
   if (!realId) {
     try {
       realId = String(sessionStorage.getItem(`workout_map_${String(id)}`) || '')
+    } catch {}
+  }
+  // 3. IndexedDB (überlebt App-Kill — Fallback wenn sessionStorage leer)
+  if (!realId) {
+    try {
+      realId = String((await getMetadata(`workout_map_${String(id)}`)) || '')
     } catch {}
   }
   return realId
@@ -1108,20 +1123,24 @@ async function runAutoSaveNow() {
   const id = route.params.id
   const w = workout.value || {}
 
-  // Übernehme alle aktuellen Notizen ins Workout-Objekt
-  if (Array.isArray(w.exercises) && Array.isArray(exerciseNotes.value)) {
-    w.exercises = w.exercises.map((ex, idx) => ({
-      ...ex,
-      note: typeof exerciseNotes.value[idx] === 'string' ? exerciseNotes.value[idx] : ex.note || ''
-    }))
-    w.notes = buildWorkoutNotesSummary(w.exercises)
-  }
+  // Notizen in einen isolierten Payload-Snapshot mergen – OHNE workout.value zu mutieren.
+  // Eine direkte Zuweisung (w.exercises = ...) würde den Vue-Reaktivitätsgraphen triggern
+  // und den deep-watcher (isDirty / writeDraftSessionSnapshot) in eine Feedback-Schleife führen.
+  const exercises = Array.isArray(w.exercises) && Array.isArray(exerciseNotes.value)
+    ? w.exercises.map((ex, idx) => ({
+        ...ex,
+        note: typeof exerciseNotes.value[idx] === 'string' ? exerciseNotes.value[idx] : ex.note || ''
+      }))
+    : (w.exercises || [])
+  const notes = buildWorkoutNotesSummary(exercises)
 
   try {
     if (id === 'draft') {
       const draftKey = getDetailDraftKey()
       await saveWorkoutOffline({
         ...w,
+        exercises,
+        notes,
         _id: draftKey,
         userId: resolveActiveWorkoutUserId(),
         _isDraft: true,
@@ -1130,22 +1149,24 @@ async function runAutoSaveNow() {
       })
       saveMsg.value = ''
       saveError.value = false
-      initialSnapshot = snapshotCore({ ...w })
+      initialSnapshot = snapshotCore({ ...w, exercises, notes })
       logger.debug('Draft gespeichert (draft):', { ...w, _id: 'draft' })
     } else if (String(id).startsWith('draft-')) {
       // Nochmals prüfen: performSaveWorkout() könnte seit dem Entry-Guard gestartet haben.
       if (saving.value || suppressDraftPersistence.value) return
-      const realId = resolveRealIdFromDraftId(id)
+      const realId = await resolveRealIdFromDraftId(id)
       if (realId) {
         const token = await getIdToken().catch(() => null)
         const { _id: _draftId, ...wWithoutId } = w
-        await store.updateWorkout(realId, wWithoutId, token)
+        await store.updateWorkout(realId, { ...wWithoutId, exercises, notes }, token)
         saveMsg.value = ''
         saveError.value = false
-        initialSnapshot = snapshotCore({ ...w, _id: realId })
+        initialSnapshot = snapshotCore({ ...w, exercises, notes, _id: realId })
       } else {
         await saveWorkoutOffline({
           ...w,
+          exercises,
+          notes,
           _id: id,
           userId: resolveActiveWorkoutUserId(),
           _isDraft: true,
@@ -1153,10 +1174,10 @@ async function runAutoSaveNow() {
         })
         const idx = store.workouts.findIndex(wi => wi._id === id)
         if (idx !== -1) {
-          store.workouts[idx] = { ...store.workouts[idx], ...w }
+          store.workouts[idx] = { ...store.workouts[idx], ...w, exercises, notes }
           initialSnapshot = snapshotCore({ ...store.workouts[idx] })
         } else {
-          initialSnapshot = snapshotCore({ ...w, _id: id })
+          initialSnapshot = snapshotCore({ ...w, exercises, notes, _id: id })
         }
         saveMsg.value = ''
         saveError.value = false
@@ -1170,7 +1191,7 @@ async function runAutoSaveNow() {
       // keepDraft ist immer true solange das Workout nicht explizit vom User gespeichert wurde.
       const keepDraft = w.completed !== true
       const { _id: _wid, ...wWithoutId } = w
-      const payload = { ...wWithoutId, _isDraft: keepDraft, isDraft: keepDraft }
+      const payload = { ...wWithoutId, exercises, notes, _isDraft: keepDraft, isDraft: keepDraft }
       await store.updateWorkout(route.params.id, payload, token)
       try {
         await saveWorkoutOffline({
@@ -2151,7 +2172,7 @@ async function performSaveWorkout() {
       clearAllDetailDraftSnapshots()
       const adjustId = String(id)
       if (adjustId.startsWith('draft-')) {
-        const realId = resolveRealIdFromDraftId(adjustId)
+        const realId = await resolveRealIdFromDraftId(adjustId)
         if (realId) {
           const tk = await getIdToken().catch(() => null)
           deleteWorkoutApi(realId, tk).catch(() => null)
@@ -2184,7 +2205,7 @@ async function performSaveWorkout() {
     }
 
     if (String(id).startsWith('draft-')) {
-      const realId = resolveRealIdFromDraftId(id)
+      const realId = await resolveRealIdFromDraftId(id)
       if (realId) {
         let token = await getIdToken().catch(() => null)
         await store.updateWorkout(realId, normalized, token)
@@ -2632,6 +2653,9 @@ function onWindowScroll() {
   scheduleViewStatePersist('scroll')
 }
 
+// Capacitor-Listener Handle (wird in onMounted gesetzt, in onBeforeUnmount entfernt)
+let _capAppStateListener = null
+
 // Watchers for auto-scroll and dirty tracking
 onMounted(async () => {
   window.addEventListener('beforeunload', beforeUnloadHandler)
@@ -2640,6 +2664,19 @@ onMounted(async () => {
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', onVisibilityChange)
   }
+  // Capacitor App-Lifecycle: appStateChange führt frühzeitig einen Draft-Save durch,
+  // bevor iOS den WebView-Prozess beenden kann (pagehide kommt zu spät oder gar nicht).
+  try {
+    if (typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.()) {
+      const { App: CapApp } = await import('@capacitor/app')
+      _capAppStateListener = await CapApp.addListener('appStateChange', ({ isActive }) => {
+        if (!isActive) {
+          writeDraftSessionSnapshot()
+          persistInProgressDraft('app-background').catch(() => {})
+        }
+      })
+    }
+  } catch {}
   loadDefaultExerciseMap().catch(() => {})
   await loadWorkout()
   // Typ aus Query übernehmen, falls Draft geladen wird und Typ fehlt
@@ -2769,6 +2806,8 @@ onBeforeUnmount(() => {
   if (typeof document !== 'undefined') {
     document.removeEventListener('visibilitychange', onVisibilityChange)
   }
+  // Capacitor-Listener entfernen
+  try { if (_capAppStateListener) { _capAppStateListener.remove(); _capAppStateListener = null } } catch {}
   writeDetailViewState('before-unmount')
   if (viewStatePersistTimer) {
     clearTimeout(viewStatePersistTimer)

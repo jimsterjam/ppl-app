@@ -60987,5 +60987,77 @@
         "bodyweight_only"
       ]
     }
+  },
+  {
+    "_id": "ex_9007",
+    "id": "9007",
+    "name": "flare power start",
+    "name_en": "flare power start",
+    "category": "Push",
+    "category_raw": "strength",
+    "muscleGroup": "Schultern",
+    "muscleGroup_en": "shoulders",
+    "equipment": "Körpergewicht",
+    "equipment_en": "body weight",
+    "description": "Der Flare Power Start ist ein akrobatischer Bodyweight-Powerstart aus dem Breakdance. Aus dem Stand wird explosiv in die Flare-Bewegung eingeleitet: Der Körper stützt sich auf einer Hand ab, während die Beine in weiten Kreisbewegungen unter dem Körper hindurchschwingen und dabei abwechselnd das Gewicht von Hand zu Hand übertragen wird. Erfordert maximale Schulter- und Körperkernkraft sowie explosiven Hüfteinsatz.",
+    "description_en": "The flare power start is an acrobatic bodyweight power move from breakdancing. Starting from a standing position, the move initiates explosively into the flare: the body is supported alternately on each hand while the legs swing in continuous wide circles beneath the torso. Requires maximal shoulder and core strength combined with explosive hip drive.",
+    "imageUrl": "/exercises/360/placeholder.gif",
+    "thumbnailUrl": "/exercises/180/placeholder.gif",
+    "bodyPart": "shoulders",
+    "target": "shoulders",
+    "secondaryMuscles": [
+      "triceps",
+      "core",
+      "hip flexors"
+    ],
+    "instructions": [],
+    "difficulty": "advanced",
+    "instructions_en": [],
+    "aiMetadata": {
+      "exerciseType": "compound",
+      "primaryPhase": "main",
+      "minDifficulty": "advanced",
+      "disallowedGoals": [],
+      "allowedEquipmentModes": [
+        "gym_plus_bodyweight",
+        "bodyweight_only"
+      ]
+    }
+  },
+  {
+    "_id": "ex_9008",
+    "id": "9008",
+    "name": "airflare power start",
+    "name_en": "airflare power start",
+    "category": "Push",
+    "category_raw": "strength",
+    "muscleGroup": "Schultern",
+    "muscleGroup_en": "shoulders",
+    "equipment": "Körpergewicht",
+    "equipment_en": "body weight",
+    "description": "Der Airflare Power Start ist eine Fortgeschrittenvariante des Breakdance-Powermoves. Aus dem Stand wird explosiv in den Airflare übergeleitet: Der Körper wird in einer 45-Grad-Schräglage nach vorne invertiert, und die Beine schwingen in einer V-Formation durch die Luft in kreisförmiger Bahn, wobei ausschließlich die Hände den Boden berühren. Die Kombination aus Schulterbelastung, Rotationsdynamik und Rumpfkontrolle macht diesen Move zu einem der technisch anspruchsvollsten Bodyweight-Moves überhaupt.",
+    "description_en": "The airflare power start is an advanced breakdancing power move initiated from a standing entry. The body is inverted at approximately a 45-degree angle to the floor with legs in a V-shape, traveling in a circular path while only the hands touch the ground. The combination of shoulder load, rotational momentum, and core control makes this one of the most technically demanding bodyweight moves.",
+    "imageUrl": "/exercises/360/placeholder.gif",
+    "thumbnailUrl": "/exercises/180/placeholder.gif",
+    "bodyPart": "shoulders",
+    "target": "shoulders",
+    "secondaryMuscles": [
+      "triceps",
+      "core",
+      "hip flexors"
+    ],
+    "instructions": [],
+    "difficulty": "advanced",
+    "instructions_en": [],
+    "aiMetadata": {
+      "exerciseType": "compound",
+      "primaryPhase": "main",
+      "minDifficulty": "advanced",
+      "disallowedGoals": [],
+      "allowedEquipmentModes": [
+        "gym_plus_bodyweight",
+        "bodyweight_only"
+      ]
+    }
   }
 ]
