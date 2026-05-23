@@ -382,7 +382,14 @@ const userSubtitle = computed(() => {
 })
 
 const avatarLoadError = ref(false)
-const avatarSrc = computed(() => String(settings.avatarUrl || '').trim())
+// avatarData (DataURL-Cache, localStorage) hat Vorrang vor der Server-URL,
+// da letztere auf iOS via img-Tag durch ATS blockiert werden kann.
+const avatarSrc = computed(() => {
+  const data = String(settings.avatarData || '').trim()
+  if (data) return data
+  return String(settings.avatarUrl || '').trim()
+})
+const avatarFallbackSrc = computed(() => String(settings.avatarUrl || '').trim())
 
 const avatarInitials = computed(() => {
   const name = String(userSubtitle.value || '').trim()
@@ -562,7 +569,13 @@ async function readDetailDraft() {
   }
 }
 
-function onAvatarImgError() {
+function onAvatarImgError(e) {
+  // Falls DataURL-Anzeige fehlschlägt (sollte nicht passieren), Server-URL probieren
+  const fallback = avatarFallbackSrc.value
+  if (fallback && e?.target && e.target.src !== fallback) {
+    e.target.src = fallback
+    return
+  }
   avatarLoadError.value = true
 }
 
