@@ -9,6 +9,7 @@ import { useThemeStore } from './stores/themeStore'
 import { useSubscriptionStore } from './stores/subscriptionStore'
 import { useAuthStore } from './stores/authStore'
 import { useUserStore } from './stores/userStore'
+import { useSettingsStore } from './stores/settingsStore'
 import { useTimerStore } from './stores/timerStore'
 import { initFirebaseAuth, useFirebaseAuth } from './utils/firebaseAuth'
 import { App as CapacitorApp } from '@capacitor/app'
@@ -171,6 +172,7 @@ async function bootstrapAuth() {
   const { onAuthStateChanged, getIdToken, getCurrentUser, handleRedirectResult } = useFirebaseAuth()
   const authStore = useAuthStore(pinia)
   const userStore = useUserStore(pinia)
+  const settingsStore = useSettingsStore(pinia)
   let lastUid = authStore.uid || null
 
   logger.debug('[main] Initializing auth listener, store auth state:', authStore.isAuthenticated)
@@ -182,6 +184,8 @@ async function bootstrapAuth() {
         userStore.$reset()
       }
       lastUid = user.uid
+      // Account-spezifische Daten (avatar, username) für diesen User laden
+      settingsStore.switchUser(user.uid)
       const token = await getIdToken().catch((err) => {
         logger.warn('[main] Failed to fetch ID token:', err)
         return null
@@ -230,6 +234,7 @@ async function bootstrapAuth() {
       }
     } else {
       lastUid = null
+      settingsStore.switchUser(null)
       authStore.clearUser()
       userStore.$reset()
       clearResumeSnapshot()
