@@ -318,7 +318,29 @@ export async function cacheWorkouts(workouts) {
       ...w,
       _syncedAt: Date.now()
     }))
-    await db.workouts.bulkPut(workoutsWithTimestamp)
+
+    // Draft-Status aus bestehenden IndexedDB-Einträgen preservieren.
+    // Der Server kennt _isDraft nicht (Mongoose-Schema stript es) → bulkPut
+    // würde aktive Drafts überschreiben. Falls ein Workout lokal als Draft
+    // markiert ist und der neue Eintrag nicht explizit completed=true hat,
+    // behalten wir den Draft-Status bei.
+    let existingById = new Map()
+    try {
+      const ids = workoutsWithTimestamp.map(w => w._id).filter(Boolean)
+      if (ids.length) {
+        const existing = await db.workouts.bulkGet(ids)
+        existing.forEach((e) => { if (e?._id) existingById.set(String(e._id), e) })
+      }
+    } catch {}
+    const workoutsToStore = workoutsWithTimestamp.map(w => {
+      const existing = existingById.get(String(w._id || ''))
+      if (existing?._isDraft === true && w.completed !== true) {
+        return { ...w, _isDraft: true, isDraft: true, completed: false }
+      }
+      return w
+    })
+
+    await db.workouts.bulkPut(workoutsToStore)
     logger.debug('💾 Offline Storage - Workouts cached:', cleanWorkouts.length, '(von', workouts.length, 'nach Tombstone/Queue-Filter)')
     emitOfflineWorkoutsUpdated({ type: 'cache', count: cleanWorkouts.length })
     await enforceWorkoutHistoryLimit()

@@ -271,9 +271,14 @@ export const useUserStore = defineStore("user", {
       try {
         const online = isOnline();
 
-        // Sofortige Anzeige aus Offline-Cache, damit UI nicht leer bleibt
+        // Sofortige Anzeige aus Offline-Cache, damit UI nicht leer bleibt.
+        // localPreFetch wird VOR dem Server-Fetch gecaptured, damit der Merge
+        // korrekte _isDraft-Flags sieht (fetchWorkouts → cacheWorkouts überschreibt
+        // IndexedDB mit Server-Daten, die kein _isDraft enthalten).
+        let localPreFetch = []
         try {
           const cachedWorkouts = await getAllWorkoutsOffline({ userId: activeUid });
+          localPreFetch = Array.isArray(cachedWorkouts) ? cachedWorkouts : []
           const scopedCached = filterDeletedWorkouts(filterByUserId(cachedWorkouts, activeUid))
           if (Array.isArray(scopedCached) && scopedCached.length) {
             this.workouts = filterOutDeletedDrafts(scopedCached.map(w => ({
@@ -296,14 +301,10 @@ export const useUserStore = defineStore("user", {
           const serverIds = (Array.isArray(serverWorkouts) ? serverWorkouts : [])
             .map(w => String(w?._id || '').trim()).filter(Boolean)
 
-          // 2. Lokalen Stand aus IndexedDB laden (enthaelt jetzt Server-Workouts +
-          //    Drafts + offline-erstellte Workouts, die noch nicht gesynct sind)
-          let localAll = []
-          try {
-            localAll = await getAllWorkoutsOffline({ userId: activeUid })
-          } catch (e) {
-            logger.warn('⚠️ [Sync] IndexedDB-Lesefehler beim Merge:', e)
-          }
+          // 2. Lokalen Stand VOR dem Server-Fetch verwenden (localPreFetch), da
+          //    fetchWorkouts bereits cacheWorkouts(res.data) aufgerufen hat und
+          //    dabei _isDraft aus der IndexedDB gelöscht hätte.
+          const localAll = localPreFetch
 
           // 3. Merge: Server ist die Basis, lokale Eintraege supplementieren.
           //    Wichtig: Loesch-Tombstones bleiben aktiv, damit bereits geloeschte
@@ -727,6 +728,11 @@ export const useUserStore = defineStore("user", {
                 if (updates.completed !== undefined) {
                   this.workouts[lateIdx].completed = updates.completed
                 }
+                // Client-Only: _isDraft aus Updates re-applizieren (Server gibt es nie zurück)
+                if (updates._isDraft !== undefined) {
+                  this.workouts[lateIdx]._isDraft = updates._isDraft
+                  this.workouts[lateIdx].isDraft = updates._isDraft
+                }
                 this.workouts = this.applyWorkoutLimit(this.workouts)
               }
             })
@@ -739,6 +745,11 @@ export const useUserStore = defineStore("user", {
           // Sicherstellen, dass completed gesetzt wird, falls der Server es nicht zurückgibt
           if (updates.completed !== undefined) {
             this.workouts[updatedIdx].completed = updates.completed;
+          }
+          // Client-Only: _isDraft aus Updates re-applizieren (Server gibt es nie zurück)
+          if (updates._isDraft !== undefined) {
+            this.workouts[updatedIdx]._isDraft = updates._isDraft;
+            this.workouts[updatedIdx].isDraft = updates._isDraft;
           }
         }
         this.workouts = this.applyWorkoutLimit(this.workouts)
