@@ -43,10 +43,9 @@ function shouldRetryCreateRequest(error) {
   const status = Number(error?.response?.status || 0)
   if ([408, 425, 429, 500, 502, 503, 504].includes(status)) return true
   const code = String(error?.code || '').toUpperCase()
-  // Nur echte Netzwerktrennung (ERR_NETWORK) darf retryen.
-  // ECONNABORTED = Timeout: Server hat den Request ggf. schon verarbeitet → kein Retry
-  // (würde Duplikate erzeugen). Stattdessen direkt Offline-Fallback.
-  if (code === 'ERR_NETWORK') return true
+  // Weder ERR_NETWORK noch ECONNABORTED dürfen retryen:
+  // Der Server könnte den Request bereits verarbeitet haben, Response ging nur verloren.
+  // Ein Retry würde ein Duplikat-Workout erzeugen. → Direkt Offline-Fallback.
   return false
 }
 

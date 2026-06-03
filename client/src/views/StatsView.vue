@@ -976,6 +976,7 @@ function calcWorkoutVolume(workout) {
         if (set?.isWarmup) return
         const reps = Number(set?.reps) || 0
         const weight = Number(set?.weight) || 0
+        if (!reps && !weight) return // leere Zeilen überspringen
         total += reps * weight
       })
     } else {

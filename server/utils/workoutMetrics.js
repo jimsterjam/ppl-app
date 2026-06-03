@@ -27,6 +27,8 @@ export function calculateExerciseVolume(exercise) {
       if (set?.isWarmup) return sum;
       const reps = Number(set?.reps ?? exercise.reps ?? 0);
       const weight = Number(set?.weight ?? exercise.weight ?? 0);
+      // Leere Zeilen (reps=null/0 UND weight=0) überspringen
+      if (!reps && !weight) return sum;
       return sum + Math.max(0, reps) * Math.max(0, weight);
     }, 0);
   }
