@@ -325,6 +325,10 @@ if (typeof window !== 'undefined') {
       userStore.workouts.splice(idx, 1, { ...workout, _offlineCreated: false })
       logger.debug('[main] workout-reconciled: Store-Eintrag ersetzt', { tempId, realId: workout._id })
     }
+    // Stats-Cache invalidieren: das reconcilierte Workout hat jetzt eine echte Server-ID,
+    // damit zeigen die Stats die korrekte Anzahl und kein offline_xxx-Duplikat mehr.
+    userStore.invalidateStatsCache()
+    logger.debug('[main] workout-reconciled: Stats-Cache invalidiert')
   })
 }
 

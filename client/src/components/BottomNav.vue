@@ -37,11 +37,14 @@ import { useI18n } from 'vue-i18n'
 import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
+import { useAuthStore } from '@/stores/authStore'
+import { getDetailDraftKey } from '@/utils/workoutBuilderFlow'
 import { Home, BarChart3, Dumbbell, HelpCircle, Settings, Timer } from 'lucide-vue-next'
 
 const { t } = useI18n()
 const isIOS = ref(false)
 const store = useUserStore()
+const authStore = useAuthStore()
 const route = useRoute()
 const activeWorkout = computed(() => {
   // 1. Pinia Store (reaktiv, in-session)
@@ -51,7 +54,9 @@ const activeWorkout = computed(() => {
   // 2. sessionStorage-Fallback: sichtbar nach Page-Reload oder wenn User auf Nicht-Dashboard-Seite landet
   // Favorit-Anpassen-Drafts sind keine "gestarteten Workouts" und werden ausgeblendet.
   try {
-    const raw = sessionStorage.getItem('workout_detail_draft')
+    const uid = String(authStore.user?.uid || authStore.uid || store.user?.uid || '').trim()
+    const uidKey = uid ? getDetailDraftKey(uid) : null
+    const raw = (uidKey ? sessionStorage.getItem(uidKey) : null) || sessionStorage.getItem('workout_detail_draft')
     if (raw) {
       const parsed = JSON.parse(raw)
       // Favorit-Anpassen-Drafts explizit ausblenden (Marker _adjustDraft oder draft-favorite- Präfix)

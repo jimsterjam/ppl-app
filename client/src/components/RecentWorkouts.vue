@@ -209,6 +209,7 @@ import { resolveWorkoutNotes } from '@/utils/workoutNotes'
 import { useUserStore } from '@/stores/userStore'
 import { saveWorkoutOffline } from '@/utils/offlineStorage'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
+import { getDetailDraftKey } from '@/utils/workoutBuilderFlow'
 
 const props = defineProps({
   workouts: {
@@ -433,7 +434,7 @@ async function repeatWorkout(sourceWorkout) {
     store.workouts.unshift(draft)
     // sessionStorage-Snapshot setzen, damit Dashboard den Draft nach App-Neustart findet
     try {
-      sessionStorage.setItem('workout_detail_draft', JSON.stringify({ ...draft, timestamp: Date.now() }))
+      sessionStorage.setItem(getDetailDraftKey(userId), JSON.stringify({ ...draft, timestamp: Date.now() }))
     } catch {}
   } catch (e) {
     logger.warn('[RecentWorkouts] repeatWorkout: Draft konnte nicht gespeichert werden', e)

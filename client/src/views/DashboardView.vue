@@ -227,7 +227,7 @@ import { isDraftDeleted } from '@/utils/draftTombstones'
 import { deleteWorkout } from '@/api/workouts'
 import { http } from '@/api/http'
 import { loadDefaultExercises, getCachedDefaultExercises } from '@/utils/defaultExercisesLoader'
-import { buildWorkoutBuilderRoute, normalizeBuilderWorkoutType, QUICK_PREFILL_KEY, DETAIL_DRAFT_KEY, saveWorkoutBuilderPrefill } from '@/utils/workoutBuilderFlow'
+import { buildWorkoutBuilderRoute, normalizeBuilderWorkoutType, QUICK_PREFILL_KEY, DETAIL_DRAFT_KEY, saveWorkoutBuilderPrefill, getDetailDraftKey as buildDetailDraftKey } from '@/utils/workoutBuilderFlow'
 import {
   getFavoritesByType,
   renameFavoriteWorkout,
@@ -402,7 +402,8 @@ const avatarInitials = computed(() => {
 })
 
 function getDetailDraftKey() {
-  return DETAIL_DRAFT_KEY
+  const uid = String(getCurrentUser?.()?.uid || authStore.user?.uid || authStore.uid || '').trim()
+  return buildDetailDraftKey(uid)
 }
 
 function buildFavoriteDetailDraft(favorite) {

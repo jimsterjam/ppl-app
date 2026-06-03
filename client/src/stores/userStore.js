@@ -134,15 +134,18 @@ export const useUserStore = defineStore("user", {
     isStatsLoading: (state) => state.loadingStats,
 
     hasDraft: (state) => {
-      const has = state.workouts.some(w => w._isDraft === true);
-      logger.debug('🧠 [userStore] hasDraft:', has, 'drafts:', state.workouts.filter(w => w._isDraft === true).map(w => ({ _id: w._id, name: w.name })) )
+      // isDraftLike() erfasst auch Workouts mit draft-* ID aber fehlendem _isDraft-Flag
+      // (z.B. nach einem fehlgeschlagenen _isDraft-Cleanup). completed:true explizit ausschließen
+      // damit abgeschlossene Saves mit noch nicht bereinigter draft-ID das Banner nicht auslösen.
+      const has = state.workouts.some(w => isDraftLike(w) && w.completed !== true);
+      logger.debug('🧠 [userStore] hasDraft:', has, 'drafts:', state.workouts.filter(w => isDraftLike(w) && w.completed !== true).map(w => ({ _id: w._id, name: w.name })) )
       return has;
     },
 
-    draftType: (state) => state.workouts.find(w => w._isDraft === true)?.type,
+    draftType: (state) => state.workouts.find(w => isDraftLike(w) && w.completed !== true)?.type,
 
     draftTimestamp: (state) => {
-      const draft = state.workouts.find(w => w._isDraft === true);
+      const draft = state.workouts.find(w => isDraftLike(w) && w.completed !== true);
       if (!draft) return null;
       const ts = draft.updatedAt || draft.date || draft._syncedAt || draft.createdAt;
       const d = typeof ts === 'number' ? new Date(ts) : new Date(ts);
@@ -563,20 +566,23 @@ export const useUserStore = defineStore("user", {
         const newWorkout = await createWorkoutApi(enrichedWorkoutData, token);
         logger.debug('🏗️ [userStore] API returned:', newWorkout)
         if (newWorkout) {
-          // Neu erstelltes Workout bleibt im Store als Draft markiert, bis performSaveWorkout
-          // es explizit auf completed setzt. Das verhindert, dass ein abgebrochenes Workout
-          // ohne Draft-Flag in den Stats auftaucht.
-          const newWorkoutAsDraft = {
+          // _isDraft ableiten aus dem Payload: wenn der Aufrufer completed:true übergeben hat
+          // (performSaveWorkout Branch B2), bleibt das Workout NICHT als Draft erhalten.
+          // In allen anderen Fällen (WorkoutBuilder, Neuanlage) bleibt es Draft bis performSaveWorkout
+          // es explizit abschließt. Verhindert, dass abgebrochene Workouts ohne Draft-Flag
+          // in den Stats auftauchen.
+          const shouldKeepAsDraft = workoutData?.completed !== true && newWorkout.completed !== true
+          const newWorkoutInStore = {
             ...newWorkout,
-            _isDraft: true,
-            isDraft: true,
-            completed: false
+            _isDraft: shouldKeepAsDraft,
+            isDraft: shouldKeepAsDraft,
+            completed: workoutData?.completed === true ? true : (newWorkout.completed ?? false)
           }
           const existingIdx = this.workouts.findIndex(w => String(w?._id || '') === String(newWorkout._id))
           if (existingIdx !== -1) {
-            this.workouts[existingIdx] = { ...this.workouts[existingIdx], ...newWorkoutAsDraft }
+            this.workouts[existingIdx] = { ...this.workouts[existingIdx], ...newWorkoutInStore }
           } else {
-            this.workouts.push(newWorkoutAsDraft);
+            this.workouts.push(newWorkoutInStore);
           }
           this.workouts = this.applyWorkoutLimit(this.workouts)
           if (newWorkout?._offlineCreated) {
@@ -673,10 +679,16 @@ export const useUserStore = defineStore("user", {
           // Ersetze nur den konkreten temporären Eintrag, behalte andere Drafts
           this.workouts = this.workouts.filter(w => String(w?._id || '') !== String(id));
           // Füge das neue Workout hinzu
-            if (newWorkout) {
-            this.workouts.push(newWorkout);
+          if (newWorkout) {
+            // Client-Only: _isDraft vom Server nie zurückgegeben — anhand updates ableiten
+            const shouldBeDraft = updates.completed !== true
+            this.workouts.push({
+              ...newWorkout,
+              _isDraft: shouldBeDraft,
+              isDraft: shouldBeDraft
+            });
             this.workouts = this.applyWorkoutLimit(this.workouts)
-            logger.debug('✅ [userStore] New workout created:', newWorkout._id, 'completed:', newWorkout.completed)
+            logger.debug('✅ [userStore] New workout created:', newWorkout._id, 'completed:', newWorkout.completed, '_isDraft:', shouldBeDraft)
           }
           if (updates.completed === true) {
             this.stats = null

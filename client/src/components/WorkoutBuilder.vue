@@ -16,7 +16,7 @@ import { getAllExercisesOffline, saveWorkoutOffline, deleteWorkoutOffline, getWo
 import { deleteWorkout as deleteServerWorkout } from '@/api/workouts';
 import { getMergedSortedExercises } from '@/utils/exerciseList';
 import { searchAndRankExercises } from '@/utils/exerciseSearch'
-import { consumeWorkoutBuilderPrefill, normalizeBuilderWorkoutType, readWorkoutBuilderRouteState } from '@/utils/workoutBuilderFlow'
+import { consumeWorkoutBuilderPrefill, normalizeBuilderWorkoutType, readWorkoutBuilderRouteState, getDetailDraftKey } from '@/utils/workoutBuilderFlow'
 import { logger } from '@/utils/logger'
 
 
@@ -381,7 +381,7 @@ async function createWorkout() {
 		};
 		await saveWorkoutOffline(tempWorkout);
 		try {
-			sessionStorage.setItem('workout_detail_draft', JSON.stringify({
+			sessionStorage.setItem(getDetailDraftKey(userIdComputed.value), JSON.stringify({
 				...tempWorkout,
 				timestamp: Date.now()
 			}))
@@ -452,7 +452,7 @@ async function createWorkout() {
 					// Noch kein Eintrag unter dieser ID → erster Schreiber, sicher
 					await saveWorkoutOffline(cleanWorkout);
 					try {
-						sessionStorage.setItem('workout_detail_draft', JSON.stringify({
+						sessionStorage.setItem(getDetailDraftKey(userIdComputed.value), JSON.stringify({
 							...cleanWorkout,
 							completed: false,
 							timestamp: Date.now()

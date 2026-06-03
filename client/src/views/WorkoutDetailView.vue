@@ -291,7 +291,7 @@
                 v-for="(row, rIdx) in (ex.setDetails || [])"
                 :key="`${ex.exerciseId || i}-working-row-${rIdx}`"
               >
-                <div v-if="!row.isWarmup" class="set-row" :data-set-index="rIdx">
+                <div v-if="!row.isWarmup" class="set-row" :class="{ 'set-row-empty': isRowEmpty(row) }" :data-set-index="rIdx">
                   <span class="col set">
                     {{ getSetLabel(ex.setDetails, rIdx) }}
                     <span v-if="Number(row.reps) >= 6" class="weight-progress-hint" :title="t('workoutDetail.progressionHint')">&#8593;</span>
@@ -302,29 +302,29 @@
                           v-model.number="row.reps"
                           data-field="reps"
                           type="number"
-                          min="1"
+                          min="0"
                           max="500"
                           step="1"
                           inputmode="numeric"
                           :readonly="isMobile"
                           @focus="trackFieldAnchor(i, rIdx, 'reps')"
                           @click="trackFieldAnchor(i, rIdx, 'reps')"
-                          @input="() => { clampRowValue(row, 'reps', 1, 500, 1); triggerAutoSave() }"
-                          @wheel.prevent="onNumberWheel($event, row, 'reps', 1, 1, 500)"
+                          @input="() => { clampRowValueNullable(row, 'reps', 0, 500, 1); triggerAutoSave() }"
+                          @wheel.prevent="onNumberWheel($event, row, 'reps', 1, 0, 500)"
                           @keydown="onNumberKeyDown($event, false)"
-                          @focus.prevent="openPicker(row, 'reps', 1, 1, 500)"
-                          @click.prevent="openPicker(row, 'reps', 1, 1, 500)"
+                          @focus.prevent="openPicker(row, 'reps', 1, 0, 500)"
+                          @click.prevent="openPicker(row, 'reps', 1, 0, 500)"
                         />
                         <div v-if="!isMobile" class="spinner-vertical">
                         <button
                           type="button"
                           class="spin-btn up"
                           aria-label="increment reps"
-                          @click="adjustRowField(row, 'reps', 1, 1, 1, 500)"
-                          @mousedown="startSpin(row, 'reps', 1, 1, 1, 500)"
+                          @click="adjustRowField(row, 'reps', 1, 1, 0, 500)"
+                          @mousedown="startSpin(row, 'reps', 1, 1, 0, 500)"
                           @mouseup="stopSpin(row, 'reps')"
                           @mouseleave="stopSpin(row, 'reps')"
-                          @touchstart.prevent="startSpin(row, 'reps', 1, 1, 1, 500)"
+                          @touchstart.prevent="startSpin(row, 'reps', 1, 1, 0, 500)"
                           @touchend.prevent="stopSpin(row, 'reps')"
                           @touchcancel.prevent="stopSpin(row, 'reps')"
                         >▲</button>
@@ -332,11 +332,11 @@
                           type="button"
                           class="spin-btn down"
                           aria-label="decrement reps"
-                          @click="adjustRowField(row, 'reps', -1, 1, 1, 500)"
-                          @mousedown="startSpin(row, 'reps', -1, 1, 1, 500)"
+                          @click="adjustRowField(row, 'reps', -1, 1, 0, 500)"
+                          @mousedown="startSpin(row, 'reps', -1, 1, 0, 500)"
                           @mouseup="stopSpin(row, 'reps')"
                           @mouseleave="stopSpin(row, 'reps')"
-                          @touchstart.prevent="startSpin(row, 'reps', -1, 1, 1, 500)"
+                          @touchstart.prevent="startSpin(row, 'reps', -1, 1, 0, 500)"
                           @touchend.prevent="stopSpin(row, 'reps')"
                           @touchcancel.prevent="stopSpin(row, 'reps')"
                         >▼</button>
@@ -636,7 +636,7 @@ import { useTimerStore } from '@/stores/timerStore'
 import { useI18n } from 'vue-i18n'
 import { logger } from '@/utils/logger'
 import { buildWorkoutNotesSummary } from '@/utils/workoutNotes'
-import { DETAIL_DRAFT_KEY } from '@/utils/workoutBuilderFlow'
+import { DETAIL_DRAFT_KEY, getDetailDraftKey as buildDetailDraftKey } from '@/utils/workoutBuilderFlow'
 import {
   saveFavoriteWorkout,
   updateFavoriteWorkout,
@@ -648,7 +648,8 @@ import {
 const userStore = useUserStore()
 const authStore = useAuthStore()
 function getDetailDraftKey() {
-  return DETAIL_DRAFT_KEY
+  const uid = String(authStore.user?.uid || authStore.uid || '').trim()
+  return buildDetailDraftKey(uid)
 }
 function readDetailDraftRaw() {
   try {
@@ -664,6 +665,7 @@ function readDetailDraftRaw() {
 function clearAllDetailDraftSnapshots() {
   try {
     sessionStorage.removeItem(getDetailDraftKey())
+    sessionStorage.removeItem(DETAIL_DRAFT_KEY) // always clear legacy key for migration
     const keys = Object.keys(sessionStorage)
     keys.forEach((key) => {
       if (key.includes('workout_detail_draft_')) {
@@ -1155,10 +1157,14 @@ async function runAutoSaveNow() {
       // Nochmals prüfen: performSaveWorkout() könnte seit dem Entry-Guard gestartet haben.
       if (saving.value || suppressDraftPersistence.value) return
       const realId = await resolveRealIdFromDraftId(id)
+      // Re-Check nach await: performSaveWorkout() könnte während resolveRealIdFromDraftId gestartet haben.
+      if (saving.value || suppressDraftPersistence.value) return
       if (realId) {
         const token = await getIdToken().catch(() => null)
+        // Re-Check nach await: performSaveWorkout() könnte während getIdToken() gestartet haben.
+        if (saving.value || suppressDraftPersistence.value) return
         const { _id: _draftId, ...wWithoutId } = w
-        await store.updateWorkout(realId, { ...wWithoutId, exercises, notes }, token)
+        await store.updateWorkout(realId, { ...wWithoutId, exercises, notes, _isDraft: true, isDraft: true }, token)
         saveMsg.value = ''
         saveError.value = false
         initialSnapshot = snapshotCore({ ...w, exercises, notes, _id: realId })
@@ -1187,6 +1193,8 @@ async function runAutoSaveNow() {
       // und diesem Punkt gestartet haben (JS interleaving an await-Punkten davor).
       if (saving.value || suppressDraftPersistence.value) return
       let token = await getIdToken().catch(() => null)
+      // Re-Check nach await: performSaveWorkout() könnte während getIdToken() gestartet haben.
+      if (saving.value || suppressDraftPersistence.value) return
       // Auto-Save darf ein aktives Workout NIE als Non-Draft markieren.
       // keepDraft ist immer true solange das Workout nicht explizit vom User gespeichert wurde.
       const keepDraft = w.completed !== true
@@ -1978,6 +1986,27 @@ function clampRowValue(row, field, min = -Infinity, max = Infinity, step = 1) {
   }
 }
 
+// Wie clampRowValue, aber leeres Feld ('' / NaN) wird als null gespeichert statt auf min geclampt.
+// Für Reps-Felder in Arbeitssätzen, die bewusst leer gelassen werden können.
+function clampRowValueNullable(row, field, min = 0, max = Infinity, step = 1) {
+  try {
+    const raw = row[field]
+    if (raw === '' || raw == null || !Number.isFinite(Number(raw))) {
+      row[field] = null
+      return
+    }
+    clampRowValue(row, field, min, max, step)
+  } catch (err) {
+    logger.warn('clampRowValueNullable error', err)
+  }
+}
+
+// Eine Satz-Zeile gilt als leer, wenn Reps nicht gesetzt UND Gewicht 0 ist.
+// Leere Zeilen werden ausgegraut und gehen nicht in Stats ein.
+function isRowEmpty(row) {
+  return (row.reps == null || row.reps === '') && (row.weight == null || Number(row.weight) === 0)
+}
+
 function adjustRowField(row, field, direction = 1, step = 1, min = -Infinity, max = Infinity) {
   try {
     const cur = Number(row[field]) || 0
@@ -2218,6 +2247,7 @@ async function performSaveWorkout() {
         saveError.value = false
         initialSnapshot = snapshotCore({ ...normalized, _id: realId })
         try { await db.workouts.delete(id) } catch {}
+        store.invalidateStatsCache()
         await postSaveCleanup()
         bypassTimerLeaveGuard.value = true
         router.push('/dashboard')
@@ -2295,6 +2325,11 @@ async function performSaveWorkout() {
     bypassTimerLeaveGuard.value = true
     router.push('/dashboard')
   } catch (e) {
+    // workout.value.completed wurde vor dem ersten await auf true gesetzt.
+    // Bei Fehler zurücksetzen, damit persistInProgressDraft() den Draft noch retten kann.
+    if (workout.value) {
+      workout.value = { ...workout.value, completed: false, _isDraft: true, isDraft: true }
+    }
     suppressDraftPersistence.value = false
     error.value = e?.message || 'Speichern fehlgeschlagen'
     saveMsg.value = 'Speichern fehlgeschlagen.'
@@ -3087,6 +3122,13 @@ onBeforeUnmount(() => {
 }
 .set-row.warmup-row {
   opacity: 0.7;
+}
+.set-row.set-row-empty {
+  opacity: 0.35;
+}
+.set-row.set-row-empty .col input {
+  border-color: var(--line-soft, rgba(255,255,255,0.1));
+  color: var(--muted);
 }
 .row-actions.warmup-actions {
   margin-bottom: 4px;
