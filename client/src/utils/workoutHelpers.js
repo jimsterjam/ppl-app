@@ -11,6 +11,7 @@
  */
 
 import { logger } from './logger'
+import { getMetadata } from './offlineStorage'
 
 /**
  * Matched eine Übung aus einer Source-Liste gegen verfügbare Übungen
@@ -224,10 +225,71 @@ export const estimateWorkoutDuration = (exercises) => {
   return Math.round(totalMinutes)
 }
 
+/**
+ * Erstellt einen deterministischen String-Snapshot der Kernfelder eines Workouts.
+ * Wird verwendet um zu erkennen ob ein Workout seit dem letzten Speichern verändert wurde.
+ * Gibt '' zurück wenn w null/undefined oder JSON.stringify fehlschlägt.
+ *
+ * @param {object|null} w - Workout-Objekt
+ * @returns {string} JSON-String der Kernfelder oder ''
+ */
+export function snapshotCore(w) {
+  if (!w) return ''
+  try {
+    const core = {
+      name: w.name,
+      type: w.type,
+      date: w.date,
+      completed: w.completed,
+      exercises: (w.exercises || []).map(ex => ({
+        exerciseId: ex.exerciseId,
+        name: ex.name,
+        muscleGroup: ex.muscleGroup,
+        setDetails: (ex.setDetails || []).map(s => ({ reps: s.reps, weight: s.weight }))
+      }))
+    }
+    return JSON.stringify(core)
+  } catch {
+    return ''
+  }
+}
+
+/**
+ * Löst eine draft-ID (z.B. 'draft-xyz') in die zugehörige echte MongoDB-ID auf.
+ * Suchpfad:
+ *   1. route.query.realId (falls übergebene route vorhanden)
+ *   2. sessionStorage  key 'workout_map_<id>'
+ *   3. IndexedDB       key 'workout_map_<id>'  (via getMetadata)
+ *
+ * @param {string} id - Die draft-ID die aufgelöst werden soll
+ * @param {object|null} route - Vue Router route-Objekt (optional)
+ * @returns {Promise<string>} Echte ID oder '' wenn nicht gefunden
+ */
+export async function resolveRealIdFromDraftId(id, route = null) {
+  if (!String(id || '').startsWith('draft-')) return ''
+  // 1. Route-Query (schnellster Pfad, immer synchron verfügbar)
+  let realId = String(route?.query?.realId || '')
+  // 2. sessionStorage (überlebt keinen iOS-Kill, aber deckt den Normal-Fall)
+  if (!realId) {
+    try {
+      realId = String(sessionStorage.getItem(`workout_map_${String(id)}`) || '')
+    } catch {}
+  }
+  // 3. IndexedDB (überlebt App-Kill — Fallback wenn sessionStorage leer)
+  if (!realId) {
+    try {
+      realId = String((await getMetadata(`workout_map_${String(id)}`)) || '')
+    } catch {}
+  }
+  return realId
+}
+
 export default {
   matchExerciseByIdOrName,
   prefillExercises,
   createDefaultWorkout,
   validateWorkout,
-  estimateWorkoutDuration
+  estimateWorkoutDuration,
+  resolveRealIdFromDraftId,
+  snapshotCore
 }

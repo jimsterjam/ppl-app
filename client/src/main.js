@@ -17,6 +17,8 @@ import { logger } from '@/utils/logger'
 import { setCacheLimits } from '@/utils/assetCache'
 import { setDownloadConcurrency } from '@/utils/assetResolver'
 import { setupAutoSync, processSyncQueue } from '@/utils/syncManager'
+import { saveWorkoutService } from '@/utils/SaveWorkoutService'
+import { deleteWorkoutOffline, OFFLINE_WORKOUTS_UPDATED_EVENT } from '@/utils/offlineStorage'
 import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
 
 const APP_RESUME_STATE_KEY = 'app_resume_state_v1'
@@ -309,28 +311,32 @@ themeStore.applyCurrent()
 const subscriptionStore = useSubscriptionStore()
 subscriptionStore.checkSubscription()
 
+// Reconciliation: wenn syncManager ein offline_xxx Workout erfolgreich zum Server pusht,
+// wird der lokale Store-Eintrag durch den echten Server-Eintrag ersetzt.
+saveWorkoutService.init(async (tempId, workout) => {
+  if (!tempId || !workout?._id) return
+  const userStore = useUserStore()
+  const idx = userStore.workouts.findIndex(w => String(w?._id || '') === String(tempId))
+  if (idx !== -1) {
+    userStore.workouts.splice(idx, 1, { ...workout, _offlineCreated: false })
+    logger.debug('[main] reconcileCallback: Store-Eintrag ersetzt', { tempId, realId: workout._id })
+  }
+  userStore.invalidateStatsCache()
+  logger.debug('[main] reconcileCallback: Stats-Cache invalidiert')
+  try {
+    await deleteWorkoutOffline(tempId)
+    logger.debug('[main] reconcileCallback: offline_xxx aus IndexedDB gelöscht', tempId)
+  } catch (e) {
+    logger.warn('[main] reconcileCallback: deleteWorkoutOffline fehlgeschlagen', e?.message)
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(OFFLINE_WORKOUTS_UPDATED_EVENT, { detail: { type: 'reconcile', tempId, realId: workout._id } }))
+  }
+})
+
 setupAutoSync().catch((error) => {
   logger.warn('[main] setupAutoSync failed:', error)
 })
-
-// Reconciliation: wenn syncManager ein offline_xxx Workout erfolgreich zum Server pusht,
-// wird der lokale Store-Eintrag durch den echten Server-Eintrag ersetzt.
-if (typeof window !== 'undefined') {
-  window.addEventListener('workout-reconciled', (event) => {
-    const { tempId, workout } = event?.detail || {}
-    if (!tempId || !workout?._id) return
-    const userStore = useUserStore()
-    const idx = userStore.workouts.findIndex(w => String(w?._id || '') === String(tempId))
-    if (idx !== -1) {
-      userStore.workouts.splice(idx, 1, { ...workout, _offlineCreated: false })
-      logger.debug('[main] workout-reconciled: Store-Eintrag ersetzt', { tempId, realId: workout._id })
-    }
-    // Stats-Cache invalidieren: das reconcilierte Workout hat jetzt eine echte Server-ID,
-    // damit zeigen die Stats die korrekte Anzahl und kein offline_xxx-Duplikat mehr.
-    userStore.invalidateStatsCache()
-    logger.debug('[main] workout-reconciled: Stats-Cache invalidiert')
-  })
-}
 
 router.isReady().then(() => {
   // Startwiederherstellung ohne Auth-Zwang: Router-Guards entscheiden final über Zugriff.

@@ -147,6 +147,15 @@ export function clearTokenCache() {
 }
 
 /**
+ * Kanonischer Token-Adapter für den SaveWorkoutService.
+ * Einziger empfohlener Einstiegspunkt für Token-Abrufe in neuem Code.
+ * Nutzt intern getAuthToken() mit Caching, Offline-Backoff und Store-Fallback.
+ *
+ * @returns {Promise<string|null>} Firebase ID-Token oder null wenn offline/nicht eingeloggt
+ */
+export const getToken = () => getAuthToken()
+
+/**
  * Liest die Firebase UID (user_id / uid / sub) direkt aus einem JWT-Token,
  * ohne einen Netzwerkaufruf zu machen.
  */

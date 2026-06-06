@@ -364,7 +364,7 @@ function updateOrientation() {
 .fullscreen-countdown {
   position: fixed;
   inset: 0;
-  z-index: 3200;
+  z-index: 3500;
   display: grid;
   place-items: center;
   pointer-events: none;
@@ -414,8 +414,8 @@ function updateOrientation() {
     max(10px, env(safe-area-inset-bottom))
     max(12px, env(safe-area-inset-left));
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  gap: clamp(10px, 2.2vh, 22px);
+  grid-template-rows: minmax(0, 1fr) minmax(0, 2fr) auto;
+  gap: 0;
   align-content: stretch;
 }
 
@@ -458,6 +458,7 @@ function updateOrientation() {
 }
 
 .timer-bar.portrait-fullscreen .timer-controls {
+  grid-row: 3;
   gap: clamp(10px, 2.6vw, 20px);
   padding-bottom: max(4px, env(safe-area-inset-bottom));
 }

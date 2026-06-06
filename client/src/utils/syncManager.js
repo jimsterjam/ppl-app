@@ -37,6 +37,27 @@ let periodicSyncTimer = null
 let syncPausedUntil = 0
 let autoSyncInitialized = false
 
+/**
+ * Callback-Interface für Workout-Reconciliation.
+ * Wird aufgerufen wenn ein offline_xxx-Workout erfolgreich auf dem Server erstellt wurde
+ * und die lokale tempId durch die echte Server-ID ersetzt werden muss.
+ *
+ * Signatur: (tempId: string, workout: object) => void
+ *   - tempId:  die bisherige lokale ID (z.B. 'offline_1717497600000')
+ *   - workout: das vollständige Workout-Objekt mit der echten Server-_id
+ *
+ * Registrieren via setReconcileCallback(). Nur ein Callback gleichzeitig aktiv.
+ */
+let reconcileCallback = null
+
+/**
+ * Registriert den Reconciliation-Callback.
+ * @param {((tempId: string, workout: object) => void) | null} cb
+ */
+export function setReconcileCallback(cb) {
+  reconcileCallback = typeof cb === 'function' ? cb : null
+}
+
 function isRetryableSyncError(error) {
   const status = Number(error?.response?.status || 0)
   const code = String(error?.code || '').toUpperCase()
@@ -356,11 +377,15 @@ async function syncWorkoutAction(action, data, token) {
           await saveWorkoutOffline({ ...createdWorkout, _offlineCreated: false })
           logger.debug('🔄 Sync - Echtes Workout lokal gecacht:', createdWorkout._id)
         } catch {}
-        // Store-Update via CustomEvent (kein direkter Pinia-Import um Zirkularität zu vermeiden)
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(new CustomEvent('workout-reconciled', {
-            detail: { tempId, realId: createdWorkout._id, workout: createdWorkout }
-          }))
+        // Store-Update: direkt via Callback
+        if (typeof reconcileCallback === 'function') {
+          try {
+            reconcileCallback(tempId, createdWorkout)
+          } catch (cbErr) {
+            logger.warn('⚠️ Sync - reconcileCallback warf Fehler:', cbErr?.message || cbErr)
+          }
+        } else {
+          logger.warn('⚠️ Sync - kein reconcileCallback registriert, Store-Update ausgelassen für tempId:', tempId)
         }
       }
       break
