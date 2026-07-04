@@ -21,6 +21,8 @@ PODS:
   - CapacitorFilesystem (7.1.7):
     - Capacitor
     - IONFilesystemLib (~> 1.0.1)
+  - CapacitorLocalNotifications (7.0.6):
+    - Capacitor
   - CapacitorScreenOrientation (7.0.0):
     - Capacitor
   - GoogleSignIn (6.2.4):
@@ -45,6 +47,7 @@ DEPENDENCIES:
   - "CapacitorCommunityTextToSpeech (from `../../node_modules/@capacitor-community/text-to-speech`)"
   - "CapacitorCordova (from `../../node_modules/@capacitor/ios`)"
   - "CapacitorFilesystem (from `../../node_modules/@capacitor/filesystem`)"
+  - "CapacitorLocalNotifications (from `../../node_modules/@capacitor/local-notifications`)"
   - "CapacitorScreenOrientation (from `../../node_modules/@capacitor/screen-orientation`)"
   - "SouthdevsCapacitorGoogleAuth (from `../../node_modules/@southdevs/capacitor-google-auth`)"
 
@@ -73,6 +76,8 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor/ios"
   CapacitorFilesystem:
     :path: "../../node_modules/@capacitor/filesystem"
+  CapacitorLocalNotifications:
+    :path: "../../node_modules/@capacitor/local-notifications"
   CapacitorScreenOrientation:
     :path: "../../node_modules/@capacitor/screen-orientation"
   SouthdevsCapacitorGoogleAuth:
@@ -88,6 +93,7 @@ SPEC CHECKSUMS:
   CapacitorCommunityTextToSpeech: 28e4eaf26995ce7ab710480267841c57ef5eded2
   CapacitorCordova: bf648a636f3c153f652d312ae145fb508b6ffced
   CapacitorFilesystem: 0eca3d4415737d22f70ab73dd446f5d6b2c809c9
+  CapacitorLocalNotifications: 2e3f5b717ec9cd2bd64d93c99a9470941e1c80be
   CapacitorScreenOrientation: 45e36e1121cdba1634eb12077c5e99391055116f
   GoogleSignIn: 5651ce3a61e56ca864160e79b484cd9ed3f49b7a
   GTMAppAuth: 0ff230db599948a9ad7470ca667337803b3fc4dd
@@ -95,6 +101,6 @@ SPEC CHECKSUMS:
   IONFilesystemLib: 89258b8e3e85465da93127d25d7ce37f977e8a6f
   SouthdevsCapacitorGoogleAuth: 6488c21faed47c2cf72404bfbfc0fe0e9af766bc
 
-PODFILE CHECKSUM: 8fd1514f98daf260b8eba8fb4612b50f200a8531
+PODFILE CHECKSUM: 62f108b80340b50e04fe19a889cd170c9b8ef65c
 
 COCOAPODS: 1.16.2

@@ -15,59 +15,7 @@
         </div>
         <button class="cta-ghost" type="button" @click="openUpgrade('general')">Pro freischalten</button>
       </section>
-      <section class="hero">
-        <div class="hero-head">
-          <div>
-            <p class="eyebrow">Deine Trainingsstatistiken</p>
-            <h2 class="hero-title">Fortschritt, der dich dranbleiben lässt</h2>
-            <p class="hero-sub">Erweiterte Analyse ist fuer alle freigeschaltet. Pro bleibt im Draft-Status.</p>
-          </div>
-          <div class="range-selector">
-            <button
-              v-for="range in rangeOptions"
-              :key="range.days"
-              type="button"
-              class="range-pill"
-              :class="{ active: selectedRangeDays === range.days, locked: range.proOnly && !isPro }"
-              @click="selectRange(range)"
-            >
-              <span>{{ range.label }}</span>
-              <span v-if="range.proOnly && !isPro" class="lock">Draft</span>
-            </button>
-          </div>
-        </div>
 
-        <div class="summary-grid">
-          <div class="summary-card">
-            <span class="summary-label">Gesamttrainings</span>
-            <span class="summary-value">{{ totalSessions }}</span>
-            <span class="summary-sub">im Zeitraum</span>
-          </div>
-          <div class="summary-card">
-            <span class="summary-label">Trainings / Woche</span>
-            <span class="summary-value">{{ avgSessionsDisplay }}</span>
-            <span class="summary-sub">Konstanz im Fokus</span>
-          </div>
-          <div class="summary-card">
-            <span class="summary-label">Trainingsvolumen</span>
-            <span class="summary-value">{{ totalVolumeLabel }}</span>
-            <span class="summary-sub">Gesamtlast</span>
-          </div>
-          <div class="summary-card highlight">
-            <span class="summary-label">Pers. Bestleistung</span>
-            <span class="summary-value">{{ personalBestLabel }}</span>
-            <span class="summary-sub">bester Satz</span>
-          </div>
-        </div>
-      </section>
-
-      <section v-if="analyticsLocked" class="panel milestone">
-        <div>
-          <h3>Erweiterte Analyse ist freigeschaltet</h3>
-          <p>Die erweiterten Analysen sind fuer alle aktiv. Die Pro-Stufe wird derzeit als Draft gefuehrt.</p>
-        </div>
-        <button class="cta-inline" type="button" @click="openUpgrade('general')">Pro freischalten</button>
-      </section>
 
       <div v-if="showLoading" class="loading-section">
         <div class="spinner"></div>
@@ -82,6 +30,14 @@
       />
 
       <template v-else>
+        <section class="section">
+          <ProgressThreeMonthsSection :workouts="statsWorkouts" />
+        </section>
+
+        <section class="section">
+          <WorkoutComparisonSection :workouts="statsWorkouts" />
+        </section>
+
         <section v-if="showMilestoneUpgrade" class="panel milestone">
           <div>
             <h3>Starker Lauf!</h3>
@@ -99,96 +55,44 @@
             <div class="panel chart-card">
               <div class="card-head">
                 <h4>Aktivitätstage</h4>
-                <span class="badge">Basis</span>
-              </div>
-              <div class="calendar-grid">
-                <div
-                  v-for="day in activityDays"
-                  :key="day.key"
-                  class="calendar-cell"
-                  :class="{ active: day.active, clickable: day.active }"
-                  @click="openDayOverlay(day)"
-                >
-                  <span>{{ day.label }}</span>
+                <div class="calendar-head-right">
+                  <span class="badge">Basis</span>
+                  <div class="calendar-month-nav" aria-label="Monatsnavigation">
+                    <button type="button" class="calendar-month-btn" aria-label="Vorheriger Monat" @click="goToPreviousMonth">‹</button>
+                    <span class="calendar-month-label">{{ calendarMonthLabel }}</span>
+                    <button type="button" class="calendar-month-btn" aria-label="Nächster Monat" @click="goToNextMonth">›</button>
+                  </div>
                 </div>
               </div>
-            </div>
-
-            <div class="panel chart-card">
-              <div class="card-head">
-                <h4>Letzte Trainingsfortschritte</h4>
-                <span class="badge">Basis</span>
-              </div>
-              <div v-if="workoutComparisons.length === 0" class="cmp-empty">
-                <span>Noch nicht genug Daten – absolviere weitere Workouts, um Vergleiche zu sehen.</span>
-              </div>
-              <div v-else class="cmp-list">
-                <div v-for="cmp in workoutComparisons" :key="cmp.key" class="cmp-card">
-                  <div class="cmp-header">
-                    <div class="cmp-header-top">
-                      <span class="cmp-title">{{ cmp.title }}</span>
-                      <span class="cmp-status-badge" :class="cmp.overallStatus">{{ getStatusLabel(cmp.overallStatus) }}</span>
-                    </div>
-                    <div class="cmp-dates">
-                      <span class="cmp-date prev">{{ cmp.prevDate }}</span>
-                      <span class="cmp-arrow-sm">→</span>
-                      <span class="cmp-date curr">{{ cmp.currDate }}</span>
-                    </div>
-                    <p v-if="cmp.trainingFocus" class="cmp-focus">{{ cmp.trainingFocus }}</p>
-                  </div>
-                  <div class="cmp-rows">
-                    <div
-                      v-for="ex in cmp.exercises"
-                      :key="ex.name"
-                      class="cmp-row"
-                      :class="{
-                        'ex-only-prev': ex.type === 'prev',
-                        'ex-only-curr': ex.type === 'curr',
-                        'row-stronger': ex.type === 'both' && ex.progressStatus === 'stronger',
-                        'row-more-volume': ex.type === 'both' && ex.progressStatus === 'more_volume',
-                        'row-declined': ex.type === 'both' && ex.progressStatus === 'declined'
-                      }"
-                    >
-                      <span class="cmp-ex-name">{{ ex.name }}</span>
-                      <span class="cmp-vol prev">{{ ex.prevVol !== null ? formatKg(ex.prevVol) : '–' }}</span>
-                      <span class="cmp-sep">→</span>
-                      <span class="cmp-vol curr">{{ ex.currVol !== null ? formatKg(ex.currVol) : '–' }}</span>
-                      <span
-                        v-if="ex.type === 'both' && ex.deltaPercent !== null"
-                        class="cmp-delta-wrap"
-                      >
-                        <span
-                          class="cmp-delta"
-                          :class="ex.progressStatus === 'stronger' ? 'up' : ex.progressStatus === 'declined' ? 'down' : ex.progressStatus === 'more_volume' ? 'up-soft' : 'flat'"
-                        >{{ ex.delta > 0 ? '+' : '' }}{{ ex.deltaPercent }}%</span>
-                        <span
-                          v-if="ex.avgWDeltaPercent !== null && ex.prevAvgW > 0"
-                          class="cmp-delta-sub"
-                          :class="ex.avgWDeltaPercent > 0 ? 'up' : ex.avgWDeltaPercent < 0 ? 'down' : 'flat'"
-                        >Ø {{ ex.avgWDeltaPercent > 0 ? '+' : '' }}{{ ex.avgWDeltaPercent }}%</span>
-                      </span>
-                      <span v-else-if="ex.type === 'both'" class="cmp-delta flat">±0%</span>
-                      <span v-else-if="ex.type === 'curr'" class="cmp-delta flat">neu</span>
-                      <span v-else class="cmp-delta flat">alt</span>
-                    </div>
-                    <div class="cmp-row total">
-                      <span class="cmp-ex-name">Gesamt</span>
-                      <span class="cmp-vol prev">{{ formatKg(cmp.prevTotal) }}</span>
-                      <span class="cmp-sep">→</span>
-                      <span class="cmp-vol curr">{{ formatKg(cmp.currTotal) }}</span>
-                      <span class="cmp-delta-wrap">
-                        <span
-                          class="cmp-delta"
-                          :class="cmp.overallStatus === 'stronger' ? 'up' : cmp.overallStatus === 'declined' ? 'down' : cmp.overallStatus === 'more_volume' ? 'up-soft' : 'flat'"
-                        >{{ cmp.totalDelta > 0 ? '+' : '' }}{{ cmp.prevTotal > 0 ? Math.round((cmp.totalDelta / cmp.prevTotal) * 100) : 0 }}%</span>
-                        <span
-                          v-if="cmp.totalAvgWDeltaPercent !== null"
-                          class="cmp-delta-sub"
-                          :class="cmp.totalAvgWDeltaPercent > 0 ? 'up' : cmp.totalAvgWDeltaPercent < 0 ? 'down' : 'flat'"
-                        >Ø {{ cmp.totalAvgWDeltaPercent > 0 ? '+' : '' }}{{ cmp.totalAvgWDeltaPercent }}%</span>
-                      </span>
-                    </div>
-                  </div>
+              <div
+                class="calendar-shell"
+                @touchstart.passive="onCalendarTouchStart"
+                @touchend.passive="onCalendarTouchEnd"
+              >
+                <div class="calendar-weekdays" role="row">
+                  <span v-for="label in calendarWeekdayLabels" :key="label" class="calendar-weekday">{{ label }}</span>
+                </div>
+                <div
+                  class="calendar-grid"
+                  role="grid"
+                >
+                  <button
+                    v-for="day in calendarDays"
+                  :key="day.key"
+                  type="button"
+                  class="calendar-cell"
+                  :class="{
+                    'is-current-month': day.isCurrentMonth,
+                    'is-outside-month': !day.isCurrentMonth,
+                    active: day.active,
+                    clickable: day.active,
+                    today: day.isToday
+                  }"
+                  @click="openDayOverlay(day)"
+                >
+                    <span class="calendar-day-number">{{ day.label }}</span>
+                    <span v-if="day.active" class="calendar-day-marker" aria-hidden="true"></span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -282,6 +186,8 @@ import EmptyState from '@/components/EmptyState.vue'
 import AppModal from '@/components/AppModal.vue'
 import UpgradeModal from '@/components/UpgradeModal.vue'
 import RecentWorkouts from '@/components/RecentWorkouts.vue'
+import ProgressThreeMonthsSection from '@/components/stats/ProgressThreeMonthsSection.vue'
+import WorkoutComparisonSection from '@/components/stats/WorkoutComparisonSection.vue'
 import { logger } from '@/utils/logger'
 import { isOnline, getAllWorkoutsOffline, deleteWorkoutOffline, saveWorkoutOffline, OFFLINE_WORKOUTS_UPDATED_EVENT } from '@/utils/offlineStorage'
 import { resolveWorkoutNotes } from '@/utils/workoutNotes'
@@ -463,15 +369,63 @@ const personalBest = computed(() => {
 
 const personalBestLabel = computed(() => (personalBest.value > 0 ? `${personalBest.value} kg` : '—'))
 
-const activityDays = computed(() => {
-  const days = 28
-  const today = new Date()
+const now = new Date()
+const calendarViewDate = ref(new Date(now.getFullYear(), now.getMonth(), 1))
+const calendarTouchStartX = ref(null)
+const todayDate = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+
+const calendarWeekdayLabels = computed(() => (
+  isDe.value
+    ? ['Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa', 'So']
+    : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+))
+
+const calendarMonthLabel = computed(() => {
+  const fmt = new Intl.DateTimeFormat(isDe.value ? 'de-DE' : 'en-US', {
+    month: 'long',
+    year: 'numeric'
+  })
+  return fmt.format(calendarViewDate.value)
+})
+
+function goToPreviousMonth() {
+  const d = calendarViewDate.value
+  calendarViewDate.value = new Date(d.getFullYear(), d.getMonth() - 1, 1)
+}
+
+function goToNextMonth() {
+  const d = calendarViewDate.value
+  calendarViewDate.value = new Date(d.getFullYear(), d.getMonth() + 1, 1)
+}
+
+function onCalendarTouchStart(event) {
+  const x = event?.changedTouches?.[0]?.clientX
+  calendarTouchStartX.value = Number.isFinite(x) ? x : null
+}
+
+function onCalendarTouchEnd(event) {
+  const startX = calendarTouchStartX.value
+  const endX = event?.changedTouches?.[0]?.clientX
+  calendarTouchStartX.value = null
+  if (!Number.isFinite(startX) || !Number.isFinite(endX)) return
+  const deltaX = endX - startX
+  if (Math.abs(deltaX) < 40) return
+  if (deltaX < 0) goToNextMonth()
+  else goToPreviousMonth()
+}
+
+const calendarDays = computed(() => {
+  const year = calendarViewDate.value.getFullYear()
+  const month = calendarViewDate.value.getMonth()
+  const firstDay = new Date(year, month, 1)
+  const startOffset = (firstDay.getDay() + 6) % 7
+  const visibleStart = new Date(year, month, 1 - startOffset)
   const list = []
   const pad = n => String(n).padStart(2, '0')
   const localKey = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
-  for (let i = days - 1; i >= 0; i -= 1) {
-    const date = new Date(today)
-    date.setDate(today.getDate() - i)
+  for (let i = 0; i < 42; i += 1) {
+    const date = new Date(visibleStart)
+    date.setDate(visibleStart.getDate() + i)
     date.setHours(0, 0, 0, 0)
     const key = localKey(date)
     const dayWorkouts = statsWorkouts.value.filter((w) => {
@@ -479,7 +433,19 @@ const activityDays = computed(() => {
       wDate.setHours(0, 0, 0, 0)
       return !Number.isNaN(wDate.getTime()) && localKey(wDate) === key
     })
-    list.push({ key, label: date.getDate(), active: dayWorkouts.length > 0, workouts: dayWorkouts })
+
+    const isCurrentMonth = date.getMonth() === month
+    const isToday = date.getTime() === todayDate.getTime()
+    // Keep clicks/overlay behavior from existing implementation:
+    // only days with workouts open the overlay.
+    list.push({
+      key,
+      label: date.getDate(),
+      active: dayWorkouts.length > 0,
+      workouts: dayWorkouts,
+      isCurrentMonth,
+      isToday
+    })
   }
   return list
 })
@@ -496,6 +462,10 @@ function closeDayOverlay() {
   calendarDayOverlay.value = null
 }
 
+watch(calendarViewDate, () => {
+  closeDayOverlay()
+})
+
 function getWorkingSetsStat(exercise) {
   if (Array.isArray(exercise.setDetails)) {
     return exercise.setDetails.filter(s => !s.isWarmup)
@@ -506,234 +476,6 @@ function getWorkingSetsStat(exercise) {
 function formatDayOverlayDate(key) {
   return new Date(key + 'T00:00:00').toLocaleDateString(isDe.value ? 'de-DE' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' })
 }
-
-function getExerciseVolumes(w) {
-  return (w.exercises || []).flatMap((ex) => {
-    let vol = 0
-    let weightSum = 0
-    let weightCount = 0
-    if (Array.isArray(ex.setDetails) && ex.setDetails.length) {
-      ex.setDetails.forEach((set) => {
-        if (set?.isWarmup) return
-        const r = Number(set.reps) || 0
-        const kg = Number(set.weight) || 0
-        vol += r * kg
-        if (kg > 0) { weightSum += kg; weightCount++ }
-      })
-    } else {
-      vol = (Number(ex.sets) || 1) * (Number(ex.reps) || 0) * (Number(ex.weight) || 0)
-      weightSum = Number(ex.weight) || 0
-      weightCount = weightSum > 0 ? 1 : 0
-    }
-    const avgWeight = weightCount > 0 ? Math.round((weightSum / weightCount) * 10) / 10 : 0
-    return vol > 0 ? [{ name: ex.name || '?', volume: vol, avgWeight }] : []
-  })
-}
-
-function calcWorkoutAvgWeight(workout) {
-  let weightSum = 0
-  let weightCount = 0
-  ;(workout.exercises || []).forEach((ex) => {
-    if (Array.isArray(ex.setDetails) && ex.setDetails.length) {
-      ex.setDetails.forEach((set) => {
-        if (set?.isWarmup) return
-        const kg = Number(set.weight) || 0
-        if (kg > 0) { weightSum += kg; weightCount++ }
-      })
-    } else {
-      const kg = Number(ex.weight) || 0
-      if (kg > 0) { weightSum += kg; weightCount++ }
-    }
-  })
-  return weightCount > 0 ? Math.round((weightSum / weightCount) * 10) / 10 : 0
-}
-
-function getProgressStatus(avgWDeltaPercent, volDeltaPercent) {
-  const aw = avgWDeltaPercent ?? 0
-  const vp = volDeltaPercent ?? 0
-  if (aw > 2) return 'stronger'
-  if (vp > 3 && aw >= -2) return 'more_volume'
-  if (aw < -2 && vp < -3) return 'declined'
-  return 'flat'
-}
-
-function getStatusLabel(status) {
-  const labels = {
-    stronger: '🟢 Stärker geworden',
-    more_volume: '🟡 Mehr Volumen',
-    declined: '🔴 Leistung gesunken',
-    flat: '⚪ Gleichbleibend'
-  }
-  return labels[status] || labels.flat
-}
-
-const workoutComparisons = computed(() => {
-  const sevenDaysAgo = new Date()
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-
-  const allSorted = [...statsWorkouts.value]
-    .filter(w => !w.isDraft)
-    .sort((a, b) => new Date(b.date) - new Date(a.date))
-
-  if (!allSorted.length) return []
-
-  const dateOpts = { day: '2-digit', month: '2-digit' }
-  const locale = isDe.value ? 'de-DE' : 'en-US'
-
-  function wId(w) {
-    return String(w._id || w.id || w.workoutId || '')
-  }
-
-  function buildComparison(curr, prev) {
-    const currExs = getExerciseVolumes(curr)
-    const prevExs = getExerciseVolumes(prev)
-    const exercises = []
-    for (const ce of currExs) {
-      const pe = prevExs.find(e => e.name === ce.name)
-      if (pe) {
-        const delta = ce.volume - pe.volume
-        const deltaPercent = pe.volume > 0 ? Math.round((delta / pe.volume) * 100) : null
-        const avgWDelta = ce.avgWeight - pe.avgWeight
-        const avgWDeltaPercent = pe.avgWeight > 0 ? Math.round((avgWDelta / pe.avgWeight) * 100) : null
-        const progressStatus = getProgressStatus(avgWDeltaPercent, deltaPercent)
-        exercises.push({
-          name: ce.name, prevVol: pe.volume, currVol: ce.volume,
-          delta, deltaPercent,
-          prevAvgW: pe.avgWeight, currAvgW: ce.avgWeight,
-          avgWDelta, avgWDeltaPercent,
-          progressStatus,
-          type: 'both'
-        })
-      } else {
-        exercises.push({ name: ce.name, prevVol: null, currVol: ce.volume, delta: null, deltaPercent: null, avgWDeltaPercent: null, progressStatus: 'flat', type: 'curr' })
-      }
-    }
-    for (const pe of prevExs) {
-      if (!currExs.find(e => e.name === pe.name)) {
-        exercises.push({ name: pe.name, prevVol: pe.volume, currVol: null, delta: null, deltaPercent: null, avgWDeltaPercent: null, progressStatus: 'flat', type: 'prev' })
-      }
-    }
-
-    // Workout-level avg weight comparison
-    const currAvgW = calcWorkoutAvgWeight(curr)
-    const prevAvgW = calcWorkoutAvgWeight(prev)
-    const totalAvgWDelta = currAvgW - prevAvgW
-    const totalAvgWDeltaPercent = prevAvgW > 0 ? Math.round((totalAvgWDelta / prevAvgW) * 100) : null
-
-    // Overall status: majority vote over 'both' exercises, stronger wins if no declined
-    const bothExs = exercises.filter(e => e.type === 'both')
-    let overallStatus = 'flat'
-    if (bothExs.length > 0) {
-      const counts = { stronger: 0, more_volume: 0, declined: 0, flat: 0 }
-      bothExs.forEach(e => { counts[e.progressStatus] = (counts[e.progressStatus] || 0) + 1 })
-      if (counts.stronger > 0 && counts.declined === 0) overallStatus = 'stronger'
-      else if (counts.stronger >= counts.declined && counts.stronger > 0) overallStatus = 'stronger'
-      else if (counts.declined > counts.stronger && counts.declined > counts.more_volume) overallStatus = 'declined'
-      else if (counts.more_volume > 0) overallStatus = 'more_volume'
-    }
-
-    // Fallback: use workout-level avg weight if no exercise data
-    if (overallStatus === 'flat' && totalAvgWDeltaPercent !== null) {
-      const currTotal = calcWorkoutVolume(curr)
-      const prevTotal = calcWorkoutVolume(prev)
-      const volDeltaPercent = prevTotal > 0 ? Math.round(((currTotal - prevTotal) / prevTotal) * 100) : null
-      overallStatus = getProgressStatus(totalAvgWDeltaPercent, volDeltaPercent)
-    }
-
-    // Training focus string
-    const currTotal = calcWorkoutVolume(curr)
-    const prevTotal = calcWorkoutVolume(prev)
-    const volDeltaPercent = prevTotal > 0 ? Math.round(((currTotal - prevTotal) / prevTotal) * 100) : null
-    let trainingFocus = null
-    if (totalAvgWDeltaPercent !== null && volDeltaPercent !== null) {
-      const wUp = totalAvgWDeltaPercent > 2
-      const wDown = totalAvgWDeltaPercent < -2
-      const vUp = volDeltaPercent > 3
-      const vDown = volDeltaPercent < -3
-      if (wUp && vDown) trainingFocus = 'Fokus: höhere Intensität bei weniger Volumen'
-      else if (wUp && vUp) trainingFocus = 'Mehr Gewicht und mehr Volumen – starke Session'
-      else if (!wUp && !wDown && vUp) trainingFocus = 'Fokus: mehr Volumen bei gleichem Gewicht'
-    }
-
-    return {
-      key: wId(curr) || curr.name || 'cmp',
-      title: curr.name || 'Workout',
-      currDate: new Date(curr.date).toLocaleDateString(locale, dateOpts),
-      prevDate: new Date(prev.date).toLocaleDateString(locale, dateOpts),
-      exercises,
-      currTotal,
-      prevTotal,
-      totalDelta: currTotal - prevTotal,
-      totalAvgWDeltaPercent,
-      overallStatus,
-      trainingFocus
-    }
-  }
-
-  // Groups by name for Phase 1
-  const groups = new Map()
-  for (const w of allSorted) {
-    const key = (w.name || 'Workout').trim().toLowerCase()
-    if (!groups.has(key)) groups.set(key, [])
-    groups.get(key).push(w)
-  }
-
-  const comparisons = []
-  const usedIds = new Set()
-  const seenNameKeys = new Set()
-
-  // Phase 1: exact name matching
-  for (const w of allSorted) {
-    if (comparisons.length >= 3) break
-    const key = (w.name || 'Workout').trim().toLowerCase()
-    if (seenNameKeys.has(key)) continue
-    seenNameKeys.add(key)
-    const group = groups.get(key)
-    if (!group || group.length < 2) continue
-    const curr = group[0]
-    const prev = group[1]
-    usedIds.add(wId(curr))
-    usedIds.add(wId(prev))
-    comparisons.push(buildComparison(curr, prev))
-  }
-
-  // Phase 2: exercise-overlap matching for workouts from last 7 days not yet paired
-  if (comparisons.length < 3) {
-    const recentCandidates = allSorted.filter(w => !usedIds.has(wId(w)) && new Date(w.date) >= sevenDaysAgo)
-    const prevPool = allSorted.filter(w => !usedIds.has(wId(w)))
-
-    for (const curr of recentCandidates) {
-      if (comparisons.length >= 3) break
-      const currId = wId(curr)
-      if (usedIds.has(currId)) continue
-      const currExNames = new Set(getExerciseVolumes(curr).map(e => e.name))
-      if (currExNames.size === 0) continue
-
-      let bestPrev = null
-      let bestOverlap = 0
-      for (const prev of prevPool) {
-        const prevId = wId(prev)
-        if (prevId === currId || usedIds.has(prevId)) continue
-        if (new Date(prev.date) >= new Date(curr.date)) continue
-        const prevExNames = getExerciseVolumes(prev).map(e => e.name)
-        const overlap = prevExNames.filter(n => currExNames.has(n)).length
-        const minSize = Math.min(currExNames.size, prevExNames.length)
-        if (overlap >= 2 && overlap / minSize >= 0.35 && overlap > bestOverlap) {
-          bestOverlap = overlap
-          bestPrev = prev
-        }
-      }
-
-      if (bestPrev) {
-        usedIds.add(currId)
-        usedIds.add(wId(bestPrev))
-        comparisons.push(buildComparison(curr, bestPrev))
-      }
-    }
-  }
-
-  return comparisons
-})
 
 const advancedCards = computed(() => ([
   { title: 'Langzeit-Fortschritt', subtitle: '3, 6, 12 Monate im Vergleich' },
@@ -1344,291 +1086,83 @@ function formatNumber(value, digits = 0) {
   font-family: "Sora", "Space Grotesk", "SF Pro Display", sans-serif;
 }
 
-.hero {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  padding: 24px;
-  border-radius: 24px;
-  background: linear-gradient(140deg, rgba(20, 22, 28, 0.92), rgba(34, 38, 48, 0.9));
-  border: 1px solid color-mix(in srgb, var(--line-soft) 55%, transparent);
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
-}
-
-.hero-head {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.hero-title {
-  margin: 6px 0 0;
-  font-size: clamp(1.8rem, 3vw, 2.4rem);
-  font-weight: 700;
-  color: var(--fg-strong, #fff);
-}
-
-.hero-sub {
-  color: color-mix(in srgb, var(--muted) 70%, white 20%);
-  font-size: 0.95rem;
-  max-width: 540px;
-}
-
-.range-selector {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}
-
-.range-pill {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--fg);
-  padding: 10px 14px;
-  border-radius: 999px;
-  font-weight: 600;
-  display: inline-flex;
-  gap: 8px;
-  align-items: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
 .range-pill.active {
   background: linear-gradient(120deg, rgba(215, 255, 31, 0.75), rgba(255, 164, 89, 0.75));
-  color: #1a1a1a;
-  border-color: transparent;
 }
 
-.range-pill.locked {
-  opacity: 0.65;
+.calendar-shell {
+  margin-top: 10px;
 }
 
-.range-pill .lock {
-  background: rgba(0, 0, 0, 0.3);
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 0.7rem;
-}
-
-.summary-grid {
+.calendar-weekdays {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 14px;
-}
-
-.summary-card {
-  background: rgba(255, 255, 255, 0.06);
-  border-radius: 18px;
-  padding: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.summary-card.highlight {
-  background: linear-gradient(150deg, rgba(213, 255, 102, 0.2), rgba(255, 164, 89, 0.25));
-}
-
-.summary-label {
-  font-size: 0.75rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-.summary-value {
-  font-size: 1.7rem;
-  font-weight: 700;
-}
-
-.summary-sub {
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-
-[data-theme="light"] .stats-view {
-  background: var(--bg);
-}
-
-[data-theme="light"] .hero {
-  background: var(--bg-panel);
-  border-color: var(--line-strong);
-  box-shadow: var(--shadow-soft);
-}
-
-[data-theme="light"] .hero-sub {
-  color: var(--muted);
-}
-
-[data-theme="light"] .range-pill {
-  background: var(--bg-panel);
-  border-color: var(--line-strong);
-  color: var(--fg);
-}
-
-[data-theme="light"] .range-pill.active {
-  background: var(--accent);
-  color: var(--accent-contrast);
-}
-
-[data-theme="light"] .summary-card {
-  background: var(--card-bg);
-  border-color: var(--line-soft);
-}
-
-[data-theme="light"] .summary-card.highlight {
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-}
-
-.section {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.section-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.section-sub {
-  color: var(--muted);
-  font-size: 0.85rem;
-}
-
-.base-grid,
-.pro-grid,
-.insight-grid {
-  display: grid;
-  gap: 16px;
-}
-
-.base-grid {
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-}
-
-.pro-grid {
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-}
-
-.panel {
-  border-radius: 18px;
-  border: 1px solid var(--line-soft);
-  background: var(--bg-panel);
-  box-shadow: var(--shadow-soft);
-  padding: 16px;
-  position: relative;
-}
-
-.chart-card {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.card-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 8px;
-}
-
-.badge {
-  padding: 4px 10px;
-  border-radius: 999px;
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  background: rgba(255, 255, 255, 0.08);
-}
-
-.badge.pro {
-  background: rgba(215, 255, 31, 0.3);
-  color: #1a1a1a;
-}
-
-.bar-chart {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 8px;
-  align-items: end;
-  height: 120px;
-}
-
-.bar-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 6px;
+  margin-bottom: 8px;
 }
 
-.bar {
-  width: 100%;
-  border-radius: 8px;
-  background: linear-gradient(180deg, rgba(215, 255, 31, 0.9), rgba(40, 182, 246, 0.75));
-  min-height: 12px;
-}
-
-.bar-label {
-  font-size: 0.7rem;
-  color: var(--muted);
+.calendar-weekday {
   text-align: center;
-}
-
-.sparkline {
-  display: grid;
-  grid-template-columns: repeat(30, 1fr);
-  gap: 2px;
-  height: 80px;
-  align-items: end;
-}
-
-.spark-bar {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
-}
-
-.sparkline-labels {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
   color: var(--muted);
+  text-transform: uppercase;
 }
 
 .calendar-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 6px;
 }
 
 .calendar-cell {
-  padding: 6px;
-  border-radius: 8px;
-  text-align: center;
-  font-size: 0.75rem;
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  min-height: 48px;
+  padding: 7px 4px 6px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--fg);
+  cursor: default;
 }
 
-.calendar-cell.active {
-  background: rgba(215, 255, 31, 0.5);
-  color: #1a1a1a;
-  font-weight: 700;
+.calendar-day-number {
+  font-size: 0.86rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.calendar-cell.is-outside-month {
+  color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.015);
+  border-color: rgba(255, 255, 255, 0.04);
+}
+
+.calendar-cell.today {
+  border-color: rgba(215, 255, 31, 0.85);
+  background: rgba(215, 255, 31, 0.14);
+  box-shadow: 0 0 0 1px rgba(215, 255, 31, 0.4);
 }
 
 .calendar-cell.clickable {
   cursor: pointer;
-  transition: transform 0.1s, box-shadow 0.1s;
 }
 
 .calendar-cell.clickable:hover {
-  transform: scale(1.12);
-  box-shadow: 0 0 0 2px rgba(215, 255, 31, 0.7);
+  transform: translateY(-1px);
+  border-color: rgba(215, 255, 31, 0.5);
+}
+
+.calendar-day-marker {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--accent-color, #d7ff1f);
 }
 
 /* Kalender-Overlay */
@@ -1827,268 +1361,6 @@ function formatNumber(value, digits = 0) {
   margin-left: 8px;
 }
 
-/* ── Workout-Vergleichskarten ─────────────────────── */
-.cmp-empty {
-  font-size: 0.82rem;
-  color: var(--muted);
-  text-align: center;
-  padding: 16px 0;
-}
-
-.cmp-list {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.cmp-card {
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  overflow: hidden;
-}
-
-.cmp-header {
-  display: flex;
-  flex-direction: column;
-  padding: 10px 12px 8px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-  gap: 6px;
-}
-
-.cmp-header-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.cmp-title {
-  font-weight: 700;
-  font-size: 0.95rem;
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.cmp-dates {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  flex-shrink: 0;
-}
-
-.cmp-date {
-  font-size: 0.72rem;
-  font-weight: 600;
-  padding: 2px 7px;
-  border-radius: 999px;
-}
-
-.cmp-date.prev {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--muted);
-}
-
-.cmp-date.curr {
-  background: color-mix(in srgb, var(--accent) 22%, transparent);
-  color: var(--accent);
-}
-
-.cmp-arrow-sm {
-  font-size: 0.7rem;
-  color: var(--muted);
-}
-
-.cmp-rows {
-  display: flex;
-  flex-direction: column;
-}
-
-.cmp-row {
-  display: grid;
-  grid-template-columns: 1fr auto auto auto auto;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
-  font-size: 0.78rem;
-}
-
-.cmp-row:nth-child(even) {
-  background: rgba(255, 255, 255, 0.025);
-}
-
-.cmp-row.total {
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  margin-top: 2px;
-  font-weight: 700;
-  font-size: 0.82rem;
-  padding-top: 7px;
-  padding-bottom: 7px;
-}
-
-.cmp-ex-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--muted);
-}
-
-.cmp-row.total .cmp-ex-name {
-  color: var(--fg);
-}
-
-.cmp-vol {
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.cmp-vol.prev {
-  color: var(--muted);
-}
-
-.cmp-vol.curr {
-  color: var(--fg);
-}
-
-.cmp-sep {
-  color: var(--muted);
-  font-size: 0.68rem;
-}
-
-.cmp-delta {
-  font-size: 0.72rem;
-  font-weight: 700;
-  padding: 2px 6px;
-  border-radius: 999px;
-  white-space: nowrap;
-  min-width: 4ch;
-  text-align: right;
-}
-
-.cmp-delta.up {
-  background: rgba(34, 197, 94, 0.15);
-  color: #22c55e;
-}
-
-.cmp-delta.down {
-  background: rgba(239, 68, 68, 0.15);
-  color: #ef4444;
-}
-
-.cmp-delta.flat {
-  background: rgba(255, 255, 255, 0.07);
-  color: var(--muted);
-}
-
-.cmp-delta.up-soft {
-  background: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
-}
-
-.cmp-delta-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-}
-
-.cmp-delta-sub {
-  font-size: 0.66rem;
-  font-weight: 600;
-  padding: 1px 5px;
-  border-radius: 999px;
-  white-space: nowrap;
-  opacity: 0.85;
-}
-
-.cmp-delta-sub.up {
-  background: rgba(34, 197, 94, 0.12);
-  color: #22c55e;
-}
-
-.cmp-delta-sub.down {
-  background: rgba(239, 68, 68, 0.12);
-  color: #ef4444;
-}
-
-.cmp-delta-sub.flat {
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--muted);
-}
-
-.cmp-status-badge {
-  display: inline-flex;
-  align-items: center;
-  font-size: 0.7rem;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 999px;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
-.cmp-status-badge.stronger {
-  background: rgba(34, 197, 94, 0.15);
-  color: #22c55e;
-  border: 1px solid rgba(34, 197, 94, 0.3);
-}
-
-.cmp-status-badge.more_volume {
-  background: rgba(59, 130, 246, 0.15);
-  color: #60a5fa;
-  border: 1px solid rgba(59, 130, 246, 0.3);
-}
-
-.cmp-status-badge.declined {
-  background: rgba(239, 68, 68, 0.15);
-  color: #f87171;
-  border: 1px solid rgba(239, 68, 68, 0.3);
-}
-
-.cmp-status-badge.flat {
-  background: rgba(255, 255, 255, 0.07);
-  color: var(--muted);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.cmp-focus {
-  font-size: 0.72rem;
-  color: var(--muted);
-  font-style: italic;
-  margin: 0;
-  line-height: 1.3;
-}
-
-.cmp-row.ex-only-prev {
-  opacity: 0.45;
-}
-
-.cmp-row.row-stronger {
-  border-left: 3px solid rgba(34, 197, 94, 0.7);
-  padding-left: 9px;
-  background: rgba(34, 197, 94, 0.04);
-}
-
-.cmp-row.row-more-volume {
-  border-left: 3px solid rgba(59, 130, 246, 0.6);
-  padding-left: 9px;
-  background: rgba(59, 130, 246, 0.04);
-}
-
-.cmp-row.row-declined {
-  border-left: 3px solid rgba(239, 68, 68, 0.6);
-  padding-left: 9px;
-  background: rgba(239, 68, 68, 0.04);
-}
-
-.cmp-row.ex-only-curr .cmp-ex-name {
-  color: var(--fg);
-}
-
 .pro-card {
   text-align: left;
   background: rgba(255, 255, 255, 0.06);
@@ -2228,6 +1500,55 @@ function formatNumber(value, digits = 0) {
   background: var(--bg-panel);
   box-shadow: var(--shadow-soft);
   padding: clamp(18px, 3vw, 24px);
+}
+
+.calendar-head-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.calendar-month-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.calendar-month-label {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--fg);
+  min-width: 11ch;
+  text-align: center;
+  text-transform: capitalize;
+}
+
+.calendar-month-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--fg);
+  line-height: 1;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.calendar-month-btn:hover {
+  border-color: rgba(215, 255, 31, 0.5);
+}
+
+@media (max-width: 540px) {
+  .calendar-cell {
+    min-height: 44px;
+    border-radius: 8px;
+    padding: 6px 2px 5px;
+  }
+
+  .calendar-day-number {
+    font-size: 0.8rem;
+  }
 }
 
 .loading-section {

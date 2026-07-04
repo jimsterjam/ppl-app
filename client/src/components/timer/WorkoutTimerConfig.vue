@@ -272,7 +272,7 @@ function saveAndStart() {
 .timer-config-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(5, 7, 10, 0.75);
+  background: color-mix(in srgb, var(--bg) 55%, black 45%);
   z-index: 1200;
   display: flex;
   align-items: center;
@@ -282,7 +282,7 @@ function saveAndStart() {
 
 .timer-config {
   width: min(580px, 100%);
-  background: color-mix(in srgb, var(--bg-panel) 92%, #0a0f14 8%);
+  background: color-mix(in srgb, var(--bg-panel) 94%, transparent);
   border: 1px solid color-mix(in srgb, var(--card-border) 65%, transparent);
   border-radius: 20px;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
@@ -463,7 +463,7 @@ function saveAndStart() {
   display: flex;
   gap: 12px;
   justify-content: flex-end;
-  background: linear-gradient(0deg, rgba(6, 8, 12, 0.95), rgba(6, 8, 12, 0.65));
+  background: color-mix(in srgb, var(--bg-elevated) 94%, transparent);
   border-top: 1px solid color-mix(in srgb, var(--card-border) 70%, transparent);
   border-radius: 0 0 20px 20px;
 }
@@ -485,8 +485,8 @@ function saveAndStart() {
 }
 
 .primary-btn {
-  background: color-mix(in srgb, var(--accent) 55%, #0d1117 45%);
-  color: var(--fg-strong, #f9fafb);
+  background: color-mix(in srgb, var(--accent) 72%, transparent);
+  color: var(--accent-color-contrast, #060606);
 }
 
 .primary-btn:disabled {

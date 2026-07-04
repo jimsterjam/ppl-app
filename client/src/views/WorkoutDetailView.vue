@@ -638,7 +638,6 @@ import { logger } from '@/utils/logger'
 import { buildWorkoutNotesSummary } from '@/utils/workoutNotes'
 import { resolveRealIdFromDraftId as _resolveRealIdFromDraftId, snapshotCore } from '@/utils/workoutHelpers'
 import { saveWorkoutService } from '@/utils/SaveWorkoutService'
-import { DETAIL_DRAFT_KEY, getDetailDraftKey as buildDetailDraftKey } from '@/utils/workoutBuilderFlow'
 import {
   saveFavoriteWorkout,
   updateFavoriteWorkout,
@@ -646,31 +645,15 @@ import {
   normalizeFavoriteName,
   normalizeWorkoutType
 } from '@/utils/workoutFavorites'
+import { clearActiveDraft, getActiveDraft, setActiveDraft, updateActiveDraft } from '@/utils/activeWorkoutDraft'
 
 const userStore = useUserStore()
 const authStore = useAuthStore()
-function getDetailDraftKey() {
-  const uid = String(authStore.user?.uid || authStore.uid || '').trim()
-  return buildDetailDraftKey(uid)
-}
-function readDetailDraftRaw() {
-  try {
-    const direct = sessionStorage.getItem(getDetailDraftKey())
-    if (direct) return direct
-    const legacyKeys = Object.keys(sessionStorage).filter((key) => key.startsWith('workout_detail_draft_'))
-    if (!legacyKeys.length) return null
-    return sessionStorage.getItem(legacyKeys[0])
-  } catch {
-    return null
-  }
-}
 function clearAllDetailDraftSnapshots() {
   try {
-    sessionStorage.removeItem(getDetailDraftKey())
-    sessionStorage.removeItem(DETAIL_DRAFT_KEY) // always clear legacy key for migration
     const keys = Object.keys(sessionStorage)
     keys.forEach((key) => {
-      if (key.includes('workout_detail_draft_')) {
+      if (key === 'workout_detail_draft' || key.startsWith('workout_detail_draft_')) {
         sessionStorage.removeItem(key)
       }
     })
@@ -686,6 +669,28 @@ function clearAllWorkoutMapKeys() {
       }
     })
   } catch {}
+}
+
+async function purgePendingCreateQueueForWorkoutId(workoutId) {
+  const id = String(workoutId || '').trim()
+  if (!id) return
+  try {
+    const all = await db.syncQueue.toArray()
+    const removeIds = all
+      .filter((item) => {
+        if (!item || item.synced === true || item.failed === true) return false
+        if (item.entityType !== 'workout' || item.action !== 'create') return false
+        return String(item?.data?._id || '').trim() === id
+      })
+      .map((item) => item.id)
+
+    if (removeIds.length) {
+      await db.syncQueue.bulkDelete(removeIds)
+      logger.debug('[WorkoutDetail] pending create queue entries removed', { workoutId: id, removed: removeIds.length })
+    }
+  } catch (err) {
+    logger.warn('[WorkoutDetail] pending create queue cleanup failed', { workoutId: id, message: err?.message || err })
+  }
 }
 
 async function postSaveCleanup() {
@@ -755,6 +760,8 @@ const suppressDraftPersistence = ref(false)
 const favoritePrefillApplied = ref(false)
 const favoriteLastPerformanceByIndex = ref({})
 const mediaExercise = ref(null)
+const REAL_ID_RESOLVE_RETRIES = Number.parseInt(import.meta.env.VITE_REAL_ID_RESOLVE_RETRIES || '', 10) || 12
+const REAL_ID_RESOLVE_DELAY_MS = Number.parseInt(import.meta.env.VITE_REAL_ID_RESOLVE_DELAY_MS || '', 10) || 500
 const mediaUrl = ref('')
 const mediaRequestId = ref(0)
 const isVideoUrl = (url) => typeof url === 'string' && /\.mp4($|[?#])/i.test(url)
@@ -804,11 +811,37 @@ function shouldKeepAsDraft(workoutLike) {
   const routeId = String(route.params.id || '')
   if (routeId === 'draft' || routeId.startsWith('draft-')) return true
   if (String(route.query?.created || '') === '1') return true
+  // Favoriten-Start: Workout gilt immer als Draft-in-Progress bis der User explizit speichert.
+  // Der Resume-Snapshot enthält favoriteStart=1 (BuilderFlow setzt es immer mit),
+  // daher greift das auch nach App-Kill + Route-Restore ohne created=1.
+  if (isFavoriteSourceRoute() && workoutLike.completed !== true) return true
   return workoutLike._isDraft === true || workoutLike.isDraft === true
 }
 
 function resolveRealIdFromDraftId(id) {
   return _resolveRealIdFromDraftId(id, route)
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function waitForRealIdFromDraftId(id) {
+  if (!String(id || '').startsWith('draft-')) return ''
+  let realId = await resolveRealIdFromDraftId(id)
+  if (realId) return realId
+
+  for (let i = 0; i < REAL_ID_RESOLVE_RETRIES; i++) {
+    await sleep(REAL_ID_RESOLVE_DELAY_MS)
+    realId = await resolveRealIdFromDraftId(id)
+    if (realId) {
+      logger.debug('[WorkoutDetail] realId nach Retry gefunden', { draftId: id, realId, attempt: i + 1 })
+      return realId
+    }
+  }
+
+  logger.warn('[WorkoutDetail] realId konnte nach Retry nicht aufgeloest werden', { draftId: id })
+  return ''
 }
 
 function resolveActiveWorkoutUserId() {
@@ -819,6 +852,16 @@ function resolveActiveWorkoutUserId() {
     || store.user?.id
     || ''
   ).trim()
+}
+
+function clearActiveDraftForCurrentUser(reason = 'unknown') {
+  const uid = resolveActiveWorkoutUserId()
+  if (!uid) return false
+  const cleared = clearActiveDraft(uid)
+  if (cleared) {
+    logger.debug('[WorkoutDetail] active draft cleared', { reason, uid })
+  }
+  return cleared
 }
 
 function parseUidFromToken(token = null) {
@@ -1106,48 +1149,37 @@ function cancelPendingAutoSave(reason = 'unknown') {
   flushAutoSaveWaiters(false)
 }
 
+
 async function runAutoSaveNow() {
-  if (saving.value || suppressDraftPersistence.value) return
-  if (isFavoriteAdjustMode.value) return // Adjust-Drafts nie auto-speichern (kein Stats-Eintrag)
-  const id = route.params.id
-  const w = workout.value || {}
+if (saving.value || suppressDraftPersistence.value) return
+if (isFavoriteAdjustMode.value) return
+const w = workout.value || {}
+const exercises = Array.isArray(w.exercises) && Array.isArray(exerciseNotes.value)
+? w.exercises.map((ex, idx) => ({
+...ex,
+note: typeof exerciseNotes.value[idx] === 'string' ? exerciseNotes.value[idx] : ex.note || ''
+}))
+: (w.exercises || [])
+const notes = buildWorkoutNotesSummary(exercises)
 
-  // Notizen in einen isolierten Payload-Snapshot mergen – OHNE workout.value zu mutieren.
-  // Eine direkte Zuweisung (w.exercises = ...) würde den Vue-Reaktivitätsgraphen triggern
-  // und den deep-watcher (isDirty / writeDraftSessionSnapshot) in eine Feedback-Schleife führen.
-  const exercises = Array.isArray(w.exercises) && Array.isArray(exerciseNotes.value)
-    ? w.exercises.map((ex, idx) => ({
-        ...ex,
-        note: typeof exerciseNotes.value[idx] === 'string' ? exerciseNotes.value[idx] : ex.note || ''
-      }))
-    : (w.exercises || [])
-  const notes = buildWorkoutNotesSummary(exercises)
+const uid = resolveActiveWorkoutUserId()
+if (!uid) return
 
-  // Effektive ID für den draft-Slot: detail-draft-Key statt literalem 'draft'
-  const effectiveId = id === 'draft' ? getDetailDraftKey() : id
+const ok = updateActiveDraft(uid, {
+...w,
+_id: w._id || String(route.params.id || ''),
+exercises,
+notes
+})
 
-  const result = await saveWorkoutService.saveDraft(
-    effectiveId,
-    { ...w, exercises, notes },
-    {
-      userId: resolveActiveWorkoutUserId(),
-      isFavoriteAdjustMode: isFavoriteAdjustMode.value,
-      suppressDraftPersistence: suppressDraftPersistence.value,
-      store,
-      shouldAbort: () => saving.value || suppressDraftPersistence.value
-    }
-  )
-
-  if (result.saved) {
-    saveMsg.value = ''
-    saveError.value = false
-    if (result.snapshot) initialSnapshot = result.snapshot
-    logger.debug('[WorkoutDetail] Auto-Save via SaveWorkoutService erfolgreich:', effectiveId)
-  } else if (!result.skipped) {
-    logger.error('[WorkoutDetail] Auto-Save fehlgeschlagen:', result.reason)
-    saveMsg.value = ''
-    saveError.value = false
-  }
+if (ok) {
+saveMsg.value = ''
+saveError.value = false
+initialSnapshot = snapshotCore({ ...w, exercises, notes })
+logger.debug('[WorkoutDetail] Auto-Save active draft aktualisiert')
+} else {
+logger.debug('[WorkoutDetail] Auto-Save übersprungen (kein aktiver Draft)')
+}
 }
 
 // Debounced Auto-Save Funktion (muss vor Aufrufen deklariert sein)
@@ -1322,6 +1354,200 @@ function pickPreferredLocalWorkout(storeWorkout, offlineWorkout) {
   return offlineTs >= storeTs ? offlineWorkout : storeWorkout
 }
 
+async function loadNewDraftWorkout() {
+  let draft = null
+  let editingWorkoutId = null
+
+  const uid = resolveActiveWorkoutUserId()
+  const active = uid ? getActiveDraft(uid) : null
+  if (active?.workout) {
+    draft = active.workout
+    editingWorkoutId = active.editingWorkoutId || null
+  }
+
+  if (!draft) {
+    draft = await getWorkoutOffline('draft')
+  }
+
+  logger.debug('[WorkoutDetail] new draft lookup', {
+    uid: uid || null,
+    source: active?.workout ? 'active-workout-draft' : (draft ? 'offline-fallback' : 'none'),
+    found: !!draft,
+    hasExercises: Array.isArray(draft && draft.exercises)
+  })
+
+  let loadedWorkout = null
+  if (draft && draft.exercises && (draft.type || route.query.type)) {
+    const allExercises = await getAllExercisesOffline({})
+    const merged = draft.exercises.map(draftEx => {
+      let dbEx = allExercises.find(e => e._id === draftEx._id)
+      if (!dbEx) {
+        const name = String(draftEx.name || '').trim().toLowerCase()
+        const mg = String(draftEx.muscleGroup || '').trim().toLowerCase()
+        dbEx = allExercises.find(e =>
+          String(e.name || '').trim().toLowerCase() === name &&
+          String(e.muscleGroup || '').trim().toLowerCase() === mg
+        )
+      }
+      if (!dbEx) {
+        const name = String(draftEx.name || '').trim().toLowerCase()
+        dbEx = allExercises.find(e => String(e.name || '').trim().toLowerCase() === name)
+      }
+      return {
+        ...(dbEx || {}),
+        ...draftEx,
+        setDetails: Array.isArray(draftEx.setDetails)
+          ? draftEx.setDetails.map(s => ({
+              reps: s.reps,
+              weight: s.weight,
+              ...(s.isWarmup ? { isWarmup: true } : {})
+            }))
+          : []
+      }
+    })
+    const type = draft.type || route.query.type || null
+    loadedWorkout = { ...draft, type, exercises: merged }
+  } else {
+    const type = (draft && draft.type) || route.query.type || null
+    loadedWorkout = draft ? { ...draft, type } : { _id: 'draft', type, exercises: [] }
+  }
+
+  return { workout: loadedWorkout, editingWorkoutId }
+}
+
+async function loadLocalWorkout(id) {
+  let loadedWorkout = null
+  let editingWorkoutId = null
+
+  const fromStore = store.workouts.find(w => w._id === id) || null
+  const fromOffline = await getWorkoutOffline(id).catch(() => null)
+  loadedWorkout = pickPreferredLocalWorkout(fromStore, fromOffline)
+
+  logger.debug('[WorkoutDetail] local lookup', {
+    id,
+    fromStore: !!fromStore,
+    fromOffline: !!fromOffline,
+    found: !!loadedWorkout
+  })
+
+  if (!loadedWorkout && String(id).startsWith('draft-')) {
+    let realId = String(route.query && route.query.realId || '')
+    if (!realId) {
+      try {
+        realId = String(sessionStorage.getItem('workout_map_' + String(id)) || '')
+      } catch {}
+    }
+
+    logger.debug('[WorkoutDetail] local realId fallback', { id, realId: realId || null })
+
+    if (realId) {
+      const mappedFromStore = store.workouts.find(w => w._id === realId) || null
+      const mappedFromOffline = await getWorkoutOffline(realId).catch(() => null)
+      loadedWorkout = pickPreferredLocalWorkout(mappedFromStore, mappedFromOffline)
+
+      logger.debug('[WorkoutDetail] mapped realId lookup', {
+        tempId: id,
+        realId,
+        fromStore: !!mappedFromStore,
+        fromOffline: !!mappedFromOffline,
+        found: !!loadedWorkout
+      })
+
+      if (!loadedWorkout) {
+        const token = await getIdToken().catch(() => null)
+        loadedWorkout = await fetchWorkout(realId, token).catch(() => null)
+        logger.debug('[WorkoutDetail] mapped realId api fallback', {
+          realId,
+          hasToken: !!token,
+          found: !!loadedWorkout
+        })
+      }
+
+      if (loadedWorkout) {
+        try { sessionStorage.removeItem('workout_map_' + String(id)) } catch {}
+        await router.replace({
+          name: 'workout-detail',
+          params: { id: realId },
+          query: { ...route.query, created: '1', realId }
+        }).catch(() => {})
+        logger.debug('[WorkoutDetail] replaced temp route with realId', { tempId: id, realId })
+        editingWorkoutId = realId
+      }
+    }
+  }
+
+  if (!loadedWorkout) {
+    logger.warn('[WorkoutDetail] local workout unresolved', {
+      id,
+      query: { ...route.query },
+      storeCount: Array.isArray(store.workouts) ? store.workouts.length : 0
+    })
+  }
+
+  return { workout: loadedWorkout, editingWorkoutId }
+}
+
+async function loadServerWorkout(id) {
+  const normalFromStore = store.workouts.find(w => w._id === id) || null
+  const normalFromOffline = await getWorkoutOffline(id).catch(() => null)
+  let loadedWorkout = pickPreferredLocalWorkout(normalFromStore, normalFromOffline)
+
+  logger.debug('[WorkoutDetail] server lookup', {
+    id,
+    fromStore: !!normalFromStore,
+    fromOffline: !!normalFromOffline,
+    found: !!loadedWorkout
+  })
+
+  if (!loadedWorkout) {
+    const token = await getIdToken().catch(() => null)
+    loadedWorkout = await fetchWorkout(id, token).catch(() => null)
+    logger.debug('[WorkoutDetail] server api fallback', {
+      id,
+      hasToken: !!token,
+      found: !!loadedWorkout
+    })
+  }
+
+  if (!loadedWorkout) {
+    logger.warn('[WorkoutDetail] server workout unresolved after all fallbacks', {
+      id,
+      query: { ...route.query },
+      storeCount: Array.isArray(store.workouts) ? store.workouts.length : 0
+    })
+  }
+
+  if (loadedWorkout && shouldKeepAsDraft(loadedWorkout) && loadedWorkout.completed !== true) {
+    loadedWorkout._isDraft = true
+    loadedWorkout.isDraft = true
+    try {
+      await saveWorkoutOffline({
+        ...loadedWorkout,
+        _id: loadedWorkout._id || id,
+        userId: resolveActiveWorkoutUserId(),
+        _isDraft: true,
+        isDraft: true,
+        updatedAt: Date.now()
+      })
+    } catch {}
+    try {
+      const idx = store.workouts.findIndex(
+        w => String(w && w._id || '') === String(loadedWorkout && loadedWorkout._id || id)
+      )
+      if (idx !== -1) {
+        store.workouts[idx] = {
+          ...store.workouts[idx],
+          _isDraft: true,
+          isDraft: true,
+          completed: false
+        }
+      }
+    } catch {}
+  }
+
+  return { workout: loadedWorkout, editingWorkoutId: id }
+}
+
 async function loadWorkout() {
   loading.value = true
   error.value = ''
@@ -1332,196 +1558,39 @@ async function loadWorkout() {
       routeName: route.name,
       query: { ...route.query }
     })
+
     if (route.query.created === '1') {
       toast.show(t('dashboard.successCreated'), { type: 'success', duration: 3000 })
     }
 
-    // Draft-Workouts immer lokal laden
+    let result
     if (id === 'draft') {
-      const draftKey = getDetailDraftKey()
-      // 1. Versuche aus sessionStorage zu laden (Resume aus Dashboard)
-      let draft = null
-      const raw = readDetailDraftRaw()
-      if (raw) {
-        try {
-          const parsed = JSON.parse(raw)
-          // Kompatibilität: alter sessionStorage-Draft kann {workout: ...} oder direkt das Objekt sein
-          draft = parsed.workout || parsed
-        } catch {}
-      }
-      // 2. Fallback: aus IndexedDB
-      if (!draft) {
-        draft = await getWorkoutOffline(draftKey)
-      }
-      // 3. Fallback: Legacy Draft unter statischem Schlüssel 'draft'
-      if (!draft) {
-        draft = await getWorkoutOffline('draft')
-      }
-      logger.debug('[WorkoutDetail] draft lookup result', {
-        draftKey,
-        found: !!draft,
-        hasExercises: Array.isArray(draft?.exercises),
-        type: draft?.type || route.query.type || null
-      })
-      if (draft && draft.exercises && (draft.type || route.query.type)) {
-        const allExercises = await getAllExercisesOffline({})
-        const merged = draft.exercises.map(draftEx => {
-          let dbEx = allExercises.find(e => e._id === draftEx._id)
-          if (!dbEx) {
-            const name = (draftEx.name || '').trim().toLowerCase()
-            const mg = (draftEx.muscleGroup || '').trim().toLowerCase()
-            dbEx = allExercises.find(e => (e.name || '').trim().toLowerCase() === name && (e.muscleGroup || '').trim().toLowerCase() === mg)
-          }
-          if (!dbEx) {
-            const name = (draftEx.name || '').trim().toLowerCase()
-            dbEx = allExercises.find(e => (e.name || '').trim().toLowerCase() === name)
-          }
-          if (dbEx) {
-            return {
-              ...dbEx,
-              ...draftEx,
-              setDetails: Array.isArray(draftEx.setDetails) ? draftEx.setDetails.map(s => ({ reps: s.reps, weight: s.weight, ...(s.isWarmup ? { isWarmup: true } : {}) })) : [],
-            }
-          } else {
-            return {
-              ...draftEx,
-              setDetails: Array.isArray(draftEx.setDetails) ? draftEx.setDetails.map(s => ({ reps: s.reps, weight: s.weight, ...(s.isWarmup ? { isWarmup: true } : {}) })) : [],
-            }
-          }
-        })
-        const type = draft.type || route.query.type || null
-        workout.value = { ...draft, type, exercises: merged }
-      } else {
-        const type = draft?.type || route.query.type || null
-        workout.value = draft ? { ...draft, type } : { _id: 'draft', type, exercises: [] }
-      }
+      result = await loadNewDraftWorkout()
+    } else if (String(id).startsWith('draft-') || String(id).startsWith('offline_')) {
+      result = await loadLocalWorkout(id)
+    } else {
+      result = await loadServerWorkout(id)
+    }
+
+    const loadedWorkout = result.workout
+    const editingWorkoutId = result.editingWorkoutId
+    workout.value = loadedWorkout
+
+    if (workout.value) {
       ensureSetDetailsStructure()
       await maybePrefillFromLastFavoritePerformance()
       await enrichExerciseImages()
-      initialSnapshot = snapshotCore(workout.value)
-      return
-    }
 
-    // Offline-IDs (lokal gespeicherte Workouts)
-    if (String(id).startsWith('draft-') || String(id).startsWith('offline_')) {
-      const fromStore = store.workouts.find(w => w._id === id) || null
-      const fromOffline = await getWorkoutOffline(id).catch(() => null)
-      workout.value = pickPreferredLocalWorkout(fromStore, fromOffline)
-      logger.debug('[WorkoutDetail] temp/offline lookup', {
-        id,
-        fromStore: !!fromStore,
-        fromOffline: !!fromOffline,
-        found: !!workout.value
-      })
-      if (!workout.value && String(id).startsWith('draft-')) {
-        let realId = String(route.query?.realId || '')
-        if (!realId) {
-          try {
-            realId = String(sessionStorage.getItem(`workout_map_${String(id)}`) || '')
-          } catch {}
-        }
-        logger.debug('[WorkoutDetail] temp realId fallback', { id, realId: realId || null })
-        if (realId) {
-          const mappedFromStore = store.workouts.find(w => w._id === realId) || null
-          const mappedFromOffline = await getWorkoutOffline(realId).catch(() => null)
-          workout.value = pickPreferredLocalWorkout(mappedFromStore, mappedFromOffline)
-          logger.debug('[WorkoutDetail] mapped realId lookup', {
-            tempId: id,
-            realId,
-            fromStore: !!mappedFromStore,
-            fromOffline: !!mappedFromOffline,
-            found: !!workout.value
-          })
-          if (!workout.value) {
-            const token = await getIdToken().catch(() => null)
-            workout.value = await fetchWorkout(realId, token).catch(() => null)
-            logger.debug('[WorkoutDetail] mapped realId api fallback', {
-              realId,
-              hasToken: !!token,
-              found: !!workout.value
-            })
-          }
-          if (workout.value) {
-            try { sessionStorage.removeItem(`workout_map_${String(id)}`) } catch {}
-            await router.replace({
-              name: 'workout-detail',
-              params: { id: realId },
-              query: { ...route.query, created: '1', realId }
-            }).catch(() => {})
-            logger.debug('[WorkoutDetail] replaced temp route with realId', { tempId: id, realId })
-          }
-        }
+      const uid = resolveActiveWorkoutUserId()
+      if (uid) {
+        await setActiveDraft(uid, workout.value, editingWorkoutId)
       }
-      if (!workout.value) {
-        logger.warn('[WorkoutDetail] temp/offline workout unresolved', {
-          id,
-          query: { ...route.query },
-          storeCount: Array.isArray(store.workouts) ? store.workouts.length : 0
-        })
-      }
-      ensureSetDetailsStructure()
-      await maybePrefillFromLastFavoritePerformance()
-      await enrichExerciseImages()
-      initialSnapshot = snapshotCore(workout.value)
-      return
-    }
 
-    // Normale Workouts: offline-first, dann API-Fallback
-    const normalFromStore = store.workouts.find(w => w._id === id) || null
-    const normalFromOffline = await getWorkoutOffline(id).catch(() => null)
-    workout.value = pickPreferredLocalWorkout(normalFromStore, normalFromOffline)
-    logger.debug('[WorkoutDetail] normal lookup', {
-      id,
-      fromStore: !!normalFromStore,
-      fromOffline: !!normalFromOffline,
-      found: !!workout.value
-    })
-    if (!workout.value) {
-      const token = await getIdToken().catch(() => null)
-      workout.value = await fetchWorkout(id, token).catch(() => null)
-      logger.debug('[WorkoutDetail] normal api fallback', {
-        id,
-        hasToken: !!token,
-        found: !!workout.value
-      })
+      initialSnapshot = snapshotCore(workout.value)
     }
-    if (!workout.value) {
-      logger.warn('[WorkoutDetail] workout unresolved after all fallbacks', {
-        id,
-        query: { ...route.query },
-        storeCount: Array.isArray(store.workouts) ? store.workouts.length : 0
-      })
-    }
-    ensureSetDetailsStructure()
-    // _isDraft MUSS vor maybePrefillFromLastFavoritePerformance gesetzt werden,
-    // damit der dort ausgelöste triggerAutoSave das Workout korrekt als Draft behandelt
-    // und nicht mit keepDraft=false in IndexedDB schreibt.
-    if (workout.value && shouldKeepAsDraft(workout.value) && workout.value.completed !== true) {
-      workout.value._isDraft = true
-      workout.value.isDraft = true
-      try {
-        await saveWorkoutOffline({
-          ...workout.value,
-          _id: workout.value._id || id,
-          userId: resolveActiveWorkoutUserId(),
-          _isDraft: true,
-          isDraft: true,
-          updatedAt: Date.now()
-        })
-      } catch {}
-      try {
-        const idx = store.workouts.findIndex(w => String(w?._id || '') === String(workout.value?._id || id))
-        if (idx !== -1) {
-          store.workouts[idx] = { ...store.workouts[idx], _isDraft: true, isDraft: true, completed: false }
-        }
-      } catch {}
-    }
-    await maybePrefillFromLastFavoritePerformance()
-    await enrichExerciseImages()
-    initialSnapshot = snapshotCore(workout.value)
   } catch (e) {
     logger.error('Workout laden fehlgeschlagen:', e)
-    error.value = e?.message || 'Unbekannter Fehler'
+    error.value = (e && e.message) || 'Unbekannter Fehler'
   } finally {
     loading.value = false
   }
@@ -1643,8 +1712,45 @@ function onPickerCancel() {
   pickerTarget = null
 }
 
+function goToPostWorkoutSummary(workoutId) {
+  const id = String(workoutId || '').trim()
+  if (!id) {
+    router.push('/dashboard')
+    return
+  }
+  router.push({
+    name: 'stats',
+    query: {
+      postWorkout: '1',
+      postWorkoutId: id
+    }
+  })
+}
+
 function shouldAutoScroll() {
   return route.query.created === '1' || route.query.focus === 'exercises' || route.hash === '#exercises'
+}
+
+async function discardDraftAndLeave() {
+  // Suppress MUSS ganz oben stehen, BEVOR router.push und onBeforeRouteLeave feuert!
+  // Sonst ruft onBeforeRouteLeave persistInProgressDraft() auf und speichert das Workout
+  // als Draft, obwohl der Benutzer "Abbrechen" geklickt hat (BUG: Cancel speichert statt zu canceln)
+  suppressDraftPersistence.value = true
+  clearActiveDraftForCurrentUser('discard-draft-leave')
+  clearAllDetailDraftSnapshots()
+  clearAllWorkoutMapKeys()
+  const routeId = String(route.params.id || '')
+  if (routeId.startsWith('draft-') || routeId.startsWith('offline_')) {
+    await purgePendingCreateQueueForWorkoutId(routeId)
+    try { await db.workouts.delete(routeId) } catch {}
+    try {
+      const idx = store.workouts.findIndex(w => String(w?._id || '') === routeId)
+      if (idx !== -1) store.workouts.splice(idx, 1)
+    } catch {}
+  }
+  timerStore.reset()
+  bypassTimerLeaveGuard.value = true
+  router.push('/dashboard')
 }
 
 function goDashboard() {
@@ -1668,8 +1774,7 @@ function goDashboard() {
     showTimerActionModal.value = true
     return
   }
-  bypassTimerLeaveGuard.value = true
-  router.push('/dashboard')
+  discardDraftAndLeave()
 }
 
 function confirmLeave() {
@@ -1685,8 +1790,7 @@ function confirmLeave() {
     showTimerActionModal.value = true
     return
   }
-  bypassTimerLeaveGuard.value = true
-  router.push('/dashboard')
+  discardDraftAndLeave()
 }
 
 async function applyPendingTimerAction() {
@@ -1700,8 +1804,7 @@ async function applyPendingTimerAction() {
   }
 
   if (action.kind === 'dashboard') {
-    bypassTimerLeaveGuard.value = true
-    router.push('/dashboard')
+    await discardDraftAndLeave()
     return
   }
 
@@ -2005,6 +2108,12 @@ async function performSaveWorkout() {
   // triggerAutoSave() und runAutoSaveNow() prüfen saving.value als primären Guard,
   // daher muss es vor cancelPendingAutoSave() und vor dem ersten await stehen.
   saving.value = true
+  // Race-Fix: Warte auf ausstehende Auto-Save-Promises bevor wir weitermachen (Race 2),
+  // um zu verhindern dass parallele saveDraft() + updateWorkout() um die gleiche ID konkurrieren
+  if (autoSaveWaiters.length > 0) {
+    logger.debug('[WorkoutDetail] performSaveWorkout: waiting for pending auto-save promises', { pending: autoSaveWaiters.length })
+    await Promise.all(autoSaveWaiters.map(w => new Promise(r => w(false))))
+  }
   try {
     cancelPendingAutoSave('final-save')
     suppressDraftPersistence.value = true
@@ -2143,96 +2252,100 @@ async function performSaveWorkout() {
     }
 
     if (String(id).startsWith('draft-')) {
-      const realId = await resolveRealIdFromDraftId(id)
-      if (realId) {
-        let token = await getIdToken().catch(() => null)
-        clearAllDetailDraftSnapshots()
-        clearAllWorkoutMapKeys()
-        await store.updateWorkout(realId, normalized, token)
-        syncStartedFavoriteFromWorkout({ ...normalized, _id: realId })
-        saveMsg.value = finalDurationMinutes > 0 ? `Gespeichert. Dauer: ${finalDurationMinutes} min` : 'Gespeichert.'
-        if (String(route.query?.favoriteStart || '') === '1') {
-          saveMsg.value += ' · Favorit aktualisiert'
-          try { localStorage.removeItem(`fav_prefill_applied_v1_${realId}`) } catch {}
-        }
-        saveError.value = false
-        initialSnapshot = snapshotCore({ ...normalized, _id: realId })
-        try { await db.workouts.delete(id) } catch {}
-        try {
-          const idx = store.workouts.findIndex(wi => String(wi?._id || '') === String(id))
-          if (idx !== -1) store.workouts.splice(idx, 1)
-        } catch {}
-        store.invalidateStatsCache()
-        await postSaveCleanup()
-        timerStore.reset()
-        bypassTimerLeaveGuard.value = true
-        router.push('/dashboard')
-        return
-      }
-      // Draft ohne realId: als neues Workout speichern, damit ein sauberer Create-/Sync-Pfad genutzt wird.
-      const createPayload = {
-        ...normalized,
-        userId: normalized.userId || resolveActiveWorkoutUserId() || undefined,
-        _isDraft: false,
-        isDraft: false,
-        completed: true
-      }
-      let token = await getIdToken().catch(() => null)
-      clearAllDetailDraftSnapshots()
-      clearAllWorkoutMapKeys()
-      let savedWorkout = null
-      try {
-        savedWorkout = await store.createWorkout(createPayload, token)
-      } catch (createError) {
-        const status = Number(createError?.statusCode || createError?.response?.status || 0)
-        const code = String(createError?.code || '').toUpperCase()
-        const transient = !status || [408, 425, 429, 500, 502, 503, 504].includes(status) || code === 'ERR_NETWORK' || code === 'ECONNABORTED'
-        if (transient) {
-          logger.warn('[WorkoutDetail] createWorkout transient fehlgeschlagen, nutze optimistischen Fallback', createError)
-          savedWorkout = await store.createWorkoutOptimistic(createPayload, token).catch(() => null)
-          if (!savedWorkout) throw createError
-        } else {
-          logger.warn('[WorkoutDetail] createWorkout nicht-retrybar fehlgeschlagen, bewahre Workout lokal auf', createError)
-          savedWorkout = await store.createWorkoutOptimistic({
-            ...createPayload,
-            _syncPendingAuth: status === 401 || status === 403
-          }, token).catch(() => null)
-          if (!savedWorkout) throw createError
-          saveMsg.value = status === 401 || status === 403
-            ? 'Lokal gespeichert. Sync startet nach erneuter Anmeldung.'
-            : 'Lokal gespeichert. Sync wird erneut versucht.'
-          saveError.value = false
-        }
-      }
+  const token = await getIdToken().catch(() => null)
+  const realId = await waitForRealIdFromDraftId(id)
 
-      // Lokalen Draft-Eintrag entfernen, damit kein Split-Brain zwischen draft-* und real/offline_* entsteht.
-      try { await db.workouts.delete(id) } catch {}
-      try {
-        const idx = store.workouts.findIndex(wi => String(wi?._id || '') === String(id))
-        if (idx !== -1) store.workouts.splice(idx, 1)
-      } catch {}
-
-      store.invalidateStatsCache()
-      syncStartedFavoriteFromWorkout({ ...createPayload, _id: savedWorkout?._id || id })
-      if (!saveMsg.value) {
-        saveMsg.value = finalDurationMinutes > 0 ? `Gespeichert. Dauer: ${finalDurationMinutes} min` : 'Gespeichert.'
-        saveError.value = false
-      }
-      if (String(route.query?.favoriteStart || '') === '1') {
-        saveMsg.value += ' · Favorit aktualisiert'
-        try { localStorage.removeItem(`fav_prefill_applied_v1_${savedWorkout?._id || id}`) } catch {}
-      }
-      initialSnapshot = snapshotCore({ ...createPayload, _id: savedWorkout?._id || id })
-      await postSaveCleanup()
-      timerStore.reset()
-      bypassTimerLeaveGuard.value = true
-      router.push('/dashboard')
-      return
+  if (realId) {
+    await store.updateWorkout(realId, normalized, token)
+    syncStartedFavoriteFromWorkout({ ...normalized, _id: realId })
+    saveMsg.value = finalDurationMinutes > 0 ? `Gespeichert. Dauer: ${finalDurationMinutes} min` : 'Gespeichert.'
+    if (String(route.query?.favoriteStart || '') === '1') {
+      saveMsg.value += ' · Favorit aktualisiert'
+      try { localStorage.removeItem(`fav_prefill_applied_v1_${realId}`) } catch {}
     }
+    saveError.value = false
+    initialSnapshot = snapshotCore({ ...normalized, _id: realId })
+    try { await db.workouts.delete(id) } catch {}
+    try {
+      const idx = store.workouts.findIndex(wi => String(wi?._id || '') === String(id))
+      if (idx !== -1) store.workouts.splice(idx, 1)
+    } catch {}
+    store.invalidateStatsCache()
+    await postSaveCleanup()
+    timerStore.reset()
+    bypassTimerLeaveGuard.value = true
+    goToPostWorkoutSummary(realId)
+    return
+  }
+
+  if (token) {
+    // Auth vorhanden, aber Mapping fehlt noch: sehr wahrscheinlich erster Save-Race
+    // gegen den Hintergrund-Create aus dem Builder. Kein 2. Create ausloesen.
+    saveMsg.value = 'Speichern wird vorbereitet. Bitte in 2-3 Sekunden erneut speichern.'
+    saveError.value = false
+    suppressDraftPersistence.value = false
+    return
+  }
+
+  // Kein Token: lokal/optimistisch anlegen bleibt als Fallback erhalten.
+  const createPayload = {
+    ...normalized,
+    userId: normalized.userId || resolveActiveWorkoutUserId() || undefined,
+    _isDraft: false,
+    isDraft: false,
+    completed: true
+  }
+
+  let savedWorkout = null
+  try {
+    savedWorkout = await store.createWorkout(createPayload, token)
+  } catch (createError) {
+    const status = Number(createError?.statusCode || createError?.response?.status || 0)
+    const code = String(createError?.code || '').toUpperCase()
+    const transient = !status || [408, 425, 429, 500, 502, 503, 504].includes(status) || code === 'ERR_NETWORK' || code === 'ECONNABORTED'
+    if (transient) {
+      logger.warn('[WorkoutDetail] createWorkout transient fehlgeschlagen, nutze optimistischen Fallback', createError)
+      savedWorkout = await store.createWorkoutOptimistic(createPayload, token).catch(() => null)
+      if (!savedWorkout) throw createError
+    } else {
+      logger.warn('[WorkoutDetail] createWorkout nicht-retrybar fehlgeschlagen, bewahre Workout lokal auf', createError)
+      savedWorkout = await store.createWorkoutOptimistic({
+        ...createPayload,
+        _syncPendingAuth: status === 401 || status === 403
+      }, token).catch(() => null)
+      if (!savedWorkout) throw createError
+      saveMsg.value = status === 401 || status === 403
+        ? 'Lokal gespeichert. Sync startet nach erneuter Anmeldung.'
+        : 'Lokal gespeichert. Sync wird erneut versucht.'
+      saveError.value = false
+    }
+  }
+
+  try { await db.workouts.delete(id) } catch {}
+  try {
+    const idx = store.workouts.findIndex(wi => String(wi?._id || '') === String(id))
+    if (idx !== -1) store.workouts.splice(idx, 1)
+  } catch {}
+
+  store.invalidateStatsCache()
+  syncStartedFavoriteFromWorkout({ ...createPayload, _id: savedWorkout?._id || id })
+  if (!saveMsg.value) {
+    saveMsg.value = finalDurationMinutes > 0 ? `Gespeichert. Dauer: ${finalDurationMinutes} min` : 'Gespeichert.'
+    saveError.value = false
+  }
+  if (String(route.query?.favoriteStart || '') === '1') {
+    saveMsg.value += ' · Favorit aktualisiert'
+    try { localStorage.removeItem(`fav_prefill_applied_v1_${savedWorkout?._id || id}`) } catch {}
+  }
+  initialSnapshot = snapshotCore({ ...createPayload, _id: savedWorkout?._id || id })
+  await postSaveCleanup()
+  timerStore.reset()
+  bypassTimerLeaveGuard.value = true
+  goToPostWorkoutSummary(savedWorkout?._id || id)
+  return
+}
 
     let token = await getIdToken().catch(() => null)
-    clearAllDetailDraftSnapshots()
-    clearAllWorkoutMapKeys()
     await store.updateWorkout(id, normalized, token)
     syncStartedFavoriteFromWorkout({ ...normalized, _id: id })
     saveMsg.value = finalDurationMinutes > 0 ? `Gespeichert. Dauer: ${finalDurationMinutes} min` : 'Gespeichert.'
@@ -2245,7 +2358,7 @@ async function performSaveWorkout() {
     await postSaveCleanup()
     timerStore.reset()
     bypassTimerLeaveGuard.value = true
-    router.push('/dashboard')
+    goToPostWorkoutSummary(id)
   } catch (e) {
     // workout.value.completed wurde vor dem ersten await auf true gesetzt.
     // Bei Fehler zurücksetzen, damit persistInProgressDraft() den Draft noch retten kann.
@@ -2539,71 +2652,61 @@ function findExerciseIndexAtPoint(x, y) {
   return Number.isNaN(idx) ? null : idx
 }
 
-function writeDraftSessionSnapshot() {
-  try {
-    if (suppressDraftPersistence.value) return
-    if (isFavoriteAdjustMode.value) return // Adjust-Drafts nie als Workout-in-Progress speichern
-    const w = workout.value
-    if (!w || w.completed === true) return
-    if (!(shouldKeepAsDraft(w) || isDirty.value)) return
-    const routeId = String(route.params.id || '')
-    const effectiveId = String(w._id || routeId || '')
-    if (!effectiveId) return
-    const snapshot = {
-      ...w,
-      _id: effectiveId,
-      _isDraft: true,
-      isDraft: true,
-      completed: false,
-      timestamp: Date.now()
-    }
-    sessionStorage.setItem(getDetailDraftKey(), JSON.stringify(snapshot))
-  } catch {}
+async function persistActiveDraft(reason = '') {
+if (suppressDraftPersistence.value) return false
+if (isFavoriteAdjustMode.value) return false
+const w = workout.value
+if (!w || w.completed === true) return false
+if (!(shouldKeepAsDraft(w) || isDirty.value)) return false
+
+const exercises = Array.isArray(w.exercises) && Array.isArray(exerciseNotes.value)
+? w.exercises.map((ex, idx) => ({
+...ex,
+note: typeof exerciseNotes.value[idx] === 'string' ? exerciseNotes.value[idx] : ex.note || ''
+}))
+: (w.exercises || [])
+const notes = buildWorkoutNotesSummary(exercises)
+
+const routeId = String(route.params.id || '').trim()
+let editingWorkoutId = null
+
+if (routeId && routeId !== 'draft' && !routeId.startsWith('draft-') && !routeId.startsWith('offline_')) {
+editingWorkoutId = routeId
+} else if (routeId.startsWith('draft-')) {
+editingWorkoutId = await resolveRealIdFromDraftId(routeId)
 }
 
-async function persistInProgressDraft(reason = '') {
-  if (suppressDraftPersistence.value) return
-  if (isFavoriteAdjustMode.value) return // Adjust-Drafts nie als Workout-in-Progress persistieren
-  writeDraftSessionSnapshot()
-  try {
-    const w = workout.value
-    if (!w || w.completed === true) return
-    if (!(shouldKeepAsDraft(w) || isDirty.value)) return
-    const routeId = String(route.params.id || '')
-    const effectiveId = String(w._id || routeId || '')
-    if (!effectiveId) return
-    const payload = {
-      ...w,
-      _id: effectiveId,
-      userId: resolveActiveWorkoutUserId(),
-      _isDraft: true,
-      isDraft: true,
-      completed: false,
-      updatedAt: Date.now()
-    }
-    await saveWorkoutOffline(payload)
-    const idx = store.workouts.findIndex(item => String(item?._id || '') === effectiveId)
-    if (idx !== -1) {
-      store.workouts[idx] = { ...store.workouts[idx], ...payload }
-    } else {
-      store.workouts.unshift(payload)
-    }
-    logger.debug('[WorkoutDetail] in-progress draft persisted', { reason, id: effectiveId })
-  } catch {}
+const uid = resolveActiveWorkoutUserId()
+if (!uid) return false
+
+const ok = setActiveDraft(uid, {
+...w,
+_id: String(w._id || routeId || ''),
+exercises,
+notes
+}, editingWorkoutId || null)
+
+if (ok) {
+logger.debug('[WorkoutDetail] active draft persisted', { reason, routeId, editingWorkoutId: editingWorkoutId || null })
+}
+return ok
+}
+
+function persistActiveDraftFromLifecycle(reason = 'unknown') {
+writeDetailViewState(reason)
+persistActiveDraft(reason).catch(() => {})
 }
 
 function onVisibilityChange() {
-  try {
-    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
-      writeDetailViewState('visibility-hidden')
-      persistInProgressDraft('visibility-hidden').catch(() => {})
-    }
-  } catch {}
+try {
+if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+persistActiveDraftFromLifecycle('visibility-hidden')
+}
+} catch {}
 }
 
 function onPageHide() {
-  writeDetailViewState('pagehide')
-  persistInProgressDraft('pagehide').catch(() => {})
+persistActiveDraftFromLifecycle('pagehide')
 }
 
 function onWindowScroll() {
@@ -2628,8 +2731,7 @@ onMounted(async () => {
       const { App: CapApp } = await import('@capacitor/app')
       _capAppStateListener = await CapApp.addListener('appStateChange', ({ isActive }) => {
         if (!isActive) {
-          writeDraftSessionSnapshot()
-          persistInProgressDraft('app-background').catch(() => {})
+          persistActiveDraftFromLifecycle('app-background')
         }
       })
     }
@@ -2689,7 +2791,7 @@ watch(() => workout.value, (w) => {
   try {
     if (!w || w.completed === true) return
     if (!(shouldKeepAsDraft(w) || isDirty.value)) return
-    writeDraftSessionSnapshot()
+    persistActiveDraft('watch-dirty').catch(() => {})
   } catch {}
 }, { deep: true })
 
@@ -2699,8 +2801,7 @@ function beforeUnloadHandler(e) {
   if (!workout.value || workout.value.completed === true) return
   if (!(shouldKeepAsDraft(workout.value) || isDirty.value)) return
   try {
-    writeDetailViewState('beforeunload')
-    writeDraftSessionSnapshot()
+    persistActiveDraftFromLifecycle('beforeunload')
     logger.debug('beforeunload snapshot saved to sessionStorage (detail)')
   } catch (err) {
     logger.warn('⚠️ WorkoutDetail - beforeunload snapshot failed:', err)
@@ -2729,17 +2830,24 @@ onBeforeRouteLeave(async (to) => {
     suppressDraftPersistence.value = true
     const adjustId = String(route.params.id || '')
     if (adjustId) {
+      await purgePendingCreateQueueForWorkoutId(adjustId)
       try { await db.workouts.delete(adjustId) } catch {}
       try {
         const idx = store.workouts.findIndex(w => String(w?._id || '') === adjustId)
         if (idx !== -1) store.workouts.splice(idx, 1)
       } catch {}
     }
+    clearActiveDraftForCurrentUser('adjust-route-leave')
     clearAllDetailDraftSnapshots()
     return true
   }
 
-  await persistInProgressDraft('route-leave')
+  // Race-Fix (Cancel-Bug): Überprüfen ob gerade discardDraftAndLeave() läuft (bypassTimerLeaveGuard=true)
+  // BEVOR persistInProgressDraft() aufgerufen wird. Sonst speichern wir Drafts, die der Benutzer
+  // mit Cancel-Button gerade verwerfen wollte. (BUG: "Abbrechen speichert das Workout")
+  if (!bypassTimerLeaveGuard.value) {
+    await persistActiveDraft('route-leave')
+  }
 
   if (bypassTimerLeaveGuard.value) {
     bypassTimerLeaveGuard.value = false
@@ -2771,7 +2879,7 @@ onBeforeUnmount(() => {
     viewStatePersistTimer = null
   }
   if (!suppressDraftPersistence.value) {
-    persistInProgressDraft('before-unmount').catch(() => {})
+    persistActiveDraft('before-unmount').catch(() => {})
   }
   cleanupPointerDragListeners()
 })

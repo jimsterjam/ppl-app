@@ -38,7 +38,7 @@ import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useUserStore } from '@/stores/userStore'
 import { useAuthStore } from '@/stores/authStore'
-import { getDetailDraftKey } from '@/utils/workoutBuilderFlow'
+import { hasActiveDraft, getActiveDraft } from '@/utils/activeWorkoutDraft'
 import { Home, BarChart3, Dumbbell, HelpCircle, Settings, Timer } from 'lucide-vue-next'
 
 const { t } = useI18n()
@@ -47,34 +47,17 @@ const store = useUserStore()
 const authStore = useAuthStore()
 const route = useRoute()
 const activeWorkout = computed(() => {
-  // 1. Pinia Store (reaktiv, in-session)
-  const storeDraft = store.workouts.find(w => (w._isDraft === true || w.isDraft === true) && w.completed !== true)
-  if (storeDraft) return storeDraft
+  const uid = String(authStore.user?.uid || authStore.uid || store.user?.uid || '').trim()
+  if (!uid || !hasActiveDraft(uid)) return null
 
-  // 2. sessionStorage-Fallback: sichtbar nach Page-Reload oder wenn User auf Nicht-Dashboard-Seite landet
-  // Favorit-Anpassen-Drafts sind keine "gestarteten Workouts" und werden ausgeblendet.
-  try {
-    const uid = String(authStore.user?.uid || authStore.uid || store.user?.uid || '').trim()
-    const uidKey = uid ? getDetailDraftKey(uid) : null
-    const raw = (uidKey ? sessionStorage.getItem(uidKey) : null) || sessionStorage.getItem('workout_detail_draft')
-    if (raw) {
-      const parsed = JSON.parse(raw)
-      // Favorit-Anpassen-Drafts explizit ausblenden (Marker _adjustDraft oder draft-favorite- Präfix)
-      if (parsed?._adjustDraft) return null
-      const draft = parsed?.workout || parsed
-      const draftId = String(draft?._id || '')
-      if (
-        draftId &&
-        !draftId.startsWith('draft-favorite-') &&
-        draft.completed !== true &&
-        draft._isDraft !== false
-      ) {
-        return { _id: draftId, _isDraft: true, isDraft: true }
-      }
-    }
-  } catch {}
+  const active = getActiveDraft(uid)
+  const workout = active?.workout || null
+  if (!workout || workout.completed === true || workout._adjustDraft === true) return null
 
-  return null
+  const workoutId = String(workout?._id || active?.editingWorkoutId || '').trim()
+  if (!workoutId || workoutId.startsWith('draft-favorite-')) return null
+
+  return { _id: workoutId, _isDraft: true, isDraft: true }
 })
 
 onMounted(() => {

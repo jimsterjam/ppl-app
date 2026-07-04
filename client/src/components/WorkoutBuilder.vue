@@ -18,6 +18,7 @@ import { getMergedSortedExercises } from '@/utils/exerciseList';
 import { searchAndRankExercises } from '@/utils/exerciseSearch'
 import { consumeWorkoutBuilderPrefill, normalizeBuilderWorkoutType, readWorkoutBuilderRouteState, getDetailDraftKey } from '@/utils/workoutBuilderFlow'
 import { logger } from '@/utils/logger'
+import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 
 
 // --- State & Stores ---
@@ -39,6 +40,7 @@ onAuthStateChanged((user) => {
 const subscriptionStore = useSubscriptionStore()
 const toast = useToastStore()
 const { t, locale } = useI18n()
+const { getTranslatedExerciseName } = useExerciseTranslation()
 const effectiveAuthUser = computed(() => firebaseUser.value || authStore.user || getCurrentUser?.() || null)
 const isLoaded = computed(() => authStore.initialized !== false)
 const isSignedIn = computed(() => !!effectiveAuthUser.value)
@@ -658,7 +660,7 @@ watch(() => `${route.query.quick || ''}:${route.query.favoriteStart || ''}`, () 
 				<h3>{{ t('builder.planTitle', { count: selectedExercises.length }) }}</h3>
 				<ul class="selected-exercise-list">
 					<li v-for="(exercise, index) in selectedExercises" :key="exercise._id" class="selected-exercise-item" draggable="true" @dragstart="onDragStart(index)" @dragover.prevent="onDrop(index)">
-						<span class="exercise-name">{{ exercise.displayName || exercise.name }}</span>
+						<span class="exercise-name">{{ getTranslatedExerciseName(exercise.displayName || exercise.name) }}</span>
 						<button class="remove-btn" @click="removeExercise(index)" aria-label="remove exercise">×</button>
 					</li>
 				</ul>

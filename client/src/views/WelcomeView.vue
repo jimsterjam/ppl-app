@@ -11,23 +11,47 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { onBeforeUnmount, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { Capacitor } from '@capacitor/core'
 import WelcomePage from '../components/WelcomePage.vue'
 import WorkoutSplash from '../components/WorkoutSplash.vue'
 
 const router = useRouter()
-const showSplash = ref(true)
+const showSplash = ref(Capacitor?.getPlatform?.() === 'web' || Capacitor?.platform === 'web')
 const welcomeVisible = ref(false)
+let splashFallbackTimer = null
+
+function clearSplashFallbackTimer() {
+  if (splashFallbackTimer !== null) {
+    clearTimeout(splashFallbackTimer)
+    splashFallbackTimer = null
+  }
+}
 
 function onReveal() {
   // intentionally ignored: welcome should appear after splash fade-out is complete
 }
 
 function onSplashDone() {
+  clearSplashFallbackTimer()
   showSplash.value = false
   welcomeVisible.value = true
 }
+
+if (showSplash.value) {
+  splashFallbackTimer = setTimeout(() => {
+    if (showSplash.value) {
+      onSplashDone()
+    }
+  }, 7000)
+} else {
+  welcomeVisible.value = true
+}
+
+onBeforeUnmount(() => {
+  clearSplashFallbackTimer()
+})
 
 function handleNavigation(displayType) {
   // displayType 2 = Dashboard basierend auf Ihrer Komponente

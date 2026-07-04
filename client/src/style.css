@@ -171,8 +171,17 @@ html {
   --accent-color-contrast: #ffffff;
 }
 
+html {
+  /* overflow-x:hidden on html (not body) avoids the iOS WebKit bug where
+     overflow-x:hidden on body creates a scroll container that breaks
+     position:fixed on iOS 17 and earlier (e.g. iPhone 11–15 series). */
+  overflow-x: hidden;
+  height: 100%;
+}
+
 body {
   min-height: 100vh;
+  min-height: 100dvh; /* dvh = dynamic viewport height; fallback to vh */
   font-family: 'Sora', 'Space Grotesk', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   color: var(--fg);
   background:
@@ -181,8 +190,9 @@ body {
     linear-gradient(150deg, var(--bg-inner) 0%, var(--bg-outer) 80%);
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
+  /* Do NOT set overflow-x:hidden here — breaks position:fixed on iOS <18 */
   touch-action: manipulation;
+  overscroll-behavior: none; /* prevent iOS rubber-band scroll that shifts fixed elements */
 }
 
 body::before {
@@ -203,6 +213,7 @@ body::before {
   position: relative;
   z-index: 1;
   min-height: 100vh;
+  min-height: 100dvh;
   background: transparent;
 }
 

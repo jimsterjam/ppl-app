@@ -72,7 +72,7 @@
           <div v-if="selectedDay.workout.exercises?.length" class="exercises-list">
             <h5>Übungen</h5>
             <div v-for="(exercise, idx) in selectedDay.workout.exercises" :key="idx" class="exercise-item">
-              <span class="exercise-name">{{ exercise.name }}</span>
+              <span class="exercise-name">{{ getTranslatedExerciseName(exercise.name) }}</span>
               <span class="exercise-details">
                 {{ exercise.weight }}kg × {{ exercise.reps }} × {{ exercise.sets }}
               </span>
@@ -125,6 +125,7 @@
 
 <script setup>
 import { ref, onMounted, watch } from 'vue'
+import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 
 const props = defineProps({
   workouts: {
@@ -137,6 +138,7 @@ const typeStats = ref({ push: 0, pull: 0, legs: 0 })
 const viewMode = ref('week') // 'week' oder 'month'
 const showOverlay = ref(false)
 const selectedDay = ref(null)
+const { getTranslatedExerciseName } = useExerciseTranslation()
 
 function processWorkoutData(workouts) {
   const now = new Date()

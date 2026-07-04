@@ -228,6 +228,7 @@ import { deleteWorkout } from '@/api/workouts'
 import { http } from '@/api/http'
 import { loadDefaultExercises, getCachedDefaultExercises } from '@/utils/defaultExercisesLoader'
 import { buildWorkoutBuilderRoute, normalizeBuilderWorkoutType, QUICK_PREFILL_KEY, DETAIL_DRAFT_KEY, saveWorkoutBuilderPrefill, getDetailDraftKey as buildDetailDraftKey } from '@/utils/workoutBuilderFlow'
+import { hasActiveDraft, getActiveDraft } from '@/utils/activeWorkoutDraft'
 import {
   getFavoritesByType,
   renameFavoriteWorkout,
@@ -283,19 +284,26 @@ function resolveDetailDraftTargetId() {
   return currentDraftId
 }
 
-function isOpenDraftWorkout(workout) {
-  return (workout?._isDraft === true || workout?.isDraft === true)
-    && workout?.completed !== true
-    && workout?._adjustDraft !== true
+function getActiveDraftUserId() {
+  return String(getCurrentUser?.()?.uid || authStore.user?.uid || authStore.uid || store.user?.uid || '').trim()
 }
 
-const hasDraft = computed(() => {
-  const storeHasDraft = (store.workouts || []).some(isOpenDraftWorkout)
-  return storeHasDraft || Boolean(resolveDetailDraftTargetId())
+const activeDraftState = computed(() => {
+  const uid = getActiveDraftUserId()
+  if (!uid || !hasActiveDraft(uid)) return null
+  const draft = getActiveDraft(uid)
+  if (!draft?.workout) return null
+  if (draft.workout?._adjustDraft === true) return null
+  return draft
 })
+
+const hasDraft = computed(() => Boolean(activeDraftState.value?.workout))
 const draftId = computed(() => {
-  const storeDraft = store.workouts.find(isOpenDraftWorkout)?._id
-  return storeDraft || resolveDetailDraftTargetId()
+  const workout = activeDraftState.value?.workout || null
+  if (!workout) return ''
+  const draftWorkoutId = String(workout._id || '').trim()
+  if (draftWorkoutId) return draftWorkoutId
+  return String(activeDraftState.value?.editingWorkoutId || '').trim() || 'draft'
 })
 const showStartOptions = computed(() => startFlowStep.value !== 'idle')
 const showFavoritesSelection = computed(() => startFlowStep.value === 'favorites')

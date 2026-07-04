@@ -349,11 +349,21 @@ function updateOrientation() {
   --timer-glyph-size: 36px;
   --timer-glyph-primary-size: 42px;
   --timer-controls-gap: 12px;
+  --timer-surface: color-mix(in srgb, var(--bg-panel) 92%, black 8%);
+  --timer-surface-strong: color-mix(in srgb, var(--bg) 95%, black 5%);
+  --timer-icon-fg: var(--fg-strong, #ffffff);
+  --timer-icon-bg: transparent;
+  --timer-icon-border: color-mix(in srgb, var(--accent) 85%, transparent);
+  --timer-primary-bg: var(--accent);
+  --timer-primary-fg: var(--accent-color-contrast, #060606);
+  --timer-primary-active-bg: color-mix(in srgb, var(--bg-panel) 92%, black 8%);
+  --timer-progress-track: color-mix(in srgb, var(--fg) 16%, transparent);
+  --timer-paused-fill: color-mix(in srgb, var(--fg) 42%, transparent);
   display: grid;
   gap: 6px;
   padding: 10px 14px 10px;
   border-radius: 0 0 16px 16px;
-  background: #07090d;
+  background: var(--timer-surface-strong);
   border: none;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
   overflow: hidden;
@@ -391,7 +401,7 @@ function updateOrientation() {
   --timer-glyph-primary-size: 34px;
   --timer-controls-gap: 14px;
   padding: 12px 14px 12px;
-  background: #07090d;
+  background: var(--timer-surface-strong);
   min-height: min(52vh, 460px);
 }
 
@@ -407,7 +417,7 @@ function updateOrientation() {
   border-radius: 0;
   border: none;
   box-shadow: none;
-  background: #050508;
+  background: var(--timer-surface);
   padding:
     max(10px, env(safe-area-inset-top))
     max(12px, env(safe-area-inset-right))
@@ -594,7 +604,7 @@ function updateOrientation() {
 }
 
 .timer-bar.running .timer-time {
-  color: var(--accent);
+  color: #708219;
 }
 
 .timer-controls {
@@ -608,9 +618,9 @@ function updateOrientation() {
   width: var(--timer-icon-size);
   height: var(--timer-icon-size);
   border-radius: 12px;
-  border: 2px solid color-mix(in srgb, var(--accent) 85%, transparent);
-  background: transparent;
-  color: #ffffff;
+  border: 2px solid var(--timer-icon-border);
+  background: var(--timer-icon-bg);
+  color: var(--timer-icon-fg);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -626,8 +636,8 @@ function updateOrientation() {
 .timer-icon.primary {
   width: var(--timer-icon-primary-size);
   height: var(--timer-icon-primary-size);
-  background: var(--accent);
-  color: #ffffff;
+  background: var(--timer-primary-bg);
+  color: var(--timer-primary-fg);
   border-color: color-mix(in srgb, var(--accent) 92%, black 8%);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 }
@@ -638,7 +648,7 @@ function updateOrientation() {
 }
 
 .timer-bar.running .timer-icon.primary {
-  background: #07090d;
+  background: var(--timer-primary-active-bg);
   border-color: var(--accent);
 }
 
@@ -680,7 +690,7 @@ function updateOrientation() {
 .timer-progress {
   height: 4px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--timer-progress-track);
   overflow: hidden;
 }
 
@@ -693,7 +703,7 @@ function updateOrientation() {
 }
 
 .timer-bar.paused .timer-progress-fill {
-  background: rgba(255, 255, 255, 0.35);
+  background: var(--timer-paused-fill);
 }
 
 @keyframes timerPulse {
@@ -726,12 +736,12 @@ function updateOrientation() {
 
   .timer-bar.expanded .timer-status {
     font-size: 2.08rem;
-    color: #ffffff;
+    color: var(--fg);
   }
 }
 
 :global(body.timer-landscape-fullscreen) {
-  background: #050505;
+  background: var(--bg);
   overflow: hidden;
 }
 
@@ -753,7 +763,7 @@ function updateOrientation() {
   grid-template-rows: auto auto;
   place-content: center;
   place-items: center;
-  background: #050508;
+  background: var(--timer-surface);
   border: none;
   border-radius: 0;
   box-shadow: none;
@@ -788,7 +798,7 @@ function updateOrientation() {
   font-size: clamp(100px, 20vw, 280px);
   font-weight: 700;
   letter-spacing: 0.08em;
-  color: var(--accent);
+  color: #708219;
   text-align: center;
   line-height: 1;
   width: auto;
@@ -813,8 +823,8 @@ function updateOrientation() {
   align-items: center;
   justify-content: center;
   border: 2px solid var(--accent);
-  background: transparent;
-  color: #ffffff;
+  background: var(--timer-icon-bg);
+  color: var(--timer-icon-fg);
 }
 
 .timer-bar.landscape-fullscreen .timer-icon.close {
@@ -827,9 +837,19 @@ function updateOrientation() {
   width: 140px;
   height: 140px;
   border-radius: 26px;
-  background: #07090d;
-  color: #ffffff;
+  background: var(--timer-primary-active-bg);
+  color: var(--timer-icon-fg);
   border-color: var(--accent);
+}
+
+:global([data-theme="light"]) .timer-bar {
+  --timer-surface: color-mix(in srgb, var(--bg) 96%, #e6ebf5 4%);
+  --timer-surface-strong: color-mix(in srgb, var(--bg-panel) 96%, #e6ebf5 4%);
+  --timer-icon-fg: var(--fg);
+  --timer-icon-border: color-mix(in srgb, var(--accent) 70%, var(--card-border) 30%);
+  --timer-primary-active-bg: color-mix(in srgb, var(--bg-elevated) 90%, white 10%);
+  --timer-progress-track: color-mix(in srgb, var(--fg) 14%, transparent);
+  --timer-paused-fill: color-mix(in srgb, var(--fg) 35%, transparent);
 }
 
 .timer-bar.landscape-fullscreen .timer-icon .icon {

@@ -32,7 +32,8 @@ export function useExerciseTranslation() {
     const normName = normalize(exerciseName)
     const found = exercisesData.value.find(e => normalize(e.name) === normName || normalize(e.name_en) === normName)
     if (!found) return exerciseName
-    return isGerman() ? found.name : found.name_en
+    // Product decision: exercise names are always displayed in English.
+    return found.name_en || found.name || exerciseName
   }
 
   function findByField(field, value) {
