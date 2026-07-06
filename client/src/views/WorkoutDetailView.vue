@@ -34,6 +34,7 @@
               <button v-if="!isFavoriteAdjustMode" class="primary timer-config-btn" type="button" @click="showTimerConfig = true">
                 ⏱ Timer einstellen
               </button>
+              <SessionStopwatch @session-time="onSessionTime" />
               <button class="reorder-toggle" type="button" :aria-pressed="isReordering" @click="toggleReorder">
                 {{ isReordering ? t('workoutDetail.done') : t('workoutDetail.editOrder') }}
               </button>
@@ -631,6 +632,7 @@ import BottomNav from '@/components/BottomNav.vue'
 import AppModal from '@/components/AppModal.vue'
 import ExerciseList from '@/components/ExerciseList.vue'
 import WorkoutTimerConfig from '@/components/timer/WorkoutTimerConfig.vue'
+import SessionStopwatch from '@/components/SessionStopwatch.vue'
 import { useToastStore } from '@/stores/toastStore'
 import { useTimerStore } from '@/stores/timerStore'
 import { useI18n } from 'vue-i18n'
@@ -2099,6 +2101,13 @@ function stopSpin(row, field) {
     _spinMap.set(row, obj)
   } catch (err) {
     logger.warn('stopSpin error', err)
+  }
+}
+
+function onSessionTime({ totalMs, formattedTime }) {
+  if (workout.value && totalMs > 0) {
+    workout.value.sessionTotalMs = totalMs
+    workout.value.sessionFormattedTime = formattedTime
   }
 }
 
