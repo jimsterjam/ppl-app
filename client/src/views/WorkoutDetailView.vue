@@ -696,7 +696,7 @@ async function purgePendingCreateQueueForWorkoutId(workoutId) {
 }
 
 async function postSaveCleanup() {
-  // Kein globales Draft-Cleanup hier: verhindert Side-Effects auf andere offene Drafts.
+  clearActiveDraftForCurrentUser('post-save')
   try { await db.workouts.delete('draft') } catch {}
   clearAllDetailDraftSnapshots()
   clearAllWorkoutMapKeys()
@@ -2287,16 +2287,7 @@ async function performSaveWorkout() {
     return
   }
 
-  if (token) {
-    // Auth vorhanden, aber Mapping fehlt noch: sehr wahrscheinlich erster Save-Race
-    // gegen den Hintergrund-Create aus dem Builder. Kein 2. Create ausloesen.
-    saveMsg.value = 'Speichern wird vorbereitet. Bitte in 2-3 Sekunden erneut speichern.'
-    saveError.value = false
-    suppressDraftPersistence.value = false
-    return
-  }
-
-  // Kein Token: lokal/optimistisch anlegen bleibt als Fallback erhalten.
+  // realId nicht gefunden: Create-Pfad als Fallback (Background-Create hat evtl. versagt).
   const createPayload = {
     ...normalized,
     userId: normalized.userId || resolveActiveWorkoutUserId() || undefined,

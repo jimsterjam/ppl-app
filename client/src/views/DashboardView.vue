@@ -228,7 +228,7 @@ import { deleteWorkout } from '@/api/workouts'
 import { http } from '@/api/http'
 import { loadDefaultExercises, getCachedDefaultExercises } from '@/utils/defaultExercisesLoader'
 import { buildWorkoutBuilderRoute, normalizeBuilderWorkoutType, QUICK_PREFILL_KEY, DETAIL_DRAFT_KEY, saveWorkoutBuilderPrefill, getDetailDraftKey as buildDetailDraftKey } from '@/utils/workoutBuilderFlow'
-import { hasActiveDraft, getActiveDraft } from '@/utils/activeWorkoutDraft'
+import { hasActiveDraft, getActiveDraft, clearActiveDraft } from '@/utils/activeWorkoutDraft'
 import {
   getFavoritesByType,
   renameFavoriteWorkout,
@@ -833,6 +833,9 @@ function openWorkoutInfo(type) {
 }
 
 async function discardDraft() {
+  // Aktiven Draft aus localStorage entfernen (verhindert Re-Anzeige des Banners)
+  const uid = getActiveDraftUserId()
+  if (uid) clearActiveDraft(uid)
   // Sammle alle IDs die mit dem aktuellen Draft zusammenhängen können:
   // 1. workout_map_{tempId} → realId (Server-Workout, vom WorkoutBuilder erzeugt)
   // 2. detailDraft._id wenn echte ObjectId (nach router.replace)
