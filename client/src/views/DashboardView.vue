@@ -27,10 +27,12 @@
     <main class="dashboard-content" :class="{ 'has-draft': hasDraft }">
       <section class="hero">
         <div>
-          <h2 class="hero-title">Bereit für dein Training?</h2>
+          <h4 class="hero-title">Bereit für dein Training?</h4>
           <p class="hero-sub">{{ weeklyProgressLabel }}</p>
         </div>
       </section>
+
+      <SessionStopwatch @session-time="onSessionTime" />
 
       <section class="quick-start">
         <div v-if="!showStartOptions" class="quick-grid">
@@ -229,6 +231,7 @@ import { http } from '@/api/http'
 import { loadDefaultExercises, getCachedDefaultExercises } from '@/utils/defaultExercisesLoader'
 import { buildWorkoutBuilderRoute, normalizeBuilderWorkoutType, QUICK_PREFILL_KEY, DETAIL_DRAFT_KEY, saveWorkoutBuilderPrefill, getDetailDraftKey as buildDetailDraftKey } from '@/utils/workoutBuilderFlow'
 import { hasActiveDraft, getActiveDraft, clearActiveDraft } from '@/utils/activeWorkoutDraft'
+import { purgePendingCreateQueueForWorkoutId, markWorkoutDeleted } from '@/utils/offlineStorage'
 import {
   getFavoritesByType,
   renameFavoriteWorkout,
@@ -243,6 +246,8 @@ import WorkoutCard from "../components/WorkoutCard.vue";
 import AppModal from "../components/AppModal.vue";
 import WorkoutTimerConfig from '@/components/timer/WorkoutTimerConfig.vue'
 import { logger } from '@/utils/logger'
+import SessionStopwatch from '@/components/SessionStopwatch.vue'
+
 
 const store = useUserStore()
 const settings = useSettingsStore()
@@ -250,7 +255,7 @@ const { t: $t, locale } = useI18n()
 const router = useRouter()
 const { getIdToken, onAuthStateChanged, getCurrentUser } = useFirebaseAuth()
 const authStore = useAuthStore()
-
+const draftStateVersion = ref(0)
 const user = ref(null)
 const isSignedIn = ref(false)
 const selectedWorkoutType = ref('push')
@@ -289,6 +294,7 @@ function getActiveDraftUserId() {
 }
 
 const activeDraftState = computed(() => {
+  void draftStateVersion.value // erzwingt Neuberechnung bei manuellem Trigger
   const uid = getActiveDraftUserId()
   if (!uid || !hasActiveDraft(uid)) return null
   const draft = getActiveDraft(uid)
@@ -363,6 +369,10 @@ function logDraftSourceOnce() {
   })
 
   draftSourceLogged.value = true
+}
+
+function onSessionTime({ totalMs, formattedTime }) {
+  console.log('Session-Zeit:', formattedTime, totalMs)
 }
 
 const weeklyGoal = computed(() => Number(settings.weeklyGoal) || 4)
@@ -833,9 +843,11 @@ function openWorkoutInfo(type) {
 }
 
 async function discardDraft() {
+  showDiscardDraftConfirm.value = false
   // Aktiven Draft aus localStorage entfernen (verhindert Re-Anzeige des Banners)
   const uid = getActiveDraftUserId()
   if (uid) clearActiveDraft(uid)
+  draftStateVersion.value++
   // Sammle alle IDs die mit dem aktuellen Draft zusammenhängen können:
   // 1. workout_map_{tempId} → realId (Server-Workout, vom WorkoutBuilder erzeugt)
   // 2. detailDraft._id wenn echte ObjectId (nach router.replace)
@@ -843,22 +855,31 @@ async function discardDraft() {
   // Alle IDs werden BEDINGUNGSLOS gesammelt – wenn der Delete-Button sichtbar ist,
   // kann kein completed Workout betroffen sein.
   const serverDraftIds = new Set()
+  const pendingCreateTempIds = new Set()
   try {
     Object.keys(sessionStorage)
       .filter(k => k.startsWith('workout_map_'))
       .forEach(k => {
         const realId = String(sessionStorage.getItem(k) || '').trim()
         if (realId && /^[a-f\d]{24}$/i.test(realId)) serverDraftIds.add(realId)
+        const tempId = k.slice('workout_map_'.length).trim()
+        if (tempId) pendingCreateTempIds.add(tempId)
       })
     // detailDraft selbst kann bereits eine echte MongoDB-ID sein (nach router.replace)
     const draftObjId = String(detailDraft.value?._id || '').trim()
     if (draftObjId && /^[a-f\d]{24}$/i.test(draftObjId)) serverDraftIds.add(draftObjId)
+    if (draftObjId && (draftObjId.startsWith('draft-') || draftObjId.startsWith('offline_'))) {
+      pendingCreateTempIds.add(draftObjId)
+    }
     // Alle Draft-Workouts im Store mit echter ObjectId ebenfalls erfassen
     ;(store.workouts || [])
       .filter(w => (w?._isDraft === true || w?.isDraft === true) && w?.completed !== true)
       .forEach(w => {
         const id = String(w?._id || '').trim()
         if (id && /^[a-f\d]{24}$/i.test(id)) serverDraftIds.add(id)
+        if (id && (id.startsWith('draft-') || id.startsWith('offline_'))) {
+          pendingCreateTempIds.add(id)
+        }
       })
   } catch {}
 
@@ -1057,7 +1078,7 @@ onActivated(async () => {
 
 .hero-title {
   margin: 6px 0 0;
-  font-size: clamp(1.9rem, 3.6vw, 2.5rem);
+  /* font-size: clamp(1.9rem, 3.6vw, 2.5rem); */
   font-weight: 900;
   color: var(--fg-strong);
   text-align: center;

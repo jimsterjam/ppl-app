@@ -109,7 +109,8 @@ onBeforeUnmount(() => {
 <style scoped>
 .session-stopwatch {
   position: relative;
-  display: inline-flex;
+  display: flex;
+  width: 100%;
 }
 
 /* Trigger */
@@ -117,28 +118,32 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 14px;
+  padding: 16px 16px;
   border-radius: 10px;
-  border: 1px solid var(--card-border);
-  background: transparent;
-  color: var(--fg);
-  font-size: 0.88rem;
+  border: none;
+  background: #dc2626;
+  color: #ffffff;
+  font-size: 1.05rem;
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
   white-space: nowrap;
-  transition: border-color 0.15s, color 0.15s;
+  transition: background-color 0.15s;
+  width: 100%;
 }
 
 .sw-trigger--running {
-  color: var(--accent);
+  color: #ffffff;
   border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: #b91c1c;
   font-variant-numeric: tabular-nums;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 .sw-trigger--paused {
   color: color-mix(in srgb, var(--fg) 50%, transparent);
+  background: #7f1d1d;
+  color: #ffffff;
   font-variant-numeric: tabular-nums;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }

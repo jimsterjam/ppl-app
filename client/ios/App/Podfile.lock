@@ -15,8 +15,6 @@ PODS:
     - Capacitor
   - CapacitorCommunityKeepAwake (7.1.0):
     - Capacitor
-  - CapacitorCommunityTextToSpeech (6.1.0):
-    - Capacitor
   - CapacitorCordova (7.4.4)
   - CapacitorFilesystem (7.1.7):
     - Capacitor
@@ -44,7 +42,6 @@ DEPENDENCIES:
   - "CapacitorCamera (from `../../node_modules/@capacitor/camera`)"
   - "CapacitorCommunityAppleSignIn (from `../../node_modules/@capacitor-community/apple-sign-in`)"
   - "CapacitorCommunityKeepAwake (from `../../node_modules/@capacitor-community/keep-awake`)"
-  - "CapacitorCommunityTextToSpeech (from `../../node_modules/@capacitor-community/text-to-speech`)"
   - "CapacitorCordova (from `../../node_modules/@capacitor/ios`)"
   - "CapacitorFilesystem (from `../../node_modules/@capacitor/filesystem`)"
   - "CapacitorLocalNotifications (from `../../node_modules/@capacitor/local-notifications`)"
@@ -70,8 +67,6 @@ EXTERNAL SOURCES:
     :path: "../../node_modules/@capacitor-community/apple-sign-in"
   CapacitorCommunityKeepAwake:
     :path: "../../node_modules/@capacitor-community/keep-awake"
-  CapacitorCommunityTextToSpeech:
-    :path: "../../node_modules/@capacitor-community/text-to-speech"
   CapacitorCordova:
     :path: "../../node_modules/@capacitor/ios"
   CapacitorFilesystem:
@@ -90,7 +85,6 @@ SPEC CHECKSUMS:
   CapacitorCamera: 6746827d82376f31cea9224945c0458c9fd0b0b2
   CapacitorCommunityAppleSignIn: 271cb2860576fd2961508bbfa7a82117d93eadca
   CapacitorCommunityKeepAwake: 05c75aab989f60e621870cf03b24a144a5544c30
-  CapacitorCommunityTextToSpeech: 28e4eaf26995ce7ab710480267841c57ef5eded2
   CapacitorCordova: bf648a636f3c153f652d312ae145fb508b6ffced
   CapacitorFilesystem: 0eca3d4415737d22f70ab73dd446f5d6b2c809c9
   CapacitorLocalNotifications: 2e3f5b717ec9cd2bd64d93c99a9470941e1c80be
@@ -101,6 +95,6 @@ SPEC CHECKSUMS:
   IONFilesystemLib: 89258b8e3e85465da93127d25d7ce37f977e8a6f
   SouthdevsCapacitorGoogleAuth: 6488c21faed47c2cf72404bfbfc0fe0e9af766bc
 
-PODFILE CHECKSUM: 154190d8c6dede93d98608905febaea0a0585871
+PODFILE CHECKSUM: 08c89ce6bba4d88423f94dfe38bce67cff69ffea
 
 COCOAPODS: 1.16.2

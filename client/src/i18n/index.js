@@ -40,7 +40,7 @@ export const messages = {
       today: 'Heute',
       
       
-      unknownDuration: 'Dauer unbekannt',
+      unknownDuration: '?',
       more: 'weitere',
       select: 'Auswählen'
     },
@@ -668,13 +668,12 @@ export const messages = {
       created: 'Erstellt',
       status: 'Status',
       completed: 'Abgeschlossen',
-      repeatTitle: 'Workout wiederholen',
       editTitle: 'Workout bearbeiten',
       deleteTitle: 'Workout löschen',
       detailsTitle: 'Details anzeigen',
       deleteConfirm: 'Workout "{name}" wirklich löschen?',
       deleteFailed: 'Workout konnte nicht gelöscht werden.',
-      unknownDuration: 'Dauer unbekannt'
+      unknownDuration: '?'
     },
     welcome: {
       title: 'Push-Pull-Legs!\n',
@@ -1417,7 +1416,6 @@ export const messages = {
       created: 'Created',
       status: 'Status',
       completed: 'Completed',
-      repeatTitle: 'Repeat workout',
       editTitle: 'Edit workout',
       deleteTitle: 'Delete workout',
       detailsTitle: 'Show details',

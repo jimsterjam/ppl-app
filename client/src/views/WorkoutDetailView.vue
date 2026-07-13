@@ -16,8 +16,8 @@
 
       <div v-else class="workout">
         <div class="workout-header">
-          <h2>{{ workout.name }}</h2>
-          <div class="meta">
+        <h2>{{ workout.name }}</h2>
+        <div class="meta">
             <span class="badge">{{ workout.type?.toUpperCase() }}</span>
             <span>{{ formatDate(workout.date) }}</span>
             <span v-if="workout.completed" class="completed">✓</span>
@@ -640,6 +640,8 @@ import { logger } from '@/utils/logger'
 import { buildWorkoutNotesSummary } from '@/utils/workoutNotes'
 import { resolveRealIdFromDraftId as _resolveRealIdFromDraftId, snapshotCore } from '@/utils/workoutHelpers'
 import { saveWorkoutService } from '@/utils/SaveWorkoutService'
+import { useSessionStopwatchStore } from '@/stores/sessionStopwatch'
+import { purgePendingCreateQueueForWorkoutId } from '@/utils/offlineStorage'
 import {
   saveFavoriteWorkout,
   updateFavoriteWorkout,
@@ -662,6 +664,11 @@ function clearAllDetailDraftSnapshots() {
   } catch {}
 }
 
+function handleSessionTime({ totalMs, formattedTime }) {
+  console.log('Session-Zeit:', formattedTime, totalMs)
+  // später: Wert an SaveWorkoutService übergeben
+}
+
 function clearAllWorkoutMapKeys() {
   try {
     const keys = Object.keys(sessionStorage)
@@ -673,27 +680,7 @@ function clearAllWorkoutMapKeys() {
   } catch {}
 }
 
-async function purgePendingCreateQueueForWorkoutId(workoutId) {
-  const id = String(workoutId || '').trim()
-  if (!id) return
-  try {
-    const all = await db.syncQueue.toArray()
-    const removeIds = all
-      .filter((item) => {
-        if (!item || item.synced === true || item.failed === true) return false
-        if (item.entityType !== 'workout' || item.action !== 'create') return false
-        return String(item?.data?._id || '').trim() === id
-      })
-      .map((item) => item.id)
 
-    if (removeIds.length) {
-      await db.syncQueue.bulkDelete(removeIds)
-      logger.debug('[WorkoutDetail] pending create queue entries removed', { workoutId: id, removed: removeIds.length })
-    }
-  } catch (err) {
-    logger.warn('[WorkoutDetail] pending create queue cleanup failed', { workoutId: id, message: err?.message || err })
-  }
-}
 
 async function postSaveCleanup() {
   clearActiveDraftForCurrentUser('post-save')
@@ -786,6 +773,7 @@ const didAutoScroll = ref(false)
 let initialSnapshot = ''
 const showLeaveModal = ref(false)
 const showTimerConfig = ref(false)
+const sessionStopwatchStore = useSessionStopwatchStore()
 
 // Notiz-Logik
 const showNote = ref([])
@@ -1749,6 +1737,39 @@ async function discardDraftAndLeave() {
       const idx = store.workouts.findIndex(w => String(w?._id || '') === routeId)
       if (idx !== -1) store.workouts.splice(idx, 1)
     } catch {}
+    // Wenn ein draft-* bereits eine echte Server-ID hat, diese ebenfalls löschen
+    try {
+      const mappedReal = await resolveRealIdFromDraftId(routeId)
+      if (mappedReal) {
+        const tk = await getIdToken().catch(() => null)
+        deleteWorkoutApi(mappedReal, tk).catch(() => null)
+        try {
+          const midx = store.workouts.findIndex(w => String(w?._id || '') === mappedReal)
+          if (midx !== -1) store.workouts.splice(midx, 1)
+        } catch {}
+      }
+    } catch {}
+  } else if (routeId && !isFavoriteAdjustMode.value) {
+    // Echte MongoDB-ID nur löschen wenn es ein frisch erstelltes, noch nicht abgeschlossenes Workout
+    // ist (z. B. Background-Create aus WorkoutBuilder lief durch, User cancelt danach).
+    // Ein bereits abgeschlossenes Workout (completed=true) wird NICHT gelöscht – der User hat
+    // lediglich Änderungen verworfen, der ursprüngliche Datensatz auf dem Server bleibt erhalten.
+    const isOrphanNewWorkout =
+      workout.value?.completed !== true &&
+      (String(route.query?.created || '') === '1' ||
+        workout.value?._isDraft === true ||
+        workout.value?.isDraft === true)
+    if (isOrphanNewWorkout) {
+      try {
+        const tk = await getIdToken().catch(() => null)
+        deleteWorkoutApi(routeId, tk).catch(() => null)
+      } catch {}
+      try {
+        const idx = store.workouts.findIndex(w => String(w?._id || '') === routeId)
+        if (idx !== -1) store.workouts.splice(idx, 1)
+      } catch {}
+      try { await db.workouts.delete(routeId) } catch {}
+    }
   }
   timerStore.reset()
   bypassTimerLeaveGuard.value = true
@@ -1771,11 +1792,11 @@ function goDashboard() {
     showLeaveModal.value = true
     return
   }
-  if (timerStore.isRunningLike) {
-    pendingTimerAction.value = { kind: 'dashboard' }
-    showTimerActionModal.value = true
-    return
-  }
+  // if (timerStore.isRunningLike) {
+  //   pendingTimerAction.value = { kind: 'dashboard' }
+  //   showTimerActionModal.value = true
+  //   return
+  // }
   discardDraftAndLeave()
 }
 
@@ -1787,11 +1808,11 @@ function confirmLeave() {
     router.push('/dashboard')
     return
   }
-  if (timerStore.isRunningLike) {
-    pendingTimerAction.value = { kind: 'dashboard' }
-    showTimerActionModal.value = true
-    return
-  }
+  // if (timerStore.isRunningLike) {
+  //   pendingTimerAction.value = { kind: 'dashboard' }
+  //   showTimerActionModal.value = true
+  //   return
+  // }
   discardDraftAndLeave()
 }
 
@@ -1817,6 +1838,12 @@ async function applyPendingTimerAction() {
 }
 
 async function onTimerDecision(mode) {
+  if (mode === 'continue') {
+    // "Weiterlaufen": Aktion abbrechen, Training fortsetzen
+    pendingTimerAction.value = null
+    showTimerActionModal.value = false
+    return
+  }
   if (mode === 'pause' && timerStore.isRunning) {
     timerStore.pause()
   } else if (mode === 'stop') {
@@ -2111,12 +2138,17 @@ function onSessionTime({ totalMs, formattedTime }) {
   }
 }
 
+// Voraussetzung (oben im <script setup>, bei den anderen Store-Imports):
+// import { useSessionStopwatchStore } from '@/stores/sessionStopwatch'
+// const sessionStopwatchStore = useSessionStopwatchStore()
+
 async function performSaveWorkout() {
   if (saving.value) return // Guard gegen Doppel-Aufruf
   // Sofort setzen – schliesst das Race-Window zwischen Guard-Check und erstem await.
   // triggerAutoSave() und runAutoSaveNow() prüfen saving.value als primären Guard,
   // daher muss es vor cancelPendingAutoSave() und vor dem ersten await stehen.
   saving.value = true
+  suppressDraftPersistence.value = true
   // Race-Fix: Warte auf ausstehende Auto-Save-Promises bevor wir weitermachen (Race 2),
   // um zu verhindern dass parallele saveDraft() + updateWorkout() um die gleiche ID konkurrieren
   if (autoSaveWaiters.length > 0) {
@@ -2130,7 +2162,9 @@ async function performSaveWorkout() {
     saveError.value = false
     const id = route.params.id
     const w = workout.value || {}
-    const timerElapsedSeconds = Math.max(0, Math.round((Number(timerStore.elapsedMs) || 0) / 1000))
+    // Gesamttrainingsdauer kommt aus der Session-Stoppuhr (SessionStopwatch/Pinia-Store),
+    // nicht mehr aus dem Pausen-Timer (timerStore) – der lief nur stückweise pro Satz.
+    const timerElapsedSeconds = Math.max(0, Math.round((Number(sessionStopwatchStore.elapsedMs) || 0) / 1000))
     const timerDurationMinutes = timerElapsedSeconds > 0 ? Math.max(1, Math.round(timerElapsedSeconds / 60)) : 0
     const existingDuration = Number(w.duration) || 0
     const finalDurationMinutes = timerDurationMinutes > 0 ? timerDurationMinutes : existingDuration
@@ -2261,89 +2295,91 @@ async function performSaveWorkout() {
     }
 
     if (String(id).startsWith('draft-')) {
-  const token = await getIdToken().catch(() => null)
-  const realId = await waitForRealIdFromDraftId(id)
+      const token = await getIdToken().catch(() => null)
+      const realId = await waitForRealIdFromDraftId(id)
 
-  if (realId) {
-    await store.updateWorkout(realId, normalized, token)
-    syncStartedFavoriteFromWorkout({ ...normalized, _id: realId })
-    saveMsg.value = finalDurationMinutes > 0 ? `Gespeichert. Dauer: ${finalDurationMinutes} min` : 'Gespeichert.'
-    if (String(route.query?.favoriteStart || '') === '1') {
-      saveMsg.value += ' · Favorit aktualisiert'
-      try { localStorage.removeItem(`fav_prefill_applied_v1_${realId}`) } catch {}
+      if (realId) {
+        await store.updateWorkout(realId, normalized, token)
+        syncStartedFavoriteFromWorkout({ ...normalized, _id: realId })
+        saveMsg.value = finalDurationMinutes > 0 ? `Gespeichert. Dauer: ${finalDurationMinutes} min` : 'Gespeichert.'
+        if (String(route.query?.favoriteStart || '') === '1') {
+          saveMsg.value += ' · Favorit aktualisiert'
+          try { localStorage.removeItem(`fav_prefill_applied_v1_${realId}`) } catch {}
+        }
+        saveError.value = false
+        initialSnapshot = snapshotCore({ ...normalized, _id: realId })
+        try { await db.workouts.delete(id) } catch {}
+        try {
+          const idx = store.workouts.findIndex(wi => String(wi?._id || '') === String(id))
+          if (idx !== -1) store.workouts.splice(idx, 1)
+        } catch {}
+        store.invalidateStatsCache()
+        await postSaveCleanup()
+        timerStore.reset()
+        sessionStopwatchStore.reset()
+        bypassTimerLeaveGuard.value = true
+        goToPostWorkoutSummary(realId)
+        return
+      }
+
+      // realId nicht gefunden: Create-Pfad als Fallback (Background-Create hat evtl. versagt).
+      const createPayload = {
+        ...normalized,
+        userId: normalized.userId || resolveActiveWorkoutUserId() || undefined,
+        _isDraft: false,
+        isDraft: false,
+        completed: true
+      }
+
+      let savedWorkout = null
+      try {
+        savedWorkout = await store.createWorkout(createPayload, token)
+      } catch (createError) {
+        const status = Number(createError?.statusCode || createError?.response?.status || 0)
+        const code = String(createError?.code || '').toUpperCase()
+        const transient = !status || [408, 425, 429, 500, 502, 503, 504].includes(status) || code === 'ERR_NETWORK' || code === 'ECONNABORTED'
+        if (transient) {
+          logger.warn('[WorkoutDetail] createWorkout transient fehlgeschlagen, nutze optimistischen Fallback', createError)
+          savedWorkout = await store.createWorkoutOptimistic(createPayload, token).catch(() => null)
+          if (!savedWorkout) throw createError
+        } else {
+          logger.warn('[WorkoutDetail] createWorkout nicht-retrybar fehlgeschlagen, bewahre Workout lokal auf', createError)
+          savedWorkout = await store.createWorkoutOptimistic({
+            ...createPayload,
+            _syncPendingAuth: status === 401 || status === 403
+          }, token).catch(() => null)
+          if (!savedWorkout) throw createError
+          saveMsg.value = status === 401 || status === 403
+            ? 'Lokal gespeichert. Sync startet nach erneuter Anmeldung.'
+            : 'Lokal gespeichert. Sync wird erneut versucht.'
+          saveError.value = false
+        }
+      }
+
+      try { await db.workouts.delete(id) } catch {}
+      try {
+        const idx = store.workouts.findIndex(wi => String(wi?._id || '') === String(id))
+        if (idx !== -1) store.workouts.splice(idx, 1)
+      } catch {}
+
+      store.invalidateStatsCache()
+      syncStartedFavoriteFromWorkout({ ...createPayload, _id: savedWorkout?._id || id })
+      if (!saveMsg.value) {
+        saveMsg.value = finalDurationMinutes > 0 ? `Gespeichert. Dauer: ${finalDurationMinutes} min` : 'Gespeichert.'
+        saveError.value = false
+      }
+      if (String(route.query?.favoriteStart || '') === '1') {
+        saveMsg.value += ' · Favorit aktualisiert'
+        try { localStorage.removeItem(`fav_prefill_applied_v1_${savedWorkout?._id || id}`) } catch {}
+      }
+      initialSnapshot = snapshotCore({ ...createPayload, _id: savedWorkout?._id || id })
+      await postSaveCleanup()
+      timerStore.reset()
+      sessionStopwatchStore.reset()
+      bypassTimerLeaveGuard.value = true
+      goToPostWorkoutSummary(savedWorkout?._id || id)
+      return
     }
-    saveError.value = false
-    initialSnapshot = snapshotCore({ ...normalized, _id: realId })
-    try { await db.workouts.delete(id) } catch {}
-    try {
-      const idx = store.workouts.findIndex(wi => String(wi?._id || '') === String(id))
-      if (idx !== -1) store.workouts.splice(idx, 1)
-    } catch {}
-    store.invalidateStatsCache()
-    await postSaveCleanup()
-    timerStore.reset()
-    bypassTimerLeaveGuard.value = true
-    goToPostWorkoutSummary(realId)
-    return
-  }
-
-  // realId nicht gefunden: Create-Pfad als Fallback (Background-Create hat evtl. versagt).
-  const createPayload = {
-    ...normalized,
-    userId: normalized.userId || resolveActiveWorkoutUserId() || undefined,
-    _isDraft: false,
-    isDraft: false,
-    completed: true
-  }
-
-  let savedWorkout = null
-  try {
-    savedWorkout = await store.createWorkout(createPayload, token)
-  } catch (createError) {
-    const status = Number(createError?.statusCode || createError?.response?.status || 0)
-    const code = String(createError?.code || '').toUpperCase()
-    const transient = !status || [408, 425, 429, 500, 502, 503, 504].includes(status) || code === 'ERR_NETWORK' || code === 'ECONNABORTED'
-    if (transient) {
-      logger.warn('[WorkoutDetail] createWorkout transient fehlgeschlagen, nutze optimistischen Fallback', createError)
-      savedWorkout = await store.createWorkoutOptimistic(createPayload, token).catch(() => null)
-      if (!savedWorkout) throw createError
-    } else {
-      logger.warn('[WorkoutDetail] createWorkout nicht-retrybar fehlgeschlagen, bewahre Workout lokal auf', createError)
-      savedWorkout = await store.createWorkoutOptimistic({
-        ...createPayload,
-        _syncPendingAuth: status === 401 || status === 403
-      }, token).catch(() => null)
-      if (!savedWorkout) throw createError
-      saveMsg.value = status === 401 || status === 403
-        ? 'Lokal gespeichert. Sync startet nach erneuter Anmeldung.'
-        : 'Lokal gespeichert. Sync wird erneut versucht.'
-      saveError.value = false
-    }
-  }
-
-  try { await db.workouts.delete(id) } catch {}
-  try {
-    const idx = store.workouts.findIndex(wi => String(wi?._id || '') === String(id))
-    if (idx !== -1) store.workouts.splice(idx, 1)
-  } catch {}
-
-  store.invalidateStatsCache()
-  syncStartedFavoriteFromWorkout({ ...createPayload, _id: savedWorkout?._id || id })
-  if (!saveMsg.value) {
-    saveMsg.value = finalDurationMinutes > 0 ? `Gespeichert. Dauer: ${finalDurationMinutes} min` : 'Gespeichert.'
-    saveError.value = false
-  }
-  if (String(route.query?.favoriteStart || '') === '1') {
-    saveMsg.value += ' · Favorit aktualisiert'
-    try { localStorage.removeItem(`fav_prefill_applied_v1_${savedWorkout?._id || id}`) } catch {}
-  }
-  initialSnapshot = snapshotCore({ ...createPayload, _id: savedWorkout?._id || id })
-  await postSaveCleanup()
-  timerStore.reset()
-  bypassTimerLeaveGuard.value = true
-  goToPostWorkoutSummary(savedWorkout?._id || id)
-  return
-}
 
     let token = await getIdToken().catch(() => null)
     await store.updateWorkout(id, normalized, token)
@@ -2357,6 +2393,7 @@ async function performSaveWorkout() {
     initialSnapshot = snapshotCore({ ...w, ...normalized })
     await postSaveCleanup()
     timerStore.reset()
+    sessionStopwatchStore.reset()
     bypassTimerLeaveGuard.value = true
     goToPostWorkoutSummary(id)
   } catch (e) {
@@ -2854,11 +2891,11 @@ onBeforeRouteLeave(async (to) => {
     return true
   }
 
-  if (timerStore.isRunningLike) {
-    pendingTimerAction.value = { kind: 'route-leave', targetPath: to?.fullPath || '/dashboard' }
-    showTimerActionModal.value = true
-    return false
-  }
+  // if (timerStore.isRunningLike) {
+  //   pendingTimerAction.value = { kind: 'route-leave', targetPath: to?.fullPath || '/dashboard' }
+  //   showTimerActionModal.value = true
+  //   return false
+  // }
 
   return true
 })

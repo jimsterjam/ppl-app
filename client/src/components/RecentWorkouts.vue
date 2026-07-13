@@ -36,13 +36,6 @@
           
           <div class="workout-actions">
             <button 
-              class="action-btn repeat"
-              :title="t('recent.repeatTitle')"
-              @click.stop="repeatWorkout(workout)"
-            >
-              🔄
-            </button>
-            <button 
               class="action-btn edit"
               :title="t('recent.editTitle')"
               @click.stop="viewWorkout(workout)"
@@ -55,13 +48,6 @@
               @click.stop="deleteWorkoutItem(workout)"
             >
               🗑️
-            </button>
-            <button 
-              class="action-btn expand"
-              :class="{ 'expanded': expandedWorkout === workout._id }"
-              :title="t('recent.detailsTitle')"
-            >
-              {{ expandedWorkout === workout._id ? '▲' : '▼' }}
             </button>
           </div>
         </div>

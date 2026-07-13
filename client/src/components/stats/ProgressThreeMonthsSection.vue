@@ -24,6 +24,11 @@
         <p class="metric-label">Gesamtvolumen</p>
         <p class="metric-value">{{ totalVolumeLabel }}</p>
       </article>
+
+      <article class="metric-card">
+        <p class="metric-label">Ø Trainingsdauer</p>
+        <p class="metric-value">{{ avgDurationLabel }}</p>
+      </article>
     </div>
 
     <div v-if="hasData" class="trend-grid">
@@ -80,6 +85,7 @@ const normalizedWorkouts = computed(() => {
       return {
         raw: workout,
         timestamp: ts,
+        duration: Number(workout?.duration) || 0,
         volume: calcWorkoutVolume(workout)
       }
     })
@@ -103,6 +109,29 @@ const totalVolume = computed(() => {
 })
 
 const totalVolumeLabel = computed(() => `${formatCompactNumber(totalVolume.value)} kg`)
+
+// Nur Workouts mit tatsächlich erfasster Dauer berücksichtigen, damit alte
+// Einträge ohne duration-Wert (0) den Durchschnitt nicht künstlich verzerren.
+const workoutsWithDuration = computed(() => {
+  return normalizedWorkouts.value.filter((item) => item.duration > 0)
+})
+
+const avgDurationMinutes = computed(() => {
+  if (!workoutsWithDuration.value.length) return 0
+  const total = workoutsWithDuration.value.reduce((sum, item) => sum + item.duration, 0)
+  return total / workoutsWithDuration.value.length
+})
+
+const avgDurationLabel = computed(() => {
+  if (!workoutsWithDuration.value.length) return '—'
+  const minutes = Math.round(avgDurationMinutes.value)
+  if (minutes >= 60) {
+    const h = Math.floor(minutes / 60)
+    const m = minutes % 60
+    return m > 0 ? `${h} h ${m} min` : `${h} h`
+  }
+  return `${minutes} min`
+})
 
 const firstHalf = computed(() => {
   return normalizedWorkouts.value.filter((item) => item.timestamp >= windowStart && item.timestamp < halfSplit)

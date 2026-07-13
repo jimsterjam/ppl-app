@@ -69,6 +69,43 @@ export function markWorkoutDeleted(id) {
   writeDeletedWorkoutTombstones(next)
 }
 
+// ── Neue Funktion, in src/utils/offlineStorage.js einfügen ────────────────────
+// (z.B. direkt nach markWorkoutDeleted/isWorkoutDeleted/filterDeletedWorkouts,
+// da sie ebenfalls db.syncQueue anfasst)
+
+/**
+ * Entfernt ausstehende 'create'-Sync-Queue-Einträge für eine Workout-ID
+ * (typischerweise eine temporäre ID wie 'draft-xxx' oder 'offline_xxx').
+ * Verhindert, dass ein bereits vom User gelöschter Draft durch einen noch
+ * ausstehenden Sync-Job erneut auf dem Server angelegt wird.
+ *
+ * @param {string} workoutId - temporäre oder finale Workout-ID
+ * @returns {Promise<number>} Anzahl entfernter Queue-Einträge
+ */
+  export async function purgePendingCreateQueueForWorkoutId(workoutId) {
+    const id = String(workoutId || '').trim()
+    if (!id) return 0
+    try {
+      const all = await db.syncQueue.toArray()
+      const removeIds = all
+        .filter((item) => {
+          if (!item || item.synced === true || item.failed === true) return false
+          if (item.entityType !== 'workout' || item.action !== 'create') return false
+          return String(item?.data?._id || '').trim() === id
+        })
+        .map((item) => item.id)
+
+      if (removeIds.length) {
+        await db.syncQueue.bulkDelete(removeIds)
+        logger.debug('🧹 Offline Storage - Pending create queue entries removed', { workoutId: id, removed: removeIds.length })
+      }
+      return removeIds.length
+    } catch (err) {
+      logger.warn('⚠️ Offline Storage - pending create queue cleanup failed', { workoutId: id, message: err?.message || err })
+      return 0
+    }
+  }
+
 /**
  * Entfernt Tombstones für IDs die vom Server bestätigt wurden.
  * Wenn der Server ein Workout zurückgibt, ist es definitiv nicht gelöscht.

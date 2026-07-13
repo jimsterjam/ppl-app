@@ -66,6 +66,12 @@
 	</dict>
 	</array>
 
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Diese App benötigt Zugriff auf deine Fotobibliothek, um ein Profilbild auszuwählen.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Diese App möchte Fotos in deiner Bibliothek speichern.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Diese App benötigt Zugriff auf die Kamera, um ein Profilfoto aufzunehmen.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

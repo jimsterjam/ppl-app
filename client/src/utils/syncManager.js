@@ -22,6 +22,7 @@ import {
 import { logger } from './logger'
 import { createWorkout, updateWorkout, deleteWorkout } from '@/api/workouts'
 import { clearTokenCache, getAuthToken, parseUidFromToken } from './authToken'
+import { isWorkoutDeleted } from '@/utils/offlineStorage'
 
 // Max Retry Attempts für fehlgeschlagene Syncs
 const MAX_RETRY_ATTEMPTS = 3
@@ -343,10 +344,22 @@ async function syncWorkoutAction(action, data, token) {
   switch (action) {
     case 'create': {
       const createData = { ...data }
+ 
       // Temporäre _id für Reconciliation merken und entfernen
       const tempId = (typeof createData._id === 'string' && (createData._id.startsWith('offline_') || createData._id.startsWith('draft-')))
         ? createData._id
         : null
+ 
+      // Tombstone-Check: Falls dieser Draft zwischenzeitlich vom User gelöscht
+      // wurde (z.B. über discardDraft im Dashboard), darf der Create-Request
+      // nicht mehr ausgeführt werden – sonst taucht das gelöschte Workout
+      // wieder in den Stats auf, obwohl der User es explizit verworfen hat.
+      const tombstoneCandidate = tempId || String(createData._id || '').trim()
+      if (tombstoneCandidate && isWorkoutDeleted(tombstoneCandidate)) {
+        logger.debug('🪦 Sync - Create-Job für tombstoned Workout übersprungen:', tombstoneCandidate)
+        break
+      }
+ 
       if (tempId) {
         logger.debug('🔄 Sync - Entferne temporäre _id:', createData._id)
         delete createData._id
@@ -356,7 +369,7 @@ async function syncWorkoutAction(action, data, token) {
       delete createData._offlineUpdated
       delete createData._failedOnline
       delete createData._syncedAt
-
+ 
       logger.debug('🔄 Sync - Bereinigte Daten für API:', {
         hasId: !!createData._id,
         name: createData.name,
@@ -366,7 +379,7 @@ async function syncWorkoutAction(action, data, token) {
       
       const createdWorkout = await createWorkout(createData, token, { skipOfflineQueue: true })
       logger.debug('✅ Sync - Workout erstellt mit neuer _id:', createdWorkout._id)
-
+ 
       // Reconciliation: offline_xxx durch echten Server-Eintrag ersetzen
       if (tempId) {
         try {
@@ -401,6 +414,12 @@ async function syncWorkoutAction(action, data, token) {
       
       // Bei temporären lokalen IDs (offline_/draft-) muss ein Create passieren.
       if (data._id && typeof data._id === 'string' && (data._id.startsWith('offline_') || data._id.startsWith('draft-'))) {
+        // Tombstone-Check: Auch hier kann der Draft zwischenzeitlich gelöscht
+        // worden sein, bevor dieser Update-zu-Create-Job zum Zug kam.
+        if (isWorkoutDeleted(data._id)) {
+          logger.debug('🪦 Sync - Update→Create-Job für tombstoned Workout übersprungen:', data._id)
+          break
+        }
         logger.warn('⚠️ Sync - Update mit temp_id gefunden, konvertiere zu Create', { id: data._id })
         delete updateData._id
         const createdWorkout = await createWorkout(updateData, token, { skipOfflineQueue: true })

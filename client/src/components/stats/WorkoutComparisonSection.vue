@@ -11,7 +11,10 @@
         class="type-card"
       >
         <summary class="card-summary">
-          <h4>{{ entry.label }}</h4>
+          <div class="summary-heading">
+            <h4>{{ entry.label }}</h4>
+            <span v-if="entry.avgDurationLabel" class="avg-duration-badge">Ø {{ entry.avgDurationLabel }}</span>
+          </div>
           <p class="date-line">{{ formatDate(entry.comparison.currentDate) }} vs. {{ formatDate(entry.comparison.previousDate) }}</p>
         </summary>
 
@@ -79,11 +82,32 @@ const comparisonEntries = computed(() => {
       return {
         key: entry.key,
         label,
-        comparison
+        comparison,
+        avgDurationLabel: calcAvgDurationLabel(sourceWorkouts)
       }
     })
     .filter((entry) => entry.comparison !== null)
 })
+
+// Durchschnittliche Trainingsdauer über alle abgeschlossenen Workouts dieses Typs
+// (nicht nur die zwei verglichenen Einträge) – nur Workouts mit erfasster duration
+// fließen ein, damit alte Einträge ohne Wert den Schnitt nicht verfälschen.
+function calcAvgDurationLabel(workouts) {
+  const durations = (Array.isArray(workouts) ? workouts : [])
+    .filter((w) => w?.completed === true)
+    .map((w) => Number(w?.duration) || 0)
+    .filter((d) => d > 0)
+
+  if (!durations.length) return ''
+
+  const avgMinutes = Math.round(durations.reduce((sum, d) => sum + d, 0) / durations.length)
+  if (avgMinutes >= 60) {
+    const h = Math.floor(avgMinutes / 60)
+    const m = avgMinutes % 60
+    return m > 0 ? `${h} h ${m} min` : `${h} h`
+  }
+  return `${avgMinutes} min`
+}
 
 function isGerman() {
   return String(locale.value || 'de').toLowerCase().startsWith('de')
@@ -220,9 +244,23 @@ function directionArrow(direction) {
   display: none;
 }
 
+.summary-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .type-card h4 {
   margin: 0;
   font-size: 1rem;
+}
+
+.avg-duration-badge {
+  font-size: 0.78rem;
+  font-weight: 600;
+  opacity: 0.75;
+  white-space: nowrap;
 }
 
 .date-line {

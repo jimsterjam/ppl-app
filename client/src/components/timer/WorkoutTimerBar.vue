@@ -604,7 +604,7 @@ function updateOrientation() {
 }
 
 .timer-bar.running .timer-time {
-  color: #708219;
+  color: #94af16;
 }
 
 .timer-controls {
@@ -637,7 +637,7 @@ function updateOrientation() {
   width: var(--timer-icon-primary-size);
   height: var(--timer-icon-primary-size);
   background: var(--timer-primary-bg);
-  color: var(--timer-primary-fg);
+  /* color: var(--timer-primary-fg); */
   border-color: color-mix(in srgb, var(--accent) 92%, black 8%);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
 }
