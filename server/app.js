@@ -4,6 +4,7 @@ import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
 import workoutRoutes from "./routes/workouts.js";
+import customExerciseRoutes from "./routes/customExercises.js";
 import exerciseRoutes from "./routes/exercises.js";
 import subscriptionRoutes from "./routes/subscription.js";
 import accountRoutes from "./routes/account.js";
@@ -64,6 +65,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Routen einbinden
 app.use("/api/workouts", workoutRoutes);
+app.use("/api/custom-exercises", customExerciseRoutes);
 app.use("/api/exercises", exerciseRoutes);
 app.use("/api/subscription", subscriptionRoutes);
 app.use("/api/account", accountRoutes);
