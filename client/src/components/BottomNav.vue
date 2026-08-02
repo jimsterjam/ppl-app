@@ -34,11 +34,11 @@
 
 <script setup>
 import { useI18n } from 'vue-i18n'
-import { ref, onMounted, computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { ref, onMounted, onBeforeUnmount, computed } from 'vue'
 import { useUserStore } from '@/stores/userStore'
 import { useAuthStore } from '@/stores/authStore'
-import { hasActiveDraft, getActiveDraft } from '@/utils/activeWorkoutDraft'
+import { hasActiveDraft, getActiveDraft, ACTIVE_DRAFT_UPDATED_EVENT } from '@/utils/activeWorkoutDraft'
 import { Home, BarChart3, Dumbbell, HelpCircle, Settings, Timer } from 'lucide-vue-next'
 
 const { t } = useI18n()
@@ -46,7 +46,10 @@ const isIOS = ref(false)
 const store = useUserStore()
 const authStore = useAuthStore()
 const route = useRoute()
+const draftUpdateTrigger = ref(0)
+
 const activeWorkout = computed(() => {
+  void draftUpdateTrigger.value // erzwingt Neuberechnung bei Active-Draft-Änderungen
   const uid = String(authStore.user?.uid || authStore.uid || store.user?.uid || '').trim()
   if (!uid || !hasActiveDraft(uid)) return null
 
@@ -60,10 +63,19 @@ const activeWorkout = computed(() => {
   return { _id: workoutId, _isDraft: true, isDraft: true }
 })
 
+function onActiveDraftUpdated() {
+  draftUpdateTrigger.value++
+}
+
 onMounted(() => {
   // Detect iOS/iPhone Simulator
   isIOS.value = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
                 (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  window.addEventListener(ACTIVE_DRAFT_UPDATED_EVENT, onActiveDraftUpdated)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener(ACTIVE_DRAFT_UPDATED_EVENT, onActiveDraftUpdated)
 })
 
 const links = [

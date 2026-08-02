@@ -20,19 +20,32 @@ import { logger } from './logger'
 
 const STORAGE_KEY_PREFIX = 'active_workout_'
 
-/**
- * @param {string} uid - User ID
- * @returns {string} localStorage key for this user's active draft
- */
+// Event-Name, auf den Components (BottomNav, DashboardView, ...) lauschen können,
+// um reaktiv auf Änderungen am Active-Draft-localStorage zu reagieren.
+export const ACTIVE_DRAFT_UPDATED_EVENT = 'active-draft-updated'
+
+// Debounce-Timer: verhindert, dass bei schnell aufeinanderfolgenden Writes
+// (z.B. loadWorkout + deep-watch + WorkoutBuilder-Migration) mehrere synchrone
+// CustomEvent-Dispatches den Vue-Reaktivitätszyklus und WKWebView-Rendering überlasten.
+let _emitDebounceTimer = null
+
+function emitActiveDraftUpdated(detail = {}) {
+  if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') return
+  if (_emitDebounceTimer) clearTimeout(_emitDebounceTimer)
+  _emitDebounceTimer = setTimeout(() => {
+    _emitDebounceTimer = null
+    try {
+      window.dispatchEvent(new CustomEvent(ACTIVE_DRAFT_UPDATED_EVENT, { detail }))
+    } catch (err) {
+      logger.warn('[activeWorkoutDraft] Event dispatch failed:', err?.message)
+    }
+  }, 60)
+}
+
 function getStorageKey(uid) {
   return STORAGE_KEY_PREFIX + uid
 }
 
-/**
- * Reads the active workout draft for a user from localStorage
- * @param {string} uid - User ID
- * @returns {Object|null} { workout, editingWorkoutId, startedAt, lastModifiedAt } or null
- */
 export function getActiveDraft(uid) {
   if (!uid) return null
   try {
@@ -47,11 +60,6 @@ export function getActiveDraft(uid) {
   }
 }
 
-/**
- * Checks if an active draft exists for a user
- * @param {string} uid - User ID
- * @returns {boolean}
- */
 export function hasActiveDraft(uid) {
   if (!uid) return false
   try {
@@ -63,20 +71,12 @@ export function hasActiveDraft(uid) {
   }
 }
 
-/**
- * Creates or overwrites the active draft for a user
- * @param {string} uid - User ID
- * @param {Object} workout - Workout object (will be cloned)
- * @param {string|null} editingWorkoutId - Real MongoDB ID (null for new), or existing draft ID
- * @returns {boolean} true if successful
- */
 export function setActiveDraft(uid, workout, editingWorkoutId = null) {
   if (!uid || !workout) return false
   try {
     const key = getStorageKey(uid)
     const existing = getActiveDraft(uid)
 
-    // Preserve startedAt from existing draft, or use now
     const startedAt = existing?.startedAt || new Date().toISOString()
 
     const draft = {
@@ -92,6 +92,7 @@ export function setActiveDraft(uid, workout, editingWorkoutId = null) {
       editingWorkoutId,
       workoutId: workout?._id
     })
+    emitActiveDraftUpdated({ type: 'set', uid, workoutId: workout?._id || null })
     return true
   } catch (err) {
     logger.error('[activeWorkoutDraft] setActiveDraft error:', err?.message)
@@ -99,13 +100,6 @@ export function setActiveDraft(uid, workout, editingWorkoutId = null) {
   }
 }
 
-/**
- * Updates only the workout + lastModifiedAt in an existing draft
- * Does nothing if no draft exists for this user
- * @param {string} uid - User ID
- * @param {Object} workout - Updated workout object
- * @returns {boolean} true if successful, false if no draft exists or error
- */
 export function updateActiveDraft(uid, workout) {
   if (!uid || !workout) return false
   try {
@@ -127,6 +121,7 @@ export function updateActiveDraft(uid, workout) {
       uid,
       workoutId: workout?._id
     })
+    emitActiveDraftUpdated({ type: 'update', uid, workoutId: workout?._id || null })
     return true
   } catch (err) {
     logger.error('[activeWorkoutDraft] updateActiveDraft error:', err?.message)
@@ -134,17 +129,13 @@ export function updateActiveDraft(uid, workout) {
   }
 }
 
-/**
- * Removes the active draft for a user
- * @param {string} uid - User ID
- * @returns {boolean} true if successful
- */
 export function clearActiveDraft(uid) {
   if (!uid) return false
   try {
     const key = getStorageKey(uid)
     localStorage.removeItem(key)
     logger.debug('[activeWorkoutDraft] Draft cleared:', uid)
+    emitActiveDraftUpdated({ type: 'clear', uid })
     return true
   } catch (err) {
     logger.error('[activeWorkoutDraft] clearActiveDraft error:', err?.message)
@@ -152,21 +143,11 @@ export function clearActiveDraft(uid) {
   }
 }
 
-/**
- * Gets the workout object from an active draft (shorthand)
- * @param {string} uid - User ID
- * @returns {Object|null}
- */
 export function getActiveDraftWorkout(uid) {
   const draft = getActiveDraft(uid)
   return draft?.workout || null
 }
 
-/**
- * Gets the editingWorkoutId from an active draft (shorthand)
- * @param {string} uid - User ID
- * @returns {string|null}
- */
 export function getActiveDraftEditingId(uid) {
   const draft = getActiveDraft(uid)
   return draft?.editingWorkoutId || null

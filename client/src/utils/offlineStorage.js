@@ -28,6 +28,12 @@ db.version(1).stores({
   metadata: 'key'
 })
 
+db.version(2).stores({
+  // customExercises: vom User selbst angelegte Übungen, nur für ihn sichtbar.
+  // userId indiziert, damit getAllCustomExercisesOffline() effizient filtern kann.
+  customExercises: '_id, userId, muscleGroup, createdAt'
+})
+
 // Datenbank öffnen
 db.open().catch(err => {
   logger.error('❌ Offline Storage - Failed to open database:', err)
@@ -517,6 +523,105 @@ export async function cacheExercises(exercises) {
     return exercises.length
   } catch (error) {
     logger.error('❌ Offline Storage - Fehler beim Cachen Exercises:', error)
+    return 0
+  }
+}
+
+// ============================================================================
+// CUSTOM EXERCISES - Vom User selbst angelegte, nur für ihn sichtbare Übungen
+// ============================================================================
+ 
+/**
+ * Erzeugt eine neue lokale ID für eine eigene Übung.
+ * Analog zu 'draft-' / 'offline_' Präfixen bei Workouts, damit sie sich
+ * eindeutig von Server-IDs (Mongo ObjectId) und Default-Übungen unterscheidet.
+ * @returns {string}
+ */
+export function generateCustomExerciseId() {
+  return `custom_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+}
+ 
+/**
+ * Speichert eine eigene Übung lokal.
+ * @param {Object} exercise - { _id?, userId, name, muscleGroup, notes? }
+ * @returns {Promise<string>} Exercise ID
+ */
+export async function saveCustomExerciseOffline(exercise) {
+  try {
+    const cleanExercise = sanitizeForIndexedDB(exercise)
+    if (!cleanExercise._id) {
+      cleanExercise._id = generateCustomExerciseId()
+    }
+    if (!cleanExercise.createdAt) {
+      cleanExercise.createdAt = Date.now()
+    }
+    await db.customExercises.put({
+      ...cleanExercise,
+      _isCustom: true,
+      _syncedAt: Date.now()
+    })
+    logger.debug('💾 Offline Storage - Eigene Übung gespeichert:', cleanExercise._id)
+    emitOfflineWorkoutsUpdated({ type: 'custom-exercise-save', id: cleanExercise._id })
+    return cleanExercise._id
+  } catch (error) {
+    logger.error('❌ Offline Storage - Fehler beim Speichern eigener Übung:', error)
+    throw error
+  }
+}
+ 
+/**
+ * Lädt alle eigenen Übungen eines Users aus dem Offline Storage.
+ * @param {Object} filters - { userId } (empfohlen, um fremde Übungen auszuschließen)
+ * @returns {Promise<Array>}
+ */
+export async function getAllCustomExercisesOffline(filters = {}) {
+  try {
+    let query = db.customExercises.toCollection()
+    if (filters.userId) {
+      query = query.filter(ex => ex.userId === filters.userId)
+    }
+    const exercises = await query.toArray()
+    logger.debug('📦 Offline Storage - Eigene Übungen geladen:', exercises.length)
+    return exercises
+  } catch (error) {
+    logger.error('❌ Offline Storage - Fehler beim Laden eigener Übungen:', error)
+    return []
+  }
+}
+ 
+/**
+ * Löscht eine eigene Übung aus dem Offline Storage.
+ * @param {string} id - Exercise ID
+ * @returns {Promise<void>}
+ */
+export async function deleteCustomExerciseOffline(id) {
+  try {
+    await db.customExercises.delete(id)
+    logger.debug('🗑️ Offline Storage - Eigene Übung gelöscht:', id)
+    emitOfflineWorkoutsUpdated({ type: 'custom-exercise-delete', id })
+  } catch (error) {
+    logger.error('❌ Offline Storage - Fehler beim Löschen eigener Übung:', error)
+    throw error
+  }
+}
+ 
+/**
+ * Cached mehrere eigene Übungen gleichzeitig (nach Server-Sync).
+ * @param {Array} exercises
+ * @returns {Promise<number>}
+ */
+export async function cacheCustomExercises(exercises) {
+  try {
+    const cleanExercises = (Array.isArray(exercises) ? exercises : []).map(ex => ({
+      ...sanitizeForIndexedDB(ex),
+      _isCustom: true,
+      _syncedAt: Date.now()
+    }))
+    await db.customExercises.bulkPut(cleanExercises)
+    logger.debug('💾 Offline Storage - Eigene Übungen cached:', cleanExercises.length)
+    return cleanExercises.length
+  } catch (error) {
+    logger.error('❌ Offline Storage - Fehler beim Cachen eigener Übungen:', error)
     return 0
   }
 }

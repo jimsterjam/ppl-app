@@ -19,6 +19,7 @@ import { searchAndRankExercises } from '@/utils/exerciseSearch'
 import { consumeWorkoutBuilderPrefill, normalizeBuilderWorkoutType, readWorkoutBuilderRouteState, getDetailDraftKey } from '@/utils/workoutBuilderFlow'
 import { logger } from '@/utils/logger'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
+import { getActiveDraft, setActiveDraft } from '@/utils/activeWorkoutDraft'
 
 
 // --- State & Stores ---
@@ -382,6 +383,12 @@ async function createWorkout() {
 			updatedAt: Date.now()
 		};
 		await saveWorkoutOffline(tempWorkout);
+
+		// Active-Draft-Eintrag sofort anlegen, nicht erst bei einem späteren
+		// Lifecycle-Event (App-Hintergrund etc.). Ohne diesen Eintrag laufen
+		// alle nachfolgenden triggerAutoSave()-Aufrufe in WorkoutDetailView
+		// mangels existierendem Eintrag ins Leere.
+		setActiveDraft(userIdComputed.value, tempWorkout, null)
 		try {
 			sessionStorage.setItem(getDetailDraftKey(userIdComputed.value), JSON.stringify({
 				...tempWorkout,
@@ -398,113 +405,9 @@ async function createWorkout() {
 		await router.push({ name: 'workout-detail', params: { id: tempId }, query: buildFavoriteDetailQuery() });
 		logger.debug('[WorkoutBuilder] navigated to temp workout detail', { tempId })
 
-		let token = await getIdToken();
-		if (!token) {
-			errorMsg.value = t('builder.authLoading');
-			toast.success(t('builder.created'))
-			return;
-		}
-		logger.debug('[WorkoutBuilder] createWorkout start', {
-			tempId,
-			type: workoutData.type,
-			exercises: workoutData.exercises?.length || 0
-		})
-		toast.success(t('builder.created'));
-		// Backend-Speichern im Hintergrund
-		userStore.createWorkout(workoutData, token).then(async created => {
-			if (created?._id) {
-				// Wenn der User bereits weg navigiert ist, Server-Workout löschen statt Ghost-Draft anlegen
-				const currentRouteId = String(router.currentRoute.value?.params?.id || '')
-				const currentRouteName = String(router.currentRoute.value?.name || '')
-				if (currentRouteId !== tempId && currentRouteName !== 'workout-builder') {
-					logger.debug('[WorkoutBuilder] User hat Workout-Flow verlassen vor Create-Response – lösche Orphan:', created._id)
-					try {
-						// Aus Store entfernen (wurde in userStore.createWorkout als _isDraft:true eingetragen)
-						const orphanIdx = userStore.workouts.findIndex(w => String(w?._id || '') === String(created._id))
-						if (orphanIdx !== -1) userStore.workouts.splice(orphanIdx, 1)
-					} catch {}
-					try {
-						const tk = await getIdToken().catch(() => null)
-						if (tk) await deleteServerWorkout(created._id, tk).catch(() => null)
-						else await deleteWorkoutOffline(created._id).catch(() => null)
-					} catch {}
-					return
-				}
-				logger.debug('[WorkoutBuilder] backend create resolved', {
-					tempId,
-					realId: created._id
-				})
-				try { sessionStorage.setItem(`workout_map_${tempId}`, String(created._id)) } catch {}
-				// Mapping auch in IndexedDB persistieren (überlebt iOS App-Kill, sessionStorage nicht)
-				setMetadata(`workout_map_${tempId}`, String(created._id)).catch(() => {})
-				logger.debug('[WorkoutBuilder] temp->real mapping stored', { tempId, realId: created._id })
-				// Workout bleibt bis zum Abschluss als Draft markiert.
-				// WICHTIG: Kein blindes Überschreiben von IndexedDB/sessionStorage mit dem
-				// Template-Stand (cleanWorkout). Der User könnte in WorkoutDetail bereits Werte
-				// geändert haben. Nur speichern wenn noch kein neuerer Eintrag existiert.
-				const cleanWorkout = {
-					...workoutData,
-					_id: created._id,
-					userId: created.userId || workoutData.userId || userIdComputed.value,
-					_isDraft: true,
-					isDraft: true
-				};
-				const existingOffline = await getWorkoutOffline(created._id).catch(() => null)
-				if (!existingOffline) {
-					// Noch kein Eintrag unter dieser ID → erster Schreiber, sicher
-					await saveWorkoutOffline(cleanWorkout);
-					try {
-						sessionStorage.setItem(getDetailDraftKey(userIdComputed.value), JSON.stringify({
-							...cleanWorkout,
-							completed: false,
-							timestamp: Date.now()
-						}))
-					} catch {}
-					logger.debug('[WorkoutBuilder] real workout cached offline (initial)', { realId: created._id })
-				} else {
-					// WorkoutDetail hat die ID bereits übernommen und speichert aktuellere Daten –
-					// Template-Stand nicht zurückschreiben, damit User-Änderungen erhalten bleiben.
-					logger.debug('[WorkoutBuilder] real workout already in IndexedDB, skip overwrite', { realId: created._id })
-				}
-
-				try {
-					const idx = userStore.workouts.findIndex(w => String(w?._id || '') === String(created._id))
-					if (idx !== -1) {
-						userStore.workouts[idx] = { ...userStore.workouts[idx], _isDraft: true, isDraft: true, completed: false }
-					} else {
-						userStore.workouts.unshift({ ...created, _isDraft: true, isDraft: true, completed: false })
-					}
-				} catch {}
-
-				// Sofort auf echtes Workout umschalten (auch wenn Route noch nicht auf tempId aktualisiert wurde)
-				// currentRouteId/currentRouteName wurden bereits oben für den Abort-Check gesetzt
-				logger.debug('[WorkoutBuilder] route state before replace', { currentRouteName, currentRouteId, tempId })
-				if (currentRouteId === tempId || currentRouteName === 'workout-builder') {
-					await router.replace({
-						name: 'workout-detail',
-						params: { id: created._id },
-						query: buildFavoriteDetailQuery({ created: '1', realId: created._id })
-					})
-					logger.debug('[WorkoutBuilder] replaced to real workout detail', { realId: created._id })
-				}
-
-				// Temp-Draft erst löschen, wenn es nicht mehr aktiv angezeigt wird
-				setTimeout(async () => {
-					try {
-						const activeId = String(router.currentRoute.value?.params?.id || '')
-						if (activeId !== tempId) {
-							await deleteWorkoutOffline(tempId)
-							logger.debug('[WorkoutBuilder] temp workout deleted after handover', { tempId, activeId })
-						} else {
-							logger.warn('[WorkoutBuilder] temp workout not deleted because it is still active', { tempId, activeId })
-						}
-					} catch {}
-				}, 1500)
-			}
-		}).catch((err) => {
-			logger.error('[WorkoutBuilder] backend create failed', { tempId, message: err?.message })
-			toast.error(t('builder.createFailed') + (err?.message ? ': ' + err.message : ''));
-		});
+		toast.success(t('builder.created')
+		);
+		
 	} catch (e) {
 		let hint = '';
 		if (e && typeof e.message === 'string' && /Cannot access 'te' before initialization/.test(e.message)) {

@@ -35,6 +35,15 @@
           </div>
           
           <div class="workout-actions">
+            <button
+              class="action-btn favorite"
+              :class="{ active: isFavorited(workout) }"
+              :title="isFavorited(workout) ? t('recent.favorited') || 'Als Favorit gespeichert' : t('recent.favoriteTitle') || 'Als Favorit speichern'"
+              :disabled="favoriteSavingId === workout._id"
+              @click.stop="openFavoriteStar(workout)"
+            >
+              {{ isFavorited(workout) ? '★' : '☆' }}
+            </button>
             <button 
               class="action-btn edit"
               :title="t('recent.editTitle')"
@@ -182,11 +191,34 @@
         </div>
       </div>
     </div>
+
+    <!-- Favoriten-Namens-Modal -->
+    <AppModal
+      v-model="showFavoriteModal"
+      :title="t('recent.favoriteNameTitle') || 'Als Favorit speichern'"
+      :confirm-text="favoriteSavingId ? t('common.loading') : t('common.save')"
+      :cancel-text="t('common.cancel')"
+      :close-on-confirm="false"
+      type="info"
+      @confirm="confirmSaveFavorite"
+    >
+      <label class="favorite-modal-field">
+        <span>{{ t('recent.favoriteNamePlaceholder') || 'Name des Favoriten' }}</span>
+        <input
+          v-model="favoriteNameInput"
+          type="text"
+          maxlength="40"
+          :placeholder="t('recent.favoriteNamePlaceholder') || 'Name des Favoriten'"
+          @keydown.enter.prevent="confirmSaveFavorite"
+        />
+      </label>
+      <p v-if="favoriteErrorMsg" class="favorite-error-msg">{{ favoriteErrorMsg }}</p>
+    </AppModal>
   </div>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
@@ -196,6 +228,8 @@ import { useUserStore } from '@/stores/userStore'
 import { saveWorkoutOffline } from '@/utils/offlineStorage'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { getDetailDraftKey } from '@/utils/workoutBuilderFlow'
+import { saveFavoriteWorkout, getFavoritesByType, normalizeWorkoutType } from '@/utils/workoutFavorites'
+import AppModal from '@/components/AppModal.vue'
 
 const props = defineProps({
   workouts: {
@@ -217,6 +251,64 @@ const { getCurrentUser } = useFirebaseAuth()
 const expandedWorkout = ref(null)
 const showAllExercises = ref(false)
 const getWorkoutNotes = (workout) => resolveWorkoutNotes(workout, { maxItems: 8, maxLength: 600 })
+
+// Favoriten-Modal-State
+const showFavoriteModal = ref(false)
+const favoriteNameInput = ref('')
+const favoriteSavingId = ref(null)
+const favoriteErrorMsg = ref('')
+const pendingFavoriteWorkout = ref(null)
+// Merkt sich pro Session, welche Workout-IDs bereits favorisiert wurden
+// (der Stern bleibt danach gefüllt, ohne bei jedem Render neu gegen den
+// Favoriten-Store abgleichen zu müssen).
+const favoritedWorkoutIds = ref(new Set())
+
+function getFavoritesUserId() {
+  return String(getCurrentUser?.()?.uid || store.user?.uid || store.user?.id || 'guest')
+}
+
+function isFavorited(workout) {
+  return favoritedWorkoutIds.value.has(String(workout._id || ''))
+}
+
+function openFavoriteStar(workout) {
+  if (isFavorited(workout)) return
+  pendingFavoriteWorkout.value = workout
+  favoriteNameInput.value = getWorkoutTitle(workout)
+  favoriteErrorMsg.value = ''
+  showFavoriteModal.value = true
+}
+
+function confirmSaveFavorite() {
+  const workout = pendingFavoriteWorkout.value
+  if (!workout) return
+  const trimmedName = favoriteNameInput.value.trim()
+  if (!trimmedName) {
+    favoriteErrorMsg.value = t('recent.favoriteNameRequired') || 'Bitte einen Namen eingeben.'
+    return
+  }
+
+  favoriteSavingId.value = workout._id
+  favoriteErrorMsg.value = ''
+
+  const result = saveFavoriteWorkout({
+    userId: getFavoritesUserId(),
+    type: normalizeWorkoutType(workout.type),
+    name: trimmedName,
+    workout
+  })
+
+  favoriteSavingId.value = null
+
+  if (!result.success) {
+    favoriteErrorMsg.value = result.message || t('common.error') || 'Speichern fehlgeschlagen.'
+    return
+  }
+
+  favoritedWorkoutIds.value = new Set([...favoritedWorkoutIds.value, String(workout._id || '')])
+  showFavoriteModal.value = false
+  pendingFavoriteWorkout.value = null
+}
 
 // Die letzten 7 Workouts (keine Drafts)
 const recentWorkouts = computed(() => {
@@ -241,6 +333,34 @@ function getWorkoutTitle(workout) {
     default: return 'Workout'
   }
 }
+
+// Gleicht recentWorkouts gegen bestehende Favoriten ab (nur über Name + Typ
+// möglich, da Favoriten keine Rückverknüpfung zur ursprünglichen Workout-ID
+// speichern). Läuft beim Mount und immer wenn sich die Workout-Liste ändert.
+// WICHTIG: Muss NACH der recentWorkouts-Deklaration stehen, sonst wirft
+// watch(recentWorkouts, ...) einen "Cannot access before initialization"-Fehler
+// (Temporal Dead Zone), da watch() das Argument synchron beim Setup ausliest.
+function syncFavoritedState() {
+  const uid = getFavoritesUserId()
+  const cache = new Map() // type -> favorites list, um getFavoritesByType nicht pro Workout neu aufzurufen
+  const matched = new Set()
+
+  for (const workout of recentWorkouts.value) {
+    const type = normalizeWorkoutType(workout.type)
+    if (!cache.has(type)) {
+      cache.set(type, getFavoritesByType(uid, type) || [])
+    }
+    const favorites = cache.get(type)
+    const workoutName = String(getWorkoutTitle(workout) || '').trim().toLowerCase()
+    const isMatch = favorites.some(fav => String(fav?.name || '').trim().toLowerCase() === workoutName)
+    if (isMatch) matched.add(String(workout._id || ''))
+  }
+
+  favoritedWorkoutIds.value = matched
+}
+
+onMounted(syncFavoritedState)
+watch(recentWorkouts, syncFavoritedState)
 
 function formatDate(dateStr) {
   if (!dateStr) return t('common.unknown')
@@ -475,7 +595,6 @@ function deleteWorkoutItem(workout) {
   border-radius: 22px;
   padding: 16px;
   border: 1px solid var(--card-border);
-  /* background: linear-gradient(135deg, rgba(16, 17, 24, 0.95), rgba(8, 9, 12, 0.95)); */
   cursor: pointer;
   transition: transform 0.2s ease, border-color 0.2s ease;
   display: flex;
@@ -518,6 +637,44 @@ function deleteWorkoutItem(workout) {
 .action-btn:hover { transform: translateY(-2px); border-color: rgba(223, 255, 83, 0.35); }
 .action-btn.expand { font-size: 0.75rem; font-weight: 700; }
 .action-btn.expand.expanded { background: var(--accent); color: var(--accent-contrast); border-color: transparent; }
+
+.action-btn.favorite {
+  font-size: 1.1rem;
+  color: #eab308;
+}
+
+.action-btn.favorite.active {
+  color: #eab308;
+  opacity: 1;
+}
+
+.action-btn.favorite:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.favorite-modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
+.favorite-modal-field input {
+  border-radius: 10px;
+  border: 1px solid var(--card-border, rgba(255,255,255,0.15));
+  background: color-mix(in srgb, var(--bg-panel, #12151b) 90%, transparent);
+  color: var(--fg, #fff);
+  padding: 10px 12px;
+  font-size: 0.95rem;
+  font-family: inherit;
+}
+
+.favorite-error-msg {
+  color: #dc2626;
+  font-size: 0.85rem;
+  margin: 8px 0 0;
+}
 
 /* Expandable Details */
 .workout-details {

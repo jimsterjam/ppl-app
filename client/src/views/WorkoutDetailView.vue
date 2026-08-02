@@ -34,10 +34,10 @@
               <button v-if="!isFavoriteAdjustMode" class="primary timer-config-btn" type="button" @click="showTimerConfig = true">
                 ⏱ Timer einstellen
               </button>
-              <SessionStopwatch @session-time="onSessionTime" />
-              <button class="reorder-toggle" type="button" :aria-pressed="isReordering" @click="toggleReorder">
+              <button class="primary reorder-toggle" type="button" :aria-pressed="isReordering" @click="toggleReorder">
                 {{ isReordering ? t('workoutDetail.done') : t('workoutDetail.editOrder') }}
               </button>
+              <SessionStopwatch @session-time="onSessionTime" />
             </div>
           </div>
     <!-- Modal für Übungsauswahl -->
@@ -59,7 +59,9 @@
           :items="allExercises"
           :selectable="true"
           :selected-ids="selectedModalExerciseIds"
+          :user-id="resolveActiveWorkoutUserId()"
           @toggle="handleAddExerciseToggle"
+          @custom-added="loadAllExercises"
         />
       </div>
     </AppModal>
@@ -113,9 +115,9 @@
                     </button>
                   </div>
                   <small>{{ getTranslatedMuscleGroup ? getTranslatedMuscleGroup(ex.muscleGroup) : ex.muscleGroup }}</small>
-                  <p v-if="favoriteLastPerformanceByIndex[i]" class="last-performance-hint">
+                  <!-- <p v-if="favoriteLastPerformanceByIndex[i]" class="last-performance-hint">
                     Letztes Mal: {{ favoriteLastPerformanceByIndex[i].sets }} Sets · {{ favoriteLastPerformanceByIndex[i].reps }} Wdh · {{ favoriteLastPerformanceByIndex[i].weight }} kg
-                  </p>
+                  </p> -->
                   <!-- Notiz-Button und Feld -->
                   <div style="margin-top: 6px;">
                     <button class="link" @click="toggleNote(i)">
@@ -415,10 +417,10 @@
             >
               {{ t('workoutDetail.done') }}
             </button>
-            <button v-else class="primary" :disabled="saving" @click="saveWorkout">
+            <button v-else class="primary save-btn" :disabled="saving" @click="saveWorkout">
               {{ saving ? t('workoutDetail.saving') : (isFavoriteAdjustMode ? t('workoutDetail.adjustSave') : t('workoutDetail.save')) }}
             </button>
-            <button
+            <!-- <button
               v-if="!isReordering && !isFavoriteAdjustMode"
               class="secondary favorite-save"
               type="button"
@@ -426,13 +428,13 @@
               @click="openFavoriteNameModal"
             >
               {{ favoriteSaving ? t('workoutDetail.saving') : t('workoutDetail.saveAsFavorite') }}
-            </button>
+            </button> -->
             <small v-if="saveMsg && !isReordering" class="save-msg" :class="{ error: saveError }">{{ saveMsg }}</small>
           </div>
         </div>
 
         <div class="actions">
-          <button class="primary" @click="goDashboard">{{ t('workoutDetail.cancel') }}</button>
+          <button class="primary cancel-btn" @click="goDashboard">{{ t('workoutDetail.cancel') }}</button>
         </div>
       </div>
     </div>
@@ -466,7 +468,8 @@
       @confirm="confirmLeave"
     />
 
-    <AppModal
+    <!-- Ursprünglich ein Modal das erscheint wenn man ein favorite speichern will. -->
+    <!-- <AppModal
       v-model="showFavoriteNameModal"
       :title="t('workoutDetail.favoriteNameTitle')"
       :confirm-text="favoriteSaving ? t('workoutDetail.saving') : t('common.save')"
@@ -486,7 +489,7 @@
           :placeholder="t('workoutDetail.favoriteNamePlaceholder')"
         />
       </label>
-    </AppModal>
+    </AppModal> -->
 
     <AppModal
       v-model="showTimerActionModal"
@@ -545,6 +548,7 @@ const showAddExerciseModal = ref(false)
 const allExercises = ref([])
 const exercisesLoading = ref(false)
 const selectedExerciseToAdd = ref(null)
+const authToken = ref(null)
 function getExerciseIdentifier(ex) {
   const value = ex?._id || ex?.exerciseId || ex?.id || ex?.mediaId || null
   return value == null ? '' : String(value)
@@ -560,7 +564,8 @@ async function loadAllExercises() {
   try {
     const list = await getMergedSortedExercises({
       locale: String(locale?.value || ''),
-      includeRemote: false
+      includeRemote: false,
+      userId: resolveActiveWorkoutUserId()
     })
     allExercises.value = list
   } catch (e) {
@@ -570,8 +575,11 @@ async function loadAllExercises() {
   }
 }
 
-watch(showAddExerciseModal, (val) => {
-  if (val) loadAllExercises()
+watch(showAddExerciseModal, async (val) => {
+  if (val) {
+    loadAllExercises()
+    authToken.value = await getIdToken().catch(() => null)
+  }
   if (!val) selectedExerciseToAdd.value = null
 })
 
@@ -818,30 +826,33 @@ function sleep(ms) {
 
 async function waitForRealIdFromDraftId(id) {
   if (!String(id || '').startsWith('draft-')) return ''
-  let realId = await resolveRealIdFromDraftId(id)
-  if (realId) return realId
-
-  for (let i = 0; i < REAL_ID_RESOLVE_RETRIES; i++) {
-    await sleep(REAL_ID_RESOLVE_DELAY_MS)
-    realId = await resolveRealIdFromDraftId(id)
-    if (realId) {
-      logger.debug('[WorkoutDetail] realId nach Retry gefunden', { draftId: id, realId, attempt: i + 1 })
-      return realId
-    }
+  const realId = await resolveRealIdFromDraftId(id)
+  if (realId) {
+    logger.debug('[WorkoutDetail] realId gefunden', { draftId: id, realId })
   }
-
-  logger.warn('[WorkoutDetail] realId konnte nach Retry nicht aufgeloest werden', { draftId: id })
-  return ''
+  return realId || ''
 }
 
+// function resolveActiveWorkoutUserId() {
+//   return String(
+//     workout.value?.userId
+//     || getCurrentUser?.()?.uid
+//     || store.user?.uid
+//     || store.user?.id
+//     || ''
+//   ).trim()
+// }
+
 function resolveActiveWorkoutUserId() {
-  return String(
+  const result = String(
     workout.value?.userId
     || getCurrentUser?.()?.uid
     || store.user?.uid
     || store.user?.id
     || ''
   ).trim()
+  console.log('[DEBUG-UID] workout.value?.userId:', workout.value?.userId, 'getCurrentUser?.()?.uid:', getCurrentUser?.()?.uid, 'result:', result)
+  return result
 }
 
 function clearActiveDraftForCurrentUser(reason = 'unknown') {
@@ -1141,53 +1152,48 @@ function cancelPendingAutoSave(reason = 'unknown') {
 
 
 async function runAutoSaveNow() {
-if (saving.value || suppressDraftPersistence.value) return
-if (isFavoriteAdjustMode.value) return
-const w = workout.value || {}
-const exercises = Array.isArray(w.exercises) && Array.isArray(exerciseNotes.value)
-? w.exercises.map((ex, idx) => ({
-...ex,
-note: typeof exerciseNotes.value[idx] === 'string' ? exerciseNotes.value[idx] : ex.note || ''
-}))
-: (w.exercises || [])
-const notes = buildWorkoutNotesSummary(exercises)
+  if (saving.value || suppressDraftPersistence.value) return
+  if (isFavoriteAdjustMode.value) return
+  const w = workout.value || {}
+  const exercises = Array.isArray(w.exercises) && Array.isArray(exerciseNotes.value)
+    ? w.exercises.map((ex, idx) => ({
+        ...ex,
+        note: typeof exerciseNotes.value[idx] === 'string' ? exerciseNotes.value[idx] : ex.note || ''
+      }))
+    : (w.exercises || [])
+  const notes = buildWorkoutNotesSummary(exercises)
 
-const uid = resolveActiveWorkoutUserId()
-if (!uid) return
+  const uid = resolveActiveWorkoutUserId()
+  if (!uid) return
 
-const ok = updateActiveDraft(uid, {
-...w,
-_id: w._id || String(route.params.id || ''),
-exercises,
-notes
-})
+  // setActiveDraft() statt updateActiveDraft() nutzen: updateActiveDraft() ist ein
+  // stiller No-Op, wenn noch kein Active-Draft-Eintrag existiert (z.B. ganz am Anfang
+  // einer Session, bevor ein Lifecycle-Event wie App-Hintergrund den Eintrag erzeugt
+  // hätte). Damit liefen normale Tipp-Autosaves bisher oft ins Leere.
+  const existingActive = getActiveDraft(uid)
+  let preservedEditingWorkoutId = existingActive?.editingWorkoutId ?? null
+  if (!preservedEditingWorkoutId) {
+    const routeId = String(route.params.id || '').trim()
+    if (routeId && routeId !== 'draft' && !routeId.startsWith('draft-') && !routeId.startsWith('offline_')) {
+      preservedEditingWorkoutId = routeId
+    }
+  }
 
-if (ok) {
-saveMsg.value = ''
-saveError.value = false
-initialSnapshot = snapshotCore({ ...w, exercises, notes })
-logger.debug('[WorkoutDetail] Auto-Save active draft aktualisiert')
-} else {
-logger.debug('[WorkoutDetail] Auto-Save übersprungen (kein aktiver Draft)')
-}
-}
+  const ok = setActiveDraft(uid, {
+    ...w,
+    _id: w._id || String(route.params.id || ''),
+    exercises,
+    notes
+  }, preservedEditingWorkoutId)
 
-// Debounced Auto-Save Funktion (muss vor Aufrufen deklariert sein)
-const triggerAutoSave = () => {
-  if (saving.value || suppressDraftPersistence.value) return Promise.resolve(false)
-  return new Promise((resolve) => {
-    autoSaveWaiters.push(resolve)
-    if (autoSaveTimer) clearTimeout(autoSaveTimer)
-    autoSaveTimer = setTimeout(async () => {
-      autoSaveTimer = null
-      if (saving.value || suppressDraftPersistence.value) {
-        flushAutoSaveWaiters(false)
-        return
-      }
-      await runAutoSaveNow()
-      flushAutoSaveWaiters(true)
-    }, AUTO_SAVE_DEBOUNCE_MS)
-  })
+  if (ok) {
+    saveMsg.value = ''
+    saveError.value = false
+    initialSnapshot = snapshotCore({ ...w, exercises, notes })
+    logger.debug('[WorkoutDetail] Auto-Save active draft aktualisiert (setActiveDraft)')
+  } else {
+    logger.debug('[WorkoutDetail] Auto-Save fehlgeschlagen')
+  }
 }
 
 function getViewStateWorkoutId() {
@@ -1409,6 +1415,21 @@ async function loadLocalWorkout(id) {
   let loadedWorkout = null
   let editingWorkoutId = null
 
+  const activeUid = resolveActiveWorkoutUserId()
+  console.log('[DEBUG-LOAD] id:', id, 'activeUid:', activeUid)
+
+
+  if (activeUid) {
+    const active = getActiveDraft(activeUid)
+    console.log('[DEBUG-LOAD] active draft found:', !!active?.workout, 'active.workout._id:', active?.workout?._id, 'active.editingWorkoutId:', active?.editingWorkoutId, 'exercises:', JSON.stringify(active?.workout?.exercises?.map(ex => ex.setDetails)))
+
+    const activeWorkoutId = String(active?.workout?._id || active?.editingWorkoutId || '').trim()
+    if (active?.workout && (activeWorkoutId === String(id) || active?.editingWorkoutId === id)) {
+      logger.debug('[WorkoutDetail] gefunden im Active-Draft-Speicher', { id })
+      return { workout: active.workout, editingWorkoutId: active.editingWorkoutId || null }
+    }
+  }
+
   const fromStore = store.workouts.find(w => w._id === id) || null
   const fromOffline = await getWorkoutOffline(id).catch(() => null)
   loadedWorkout = pickPreferredLocalWorkout(fromStore, fromOffline)
@@ -1478,6 +1499,22 @@ async function loadLocalWorkout(id) {
 }
 
 async function loadServerWorkout(id) {
+
+  // Active-Draft-Speicher zuerst prüfen: hier landet der aktuellste Stand aus
+  // laufenden Auto-Saves (triggerAutoSave/persistActiveDraft), der noch nicht
+  // zwingend in Store/IndexedDB durchgeschrieben wurde. Ohne diesen Check als
+  // ERSTE Prüfung verliert der User Fortschritt, wenn die App neu startet
+  // (iOS-Prozess-Kill) und loadWorkout() den alten Server-/Cache-Stand lädt.
+  const activeUid = resolveActiveWorkoutUserId()
+  if (activeUid) {
+    const active = getActiveDraft(activeUid)
+    const activeWorkoutId = String(active?.workout?._id || active?.editingWorkoutId || '').trim()
+    if (active?.workout && (activeWorkoutId === String(id) || active?.editingWorkoutId === id)) {
+      logger.debug('[WorkoutDetail] gefunden im Active-Draft-Speicher (server-path)', { id })
+      return { workout: active.workout, editingWorkoutId: active.editingWorkoutId || null }
+    }
+  }
+
   const normalFromStore = store.workouts.find(w => w._id === id) || null
   const normalFromOffline = await getWorkoutOffline(id).catch(() => null)
   let loadedWorkout = pickPreferredLocalWorkout(normalFromStore, normalFromOffline)
@@ -1568,12 +1605,20 @@ async function loadWorkout() {
 
     if (workout.value) {
       ensureSetDetailsStructure()
-      await maybePrefillFromLastFavoritePerformance()
+      // await maybePrefillFromLastFavoritePerformance()
       await enrichExerciseImages()
 
-      const uid = resolveActiveWorkoutUserId()
-      if (uid) {
-        await setActiveDraft(uid, workout.value, editingWorkoutId)
+      // Active-Draft-Eintrag NUR anlegen wenn das Workout tatsächlich in Bearbeitung ist
+      // (Draft/Favoriten-Start). Für bereits abgeschlossene Workouts soll kein Active-Draft
+      // angelegt werden – das würde sonst BottomNav-Indikatoren fälschlicherweise aktivieren.
+      // Hinweis: der deep-watch auf workout.value ruft persistActiveDraft() ebenfalls auf;
+      // hier stellen wir nur sicher, dass der Eintrag SOFORT nach dem Laden existiert (damit
+      // triggerAutoSave()-Aufrufe, die noch vor dem nächsten Watcher-Tick kommen, greifen).
+      if (shouldKeepAsDraft(workout.value) && workout.value.completed !== true) {
+        const uid = resolveActiveWorkoutUserId()
+        if (uid) {
+          setActiveDraft(uid, workout.value, editingWorkoutId)
+        }
       }
 
       initialSnapshot = snapshotCore(workout.value)
@@ -2992,6 +3037,7 @@ onBeforeUnmount(() => {
 .content.timer-offset {
   padding-top: clamp(68px, 10vh, 112px);
 }
+
 .loading, .empty, .error { text-align: center; color: var(--muted); padding: 40px 0; }
 .workout-header { margin-bottom: 16px; }
 .workout-header h2 { margin: 0 0 8px 0; font-size: 1.5rem; }
@@ -3008,7 +3054,10 @@ onBeforeUnmount(() => {
 .ex-list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .ex-list-actions { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; width: 100%; }
 .ex-list-header h3 { margin: 0; font-size: 1.1rem; }
-.reorder-toggle { background: var(--surface); color: var(--fg); border: 1px solid var(--card-border); border-radius: 6px; padding: 6px 10px; cursor: pointer; font-size: 0.85rem; }
+.reorder-toggle { background: color-mix(in srgb, var(--accent) 16%, var(--bg-panel)) !important;
+  color: var(--fg-strong);
+  border: 2px solid color-mix(in srgb, var(--accent) 65%, var(--line-strong)) !important;
+  font-weight: 700; }
 .reorder-hint { color: var(--muted); margin: 0 0 8px; font-size: 0.85rem; }
 .ex-item { padding: 10px 0; border-bottom: 1px solid var(--card-border); }
 .ex-item:last-child { border-bottom: none; }
@@ -3059,15 +3108,15 @@ onBeforeUnmount(() => {
 .weight-input .unit { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 0.75rem; pointer-events: none; }
 .row-actions { padding: 4px 0; }
 .add-row-btn {
-  background: color-mix(in srgb, var(--accent) 90%, black 10%);
+  background: transparent;
   color: var(--accent-contrast, #ffffff);
-  border: 1px solid color-mix(in srgb, var(--accent) 72%, black 28%);
+  border: 2px solid color-mix(in srgb,var(--accent) 65%,var(--line-strong));
   border-radius: 8px;
   padding: 7px 12px;
   cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 700;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
+  /* font-size: 0.9rem; */
+  /* font-weight: 700; */
+  /* text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35); */
 }
 .remove-row-btn { background: var(--danger-color); color: var(--accent-contrast); border: none; border-radius: 4px; width: 28px; height: 28px; cursor: pointer; font-size: 1rem; }
 .number-with-spinner { display: flex; align-items: center; gap: 6px; }
@@ -3089,6 +3138,19 @@ onBeforeUnmount(() => {
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35);
 }
 .secondary { padding: 12px; border-radius: 10px; border: 1px solid var(--line-strong); cursor: pointer; background: var(--bg-panel); color: var(--fg-strong); font-weight: 600; }
+.cancel-btn {
+  width: 100%;
+  padding: 12px;
+  border-radius: 10px;
+  background: #dc2626 !important;
+  color: #ffffff !important;
+  border-color: #dc2626 !important;
+}
+.cancel-btn:hover,
+.cancel-btn:active {
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
 .favorite-save {
   border-color: color-mix(in srgb, var(--accent) 60%, var(--line-strong));
   color: var(--accent);
@@ -3121,6 +3183,11 @@ onBeforeUnmount(() => {
   border: 1px solid color-mix(in srgb, var(--danger-color) 45%, transparent);
   border-radius: 8px;
   padding: 4px 8px;
+}
+
+.save-btn{
+  background: #dc2626;
+  color: #000000;
 }
 .remove-row-btn {
   background: var(--danger-color);
@@ -3203,7 +3270,7 @@ onBeforeUnmount(() => {
 .add-warmup-btn {
   background: transparent;
   color: color-mix(in srgb, #f59e0b 70%, var(--muted));
-  border: 1px dashed color-mix(in srgb, #f59e0b 35%, var(--card-border, rgba(255,255,255,0.12)));
+  border: 2px solid #6B7280;
   border-radius: 6px;
   padding: 4px 10px;
   cursor: pointer;
@@ -3230,7 +3297,7 @@ onBeforeUnmount(() => {
 }
 
 .actions .primary,
-.workout > .primary {
+.workout > .primary{
   background: color-mix(in srgb, var(--accent) 92%, black 8%);
   color: var(--accent-contrast, #ffffff);
   border: 1px solid color-mix(in srgb, var(--accent) 72%, black 28%);

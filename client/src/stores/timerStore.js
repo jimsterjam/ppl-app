@@ -399,7 +399,8 @@ export const useTimerStore = defineStore('timer', {
       this.status = 'running'
       this.showMini()
       const now = Date.now()
-      const prepMs = Math.max(0, Number(cfg.prepSeconds || 0)) * 1000
+      // const prepMs = Math.max(0, Number(cfg.prepSeconds || 0)) * 1000
+      const prepMs = this.isStopwatchMode ? 0 : Math.max(0, Number(cfg.prepSeconds || 0)) * 1000
       const startDelayMs = Number.isFinite(prepMs) ? prepMs : 0
       this.startedAt = now + startDelayMs
       this.pausedAt = null

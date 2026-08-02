@@ -1,10 +1,12 @@
-import { getAllExercisesOffline } from '@/utils/offlineStorage'
+import { getAllExercisesOffline, getAllCustomExercisesOffline } from '@/utils/offlineStorage'
 import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
 import { fetchExercises } from '@/api/exercises'
 
 // Merge offline exercises with JSON defaults, dedupe by name+equipment, optional equipment filter,
-// and sort alphabetically by first three letters, then full name
-export async function getMergedSortedExercises({ category = '', equipment = '', locale = '', includeRemote = true } = {}) {
+// and sort alphabetically by first three letters, then full name.
+// userId: falls gesetzt, werden zusätzlich die eigenen (nur für diesen User sichtbaren) Übungen eingemischt.
+export async function getMergedSortedExercises({ category = '', equipment = '', locale = '', includeRemote = true, userId = '' } = {}) {
+  console.log('[DEBUG-CUSTOM] getMergedSortedExercises aufgerufen mit userId:', userId || 'LEER')
   // Build quick lookup by both DE and EN names from defaults
   const normalize = (s) => (s || '').trim().toLowerCase()
   const isGermanLocale = String(locale || '').toLowerCase().startsWith('de')
@@ -79,19 +81,44 @@ export async function getMergedSortedExercises({ category = '', equipment = '', 
     list = [...list, ...mappedOffline]
   } catch {}
 
+  // Eigene Übungen des Users anhängen (nur für ihn sichtbar, nicht mit Defaults/Remote gemerged,
+  // da sie bewusst keine kanonische Übersetzung haben — displayName = eingegebener Name).
+  if (userId) {
+    try {
+      const custom = await getAllCustomExercisesOffline({ userId })
+      console.log('[DEBUG-CUSTOM] userId:', userId, '| gefundene eigene Übungen:', custom.length, '|', custom.map(c => c.name))
+      const mappedCustom = (Array.isArray(custom) ? custom : []).map(ex => ({
+        ...ex,
+        displayName: ex.name || '',
+        _isCustom: true,
+        // Eigene Übungen sollen nicht mit Default-Übungen dedupliziert werden,
+        // auch wenn der Name zufällig übereinstimmt — der User hat sie bewusst
+        // separat angelegt (z.B. weil die Standard-Variante nicht passte).
+        __canonKey: `custom__${normalize(ex._id)}`
+      }))
+      list = [...list, ...mappedCustom]
+    } catch (err) {
+      console.warn('[DEBUG-CUSTOM] getAllCustomExercisesOffline failed:', err?.message || err)
+    }
+  }
+
   // Equipment filter if provided (match raw equipment string, case-insensitive)
+  // Eigene Übungen sind vom Equipment-Filter ausgenommen, da sie oft kein
+  // Equipment-Feld gepflegt haben und sonst fälschlich rausgefiltert würden.
   if (equipment) {
     const eq = equipment.toLowerCase()
-    list = list.filter(ex => (ex.equipment || '').toLowerCase() === eq)
+    list = list.filter(ex => ex._isCustom || (ex.equipment || '').toLowerCase() === eq)
   }
 
   // Deduplicate by canonical name + canonical equipment (keep first: defaults preferred)
   const seen = new Set()
   const unique = []
   for (const ex of list) {
-    const key = isGermanLocale
-      ? normalize(ex.displayName || ex.name || ex.name_en)
-      : (ex.__canonKey || `${normalize(ex.name)}__${normalize(ex.equipment || 'bodyweight')}`)
+    const key = ex._isCustom
+      ? ex.__canonKey
+      : (isGermanLocale
+          ? normalize(ex.displayName || ex.name || ex.name_en)
+          : (ex.__canonKey || `${normalize(ex.name)}__${normalize(ex.equipment || 'bodyweight')}`))
     if (!seen.has(key)) { seen.add(key); unique.push(ex) }
   }
 
@@ -104,6 +131,6 @@ export async function getMergedSortedExercises({ category = '', equipment = '', 
     return an.localeCompare(bn)
   })
 
-  console.debug('[ExerciseList] final sorted result:', sorted.length, '| unique:', unique.length)
+  console.debug('[ExerciseList] final sorted result:', sorted.length, '| unique:', unique.length, '| custom:', sorted.filter(e => e._isCustom).length)
   return sorted
 }

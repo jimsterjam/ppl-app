@@ -64,6 +64,14 @@
     <div v-else>
       <div class="result-toolbar">
         <span class="result-count">{{ visibleExercises.length }} / {{ filteredExercises.length }}</span>
+        <button
+          v-if="userId"
+          class="add-custom-exercise-btn"
+          type="button"
+          @click="editingCustomExercise = null; showAddCustomModal = true"
+          >
+          {{ t('exercises.addCustom') || 'Eigene Übung' }}
+        </button>
       </div>
 
       <div class="exercise-grid">
@@ -85,8 +93,29 @@
               @click.stop="openMedia(ex)"
             />
             <div class="meta">
-              <h2 class="title">{{ ex.renderedName || ex.name }}</h2>
+              <h2 class="title">
+                {{ ex.renderedName || ex.name }}
+                <span v-if="ex._isCustom" class="custom-badge">Eigene Übung</span>
+              </h2>
               <p class="sub">{{ ex.renderedCategory || ex.category }} · {{ ex.renderedMuscle || ex.muscleGroup || (ex.muscleGroups?.[0] || '') }}</p>
+            </div>
+            <div v-if="ex._isCustom" class="custom-actions">
+              <button
+                class="custom-action-btn"
+                type="button"
+                :title="t('exercises.editCustomTitle') || 'Bearbeiten'"
+                @click.stop="openEditCustom(ex)"
+              >
+                ✏️
+              </button>
+              <button
+                class="custom-action-btn danger"
+                type="button"
+                :title="t('exercises.deleteCustomTitle') || 'Löschen'"
+                @click.stop="askDeleteCustom(ex)"
+              >
+                🗑️
+              </button>
             </div>
           </div>
           <p class="desc">{{ ex.renderedDescription }}</p>
@@ -126,6 +155,22 @@
       </div>
     </div>
   </div>
+  <AddCustomExerciseModal
+    v-model="showAddCustomModal"
+    :user-id="userId"
+    :exercise="editingCustomExercise"
+    @created="onCustomExerciseCreated"
+    @updated="onCustomExerciseUpdated"
+  />
+  <AppModal
+    v-model="showDeleteCustomModal"
+    :title="t('exercises.deleteCustomConfirmTitle') || 'Übung löschen'"
+    :message="t('exercises.deleteCustomConfirmMsg') || 'Diese eigene Übung wirklich löschen?'"
+    :confirm-text="t('common.delete') || 'Löschen'"
+    :cancel-text="t('common.cancel')"
+    type="warning"
+    @confirm="confirmDeleteCustom"
+  />
 </template>
 
 <script setup>
@@ -136,6 +181,10 @@ import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 import { resolveExerciseMedia, getExerciseThumb, preloadExerciseMedia, buildExerciseMediaUrl } from '@/utils/assetResolver'
 import { loadDefaultExercises, getCachedDefaultExercises } from '@/utils/defaultExercisesLoader'
 import { searchAndRankExercises } from '@/utils/exerciseSearch'
+import AddCustomExerciseModal from '@/components/AddCustomExerciseModal.vue'
+import AppModal from '@/components/AppModal.vue'
+import { deleteCustomExercise } from '@/api/customExercises'
+import { useFirebaseAuth } from '@/utils/firebaseAuth'
 
 const props = defineProps({
   showTitle: {
@@ -157,14 +206,58 @@ const props = defineProps({
   selectedIds: {
     type: Array,
     default: () => []
+  },
+  userId: { 
+    type: String, 
+    default: '' 
   }
 })
-const emit = defineEmits(['toggle'])
-
+const emit = defineEmits(['toggle', 'custom-added'])
 const { t, locale } = useI18n()
 const showTitle = computed(() => props.showTitle)
 const showControls = computed(() => props.showControls)
 const selectable = computed(() => props.selectable)
+const { getIdToken } = useFirebaseAuth()
+const showAddCustomModal = ref(false)
+const editingCustomExercise = ref(null)
+const showDeleteCustomModal = ref(false)
+const pendingDeleteCustom = ref(null)
+
+function openEditCustom(exercise) {
+  editingCustomExercise.value = exercise
+  showAddCustomModal.value = true
+}
+
+function askDeleteCustom(exercise) {
+  pendingDeleteCustom.value = exercise
+  showDeleteCustomModal.value = true
+}
+
+async function confirmDeleteCustom() {
+  const exercise = pendingDeleteCustom.value
+  showDeleteCustomModal.value = false
+  if (!exercise?._id) return
+  try {
+    const token = await getIdToken().catch(() => null)
+    await deleteCustomExercise(exercise._id, token)
+    emit('custom-added')
+  } catch (err) {
+    logger.error('[ExerciseList] Löschen fehlgeschlagen', err)
+  } finally {
+    pendingDeleteCustom.value = null
+  }
+}
+
+function onCustomExerciseCreated() {
+  showAddCustomModal.value = false
+  emit('custom-added')
+}
+
+function onCustomExerciseUpdated() {
+  showAddCustomModal.value = false
+  editingCustomExercise.value = null
+  emit('custom-added')
+}
 
 // Reaktive Variablen
 const exercises = ref([]);
@@ -503,6 +596,49 @@ function closeMedia() {
 </script>
 
 <style scoped>
+.add-custom-exercise-btn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--card-border, rgba(255,255,255,0.15));
+  background: transparent;
+  color: var(--accent, #4f9dff);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.custom-badge {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--accent, #4f9dff) 20%, transparent);
+  color: var(--accent, #4f9dff);
+  font-size: 0.65rem;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.custom-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+  align-self: flex-start;
+}
+
+.custom-action-btn {
+  background: none;
+  border: none;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 4px;
+  opacity: 0.8;
+}
+
+.custom-action-btn:hover {
+  opacity: 1;
+}
+
 .exercise-list-root {
   width: 100%;
   max-width: 1080px;
