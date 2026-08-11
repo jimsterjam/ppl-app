@@ -3,13 +3,6 @@
     <button class="card-hit" type="button" @click="onClick">
       <span class="workout-label">{{ label }}</span>
     </button>
-    <button
-      v-if="infoLabel"
-      class="info-btn"
-      type="button"
-      :aria-label="infoLabel"
-      @click.stop="onInfo"
-    >i</button>
   </div>
 </template>
 
@@ -59,30 +52,6 @@ const onInfo = () => emit('info', props.label)
   text-align: center;
   cursor: pointer;
 }
-.info-btn {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 13px;
-  height: 13px;
-  border-radius: 999px;
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line-strong));
-  background: var(--bg-panel);
-  color: var(--fg-strong);
-  font-weight: 800;
-  font-size: 0.5rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  text-transform: none;
-  letter-spacing: normal;
-}
-
-.info-btn:hover {
-  background: color-mix(in srgb, var(--bg-panel) 85%, var(--fg) 6%);
-}
-
 
 .workout-card:hover {
   background: color-mix(in srgb, var(--card-bg) 85%, var(--fg) 5%);

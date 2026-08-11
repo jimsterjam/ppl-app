@@ -22,6 +22,12 @@ const customExerciseSchema = new mongoose.Schema({
     trim: true,
     maxlength: 200
   },
+  description: {
+    type: String,
+    default: '',
+    trim: true,
+    maxlength: 500
+  },
   imageUrl: {
     type: String,
     default: ''

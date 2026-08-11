@@ -38,13 +38,13 @@ html {
   --shadow-card: 0 30px 60px rgba(0, 0, 0, 0.55);
   --panel-radius: 28px;
   --chip-radius: 16px;
-  --accent: #d7ff1f;
-  --accent-strong: #f3ff82;
-  --accent-contrast: #060606;
-  --accent-soft: rgba(215, 255, 31, 0.16);
-  --accent-color: #d7ff1f;
-  --accent-color-strong: #f3ff82;
-  --accent-color-contrast: #060606;
+  --accent: #3d8ee6;
+  --accent-strong: #6aaff0;
+  --accent-contrast: #ffffff;
+  --accent-soft: rgba(61, 142, 230, 0.16);
+  --accent-color: #3d8ee6;
+  --accent-color-strong: #6aaff0;
+  --accent-color-contrast: #050608;
   --danger: #ff5f5f;
   --warning: #ff9e3d;
   --success: #79ffb4;
@@ -85,11 +85,12 @@ html {
   --shadow-soft: 0 25px 55px rgba(15, 22, 40, 0.12);
   --shadow-hard: 0 30px 70px rgba(15, 22, 40, 0.16);
   --shadow-card: 0 25px 55px rgba(12, 20, 38, 0.14);
-  --accent: #bede27;
-  --accent-strong: #f5ff80;
-  --accent-soft: rgba(190, 222, 39, 0.2);
-  --accent-color: #506400;
-  --accent-color-strong: #6a8700;
+  --accent: #3d8ee6;
+  --accent-strong: #6faeef;
+  --accent-contrast: #ffffff;
+  --accent-soft: rgba(61, 142, 230, 0.2);
+  --accent-color: #21548b;
+  --accent-color-strong: #2f6aa8;
   --accent-color-contrast: #ffffff;
   --danger: #d43a3a;
   --warning: #c76c10;
@@ -132,12 +133,22 @@ html {
   --accent-color-contrast: #2a0d00;
 }
 
-[data-theme="light"][data-accent="lime"] {
-  --accent: #bede27;
-  --accent-strong: #f5ff80;
-  --accent-soft: rgba(190, 222, 39, 0.2);
-  --accent-color: #506400;
-  --accent-color-strong: #6a8700;
+:root[data-accent="green"] {
+  --accent: #7b8f1f;
+  --accent-strong: #9fbf3f;
+  --accent-contrast: #ffffff;
+  --accent-soft: rgba(123, 143, 31, 0.16);
+  --accent-color: #7b8f1f;
+  --accent-color-strong: #9fbf3f;
+  --accent-color-contrast: #ffffff;
+}
+
+[data-theme="light"][data-accent="green"] {
+  --accent: #7b8f1f;
+  --accent-strong: #9fbf3f;
+  --accent-soft: rgba(123, 143, 31, 0.2);
+  --accent-color: #4a5a0f;
+  --accent-color-strong: #5a6b16;
   --accent-color-contrast: #ffffff;
 }
 
@@ -185,7 +196,7 @@ body {
   font-family: 'Sora', 'Space Grotesk', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   color: var(--fg);
   background:
-    radial-gradient(circle at 10% 18%, rgba(215, 255, 31, 0.14), transparent 50%),
+    radial-gradient(circle at 10% 18%, rgba(61, 142, 230, 0.14), transparent 50%),
     radial-gradient(circle at 85% 0%, rgba(255, 163, 112, 0.13), transparent 45%),
     linear-gradient(150deg, var(--bg-inner) 0%, var(--bg-outer) 80%);
   background-attachment: fixed;

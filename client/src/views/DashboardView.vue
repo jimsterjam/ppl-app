@@ -1010,6 +1010,10 @@ onActivated(async () => {
 }
 
 .dashboard-content.has-draft {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: calc(100dvh - var(--header-height) - var(--safe-top) - 64px - var(--safe-bottom, 0px));
+  overflow-y: auto;
   gap: 8px;
   padding-top: 10px;
   padding-bottom: calc(78px + env(safe-area-inset-bottom, 0px));
@@ -1063,6 +1067,8 @@ onActivated(async () => {
 .hero {
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  flex-shrink: 1;
   gap: 10px;
   padding: 10px 12px;
   border-radius: calc(var(--panel-radius) - 12px);
@@ -1096,6 +1102,8 @@ onActivated(async () => {
 .quick-start {
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  flex-shrink: 1;
   gap: 10px;
 }
 
@@ -1104,14 +1112,22 @@ onActivated(async () => {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+  min-height: 0;
 }
 
 .quick-grid :deep(.workout-card) {
   aspect-ratio: 1.15 / 1;
 }
 
+.dashboard-content.has-draft .quick-grid {
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  min-height: 0;
+}
+
 .dashboard-content.has-draft .quick-grid :deep(.workout-card) {
-  aspect-ratio: 1.28 / 1;
+  aspect-ratio: unset;
+  height: 100%;
+  min-height: 0;
 }
 
 .quick-fav-shortcut {
@@ -1313,9 +1329,7 @@ onActivated(async () => {
 }
 
 .dashboard-content.has-draft .draft-note {
-  position: sticky;
-  bottom: calc(64px + env(safe-area-inset-bottom, 0px));
-  z-index: 20;
+  position: static;
 }
 
 .draft-actions {

@@ -115,6 +115,7 @@
                     </button>
                   </div>
                   <small>{{ getTranslatedMuscleGroup ? getTranslatedMuscleGroup(ex.muscleGroup) : ex.muscleGroup }}</small>
+                  <p v-if="ex.description" class="ex-description">{{ ex.description }}</p>
                   <!-- <p v-if="favoriteLastPerformanceByIndex[i]" class="last-performance-hint">
                     Letztes Mal: {{ favoriteLastPerformanceByIndex[i].sets }} Sets · {{ favoriteLastPerformanceByIndex[i].reps }} Wdh · {{ favoriteLastPerformanceByIndex[i].weight }} kg
                   </p> -->
@@ -439,7 +440,6 @@
       </div>
     </div>
 
-    <BottomNav />
 
     <NumberPicker
       :visible="pickerVisible"
@@ -624,6 +624,7 @@ function onAddExerciseConfirm() {
   toast.show('Übung hinzugefügt', { type: 'success', duration: 1500 })
 }
 import { ref, onMounted, onBeforeUnmount, watch, nextTick, reactive, computed } from 'vue'
+import { getCurrentInstance } from 'vue'
 import NumberPicker from '@/components/NumberPicker.vue'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
@@ -649,6 +650,7 @@ import { buildWorkoutNotesSummary } from '@/utils/workoutNotes'
 import { resolveRealIdFromDraftId as _resolveRealIdFromDraftId, snapshotCore } from '@/utils/workoutHelpers'
 import { saveWorkoutService } from '@/utils/SaveWorkoutService'
 import { useSessionStopwatchStore } from '@/stores/sessionStopwatch'
+import { resolveServerMediaUrl } from '@/api/http'
 import { purgePendingCreateQueueForWorkoutId } from '@/utils/offlineStorage'
 import {
   saveFavoriteWorkout,
@@ -775,6 +777,7 @@ const activeFallbackTouchId = ref(null)
 let fallbackTouchMoveListener = null
 let fallbackTouchEndListener = null
 let fallbackTouchCancelListener = null
+let suppressNextPickerOpen = false
 const isDirty = ref(false)
 const exListRef = ref(null)
 const didAutoScroll = ref(false)
@@ -1178,7 +1181,9 @@ async function runAutoSaveNow() {
       preservedEditingWorkoutId = routeId
     }
   }
-
+  logDiagnostic('autosave', {
+    exercises: exercises?.map(ex => ({ name: ex.name, setDetails: ex.setDetails })) || []
+  })
   const ok = setActiveDraft(uid, {
     ...w,
     _id: w._id || String(route.params.id || ''),
@@ -1279,7 +1284,11 @@ function restoreDetailViewState() {
         const selector = `[data-ex-index="${exIndex}"] [data-set-index="${setIndex}"] input[data-field="${field}"]`
         const input = typeof document !== 'undefined' ? document.querySelector(selector) : null
         if (!input || typeof input.focus !== 'function') return
+        suppressNextPickerOpen = true
         input.focus({ preventScroll: true })
+        // Flag nach kurzer Verzögerung zurücksetzen, falls der Fokus aus irgendeinem
+        // Grund keinen Picker-Trigger auslöst (z.B. Desktop, kein Mobile-Picker aktiv)
+        setTimeout(() => { suppressNextPickerOpen = false }, 300)
       } catch {}
     })
   } catch {}
@@ -1416,13 +1425,9 @@ async function loadLocalWorkout(id) {
   let editingWorkoutId = null
 
   const activeUid = resolveActiveWorkoutUserId()
-  console.log('[DEBUG-LOAD] id:', id, 'activeUid:', activeUid)
-
 
   if (activeUid) {
     const active = getActiveDraft(activeUid)
-    console.log('[DEBUG-LOAD] active draft found:', !!active?.workout, 'active.workout._id:', active?.workout?._id, 'active.editingWorkoutId:', active?.editingWorkoutId, 'exercises:', JSON.stringify(active?.workout?.exercises?.map(ex => ex.setDetails)))
-
     const activeWorkoutId = String(active?.workout?._id || active?.editingWorkoutId || '').trim()
     if (active?.workout && (activeWorkoutId === String(id) || active?.editingWorkoutId === id)) {
       logger.debug('[WorkoutDetail] gefunden im Active-Draft-Speicher', { id })
@@ -1440,52 +1445,6 @@ async function loadLocalWorkout(id) {
     fromOffline: !!fromOffline,
     found: !!loadedWorkout
   })
-
-  if (!loadedWorkout && String(id).startsWith('draft-')) {
-    let realId = String(route.query && route.query.realId || '')
-    if (!realId) {
-      try {
-        realId = String(sessionStorage.getItem('workout_map_' + String(id)) || '')
-      } catch {}
-    }
-
-    logger.debug('[WorkoutDetail] local realId fallback', { id, realId: realId || null })
-
-    if (realId) {
-      const mappedFromStore = store.workouts.find(w => w._id === realId) || null
-      const mappedFromOffline = await getWorkoutOffline(realId).catch(() => null)
-      loadedWorkout = pickPreferredLocalWorkout(mappedFromStore, mappedFromOffline)
-
-      logger.debug('[WorkoutDetail] mapped realId lookup', {
-        tempId: id,
-        realId,
-        fromStore: !!mappedFromStore,
-        fromOffline: !!mappedFromOffline,
-        found: !!loadedWorkout
-      })
-
-      if (!loadedWorkout) {
-        const token = await getIdToken().catch(() => null)
-        loadedWorkout = await fetchWorkout(realId, token).catch(() => null)
-        logger.debug('[WorkoutDetail] mapped realId api fallback', {
-          realId,
-          hasToken: !!token,
-          found: !!loadedWorkout
-        })
-      }
-
-      if (loadedWorkout) {
-        try { sessionStorage.removeItem('workout_map_' + String(id)) } catch {}
-        await router.replace({
-          name: 'workout-detail',
-          params: { id: realId },
-          query: { ...route.query, created: '1', realId }
-        }).catch(() => {})
-        logger.debug('[WorkoutDetail] replaced temp route with realId', { tempId: id, realId })
-        editingWorkoutId = realId
-      }
-    }
-  }
 
   if (!loadedWorkout) {
     logger.warn('[WorkoutDetail] local workout unresolved', {
@@ -1578,8 +1537,16 @@ async function loadServerWorkout(id) {
 async function loadWorkout() {
   loading.value = true
   error.value = ''
+  const requestedId = String(route.params.id || '')
+  logDiagnostic('load-start', {
+    requestedId,
+    fullPath: route.fullPath,
+    query: { ...route.query },
+    componentUid: getCurrentInstance()?.uid
+  })
+  // const requestedId = String(route.params.id || '')
   try {
-    const id = route.params.id
+    const id = requestedId
     logger.debug('[WorkoutDetail] loadWorkout start', {
       id,
       routeName: route.name,
@@ -1599,21 +1566,48 @@ async function loadWorkout() {
       result = await loadServerWorkout(id)
     }
 
+    // Guard gegen veraltete, spät ankommende Ladevorgänge: Falls sich route.params.id
+    // während des asynchronen Ladens geändert hat (z.B. User hat währenddessen zu einem
+    // anderen Workout navigiert, oder ein zweiter loadWorkout()-Aufruf lief parallel),
+    // diesen Ladevorgang verwerfen statt workout.value mit falschen Daten zu überschreiben.
+    const currentRouteId = String(route.params.id || '')
+    if (currentRouteId !== requestedId) {
+      logger.warn('[WorkoutDetail] loadWorkout verworfen – route.params.id hat sich während des Ladens geändert', {
+        requestedId,
+        currentRouteId
+      })
+      return
+    }
+
     const loadedWorkout = result.workout
     const editingWorkoutId = result.editingWorkoutId
+
+    // Zusätzliche Absicherung: Falls das geladene Workout selbst eine _id trägt, die
+    // weder der angeforderten Route-ID noch der aufgelösten editingWorkoutId entspricht,
+    // ebenfalls verwerfen – schützt vor falsch zugeordneten Datensätzen aus Store/Cache.
+    const loadedId = String(loadedWorkout?._id || '').trim()
+    if (loadedWorkout && loadedId && loadedId !== requestedId && loadedId !== String(editingWorkoutId || '')) {
+      logger.warn('[WorkoutDetail] loadWorkout verworfen – geladenes Workout hat unerwartete ID', {
+        requestedId,
+        loadedId,
+        editingWorkoutId
+      })
+      return
+    }
+
+    logDiagnostic('load-before-assign', {
+      requestedId,
+      currentRouteId: String(route.params.id || ''),
+      loadedWorkoutId: loadedWorkout?._id || null,
+      loadedExercises: loadedWorkout?.exercises?.map(ex => ({ name: ex.name, setDetails: ex.setDetails })) || []
+    })
+
     workout.value = loadedWorkout
 
     if (workout.value) {
       ensureSetDetailsStructure()
-      // await maybePrefillFromLastFavoritePerformance()
       await enrichExerciseImages()
 
-      // Active-Draft-Eintrag NUR anlegen wenn das Workout tatsächlich in Bearbeitung ist
-      // (Draft/Favoriten-Start). Für bereits abgeschlossene Workouts soll kein Active-Draft
-      // angelegt werden – das würde sonst BottomNav-Indikatoren fälschlicherweise aktivieren.
-      // Hinweis: der deep-watch auf workout.value ruft persistActiveDraft() ebenfalls auf;
-      // hier stellen wir nur sicher, dass der Eintrag SOFORT nach dem Laden existiert (damit
-      // triggerAutoSave()-Aufrufe, die noch vor dem nächsten Watcher-Tick kommen, greifen).
       if (shouldKeepAsDraft(workout.value) && workout.value.completed !== true) {
         const uid = resolveActiveWorkoutUserId()
         if (uid) {
@@ -1650,7 +1644,7 @@ async function enrichExerciseImages() {
 }
 
 function getExerciseImage(ex) {
-  const imageUrl = typeof ex?.imageUrl === 'string' ? ex.imageUrl : ''
+  const imageUrl = typeof ex?.imageUrl === 'string' ? resolveServerMediaUrl(ex.imageUrl) : ''
   const safeImage = /\.gif($|[?#])/i.test(imageUrl) ? '' : imageUrl
   const direct = ex?.thumbnailStaticUrl || ex?.thumbnailUrl || safeImage
   if (direct) return direct
@@ -1661,8 +1655,8 @@ function getExerciseImage(ex) {
 }
 
 function getExerciseLargeImage(ex) {
-  const imageUrl = typeof ex?.imageUrl === 'string' ? ex.imageUrl : ''
-  const safeImage = /\.gif($|[?#])/i.test(imageUrl) ? '' : imageUrl
+  const imageUrl = typeof ex?.imageUrl === 'string' ? resolveServerMediaUrl(ex.imageUrl) : ''
+  const safeImage = /\.gif($|[?#])/i.test(imageUrl) ? '': imageUrl
   const direct = safeImage || ex?.thumbnailUrl
   if (direct) return direct
   const nameKey = String(ex?.name || '').trim().toLowerCase()
@@ -1720,6 +1714,11 @@ function scrollToExercises() {
 }
 
 function openPicker(row, field, step = 1, min = 0, max = 1000, title = '') {
+  logDiagnostic('picker-open', { field, currentValue: row?.[field], suppressed: suppressNextPickerOpen })
+  if (suppressNextPickerOpen) {
+    suppressNextPickerOpen = false
+    return
+  }
   // Only show the picker on mobile
   if (!isMobile.value) return
   pickerTarget = { row, field }
@@ -1771,6 +1770,16 @@ async function discardDraftAndLeave() {
   // Sonst ruft onBeforeRouteLeave persistInProgressDraft() auf und speichert das Workout
   // als Draft, obwohl der Benutzer "Abbrechen" geklickt hat (BUG: Cancel speichert statt zu canceln)
   suppressDraftPersistence.value = true
+
+  // Sicherheitsnetz: Falls die Navigation aus irgendeinem Grund nicht durchläuft
+  // (z.B. Router-Guard bricht ab, Promise wird nie aufgelöst), Suppress nach
+  // kurzer Zeit automatisch zurücksetzen, statt die App für den Rest der
+  // Session lautlos vom Speichern zu blockieren.
+  const safetyResetTimer = setTimeout(() => {
+    suppressDraftPersistence.value = false
+    logDiagnostic('suppress-safety-reset', { reason: 'discardDraftAndLeave-timeout' })
+  }, 3000)
+
   clearActiveDraftForCurrentUser('discard-draft-leave')
   clearAllDetailDraftSnapshots()
   clearAllWorkoutMapKeys()
@@ -1818,7 +1827,8 @@ async function discardDraftAndLeave() {
   }
   timerStore.reset()
   bypassTimerLeaveGuard.value = true
-  router.push('/dashboard')
+  await router.push('/dashboard')
+  clearTimeout(safetyResetTimer)
 }
 
 function goDashboard() {
@@ -2683,6 +2693,20 @@ function handleTouchMove(event) {
   }
 }
 
+function logDiagnostic(event, data = {}) {
+  try {
+    const key = 'bro_split_load_diagnostics_v1'
+    const existing = JSON.parse(localStorage.getItem(key) || '[]')
+    existing.push({
+      event,
+      ...data,
+      timestamp: new Date().toISOString()
+    })
+    const trimmed = existing.slice(-40)
+    localStorage.setItem(key, JSON.stringify(trimmed))
+  } catch {}
+}
+
 function handleTouchEnd(event) {
   if (!activeFallbackTouchId.value) return
   const changed = event.changedTouches || []
@@ -2775,8 +2799,9 @@ return ok
 }
 
 function persistActiveDraftFromLifecycle(reason = 'unknown') {
-writeDetailViewState(reason)
-persistActiveDraft(reason).catch(() => {})
+  logDiagnostic('lifecycle-persist', { reason })
+  writeDetailViewState(reason)
+  persistActiveDraft(reason).catch(() => {})
 }
 
 function onVisibilityChange() {
@@ -2812,6 +2837,7 @@ onMounted(async () => {
     if (typeof window !== 'undefined' && window.Capacitor?.isNativePlatform?.()) {
       const { App: CapApp } = await import('@capacitor/app')
       _capAppStateListener = await CapApp.addListener('appStateChange', ({ isActive }) => {
+        logDiagnostic('app-state-change', { isActive })
         if (!isActive) {
           persistActiveDraftFromLifecycle('app-background')
         }
@@ -2910,18 +2936,34 @@ onBeforeRouteLeave(async (to) => {
     // danach mit der bereits geänderten Route feuert (isFavoriteAdjustMode wäre dann false)
     // und persistInProgressDraft den Draft sonst zurückschreiben würde.
     suppressDraftPersistence.value = true
-    const adjustId = String(route.params.id || '')
-    if (adjustId) {
-      await purgePendingCreateQueueForWorkoutId(adjustId)
-      try { await db.workouts.delete(adjustId) } catch {}
-      try {
-        const idx = store.workouts.findIndex(w => String(w?._id || '') === adjustId)
-        if (idx !== -1) store.workouts.splice(idx, 1)
-      } catch {}
+    // Sicherheitsnetz: Falls im Cleanup unten ein unerwarteter Fehler auftritt,
+    // Suppress nach kurzer Zeit automatisch zurücksetzen, statt die Session
+    // dauerhaft vom Speichern zu blockieren.
+    const safetyResetTimer = setTimeout(() => {
+      suppressDraftPersistence.value = false
+      logDiagnostic('suppress-safety-reset', { reason: 'onBeforeRouteLeave-adjust-timeout' })
+    }, 3000)
+
+    try {
+      const adjustId = String(route.params.id || '')
+      if (adjustId) {
+        await purgePendingCreateQueueForWorkoutId(adjustId)
+        try { await db.workouts.delete(adjustId) } catch {}
+        try {
+          const idx = store.workouts.findIndex(w => String(w?._id || '') === adjustId)
+          if (idx !== -1) store.workouts.splice(idx, 1)
+        } catch {}
+      }
+      clearActiveDraftForCurrentUser('adjust-route-leave')
+      clearAllDetailDraftSnapshots()
+      clearTimeout(safetyResetTimer)
+      return true
+    } catch (e) {
+      clearTimeout(safetyResetTimer)
+      suppressDraftPersistence.value = false
+      logDiagnostic('suppress-safety-reset', { reason: 'onBeforeRouteLeave-adjust-error', message: e?.message })
+      return true
     }
-    clearActiveDraftForCurrentUser('adjust-route-leave')
-    clearAllDetailDraftSnapshots()
-    return true
   }
 
   // Race-Fix (Cancel-Bug): Überprüfen ob gerade discardDraftAndLeave() läuft (bypassTimerLeaveGuard=true)
@@ -3050,6 +3092,12 @@ onBeforeUnmount(() => {
 .ex-list textarea {
   font-size: 16px;
   color: var(--fg);
+}
+.ex-description {
+  font-size: 0.82rem;
+  color: var(--muted);
+  margin: 4px 0 0;
+  line-height: 1.4;
 }
 .ex-list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .ex-list-actions { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; width: 100%; }

@@ -559,14 +559,14 @@ function updateOrientation() {
 .timer-time {
   font-size: var(--timer-time-size);
   font-weight: 800;
-  /* letter-spacing: 0.08em; */
+  letter-spacing: -0.02em;
   color: var(--accent);
   text-shadow:
     0 1px 0 color-mix(in srgb, white 22%, transparent),
     0 2px 8px rgba(0, 0, 0, 0.32);
   text-align: center;
   font-variant-numeric: tabular-nums;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-family: "DIN Alternate", "DIN Condensed", -apple-system, "Helvetica Neue", Arial, sans-serif;
   transition: font-size 340ms ease-in-out, letter-spacing 340ms ease-in-out;
 }
 
@@ -604,7 +604,7 @@ function updateOrientation() {
 }
 
 .timer-bar.running .timer-time {
-  color: #94af16;
+  color: var(--accent);
 }
 
 .timer-controls {
@@ -797,8 +797,8 @@ function updateOrientation() {
 .timer-bar.landscape-fullscreen .timer-time {
   font-size: clamp(100px, 20vw, 280px);
   font-weight: 700;
-  letter-spacing: 0.08em;
-  color: #708219;
+  letter-spacing: -0.02em;
+  color: var(--accent);
   text-align: center;
   line-height: 1;
   width: auto;
@@ -806,6 +806,8 @@ function updateOrientation() {
   height: auto;
   margin: 0;
   display: block;
+  font-family: "DIN Alternate", "DIN Condensed", -apple-system, "Helvetica Neue", Arial, sans-serif;
+  font-variant-numeric: tabular-nums;
 }
 
 .timer-bar.landscape-fullscreen .timer-controls {

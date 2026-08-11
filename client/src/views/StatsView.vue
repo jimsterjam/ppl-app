@@ -1087,7 +1087,7 @@ function formatNumber(value, digits = 0) {
 }
 
 .range-pill.active {
-  background: linear-gradient(120deg, rgba(215, 255, 31, 0.75), rgba(255, 164, 89, 0.75));
+  background: linear-gradient(120deg, rgba(61, 142, 230, 0.75), rgba(255, 164, 89, 0.75));
 }
 
 .calendar-shell {
@@ -1144,9 +1144,9 @@ function formatNumber(value, digits = 0) {
 }
 
 .calendar-cell.today {
-  border-color: rgba(215, 255, 31, 0.85);
-  background: rgba(215, 255, 31, 0.14);
-  box-shadow: 0 0 0 1px rgba(215, 255, 31, 0.4);
+  border-color: rgba(61, 142, 230, 0.85);
+  background: rgba(61, 142, 230, 0.14);
+  box-shadow: 0 0 0 1px rgba(61, 142, 230, 0.4);
 }
 
 .calendar-cell.clickable {
@@ -1155,14 +1155,14 @@ function formatNumber(value, digits = 0) {
 
 .calendar-cell.clickable:hover {
   transform: translateY(-1px);
-  border-color: rgba(215, 255, 31, 0.5);
+  border-color: rgba(61, 142, 230, 0.5);
 }
 
 .calendar-day-marker {
   width: 7px;
   height: 7px;
   border-radius: 999px;
-  background: var(--accent-color, #d7ff1f);
+  background: var(--accent-color, #3d8ee6);
 }
 
 /* Kalender-Overlay */
@@ -1428,7 +1428,7 @@ function formatNumber(value, digits = 0) {
   padding: 18px 20px;
   border-radius: 20px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  background: linear-gradient(120deg, rgba(215, 255, 31, 0.22), rgba(255, 164, 89, 0.18));
+  background: linear-gradient(120deg, rgba(61, 142, 230, 0.22), rgba(255, 164, 89, 0.18));
 }
 
 .banner-title {
@@ -1475,7 +1475,7 @@ function formatNumber(value, digits = 0) {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  background: linear-gradient(120deg, rgba(255, 164, 89, 0.18), rgba(215, 255, 31, 0.18));
+  background: linear-gradient(120deg, rgba(255, 164, 89, 0.18), rgba(61, 142, 230, 0.18));
 }
 
 .insight-icon {
@@ -1486,8 +1486,8 @@ function formatNumber(value, digits = 0) {
   align-self: flex-start;
   margin-top: 6px;
   border: none;
-  background: rgba(215, 255, 31, 0.9);
-  color: #1a1a1a;
+  background: var(--accent);
+  color: var(--accent-contrast);
   padding: 6px 12px;
   border-radius: 999px;
   font-weight: 700;
@@ -1536,7 +1536,7 @@ function formatNumber(value, digits = 0) {
 }
 
 .calendar-month-btn:hover {
-  border-color: rgba(215, 255, 31, 0.5);
+  border-color: rgba(61, 142, 230, 0.5);
 }
 
 @media (max-width: 540px) {
@@ -1570,7 +1570,7 @@ function formatNumber(value, digits = 0) {
   height: 28px;
   border-radius: 999px;
   border: 3px solid rgba(255, 255, 255, 0.12);
-  border-top-color: rgba(215, 255, 31, 0.9);
+  border-top-color: rgba(61, 142, 230, 0.9);
   animation: spin 0.9s linear infinite;
 }
 

@@ -62,7 +62,7 @@ export const messages = {
       exercises: 'Übungen',
       plan: 'Plan',
       faqs: "FAQ's",
-      settings: 'Einstellungen',
+      settings: 'Einst.',
       legal: 'Rechtliches',
       ariaMain: 'Hauptnavigation'
     },
@@ -372,6 +372,26 @@ export const messages = {
         reset: 'Zurücksetzen'
       },
       searchLettersOnly: 'Nur Buchstaben erlaubt.',
+      addCustom: 'Eigene Übung hinzufügen',
+      addCustomTitle: 'Eigene Übung hinzufügen',
+      editCustomTitle: 'Übung bearbeiten',
+      nameLabel: 'Name der Übung',
+      nameRequired: 'Bitte einen Namen eingeben.',
+      muscleGroupLabel: 'Muskelgruppe',
+      muscleGroupPlaceholder: 'Bitte wählen',
+      notesLabel: 'Notiz (optional)',
+      notesPlaceholder: 'z.B. Ersatz für Nordic Curls, näher an meiner tatsächlichen Übung',
+      imageLabel: 'Bild (optional)',
+      imageAdd: 'Bild wählen',
+      imageError: 'Bild konnte nicht verarbeitet werden.',
+      imageUploadFailed: 'Übung gespeichert, Bild-Upload fehlgeschlagen.',
+      imageSyncHint: 'Bild kann erst nach der ersten Synchronisierung hinzugefügt werden.',
+      imagePickTitle: 'Bild auswählen',
+      imagePickGallery: 'Aus Galerie wählen',
+      imagePickCamera: 'Foto aufnehmen',
+      deleteCustomTitle: 'Löschen',
+      deleteCustomConfirmTitle: 'Übung löschen',
+      deleteCustomConfirmMsg: 'Diese eigene Übung wirklich löschen?',
       // Übersetzungsmapping für deutsche → englische Übungsnamen
       names: {
         // PUSH Übungen
@@ -1147,6 +1167,26 @@ export const messages = {
         reset: 'Reset'
       },
       searchLettersOnly: 'Letters only, please.',
+      addCustom: 'Add Custom Exercise',
+      addCustomTitle: 'Add custom exercise',
+      editCustomTitle: 'Edit exercise',
+      nameLabel: 'Exercise name',
+      nameRequired: 'Please enter a name.',
+      muscleGroupLabel: 'Muscle group',
+      muscleGroupPlaceholder: 'Please select',
+      notesLabel: 'Note (optional)',
+      notesPlaceholder: 'e.g. Replacement for Nordic Curls, closer to my actual exercise',
+      imageLabel: 'Image (optional)',
+      imageAdd: 'Choose image',
+      imageError: 'Image could not be processed.',
+      imageUploadFailed: 'Exercise saved, image upload failed.',
+      imageSyncHint: 'Image can only be added after the first sync.',
+      imagePickTitle: 'Choose image',
+      imagePickGallery: 'Choose from gallery',
+      imagePickCamera: 'Take photo',
+      deleteCustomTitle: 'Delete',
+      deleteCustomConfirmTitle: 'Delete exercise',
+      deleteCustomConfirmMsg: 'Really delete this custom exercise?',
       // Exercise name translation mapping (same as German for reference)
       names: {
         // PUSH Exercises

@@ -14,16 +14,10 @@
     <div class="custom-exercise-form">
       <label class="field image-field">
         <span>{{ t('exercises.imageLabel') || 'Bild (optional)' }}</span>
-        <label class="field image-field">
-        <span>{{ t('exercises.imageLabel') || 'Bild (optional)' }}</span>
         <div class="image-picker" @click="pickImage">
           <img v-if="imagePreviewUrl" :src="imagePreviewUrl" class="image-preview" alt="" />
           <span v-else class="image-placeholder">+ {{ t('exercises.imageAdd') || 'Bild wählen' }}</span>
         </div>
-        <small v-if="isEditMode && !canUploadImage" class="image-hint">
-          {{ t('exercises.imageSyncHint') || 'Bild kann erst nach der ersten Synchronisierung hinzugefügt werden.' }}
-        </small>
-      </label>
         <small v-if="isEditMode && !canUploadImage" class="image-hint">
           {{ t('exercises.imageSyncHint') || 'Bild kann erst nach der ersten Synchronisierung hinzugefügt werden.' }}
         </small>
@@ -55,7 +49,15 @@
           <option value="other">{{ t('muscleGroups.other') || 'Sonstiges' }}</option>
         </select>
       </label>
-
+      <label class="field">
+      <span>{{ t('exercises.descriptionLabel') || 'Beschreibung (optional)' }}</span>
+        <textarea
+          v-model="description"
+          rows="3"
+          maxlength="500"
+          :placeholder="t('exercises.descriptionPlaceholder') || 'Kurze Beschreibung oder Ausführungshinweise'"
+        ></textarea>
+      </label>
       <label class="field">
         <span>{{ t('exercises.notesLabel') || 'Notiz (optional)' }}</span>
         <textarea
@@ -66,8 +68,8 @@
         ></textarea>
       </label>
 
-      <p v-if="errorMsg" class="error-msg">{{ errorMsg }}</p>
-    </div>
+    <p v-if="errorMsg" class="error-msg">{{ errorMsg }}</p>
+  </div>
   </AppModal>
 </template>
 
@@ -100,6 +102,7 @@ const saving = ref(false)
 const errorMsg = ref('')
 const selectedImageFile = ref(null)
 const imagePreviewUrl = ref('')
+const description = ref('')
 
 const isEditMode = computed(() => Boolean(props.exercise?._id))
 // Bild-Upload braucht eine bereits synchronisierte Server-ID (kein custom_-Präfix)
@@ -114,11 +117,13 @@ watch(() => props.modelValue, (val) => {
     if (isEditMode.value) {
       name.value = props.exercise?.name || ''
       muscleGroup.value = props.exercise?.muscleGroup || ''
+      description.value = props.exercise?.description || ''
       notes.value = props.exercise?.notes || ''
       imagePreviewUrl.value = props.exercise?.imageUrl || ''
     } else {
       name.value = ''
       muscleGroup.value = ''
+      description.value = ''
       notes.value = ''
       imagePreviewUrl.value = ''
     }
@@ -177,6 +182,7 @@ async function onConfirm() {
       result = await updateCustomExercise(props.exercise._id, {
         name: trimmedName,
         muscleGroup: muscleGroup.value || 'other',
+        description: description.value.trim() || '',
         notes: notes.value.trim() || ''
       }, token)
 
@@ -197,6 +203,7 @@ async function onConfirm() {
         userId: props.userId,
         name: trimmedName,
         muscleGroup: muscleGroup.value || 'other',
+        description: description.value.trim() || '',
         notes: notes.value.trim() || ''
       }, token)
 

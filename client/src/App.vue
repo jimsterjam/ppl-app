@@ -25,6 +25,7 @@ onMounted(async () => {
         </div>
       </Transition>
     </RouterView>
+    <BottomNav />
     <TimerPortal />
     <ToastHost />
   </div>

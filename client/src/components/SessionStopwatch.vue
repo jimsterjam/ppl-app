@@ -121,7 +121,7 @@ onBeforeUnmount(() => {
   padding: 16px 16px;
   border-radius: 10px;
   border: none;
-  background: #dc2626;
+  background: var(--accent);
   color: #ffffff;
   font-size: 1.05rem;
   font-weight: 600;
@@ -135,7 +135,7 @@ onBeforeUnmount(() => {
 .sw-trigger--running {
   color: #ffffff;
   border-color: color-mix(in srgb, var(--accent) 55%, transparent);
-  background: #b91c1c;
+  background: var(--accent);
   font-variant-numeric: tabular-nums;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }

@@ -53,6 +53,14 @@
         @input="onSearchInput"
       />
       <p v-if="searchError" class="search-error">{{ searchError }}</p>
+      <button
+        v-if="userId"
+        class="add-custom-exercise-btn"
+        type="button"
+        @click="editingCustomExercise = null; showAddCustomModal = true"
+        >
+        {{ t('exercises.addCustom') || 'Eigene Übung' }}
+      </button>
     </div>
 
     <!-- Ladezustand -->
@@ -64,14 +72,6 @@
     <div v-else>
       <div class="result-toolbar">
         <span class="result-count">{{ visibleExercises.length }} / {{ filteredExercises.length }}</span>
-        <button
-          v-if="userId"
-          class="add-custom-exercise-btn"
-          type="button"
-          @click="editingCustomExercise = null; showAddCustomModal = true"
-          >
-          {{ t('exercises.addCustom') || 'Eigene Übung' }}
-        </button>
       </div>
 
       <div class="exercise-grid">
@@ -185,6 +185,7 @@ import AddCustomExerciseModal from '@/components/AddCustomExerciseModal.vue'
 import AppModal from '@/components/AppModal.vue'
 import { deleteCustomExercise } from '@/api/customExercises'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
+import { resolveServerMediaUrl } from '@/api/http'
 
 const props = defineProps({
   showTitle: {
@@ -550,7 +551,7 @@ function getExerciseListImage(ex) {
   if (!ex) return '/exercises/play.svg'
   const id = ex._id
   if (id != null && brokenImageIds.value.has(id)) return '/exercises/play.svg'
-  const imageUrl = typeof ex?.imageUrl === 'string' ? ex.imageUrl : ''
+  const imageUrl = typeof ex?.imageUrl === 'string' ? resolveServerMediaUrl(ex.imageUrl) : ''
   const mediaUrl = typeof ex?.mediaUrl === 'string' ? ex.mediaUrl : ''
   const safeImage = /\.gif($|[?#])/i.test(imageUrl) ? '' : imageUrl
   const safeMedia = /\.gif($|[?#])/i.test(mediaUrl) ? '' : mediaUrl
@@ -558,7 +559,7 @@ function getExerciseListImage(ex) {
 }
 
 function getExerciseLargeImage(ex) {
-  const imageUrl = typeof ex?.imageUrl === 'string' ? ex.imageUrl : ''
+  const imageUrl = typeof ex?.imageUrl === 'string' ? resolveServerMediaUrl(ex.imageUrl) : ''
   const mediaUrl = typeof ex?.mediaUrl === 'string' ? ex.mediaUrl : ''
   const safeImage = /\.gif($|[?#])/i.test(imageUrl) ? '' : imageUrl
   const safeMedia = /\.gif($|[?#])/i.test(mediaUrl) ? '' : mediaUrl

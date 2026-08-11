@@ -736,6 +736,9 @@ export const useUserStore = defineStore("user", {
               if (!lateUpdate) return
               const lateIdx = this.workouts.findIndex(w => w._id === id)
               if (lateIdx !== -1) {
+                const currentTs = new Date(this.workouts[lateIdx]?.updatedAt || 0).getTime()
+                const lateTs = new Date(lateUpdate?.updatedAt || 0).getTime()
+                if (lateTs < currentTs) return
                 this.workouts[lateIdx] = { ...this.workouts[lateIdx], ...lateUpdate }
                 if (updates.completed !== undefined) {
                   this.workouts[lateIdx].completed = updates.completed
