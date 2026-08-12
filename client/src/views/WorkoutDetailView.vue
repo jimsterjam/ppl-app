@@ -1153,6 +1153,17 @@ function cancelPendingAutoSave(reason = 'unknown') {
   flushAutoSaveWaiters(false)
 }
 
+function triggerAutoSave() {
+  cancelPendingAutoSave('debounce-restart')
+  autoSaveTimer = setTimeout(() => {
+    autoSaveTimer = null
+    runAutoSaveNow().then((result) => {
+      flushAutoSaveWaiters(result !== false)
+    }).catch(() => {
+      flushAutoSaveWaiters(false)
+    })
+  }, AUTO_SAVE_DEBOUNCE_MS)
+}
 
 async function runAutoSaveNow() {
   if (saving.value || suppressDraftPersistence.value) return
