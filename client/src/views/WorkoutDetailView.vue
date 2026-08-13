@@ -1767,7 +1767,7 @@ function goToPostWorkoutSummary(workoutId) {
     name: 'stats',
     query: {
       postWorkout: '1',
-      postWorkoutId: id
+      workoutId: id
     }
   })
 }

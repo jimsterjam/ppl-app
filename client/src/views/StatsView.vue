@@ -2,6 +2,13 @@
   <div class="stats-view">
     <HeaderBar :title="t('stats.overview')" />
 
+    <!-- Post-Workout AI Feedback Summary -->
+    <PostWorkoutSummary
+      v-if="postWorkoutId"
+      :workout-id="postWorkoutId"
+      @close="postWorkoutId = null"
+    />
+
     <main class="stats-content">
       <section class="section">
         <RecentWorkouts :workouts="recentWorkoutsSource" :show-view-all="false" @delete="handleDeleteRecentWorkout" />
@@ -176,6 +183,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { useUserStore } from '@/stores/userStore'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -188,6 +196,7 @@ import UpgradeModal from '@/components/UpgradeModal.vue'
 import RecentWorkouts from '@/components/RecentWorkouts.vue'
 import ProgressThreeMonthsSection from '@/components/stats/ProgressThreeMonthsSection.vue'
 import WorkoutComparisonSection from '@/components/stats/WorkoutComparisonSection.vue'
+import PostWorkoutSummary from '@/components/PostWorkoutSummary.vue'
 import { logger } from '@/utils/logger'
 import { isOnline, getAllWorkoutsOffline, deleteWorkoutOffline, saveWorkoutOffline, OFFLINE_WORKOUTS_UPDATED_EVENT } from '@/utils/offlineStorage'
 import { resolveWorkoutNotes } from '@/utils/workoutNotes'
@@ -195,6 +204,7 @@ import { deleteWorkout as deleteWorkoutApi } from '@/api/workouts'
 import { deleteWorkoutFromStats, getWorkoutIdentifier } from '@/utils/workoutDeletion'
 
 const { t, locale } = useI18n()
+const route = useRoute()
 const store = useUserStore()
 const settings = useSettingsStore()
 const { getIdToken, onAuthStateChanged, getCurrentUser } = useFirebaseAuth()
@@ -204,6 +214,7 @@ const subscriptionStore = useSubscriptionStore()
 const loading = ref(true)
 const offlineWorkouts = ref([])
 const authToken = ref(null)
+const postWorkoutId = ref(null)
 
 const statsWorkouts = computed(() => {
   const offlineList = Array.isArray(offlineWorkouts.value) ? offlineWorkouts.value : []
@@ -641,6 +652,20 @@ watch(selectedRangeDays, async (next) => {
   const token = await getIdToken().catch(() => null)
   await store.loadStats(token, { rangeDays: next })
 })
+
+// Beobachte route.query.postWorkout um PostWorkoutSummary anzuzeigen
+watch(
+  () => ({
+    postWorkout: route.query.postWorkout,
+    workoutId: route.query.workoutId
+  }),
+  (newQuery) => {
+    if (newQuery.postWorkout === '1' && newQuery.workoutId) {
+      postWorkoutId.value = String(newQuery.workoutId)
+    }
+  },
+  { immediate: true }
+)
 
 function selectRange(range) {
   if (range.proOnly && !isPro.value) {

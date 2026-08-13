@@ -7,6 +7,13 @@ import exercises from '../data/exercises.js';
 import Exercise from '../models/Exercise.js';
 import UserProfile from '../models/UserProfile.js';
 import { logger } from '../utils/logger.js';
+import { getAIService } from '../services/aiService.js';
+import {
+  calculateExerciseStats,
+  analyzeWorkoutProgression,
+  structureAnalysisForAI,
+  createSimpleExerciseFeedback
+} from '../services/trainingAnalysisService.js';
 import {
   startOfIsoWeek,
   normalizeCategory,
@@ -1131,6 +1138,480 @@ router.post("/ai-feedback", firebaseAuthMiddleware, async (req, res) => {
   } catch (err) {
     logger.error('❌ AI Feedback Error:', err);
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Note: calculateExerciseStats ist jetzt in trainingAnalysisService.js
+// Wird via import genutzt
+
+// 🔍 WORKOUT ANALYZER: Trainingsanalyse mit strukturiertem AI-Feedback
+router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
+  const requestId = `analysis_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+  try {
+    const { userId } = req.auth;
+    const workoutId = req.params.id;
+
+    if (!(await import('mongoose')).default.Types.ObjectId.isValid(workoutId)) {
+      return res.status(400).json({ error: 'Invalid workout ID', requestId });
+    }
+
+    logger.info('🔍 Workout analysis started', { requestId, userId, workoutId });
+
+    // 1. Lade aktuelles Workout
+    const currentWorkout = await Workout.findOne({ _id: workoutId, userId }).lean();
+    if (!currentWorkout) {
+      return res.status(404).json({ error: 'Workout not found', requestId });
+    }
+
+    // 2. Lade alle Workouts des Users
+    const allWorkouts = await Workout.find({ userId })
+      .sort({ date: -1 })
+      .lean();
+
+    // 3. Backend-Berechnung: Analysiere Fortschritte
+    const exerciseAnalyses = analyzeWorkoutProgression(currentWorkout, allWorkouts);
+
+    if (exerciseAnalyses.length === 0) {
+      return res.json({
+        success: true,
+        workoutId: currentWorkout._id,
+        message: 'No exercises with previous sessions found for analysis',
+        exercises: [],
+        metadata: {
+          requestId,
+          timestamp: new Date().toISOString(),
+          provider: 'backend_only'
+        }
+      });
+    }
+
+    // 4. Strukturiere Daten für AI (Mini-Datensatz)
+    const structuredAnalysis = structureAnalysisForAI(exerciseAnalyses);
+
+    // 5. Rufe AI-Service auf (OpenAI oder Ollama, abhängig von Konfiguration)
+    const aiService = getAIService();
+    let aiResult = null;
+    let aiError = null;
+
+    try {
+      aiResult = await aiService.generateTrainingAnalysis(structuredAnalysis, {
+        requestId,
+        temperature: 0.7
+      });
+    } catch (error) {
+      aiError = error;
+      logger.error('❌ AI generation failed', {
+        requestId,
+        provider: aiService.getProviderName(),
+        error: error.message
+      });
+      // Gib trotzdem die Backend-Analysen zurück
+    }
+
+    // 6. Kombiniere Backend-Analysen + AI-Feedback
+    res.json({
+      success: true,
+      workoutId: currentWorkout._id,
+      workoutDate: currentWorkout.date,
+
+      // Backend-Berechnungen (Fakten)
+      backend_analysis: {
+        total_exercises: exerciseAnalyses.length,
+        progression_summary: structuredAnalysis.progression_summary,
+        exercises: exerciseAnalyses.map(ex => ({
+          exercise: ex.exercise,
+          current: ex.current,
+          previous: ex.previous || null,
+          changes: ex.changes,
+          progression: ex.progression,
+          period_days: ex.period_days
+        }))
+      },
+
+      // AI-Feedback (Interpretation)
+      ...(aiResult ? {
+        ai_feedback: aiResult.feedback,
+        ai_metadata: aiResult.metadata
+      } : {}),
+
+      metadata: {
+        requestId,
+        timestamp: new Date().toISOString(),
+        aiProvider: aiService.getProviderName(),
+        aiModel: aiService.getModelName(),
+        aiAvailable: !aiError,
+        ...(aiError ? { aiError: aiError.message } : {})
+      }
+    });
+
+  } catch (error) {
+    logger.error('❌ Workout analysis error', {
+      requestId,
+      message: error.message,
+      stack: error.stack
+    });
+
+    res.status(500).json({
+      error: 'Workout analysis failed',
+      code: 'ANALYSIS_FAILED',
+      message: error.message,
+      requestId
+    });
+  }
+});
+
+// 🧪 TEST: AI-Analysis OHNE Auth (für lokale Tests)
+router.post("/:id/ai-analysis-test", async (req, res) => {
+  const requestId = `analysis_test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+  try {
+    const workoutId = req.params.id;
+
+    if (!(await import('mongoose')).default.Types.ObjectId.isValid(workoutId)) {
+      return res.status(400).json({ error: 'Invalid workout ID', requestId });
+    }
+
+    logger.info('🔍 Workout analysis TEST (no auth) started', { requestId, workoutId });
+
+    // 1. Lade aktuelles Workout (ohne userId-Filter für Tests)
+    const currentWorkout = await Workout.findOne({ _id: workoutId }).lean();
+    if (!currentWorkout) {
+      return res.status(404).json({ error: 'Workout not found', requestId });
+    }
+
+    // 2. Lade alle Workouts (ohne userId-Filter für Tests)
+    const allWorkouts = await Workout.find({})
+      .sort({ date: -1 })
+      .lean();
+
+    // 3. Backend-Berechnung: Analysiere Fortschritte
+    const exerciseAnalyses = analyzeWorkoutProgression(currentWorkout, allWorkouts);
+
+    if (exerciseAnalyses.length === 0) {
+      return res.json({
+        success: true,
+        workoutId: currentWorkout._id,
+        message: 'No exercises with previous sessions found for analysis',
+        exercises: [],
+        metadata: {
+          requestId,
+          timestamp: new Date().toISOString(),
+          provider: 'backend_only',
+          testMode: true
+        }
+      });
+    }
+
+    // 4. Strukturiere Daten für AI (Mini-Datensatz)
+    const structuredAnalysis = structureAnalysisForAI(exerciseAnalyses);
+
+    // 5. Rufe AI-Service auf (OpenAI oder Ollama, abhängig von Konfiguration)
+    const aiService = getAIService();
+    let aiResult = null;
+    let aiError = null;
+
+    try {
+      aiResult = await aiService.generateTrainingAnalysis(structuredAnalysis, {
+        requestId,
+        temperature: 0.7
+      });
+    } catch (error) {
+      aiError = error;
+      logger.error('❌ AI generation failed (test mode)', {
+        requestId,
+        provider: aiService.getProviderName(),
+        error: error.message
+      });
+      // Gib trotzdem die Backend-Analysen zurück
+    }
+
+    // 6. Kombiniere Backend-Analysen + AI-Feedback
+    res.json({
+      success: true,
+      workoutId: currentWorkout._id,
+      workoutDate: currentWorkout.date,
+
+      // Backend-Berechnungen (Fakten)
+      backend_analysis: {
+        total_exercises: exerciseAnalyses.length,
+        progression_summary: structuredAnalysis.progression_summary,
+        exercises: exerciseAnalyses.map(ex => ({
+          exercise: ex.exercise,
+          current: ex.current,
+          previous: ex.previous || null,
+          changes: ex.changes,
+          progression: ex.progression,
+          period_days: ex.period_days
+        }))
+      },
+
+      // AI-Feedback (Interpretation)
+      ...(aiResult ? {
+        ai_feedback: aiResult.feedback,
+        ai_metadata: aiResult.metadata
+      } : {}),
+
+      metadata: {
+        requestId,
+        timestamp: new Date().toISOString(),
+        aiProvider: aiService.getProviderName(),
+        aiModel: aiService.getModelName(),
+        aiAvailable: !aiError,
+        testMode: true,
+        ...(aiError ? { aiError: aiError.message } : {})
+      }
+    });
+
+  } catch (error) {
+    logger.error('❌ Workout analysis test error', {
+      requestId,
+      message: error.message,
+      stack: error.stack
+    });
+
+    res.status(500).json({
+      error: 'Workout analysis failed',
+      code: 'ANALYSIS_FAILED',
+      message: error.message,
+      requestId
+    });
+  }
+});
+
+// 🧪 TEST: Einfaches Feedback OHNE Auth (für lokale Tests)
+router.post("/ai-progress-feedback-test", async (req, res) => {
+  const requestId = `progress_test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+  try {
+    const {
+      exercise,
+      period = 'unknown',
+      weight_change = 0,
+      rep_change = 0,
+      volume_change = 0,
+      progression = 'unknown'
+    } = req.body;
+
+    logger.info('🤖 Progress Feedback TEST requested', {
+      requestId,
+      exercise,
+      period
+    });
+
+    // Validierung
+    if (!exercise || typeof exercise !== 'string') {
+      return res.status(400).json({
+        error: 'Missing or invalid exercise name',
+        code: 'INVALID_INPUT',
+        requestId
+      });
+    }
+
+    // Strukturiere einfachen Datensatz
+    const trainingData = createSimpleExerciseFeedback({
+      exercise: exercise.trim(),
+      period: String(period).trim(),
+      weight_change: Number(weight_change) || 0,
+      rep_change: Number(rep_change) || 0,
+      volume_change: Number(volume_change) || 0,
+      progression: String(progression).toLowerCase()
+    });
+
+    // Wrappse in Struktur für AI Service
+    const analysisForAI = {
+      analysis_date: new Date().toISOString(),
+      total_exercises_analyzed: 1,
+      progression_summary: {
+        positive: trainingData.progression === 'positive' ? 1 : 0,
+        stable: trainingData.progression === 'stable' ? 1 : 0,
+        negative: trainingData.progression === 'negative' ? 1 : 0
+      },
+      exercises: [trainingData],
+      top_improvements: trainingData.progression === 'positive' ? [{ exercise: trainingData.exercise, volume_change_percent: trainingData.volume_change_percent }] : [],
+      top_declines: trainingData.progression === 'negative' ? [{ exercise: trainingData.exercise, volume_change_percent: trainingData.volume_change_percent }] : []
+    };
+
+    // Rufe AI Service auf
+    const aiService = getAIService();
+    let feedback = null;
+    let aiError = null;
+
+    try {
+      const aiResult = await aiService.generateTrainingAnalysis(analysisForAI, {
+        requestId,
+        temperature: 0.6
+      });
+      feedback = aiResult.feedback;
+
+      logger.debug('✅ Progress feedback generated', {
+        requestId,
+        exercise,
+        provider: aiService.getProviderName()
+      });
+    } catch (error) {
+      aiError = error;
+      logger.error('❌ AI generation failed', {
+        requestId,
+        provider: aiService.getProviderName(),
+        error: error.message
+      });
+    }
+
+    // Gib Antwort zurück
+    if (feedback) {
+      res.json({
+        success: true,
+        exercise: trainingData.exercise,
+        feedback: feedback,
+        metadata: {
+          requestId,
+          timestamp: new Date().toISOString(),
+          provider: aiService.getProviderName(),
+          model: aiService.getModelName()
+        }
+      });
+    } else {
+      res.status(503).json({
+        error: 'AI service unavailable',
+        code: 'AI_SERVICE_UNAVAILABLE',
+        message: aiError?.message,
+        requestId
+      });
+    }
+
+  } catch (error) {
+    logger.error('❌ Progress Feedback Error', {
+      requestId,
+      message: error.message,
+      stack: error.stack
+    });
+
+    res.status(500).json({
+      error: 'Failed to generate progress feedback',
+      code: 'FEEDBACK_GENERATION_FAILED',
+      message: error.message,
+      requestId
+    });
+  }
+});
+
+// 🚀 SIMPLE PROGRESS FEEDBACK: Einfaches Feedback zu einzelner Übung
+router.post("/ai-progress-feedback", firebaseAuthMiddleware, async (req, res) => {
+  const requestId = `progress_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+  try {
+    const { userId } = req.auth;
+    const {
+      exercise,
+      period = 'unknown',
+      weight_change = 0,
+      rep_change = 0,
+      volume_change = 0,
+      progression = 'unknown'
+    } = req.body;
+
+    logger.info('🤖 Progress Feedback requested', {
+      requestId,
+      userId,
+      exercise,
+      period
+    });
+
+    // Validierung
+    if (!exercise || typeof exercise !== 'string') {
+      return res.status(400).json({
+        error: 'Missing or invalid exercise name',
+        code: 'INVALID_INPUT',
+        requestId
+      });
+    }
+
+    // Strukturiere einfachen Datensatz
+    const trainingData = createSimpleExerciseFeedback({
+      exercise: exercise.trim(),
+      period: String(period).trim(),
+      weight_change: Number(weight_change) || 0,
+      rep_change: Number(rep_change) || 0,
+      volume_change: Number(volume_change) || 0,
+      progression: String(progression).toLowerCase()
+    });
+
+    // Wrappse in Struktur für AI Service
+    const analysisForAI = {
+      analysis_date: new Date().toISOString(),
+      total_exercises_analyzed: 1,
+      progression_summary: {
+        positive: trainingData.progression === 'positive' ? 1 : 0,
+        stable: trainingData.progression === 'stable' ? 1 : 0,
+        negative: trainingData.progression === 'negative' ? 1 : 0
+      },
+      exercises: [trainingData],
+      top_improvements: trainingData.progression === 'positive' ? [{ exercise: trainingData.exercise, volume_change_percent: trainingData.volume_change_percent }] : [],
+      top_declines: trainingData.progression === 'negative' ? [{ exercise: trainingData.exercise, volume_change_percent: trainingData.volume_change_percent }] : []
+    };
+
+    // Rufe AI Service auf
+    const aiService = getAIService();
+    let feedback = null;
+    let aiError = null;
+
+    try {
+      const aiResult = await aiService.generateTrainingAnalysis(analysisForAI, {
+        requestId,
+        temperature: 0.6
+      });
+      feedback = aiResult.feedback;
+
+      logger.debug('✅ Progress feedback generated', {
+        requestId,
+        exercise,
+        provider: aiService.getProviderName()
+      });
+    } catch (error) {
+      aiError = error;
+      logger.error('❌ AI generation failed', {
+        requestId,
+        provider: aiService.getProviderName(),
+        error: error.message
+      });
+    }
+
+    // Gib Antwort zurück
+    if (feedback) {
+      res.json({
+        success: true,
+        exercise: trainingData.exercise,
+        feedback: feedback,
+        metadata: {
+          requestId,
+          timestamp: new Date().toISOString(),
+          provider: aiService.getProviderName(),
+          model: aiService.getModelName()
+        }
+      });
+    } else {
+      res.status(503).json({
+        error: 'AI service unavailable',
+        code: 'AI_SERVICE_UNAVAILABLE',
+        message: aiError?.message,
+        requestId
+      });
+    }
+
+  } catch (error) {
+    logger.error('❌ Progress Feedback Error', {
+      requestId,
+      message: error.message,
+      stack: error.stack
+    });
+
+    res.status(500).json({
+      error: 'Failed to generate progress feedback',
+      code: 'FEEDBACK_GENERATION_FAILED',
+      message: error.message,
+      requestId
+    });
   }
 });
 

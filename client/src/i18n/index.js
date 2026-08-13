@@ -38,8 +38,7 @@ export const messages = {
       reps: 'Wdh.',
       duration: 'Dauer',
       today: 'Heute',
-      
-      
+      continue: 'Weiter',
       unknownDuration: '?',
       more: 'weitere',
       select: 'Auswählen'
@@ -694,6 +693,15 @@ export const messages = {
       deleteConfirm: 'Workout "{name}" wirklich löschen?',
       deleteFailed: 'Workout konnte nicht gelöscht werden.',
       unknownDuration: '?'
+    },
+    postWorkout: {
+      title: 'Workout abgeschlossen!',
+      analyzing: 'Analysiere deinen Trainingsfortschritt...',
+      feedback: 'Dein Feedback',
+      gotIt: 'Verstanden',
+      seeDetails: 'Details anschauen',
+      saved: 'Dein Workout wurde gespeichert!',
+      error: 'Feedback konnte nicht geladen werden'
     },
     welcome: {
       title: 'Push-Pull-Legs!\n',
@@ -1462,6 +1470,15 @@ export const messages = {
       deleteConfirm: 'Do you really want to delete "{name}"?',
       deleteFailed: 'Workout could not be deleted.',
       unknownDuration: 'Unknown duration'
+    },
+    postWorkout: {
+      title: 'Workout complete!',
+      analyzing: 'Analyzing your training progress...',
+      feedback: 'Your feedback',
+      gotIt: 'Got it',
+      seeDetails: 'See details',
+      saved: 'Your workout has been saved!',
+      error: 'Could not load feedback'
     },
     welcome: {
       title: 'Welcome to the Bro Split App!',
