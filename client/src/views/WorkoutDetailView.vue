@@ -2769,50 +2769,85 @@ function findExerciseIndexAtPoint(x, y) {
   return Number.isNaN(idx) ? null : idx
 }
 
+/**
+ * Core-Funktion zum Speichern des Active Draft
+ * Extrahiert aus persistActiveDraft() um Code-Duplikation zu vermeiden
+ * und das isDirty Race Condition Problem zu lösen.
+ *
+ * @param {string} reason - Grund des Saves (für Logging)
+ * @param {boolean} forceIgnoreDirty - true = speichern ohne isDirty zu prüfen (für Lifecycle-Events)
+ * @returns {boolean} true wenn erfolgreich gespeichert
+ */
+function saveActiveDraftDirect(reason = 'unknown', forceIgnoreDirty = false) {
+  if (suppressDraftPersistence.value) return false
+  if (isFavoriteAdjustMode.value) return false
+
+  const w = workout.value
+  if (!w || w.completed === true) return false
+
+  // Guard: Workout muss als Draft behalten werden
+  if (!shouldKeepAsDraft(w)) return false
+
+  // Normale Saves brauchen isDirty = true; Lifecycle-Saves ignorieren das
+  if (!forceIgnoreDirty && !isDirty.value) return false
+
+  const uid = resolveActiveWorkoutUserId()
+  if (!uid) return false
+
+  // Baue exercises mit notes zusammen
+  const exercises = Array.isArray(w.exercises) && Array.isArray(exerciseNotes.value)
+    ? w.exercises.map((ex, idx) => ({
+        ...ex,
+        note: typeof exerciseNotes.value[idx] === 'string' ? exerciseNotes.value[idx] : ex.note || ''
+      }))
+    : (w.exercises || [])
+
+  const notes = buildWorkoutNotesSummary(exercises)
+
+  // Resolve editingWorkoutId: nutze bestehenden oder ermittle aus Route
+  const existing = getActiveDraft(uid)
+  let editingWorkoutId = existing?.editingWorkoutId ?? null
+
+  if (!editingWorkoutId) {
+    const routeId = String(route.params.id || '').trim()
+    if (routeId && routeId !== 'draft' && !routeId.startsWith('draft-') && !routeId.startsWith('offline_')) {
+      editingWorkoutId = routeId
+    }
+  }
+
+  // Speichere
+  const ok = setActiveDraft(uid, {
+    ...w,
+    _id: String(w._id || route.params.id || ''),
+    exercises,
+    notes
+  }, editingWorkoutId || null)
+
+  if (ok) {
+    logger.debug('[WorkoutDetail] active draft saved', {
+      reason,
+      forceIgnoreDirty,
+      editingWorkoutId: editingWorkoutId || null,
+      exerciseCount: exercises.length
+    })
+  }
+  return ok
+}
+
 async function persistActiveDraft(reason = '') {
-if (suppressDraftPersistence.value) return false
-if (isFavoriteAdjustMode.value) return false
-const w = workout.value
-if (!w || w.completed === true) return false
-if (!(shouldKeepAsDraft(w) || isDirty.value)) return false
-
-const exercises = Array.isArray(w.exercises) && Array.isArray(exerciseNotes.value)
-? w.exercises.map((ex, idx) => ({
-...ex,
-note: typeof exerciseNotes.value[idx] === 'string' ? exerciseNotes.value[idx] : ex.note || ''
-}))
-: (w.exercises || [])
-const notes = buildWorkoutNotesSummary(exercises)
-
-const routeId = String(route.params.id || '').trim()
-let editingWorkoutId = null
-
-if (routeId && routeId !== 'draft' && !routeId.startsWith('draft-') && !routeId.startsWith('offline_')) {
-editingWorkoutId = routeId
-} else if (routeId.startsWith('draft-')) {
-editingWorkoutId = await resolveRealIdFromDraftId(routeId)
-}
-
-const uid = resolveActiveWorkoutUserId()
-if (!uid) return false
-
-const ok = setActiveDraft(uid, {
-...w,
-_id: String(w._id || routeId || ''),
-exercises,
-notes
-}, editingWorkoutId || null)
-
-if (ok) {
-logger.debug('[WorkoutDetail] active draft persisted', { reason, routeId, editingWorkoutId: editingWorkoutId || null })
-}
-return ok
+  // Nutze die extrahierte Funktion mit normalem isDirty-Check
+  return saveActiveDraftDirect(reason, false)
 }
 
 function persistActiveDraftFromLifecycle(reason = 'unknown') {
   logDiagnostic('lifecycle-persist', { reason })
   writeDetailViewState(reason)
-  persistActiveDraft(reason).catch(() => {})
+  // 🔧 BUGFIX: Speichere direkt ohne auf isDirty-Watch zu warten
+  // Das verhindert das Race Condition Problem wenn die App schnell in den
+  // Hintergrund geht bevor der Watch seinen Callback gefeuert hat.
+  // forceIgnoreDirty=true bedeutet: speichere den aktuellen workout.value sofort
+  // (aber prüfe immer noch shouldKeepAsDraft um leere Drafts zu vermeiden)
+  saveActiveDraftDirect(reason, true)
 }
 
 function onVisibilityChange() {
@@ -2910,7 +2945,8 @@ watch(() => workout.value, (w) => {
   try {
     if (!w || w.completed === true) return
     if (!(shouldKeepAsDraft(w) || isDirty.value)) return
-    persistActiveDraft('watch-dirty').catch(() => {})
+    // 🔧 Nutze extrahierte Funktion mit normalem isDirty-Check (forceIgnoreDirty=false)
+    saveActiveDraftDirect('watch-dirty', false)
   } catch {}
 }, { deep: true })
 
