@@ -1198,20 +1198,29 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
       .lean();
 
     // 3. Backend-Berechnung: Analysiere Fortschritte
-    const exerciseAnalyses = analyzeWorkoutProgression(currentWorkout, allWorkouts);
+    let exerciseAnalyses = analyzeWorkoutProgression(currentWorkout, allWorkouts);
 
+    // Fallback: Wenn keine Vorwerte existieren, nutze aktuelle Übungen als Basis-Analyse
     if (exerciseAnalyses.length === 0) {
-      return res.json({
-        success: true,
-        workoutId: currentWorkout._id,
-        message: 'No exercises with previous sessions found for analysis',
-        exercises: [],
-        metadata: {
-          requestId,
-          timestamp: new Date().toISOString(),
-          provider: 'backend_only'
-        }
-      });
+      exerciseAnalyses = (currentWorkout.exercises || []).map(ex => ({
+        exercise: ex.name || 'Unknown',
+        current: {
+          weight: Number(ex.weight) || 0,
+          reps: Number(ex.reps) || 0,
+          sets: (ex.setDetails || []).length || 1,
+          volume: (Number(ex.weight) || 0) * (Number(ex.reps) || 0) * ((ex.setDetails || []).length || 1)
+        },
+        previous: null,
+        changes: {
+          weight_change: 0,
+          rep_change: 0,
+          volume_change: 0,
+          volume_change_percent: 0
+        },
+        progression: 'first_session',
+        period_days: 0,
+        period_description: 'Erstes Training'
+      }))
     }
 
     // 4. Strukturiere Daten für AI (Mini-Datensatz)
@@ -1314,21 +1323,29 @@ router.post("/:id/ai-analysis-test", async (req, res) => {
       .lean();
 
     // 3. Backend-Berechnung: Analysiere Fortschritte
-    const exerciseAnalyses = analyzeWorkoutProgression(currentWorkout, allWorkouts);
+    let exerciseAnalyses = analyzeWorkoutProgression(currentWorkout, allWorkouts);
 
+    // Fallback: Wenn keine Vorwerte existieren, nutze aktuelle Übungen als Basis-Analyse
     if (exerciseAnalyses.length === 0) {
-      return res.json({
-        success: true,
-        workoutId: currentWorkout._id,
-        message: 'No exercises with previous sessions found for analysis',
-        exercises: [],
-        metadata: {
-          requestId,
-          timestamp: new Date().toISOString(),
-          provider: 'backend_only',
-          testMode: true
-        }
-      });
+      exerciseAnalyses = (currentWorkout.exercises || []).map(ex => ({
+        exercise: ex.name || 'Unknown',
+        current: {
+          weight: Number(ex.weight) || 0,
+          reps: Number(ex.reps) || 0,
+          sets: (ex.setDetails || []).length || 1,
+          volume: (Number(ex.weight) || 0) * (Number(ex.reps) || 0) * ((ex.setDetails || []).length || 1)
+        },
+        previous: null,
+        changes: {
+          weight_change: 0,
+          rep_change: 0,
+          volume_change: 0,
+          volume_change_percent: 0
+        },
+        progression: 'first_session',
+        period_days: 0,
+        period_description: 'Erstes Training'
+      }))
     }
 
     // 4. Strukturiere Daten für AI (Mini-Datensatz)
