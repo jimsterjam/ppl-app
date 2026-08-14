@@ -36,7 +36,7 @@ export class OllamaProvider extends AIProvider {
     try {
       logger.debug('🔄 Ollama request started', {
         requestId,
-        model: OLLAMA_MODEL,
+        model: this.model,
         exerciseCount: trainingAnalysis.total_exercises_analyzed
       });
 
@@ -45,7 +45,7 @@ export class OllamaProvider extends AIProvider {
 
       // Rufe Ollama auf
       const controller = new AbortController();
-      const timeoutHandle = setTimeout(() => controller.abort(), OLLAMA_TIMEOUT_MS);
+      const timeoutHandle = setTimeout(() => controller.abort(), this.timeout);
 
       const response = await fetch(`${this.baseUrl}/api/generate`, {
         method: 'POST',
@@ -88,7 +88,7 @@ export class OllamaProvider extends AIProvider {
     } catch (error) {
       logger.error('❌ Ollama request failed', {
         requestId,
-        model: OLLAMA_MODEL,
+        model: this.model,
         error: error.message
       });
       throw error;

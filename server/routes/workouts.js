@@ -448,6 +448,34 @@ async function initializeOpenAI() {
 }
 
 // Alle Workouts für den eingeloggten User holen (mit optionaler Pagination)
+// 🧪 TEST: Alle Workouts OHNE Auth (für lokale Tests und Debugging)
+router.get("/test", async (req, res) => {
+  try {
+    const workouts = await Workout.find({})
+      .sort({ date: -1 })
+      .limit(50)
+      .lean();
+
+    logger.info('🧪 Test endpoint: fetched all workouts', { count: workouts.length });
+
+    res.json({
+      testMode: true,
+      count: workouts.length,
+      workouts: workouts.map(w => ({
+        _id: w._id,
+        name: w.name,
+        type: w.type,
+        date: w.date,
+        completed: w.completed,
+        exerciseCount: (w.exercises || []).length
+      }))
+    });
+  } catch (err) {
+    logger.error('🧪 Test endpoint error', { message: err.message });
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get("/", firebaseAuthMiddleware, validateQuery(workoutListQuerySchema), async (req, res) => {
   try {
     const { userId } = req.auth;
