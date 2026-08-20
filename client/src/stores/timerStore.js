@@ -1,6 +1,6 @@
 // /src/stores/timerStore.js
 import { defineStore } from 'pinia'
-import { KeepAwake } from '@capacitor-community/keep-awake'
+import { acquireKeepAwake, releaseKeepAwake } from '@/utils/keepAwakeGuard'
 import {
   ensureAudioUnlocked,
   clearSignalHistory,
@@ -149,10 +149,10 @@ const setKeepAwake = async (enabled) => {
   if (typeof window === 'undefined') return
   if (keepAwakeEnabled === enabled) return
   keepAwakeEnabled = enabled
-  try {
-    if (enabled) await KeepAwake.keepAwake()
-    else await KeepAwake.allowSleep()
-  } catch {}
+  // Nutzt den referenzgezählten Guard, damit sich Timer und andere Stellen (Workout-Speichern,
+  // KI-Feedback-Erzeugung) nicht gegenseitig das Display ausschalten.
+  if (enabled) await acquireKeepAwake('timer')
+  else await releaseKeepAwake('timer')
 }
 
 const DEFAULT_CONFIG = {

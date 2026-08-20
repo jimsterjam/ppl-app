@@ -48,6 +48,31 @@ const router = express.Router();
 
 const exerciseCatalog = Array.isArray(exercises) ? exercises : [];
 
+// Mindestanzahl identischer Wiederholungen desselben Workouts, bevor AI-Feedback generiert wird.
+// Vergleichsdaten aus nur einer Session sind für Fortschrittsmessung nicht aussagekräftig.
+const AI_FEEDBACK_MIN_REPETITIONS = 3;
+
+// Kanonischer Fingerprint der Übungsliste eines Workouts (Namen, sortiert, normalisiert).
+// Zwei Workouts gelten als "gleiches Workout", wenn dieser Fingerprint exakt übereinstimmt.
+function exerciseSetFingerprint(workout) {
+  const names = Array.isArray(workout?.exercises)
+    ? workout.exercises.map(ex => String(ex?.name || '').trim().toLowerCase()).filter(Boolean)
+    : [];
+  return [...new Set(names)].sort().join('|');
+}
+
+// Zählt, wie oft (inkl. currentWorkout) ein identisches Workout bereits abgeschlossen wurde.
+function countMatchingCompletedWorkouts(currentWorkout, allWorkouts) {
+  const targetFingerprint = exerciseSetFingerprint(currentWorkout);
+  if (!targetFingerprint) return 1; // Kein Übungsdaten vorhanden, keine sinnvolle Zählung möglich
+  const matches = (allWorkouts || []).filter(w =>
+    w.completed === true && exerciseSetFingerprint(w) === targetFingerprint
+  );
+  // currentWorkout selbst muss enthalten sein (falls bereits completed:true gespeichert)
+  const alreadyIncluded = matches.some(w => String(w._id) === String(currentWorkout._id));
+  return alreadyIncluded ? matches.length : matches.length + 1;
+}
+
 const METADATA_NAME_KEYS = ['name', 'name_en'];
 
 function normalizeLookupKey(value = '') {
@@ -785,16 +810,62 @@ router.get("/exercise-stats", async (req, res) => {
   }
 });
 
+// 📋 Liste aller Workouts mit gespeichertem AI-Feedback (chronologisch, neueste zuerst)
+router.get("/feedbacks", firebaseAuthMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.auth;
+    const page = Math.max(1, Number.parseInt(req.query?.page, 10) || 1);
+    const limit = Math.min(50, Math.max(1, Number.parseInt(req.query?.limit, 10) || 20));
+    const skip = (page - 1) * limit;
+
+    const query = { userId, ai_feedback: { $exists: true, $ne: null } };
+
+    const [items, total] = await Promise.all([
+      Workout.find(query)
+        .sort({ ai_generated_at: -1 })
+        .skip(skip)
+        .limit(limit)
+        .select('_id name type date ai_feedback ai_generated_at ai_metadata')
+        .lean(),
+      Workout.countDocuments(query)
+    ]);
+
+    res.json({
+      success: true,
+      items: items.map(w => ({
+        workoutId: w._id,
+        name: w.name,
+        type: w.type,
+        date: w.date,
+        ai_feedback: w.ai_feedback,
+        ai_generated_at: w.ai_generated_at,
+        ai_metadata: w.ai_metadata
+      })),
+      page,
+      limit,
+      total,
+      hasMore: skip + items.length < total
+    });
+  } catch (err) {
+    logger.error('❌ Feedback-Liste Fehler:', err);
+    res.status(500).json({ error: 'Feedback-Liste konnte nicht geladen werden', message: err.message });
+  }
+});
+
 // Einzelnes Workout anhand ID holen
 router.get("/:id", firebaseAuthMiddleware, async (req, res) => {
   try {
     const { userId } = req.auth;
     if (!(await import('mongoose')).default.Types.ObjectId.isValid(req.params.id)) {
+      logger.warn('⚠️ Ungültige Workout-ID abgelehnt', {
+        method: 'GET', path: req.originalUrl, id: req.params.id, userId,
+        userAgent: req.headers['user-agent']
+      });
       return res.status(400).json({ error: 'Ungültige Workout-ID' });
     }
-    const workout = await Workout.findOne({ 
-      _id: req.params.id, 
-      userId 
+    const workout = await Workout.findOne({
+      _id: req.params.id,
+      userId
     });
     
     if (!workout) {
@@ -846,6 +917,10 @@ router.put("/:id", firebaseAuthMiddleware, async (req, res) => {
   try {
     const { userId } = req.auth;
     if (!(await import('mongoose')).default.Types.ObjectId.isValid(req.params.id)) {
+      logger.warn('⚠️ Ungültige Workout-ID abgelehnt', {
+        method: 'PUT', path: req.originalUrl, id: req.params.id, userId,
+        userAgent: req.headers['user-agent']
+      });
       return res.status(400).json({ error: 'Ungültige Workout-ID' });
     }
     // _id aus dem Body entfernen – der Identifikator kommt ausschließlich aus dem URL-Param
@@ -871,9 +946,13 @@ router.delete("/:id", firebaseAuthMiddleware, async (req, res) => {
   try {
     const { userId } = req.auth;
     if (!(await import('mongoose')).default.Types.ObjectId.isValid(req.params.id)) {
+      logger.warn('⚠️ Ungültige Workout-ID abgelehnt', {
+        method: 'DELETE', path: req.originalUrl, id: req.params.id, userId,
+        userAgent: req.headers['user-agent']
+      });
       return res.status(400).json({ error: 'Ungültige Workout-ID' });
     }
-    const workout = await Workout.findOneAndDelete({ 
+    const workout = await Workout.findOneAndDelete({
       _id: req.params.id, 
       userId 
     });
@@ -1192,10 +1271,60 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
       return res.status(404).json({ error: 'Workout not found', requestId });
     }
 
+    // 1b. Bereits generiertes Feedback? Nicht erneut generieren (spart AI-Kontingent),
+    // außer der Client fragt explizit einen Refresh an.
+    const forceRefresh = String(req.query?.refresh || '') === '1';
+    if (currentWorkout.ai_feedback && !forceRefresh) {
+      logger.info('♻️ Workout analysis: gecachtes Feedback zurückgegeben', { requestId, workoutId });
+      return res.json({
+        success: true,
+        workoutId: currentWorkout._id,
+        workoutDate: currentWorkout.date,
+        ai_feedback: currentWorkout.ai_feedback,
+        ai_metadata: currentWorkout.ai_metadata,
+        cached: true,
+        metadata: {
+          requestId,
+          timestamp: new Date().toISOString(),
+          aiProvider: currentWorkout.ai_metadata?.provider,
+          aiModel: currentWorkout.ai_metadata?.model,
+          aiAvailable: true
+        }
+      });
+    }
+
     // 2. Lade alle Workouts des Users
+    // Sekundärsortierung nach createdAt, damit bei gleichem `date` (z.B. mehrere Workouts
+    // am selben Tag) eine stabile, chronologisch korrekte Reihenfolge für den
+    // "previous workout"-Vergleich in analyzeWorkoutProgression() garantiert ist.
     const allWorkouts = await Workout.find({ userId })
-      .sort({ date: -1 })
+      .sort({ date: -1, createdAt: -1 })
       .lean();
+
+    // 2b. Genug Wiederholungen desselben Workouts? Ohne Vergleichsbasis über mehrere
+    // identische Sessions ist AI-Feedback nicht aussagekräftig – kein AI-Call, kein
+    // Kontingent-Verbrauch, stattdessen ein "noch X Workouts"-Hinweis.
+    const matchingCount = countMatchingCompletedWorkouts(currentWorkout, allWorkouts);
+    if (matchingCount < AI_FEEDBACK_MIN_REPETITIONS) {
+      const remaining = AI_FEEDBACK_MIN_REPETITIONS - matchingCount;
+      logger.info('⏳ Workout analysis: zu wenig Wiederholungen für Feedback', {
+        requestId, workoutId, matchingCount, remaining
+      });
+      return res.json({
+        success: true,
+        workoutId: currentWorkout._id,
+        workoutDate: currentWorkout.date,
+        feedback_status: 'insufficient_history',
+        matching_count: matchingCount,
+        required_count: AI_FEEDBACK_MIN_REPETITIONS,
+        remaining,
+        metadata: {
+          requestId,
+          timestamp: new Date().toISOString(),
+          aiAvailable: false
+        }
+      });
+    }
 
     // 3. Backend-Berechnung: Analysiere Fortschritte
     let exerciseAnalyses = analyzeWorkoutProgression(currentWorkout, allWorkouts);
@@ -1231,6 +1360,37 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
     let aiResult = null;
     let aiError = null;
 
+    // Schneller Erreichbarkeits-Check vor dem eigentlichen (bis zu 120s dauernden) Generierungs-
+    // Aufruf. Grund (User-Report "Speichern dauert sehr lange"): in der Testphase läuft die
+    // Analyse über Ollama im Heimnetzwerk — ist das Handy woanders, ist die IP schlicht nicht
+    // erreichbar, und der User starrt bis zu 2 Minuten auf "Analysiere...", bevor überhaupt der
+    // harmlose Fallback ("Workout gespeichert") kommt. Mit einem kurzen Health-Check (max. 3s,
+    // siehe Fix in OllamaProvider.healthCheck) lässt sich das vorher erkennen und der Client
+    // bekommt sofort eine ehrliche, spezifische Meldung statt eines langen Hängers.
+    const networkCheckStart = Date.now();
+    const providerReachable = await aiService.healthCheck().catch(() => false);
+    logger.debug('🌐 AI provider reachability check', {
+      requestId,
+      provider: aiService.getProviderName(),
+      reachable: providerReachable,
+      durationMs: Date.now() - networkCheckStart
+    });
+
+    if (!providerReachable) {
+      return res.json({
+        success: true,
+        workoutId: currentWorkout._id,
+        workoutDate: currentWorkout.date,
+        feedback_status: 'network_unavailable',
+        metadata: {
+          requestId,
+          timestamp: new Date().toISOString(),
+          aiProvider: aiService.getProviderName(),
+          aiAvailable: false
+        }
+      });
+    }
+
     try {
       aiResult = await aiService.generateTrainingAnalysis(structuredAnalysis, {
         requestId,
@@ -1244,6 +1404,25 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
         error: error.message
       });
       // Gib trotzdem die Backend-Analysen zurück
+    }
+
+    // 5b. Erfolgreiches Feedback am Workout persistieren (für späteres Wiederabrufen)
+    if (aiResult?.feedback) {
+      await Workout.updateOne(
+        { _id: workoutId, userId },
+        {
+          $set: {
+            ai_feedback: aiResult.feedback,
+            ai_generated_at: new Date(),
+            ai_metadata: {
+              provider: aiService.getProviderName(),
+              model: aiService.getModelName()
+            }
+          }
+        }
+      ).catch((e) => {
+        logger.warn('⚠️ Konnte AI-Feedback nicht persistieren', { requestId, error: e.message });
+      });
     }
 
     // 6. Kombiniere Backend-Analysen + AI-Feedback
@@ -1319,7 +1498,7 @@ router.post("/:id/ai-analysis-test", async (req, res) => {
 
     // 2. Lade alle Workouts (ohne userId-Filter für Tests)
     const allWorkouts = await Workout.find({})
-      .sort({ date: -1 })
+      .sort({ date: -1, createdAt: -1 })
       .lean();
 
     // 3. Backend-Berechnung: Analysiere Fortschritte
@@ -1801,6 +1980,104 @@ function normalizeEquipmentMode(mode) {
   return 'gym_plus_bodyweight';
 }
 
+// Verifiziert echte Übungsnamen aus der Katalog-Collection (client/public/data/default-exercises.json),
+// abgeglichen über die sauberen englischen Bezeichnungen (name_en). Nur für gym_only und
+// gym_plus_bodyweight, da der Katalog dort solide Abdeckung hat. bodyweight_only hat noch
+// Lücken bei Basics (Glute Bridge, Inverted Row etc. existieren nicht unter diesen Namen) und
+// bleibt bewusst beim alten Verfahren, bis der Katalog überarbeitet ist.
+// Jede Kombination hat 1-2 Varianten (Arrays von Arrays). getWorkoutBlueprint() wählt
+// zufällig eine Variante aus, damit z.B. ein Bein-Tag nicht immer identisch mit derselben
+// führenden Übung startet (mal Kniebeuge, mal Kreuzheben zuerst) — beide Reihenfolgen sind
+// fachlich vertretbar, nur "immer dasselbe" wirkt stumpf. Alle Namen sind gegen den echten
+// Katalog (default-exercises.json) verifiziert, nur die Reihenfolge/Führung variiert.
+//
+// Bewusst auf Englisch (User-Wunsch: "nur englischsprachige Übungen, konsistenter, weniger
+// Doppelungen"). Basis ist jeweils das Katalogfeld name_en, außer bei "Barbell Front Squat" —
+// der Katalog-Eintrag für "Frontkniebeuge Langhantel" hat dort einen kaputten Wert
+// ("front squat barbell bench", auch in der Katalog-description_en falsch), manuell korrigiert.
+const CURATED_REAL_BLUEPRINTS = {
+  push: {
+    hypertrophy: {
+      gym_only: [
+        ['Barbell Bench Press', 'Barbell Seated Overhead Press', 'Barbell Incline Bench Press', 'Chest Dip', 'Dumbbell Lateral Raise'],
+        ['Barbell Incline Bench Press', 'Barbell Bench Press', 'Barbell Seated Overhead Press', 'Chest Dip', 'Dumbbell Lateral Raise']
+      ],
+      gym_plus_bodyweight: [
+        ['Barbell Bench Press', 'Dumbbell Standing Overhead Press', 'Chest Dip', 'Dumbbell Fly', 'Dumbbell Lateral Raise']
+      ]
+    },
+    strength: {
+      gym_only: [
+        ['Barbell Bench Press', 'Barbell Seated Overhead Press', 'Barbell Incline Bench Press', 'Chest Dip'],
+        ['Barbell Incline Bench Press', 'Barbell Bench Press', 'Barbell Seated Overhead Press', 'Chest Dip']
+      ],
+      gym_plus_bodyweight: [
+        ['Barbell Bench Press', 'Dumbbell Standing Overhead Press', 'Chest Dip', 'Dumbbell Fly']
+      ]
+    }
+  },
+  pull: {
+    hypertrophy: {
+      gym_only: [
+        ['Barbell Bent Over Row', 'Chin-Up', 'Lat Pulldown Wide Grip', 'Barbell Curl', 'Cable Hammer Curl (With Rope)'],
+        ['Chin-Up', 'Barbell Bent Over Row', 'Lat Pulldown Wide Grip', 'Barbell Curl', 'Cable Hammer Curl (With Rope)']
+      ],
+      gym_plus_bodyweight: [
+        ['Chin-Up', 'Barbell Bent Over Row', 'Dumbbell Bent Over Row', 'Dumbbell Hammer Curl', 'Dumbbell Shrug']
+      ]
+    },
+    strength: {
+      gym_only: [
+        ['Barbell Bent Over Row', 'Chin-Up', 'Lat Pulldown Wide Grip', 'Barbell Curl'],
+        ['Chin-Up', 'Barbell Bent Over Row', 'Lat Pulldown Wide Grip', 'Barbell Curl']
+      ],
+      gym_plus_bodyweight: [
+        ['Chin-Up', 'Barbell Bent Over Row', 'Dumbbell Bent Over Row', 'Barbell Curl']
+      ]
+    }
+  },
+  legs: {
+    hypertrophy: {
+      gym_only: [
+        ['Barbell Front Squat', 'Barbell Deadlift', 'Barbell Lunge', 'Leg Extension', 'Leg Curl Lying', 'Barbell Seated Calf Raise'],
+        ['Barbell Deadlift', 'Barbell Front Squat', 'Barbell Lunge', 'Leg Curl Lying', 'Leg Extension', 'Barbell Seated Calf Raise']
+      ],
+      gym_plus_bodyweight: [
+        ['Barbell Front Squat', 'Dumbbell Romanian Deadlift', 'Barbell Lunge', 'Leg Extension', 'Leg Curl Lying', 'Barbell Floor Calf Raise']
+      ]
+    },
+    strength: {
+      gym_only: [
+        ['Barbell Front Squat', 'Barbell Deadlift', 'Barbell Lunge', 'Leg Extension'],
+        ['Barbell Deadlift', 'Barbell Front Squat', 'Barbell Lunge', 'Leg Extension']
+      ],
+      gym_plus_bodyweight: [
+        ['Barbell Front Squat', 'Dumbbell Romanian Deadlift', 'Barbell Lunge', 'Leg Extension']
+      ]
+    }
+  },
+  fullbody: {
+    hypertrophy: {
+      gym_only: [
+        ['Barbell Front Squat', 'Barbell Bench Press', 'Barbell Bent Over Row', 'Barbell Deadlift', 'Barbell Seated Calf Raise'],
+        ['Barbell Deadlift', 'Barbell Bench Press', 'Barbell Bent Over Row', 'Barbell Front Squat', 'Barbell Seated Calf Raise']
+      ],
+      gym_plus_bodyweight: [
+        ['Barbell Front Squat', 'Barbell Bench Press', 'Chin-Up', 'Dumbbell Romanian Deadlift', 'Barbell Lunge']
+      ]
+    },
+    strength: {
+      gym_only: [
+        ['Barbell Front Squat', 'Barbell Bench Press', 'Barbell Bent Over Row', 'Barbell Deadlift'],
+        ['Barbell Deadlift', 'Barbell Bench Press', 'Barbell Bent Over Row', 'Barbell Front Squat']
+      ],
+      gym_plus_bodyweight: [
+        ['Barbell Front Squat', 'Barbell Bench Press', 'Chin-Up', 'Barbell Deadlift']
+      ]
+    }
+  }
+};
+
 const WORKOUT_BLUEPRINTS = {
   push: {
     hypertrophy: {
@@ -1855,23 +2132,26 @@ const WORKOUT_BLUEPRINTS = {
 function inferExerciseType(name = '') {
   const normalized = String(name).toLowerCase();
 
-  const pushTerms = ['bank', 'drücken', 'liegestütz', 'dips', 'trizeps', 'seitheben', 'frontheben', 'press', 'push-up', 'push up', 'pushup'];
-  const pullTerms = ['rudern', 'klimm', 'latzug', 'bizeps', 'face pull', 'curl', 'shrug', 'pull', 'row'];
-  const legTerms = ['kniebeuge', 'bein', 'ausfallschritt', 'waden', 'squat', 'deadlift', 'kreuzheben', 'hip thrust', 'lunge', 'glute'];
+  // Reihenfolge ist wichtig: legTerms zuerst geprüft, damit "leg press"/"leg curl"/"leg
+  // extension" nicht fälschlich über die generischeren push/pull-Begriffe ("press", "curl")
+  // matchen — sonst würde z.B. "Leg Press" als Push klassifiziert.
+  const legTerms = ['kniebeuge', 'bein', 'ausfallschritt', 'waden', 'squat', 'deadlift', 'kreuzheben', 'hip thrust', 'lunge', 'glute', 'leg press', 'leg extension', 'leg curl', 'calf raise'];
+  const pushTerms = ['bank', 'bench', 'drücken', 'liegestütz', 'dips', 'dip', 'trizeps', 'triceps', 'seitheben', 'lateral raise', 'frontheben', 'front raise', 'fly', 'press', 'push-up', 'push up', 'pushup'];
+  const pullTerms = ['rudern', 'klimm', 'latzug', 'lat pulldown', 'bizeps', 'biceps', 'face pull', 'curl', 'shrug', 'pull', 'row', 'chin-up', 'chin up'];
 
+  if (legTerms.some((term) => normalized.includes(term))) return 'legs';
   if (pushTerms.some((term) => normalized.includes(term))) return 'push';
   if (pullTerms.some((term) => normalized.includes(term))) return 'pull';
-  if (legTerms.some((term) => normalized.includes(term))) return 'legs';
   return 'fullbody';
 }
 
 function inferMovementPattern(name = '') {
   const normalized = String(name).toLowerCase();
-  if (normalized.includes('bank') || normalized.includes('liegestütz') || normalized.includes('push-up')) return 'horizontal_push';
-  if (normalized.includes('schulterdr') || normalized.includes('military press') || normalized.includes('overhead')) return 'vertical_push';
+  if (normalized.includes('bank') || normalized.includes('bench') || normalized.includes('liegestütz') || normalized.includes('push-up') || normalized.includes('push up')) return 'horizontal_push';
+  if (normalized.includes('schulterdr') || normalized.includes('military press') || normalized.includes('overhead') || normalized.includes('shoulder press')) return 'vertical_push';
   if (normalized.includes('rudern') || normalized.includes('row') || normalized.includes('face pull')) return 'horizontal_pull';
-  if (normalized.includes('latzug') || normalized.includes('klimmzug') || normalized.includes('pull-up')) return 'vertical_pull';
-  if (normalized.includes('kniebeuge') || normalized.includes('beinpresse') || normalized.includes('split squat') || normalized.includes('ausfallschritt')) return 'squat';
+  if (normalized.includes('latzug') || normalized.includes('klimmzug') || normalized.includes('pull-up') || normalized.includes('pull up') || normalized.includes('chin-up') || normalized.includes('chin up') || normalized.includes('lat pulldown')) return 'vertical_pull';
+  if (normalized.includes('kniebeuge') || normalized.includes('beinpresse') || normalized.includes('leg press') || normalized.includes('split squat') || normalized.includes('ausfallschritt') || normalized.includes('squat') || normalized.includes('lunge')) return 'squat';
   if (normalized.includes('kreuzheben') || normalized.includes('deadlift') || normalized.includes('hip thrust') || normalized.includes('good morning')) return 'hinge';
   if (normalized.includes('plank') || normalized.includes('core') || normalized.includes('bauch') || normalized.includes('abs')) return 'core';
   return 'other';
@@ -1879,7 +2159,12 @@ function inferMovementPattern(name = '') {
 
 function isIsolationExercise(name = '') {
   const normalized = String(name).toLowerCase();
-  const isolationTerms = ['curl', 'heben', 'kickback', 'trizeps', 'bizeps', 'waden', 'fly', 'flys', 'extension', 'beinstrecker', 'beincurls'];
+  // Bug (gefunden nach User-Report "buggy Workouts"): der generische Begriff 'heben' matchte
+  // als Teilstring auch "Kreuzheben" (Kreuzheben = Deadlift, eindeutig ein schwerer Compound,
+  // kein Isolationsheben) und stufte damit Kreuzheben-Varianten fälschlich als billige
+  // Zusatzübung ein — mit Folgefehlern in Rollen-Sortierung, Redundanz-Filter und Zeitbudget.
+  // Ersetzt durch spezifische Begriffe für echte Hebe-Isolationsübungen.
+  const isolationTerms = ['curl', 'seitheben', 'lateral raise', 'frontheben', 'front raise', 'deltaheben', 'schrägheben', 'kickback', 'trizeps', 'triceps', 'bizeps', 'biceps', 'waden', 'calf raise', 'fly', 'flys', 'extension', 'beinstrecker', 'beincurls', 'beinheben'];
   return isolationTerms.some((term) => normalized.includes(term));
 }
 
@@ -1903,7 +2188,10 @@ function isMobilityOrWarmupExercise(name = '') {
     'beweglichkeit',
     'stretch',
     'stretching',
-    'streck',
+    // 'streck' entfernt (Bug, gefunden nach User-Report): matchte als Teilstring auch echte
+    // Kraftübungen wie "Beinstrecker" (Leg Extension) oder "Trizepsstreckung" (Triceps
+    // Extension, 43 Katalog-Treffer) und hat die als Mobility/Warm-up rausgefiltert.
+    // "dehnen"/"dehnung"/"dehn" decken die eigentlich gemeinten Stretch-Begriffe bereits ab.
     'dehnen',
     'dehnung',
     'dehn',
@@ -1936,8 +2224,11 @@ function isMachineHeavyExercise(name = '') {
     'maschine',
     'machine',
     'beinpresse',
+    'leg press',
     'kabelzug',
+    'cable',
     'latzug',
+    'lat pulldown',
     'smith'
   ].some((term) => normalized.includes(term));
 }
@@ -2012,7 +2303,13 @@ function applyHardExerciseFilters(exercises = [], context = {}) {
       return false;
     }
 
-    if (level === 'beginner' && exercise.minDifficulty !== 'beginner') {
+    // War vorher: level==='beginner' && minDifficulty !== 'beginner' (exakte Übereinstimmung).
+    // Da die meisten Standard-Grundübungen (Kniebeuge, Kreuzheben, Ausfallschritt) im Katalog
+    // als 'intermediate' statt 'beginner' getaggt sind, hat das Anfängern praktisch jede
+    // Kniebeugen-/Hinge-Bewegung entzogen — übrig blieben nur Maschinen/Isolationsübungen wie
+    // Beinstrecker und Wadenheben (User-Report: "nur Wadenheben für Anfänger"). Anfänger dürfen
+    // jetzt wie Fortgeschrittene 'beginner'+'intermediate' machen, nur 'advanced' bleibt gesperrt.
+    if (level === 'beginner' && exercise.minDifficulty === 'advanced') {
       return false;
     }
 
@@ -2092,8 +2389,24 @@ function buildDeterministicExerciseOrder(exercises = [], context = {}, targetExe
   return ordered.slice(0, maxCount);
 }
 
+// Wählt zufällig eine Variante aus einer Liste von Blueprint-Varianten. Bleibt
+// abwärtskompatibel zu flachen Listen (z.B. WORKOUT_BLUEPRINTS), die keine Varianten haben.
+function pickBlueprintVariant(variantsOrList) {
+  if (!Array.isArray(variantsOrList) || variantsOrList.length === 0) return [];
+  if (!Array.isArray(variantsOrList[0])) return variantsOrList;
+  const index = Math.floor(Math.random() * variantsOrList.length);
+  return variantsOrList[index];
+}
+
 function getWorkoutBlueprint(type, goal, equipmentMode) {
-  return (
+  // gym_only/gym_plus_bodyweight: echte, im Katalog verifizierte Übungsnamen verwenden.
+  // bodyweight_only: alter Namensatz, bis der Katalog dort nachgebessert ist (siehe Kommentar oben).
+  if (equipmentMode === 'gym_only' || equipmentMode === 'gym_plus_bodyweight') {
+    const curated = CURATED_REAL_BLUEPRINTS[type]?.[goal]?.[equipmentMode]
+      || CURATED_REAL_BLUEPRINTS[type]?.[goal]?.gym_plus_bodyweight;
+    if (curated) return pickBlueprintVariant(curated);
+  }
+  return pickBlueprintVariant(
     WORKOUT_BLUEPRINTS[type]?.[goal]?.[equipmentMode]
     || WORKOUT_BLUEPRINTS[type]?.[goal]?.gym_plus_bodyweight
     || []
@@ -2112,6 +2425,12 @@ function findExerciseByBlueprintName(pool, blueprintName) {
 
 function buildBlueprintFallbackExercise(name, fallbackType, goal) {
   const strength = goal === 'strength';
+  // Bug (gefunden nach User-Report "nur Wadenheben für Anfänger"): dieses Fallback-Objekt
+  // setzte kein minDifficulty/exerciseType/allowedEquipmentModes. applyHardExerciseFilters()
+  // verlangt für level==='beginner' aber exakt minDifficulty==='beginner' — undefined fiel
+  // durch den Filter, d.h. JEDE Blueprint-Übung, die nicht zufällig schon im KI/Demo-Output
+  // vorkam (und dadurch echte Katalog-Metadaten hatte), wurde für Anfänger komplett entfernt.
+  const metadata = resolveExerciseMetadata(name);
   return {
     name,
     sets: strength ? 4 : 3,
@@ -2122,7 +2441,13 @@ function buildBlueprintFallbackExercise(name, fallbackType, goal) {
     movementPattern: inferMovementPattern(name),
     targetType: inferExerciseType(name),
     isIsolation: isIsolationExercise(name),
-    demandTier: inferDemandTier(name)
+    demandTier: inferDemandTier(name),
+    aiMetadata: metadata,
+    minDifficulty: metadata?.minDifficulty || 'beginner',
+    exerciseType: metadata?.exerciseType || null,
+    primaryPhase: metadata?.primaryPhase || null,
+    disallowedGoals: Array.isArray(metadata?.disallowedGoals) ? metadata.disallowedGoals : [],
+    allowedEquipmentModes: Array.isArray(metadata?.allowedEquipmentModes) ? metadata.allowedEquipmentModes : null
   };
 }
 
@@ -2152,11 +2477,169 @@ function normalizeExercise(exercise, fallbackType) {
   };
 }
 
+// Fallback-Ziel, falls das Zeitmodell (siehe unten) aus irgendeinem Grund nicht greift
+// (z.B. bodyweight_only ohne kuratierte Blueprint-Daten). Bleibt als grobe Untergrenze bestehen.
 function getTimeAdjustedExerciseTarget(durationMinutes = 45, goal = 'hypertrophy') {
   const duration = Number(durationMinutes) || 45;
   if (duration <= 30) return goal === 'strength' ? 3 : 4;
   if (duration <= 45) return goal === 'strength' ? 4 : 5;
   return goal === 'strength' ? 5 : 6;
+}
+
+// ── Zeitmodell (Konzept-Papier Abschnitt 17.3/17.4) ─────────────────────────
+// Ersetzt die reine "Minuten → feste Übungszahl"-Tabelle oben durch eine echte
+// Dauer-Schätzung: Satzdauer + Pausen + Aufbau-/Wechselzeit + Warm-up + Reserve.
+// Werte sind konservative Startschätzungen (noch keine persönliche Kalibrierung
+// aus echten Timer-Daten, siehe Papier 17.3 "Persönliche Kalibrierung").
+const EXERCISE_TIME_METADATA = {
+  'Barbell Bench Press': { estimatedSetSeconds: 35, setupSeconds: 90, transitionSeconds: 60 },
+  'Barbell Seated Overhead Press': { estimatedSetSeconds: 30, setupSeconds: 60, transitionSeconds: 45 },
+  'Barbell Incline Bench Press': { estimatedSetSeconds: 35, setupSeconds: 90, transitionSeconds: 60 },
+  'Chest Dip': { estimatedSetSeconds: 30, setupSeconds: 30, transitionSeconds: 45 },
+  'Dumbbell Lateral Raise': { estimatedSetSeconds: 25, setupSeconds: 20, transitionSeconds: 30 },
+  'Dumbbell Standing Overhead Press': { estimatedSetSeconds: 30, setupSeconds: 45, transitionSeconds: 45 },
+  'Dumbbell Fly': { estimatedSetSeconds: 25, setupSeconds: 30, transitionSeconds: 30 },
+  'Barbell Bent Over Row': { estimatedSetSeconds: 35, setupSeconds: 60, transitionSeconds: 60 },
+  'Chin-Up': { estimatedSetSeconds: 25, setupSeconds: 15, transitionSeconds: 30 },
+  'Lat Pulldown Wide Grip': { estimatedSetSeconds: 30, setupSeconds: 45, transitionSeconds: 45 },
+  'Barbell Curl': { estimatedSetSeconds: 25, setupSeconds: 30, transitionSeconds: 30 },
+  'Cable Hammer Curl (With Rope)': { estimatedSetSeconds: 25, setupSeconds: 45, transitionSeconds: 30 },
+  'Dumbbell Bent Over Row': { estimatedSetSeconds: 30, setupSeconds: 20, transitionSeconds: 30 },
+  'Dumbbell Hammer Curl': { estimatedSetSeconds: 25, setupSeconds: 20, transitionSeconds: 30 },
+  'Dumbbell Shrug': { estimatedSetSeconds: 20, setupSeconds: 20, transitionSeconds: 30 },
+  'Barbell Front Squat': { estimatedSetSeconds: 40, setupSeconds: 90, transitionSeconds: 60 },
+  'Barbell Deadlift': { estimatedSetSeconds: 35, setupSeconds: 90, transitionSeconds: 75 },
+  'Barbell Lunge': { estimatedSetSeconds: 40, setupSeconds: 60, transitionSeconds: 45 },
+  'Leg Extension': { estimatedSetSeconds: 25, setupSeconds: 45, transitionSeconds: 30 },
+  'Leg Curl Lying': { estimatedSetSeconds: 25, setupSeconds: 45, transitionSeconds: 30 },
+  'Barbell Seated Calf Raise': { estimatedSetSeconds: 20, setupSeconds: 45, transitionSeconds: 30 },
+  'Dumbbell Romanian Deadlift': { estimatedSetSeconds: 35, setupSeconds: 45, transitionSeconds: 60 },
+  'Barbell Floor Calf Raise': { estimatedSetSeconds: 20, setupSeconds: 45, transitionSeconds: 30 }
+};
+
+const DEFAULT_REST_SECONDS = { strength: 150, hypertrophy: 90 };
+const DEFAULT_ISOLATION_REST_SECONDS = { strength: 90, hypertrophy: 60 };
+
+// Allgemeines Warm-up (AHA: ~5-10 min), analog Papier 17.3/17.4. Steht im Standardmodus
+// "training_only" (Papier 18.1) außerhalb des Zeitbudgets aus den User-Minuten und wird
+// obendrauf gerechnet statt es abzuziehen.
+const GENERAL_WARMUP_SECONDS = 300;
+// Fester Puffer statt 10%-Reserve (Papier 18.2: 60-120s bzw. max 5% der reinen
+// Trainingszeit) — vermeidet, dass lange Workouts überproportional viel "Luft" bekommen.
+const TIME_BUFFER_SECONDS = 90;
+
+function getExerciseTimeMeta(exercise, goal) {
+  const name = String(exercise?.name || '').trim();
+  const meta = EXERCISE_TIME_METADATA[name];
+  const isolation = Boolean(exercise?.isIsolation);
+  const restSeconds = isolation
+    ? (DEFAULT_ISOLATION_REST_SECONDS[goal] || DEFAULT_ISOLATION_REST_SECONDS.hypertrophy)
+    : (DEFAULT_REST_SECONDS[goal] || DEFAULT_REST_SECONDS.hypertrophy);
+
+  if (meta) {
+    return { ...meta, restSeconds };
+  }
+  // Fallback für Übungen ohne hinterlegte Metadaten (z.B. bodyweight_only)
+  return {
+    estimatedSetSeconds: isolation ? 25 : 35,
+    setupSeconds: isolation ? 20 : 45,
+    transitionSeconds: 30,
+    restSeconds
+  };
+}
+
+/**
+ * Schätzt die reine Trainingszeit (ohne allgemeines Warm-up) in Sekunden.
+ * Formel (Papier 17.3, korrigiert per 18.2): spezifische Aufwärmsätze + Ausführungszeit +
+ * Satzpausen + Aufbau-/Wechselzeit + fester Puffer.
+ * Die erste, nicht-isolierte Übung bekommt zusätzlich 2 spezifische Aufwärmsätze.
+ *
+ * Zwei Doppelzähl-Bugs aus der Vorversion sind hier behoben (Papier 18.2):
+ * - setupSeconds und transitionSeconds wurden pro Übung addiert, obwohl beide dieselbe
+ *   "Wechsel zur nächsten Übung"-Zeit beschreiben. Jetzt: der größere der beiden Werte zählt.
+ * - Nach dem letzten Satz der letzten Übung wurde trotzdem eine Pause eingerechnet, obwohl
+ *   danach nichts mehr folgt. Jetzt: die letzte Pause der letzten Übung wird abgezogen.
+ */
+function estimateTrainingSeconds(exercises = [], goal = 'hypertrophy') {
+  let total = 0;
+  let firstCompoundSeen = false;
+
+  exercises.forEach((exercise) => {
+    const meta = getExerciseTimeMeta(exercise, goal);
+    const sets = Math.max(1, Number(exercise?.sets) || 3);
+
+    // setupSeconds (Gewicht/Gerät einstellen) und transitionSeconds (Weg zur nächsten
+    // Station) überlappen sich in der Praxis meist statt sich zu addieren.
+    total += Math.max(meta.setupSeconds, meta.transitionSeconds);
+
+    // Spezifische Aufwärmsätze (Papier 17.1/17.3): 2 leichtere, kürzere Sätze vor der
+    // ersten anspruchsvollen (nicht-isolierten) Übung.
+    if (!firstCompoundSeen && !exercise?.isIsolation) {
+      total += 2 * (meta.estimatedSetSeconds + 45);
+      firstCompoundSeen = true;
+    }
+
+    total += sets * (meta.estimatedSetSeconds + meta.restSeconds);
+  });
+
+  if (exercises.length > 0) {
+    // Keine Pause nach dem allerletzten Satz des Workouts einrechnen (Papier 18.2, Z-08).
+    const lastMeta = getExerciseTimeMeta(exercises[exercises.length - 1], goal);
+    total -= lastMeta.restSeconds;
+  }
+
+  if (total > 0) {
+    total += TIME_BUFFER_SECONDS;
+  }
+
+  return Math.max(0, total);
+}
+
+/**
+ * Gesamtdauer der Session inkl. allgemeinem Warm-up (zur Anzeige an den User).
+ * Im Standardmodus "training_only" (Papier 18.1) kommt das Warm-up obendrauf, statt vom
+ * Zeitbudget der Übungsauswahl abgezogen zu werden.
+ */
+function estimateWorkoutDurationSeconds(exercises = [], goal = 'hypertrophy') {
+  return estimateTrainingSeconds(exercises, goal) + GENERAL_WARMUP_SECONDS;
+}
+
+/**
+ * Wählt aus einer bereits nach Priorität sortierten Übungsliste so viele Übungen,
+ * wie ins Zeitbudget passen (Papier 17.7 Kürzungsregeln: niedrigste Priorität zuerst
+ * entfernen — hier realisiert durch schrittweises Hinzufügen in Prioritätsreihenfolge,
+ * Abbruch sobald das Budget überschritten würde).
+ */
+function selectExercisesWithinTimeBudget(orderedExercises = [], durationMinutes = 45, goal = 'hypertrophy', durationMode = 'training_only') {
+  const rawMinutes = Math.max(20, Number(durationMinutes) || 45);
+  // training_only (Default, Papier 18.1): die User-Minuten sind reine Trainingszeit, das
+  // Warm-up kommt obendrauf. total_session: das Warm-up wird von den User-Minuten abgezogen.
+  const budgetSeconds = durationMode === 'total_session'
+    ? Math.max(0, rawMinutes * 60 - GENERAL_WARMUP_SECONDS)
+    : rawMinutes * 60;
+  const minCount = Math.min(2, orderedExercises.length);
+  const selected = [];
+
+  for (let i = 0; i < orderedExercises.length; i += 1) {
+    const candidate = [...selected, orderedExercises[i]];
+    const estimated = estimateTrainingSeconds(candidate, goal);
+    if (estimated <= budgetSeconds || candidate.length <= minCount) {
+      selected.push(orderedExercises[i]);
+    } else {
+      break;
+    }
+  }
+
+  const trainingSeconds = estimateTrainingSeconds(selected, goal);
+  return {
+    exercises: selected,
+    estimatedDurationSeconds: trainingSeconds + GENERAL_WARMUP_SECONDS,
+    trainingSeconds,
+    warmupSeconds: GENERAL_WARMUP_SECONDS,
+    timeBudgetSeconds: budgetSeconds,
+    durationMode,
+    trimmed: selected.length < orderedExercises.length
+  };
 }
 
 function isAssistedVariation(name = '') {
@@ -2298,11 +2781,128 @@ function applyGoalRanges(exercises, goal) {
   });
 }
 
+// Erlaubte Equipment-Werte (Katalogfeld "equipment") pro Modus. Verhindert, dass bei
+// "nur Gym" z.B. Balance-/Plyo-Körpergewichtsübungen aus dem Katalog reinrutschen, auch wenn
+// deren aiMetadata.allowedEquipmentModes (Katalog-Metadaten sind grob, siehe bekannte
+// Katalog-Qualitätsmängel) gym_only fälschlich mit auflistet.
+const GYM_EQUIPMENT_VALUES = new Set(['Langhantel', 'Kurzhanteln', 'Maschine', 'Kabelzug', 'Kettlebell']);
+const BODYWEIGHT_EQUIPMENT_VALUES = new Set(['Körpergewicht']);
+
+// Namensbasiertes Backstop gegen Übungshäufung derselben kleinen Muskelgruppe (v.a. Waden —
+// der Katalog hat davon besonders viele Varianten), unabhängig vom (teils ungenauen) "target"-
+// Feld im Katalog.
+const ACCESSORY_KEYWORD_BUCKETS = ['waden', 'calf raise', 'bizeps', 'biceps curl', 'trizeps', 'triceps extension', 'beinstrecker', 'leg extension', 'beincurls', 'leg curl', 'seitheben', 'lateral raise', 'frontheben', 'front raise', 'deltaheben'];
+function getAccessoryKeywordBucket(name = '') {
+  const normalized = String(name).toLowerCase();
+  return ACCESSORY_KEYWORD_BUCKETS.find((term) => normalized.includes(term)) || null;
+}
+
+// Katalog-Einträge, deren name_en-Feld nachweislich fehlerhaft/unsinnig ist (z.B. durch
+// Auto-Übersetzung), erkannt am deutschen Original-Namen. Werden aus dem englischsprachigen
+// Katalog-Pool ausgeschlossen, damit kein kaputter Name im Output landet.
+const BROKEN_NAME_EN_SOURCE_NAMES = new Set([
+  'frontkniebeuge langhantel', // name_en: "front squat barbell bench" (falsch, auch in description_en)
+  'langhantel-bankkniebeuge'   // name_en: "barbell bench squat" (verwechselt mit Bankdrücken)
+].map((n) => n.toLowerCase()));
+
+function toTitleCase(value = '') {
+  return String(value)
+    .split(' ')
+    .map((word) => (word.length > 0 ? word.charAt(0).toUpperCase() + word.slice(1) : word))
+    .join(' ');
+}
+
+// User-Report "immer dieselben 3-4 Übungen" bei mehrfacher Generierung: die kuratierte
+// CURATED_REAL_BLUEPRINTS-Liste deckt nur ~23 Namen ab und wird bei fehlender/knapper
+// KI-Antwort (Demo-Fallback ohne OpenAI-Kontingent) fast 1:1 wiederholt. Diese Funktion holt
+// zusätzliche, echte Kandidaten direkt aus dem vollen Katalog (>1000 Einträge), gefiltert nach
+// Split/Equipment/Ziel/Level und zufällig gemischt — sorgt für echte Varianz auch ohne KI-Antwort
+// und lässt (wo vorhanden) mehr vom tatsächlichen Katalog statt der schmalen Whitelist zu.
+function getCatalogRemainderCandidates(requestedType, equipmentMode, goal, level, excludeKeys = new Set(), maxCount = 16) {
+  const categoryMap = { push: 'Push', pull: 'Pull', legs: 'Legs' };
+  const wantedCategories = requestedType === 'fullbody'
+    ? ['Push', 'Pull', 'Legs']
+    : [categoryMap[requestedType]].filter(Boolean);
+  if (wantedCategories.length === 0) return [];
+
+  const candidates = exerciseCatalog.filter((entry) => {
+    if (!entry || !wantedCategories.includes(entry.category)) return false;
+    const meta = entry.aiMetadata;
+    if (!meta) return false;
+    if (meta.primaryPhase === 'warmup' || meta.exerciseType === 'mobility') return false;
+    if (Array.isArray(meta.disallowedGoals) && meta.disallowedGoals.includes(goal)) return false;
+    if (!Array.isArray(meta.allowedEquipmentModes) || !meta.allowedEquipmentModes.includes(equipmentMode)) return false;
+    // War vorher zu streng (minDifficulty !== 'beginner'), siehe gleicher Fix in
+    // applyHardExerciseFilters — Anfänger dürfen 'beginner' UND 'intermediate', nur nicht 'advanced'.
+    if (level === 'beginner' && meta.minDifficulty === 'advanced') return false;
+    if (level === 'intermediate' && meta.minDifficulty === 'advanced') return false;
+
+    const equipmentOk = equipmentMode === 'bodyweight_only'
+      ? BODYWEIGHT_EQUIPMENT_VALUES.has(entry.equipment)
+      : equipmentMode === 'gym_only'
+        ? GYM_EQUIPMENT_VALUES.has(entry.equipment)
+        : GYM_EQUIPMENT_VALUES.has(entry.equipment) || BODYWEIGHT_EQUIPMENT_VALUES.has(entry.equipment);
+    if (!equipmentOk) return false;
+
+    const sourceName = String(entry.name || '').trim();
+    if (!sourceName || BROKEN_NAME_EN_SOURCE_NAMES.has(sourceName.toLowerCase())) return false;
+
+    // Nur englische Übungsnamen (User-Wunsch: konsistenter, weniger Doppelungen durch
+    // Sprachmischung). name_en ist im Katalog durchgehend gepflegt, kleingeschrieben —
+    // toTitleCase() macht daraus lesbare Anzeige-Namen.
+    const nameEn = String(entry.name_en || '').trim();
+    if (!nameEn) return false;
+    const displayName = toTitleCase(nameEn);
+    if (excludeKeys.has(displayName.toLowerCase())) return false;
+    if (isMobilityOrWarmupExercise(sourceName) || isRehabOrActivationExercise(sourceName)) return false;
+    if (isMobilityOrWarmupExercise(nameEn) || isRehabOrActivationExercise(nameEn)) return false;
+
+    return true;
+  });
+
+  const shuffled = [...candidates];
+  for (let i = shuffled.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+
+  // Der Katalog hat für manche Muskelgruppen (z.B. Waden) deutlich mehr Varianten als für
+  // andere — ungewichtetes Ziehen häuft sonst z.B. 3 Wadenheben-Varianten in einem Bein-Tag
+  // an, statt Quads/Hamstrings/Glutes abzudecken. Höchstens 1 Kandidat pro Zielmuskel
+  // (Katalogfeld "target"), damit die Auswahl über die Muskelgruppen streut. Das Katalogfeld
+  // "target" ist stellenweise ungenau gepflegt (siehe bekannte Katalog-Qualitätsmängel), daher
+  // zusätzlich ein namensbasiertes Backstop für bekannte Problemfälle (v.a. Waden-Varianten).
+  const usedTargets = new Set();
+  const usedKeywordBuckets = new Set(
+    [...excludeKeys].map((key) => getAccessoryKeywordBucket(key)).filter(Boolean)
+  );
+  const picked = [];
+  shuffled.forEach((entry) => {
+    if (picked.length >= maxCount) return;
+    const targetKey = String(entry.target || entry.muscleGroup_en || entry.muscleGroup || '').toLowerCase().trim();
+    const keywordBucket = getAccessoryKeywordBucket(entry.name) || getAccessoryKeywordBucket(entry.name_en);
+    if (targetKey && usedTargets.has(targetKey)) return;
+    if (keywordBucket && usedKeywordBuckets.has(keywordBucket)) return;
+    if (targetKey) usedTargets.add(targetKey);
+    if (keywordBucket) usedKeywordBuckets.add(keywordBucket);
+    picked.push(entry);
+  });
+
+  return picked
+    .map((entry) => normalizeExercise({ name: toTitleCase(entry.name_en) }, requestedType))
+    .filter(Boolean);
+}
+
 function enforceWorkoutProgrammingRules(payload, context = {}, options = {}) {
   const requestedType = normalizeRequestedType(context.requestedType || context.focus);
   const goal = normalizeGoal(context.goal || (Number(context.intensity) >= 4 ? 'strength' : 'muscle_building'));
   const equipmentMode = normalizeEquipmentMode(context.equipmentMode || payload?.equipmentMode);
-  const targetExerciseCount = getTimeAdjustedExerciseTarget(context.durationMinutes || context.timeAvailable, goal);
+  const level = String(context.level || context.experienceLevel || 'beginner').toLowerCase();
+  const durationMinutes = Number(context.durationMinutes || context.timeAvailable) || 45;
+  // Oberes Limit für den Kandidaten-Pool, bevor das Zeitmodell (weiter unten) die
+  // tatsächliche Anzahl anhand der geschätzten Dauer bestimmt (Papier 17.1/17.3: die
+  // Übungszahl ist das ERGEBNIS der Zeitplanung, keine feste Vorgabe aus den Minuten).
+  const candidatePoolCap = 8;
   const preferredBySplit = {
     push: ['horizontal_push', 'vertical_push', 'horizontal_push', 'vertical_push', 'other'],
     pull: ['horizontal_pull', 'vertical_pull', 'horizontal_pull', 'vertical_pull', 'other'],
@@ -2314,7 +2914,14 @@ function enforceWorkoutProgrammingRules(payload, context = {}, options = {}) {
   const normalized = inputExercises
     .map((exercise) => normalizeExercise(exercise, requestedType))
     .filter(Boolean)
-    .filter((exercise) => (requestedType === 'fullbody' ? true : matchesRequestedType(exercise.name, requestedType)));
+    .filter((exercise) => (requestedType === 'fullbody' ? true : matchesRequestedType(exercise.name, requestedType)))
+    // Sicherheitsnetz gegen von der KI erfundene, nicht existierende Übungen: bei gym_only/
+    // gym_plus_bodyweight muss der Name im echten Übungskatalog auflösbar sein. bodyweight_only
+    // bleibt ungefiltert, da der Katalog dort noch Lücken hat (siehe CURATED_REAL_BLUEPRINTS-Kommentar).
+    .filter((exercise) => {
+      if (equipmentMode !== 'gym_only' && equipmentMode !== 'gym_plus_bodyweight') return true;
+      return Boolean(resolveExerciseMetadata(exercise.name));
+    });
 
   const blueprint = getWorkoutBlueprint(requestedType, goal, equipmentMode);
   const blueprintSelected = [];
@@ -2330,40 +2937,87 @@ function enforceWorkoutProgrammingRules(payload, context = {}, options = {}) {
     }
   });
 
+  // Bewegungsmuster, die der Blueprint bereits als schweren Compound abdeckt (z.B. "hinge"
+  // durch Kreuzheben). Verhindert, dass aus dem restlichen Kandidaten-Pool (z.B. KI-Output)
+  // eine zweite schwere Übung desselben Musters reinrutscht (z.B. Kreuzheben + Rumänisches
+  // Kreuzheben in derselben Session — beides Hinge, unnötig redundante Belastung).
+  const blueprintHeavyPatterns = new Set(
+    blueprintSelected
+      .filter((exercise) => !exercise.isIsolation)
+      .map((exercise) => exercise.movementPattern)
+      .filter((pattern) => pattern === 'squat' || pattern === 'hinge')
+  );
+
   const normalizedWithoutBlueprint = normalized.filter((exercise) => {
     const key = String(exercise.name || '').toLowerCase();
-    return !blueprintUsedNames.has(key);
+    if (blueprintUsedNames.has(key)) return false;
+    if (!exercise.isIsolation && blueprintHeavyPatterns.has(exercise.movementPattern)) return false;
+    return true;
   });
 
-  const orderedRemainder = pickExercisesByPattern(normalizedWithoutBlueprint, preferredBySplit[requestedType] || preferredBySplit.fullbody, 6);
-  const ordered = [...blueprintSelected, ...orderedRemainder].slice(0, 6);
-  const hardFiltered = applyHardExerciseFilters(ordered, {
+  // Zusätzliche echte Katalog-Kandidaten (siehe getCatalogRemainderCandidates-Kommentar):
+  // sorgt für Varianz über die schmale CURATED_REAL_BLUEPRINTS-Liste hinaus, besonders wenn
+  // kein OpenAI-Kontingent verfügbar ist und sonst nur der 5-Übungen-Demo-Fallback zur
+  // Verfügung stünde.
+  const excludeKeysForCatalog = new Set([
+    ...blueprintUsedNames,
+    ...normalizedWithoutBlueprint.map((exercise) => String(exercise.name || '').toLowerCase())
+  ]);
+  const catalogRemainderCandidates = (equipmentMode === 'gym_only' || equipmentMode === 'gym_plus_bodyweight')
+    ? getCatalogRemainderCandidates(requestedType, equipmentMode, goal, level, excludeKeysForCatalog, 16)
+      .filter((exercise) => !(!exercise.isIsolation && blueprintHeavyPatterns.has(exercise.movementPattern)))
+    : [];
+
+  // Bei gym_only/gym_plus_bodyweight NICHT den rohen KI/Demo-Output als Zusatzkandidaten
+  // mischen (meist Deutsch, teils unverifizierte Namen) — sonst landen deutsche Namen neben
+  // den jetzt englischen Blueprint-/Katalog-Namen im selben Workout (User-Wunsch: nur Englisch,
+  // konsistenter). Die englischen Katalog-Kandidaten decken die Zusatz-Slots bereits ab.
+  // bodyweight_only bleibt unverändert (altes System, siehe CURATED_REAL_BLUEPRINTS-Kommentar).
+  const remainderPool = (equipmentMode === 'gym_only' || equipmentMode === 'gym_plus_bodyweight')
+    ? catalogRemainderCandidates
+    : [...normalizedWithoutBlueprint, ...catalogRemainderCandidates];
+  const orderedRemainder = pickExercisesByPattern(remainderPool, preferredBySplit[requestedType] || preferredBySplit.fullbody, candidatePoolCap);
+  const hardFilteredRemainder = applyHardExerciseFilters(orderedRemainder, {
     ...context,
     requestedType,
     goal,
     equipmentMode
   });
-  const performanceFiltered = applyPerformanceSelectionRules(hardFiltered, context.performance || {});
-  const deterministicOrder = buildDeterministicExerciseOrder(
-    performanceFiltered,
+  const performanceFilteredRemainder = applyPerformanceSelectionRules(hardFilteredRemainder, context.performance || {});
+  const remainderCap = Math.max(0, candidatePoolCap - blueprintSelected.length);
+  const remainderOrdered = buildDeterministicExerciseOrder(
+    performanceFilteredRemainder,
     {
       ...context,
       requestedType,
       goal
     },
-    targetExerciseCount
+    remainderCap
   );
 
-  let reordered = deterministicOrder;
-  const firstCompoundIndex = reordered.findIndex((exercise) => !exercise.isIsolation);
-  if (firstCompoundIndex > 0) {
-    const firstCompound = reordered[firstCompoundIndex];
-    reordered = [firstCompound, ...reordered.filter((_, index) => index !== firstCompoundIndex)];
-  }
+  // Blueprint-Reihenfolge ist bewusst kuratiert (z.B. Kniebeuge vor Kreuzheben, um die
+  // hintere Kette nicht schon vor der Kniebeuge zu ermüden) und darf nicht von der
+  // generischen Muster-Sortierung überschrieben werden — nur die Übungen aus dem übrigen
+  // Kandidaten-Pool werden nach Muster sortiert und hinten angehängt.
+  const blueprintHardFiltered = applyHardExerciseFilters(blueprintSelected, {
+    ...context,
+    requestedType,
+    goal,
+    equipmentMode
+  });
+  const blueprintPerformanceFiltered = applyPerformanceSelectionRules(blueprintHardFiltered, context.performance || {});
 
-  const goalAdjusted = applyGoalRanges(reordered, goal)
-    .slice(0, targetExerciseCount)
-    .map((exercise, index) => ({
+  const reordered = [...blueprintPerformanceFiltered, ...remainderOrdered];
+  const goalRangedCandidates = applyGoalRanges(reordered, goal);
+
+  // Zeitmodell (Papier 17.1/17.3/17.7): aus der priorisierten Kandidatenliste so viele
+  // Übungen behalten, wie ins Zeitbudget passen. Die Reihenfolge oben stellt bereits sicher,
+  // dass Hauptübungen vorne stehen und niedriger priorisierte Ergänzungen/Isolationen zuerst
+  // wegfallen, wenn gekürzt werden muss (Kürzungsregel 1-3 aus Abschnitt 17.7).
+  const durationMode = context.durationMode === 'total_session' ? 'total_session' : 'training_only';
+  const timeSelection = selectExercisesWithinTimeBudget(goalRangedCandidates, durationMinutes, goal, durationMode);
+
+  const goalAdjusted = timeSelection.exercises.map((exercise, index) => ({
     name: exercise.name,
     sets: exercise.sets,
     reps: exercise.reps,
@@ -2371,10 +3025,10 @@ function enforceWorkoutProgrammingRules(payload, context = {}, options = {}) {
     rest: exercise.rest,
     category: requestedType,
     note: buildExerciseCoachingNote(exercise, goal, index)
-    }));
+  }));
 
   const fallbackName = requestedType === 'fullbody' ? 'Full Body Session' : `${requestedType.toUpperCase()} Session`;
-  const warmupHint = Number(context.durationMinutes || context.timeAvailable || 45) >= 30
+  const warmupHint = durationMinutes >= 30
     ? `Warm-up: 5-8 min ${requestedType === 'legs' ? 'Mobilität + Ramp-Up Sets' : 'leichtes Cardio + Aktivierung'}.`
     : 'Warm-up: 2-4 min Gelenkaktivierung + 1 leichter Ramp-up Satz.';
 
@@ -2383,15 +3037,18 @@ function enforceWorkoutProgrammingRules(payload, context = {}, options = {}) {
       ? payload.workoutName.trim()
       : fallbackName,
     exercises: goalAdjusted,
-    estimatedDuration: Math.min(120, Math.max(20, Number(payload?.estimatedDuration) || Number(context.durationMinutes) || Number(context.timeAvailable) || 45)),
+    estimatedDuration: Math.round(timeSelection.estimatedDurationSeconds / 60),
     difficulty: payload?.difficulty === 'advanced' ? 'advanced' : 'beginner',
     warmup: warmupHint,
     notes: [
       warmupHint,
       goal === 'strength'
         ? 'Reihenfolge: Main Compound → Secondary Compound → Accessory. Pausen 2-4 min bei Hauptlifts.'
-        : 'Reihenfolge: Main Compound → Secondary Compound → Accessory. Kontrollierte Exzentrik und saubere Technik.'
-    ].join(' '),
+        : 'Reihenfolge: Main Compound → Secondary Compound → Accessory. Kontrollierte Exzentrik und saubere Technik.',
+      timeSelection.trimmed
+        ? `Zeitbudget von ${durationMinutes} min erreicht: ${timeSelection.exercises.length} von ${goalRangedCandidates.length} möglichen Übungen ausgewählt.`
+        : null
+    ].filter(Boolean).join(' '),
     goal,
     requestedType,
     equipmentMode,
@@ -2404,7 +3061,7 @@ function enforceWorkoutProgrammingRules(payload, context = {}, options = {}) {
         requestedType,
         equipmentMode,
         blueprintLocked: true,
-        targetExerciseCount,
+        targetExerciseCount: timeSelection.exercises.length,
         outputFormat: {
           title: true,
           goal: true,
@@ -2412,6 +3069,17 @@ function enforceWorkoutProgrammingRules(payload, context = {}, options = {}) {
           warmup: true,
           exerciseNotes: true
         }
+      },
+      timeModel: {
+        enabled: true,
+        durationMode,
+        estimatedDurationSeconds: timeSelection.estimatedDurationSeconds,
+        trainingSeconds: timeSelection.trainingSeconds,
+        warmupSeconds: timeSelection.warmupSeconds,
+        timeBudgetSeconds: timeSelection.timeBudgetSeconds,
+        bufferSeconds: TIME_BUFFER_SECONDS,
+        trimmed: timeSelection.trimmed,
+        candidatePoolSize: goalRangedCandidates.length
       }
     }
   };

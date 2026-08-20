@@ -177,15 +177,24 @@ Sprich den Nutzer direkt an (Du/Dein). Deutsch. Sachlich.`;
    * Health Check
    */
   async healthCheck() {
+    // Bug: `timeout` ist keine gültige fetch()-Option (weder Browser noch Node/undici) und
+    // wurde bisher stillschweigend ignoriert — ein unerreichbares Ollama (z.B. Handy nicht im
+    // Heimnetzwerk) konnte den "5s-Check" faktisch bis zum TCP-eigenen Timeout blockieren.
+    // Jetzt mit echtem AbortController-Timeout, damit die Health-Check-Antwort verlässlich
+    // schnell kommt, unabhängig vom eigentlichen (120s) Generierungs-Timeout.
+    const controller = new AbortController();
+    const timeoutHandle = setTimeout(() => controller.abort(), 3000);
     try {
       const response = await fetch(`${this.baseUrl}/api/tags`, {
         method: 'GET',
-        timeout: 5000
+        signal: controller.signal
       });
       return response.ok;
     } catch (error) {
       logger.warn('❌ Ollama health check failed:', error.message);
       return false;
+    } finally {
+      clearTimeout(timeoutHandle);
     }
   }
 

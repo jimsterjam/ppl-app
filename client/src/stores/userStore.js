@@ -10,6 +10,8 @@ import {
   saveWorkoutOffline,
   queueAction,
   purgeServerDeletedWorkouts,
+  purgePendingCreateQueueForWorkoutId,
+  setMetadata,
   db
 } from '@/utils/offlineStorage'
 import {
@@ -563,7 +565,66 @@ export const useUserStore = defineStore("user", {
           })
         }
         logger.debug('DEBUG: createWorkout token:', token ? 'present' : 'null', 'data:', enrichedWorkoutData)
-        const newWorkout = await createWorkoutApi(enrichedWorkoutData, token);
+
+        // Schnelles lokales Speichern + Server-Race (analog zu updateWorkout weiter unten):
+        // Nach spätestens WORKOUT_CREATE_TIMEOUT_MS gilt das Workout lokal als gespeichert
+        // (optimistischer offline_-Eintrag + Sync-Queue), der eigentliche Server-Request läuft
+        // im Hintergrund weiter. Löst der Nutzer das Speichern in einem Funkloch/langsamen Netz
+        // aus, muss die UI nicht mehr bis zu 25s (VITE_WORKOUTS_TIMEOUT_MS) warten, bevor
+        // "gespeichert" angezeigt wird.
+        const CREATE_RACE_TIMEOUT_MS = 2000
+        const apiPromise = createWorkoutApi(enrichedWorkoutData, token)
+        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), CREATE_RACE_TIMEOUT_MS))
+        let newWorkout = await Promise.race([apiPromise, timeoutPromise])
+
+        if (!newWorkout) {
+          logger.warn('⏳ [userStore] createWorkout Timeout, speichere optimistisch lokal weiter')
+          const optimistic = await this.createWorkoutOptimistic(enrichedWorkoutData)
+
+          // Die ursprüngliche (schnellere) Anfrage lief unabhängig vom Timeout weiter - kommt
+          // sie später doch noch mit Erfolg zurück, den optimistischen offline_-Eintrag durch
+          // den echten Server-Datensatz ersetzen UND den zwischenzeitlich von
+          // createWorkoutOptimistic() angelegten Sync-Queue-Eintrag entfernen. Sonst würde die
+          // Sync-Queue später denselben Workout ein zweites Mal auf dem Server anlegen
+          // (Duplikat), weil sie nichts von dieser bereits erfolgreichen Anfrage weiß.
+          apiPromise
+            .then((lateWorkout) => {
+              if (!lateWorkout) return
+              const shouldKeepAsDraft = workoutData?.completed !== true && lateWorkout.completed !== true
+              const lateIdx = this.workouts.findIndex(w => String(w?._id || '') === String(optimistic._id))
+              if (lateIdx !== -1) {
+                this.workouts[lateIdx] = {
+                  ...lateWorkout,
+                  _isDraft: shouldKeepAsDraft,
+                  isDraft: shouldKeepAsDraft,
+                  completed: workoutData?.completed === true ? true : (lateWorkout.completed ?? false)
+                }
+                this.workouts = this.applyWorkoutLimit(this.workouts)
+              }
+              purgePendingCreateQueueForWorkoutId(optimistic._id).catch(() => {})
+              deleteWorkoutOffline(optimistic._id).catch(() => {})
+              // Mapping temp-ID -> echte ID hinterlegen (gleicher Mechanismus wie draft-*,
+              // siehe resolveRealIdFromDraftId in workoutHelpers.js). Wichtig für Stellen,
+              // die die zurückgegebene offline_-ID bereits weitergereicht haben (z.B.
+              // PostWorkoutSummary.vue), bevor die Reconciliation hier abgeschlossen war.
+              try {
+                sessionStorage.setItem(`workout_map_${optimistic._id}`, String(lateWorkout._id))
+              } catch {}
+              setMetadata(`workout_map_${optimistic._id}`, String(lateWorkout._id)).catch(() => {})
+              logger.debug('✅ [userStore] createWorkout (verzögert) erfolgreich, optimistischen Eintrag ersetzt', {
+                tempId: optimistic._id,
+                realId: lateWorkout._id
+              })
+            })
+            .catch((lateError) => {
+              // Kein Sonderfall nötig: der optimistische Eintrag bleibt in der Sync-Queue und
+              // wird vom periodischen Auto-Sync später erneut versucht.
+              logger.warn('⚠️ [userStore] createWorkout (verzögert) endgültig fehlgeschlagen, bleibt in Sync-Queue', lateError?.message)
+            })
+
+          return optimistic
+        }
+
         logger.debug('🏗️ [userStore] API returned:', newWorkout)
         if (newWorkout) {
           // _isDraft ableiten aus dem Payload: wenn der Aufrufer completed:true übergeben hat

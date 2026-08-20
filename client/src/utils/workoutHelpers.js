@@ -255,18 +255,22 @@ export function snapshotCore(w) {
 }
 
 /**
- * Löst eine draft-ID (z.B. 'draft-xyz') in die zugehörige echte MongoDB-ID auf.
+ * Löst eine temporäre lokale ID ('draft-xyz' ODER 'offline_xyz') in die zugehörige
+ * echte MongoDB-ID auf. Beide Präfixe nutzen denselben 'workout_map_<id>'-Mechanismus:
+ * draft- wird von WorkoutBuilder's Background-Create geschrieben, offline_ vom
+ * verzögerten createWorkout()-Erfolg in userStore.js (siehe dort).
  * Suchpfad:
- *   1. route.query.realId (falls übergebene route vorhanden)
+ *   1. route.query.realId (falls übergebene route vorhanden, nur für draft-)
  *   2. sessionStorage  key 'workout_map_<id>'
  *   3. IndexedDB       key 'workout_map_<id>'  (via getMetadata)
  *
- * @param {string} id - Die draft-ID die aufgelöst werden soll
+ * @param {string} id - Die temporäre ID die aufgelöst werden soll
  * @param {object|null} route - Vue Router route-Objekt (optional)
  * @returns {Promise<string>} Echte ID oder '' wenn nicht gefunden
  */
 export async function resolveRealIdFromDraftId(id, route = null) {
-  if (!String(id || '').startsWith('draft-')) return ''
+  const isTemp = String(id || '').startsWith('draft-') || String(id || '').startsWith('offline_')
+  if (!isTemp) return ''
   // 1. Route-Query (schnellster Pfad, immer synchron verfügbar)
   let realId = String(route?.query?.realId || '')
   // 2. sessionStorage (überlebt keinen iOS-Kill, aber deckt den Normal-Fall)

@@ -67,6 +67,12 @@ export class OpenAIProvider extends AIProvider {
       const prompt = this.buildPrompt(trainingAnalysis);
 
       // Rufe OpenAI auf
+      // WICHTIG: `timeout` ist beim openai-SDK ein Request-OPTIONS-Parameter (2. Argument),
+      // kein Feld des Request-Bodys. Stand er im Body-Objekt, schickte der SDK-Client ihn als
+      // unbekanntes JSON-Feld mit an die API -> "400 Unrecognized request argument supplied:
+      // timeout". Der Client-Timeout (this.timeout) greift ohnehin schon global über die
+      // `new OpenAI({ timeout })`-Konfiguration im Constructor; hier zusätzlich als
+      // Options-Argument gesetzt, falls ein Request abweichend länger/kürzer dauern soll.
       const response = await this.client.chat.completions.create({
         model: this.model,
         messages: [
@@ -80,7 +86,8 @@ export class OpenAIProvider extends AIProvider {
           }
         ],
         temperature,
-        max_tokens: 800,
+        max_tokens: 800
+      }, {
         timeout: this.timeout
       });
 

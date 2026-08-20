@@ -69,6 +69,13 @@ client/ios/App/Pods/
 client/ios/App/build/
 client/ios/App/Podfile *.lock
 client/ios/App/Podfile [0-9]*.lock
+# config.xml wird von @capacitor/cli bei jedem `cap sync`/`cap copy` automatisch
+# gelöscht und neu erzeugt (Cordova-Kompatibilitäts-Bridge) — nie manuell editieren.
+# Das schnelle Löschen+Neuerzeugen kollidiert oft mit einem laufenden iCloud-Drive-Sync
+# (gleiches Muster wie bei den Podfile.lock-Zeilen oben) und erzeugt dabei nummerierte
+# Konfliktkopien ("config 2.xml", "config 3.xml", ...) — diese ebenfalls ignorieren.
+client/ios/App/App/config.xml
+client/ios/App/App/config [0-9]*.xml
 
 # =========================
 # Lokale Backup-/Kopie-Dateien

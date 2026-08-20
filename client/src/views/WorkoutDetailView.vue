@@ -285,7 +285,7 @@
                 </div>
               </template>
               <div class="row-actions warmup-actions">
-                <button class="add-warmup-btn" @click="addWarmupSetRow(i)">＋ {{ t('workoutDetail.addWarmupSet') }}</button>
+                <button class="add-warmup-btn" @click="addWarmupSetRow(i, $event)">＋ {{ t('workoutDetail.addWarmupSet') }}</button>
               </div>
 
               <!-- Arbeitssätze -->
@@ -404,7 +404,7 @@
               </template>
 
               <div class="row-actions">
-                <button class="add-row-btn" :title="t('workoutDetail.addSet')" @click="addSetRow(i)">＋ {{ t('workoutDetail.addSet') }}</button>
+                <button class="add-row-btn" :title="t('workoutDetail.addSet')" @click="addSetRow(i, $event)">＋ {{ t('workoutDetail.addSet') }}</button>
               </div>
             </div>
           </div>
@@ -659,7 +659,8 @@ import {
   normalizeFavoriteName,
   normalizeWorkoutType
 } from '@/utils/workoutFavorites'
-import { clearActiveDraft, getActiveDraft, setActiveDraft, updateActiveDraft } from '@/utils/activeWorkoutDraft'
+import { clearActiveDraft, getActiveDraft, setActiveDraft, updateActiveDraft, findActiveDraftByWorkoutId } from '@/utils/activeWorkoutDraft'
+import { acquireKeepAwake, releaseKeepAwake } from '@/utils/keepAwakeGuard'
 
 const userStore = useUserStore()
 const authStore = useAuthStore()
@@ -807,6 +808,43 @@ const pickerConfig = reactive({
 })
 let pickerTarget = null // { row, field }
 
+// HYPOTHESE (spontane Set-Duplikate / "Daten werden zurückgesetzt"), NOCH NICHT BEWIESEN:
+// NumberPicker.vue ist ein position:fixed Vollbild-Overlay (z-index 2000), das per v-if
+// sofort aus dem DOM verschwindet, sobald der User im Header auf "OK" tippt. Auf iOS/
+// WKWebView KANN das Antippen eines Elements, das sich genau in diesem Moment aus dem DOM
+// entfernt, einen "Ghost Click" erzeugen: das echte Touch-Event schließt den Picker, ein
+// nachgelagertes synthetisches click-Event trifft dann das Element, das an derselben
+// Bildschirmposition jetzt sichtbar ist - z.B. den "+ Satz hinzufügen"-Button darunter.
+// Bisher wurde ein Aufruf von addSetRow() gar nicht geloggt, weder bei echtem Tap noch bei
+// Ghost-Click - die Log-Historie konnte diese Hypothese also NICHT bestätigen, nur ein
+// zeitliches/inhaltliches Muster nahelegen (Duplikat mit identischen Werten kurz nach einer
+// Picker-Bestätigung). lastPickerCloseAt + logSetRowTrigger() unten liefern jetzt beim
+// nächsten Auftreten harte Daten: Zeitabstand zum Picker-Schluss und Klick-Koordinaten.
+// Der Klick-Schluck-Fix unten ist eine sichere Absicherung gegen dieses bekannte
+// Browser-Verhalten, unabhängig davon, ob er hier tatsächlich die Ursache war.
+let pickerGhostClickGuardUntil = 0
+let lastPickerCloseAt = 0
+const PICKER_GHOST_CLICK_GUARD_MS = 400
+
+function armPickerGhostClickGuard() {
+  pickerGhostClickGuardUntil = Date.now() + PICKER_GHOST_CLICK_GUARD_MS
+  lastPickerCloseAt = Date.now()
+}
+
+function swallowPickerGhostClick(event) {
+  if (Date.now() >= pickerGhostClickGuardUntil) return
+  pickerGhostClickGuardUntil = 0
+  try {
+    event.preventDefault()
+    event.stopPropagation()
+    if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation()
+  } catch {}
+  logDiagnostic('ghost-click-swallowed', {
+    target: event?.target?.tagName || null,
+    className: event?.target?.className || null
+  })
+}
+
 function shouldKeepAsDraft(workoutLike) {
   if (!workoutLike) return false
   const routeId = String(route.params.id || '')
@@ -828,7 +866,8 @@ function sleep(ms) {
 }
 
 async function waitForRealIdFromDraftId(id) {
-  if (!String(id || '').startsWith('draft-')) return ''
+  const idStr = String(id || '')
+  if (!idStr.startsWith('draft-') && !idStr.startsWith('offline_')) return ''
   const realId = await resolveRealIdFromDraftId(id)
   if (realId) {
     logger.debug('[WorkoutDetail] realId gefunden', { draftId: id, realId })
@@ -1442,8 +1481,18 @@ async function loadLocalWorkout(id) {
     const activeWorkoutId = String(active?.workout?._id || active?.editingWorkoutId || '').trim()
     if (active?.workout && (activeWorkoutId === String(id) || active?.editingWorkoutId === id)) {
       logger.debug('[WorkoutDetail] gefunden im Active-Draft-Speicher', { id })
-      return { workout: active.workout, editingWorkoutId: active.editingWorkoutId || null }
+      return { workout: active.workout, editingWorkoutId: active.editingWorkoutId || null, source: 'active-draft-by-uid' }
     }
+  }
+
+  // Fallback ohne uid-Abhängigkeit: siehe Kommentar bei findActiveDraftByWorkoutId(). Schützt
+  // gegen einen App-Kaltstart, bei dem resolveActiveWorkoutUserId() (Firebase-Auth/User-Store
+  // noch nicht hydriert) kurzzeitig leer ist und der obige uid-Check dadurch übersprungen wird.
+  const byIdMatch = findActiveDraftByWorkoutId(id)
+  if (byIdMatch?.draft?.workout) {
+    logger.debug('[WorkoutDetail] gefunden im Active-Draft-Speicher (id-fallback, uid war leer/anders)', { id, uid: byIdMatch.uid, activeUid })
+    logDiagnostic('active-draft-id-fallback-hit', { id, uid: byIdMatch.uid, activeUidAtLookup: activeUid || null })
+    return { workout: byIdMatch.draft.workout, editingWorkoutId: byIdMatch.draft.editingWorkoutId || null, source: 'active-draft-by-id-fallback' }
   }
 
   const fromStore = store.workouts.find(w => w._id === id) || null
@@ -1465,7 +1514,7 @@ async function loadLocalWorkout(id) {
     })
   }
 
-  return { workout: loadedWorkout, editingWorkoutId }
+  return { workout: loadedWorkout, editingWorkoutId, source: fromStore || fromOffline ? 'store-or-offline-fallback' : 'not-found' }
 }
 
 async function loadServerWorkout(id) {
@@ -1481,8 +1530,18 @@ async function loadServerWorkout(id) {
     const activeWorkoutId = String(active?.workout?._id || active?.editingWorkoutId || '').trim()
     if (active?.workout && (activeWorkoutId === String(id) || active?.editingWorkoutId === id)) {
       logger.debug('[WorkoutDetail] gefunden im Active-Draft-Speicher (server-path)', { id })
-      return { workout: active.workout, editingWorkoutId: active.editingWorkoutId || null }
+      return { workout: active.workout, editingWorkoutId: active.editingWorkoutId || null, source: 'active-draft-by-uid' }
     }
+  }
+
+  // Fallback ohne uid-Abhängigkeit (siehe findActiveDraftByWorkoutId): fängt den Fall ab, dass
+  // resolveActiveWorkoutUserId() bei einem App-Kaltstart kurzzeitig leer ist, weil Firebase-Auth
+  // /User-Store noch nicht hydriert sind.
+  const byIdMatchServer = findActiveDraftByWorkoutId(id)
+  if (byIdMatchServer?.draft?.workout) {
+    logger.debug('[WorkoutDetail] gefunden im Active-Draft-Speicher (server-path, id-fallback)', { id, uid: byIdMatchServer.uid, activeUid })
+    logDiagnostic('active-draft-id-fallback-hit', { id, uid: byIdMatchServer.uid, activeUidAtLookup: activeUid || null, path: 'server' })
+    return { workout: byIdMatchServer.draft.workout, editingWorkoutId: byIdMatchServer.draft.editingWorkoutId || null, source: 'active-draft-by-id-fallback' }
   }
 
   const normalFromStore = store.workouts.find(w => w._id === id) || null
@@ -1610,10 +1669,24 @@ async function loadWorkout() {
       requestedId,
       currentRouteId: String(route.params.id || ''),
       loadedWorkoutId: loadedWorkout?._id || null,
+      source: result.source || null,
+      activeUidAtLoad: resolveActiveWorkoutUserId() || null,
       loadedExercises: loadedWorkout?.exercises?.map(ex => ({ name: ex.name, setDetails: ex.setDetails })) || []
     })
 
-    workout.value = loadedWorkout
+    // HÄRTUNG gegen stille Fremd-Mutation: loadLocalWorkout()/loadServerWorkout() können
+    // eine Objekt-REFERENZ aus store.workouts (Pinia) oder dem Active-Draft direkt
+    // zurückgeben statt einer Kopie. Wird dieselbe Referenz später von anderem Code
+    // in-place mutiert (z.B. Sync-Reconciliation nach Offline->Online-Wechsel, oder ein
+    // paralleler loadWorkout()-Aufruf), würde sich workout.value MITÄNDERN, ohne dass
+    // hier irgendein Code das ausgelöst hätte - für den User sieht das wie ein
+    // spontaner Datenverlust/-reset aus. Deep-Clone entkoppelt den reaktiven Formular-
+    // State zuverlässig von allen anderen Referenzen auf dasselbe Objekt.
+    workout.value = loadedWorkout && typeof structuredClone === 'function'
+      ? structuredClone(loadedWorkout)
+      : loadedWorkout
+        ? JSON.parse(JSON.stringify(loadedWorkout))
+        : loadedWorkout
 
     if (workout.value) {
       ensureSetDetailsStructure()
@@ -1622,6 +1695,15 @@ async function loadWorkout() {
       if (shouldKeepAsDraft(workout.value) && workout.value.completed !== true) {
         const uid = resolveActiveWorkoutUserId()
         if (uid) {
+          // Bisher unprotokollierter Schreibpfad: schreibt den GERADE GELADENEN Stand direkt in
+          // den Active-Draft zurück. Kam der Ladevorgang über den store/offline-Fallback statt
+          // aus dem Active-Draft selbst (source !== 'active-draft-by-*'), überschreibt dieser aus
+          // Versehen einen ggf. neueren Draft mit einem veralteten Stand - das ist der Schreib-
+          // vorgang, der bisher unsichtbar im Log war. draft-write-source macht ihn sichtbar.
+          logDiagnostic('draft-write-source', {
+            source: result.source || null,
+            exercises: workout.value.exercises?.map(ex => ({ name: ex.name, setDetails: ex.setDetails })) || []
+          })
           setActiveDraft(uid, workout.value, editingWorkoutId)
         }
       }
@@ -1744,6 +1826,7 @@ function openPicker(row, field, step = 1, min = 0, max = 1000, title = '') {
 }
 
 function onPickerConfirm(val) {
+  armPickerGhostClickGuard()
   if (!pickerTarget) { pickerVisible.value = false; return }
   const { row, field } = pickerTarget
   row[field] = val
@@ -1753,16 +1836,20 @@ function onPickerConfirm(val) {
 }
 
 function onPickerCancel() {
+  armPickerGhostClickGuard()
   pickerVisible.value = false
   pickerTarget = null
 }
 
 function goToPostWorkoutSummary(workoutId) {
   const id = String(workoutId || '').trim()
+  logger.info('[WorkoutDetail] goToPostWorkoutSummary called', { workoutId, id })
   if (!id) {
+    logger.warn('[WorkoutDetail] No workoutId, redirecting to dashboard')
     router.push('/dashboard')
     return
   }
+  logger.info('[WorkoutDetail] Navigating to stats with postWorkout=1', { id })
   router.push({
     name: 'stats',
     query: {
@@ -1976,7 +2063,27 @@ function getSetLabel(setDetails, rIdx) {
   return setDetails[rIdx]?.isWarmup ? `W${warmupCount}` : `${workingCount}`
 }
 
-function addSetRow(exIndex) {
+// Protokolliert JEDEN Aufruf von addSetRow/addWarmupSetRow mit Beweis-Metadaten (statt wie
+// bisher gar nicht), damit sich beim nächsten Auftreten des Duplikat-Bugs eindeutig klären
+// lässt, WER/WAS den Aufruf ausgelöst hat: msSincePickerClose zeigt, wie kurz nach einem
+// Picker-Schließen der Klick kam (Ghost-Click-Verdacht bei sehr kleinen Werten); x/y sind die
+// Klick-Koordinaten (zusammen mit der Button-Position im DOM überprüfbar, ob sie zur vorherigen
+// Picker-Position passen); isTrusted ist bei echten Nutzer-Klicks immer true (unterscheidet
+// also NICHT zwischen "echter Tap" und "Ghost-Click", da beide vom Browser als trusted gelten -
+// aber schließt zumindest synthetische/programmatische Auslöser aus).
+function logSetRowTrigger(kind, exIndex, event) {
+  logDiagnostic('set-row-add-trigger', {
+    kind,
+    exIndex,
+    msSincePickerClose: lastPickerCloseAt ? Date.now() - lastPickerCloseAt : null,
+    x: event?.clientX ?? null,
+    y: event?.clientY ?? null,
+    isTrusted: event?.isTrusted ?? null
+  })
+}
+
+function addSetRow(exIndex, event = null) {
+  logSetRowTrigger('working', exIndex, event)
   const ex = workout.value?.exercises?.[exIndex]
   if (!ex) return
   if (!Array.isArray(ex.setDetails)) ex.setDetails = []
@@ -1985,7 +2092,8 @@ function addSetRow(exIndex) {
   try { triggerAutoSave() } catch {}
 }
 
-function addWarmupSetRow(exIndex) {
+function addWarmupSetRow(exIndex, event = null) {
+  logSetRowTrigger('warmup', exIndex, event)
   const ex = workout.value?.exercises?.[exIndex]
   if (!ex) return
   if (!Array.isArray(ex.setDetails)) ex.setDetails = []
@@ -2215,6 +2323,23 @@ async function performSaveWorkout() {
   // daher muss es vor cancelPendingAutoSave() und vor dem ersten await stehen.
   saving.value = true
   suppressDraftPersistence.value = true
+
+  // Bildschirm bleibt an, bis Speichern + anschließende KI-Analyse abgeschlossen sind (User-
+  // Wunsch: Standby darf diese Vorgänge nicht abbrechen). Bei Erfolg übernimmt
+  // PostWorkoutSummary.vue die Freigabe (siehe dort); bei Fehlern/Abbrüchen hier in diesem
+  // Funktionsdurchlauf wird unten explizit wieder freigegeben. Sicherheitsnetz: falls aus
+  // irgendeinem Grund weder das eine noch das andere greift, spätestens nach 90s freigeben,
+  // damit der Bildschirm nicht dauerhaft an bleibt.
+  acquireKeepAwake('workout-save')
+  const keepAwakeSafetyTimer = setTimeout(() => {
+    releaseKeepAwake('workout-save')
+  }, 90000)
+  // Für alle Ausstiegspunkte, die NICHT zu PostWorkoutSummary führen (Fehler, Favorit-
+  // Anpassen-Modus): Keep-Awake sofort wieder freigeben statt bis zum 90s-Sicherheitsnetz zu warten.
+  const releaseSaveKeepAwake = () => {
+    clearTimeout(keepAwakeSafetyTimer)
+    releaseKeepAwake('workout-save')
+  }
   // Race-Fix: Warte auf ausstehende Auto-Save-Promises bevor wir weitermachen (Race 2),
   // um zu verhindern dass parallele saveDraft() + updateWorkout() um die gleiche ID konkurrieren
   if (autoSaveWaiters.length > 0) {
@@ -2287,6 +2412,7 @@ async function performSaveWorkout() {
           toast.show('Fehler beim Aktualisieren des Favoriten', { type: 'error', duration: 4000 })
           saving.value = false
           suppressDraftPersistence.value = false
+          releaseSaveKeepAwake()
           return
         }
         if (!updateResult?.success) {
@@ -2295,18 +2421,21 @@ async function performSaveWorkout() {
             toast.show(t('workoutDetail.favoriteNotFound') || 'Favorit wurde nicht gefunden – wurde er gelöscht?', { type: 'error', duration: 4000 })
             saving.value = false
             suppressDraftPersistence.value = false
+            releaseSaveKeepAwake()
             return
           }
           if (updateResult?.code === 'INVALID_NAME') {
             toast.show(t('workoutDetail.favoriteNameInvalid') || 'Ungültiger Favoritenname', { type: 'error', duration: 4000 })
             saving.value = false
             suppressDraftPersistence.value = false
+            releaseSaveKeepAwake()
             return
           }
           // Unbekannter Fehlercode: Nutzer informieren, nicht still verlieren
           toast.show(`Favorit konnte nicht aktualisiert werden (${updateResult?.code || 'unbekannt'})`, { type: 'error', duration: 4000 })
           saving.value = false
           suppressDraftPersistence.value = false
+          releaseSaveKeepAwake()
           return
         } else {
           logger.debug('[WorkoutDetail] Favorit erfolgreich aktualisiert', favId)
@@ -2320,6 +2449,7 @@ async function performSaveWorkout() {
         toast.show('Favorit konnte nicht gespeichert werden: fehlende ID', { type: 'error', duration: 4000 })
         saving.value = false
         suppressDraftPersistence.value = false
+        releaseSaveKeepAwake()
         return
       }
       // Draft-Workout aus IndexedDB, Store UND sessionStorage entfernen.
@@ -2327,7 +2457,12 @@ async function performSaveWorkout() {
       // Draft als "in Bearbeitung" an (readDetailDraft liest workout_detail_draft).
       clearAllDetailDraftSnapshots()
       const adjustId = String(id)
-      if (adjustId.startsWith('draft-')) {
+      // Wichtig: offline_-IDs (vom schnellen createWorkout()-Race in userStore.js) genauso
+      // behandeln wie draft-*-IDs. Vorher wurde hier nur auf 'draft-' geprüft, wodurch eine
+      // offline_-ID in den else-Zweig fiel und ungeprüft als echte ID an deleteWorkoutApi
+      // (DELETE /api/workouts/:id) übergeben wurde - der Server lehnt das mit
+      // "Ungültige Workout-ID" ab, da offline_... kein gültiges ObjectId-Format ist.
+      if (adjustId.startsWith('draft-') || adjustId.startsWith('offline_')) {
         const realId = await resolveRealIdFromDraftId(adjustId)
         if (realId) {
           const tk = await getIdToken().catch(() => null)
@@ -2344,6 +2479,7 @@ async function performSaveWorkout() {
       }
       toast.show(t('workoutDetail.adjustSaved') || 'Favorit aktualisiert', { type: 'success', duration: 2000 })
       bypassTimerLeaveGuard.value = true
+      releaseSaveKeepAwake()
       router.push('/dashboard')
       return
     }
@@ -2360,7 +2496,12 @@ async function performSaveWorkout() {
       }
     }
 
-    if (String(id).startsWith('draft-')) {
+    // offline_-IDs (vom schnellen createWorkout()-Race in userStore.js, siehe dort) müssen
+    // hier genauso wie draft-*-IDs behandelt werden - sonst fällt die Ausführung in den
+    // generischen store.updateWorkout(id, ...)-Zweig weiter unten, der zwar selbst sicher mit
+    // offline_-IDs umgeht (kein direkter Server-Call), aber goToPostWorkoutSummary() danach
+    // ohne aufgelöste echte ID aufruft.
+    if (String(id).startsWith('draft-') || String(id).startsWith('offline_')) {
       const token = await getIdToken().catch(() => null)
       const realId = await waitForRealIdFromDraftId(id)
 
@@ -2472,6 +2613,7 @@ async function performSaveWorkout() {
     error.value = e?.message || 'Speichern fehlgeschlagen'
     saveMsg.value = 'Speichern fehlgeschlagen.'
     saveError.value = true
+    releaseSaveKeepAwake()
   } finally {
     saving.value = false
   }
@@ -2713,7 +2855,7 @@ function logDiagnostic(event, data = {}) {
       ...data,
       timestamp: new Date().toISOString()
     })
-    const trimmed = existing.slice(-40)
+    const trimmed = existing.slice(-100)
     localStorage.setItem(key, JSON.stringify(trimmed))
   } catch {}
 }
@@ -2830,6 +2972,15 @@ function saveActiveDraftDirect(reason = 'unknown', forceIgnoreDirty = false) {
       editingWorkoutId: editingWorkoutId || null,
       exerciseCount: exercises.length
     })
+    // Voller Exercise-Dump (nicht nur Zähler) bei JEDEM Schreibpfad auf den Active-Draft,
+    // damit sich der exakte Moment eines Set-Verlusts im Diagnose-Log nachvollziehen lässt
+    // (vorher loggten lifecycle-persist-Events nur den "reason", ohne Dateninhalt, sodass
+    // ein Datenverlust zwischen zwei "load-before-assign"-Events nicht mehr rekonstruierbar war).
+    logDiagnostic('draft-write', {
+      reason,
+      forceIgnoreDirty,
+      exercises: exercises.map(ex => ({ name: ex.name, setDetails: ex.setDetails }))
+    })
   }
   return ok
 }
@@ -2876,6 +3027,10 @@ onMounted(async () => {
   window.addEventListener('scroll', onWindowScroll, { passive: true })
   if (typeof document !== 'undefined') {
     document.addEventListener('visibilitychange', onVisibilityChange)
+    // Capture-Phase, damit der Ghost-Click abgefangen wird, BEVOR er Button-Handler
+    // wie addSetRow() im "+ Satz hinzufügen"-Button erreicht (siehe Kommentar bei
+    // pickerGhostClickGuardUntil weiter oben).
+    document.addEventListener('click', swallowPickerGhostClick, true)
   }
   // Capacitor App-Lifecycle: appStateChange führt frühzeitig einen Draft-Save durch,
   // bevor iOS den WebView-Prozess beenden kann (pagehide kommt zu spät oder gar nicht).
@@ -2918,16 +3073,47 @@ watch(() => workout.value?.exercises?.length || 0, async (len) => {
 // Wenn router.replace die Route von der Temp-ID auf die echte MongoDB-ID wechselt (WorkoutBuilder
 // erstellt das Workout im Hintergrund), den localStorage-Prefill-Key migrieren und workout._id
 // synchronisieren, damit Auto-Save nicht mehr die Draft-ID in den PUT-Body einschleust.
+//
+// BUGFIX (Daten-Reset bei App-Resume): Der Active-Draft in localStorage wurde bisher NICHT
+// synchron mit dieser ID-Migration aktualisiert, sondern erst über den separaten deep-watch auf
+// workout.value (siehe unten), der asynchron über Vues Reaktivitäts-Flush läuft. Ging die App
+// GENAU in diesem schmalen Zeitfenster (Route wechselt von temp-ID auf echte Mongo-ID, aber der
+// deep-watch hat noch nicht gefeuert) in den Hintergrund oder wurde der Prozess von iOS beendet,
+// stand im localStorage-Draft weiterhin die ALTE temp-ID (workout._id UND editingWorkoutId). Beim
+// Zurückkehren/Neustart sucht loadServerWorkout(id) mit der NEUEN echten ID nach einem Active-
+// Draft-Treffer (strikter ID-Vergleich) — der schlug wegen der veralteten temp-ID im Draft
+// fehl, der Lookup fiel auf Store/Offline/Server zurück und lieferte den alten Stand OHNE die
+// zuletzt eingegebenen Daten zurück. Das sah für den User wie ein "Reset" aus.
+// Fix: Active-Draft sofort (synchron, im selben Tick wie die ID-Änderung) unter der neuen ID
+// umschreiben, statt auf den asynchronen deep-watch zu warten.
 watch(() => String(route.params.id || ''), (newId, oldId) => {
   if (!newId || !oldId || newId === oldId) return
   // workout.value._id auf die neue (echte) ID aktualisieren, wenn wir von einer Draft-ID gewechselt haben
+  const wasTempId = workout.value && (
+    String(workout.value._id || '') === oldId || String(workout.value._id || '').startsWith('draft-')
+  )
   if (
     workout.value &&
     !newId.startsWith('draft-') &&
     !newId.startsWith('offline_') &&
-    (String(workout.value._id || '') === oldId || String(workout.value._id || '').startsWith('draft-'))
+    wasTempId
   ) {
     workout.value = { ...workout.value, _id: newId }
+
+    // Sofort-Migration des Active-Drafts, um die Race Condition oben zu schließen.
+    try {
+      const uid = resolveActiveWorkoutUserId()
+      const active = uid ? getActiveDraft(uid) : null
+      const activeMatchesOld = active?.workout && (
+        String(active.workout._id || '') === oldId || active.editingWorkoutId === oldId
+      )
+      if (uid && activeMatchesOld) {
+        setActiveDraft(uid, { ...active.workout, _id: newId }, newId)
+        logDiagnostic('active-draft-id-migrated', { oldId, newId })
+      }
+    } catch (err) {
+      logger.warn('[WorkoutDetail] Active-Draft ID-Migration fehlgeschlagen:', err?.message)
+    }
   }
   try {
     const oldKey = `fav_prefill_applied_v1_${oldId}`
@@ -3041,6 +3227,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('scroll', onWindowScroll)
   if (typeof document !== 'undefined') {
     document.removeEventListener('visibilitychange', onVisibilityChange)
+    document.removeEventListener('click', swallowPickerGhostClick, true)
   }
   // Capacitor-Listener entfernen
   try { if (_capAppStateListener) { _capAppStateListener.remove(); _capAppStateListener = null } } catch {}

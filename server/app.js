@@ -60,6 +60,17 @@ app.use(cors({
 // JSON
 app.use(express.json());
 
+// API-Antworten nie cachen: ohne expliziten Cache-Control-Header cacht der WKWebView
+// (iOS-App) GET-Requests heuristisch selbst und liefert sie später aus dem Disk-Cache
+// aus (Status 304, "Quelle: Speichercache" in den DevTools) — OHNE überhaupt eine
+// Anfrage an den Server zu schicken. Dadurch sah die Übersicht ("Feedbacks") frisch
+// generiertes AI-Feedback nicht, obwohl der Server es korrekt erzeugt und gespeichert
+// hatte. Betrifft nur /api/*, nicht die statischen Assets darunter.
+app.use('/api', (req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+});
+
 // Statische Dateien (Rollback: gesamtes public-Verzeichnis)
 app.use(express.static(path.join(__dirname, 'public')));
 

@@ -83,10 +83,21 @@ const workoutSchema = new mongoose.Schema({
   ,
   // Optionales Workout-Coverbild
   imageUrl: { type: String },
-  thumbnailUrl: { type: String }
+  thumbnailUrl: { type: String },
+
+  // KI-generiertes Trainings-Feedback (einmal generiert, danach wiederverwendet)
+  ai_feedback: { type: String },
+  ai_generated_at: { type: Date },
+  ai_metadata: {
+    provider: String,
+    model: String
+  }
 }, {
   timestamps: true
 });
+
+// Feedback-Liste: userId + ai_generated_at DESC mit Limit
+workoutSchema.index({ userId: 1, ai_generated_at: -1 })
 
 // 🚀 Database Indexes für Performance-Optimierung
 // Häufige Query-Patterns:

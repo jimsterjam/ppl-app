@@ -149,8 +149,31 @@ export function analyzeWorkoutProgression(currentWorkout, allWorkouts) {
 
     try {
       // Finde letzte Session der gleichen Übung
+      //
+      // WICHTIG: allWorkouts ist nach date DESC sortiert (neueste zuerst). Ein reines
+      // .find() ohne Datums-Prüfung liefert bei diesem Sortier-Array das JÜNGSTE andere
+      // Workout mit dieser Übung - das kann bei einem älteren currentWorkout ein SPÄTERES
+      // (zukünftiges relativ zu currentWorkout) Workout sein statt des tatsächlich
+      // vorherigen. Beispiel: 3 Workouts W1(alt)->W2->W3(neu) mit Gewichtssteigerung nur in
+      // W2. Beim Analysieren von W1 fand find() fälschlich W3 als "previous" (identisches
+      // Gewicht wie W1), wodurch die echte Steigerung in W2 nie sichtbar wurde. Fix: nur
+      // Workouts zulassen, die chronologisch VOR currentWorkout liegen (date, bei Gleichstand
+      // createdAt als Tiebreaker) - da das Array DESC sortiert ist, liefert find() dann
+      // korrekt das nächstgelegene frühere Workout.
+      const currentDateMs = new Date(currentWorkout.date).getTime();
+      const currentCreatedMs = currentWorkout.createdAt ? new Date(currentWorkout.createdAt).getTime() : 0;
+
+      const isStrictlyBeforeCurrent = (w) => {
+        const wDateMs = new Date(w.date).getTime();
+        if (wDateMs !== currentDateMs) return wDateMs < currentDateMs;
+        // Gleiches Datum (z.B. Testdaten am selben Tag) -> createdAt als Tiebreaker
+        const wCreatedMs = w.createdAt ? new Date(w.createdAt).getTime() : 0;
+        return wCreatedMs < currentCreatedMs;
+      };
+
       const previousWorkout = allWorkouts.find(w => {
         if (w._id.toString() === currentWorkout._id.toString()) return false;
+        if (!isStrictlyBeforeCurrent(w)) return false;
         return w.exercises?.some(e => (e.name || '').toLowerCase() === exerciseName.toLowerCase());
       });
 

@@ -152,3 +152,45 @@ export function getActiveDraftEditingId(uid) {
   const draft = getActiveDraft(uid)
   return draft?.editingWorkoutId || null
 }
+
+/**
+ * Fallback-Suche über ALLE aktiven Drafts (unabhängig vom User), wenn die uid-basierte
+ * Suche fehlschlägt oder die uid zum Zeitpunkt des Aufrufs (noch) nicht auflösbar ist.
+ *
+ * Hintergrund: resolveActiveWorkoutUserId() in WorkoutDetailView.vue hängt u.a. von
+ * auth.currentUser (Firebase) und dem Pinia-User-Store ab. Bei einem echten App-Kaltstart
+ * (z.B. nach langem Backgrounding, wenn iOS den Prozess beendet hat) sind diese beim
+ * allerersten Mount-Zyklus noch nicht zwingend hydriert - resolveActiveWorkoutUserId() kann
+ * dann kurzzeitig einen leeren String liefern, obwohl der korrekte Draft längst in
+ * localStorage liegt. Ohne diesen Fallback wird die uid-Prüfung übersprungen, der Code fällt
+ * auf einen veralteten Store-/IndexedDB-Stand zurück, und frische Eingaben scheinen "zurück-
+ * gesetzt". Da es auf einem Gerät zu jedem Zeitpunkt praktisch nur einen aktiven Draft pro
+ * Workout-ID gibt, ist die Suche über alle active_workout_*-Keys unabhängig von der uid sicher.
+ *
+ * @param {string} workoutId - gesuchte Workout-ID (Route-Param oder editingWorkoutId)
+ * @returns {{ uid: string, draft: object } | null}
+ */
+export function findActiveDraftByWorkoutId(workoutId) {
+  const id = String(workoutId || '').trim()
+  if (!id || typeof localStorage === 'undefined') return null
+  try {
+    for (const key of Object.keys(localStorage)) {
+      if (!key.startsWith(STORAGE_KEY_PREFIX)) continue
+      let draft
+      try {
+        draft = JSON.parse(localStorage.getItem(key) || 'null')
+      } catch {
+        continue
+      }
+      if (!draft?.workout) continue
+      const draftWorkoutId = String(draft.workout._id || '').trim()
+      const draftEditingId = String(draft.editingWorkoutId || '').trim()
+      if (draftWorkoutId === id || draftEditingId === id) {
+        return { uid: key.slice(STORAGE_KEY_PREFIX.length), draft }
+      }
+    }
+  } catch (err) {
+    logger.warn('[activeWorkoutDraft] findActiveDraftByWorkoutId error:', err?.message)
+  }
+  return null
+}

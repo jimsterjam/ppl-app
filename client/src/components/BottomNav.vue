@@ -117,6 +117,13 @@ const activeWorkout = computed(() => {
   return { _id: workoutId, _isDraft: true, isDraft: true }
 })
 
+// Korrektur nach Video-Abgleich mit dem echten App Store: der aktive Indikator ist dort KEIN
+// kleiner Icon-Kreis, sondern eine Pille über Icon+Label (wie ursprünglich), nur mit neutraler
+// grauer statt akzentfarbener Füllung — die Farbe kommt vom Icon/Text, nicht vom Hintergrund.
+// Kleiner Innenabstand (INSET) sorgt dafür, dass die Pille nicht ganz bis an die Nachbar-Items
+// reicht, wie im Video zu sehen.
+const PILL_INSET = 4
+
 function onNavClick(index, path) {
   // Pille sofort optimistisch zum Ziel bewegen, unabhängig davon, ob die
   // Zielseite lazy-geladen wird und die Navigation dadurch etwas dauert —
@@ -124,7 +131,7 @@ function onNavClick(index, path) {
   const el = navItemRefs.value[index]
   const rect = getItemRectRelativeToContainer(el)
   if (rect) {
-    pillPosition.value = { left: rect.left, width: rect.width }
+    pillPosition.value = { left: rect.left + PILL_INSET, width: Math.max(0, rect.width - PILL_INSET * 2) }
   }
   router.push(path)
 }
@@ -140,11 +147,46 @@ onMounted(() => {
   window.addEventListener(ACTIVE_DRAFT_UPDATED_EVENT, onActiveDraftUpdated)
 })
 
+// Bug (User-Report "Pille fast rund beim Zurückkehren in die App"): die Pille wird per JS
+// über getBoundingClientRect() der Nav-Buttons positioniert. Bisher gab es dafür keinen
+// Trigger beim App-Resume (nur bei Routenwechsel/Resize) — kehrt man aus dem Hintergrund
+// zurück, kann die erste Messung nach dem Wiederaufwachen der WebView noch eine veraltete/zu
+// kleine Breite liefern (Layout ist in dem Moment noch nicht final). Der SVG-Goo-Filter
+// (Gaussian Blur + Kontrast) verstärkt eine zu schmale Pille optisch zu einem fast runden
+// Blob — das ist keine echte border-radius-Änderung, sondern eine falsch gemessene Breite.
+// Fix: bei Resume/Sichtbarkeitswechsel neu messen, mit doppeltem rAF, damit das Layout beim
+// Messen sicher final ist.
+function remeasurePillAfterResume() {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(updatePillPosition)
+  })
+}
+
+let capAppStateListener = null
+
+onMounted(async () => {
+  document.addEventListener('visibilitychange', onVisibilityChangeForPill)
+  try {
+    const { App: CapApp } = await import('@capacitor/app')
+    capAppStateListener = await CapApp.addListener('appStateChange', ({ isActive }) => {
+      if (isActive) remeasurePillAfterResume()
+    })
+  } catch {
+    // Web-Kontext ohne Capacitor — visibilitychange reicht dort aus.
+  }
+})
+
+function onVisibilityChangeForPill() {
+  if (document.visibilityState === 'visible') remeasurePillAfterResume()
+}
+
 onBeforeUnmount(() => {
   window.removeEventListener(ACTIVE_DRAFT_UPDATED_EVENT, onActiveDraftUpdated)
   window.removeEventListener('resize', updatePillPosition)
   window.removeEventListener('pointermove', onPillPointerMove)
   window.removeEventListener('pointerup', onPillPointerUp)
+  document.removeEventListener('visibilitychange', onVisibilityChangeForPill)
+  capAppStateListener?.remove?.()
 })
 
 const links = [
@@ -191,12 +233,20 @@ function getItemRectRelativeToContainer(el) {
   }
 }
 
-function updatePillPosition() {
+function updatePillPosition(retriesLeft = 3) {
   const activeIndex = currentActiveIndex()
   const el = navItemRefs.value[activeIndex]
   const rect = getItemRectRelativeToContainer(el)
   if (!rect) return
-  pillPosition.value = { left: rect.left, width: rect.width }
+  // Defensive Untergrenze: eine plausible Tab-Breite liegt immer deutlich über 20px. Eine
+  // kleinere Messung deutet auf ein noch nicht fertig layoutetes DOM hin (z.B. kurz nach
+  // App-Resume) — dann kurz erneut versuchen statt die verfälschte, vom Goo-Filter zum Blob
+  // verzerrte Breite zu übernehmen.
+  if (rect.width < 20 && retriesLeft > 0) {
+    requestAnimationFrame(() => updatePillPosition(retriesLeft - 1))
+    return
+  }
+  pillPosition.value = { left: rect.left + PILL_INSET, width: Math.max(0, rect.width - PILL_INSET * 2) }
 }
 
 watch(() => route.path, () => {
@@ -257,15 +307,6 @@ function onPillPointerUp() {
     }
   })
 
-  function onPillPointerDown(event) {
-    console.log('[DEBUG-DRAG] pointerdown gefeuert')
-    isDragging.value = true
-    dragStartClientX = event.clientX
-    dragStartLeft = pillPosition.value.left
-    window.addEventListener('pointermove', onPillPointerMove)
-    window.addEventListener('pointerup', onPillPointerUp)
-  }
-
   const isWorkoutTarget = nearestIndex === links.length
   const target = isWorkoutTarget
     ? (activeWorkout.value ? `/workouts/${activeWorkout.value._id}` : null)
@@ -300,19 +341,43 @@ function onPillPointerUp() {
   pointer-events: auto;
   width: 100%;
   margin: 0 auto;
-  background: color-mix(in srgb, var(--bg-panel) 50%, transparent);
-  border-radius: 34px;
-  border: 2px solid var(--line-soft);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+  /* Deutlich transparenter als vorher (war 38-46%): native Bars liegen bei ~10-15%
+     Grundfarbe, der optische Effekt kommt fast komplett vom Blur, nicht von der Füllung. */
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--bg-panel) 20%, transparent) 0%,
+    color-mix(in srgb, var(--bg-panel) 14%, transparent) 100%
+  );
+  /* Video-Abgleich: die App Store Bar ist eine volle Kapsel (Radius = halbe Höhe), nicht
+     nur "stark abgerundet". 999px erzwingt das unabhängig von der tatsächlichen Höhe. */
+  border-radius: 999px;
+  /* Haarlinie statt Karten-Rahmen (war 1-2px sichtbarer Border) */
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  /* Spekularer Rand oben + weicher Schlagschatten unten: das ist der Teil, der flachen
+     Blur von echtem "Liquid Glass" unterscheidet — ein heller Kantenreflex, der Licht von
+     oben simuliert, plus ein zarter Innenschatten unten für Tiefe. */
+  box-shadow:
+    0 8px 20px -6px rgba(0, 0, 0, 0.35),
+    0 20px 40px -10px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.12);
   padding: 10px;
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  backdrop-filter: blur(34px) saturate(200%);
+  -webkit-backdrop-filter: blur(34px) saturate(200%);
 }
 
 [data-theme="light"] .nav-surface {
-  background: color-mix(in srgb, var(--bg-panel) 95%, #f8f9fd 5%);
-  border-color: rgba(0, 0, 0, 0.12);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.08);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--bg-panel) 48%, transparent) 0%,
+    color-mix(in srgb, var(--bg-panel) 38%, transparent) 100%
+  );
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow:
+    0 8px 20px -6px rgba(0, 0, 0, 0.10),
+    0 20px 40px -10px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.04);
 }
 
 .nav-container {
@@ -322,15 +387,23 @@ function onPillPointerUp() {
 
 .active-pill {
   position: absolute;
-  top: 0;
+  /* Nach Video-Abgleich mit dem echten App Store korrigiert: Pille deckt Icon+Label ab
+     (top/bottom-Inset statt fixer Höhe), Form ist komplett "stadium" (volle Kapsel), und die
+     Füllung ist neutral/grau statt akzentfarben — die Akzentfarbe zeigt sich nur an
+     Icon+Label (siehe .nav-btn.active), nicht am Pillen-Hintergrund. */
+  top: 4px;
+  bottom: 4px;
   left: 0;
-  height: 100%;
-  background: var(--accent) !important;
-  border-radius: 30px;
+  background: rgba(120, 120, 128, 0.24) !important;
+  border-radius: 999px;
   z-index: 1;
   will-change: transform, width;
   cursor: grab;
   touch-action: none;
+}
+
+[data-theme="light"] .active-pill {
+  background: rgba(120, 120, 128, 0.16) !important;
 }
 
 .active-pill.dragging {
@@ -387,7 +460,17 @@ function onPillPointerUp() {
 }
 
 .nav-btn.active {
-  color: #ffffff;
+  /* War #ffffff (weiß auf akzentfarbener Pille) — die Pille ist nach Video-Abgleich jetzt
+     neutral/grau, die Akzentfarbe sitzt stattdessen auf Icon+Label, wie im echten App Store. */
+  color: var(--accent);
+  /* Bug (User-Report "Pille lässt sich nicht verschieben"): .nav-btn liegt auf z-index: 2,
+     die Pille darunter auf z-index: 1 — der aktive Button deckt die Pille exakt ab, jeder
+     Pointerdown auf der sichtbar-aktiven Pille landete deshalb immer auf dem Button statt auf
+     der Pille, Drag konnte nie starten. pointer-events: none lässt Zeigerereignisse durch den
+     (bereits aktiven, für sich genommen funktionslosen) Button zur Pille durch; Icon/Label
+     bleiben optisch unverändert oben, da sich nur das Hit-Testing ändert, nicht die z-Reihenfolge.
+     Alle anderen (nicht aktiven) Tabs bleiben normal klickbar. */
+  pointer-events: none;
 }
 
 .icon {
@@ -405,15 +488,22 @@ function onPillPointerUp() {
   stroke-width: 1.6;
   fill: none;
   transition: fill 0.2s ease, stroke 0.2s ease, stroke-width 0.2s ease;
+  /* Kontrast-Anker gegen wechselnden Untergrund bei transparenter Nav */
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.35));
 }
 
 .nav-btn:not(.active) .icon-svg {
   stroke: #64748b;
 }
 
+[data-theme="light"] .nav-btn:not(.active) .icon-svg {
+  stroke: #334155;
+  filter: drop-shadow(0 1px 2px rgba(255, 255, 255, 0.5));
+}
+
 .nav-btn.active .icon-svg {
-  fill: #ffffff;
-  stroke: #ffffff;
+  fill: none;
+  stroke: var(--accent);
   stroke-width: 2.2;
 }
 
@@ -422,6 +512,11 @@ function onPillPointerUp() {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+}
+
+[data-theme="light"] .label {
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.5);
 }
 
 .workout-btn:not(.active) {
@@ -458,9 +553,6 @@ function onPillPointerUp() {
   }
   .nav-btn:not(.active) .icon-svg {
     stroke: rgba(235, 235, 245, 0.6);
-  }
-  .active-pill {
-    background: #0A84FF;
   }
   .workout-icon::after {
     box-shadow: 0 0 0 3px rgba(28, 28, 30, 0.95);

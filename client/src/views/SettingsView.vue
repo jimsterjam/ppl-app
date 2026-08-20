@@ -276,6 +276,12 @@
         <button class="dev-btn" @click="goToFeatureTest">
           🚀 Open Features Test Dashboard
         </button>
+        <button class="dev-btn" @click="clearDraftDebugLog">
+          🧹 Draft-Debug-Log leeren (vor Reproduce antippen)
+        </button>
+        <button class="dev-btn" @click="copyDraftDebugLog">
+          🩺 Draft-Debug-Log kopieren
+        </button>
         <div class="dev-plan-toggle">
           <div class="plan-status">
             <div>
@@ -1545,6 +1551,55 @@ function resetCoachState() {
   clientsLoading.value = false
   clientsError.value = ''
   closeClientModal()
+}
+
+// Diagnose für den "Daten werden bei App-Resume zurückgesetzt"-Bug: sammelt den
+// laufenden Lifecycle-Log aus WorkoutDetailView.vue (logDiagnostic(), Key
+// bro_split_load_diagnostics_v1 - letzte 40 Events: load-start, autosave, lifecycle-
+// persist, app-state-change, active-draft-id-migrated, ...) zusammen mit dem aktuellen
+// Active-Draft und dem Route-Resume-Snapshot, damit man nach einem Reproduce sofort
+// sieht, WAS beim Zurückkehren tatsächlich passiert ist (Remount? Cold Start? Draft-
+// Lookup verfehlt?), statt weiter zu raten.
+async function copyDraftDebugLog() {
+  try {
+    const diagnostics = JSON.parse(localStorage.getItem('bro_split_load_diagnostics_v1') || '[]')
+    const resumeSnapshot = JSON.parse(localStorage.getItem('app_resume_state_v1') || 'null')
+    const activeDraftKeys = Object.keys(localStorage).filter((k) => k.startsWith('active_workout_'))
+    const activeDrafts = Object.fromEntries(
+      activeDraftKeys.map((k) => {
+        try { return [k, JSON.parse(localStorage.getItem(k))] } catch { return [k, null] }
+      })
+    )
+    const payload = {
+      generatedAt: new Date().toISOString(),
+      diagnostics,
+      resumeSnapshot,
+      activeDrafts
+    }
+    const text = JSON.stringify(payload, null, 2)
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text)
+      toast.show(`Debug-Log kopiert (${diagnostics.length} Events)`, { type: 'success', duration: 1800 })
+    } else {
+      logger.debug('[SettingsView] Draft-Debug-Log:', text)
+      toast.show('Clipboard nicht verfügbar, siehe Konsole', { type: 'info', duration: 1800 })
+    }
+  } catch (e) {
+    toast.show('Debug-Log konnte nicht erstellt werden', { type: 'error', duration: 1600 })
+  }
+}
+
+// Leert den rollierenden Diagnose-Puffer VOR einem gezielten Reproduktionsversuch, damit das
+// danach kopierte Log garantiert nur den einen aktuellen Testlauf enthält, statt bis zu 100
+// Events aus mehreren, teils Stunden auseinanderliegenden Sessions zu vermischen (das hat
+// beim letzten Mal zu einer Fehlanalyse anhand veralteter Log-Einträge geführt).
+function clearDraftDebugLog() {
+  try {
+    localStorage.removeItem('bro_split_load_diagnostics_v1')
+    toast.show('Debug-Log geleert', { type: 'success', duration: 1400 })
+  } catch (e) {
+    toast.show('Log konnte nicht geleert werden', { type: 'error', duration: 1600 })
+  }
 }
 
 async function copyIdToken() {

@@ -34,6 +34,36 @@
       </div>
     </div>
 
+    <!-- Insufficient History: noch nicht genug identische Wiederholungen für aussagekräftiges Feedback -->
+    <div v-else-if="insufficientHistory" class="summary-content fallback">
+      <p>
+        {{ remainingCount === 1
+          ? (t('postWorkout.insufficientHistorySingle') || 'Noch 1 gleiches Workout, dann bekommst du dein erstes Feedback.')
+          : (t('postWorkout.insufficientHistoryMulti', { count: remainingCount }) || `Noch ${remainingCount} gleiche Workouts, dann bekommst du dein erstes Feedback.`)
+        }}
+      </p>
+      <button class="primary" type="button" @click="dismissSummary">
+        {{ t('common.continue') || 'Weiter' }}
+      </button>
+    </div>
+
+    <!-- Netzwerk nicht erreichbar: Analyse läuft aktuell nur im Heimnetzwerk (Testphase) -->
+    <div v-else-if="networkUnavailable" class="summary-content fallback">
+      <p>{{ t('postWorkout.networkUnavailable') || 'Dein Workout ist gespeichert. Die Analyse ist gerade nicht erreichbar (Testphase, nur im Heimnetzwerk verfügbar) — du kannst sie später in den Stats nachholen.' }}</p>
+      <button class="primary" type="button" @click="dismissSummary">
+        {{ t('common.continue') || 'Weiter' }}
+      </button>
+    </div>
+
+    <!-- Workout wurde noch nicht mit dem Server synchronisiert (z.B. langsames Netz beim
+         Speichern) - die echte ID lag beim Laden dieser Ansicht noch nicht vor. -->
+    <div v-else-if="syncPending" class="summary-content fallback">
+      <p>{{ t('postWorkout.syncPending') || 'Dein Workout wird gerade noch synchronisiert. Das Feedback kannst du in Kürze in den Stats abrufen.' }}</p>
+      <button class="primary" type="button" @click="dismissSummary">
+        {{ t('common.continue') || 'Weiter' }}
+      </button>
+    </div>
+
     <!-- Fallback: No Feedback (AI unavailable but workout saved) -->
     <div v-else class="summary-content fallback">
       <p>{{ t('postWorkout.saved') || 'Dein Workout wurde gespeichert!' }}</p>
@@ -50,7 +80,10 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { logger } from '@/utils/logger'
+import { apiUrl } from '@/api/http'
 import axios from 'axios'
+import { acquireKeepAwake, releaseKeepAwake } from '@/utils/keepAwakeGuard'
+import { resolveRealIdFromDraftId } from '@/utils/workoutHelpers'
 
 const props = defineProps({
   workoutId: {
@@ -69,6 +102,44 @@ const showSummary = ref(true)
 const loading = ref(true)
 const feedback = ref(null)
 const error = ref(null)
+const insufficientHistory = ref(false)
+const remainingCount = ref(0)
+const networkUnavailable = ref(false)
+const syncPending = ref(false)
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/**
+ * Wartet kurz auf die Reconciliation einer temporären ID (offline_.../draft-...) zur
+ * echten Server-ID. Grund: createWorkout() im userStore kann bei einem langsamen
+ * Save (z.B. Render Cold-Start über Funknetz) nach 2s bereits eine temporäre ID
+ * zurückgeben, bevor der eigentliche Server-Request abgeschlossen ist (siehe
+ * userStore.js, CREATE_RACE_TIMEOUT_MS). Ohne diese Wartung würde hier eine
+ * ai-analysis-Anfrage mit einer ungültigen (Nicht-ObjectId) Workout-ID an den
+ * Server geschickt und mit einem Fehler abgelehnt.
+ */
+async function resolveWorkoutIdForAnalysis(rawId) {
+  const id = String(rawId || '').trim()
+  const isTemp = id.startsWith('offline_') || id.startsWith('draft-')
+  if (!isTemp) return id
+
+  const maxWaitMs = 8000
+  const intervalMs = 500
+  let waited = 0
+  while (waited < maxWaitMs) {
+    const realId = await resolveRealIdFromDraftId(id).catch(() => '')
+    if (realId) {
+      logger.debug('[PostWorkoutSummary] Temp-ID aufgelöst', { tempId: id, realId })
+      return realId
+    }
+    await sleep(intervalMs)
+    waited += intervalMs
+  }
+  logger.warn('[PostWorkoutSummary] Temp-ID nach Wartezeit weiterhin ungelöst', { tempId: id })
+  return ''
+}
 
 /**
  * Lade AI-Feedback nach Workout-Speicherung
@@ -80,20 +151,43 @@ async function loadAIFeedback() {
     return
   }
 
+  // Bildschirm bleibt an, bis die KI-Analyse abgeschlossen ist (Standby darf sie nicht
+  // abbrechen). Übernimmt den 'workout-save'-Tag von WorkoutDetailView.vue (siehe dort) -
+  // durch das Referenzzählen im Guard gibt es dabei keine Lücke, in der der Bildschirm
+  // zwischenzeitlich einschlafen könnte.
+  acquireKeepAwake('ai-feedback')
+  releaseKeepAwake('workout-save')
+
   try {
     loading.value = true
     error.value = null
     feedback.value = null
+    insufficientHistory.value = false
+    networkUnavailable.value = false
+    syncPending.value = false
+
+    const resolvedWorkoutId = await resolveWorkoutIdForAnalysis(props.workoutId)
+    if (!resolvedWorkoutId) {
+      syncPending.value = true
+      return
+    }
 
     const token = await getIdToken().catch(() => null)
 
     // Rufe AI-Analysis Endpunkt auf
+    const url = `${apiUrl('workouts')}/${resolvedWorkoutId}/ai-analysis`
+    logger.debug('[PostWorkoutSummary] Requesting AI analysis', { url })
+
     const response = await axios.post(
-      `/api/workouts/${props.workoutId}/ai-analysis`,
+      url,
       {},
       {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
-        timeout: 60000 // AI braucht Zeit
+        // Server macht jetzt einen schnellen Erreichbarkeits-Check (max. 3s) vor dem
+        // eigentlichen Generierungs-Aufruf und antwortet bei nicht erreichbarem Provider
+        // sofort mit feedback_status: 'network_unavailable' statt lange zu hängen — der
+        // Client muss also nicht mehr für den "unerreichbar"-Fall auf ein langes Timeout warten.
+        timeout: 60000
       }
     )
 
@@ -102,6 +196,19 @@ async function loadAIFeedback() {
       logger.debug('[PostWorkoutSummary] Feedback loaded', {
         workoutId: props.workoutId,
         provider: response.data.ai_metadata?.provider
+      })
+    } else if (response.data?.feedback_status === 'network_unavailable') {
+      networkUnavailable.value = true
+      logger.debug('[PostWorkoutSummary] AI provider not reachable (network)', {
+        workoutId: props.workoutId
+      })
+    } else if (response.data?.feedback_status === 'insufficient_history') {
+      insufficientHistory.value = true
+      remainingCount.value = Number(response.data?.remaining) || 0
+      logger.debug('[PostWorkoutSummary] Insufficient history for feedback', {
+        workoutId: props.workoutId,
+        matchingCount: response.data?.matching_count,
+        remaining: remainingCount.value
       })
     } else {
       // Kein Feedback, aber kein Error
@@ -121,6 +228,7 @@ async function loadAIFeedback() {
                   'Feedback konnte nicht geladen werden'
   } finally {
     loading.value = false
+    releaseKeepAwake('ai-feedback')
   }
 }
 
@@ -150,10 +258,11 @@ onMounted(() => {
   left: 0;
   right: 0;
   max-height: 80vh;
-  padding: 2rem 1.5rem 1.5rem;
+  padding: 2rem 1.5rem calc(1.5rem + 88px + env(safe-area-inset-bottom));
   border-radius: 1rem 1rem 0 0;
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.15);
-  z-index: 100;
+  /* Über der BottomNav (z-index: 1000), sonst verschwindet der untere Bereich dahinter */
+  z-index: 1010;
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -332,7 +441,7 @@ onMounted(() => {
 @media (max-height: 600px) {
   .post-workout-summary {
     max-height: 100vh;
-    padding: 1.5rem 1rem 1rem;
+    padding: 1.5rem 1rem calc(1rem + 88px + env(safe-area-inset-bottom));
   }
 
   .summary-content {

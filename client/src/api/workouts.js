@@ -19,7 +19,7 @@ const api = createResourceApi('workouts', { timeout: WORKOUTS_TIMEOUT_MS });
 
 const CREATE_RETRY_DELAY_MS = Number.parseInt(import.meta.env.VITE_WORKOUTS_CREATE_RETRY_DELAY_MS || '', 10) || 1200
 // Kürzerer Timeout speziell für Create-Requests: schneller Offline-Fallback statt 25s warten
-const WORKOUTS_CREATE_TIMEOUT_MS = Number.parseInt(import.meta.env.VITE_WORKOUTS_CREATE_TIMEOUT_MS || '', 10) || 8000
+const WORKOUTS_CREATE_TIMEOUT_MS = Number.parseInt(import.meta.env.VITE_WORKOUTS_CREATE_TIMEOUT_MS || '', 10) || 60000
 const STATS_RETRY_DELAY_MS = Number.parseInt(import.meta.env.VITE_WORKOUTS_STATS_RETRY_DELAY_MS || '', 10) || 1000
 
 function sleep(ms) {
@@ -210,6 +210,36 @@ export async function fetchWorkout(workoutId, token = null) {
       if (cached) return cached;
     }
     throw handleAPIError(error, 'Workout laden');
+  }
+}
+
+// KI-generiertes Workout anhand eines kurzen Fragebogens (Ziel, Level, Equipment etc.)
+export async function quickGenerateWorkout(context, token = null) {
+  try {
+    const config = {
+      ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+      timeout: 45000
+    }
+    const res = await api.post('/quick-generator', context, config)
+    return res.data
+  } catch (error) {
+    logger.warn('⚠️ Workouts API - quickGenerateWorkout failed:', error?.message)
+    throw handleAPIError(error, 'Workout generieren', { showToast: false })
+  }
+}
+
+// Liste aller Workouts mit gespeichertem AI-Feedback (chronologisch, neueste zuerst)
+export async function fetchWorkoutFeedbacks(token = null, { page = 1, limit = 20 } = {}) {
+  try {
+    const config = {
+      ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+      params: { page, limit }
+    }
+    const res = await api.get('/feedbacks', config)
+    return res.data
+  } catch (error) {
+    logger.warn('⚠️ Workouts API - fetchWorkoutFeedbacks failed:', error?.message)
+    throw handleAPIError(error, 'Feedbacks laden', { showToast: false })
   }
 }
 

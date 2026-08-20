@@ -421,9 +421,32 @@ async function syncWorkoutAction(action, data, token) {
           break
         }
         logger.warn('⚠️ Sync - Update mit temp_id gefunden, konvertiere zu Create', { id: data._id })
+        const tempId = data._id
         delete updateData._id
         const createdWorkout = await createWorkout(updateData, token, { skipOfflineQueue: true })
         logger.debug('✅ Sync - Workout als Create erstellt:', createdWorkout._id)
+
+        // Mapping temp-ID -> echte ID hinterlegen (gleicher Mechanismus wie beim direkten
+        // Create-Pfad oben und in userStore.js createWorkout()). Ohne das bleibt jede Stelle,
+        // die die temp-ID bereits weitergereicht hat (z.B. PostWorkoutSummary.vue für die
+        // KI-Analyse), dauerhaft auf einer nie aufgelösten offline_/draft-ID hängen.
+        try {
+          sessionStorage.setItem(`workout_map_${tempId}`, String(createdWorkout._id))
+        } catch {}
+        setMetadata(`workout_map_${tempId}`, String(createdWorkout._id)).catch(() => {})
+        try {
+          await deleteWorkoutOffline(tempId)
+        } catch {}
+        try {
+          await saveWorkoutOffline({ ...createdWorkout, _offlineCreated: false })
+        } catch {}
+        if (typeof reconcileCallback === 'function') {
+          try {
+            reconcileCallback(tempId, createdWorkout)
+          } catch (cbErr) {
+            logger.warn('⚠️ Sync - reconcileCallback warf Fehler (update→create):', cbErr?.message || cbErr)
+          }
+        }
       } else {
         await updateWorkout(data._id, updateData, token)
         logger.debug('✅ Sync - Workout aktualisiert:', data._id)

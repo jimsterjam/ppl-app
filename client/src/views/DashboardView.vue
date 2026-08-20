@@ -122,6 +122,9 @@
             <button class="quick-mode-btn" type="button" @click="openFavoritesForType">
               {{ $t('dashboard.startModeFavorites') }}
             </button>
+            <button class="quick-mode-btn" type="button" @click="openQuickGenerator">
+              {{ $t('dashboard.startModeGenerate') }}
+            </button>
           </template>
 
           <p v-if="favoriteInfoText" class="quick-mode-info">{{ favoriteInfoText }}</p>
@@ -680,6 +683,11 @@ function closeStartModePanel() {
 function onManualSelected() {
   closeStartModePanel()
   startQuick(pendingWorkoutType.value)
+}
+
+function openQuickGenerator() {
+  closeStartModePanel()
+  router.push({ name: 'quick-workout-generator', query: { type: pendingWorkoutType.value } })
 }
 
 function openFavoritesForType() {

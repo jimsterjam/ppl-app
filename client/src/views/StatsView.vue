@@ -14,6 +14,10 @@
         <RecentWorkouts :workouts="recentWorkoutsSource" :show-view-all="false" @delete="handleDeleteRecentWorkout" />
       </section>
 
+      <section class="section">
+        <AIFeedbackHistory />
+      </section>
+
       <section v-if="!isPro" class="pro-banner">
         <div>
           <p class="eyebrow">Pro Test</p>
@@ -194,6 +198,7 @@ import EmptyState from '@/components/EmptyState.vue'
 import AppModal from '@/components/AppModal.vue'
 import UpgradeModal from '@/components/UpgradeModal.vue'
 import RecentWorkouts from '@/components/RecentWorkouts.vue'
+import AIFeedbackHistory from '@/components/AIFeedbackHistory.vue'
 import ProgressThreeMonthsSection from '@/components/stats/ProgressThreeMonthsSection.vue'
 import WorkoutComparisonSection from '@/components/stats/WorkoutComparisonSection.vue'
 import PostWorkoutSummary from '@/components/PostWorkoutSummary.vue'
