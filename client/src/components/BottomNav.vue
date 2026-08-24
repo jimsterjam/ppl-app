@@ -123,6 +123,28 @@ const activeWorkout = computed(() => {
 // Kleiner Innenabstand (INSET) sorgt dafür, dass die Pille nicht ganz bis an die Nachbar-Items
 // reicht, wie im Video zu sehen.
 const PILL_INSET = 4
+// Mindestbreite der Pille: sobald der Workout-Tab dazukommt, teilen sich 6 statt 5 Items die
+// Nav-Breite (space-around), jedes Item wird schmaler - ohne Untergrenze würde die Pille dann
+// spürbar kleiner wirken, obwohl der User erwartet, dass sie "ausreichend groß" bleibt.
+const PILL_MIN_WIDTH = 48
+
+// Berechnet die Pillen-Position/-Breite für ein Nav-Item, zentriert auf dessen Mittelpunkt,
+// mit Untergrenze PILL_MIN_WIDTH (kann dadurch etwas über die Item-Ränder hinausragen, das ist
+// bei 6 eng gepackten Tabs gewollt statt einer kaum sichtbaren Pille).
+// Zusätzliche Breite gegenüber dem reinen Item-Inset - User-Feedback: Pille wirkte trotz
+// des Höhen-Fixes zu schmal für Icon+Label.
+const PILL_EXTRA_WIDTH = 5
+
+function computePillRect(rect) {
+  let left = rect.left + PILL_INSET - PILL_EXTRA_WIDTH / 2
+  let width = Math.max(0, rect.width - PILL_INSET * 2 + PILL_EXTRA_WIDTH)
+  if (width < PILL_MIN_WIDTH) {
+    const center = rect.left + rect.width / 2
+    width = PILL_MIN_WIDTH
+    left = center - width / 2
+  }
+  return { left, width }
+}
 
 function onNavClick(index, path) {
   // Pille sofort optimistisch zum Ziel bewegen, unabhängig davon, ob die
@@ -131,7 +153,7 @@ function onNavClick(index, path) {
   const el = navItemRefs.value[index]
   const rect = getItemRectRelativeToContainer(el)
   if (rect) {
-    pillPosition.value = { left: rect.left + PILL_INSET, width: Math.max(0, rect.width - PILL_INSET * 2) }
+    pillPosition.value = computePillRect(rect)
   }
   router.push(path)
 }
@@ -185,6 +207,7 @@ onBeforeUnmount(() => {
   window.removeEventListener('resize', updatePillPosition)
   window.removeEventListener('pointermove', onPillPointerMove)
   window.removeEventListener('pointerup', onPillPointerUp)
+  window.removeEventListener('pointercancel', onPillPointerUp)
   document.removeEventListener('visibilitychange', onVisibilityChangeForPill)
   capAppStateListener?.remove?.()
 })
@@ -246,7 +269,7 @@ function updatePillPosition(retriesLeft = 3) {
     requestAnimationFrame(() => updatePillPosition(retriesLeft - 1))
     return
   }
-  pillPosition.value = { left: rect.left + PILL_INSET, width: Math.max(0, rect.width - PILL_INSET * 2) }
+  pillPosition.value = computePillRect(rect)
 }
 
 watch(() => route.path, () => {
@@ -271,8 +294,16 @@ function onPillPointerDown(event) {
   isDragging.value = true
   dragStartClientX = event.clientX
   dragStartLeft = pillPosition.value.left
+  // Ohne explizites Pointer Capture kann iOS/WKWebView die laufende Zeigersequenz bei
+  // schnellerer Bewegung als mehrdeutige Geste werten und an natives Scrollen/Bounce
+  // "verlieren" (Symptom: Drag startet sichtbar, bricht dann aber sofort ab). touch-action:
+  // none auf .active-pill allein reicht dafür nicht zuverlässig - explizites Capture bindet
+  // alle folgenden Pointer-Events fest an dieses Element, bis pointerup/-cancel.
+  try { event.target.setPointerCapture(event.pointerId) } catch {}
+  event.preventDefault()
   window.addEventListener('pointermove', onPillPointerMove)
   window.addEventListener('pointerup', onPillPointerUp)
+  window.addEventListener('pointercancel', onPillPointerUp)
 }
 
 function onPillPointerMove(event) {
@@ -290,6 +321,7 @@ function onPillPointerUp() {
   isDragging.value = false
   window.removeEventListener('pointermove', onPillPointerMove)
   window.removeEventListener('pointerup', onPillPointerUp)
+  window.removeEventListener('pointercancel', onPillPointerUp)
 
   // Nächstgelegenes Nav-Item anhand der Mittelpunkt-Distanz zur Pille bestimmen
   const pillCenter = pillPosition.value.left + pillPosition.value.width / 2
@@ -382,7 +414,7 @@ function onPillPointerUp() {
 
 .nav-container {
   position: relative;
-  filter: url('#goo-filter');
+  /* filter: url('#goo-filter'); */
 }
 
 .active-pill {
@@ -391,8 +423,10 @@ function onPillPointerUp() {
      (top/bottom-Inset statt fixer Höhe), Form ist komplett "stadium" (volle Kapsel), und die
      Füllung ist neutral/grau statt akzentfarben — die Akzentfarbe zeigt sich nur an
      Icon+Label (siehe .nav-btn.active), nicht am Pillen-Hintergrund. */
-  top: 4px;
-  bottom: 4px;
+  /* Etwas mehr Höhe als vorher (war 4px/4px): die Pille deckte Icon+Label nicht ganz komplett
+     ab, an den Rändern blieb ein sichtbarer Spalt. */
+  top: 2px;
+  bottom: 2px;
   left: 0;
   background: rgba(120, 120, 128, 0.24) !important;
   border-radius: 999px;

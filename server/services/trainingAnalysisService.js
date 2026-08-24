@@ -11,6 +11,7 @@
  */
 
 import { logger } from '../utils/logger.js';
+import { determineTrendWithProfile, resolveEffectiveProfile, buildNoteContext } from './exerciseAnalysisRules.js';
 
 /**
  * Berechne echte Exercise-Stats
@@ -77,14 +78,32 @@ export function determineTrend(weightChange, volumeChange) {
  * @param {Object} currentEx - Aktuelle Übung
  * @param {Object} previousEx - Vorherige Übung (optional)
  * @param {number} daysDiff - Tage seit letzter Session
+ * @param {Object} [options] - Additive, optionale Korrektheits-Daten (Kap. 24-26, Phase 2).
+ *   Standardmäßig leer -> Verhalten bleibt 1:1 identisch zum bisherigen Bestand, solange
+ *   Aufrufer (Phase 3) noch kein Profil/keine Notiz übergeben.
+ * @param {Object|null} [options.globalProfile] - Exercise.metricProfile (Rang 3)
+ * @param {Object|null} [options.userNote] - UserExerciseNote-Dokument (Rang 1/2)
  * @returns {Object} Analysis-Objekt
  */
-export function analyzeExercise(exerciseName, currentEx, previousEx = null, daysDiff = 0) {
+export function analyzeExercise(exerciseName, currentEx, previousEx = null, daysDiff = 0, options = {}) {
   const currentStats = calculateExerciseStats(currentEx);
 
   if (!currentStats) {
     return null; // Keine echten Sets in Current
   }
+
+  const { globalProfile = null, userNote = null } = options || {};
+  const effectiveProfile = resolveEffectiveProfile(globalProfile, userNote);
+
+  // Nutzer-Notiz zur aktuellen Übung (z.B. "heute war die Technik gefühlt besser" oder
+  // Hinweis auf eine technikfokussierte Übung ohne Gewichtssteigerung). Wird unverändert
+  // an die AI weitergereicht, damit sie Stagnation/fehlendes Gewicht nicht fälschlich als
+  // negative Progression wertet, wenn der Nutzer das selbst erklärt hat.
+  const note = typeof currentEx?.note === 'string' ? currentEx.note.trim() : '';
+
+  // Kap. 25: persistente exerciseNote (Rang 1/2) + sessionNote dieser Session zusammen -
+  // additiv neben dem bisherigen "note"-Feld, ersetzt es nicht (Rückwärtskompatibilität).
+  const noteContext = buildNoteContext({ sessionNote: note, userNote });
 
   let analysis = {
     exercise: exerciseName,
@@ -97,7 +116,20 @@ export function analyzeExercise(exerciseName, currentEx, previousEx = null, days
       volume_change_percent: 0
     },
     progression: 'first_session',
-    period_days: daysDiff
+    period_days: daysDiff,
+    note: note || null,
+    noteContext,
+    // Kap. 26: schlanker Hinweis fürs Prompt (Phase 4), damit die AI z.B. bei einer reinen
+    // Technikübung nicht trotzdem eine Gewichtssteigerung empfiehlt. Nur gesetzt, wenn ein
+    // Profil (global oder per User-Override) tatsächlich vorliegt - sonst weiterhin keine
+    // übungsspezifische Aussage (Null-Annahmen-Prinzip).
+    profileHint: effectiveProfile ? {
+      exerciseType: effectiveProfile.exerciseType || null,
+      externalLoadRelevant: effectiveProfile.externalLoadRelevant !== false,
+      higherRepsAreProgress: effectiveProfile.higherRepsAreProgress !== false,
+      trainingVolumeRelevant: effectiveProfile.trainingVolumeRelevant !== false,
+      targetRepRange: effectiveProfile.targetRepRange || null
+    } : null
   };
 
   // Wenn vorherige Session existiert
@@ -116,7 +148,14 @@ export function analyzeExercise(exerciseName, currentEx, previousEx = null, days
         volume_change_percent: volumeChangePct
       };
 
-      analysis.progression = determineTrend(analysis.changes.weight_change, volumeChangePct);
+      // Kap. 26: übungstypabhängige Trendbewertung, wenn ein Profil vorliegt (Rang 1-3);
+      // ohne Profil identisch zum bisherigen determineTrend()-Verhalten.
+      analysis.progression = determineTrendWithProfile({
+        weightChange: analysis.changes.weight_change,
+        volumeChangePercent: volumeChangePct,
+        repsChange: analysis.changes.rep_change,
+        profile: effectiveProfile
+      });
 
       // Kategorisiere Zeitraum
       if (daysDiff > 30) {
@@ -139,13 +178,18 @@ export function analyzeExercise(exerciseName, currentEx, previousEx = null, days
  *
  * @param {Object} currentWorkout - Aktuelles Workout
  * @param {Array} allWorkouts - Alle Workouts des Users (sortiert nach Datum DESC)
+ * @param {Object} [profileMaps] - Additiv/optional (Phase 2/3, default leer -> altes Verhalten)
+ * @param {Map<string, Object>} [profileMaps.profileByExerciseName] - lowercased exerciseName -> Exercise.metricProfile
+ * @param {Map<string, Object>} [profileMaps.userNoteByExerciseName] - lowercased exerciseName -> UserExerciseNote
  * @returns {Array} Array von Exercise-Analysen
  */
-export function analyzeWorkoutProgression(currentWorkout, allWorkouts) {
+export function analyzeWorkoutProgression(currentWorkout, allWorkouts, profileMaps = {}) {
   const analysisResults = [];
+  const { profileByExerciseName = new Map(), userNoteByExerciseName = new Map() } = profileMaps || {};
 
   for (const exercise of currentWorkout.exercises || []) {
     const exerciseName = exercise.name || 'Unknown';
+    const lookupKey = exerciseName.toLowerCase();
 
     try {
       // Finde letzte Session der gleichen Übung
@@ -189,7 +233,10 @@ export function analyzeWorkoutProgression(currentWorkout, allWorkouts) {
         );
       }
 
-      const analysis = analyzeExercise(exerciseName, exercise, previousEx, daysDiff);
+      const analysis = analyzeExercise(exerciseName, exercise, previousEx, daysDiff, {
+        globalProfile: profileByExerciseName.get(lookupKey) || null,
+        userNote: userNoteByExerciseName.get(lookupKey) || null
+      });
 
       if (analysis) {
         analysisResults.push(analysis);
@@ -211,12 +258,18 @@ export function analyzeWorkoutProgression(currentWorkout, allWorkouts) {
  * Dies ist der "Mini-Datensatz" den das LLM erhält
  *
  * @param {Array} exerciseAnalyses - Array von analyzeExercise() Ergebnissen
+ * @param {Object} [options] - Additiv/optional (Phase 2/3, default leer -> altes Verhalten)
+ * @param {number|null} [options.athleteBodyweightKg] - Kap. 24: nur ausgeben, wenn tatsächlich
+ *   erfasst (Null-Annahmen-Prinzip) - fehlt der Wert, wird das Feld schlicht weggelassen statt
+ *   mit einem Platzhalter gefüllt, damit die AI keine Annahme über das Körpergewicht trifft.
  * @returns {Object} Strukturierte Daten für AI
  */
-export function structureAnalysisForAI(exerciseAnalyses) {
+export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
   if (!Array.isArray(exerciseAnalyses) || exerciseAnalyses.length === 0) {
     return null;
   }
+
+  const { athleteBodyweightKg = null } = options || {};
 
   // Statistiken über alle Übungen
   const positiveExercises = exerciseAnalyses.filter(e => e.progression === 'positive');
@@ -238,6 +291,10 @@ export function structureAnalysisForAI(exerciseAnalyses) {
   return {
     analysis_date: new Date().toISOString(),
     total_exercises_analyzed: exerciseAnalyses.length,
+
+    // Nur ausgegeben, wenn tatsächlich für diese Session erfasst (Null-Annahmen-Prinzip,
+    // Kap. 24) - kein Fallback/Platzhalter.
+    ...(athleteBodyweightKg != null ? { athlete_bodyweight_kg: athleteBodyweightKg } : {}),
 
     // Zusammenfassung Progressionen
     progression_summary: {
@@ -270,7 +327,19 @@ export function structureAnalysisForAI(exerciseAnalyses) {
       // Trend (von Backend berechnet)
       progression: ex.progression, // 'positive' | 'negative' | 'stable' | 'first_session'
       period_days: ex.period_days,
-      period_description: ex.period || 'first session'
+      period_description: ex.period || 'first session',
+
+      // Nutzer-Notiz zu dieser Übung (nur wenn vorhanden) - siehe analyzeExercise()
+      ...(ex.note ? { note: ex.note } : {}),
+
+      // Kap. 25: additiv, gemergte Notiz aus persistenter exerciseNote (Rang 1/2) und
+      // sessionNote dieser Session, mit Kennzeichnung von Herkunft/Bestätigung, damit die
+      // AI eine bestätigte persistente Einschränkung nicht mit einer einmaligen
+      // Session-Bemerkung verwechselt (Prioritätsreihenfolge Kap. 25.1).
+      ...(ex.noteContext ? { note_context: ex.noteContext } : {}),
+
+      // Kap. 26: schlanker Übungsprofil-Hinweis (nur wenn vorhanden) - siehe analyzeExercise().
+      ...(ex.profileHint ? { profile_hint: ex.profileHint } : {})
     })),
 
     // Top-Übungen für AI-Schwerpunkt
@@ -309,3 +378,8 @@ export default {
   structureAnalysisForAI,
   createSimpleExerciseFeedback
 };
+
+// Hinweis: determineTrend() (rein gewicht-/volumenbasiert) bleibt unverändert exportiert und
+// als generischer Fallback erhalten. exerciseAnalysisRules.js repliziert dieselbe Logik
+// intern (statt zu importieren), um einen zirkulären Import zwischen beiden Modulen zu
+// vermeiden; beide Implementierungen müssen bei künftigen Änderungen synchron gehalten werden.

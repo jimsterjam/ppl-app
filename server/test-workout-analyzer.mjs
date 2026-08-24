@@ -8,7 +8,6 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import Workout from './models/Workout.js';
 import { generateProgressFeedback } from './utils/ollamaClient.js';
-import { logger } from './utils/logger.js';
 
 dotenv.config({ path: './.env' });
 

@@ -207,6 +207,7 @@ import { isOnline, getAllWorkoutsOffline, deleteWorkoutOffline, saveWorkoutOffli
 import { resolveWorkoutNotes } from '@/utils/workoutNotes'
 import { deleteWorkout as deleteWorkoutApi } from '@/api/workouts'
 import { deleteWorkoutFromStats, getWorkoutIdentifier } from '@/utils/workoutDeletion'
+import { dedupeWorkoutsForStats } from '@/utils/workoutMerge'
 
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -225,26 +226,17 @@ const statsWorkouts = computed(() => {
   const offlineList = Array.isArray(offlineWorkouts.value) ? offlineWorkouts.value : []
   const storeList = Array.isArray(store.workouts) ? store.workouts : []
   const list = [...offlineList, ...storeList]
-  const normalized = list
-    .filter(item => !(item?._isDraft || item?.isDraft))
-    .map(item => ({
-      ...item,
-      notes: resolveWorkoutNotes(item)
-    }))
-  const deduped = new Map()
-  normalized.forEach((item) => {
-    const key = String(item?._id || item?.id || item?.workoutId || '').trim()
-      || `${String(item?.date || '')}|${String(item?.name || '').toLowerCase()}|${String(item?.type || '').toLowerCase()}`
-    const existing = deduped.get(key)
-    if (!existing) {
-      deduped.set(key, item)
-      return
-    }
-    const existingTs = new Date(existing?.updatedAt || existing?.date || existing?.createdAt || 0).getTime()
-    const nextTs = new Date(item?.updatedAt || item?.date || item?.createdAt || 0).getTime()
-    if (nextTs >= existingTs) deduped.set(key, item)
-  })
-  return Array.from(deduped.values())
+  const normalized = list.map(item => ({
+    ...item,
+    notes: resolveWorkoutNotes(item)
+  }))
+  // Gemeinsame Dedup-Logik mit userStore.js (dedupeWorkoutsForStats aus workoutMerge.js):
+  // dedupliziert primär nach _id, fällt bei fehlender/uneindeutiger ID auf einen
+  // Inhalts-Fingerprint (Datum+Name+Typ+Übungsanzahl+Volumen) zurück statt nur
+  // Datum+Name+Typ. Das fängt auch den Fall ab, dass ein offline_-Eintrag und sein
+  // bereits reconciliierter Server-Gegenpart (verschiedene _id) kurzzeitig gleichzeitig
+  // in offlineWorkouts/store.workouts vorhanden sind.
+  return dedupeWorkoutsForStats(normalized)
     .sort((a, b) => new Date(b.updatedAt || b.date || b.createdAt || 0) - new Date(a.updatedAt || a.date || a.createdAt || 0))
 })
 

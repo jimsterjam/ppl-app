@@ -88,6 +88,60 @@ exerciseSchema.add({
   thumbFileId: { type: mongoose.Schema.Types.ObjectId }
 });
 
+// ---------------------------------------------------------------------------
+// metricProfile (KI-Coach Konzept-PDF, Kap. 26 "Übungsspezifisches Bewertungsmodell")
+// ---------------------------------------------------------------------------
+// Fachlich geprüftes, GLOBALES Übungsprofil (Rang 3 in der Prioritätsreihenfolge aus
+// Kap. 25.1 - wird nur verwendet, wenn kein persönlicher User-Override existiert, siehe
+// models/UserExerciseNote.js für Rang 1/2). Legt fest, welche Fortschrittsmetriken für
+// diese Übung überhaupt zulässig sind - z.B. darf eine reine Technikübung
+// (exerciseType=technique) nicht über Gewicht bewertet werden, eine Schnellkraftübung
+// (exerciseType=power) nicht über höhere Wiederholungszahl.
+//
+// Additiv und optional: bestehende Exercises ohne metricProfile funktionieren unverändert
+// weiter (die Regel-Engine behandelt exerciseType=null als "kein Profil hinterlegt" und
+// fällt auf die bisherige generische Gewicht/Volumen-Bewertung zurück statt eine Analyse zu
+// blockieren - kein Breaking Change für den bestehenden Bestand).
+const metricProfileSchema = new mongoose.Schema({
+  exerciseType: {
+    type: String,
+    enum: ['strength', 'hypertrophy', 'power', 'technique', 'endurance'],
+    default: null
+  },
+  exerciseGoal: { type: String, default: '' }, // z.B. "explosive_strength", "skill_acquisition"
+  // Welche Metriken die KI für diese Übung überhaupt bewerten/empfehlen darf.
+  allowedProgressMetrics: [{
+    type: String,
+    enum: [
+      'external_load', 'reps_in_range', 'sets', 'rir_rpe',
+      'estimated_1rm', 'volume', 'movement_velocity', 'execution_quality',
+      'successful_attempts', 'assistance_level', 'technique_stage', 'quality_rating',
+      'duration', 'distance', 'pace'
+    ]
+  }],
+  targetRepRange: {
+    min: { type: Number, default: null },
+    max: { type: Number, default: null }
+  },
+  // false bei z.B. Speed Squats: mehr Wiederholungen sind dort KEIN Fortschritt (Kap. 26.1)
+  higherRepsAreProgress: { type: Boolean, default: true },
+  // false bei reinen Technikübungen (Kap. 26.2) - Gewicht darf dann nicht bewertet werden
+  externalLoadRelevant: { type: Boolean, default: true },
+  trainingVolumeRelevant: { type: Boolean, default: true },
+  plateauEvaluationEnabled: { type: Boolean, default: true },
+  // Fachliche Freigabe (Kap. 12 "Status für redaktionelle und fachliche Freigabe")
+  reviewStatus: {
+    type: String,
+    enum: ['draft', 'coach-reviewed'],
+    default: 'draft'
+  },
+  version: { type: Number, default: 1 }
+}, { _id: false });
+
+exerciseSchema.add({
+  metricProfile: { type: metricProfileSchema, default: null }
+});
+
 
 const Exercise = mongoose.models.Exercise || mongoose.model("Exercise", exerciseSchema);
 export default Exercise;

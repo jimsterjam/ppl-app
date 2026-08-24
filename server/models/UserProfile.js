@@ -16,10 +16,6 @@ const userProfileSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
-  coaches: {
-    type: [String],
-    default: []
-  },
   subscription: {
     plan: {
       type: String,
@@ -59,8 +55,6 @@ const userProfileSchema = new mongoose.Schema({
 }, {
   timestamps: true
 })
-
-userProfileSchema.index({ coaches: 1 })
 
 const UserProfile = mongoose.model('UserProfile', userProfileSchema)
 

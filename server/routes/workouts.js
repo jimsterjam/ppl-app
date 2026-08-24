@@ -5,6 +5,7 @@ import { firebaseAuthMiddleware } from '../middleware/firebaseAuth.js';
 import { OpenAI } from 'openai';
 import exercises from '../data/exercises.js';
 import Exercise from '../models/Exercise.js';
+import UserExerciseNote from '../models/UserExerciseNote.js';
 import UserProfile from '../models/UserProfile.js';
 import { logger } from '../utils/logger.js';
 import { getAIService } from '../services/aiService.js';
@@ -14,6 +15,7 @@ import {
   structureAnalysisForAI,
   createSimpleExerciseFeedback
 } from '../services/trainingAnalysisService.js';
+import { resolveEffectiveProfile } from '../services/exerciseAnalysisRules.js';
 import {
   startOfIsoWeek,
   normalizeCategory,
@@ -48,9 +50,16 @@ const router = express.Router();
 
 const exerciseCatalog = Array.isArray(exercises) ? exercises : [];
 
-// Mindestanzahl identischer Wiederholungen desselben Workouts, bevor AI-Feedback generiert wird.
-// Vergleichsdaten aus nur einer Session sind für Fortschrittsmessung nicht aussagekräftig.
-const AI_FEEDBACK_MIN_REPETITIONS = 3;
+// Mindestanzahl identischer Wiederholungen desselben Workouts, bevor eine WERTENDE
+// (vergleichende) AI-Analyse generiert wird. Weniger als 8 identische Sessions liefern zu
+// wenig Vergleichsdaten für eine belastbare Fortschrittsaussage - siehe auch
+// AI_FEEDBACK_MIN_HISTORY_DAYS als alternatives (zeitbasiertes) Kriterium.
+const AI_FEEDBACK_MIN_REPETITIONS = 8;
+
+// Alternative zum reinen Wiederholungs-Zähler: liegt die erste identische Session bereits
+// mindestens 4 Wochen zurück, ist genug Trainingszeitraum vergangen, um eine wertende
+// Analyse zuzulassen, auch wenn (noch) keine 8 identischen Workouts erreicht wurden.
+const AI_FEEDBACK_MIN_HISTORY_DAYS = 28;
 
 // Kanonischer Fingerprint der Übungsliste eines Workouts (Namen, sortiert, normalisiert).
 // Zwei Workouts gelten als "gleiches Workout", wenn dieser Fingerprint exakt übereinstimmt.
@@ -61,16 +70,36 @@ function exerciseSetFingerprint(workout) {
   return [...new Set(names)].sort().join('|');
 }
 
-// Zählt, wie oft (inkl. currentWorkout) ein identisches Workout bereits abgeschlossen wurde.
-function countMatchingCompletedWorkouts(currentWorkout, allWorkouts) {
+// Ermittelt Anzahl identischer abgeschlossener Workouts (inkl. currentWorkout) sowie den
+// zeitlichen Abstand zwischen der frühesten identischen Session und currentWorkout - beide
+// Werte werden gebraucht, um zu entscheiden, ob eine wertende Analyse möglich ist (siehe
+// AI_FEEDBACK_MIN_REPETITIONS / AI_FEEDBACK_MIN_HISTORY_DAYS).
+function analyzeMatchingCompletedWorkouts(currentWorkout, allWorkouts) {
   const targetFingerprint = exerciseSetFingerprint(currentWorkout);
-  if (!targetFingerprint) return 1; // Kein Übungsdaten vorhanden, keine sinnvolle Zählung möglich
+  if (!targetFingerprint) {
+    // Kein Übungsdaten vorhanden, keine sinnvolle Zählung möglich
+    return { matchingCount: 1, spanDays: 0 };
+  }
   const matches = (allWorkouts || []).filter(w =>
     w.completed === true && exerciseSetFingerprint(w) === targetFingerprint
   );
-  // currentWorkout selbst muss enthalten sein (falls bereits completed:true gespeichert)
   const alreadyIncluded = matches.some(w => String(w._id) === String(currentWorkout._id));
-  return alreadyIncluded ? matches.length : matches.length + 1;
+  const matchingCount = alreadyIncluded ? matches.length : matches.length + 1;
+
+  const allDates = matches.map(w => new Date(w.date || w.createdAt || 0).getTime()).filter(Number.isFinite);
+  const currentDate = new Date(currentWorkout.date || currentWorkout.createdAt || Date.now()).getTime();
+  if (Number.isFinite(currentDate)) allDates.push(currentDate);
+  const earliest = allDates.length ? Math.min(...allDates) : currentDate;
+  const spanDays = Number.isFinite(earliest) && Number.isFinite(currentDate)
+    ? Math.max(0, Math.floor((currentDate - earliest) / (24 * 60 * 60 * 1000)))
+    : 0;
+
+  return { matchingCount, spanDays };
+}
+
+// Rückwärtskompatibler Alias (nur Zähler) - falls anderswo im Code noch gebraucht.
+function countMatchingCompletedWorkouts(currentWorkout, allWorkouts) {
+  return analyzeMatchingCompletedWorkouts(currentWorkout, allWorkouts).matchingCount;
 }
 
 const METADATA_NAME_KEYS = ['name', 'name_en'];
@@ -1259,6 +1288,19 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
     const { userId } = req.auth;
     const workoutId = req.params.id;
 
+    // Gleiche Burst-Bremse wie /quick-generator und /ai-suggestion (siehe utils/aiUtils.js) -
+    // ohne sie könnte ein einzelner Nutzer beliebig oft die (kostenpflichtige) OpenAI-Analyse
+    // auslösen, z.B. durch wiederholtes Aufrufen der Post-Workout-Ansicht.
+    const burst = checkAiBurstLimit(userId);
+    if (!burst.allowed) {
+      return res.status(429).json({
+        error: 'Too many AI requests in a short timeframe',
+        code: 'AI_RATE_LIMITED',
+        retryAfter: burst.retryAfterSec,
+        requestId
+      });
+    }
+
     if (!(await import('mongoose')).default.Types.ObjectId.isValid(workoutId)) {
       return res.status(400).json({ error: 'Invalid workout ID', requestId });
     }
@@ -1304,11 +1346,18 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
     // 2b. Genug Wiederholungen desselben Workouts? Ohne Vergleichsbasis über mehrere
     // identische Sessions ist AI-Feedback nicht aussagekräftig – kein AI-Call, kein
     // Kontingent-Verbrauch, stattdessen ein "noch X Workouts"-Hinweis.
-    const matchingCount = countMatchingCompletedWorkouts(currentWorkout, allWorkouts);
-    if (matchingCount < AI_FEEDBACK_MIN_REPETITIONS) {
-      const remaining = AI_FEEDBACK_MIN_REPETITIONS - matchingCount;
-      logger.info('⏳ Workout analysis: zu wenig Wiederholungen für Feedback', {
-        requestId, workoutId, matchingCount, remaining
+    const { matchingCount, spanDays } = analyzeMatchingCompletedWorkouts(currentWorkout, allWorkouts);
+    // Wertende (vergleichende) Analyse erst zulassen, wenn EINES der beiden Kriterien erfüllt
+    // ist: genug identische Sessions (>= AI_FEEDBACK_MIN_REPETITIONS) ODER genug verstrichene
+    // Zeit seit der ersten identischen Session (>= AI_FEEDBACK_MIN_HISTORY_DAYS). Reines
+    // Session-Zählen allein war zu früh aussagekräftig (z.B. 3x in einer Woche trainiert).
+    const hasEnoughRepetitions = matchingCount >= AI_FEEDBACK_MIN_REPETITIONS;
+    const hasEnoughHistorySpan = spanDays >= AI_FEEDBACK_MIN_HISTORY_DAYS;
+    if (!hasEnoughRepetitions && !hasEnoughHistorySpan) {
+      const remaining = Math.max(0, AI_FEEDBACK_MIN_REPETITIONS - matchingCount);
+      const remainingDays = Math.max(0, AI_FEEDBACK_MIN_HISTORY_DAYS - spanDays);
+      logger.info('⏳ Workout analysis: zu wenig Wiederholungen/Zeitraum für wertendes Feedback', {
+        requestId, workoutId, matchingCount, remaining, spanDays, remainingDays
       });
       return res.json({
         success: true,
@@ -1318,6 +1367,9 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
         matching_count: matchingCount,
         required_count: AI_FEEDBACK_MIN_REPETITIONS,
         remaining,
+        span_days: spanDays,
+        required_days: AI_FEEDBACK_MIN_HISTORY_DAYS,
+        remaining_days: remainingDays,
         metadata: {
           requestId,
           timestamp: new Date().toISOString(),
@@ -1326,34 +1378,89 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
       });
     }
 
+    // 2c. Korrektheits-Regel-Engine (Kap. 24-26, Phase 2/3): lade das fachlich geprüfte
+    // metricProfile (Rang 3) je Übung dieses Workouts sowie eine ggf. vorhandene, persönliche
+    // exerciseNote des Nutzers (Rang 1/2, session-übergreifend). Beides ist rein additiv - fehlt
+    // ein Profil/eine Notiz, verhält sich die Analyse exakt wie bisher (siehe
+    // exerciseAnalysisRules.js). Lookup nur über die Übungsnamen DIESES Workouts, da nur diese
+    // in exerciseAnalyses vorkommen.
+    const exerciseNamesInWorkout = [...new Set(
+      (currentWorkout.exercises || [])
+        .map(ex => (ex.name || '').trim())
+        .filter(Boolean)
+    )];
+
+    const profileByExerciseName = new Map();
+    const userNoteByExerciseName = new Map();
+
+    if (exerciseNamesInWorkout.length > 0) {
+      const [exerciseDocs, userNoteDocs] = await Promise.all([
+        Exercise.find({ name: { $in: exerciseNamesInWorkout } }).lean(),
+        UserExerciseNote.find({ userId, exerciseName: { $in: exerciseNamesInWorkout } }).lean()
+      ]);
+      for (const doc of exerciseDocs) {
+        if (doc.metricProfile) profileByExerciseName.set((doc.name || '').toLowerCase(), doc.metricProfile);
+      }
+      for (const doc of userNoteDocs) {
+        userNoteByExerciseName.set((doc.exerciseName || '').toLowerCase(), doc);
+      }
+    }
+
     // 3. Backend-Berechnung: Analysiere Fortschritte
-    let exerciseAnalyses = analyzeWorkoutProgression(currentWorkout, allWorkouts);
+    let exerciseAnalyses = analyzeWorkoutProgression(currentWorkout, allWorkouts, {
+      profileByExerciseName,
+      userNoteByExerciseName
+    });
 
     // Fallback: Wenn keine Vorwerte existieren, nutze aktuelle Übungen als Basis-Analyse
     if (exerciseAnalyses.length === 0) {
-      exerciseAnalyses = (currentWorkout.exercises || []).map(ex => ({
-        exercise: ex.name || 'Unknown',
-        current: {
-          weight: Number(ex.weight) || 0,
-          reps: Number(ex.reps) || 0,
-          sets: (ex.setDetails || []).length || 1,
-          volume: (Number(ex.weight) || 0) * (Number(ex.reps) || 0) * ((ex.setDetails || []).length || 1)
-        },
-        previous: null,
-        changes: {
-          weight_change: 0,
-          rep_change: 0,
-          volume_change: 0,
-          volume_change_percent: 0
-        },
-        progression: 'first_session',
-        period_days: 0,
-        period_description: 'Erstes Training'
-      }))
+      exerciseAnalyses = (currentWorkout.exercises || []).map(ex => {
+        const lookupKey = (ex.name || '').trim().toLowerCase();
+        const userNote = userNoteByExerciseName.get(lookupKey) || null;
+        const globalProfile = profileByExerciseName.get(lookupKey) || null;
+        const effectiveProfile = resolveEffectiveProfile(globalProfile, userNote);
+        const sessionNote = (typeof ex.note === 'string' ? ex.note.trim() : '') || '';
+        return {
+          exercise: ex.name || 'Unknown',
+          current: {
+            weight: Number(ex.weight) || 0,
+            reps: Number(ex.reps) || 0,
+            sets: (ex.setDetails || []).length || 1,
+            volume: (Number(ex.weight) || 0) * (Number(ex.reps) || 0) * ((ex.setDetails || []).length || 1)
+          },
+          previous: null,
+          changes: {
+            weight_change: 0,
+            rep_change: 0,
+            volume_change: 0,
+            volume_change_percent: 0
+          },
+          progression: 'first_session',
+          period_days: 0,
+          period_description: 'Erstes Training',
+          note: sessionNote || null,
+          // Kap. 25: auch im "Erstes Training"-Fallback eine bestätigte persistente
+          // Einschränkung mitgeben, falls vorhanden (z.B. Knieproblem-Notiz gilt ab Tag 1).
+          noteContext: (sessionNote || userNote) ? { persistent: userNote?.noteText ? { text: userNote.noteText, confirmed: !!userNote.isConfirmed } : null, session: sessionNote || null } : null,
+          // Kap. 26: gleicher Profil-Hinweis wie im Vergleichs-Pfad, auch beim ersten Training.
+          profileHint: effectiveProfile ? {
+            exerciseType: effectiveProfile.exerciseType || null,
+            externalLoadRelevant: effectiveProfile.externalLoadRelevant !== false,
+            higherRepsAreProgress: effectiveProfile.higherRepsAreProgress !== false,
+            trainingVolumeRelevant: effectiveProfile.trainingVolumeRelevant !== false,
+            targetRepRange: effectiveProfile.targetRepRange || null
+          } : null
+        };
+      })
     }
 
     // 4. Strukturiere Daten für AI (Mini-Datensatz)
-    const structuredAnalysis = structureAnalysisForAI(exerciseAnalyses);
+    const structuredAnalysis = structureAnalysisForAI(exerciseAnalyses, {
+      // Null-Annahmen-Prinzip (Kap. 24): nur ausgeben, wenn für DIESE Session tatsächlich
+      // erfasst - aktuell noch kein Client-UI zum Erfassen vorhanden, daher in der Praxis
+      // meist null, was structureAnalysisForAI() korrekt als "weglassen" behandelt.
+      athleteBodyweightKg: currentWorkout.athleteBodyweightKg ?? null
+    });
 
     // 5. Rufe AI-Service auf (OpenAI oder Ollama, abhängig von Konfiguration)
     const aiService = getAIService();
@@ -1477,27 +1584,33 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
   }
 });
 
-// 🧪 TEST: AI-Analysis OHNE Auth (für lokale Tests)
-router.post("/:id/ai-analysis-test", async (req, res) => {
+// 🧪 TEST: AI-Analysis mit Auth, nur außerhalb von Produktion nutzbar
+router.post("/:id/ai-analysis-test", (req, res, next) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(404).json({ error: 'Not Found', path: req.originalUrl });
+  }
+  return next();
+}, firebaseAuthMiddleware, async (req, res) => {
   const requestId = `analysis_test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
   try {
+    const { userId } = req.auth;
     const workoutId = req.params.id;
 
     if (!(await import('mongoose')).default.Types.ObjectId.isValid(workoutId)) {
       return res.status(400).json({ error: 'Invalid workout ID', requestId });
     }
 
-    logger.info('🔍 Workout analysis TEST (no auth) started', { requestId, workoutId });
+    logger.info('🔍 Workout analysis TEST (dev only) started', { requestId, workoutId, userId });
 
-    // 1. Lade aktuelles Workout (ohne userId-Filter für Tests)
-    const currentWorkout = await Workout.findOne({ _id: workoutId }).lean();
+    // 1. Lade aktuelles Workout (nur für den authentifizierten Nutzer)
+    const currentWorkout = await Workout.findOne({ _id: workoutId, userId }).lean();
     if (!currentWorkout) {
       return res.status(404).json({ error: 'Workout not found', requestId });
     }
 
-    // 2. Lade alle Workouts (ohne userId-Filter für Tests)
-    const allWorkouts = await Workout.find({})
+    // 2. Lade alle Workouts des Nutzers
+    const allWorkouts = await Workout.find({ userId })
       .sort({ date: -1, createdAt: -1 })
       .lean();
 
@@ -1523,7 +1636,8 @@ router.post("/:id/ai-analysis-test", async (req, res) => {
         },
         progression: 'first_session',
         period_days: 0,
-        period_description: 'Erstes Training'
+        period_description: 'Erstes Training',
+        note: (typeof ex.note === 'string' ? ex.note.trim() : '') || null
       }))
     }
 
@@ -1726,6 +1840,20 @@ router.post("/ai-progress-feedback", firebaseAuthMiddleware, async (req, res) =>
 
   try {
     const { userId } = req.auth;
+
+    // Gleiche Burst-Bremse wie /quick-generator, /ai-suggestion und /:id/ai-analysis
+    // (siehe utils/aiUtils.js) - dieser Endpunkt ruft ebenfalls den kostenpflichtigen
+    // AI-Service auf.
+    const burst = checkAiBurstLimit(userId);
+    if (!burst.allowed) {
+      return res.status(429).json({
+        error: 'Too many AI requests in a short timeframe',
+        code: 'AI_RATE_LIMITED',
+        retryAfter: burst.retryAfterSec,
+        requestId
+      });
+    }
+
     const {
       exercise,
       period = 'unknown',

@@ -56,8 +56,15 @@ const workoutSchema = new mongoose.Schema({
     weight: Number,
     // optional zur Ableitung
     category: String,
-    // Notiz pro Übung (allgemein)
+    // Notiz pro Übung für DIESE Session (KI-Coach Konzept-PDF Kap. 25: "sessionNote" -
+    // gilt nur für dieses eine Workout, im Gegensatz zur persistenten, übungsgebundenen
+    // "exerciseNote" in models/UserExerciseNote.js. Feldname bewusst NICHT umbenannt,
+    // um bestehende Clients/Daten nicht zu brechen - nur semantisch hier dokumentiert).
     note: String,
+    // Tatsächlich bewegtes externes Gewicht für diese Übung in dieser Session (Kap. 24.2:
+    // strikt getrennt von athleteBodyweightKg - z.B. Zusatzgewicht am Gürtel bei
+    // Klimmzügen. Additiv/optional, null = nicht erfasst.)
+    externalLoadKg: { type: Number, default: null },
     // Detaillierte Set-Informationen (modernes Format)
     setDetails: [{
       reps: Number,
@@ -84,6 +91,13 @@ const workoutSchema = new mongoose.Schema({
   // Optionales Workout-Coverbild
   imageUrl: { type: String },
   thumbnailUrl: { type: String },
+
+  // Tatsächliches, gemessenes Körpergewicht des Nutzers zum Zeitpunkt dieser Session
+  // (KI-Coach Konzept-PDF Kap. 24: "Null-Annahmen-Prinzip" - strikt getrennt von
+  // loadType/exercises[].category = 'Körpergewicht' (Eigenschaft der ÜBUNG, nicht des
+  // Körpergewichts des Nutzers). Darf NIEMALS aus loadType='bodyweight' abgeleitet werden.
+  // Additiv/optional, null = nicht erfasst -> KI darf dann keine Aussage über Bodyweight treffen.
+  athleteBodyweightKg: { type: Number, default: null },
 
   // KI-generiertes Trainings-Feedback (einmal generiert, danach wiederverwendet)
   ai_feedback: { type: String },

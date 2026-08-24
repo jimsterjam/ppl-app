@@ -59,6 +59,24 @@ export function setReconcileCallback(cb) {
   reconcileCallback = typeof cb === 'function' ? cb : null
 }
 
+/**
+ * Tracks tempIds (offline_...), deren URSPRÜNGLICHE Create-Anfrage (aus dem 2s-Race in
+ * userStore.createWorkout) noch im Hintergrund läuft. Verarbeitet processSyncQueue in dieser
+ * Zeit denselben 'create'-Queue-Eintrag, entstehen zwei echte Server-Datensätze für ein und
+ * dasselbe Workout - sichtbar als Duplikat in den Stats. userStore.js registriert die tempId
+ * hier für die Dauer des Race und entfernt sie wieder, sobald die ursprüngliche Anfrage sich
+ * auflöst (Erfolg oder Fehler).
+ */
+const pendingOriginalCreates = new Set()
+
+export function markOriginalCreatePending(tempId) {
+  if (tempId) pendingOriginalCreates.add(String(tempId))
+}
+
+export function clearOriginalCreatePending(tempId) {
+  if (tempId) pendingOriginalCreates.delete(String(tempId))
+}
+
 function isRetryableSyncError(error) {
   const status = Number(error?.response?.status || 0)
   const code = String(error?.code || '').toUpperCase()
@@ -176,6 +194,18 @@ export async function processSyncQueue(preferredToken = null) {
 
     // Verarbeite jede Action sequentiell
     for (const item of pending) {
+      if (item?.entityType === 'workout' && item?.action === 'create') {
+        const tempId = String(item?.data?._id || '').trim()
+        if (tempId && pendingOriginalCreates.has(tempId)) {
+          skippedCount++
+          logger.debug('⏭️ Sync Manager - Überspringe Create, Original-Request läuft noch im Hintergrund', {
+            queueId: item?.id,
+            tempId
+          })
+          continue
+        }
+      }
+
       if (item?.entityType === 'workout' && (item?.action === 'create' || item?.action === 'update')) {
         let queuedUserId = String(item?.data?.userId || '').trim()
         if (!queuedUserId) {

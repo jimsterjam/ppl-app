@@ -297,6 +297,7 @@ export async function createWorkout(workoutData, token = null, options = {}) {
       }
       // Falls keine Daten zurückkommen, fallback unten verwenden
     } catch (error) {
+      let effectiveError = error
       if (shouldRetryCreateRequest(error)) {
         logger.warn('⚠️ Workouts API - createWorkout erster Versuch fehlgeschlagen, retrye einmal', {
           requestId,
@@ -326,25 +327,25 @@ export async function createWorkout(workoutData, token = null, options = {}) {
             return retriedWorkout
           }
         } catch (retryError) {
-          error = retryError
+          effectiveError = retryError
         }
       }
 
-      const status = Number(error?.response?.status || 0)
+      const status = Number(effectiveError?.response?.status || 0)
       logger.error('❌ Workouts API - Fehler beim Online-Speichern, bleibt offline:', {
         requestId,
-        message: error?.message,
-        code: error?.code || null,
+        message: effectiveError?.message,
+        code: effectiveError?.code || null,
         status: status || null,
-        method: error?.config?.method || null,
-        url: error?.config?.url || null,
-        baseURL: error?.config?.baseURL || null,
-        timeout: error?.config?.timeout || null,
-        serverError: error?.response?.data || null
+        method: effectiveError?.config?.method || null,
+        url: effectiveError?.config?.url || null,
+        baseURL: effectiveError?.config?.baseURL || null,
+        timeout: effectiveError?.config?.timeout || null,
+        serverError: effectiveError?.response?.data || null
       });
 
-      if (!shouldUseOfflineCreateFallback(error)) {
-        throw handleAPIError(error, 'Workout speichern', { showToast: false })
+      if (!shouldUseOfflineCreateFallback(effectiveError)) {
+        throw handleAPIError(effectiveError, 'Workout speichern', { showToast: false })
       }
 
       // Nur bei Netzwerk-/Transient-Fehlern offline fallbacken.

@@ -106,6 +106,11 @@ export class OllamaProvider extends AIProvider {
     let prompt = `Du bist ein sachlicher Fitness-Coach.
 Analysiere diese Trainingsdaten und erstelle kurzes, ehrliches Feedback (300-400 Wörter).
 
+WICHTIG zu Notizen: Wenn eine Übung eine Notiz vom Nutzer hat, erkläre ihre Zahlen im
+Licht dieser Notiz, bevor du sie bewertest. Stagnation oder fehlendes Gewicht NICHT als
+negative Entwicklung werten, wenn die Notiz das erklärt (z.B. technikfokussierte Übung,
+bewusstes Deload, Formfokus). Nutze nur, was explizit in der Notiz steht.
+
 # Trainingsfortschritt-Analyse
 
 ## Zusammenfassung
@@ -146,6 +151,12 @@ ${exercises
 - Gewicht: ${ex.changes.weight_change_kg > 0 ? '+' : ''}${ex.changes.weight_change_kg}kg
 - Wiederholungen: ${ex.changes.reps_change > 0 ? '+' : ''}${ex.changes.reps_change}
 - Volumen: ${ex.changes.volume_change_percent > 0 ? '+' : ''}${ex.changes.volume_change_percent}%`;
+    }
+
+    if (ex.note) {
+      exPrompt += `
+
+**Notiz des Nutzers zu dieser Übung:** "${ex.note}"`;
     }
 
     return exPrompt;

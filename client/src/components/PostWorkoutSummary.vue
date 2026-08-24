@@ -34,13 +34,25 @@
       </div>
     </div>
 
-    <!-- Insufficient History: noch nicht genug identische Wiederholungen für aussagekräftiges Feedback -->
+    <!-- Insufficient History: eine WERTENDE (vergleichende) Analyse braucht entweder genug
+         identische Wiederholungen ODER genug verstrichenen Zeitraum (siehe
+         AI_FEEDBACK_MIN_REPETITIONS / AI_FEEDBACK_MIN_HISTORY_DAYS serverseitig). -->
     <div v-else-if="insufficientHistory" class="summary-content fallback">
       <p>
+        {{ t('postWorkout.insufficientHistoryExplainer') || 'Eine wertende Analyse ist erst nach mindestens 4 Wochen bzw. 8 identischen Workouts aussagekräftig.' }}
+      </p>
+      <p v-if="remainingCount > 0 || remainingDays > 0">
         {{ remainingCount === 1
           ? (t('postWorkout.insufficientHistorySingle') || 'Noch 1 gleiches Workout, dann bekommst du dein erstes Feedback.')
           : (t('postWorkout.insufficientHistoryMulti', { count: remainingCount }) || `Noch ${remainingCount} gleiche Workouts, dann bekommst du dein erstes Feedback.`)
         }}
+        <template v-if="remainingDays > 0">
+          {{ t('postWorkout.insufficientHistoryOr') || '(oder' }}
+          {{ remainingDays === 1
+            ? (t('postWorkout.insufficientHistoryDaySingle') || 'noch 1 Tag)')
+            : (t('postWorkout.insufficientHistoryDaysMulti', { days: remainingDays }) || `noch ${remainingDays} Tage)`)
+          }}
+        </template>
       </p>
       <button class="primary" type="button" @click="dismissSummary">
         {{ t('common.continue') || 'Weiter' }}
@@ -75,7 +87,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
@@ -84,6 +96,8 @@ import { apiUrl } from '@/api/http'
 import axios from 'axios'
 import { acquireKeepAwake, releaseKeepAwake } from '@/utils/keepAwakeGuard'
 import { resolveRealIdFromDraftId } from '@/utils/workoutHelpers'
+import { logDiagnostic } from '@/utils/diagnosticsLog'
+import { OFFLINE_WORKOUTS_UPDATED_EVENT } from '@/utils/offlineStorage'
 
 const props = defineProps({
   workoutId: {
@@ -104,8 +118,34 @@ const feedback = ref(null)
 const error = ref(null)
 const insufficientHistory = ref(false)
 const remainingCount = ref(0)
+const remainingDays = ref(0)
 const networkUnavailable = ref(false)
 const syncPending = ref(false)
+
+// Reagiert auf verzögerte Reconciliation (siehe resolveWorkoutIdForAnalysis oben): wartet
+// dort das 8s-Zeitfenster ohne Erfolg ab (z.B. weil die Netzwerkverbindung beim Speichern
+// unterbrochen war, siehe User-Report "Feedback hat nicht beim ersten Mal funktioniert"),
+// gibt syncPending bisher endgültig auf - auch wenn der Workout Sekunden später im
+// Hintergrund erfolgreich synchronisiert wird. saveWorkoutOffline()/deleteWorkoutOffline()
+// feuern bei jeder Änderung (auch bei der Reconciliation selbst) OFFLINE_WORKOUTS_UPDATED_EVENT;
+// hier genutzt, um bei syncPending automatisch einen erneuten Versuch zu starten, statt dass
+// der Nutzer die Ansicht manuell neu öffnen muss.
+const MAX_SYNC_RETRY_ATTEMPTS = 5
+let syncRetryAttempts = 0
+let retryingAfterSync = false
+
+async function handleOfflineWorkoutsUpdated() {
+  if (!syncPending.value || retryingAfterSync) return
+  if (syncRetryAttempts >= MAX_SYNC_RETRY_ATTEMPTS) return
+  syncRetryAttempts += 1
+  retryingAfterSync = true
+  logDiagnostic('ai-feedback-retry-after-sync', { workoutId: props.workoutId, attempt: syncRetryAttempts })
+  try {
+    await loadAIFeedback()
+  } finally {
+    retryingAfterSync = false
+  }
+}
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
@@ -145,6 +185,11 @@ async function resolveWorkoutIdForAnalysis(rawId) {
  * Lade AI-Feedback nach Workout-Speicherung
  */
 async function loadAIFeedback() {
+  // DIAGNOSE (User-Report "Feedback hat nicht beim ersten Mal funktioniert"): bisher gab es
+  // für diesen kompletten Ablauf keine Einträge im (kopierbaren) Diagnose-Log, nur normale
+  // logger.debug()-Aufrufe. Jeder Aufruf (auch Remounts/erneute Versuche) wird jetzt geloggt.
+  logDiagnostic('ai-feedback-load-start', { workoutId: props.workoutId })
+
   if (!props.workoutId) {
     logger.warn('[PostWorkoutSummary] No workoutId provided')
     loading.value = false
@@ -163,12 +208,14 @@ async function loadAIFeedback() {
     error.value = null
     feedback.value = null
     insufficientHistory.value = false
+    remainingDays.value = 0
     networkUnavailable.value = false
     syncPending.value = false
 
     const resolvedWorkoutId = await resolveWorkoutIdForAnalysis(props.workoutId)
     if (!resolvedWorkoutId) {
       syncPending.value = true
+      logDiagnostic('ai-feedback-sync-pending', { workoutId: props.workoutId })
       return
     }
 
@@ -177,6 +224,7 @@ async function loadAIFeedback() {
     // Rufe AI-Analysis Endpunkt auf
     const url = `${apiUrl('workouts')}/${resolvedWorkoutId}/ai-analysis`
     logger.debug('[PostWorkoutSummary] Requesting AI analysis', { url })
+    logDiagnostic('ai-feedback-request', { workoutId: props.workoutId, resolvedWorkoutId, hasToken: !!token })
 
     const response = await axios.post(
       url,
@@ -197,22 +245,29 @@ async function loadAIFeedback() {
         workoutId: props.workoutId,
         provider: response.data.ai_metadata?.provider
       })
+      logDiagnostic('ai-feedback-result', { workoutId: props.workoutId, outcome: 'feedback', provider: response.data.ai_metadata?.provider, cached: !!response.data.cached })
     } else if (response.data?.feedback_status === 'network_unavailable') {
       networkUnavailable.value = true
       logger.debug('[PostWorkoutSummary] AI provider not reachable (network)', {
         workoutId: props.workoutId
       })
+      logDiagnostic('ai-feedback-result', { workoutId: props.workoutId, outcome: 'network_unavailable' })
     } else if (response.data?.feedback_status === 'insufficient_history') {
       insufficientHistory.value = true
       remainingCount.value = Number(response.data?.remaining) || 0
+      remainingDays.value = Number(response.data?.remaining_days) || 0
       logger.debug('[PostWorkoutSummary] Insufficient history for feedback', {
         workoutId: props.workoutId,
         matchingCount: response.data?.matching_count,
-        remaining: remainingCount.value
+        remaining: remainingCount.value,
+        spanDays: response.data?.span_days,
+        remainingDays: remainingDays.value
       })
+      logDiagnostic('ai-feedback-result', { workoutId: props.workoutId, outcome: 'insufficient_history', remaining: remainingCount.value, remainingDays: remainingDays.value })
     } else {
       // Kein Feedback, aber kein Error
       logger.debug('[PostWorkoutSummary] No feedback in response', { response: response.data })
+      logDiagnostic('ai-feedback-result', { workoutId: props.workoutId, outcome: 'empty', response: response.data })
     }
 
   } catch (err) {
@@ -226,6 +281,12 @@ async function loadAIFeedback() {
                   err.message ||
                   t('postWorkout.error') ||
                   'Feedback konnte nicht geladen werden'
+    logDiagnostic('ai-feedback-result', {
+      workoutId: props.workoutId,
+      outcome: 'error',
+      status: err?.response?.status ?? null,
+      message: err?.message || String(err)
+    })
   } finally {
     loading.value = false
     releaseKeepAwake('ai-feedback')
@@ -248,6 +309,11 @@ function goToAnalytics() {
 
 onMounted(() => {
   loadAIFeedback()
+  window.addEventListener(OFFLINE_WORKOUTS_UPDATED_EVENT, handleOfflineWorkoutsUpdated)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener(OFFLINE_WORKOUTS_UPDATED_EVENT, handleOfflineWorkoutsUpdated)
 })
 </script>
 

@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import { fileURLToPath } from "url";
 import path from "path";
+import { validateEnv } from "./utils/validateEnv.js";
 import { initializeAIService } from "./services/aiService.js";
 import OpenAIProvider from "./services/OpenAIProvider.js";
 import OllamaProvider from "./services/OllamaProvider.js";
@@ -12,6 +13,13 @@ import OllamaProvider from "./services/OllamaProvider.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.join(__dirname, ".env") });
+
+// Validiert kritische ENV-Variablen (u.a. MONGO_URI inkl. Format) direkt nach dem Laden
+// der .env-Datei und BEVOR irgendein Service (AI-Provider, Mongo-Connect) sie liest.
+// Beendet den Prozess mit exit(1) bei fehlenden/ungültigen Pflicht-Variablen - siehe
+// server/utils/validateEnv.js. Ersetzt den vorherigen, weniger strengen Inline-Check
+// weiter unten (nur "gesetzt?", kein Format-Check).
+validateEnv();
 
 const { default: app } = await import("./app.js");
 
@@ -46,11 +54,8 @@ try {
   logger.info("Firebase Admin nicht initialisiert (optional):", e?.message);
 }
 
-if (!MONGO_URI) {
-  logger.error("MONGO_URI fehlt. Server wird beendet.");
-  process.exit(1);
-}
-
+// MONGO_URI ist an dieser Stelle durch validateEnv() oben bereits als gesetzt und
+// formatgültig garantiert (sonst hätte der Prozess dort schon beendet).
 mongoose.connect(MONGO_URI).then(() => {
   logger.info("MongoDB verbunden");
   app.listen(PORT, HOST, () => {

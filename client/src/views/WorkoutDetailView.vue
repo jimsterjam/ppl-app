@@ -491,6 +491,23 @@
       </label>
     </AppModal> -->
 
+    <!-- Bestätigungsmodal: Notizen zu einer oder mehreren Übungen fehlen - Notizen sind
+         wichtiger Kontext für die AI-Analyse, deshalb hier nochmal nachfragen statt still zu
+         speichern. -->
+    <AppModal
+      v-model="showMissingNotesModal"
+      :title="t('workoutDetail.missingNotesTitle') || 'Notizen unvollständig'"
+      :confirm-text="t('workoutDetail.missingNotesConfirm') || 'Trotzdem speichern'"
+      :cancel-text="t('workoutDetail.missingNotesCancel') || 'Notizen prüfen'"
+      type="warning"
+      @confirm="confirmSaveDespiteMissingNotes"
+    >
+      <p>{{ t('workoutDetail.missingNotesMessage') || 'Zu folgenden Übungen fehlt noch eine Notiz. Notizen helfen der AI-Analyse, dein Training besser einzuschätzen.' }}</p>
+      <ul class="missing-notes-list">
+        <li v-for="name in missingNotesExerciseNames" :key="name">{{ name }}</li>
+      </ul>
+    </AppModal>
+
     <AppModal
       v-model="showTimerActionModal"
       title="Aktiver Timer"
@@ -623,7 +640,7 @@ function onAddExerciseConfirm() {
   try { triggerAutoSave() } catch {}
   toast.show('Übung hinzugefügt', { type: 'success', duration: 1500 })
 }
-import { ref, onMounted, onBeforeUnmount, watch, nextTick, reactive, computed } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, nextTick, computed } from 'vue'
 import { getCurrentInstance } from 'vue'
 import NumberPicker from '@/components/NumberPicker.vue'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
@@ -648,6 +665,9 @@ import { useI18n } from 'vue-i18n'
 import { logger } from '@/utils/logger'
 import { buildWorkoutNotesSummary } from '@/utils/workoutNotes'
 import { resolveRealIdFromDraftId as _resolveRealIdFromDraftId, snapshotCore } from '@/utils/workoutHelpers'
+import { logDiagnostic } from '@/utils/diagnosticsLog'
+import { useWorkoutPicker } from '@/composables/useWorkoutPicker'
+import { useWorkoutExerciseOrdering } from '@/composables/useWorkoutExerciseOrdering'
 import { saveWorkoutService } from '@/utils/SaveWorkoutService'
 import { useSessionStopwatchStore } from '@/stores/sessionStopwatch'
 import { resolveServerMediaUrl } from '@/api/http'
@@ -765,22 +785,8 @@ const REAL_ID_RESOLVE_DELAY_MS = Number.parseInt(import.meta.env.VITE_REAL_ID_RE
 const mediaUrl = ref('')
 const mediaRequestId = ref(0)
 const isVideoUrl = (url) => typeof url === 'string' && /\.mp4($|[?#])/i.test(url)
-const isReordering = ref(false)
-const draggingIndex = ref(null)
-const dropTargetIndex = ref(null)
-const activeTouchPointerId = ref(null)
-let pointerMoveListener = null
-let pointerUpListener = null
-let pointerCancelListener = null
-const touchPointerTypes = new Set(['touch', 'pen'])
 const supportsPointerEvents = typeof window !== 'undefined' && typeof window.PointerEvent !== 'undefined'
-const activeFallbackTouchId = ref(null)
-let fallbackTouchMoveListener = null
-let fallbackTouchEndListener = null
-let fallbackTouchCancelListener = null
-let suppressNextPickerOpen = false
 const isDirty = ref(false)
-const exListRef = ref(null)
 const didAutoScroll = ref(false)
 let initialSnapshot = ''
 const showLeaveModal = ref(false)
@@ -790,60 +796,47 @@ const sessionStopwatchStore = useSessionStopwatchStore()
 // Notiz-Logik
 const showNote = ref([])
 const exerciseNotes = ref([])
+
+// Bestätigungsgate vor dem finalen Speichern: warnt, wenn zu Übungen mit geloggten Sätzen
+// keine (oder nur leere) Notiz existiert - Notizen sind wichtiger Kontext für die spätere
+// AI-Analyse, sollen also nicht versehentlich leer gespeichert werden. Der User kann
+// entweder abbrechen (zurück zu den Notizen) oder trotzdem speichern.
+const showMissingNotesModal = ref(false)
+const missingNotesExerciseNames = ref([])
+let notesCheckAcknowledged = false
 // Mobile detection (treat app as mobile-only if touch available or narrow)
 const isMobile = ref(typeof window !== 'undefined' && ('ontouchstart' in window || window.innerWidth <= 768))
 
-// Picker state
-const pickerVisible = ref(false)
-const pickerValue = ref(0)
-const pickerConfig = reactive({
-  min: 0,
-  max: 1000,
-  step: 1,
-  splitDecimals: false,
-  decimalOptions: [0, 0.25, 0.5, 0.75],
-  title: '',
-  confirmText: 'OK',
-  cancelText: 'Abbrechen'
-})
-let pickerTarget = null // { row, field }
+// Picker- und Reorder-Interaktionslogik ausgelagert (Auslagerungsplan "Schritt 1:
+// UI-Interaction-Composables") - reine 1:1-Extraktion ohne Verhaltensänderung, siehe
+// composables/useWorkoutPicker.js und composables/useWorkoutExerciseOrdering.js.
+const {
+  pickerVisible,
+  pickerValue,
+  pickerConfig,
+  openPicker,
+  onPickerConfirm,
+  onPickerCancel,
+  swallowPickerGhostClick,
+  suppressNextOpen,
+  getLastPickerCloseAt
+} = useWorkoutPicker({ isMobile, onValueChanged: () => { try { triggerAutoSave() } catch {} } })
 
-// HYPOTHESE (spontane Set-Duplikate / "Daten werden zurückgesetzt"), NOCH NICHT BEWIESEN:
-// NumberPicker.vue ist ein position:fixed Vollbild-Overlay (z-index 2000), das per v-if
-// sofort aus dem DOM verschwindet, sobald der User im Header auf "OK" tippt. Auf iOS/
-// WKWebView KANN das Antippen eines Elements, das sich genau in diesem Moment aus dem DOM
-// entfernt, einen "Ghost Click" erzeugen: das echte Touch-Event schließt den Picker, ein
-// nachgelagertes synthetisches click-Event trifft dann das Element, das an derselben
-// Bildschirmposition jetzt sichtbar ist - z.B. den "+ Satz hinzufügen"-Button darunter.
-// Bisher wurde ein Aufruf von addSetRow() gar nicht geloggt, weder bei echtem Tap noch bei
-// Ghost-Click - die Log-Historie konnte diese Hypothese also NICHT bestätigen, nur ein
-// zeitliches/inhaltliches Muster nahelegen (Duplikat mit identischen Werten kurz nach einer
-// Picker-Bestätigung). lastPickerCloseAt + logSetRowTrigger() unten liefern jetzt beim
-// nächsten Auftreten harte Daten: Zeitabstand zum Picker-Schluss und Klick-Koordinaten.
-// Der Klick-Schluck-Fix unten ist eine sichere Absicherung gegen dieses bekannte
-// Browser-Verhalten, unabhängig davon, ob er hier tatsächlich die Ursache war.
-let pickerGhostClickGuardUntil = 0
-let lastPickerCloseAt = 0
-const PICKER_GHOST_CLICK_GUARD_MS = 400
-
-function armPickerGhostClickGuard() {
-  pickerGhostClickGuardUntil = Date.now() + PICKER_GHOST_CLICK_GUARD_MS
-  lastPickerCloseAt = Date.now()
-}
-
-function swallowPickerGhostClick(event) {
-  if (Date.now() >= pickerGhostClickGuardUntil) return
-  pickerGhostClickGuardUntil = 0
-  try {
-    event.preventDefault()
-    event.stopPropagation()
-    if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation()
-  } catch {}
-  logDiagnostic('ghost-click-swallowed', {
-    target: event?.target?.tagName || null,
-    className: event?.target?.className || null
-  })
-}
+const {
+  isReordering,
+  draggingIndex,
+  dropTargetIndex,
+  exListRef,
+  toggleReorder,
+  onDragStart,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+  onPointerDown,
+  onTouchStart,
+  stopDrag,
+  cleanupPointerDragListeners
+} = useWorkoutExerciseOrdering(workout)
 
 function shouldKeepAsDraft(workoutLike) {
   if (!workoutLike) return false
@@ -1194,8 +1187,23 @@ function cancelPendingAutoSave(reason = 'unknown') {
 
 function triggerAutoSave() {
   cancelPendingAutoSave('debounce-restart')
+  // DIAGNOSE (Temp-ID/Real-ID-Race-Verdacht): Zeitpunkt + IDs beim Scheduling festhalten,
+  // damit sich im Log nachvollziehen lässt, ob zwischen Scheduling und Feuern des Timers
+  // eine ID-Migration (route.params.id-Watcher weiter unten) oder ein loadWorkout()-Reload
+  // dazwischenfunkt. Rein lesend, ändert kein Verhalten.
+  const scheduledAtMs = Date.now()
+  const scheduledRouteId = String(route.params.id || '')
+  const scheduledWorkoutId = String(workout.value?._id || '')
   autoSaveTimer = setTimeout(() => {
     autoSaveTimer = null
+    logDiagnostic('autosave-fired', {
+      scheduledRouteId,
+      scheduledWorkoutId,
+      currentRouteId: String(route.params.id || ''),
+      currentWorkoutId: String(workout.value?._id || ''),
+      idsDriftedSinceSchedule: scheduledRouteId !== String(route.params.id || '') || scheduledWorkoutId !== String(workout.value?._id || ''),
+      delayMs: Date.now() - scheduledAtMs
+    })
     runAutoSaveNow().then((result) => {
       flushAutoSaveWaiters(result !== false)
     }).catch(() => {
@@ -1334,11 +1342,10 @@ function restoreDetailViewState() {
         const selector = `[data-ex-index="${exIndex}"] [data-set-index="${setIndex}"] input[data-field="${field}"]`
         const input = typeof document !== 'undefined' ? document.querySelector(selector) : null
         if (!input || typeof input.focus !== 'function') return
-        suppressNextPickerOpen = true
-        input.focus({ preventScroll: true })
         // Flag nach kurzer Verzögerung zurücksetzen, falls der Fokus aus irgendeinem
         // Grund keinen Picker-Trigger auslöst (z.B. Desktop, kein Mobile-Picker aktiv)
-        setTimeout(() => { suppressNextPickerOpen = false }, 300)
+        suppressNextOpen(300)
+        input.focus({ preventScroll: true })
       } catch {}
     })
   } catch {}
@@ -1368,6 +1375,23 @@ function deleteNote(idx) {
   if (exerciseNotes.value) exerciseNotes.value[idx] = ''
   if (showNote.value) showNote.value[idx] = false
   try { triggerAutoSave() } catch {}
+}
+
+// Liefert die Namen aller Übungen, zu denen mindestens ein Satz geloggt wurde, aber deren
+// Notiz leer/nur Whitespace ist. Grundlage für das Bestätigungsmodal vor dem finalen
+// Speichern (showMissingNotesModal) - siehe saveWorkout().
+function getExercisesMissingNotes() {
+  const exercisesList = Array.isArray(workout.value?.exercises) ? workout.value.exercises : []
+  const missing = []
+  exercisesList.forEach((ex, idx) => {
+    const hasLoggedSets = Array.isArray(ex?.setDetails) && ex.setDetails.length > 0
+    if (!hasLoggedSets) return
+    const note = getNote(idx)
+    if (!String(note || '').trim()) {
+      missing.push(ex?.name || `Übung ${idx + 1}`)
+    }
+  })
+  return missing
 }
 
 function formatDate(dateStr) {
@@ -1806,44 +1830,12 @@ function scrollToExercises() {
   } catch {}
 }
 
-function openPicker(row, field, step = 1, min = 0, max = 1000, title = '') {
-  logDiagnostic('picker-open', { field, currentValue: row?.[field], suppressed: suppressNextPickerOpen })
-  if (suppressNextPickerOpen) {
-    suppressNextPickerOpen = false
-    return
-  }
-  // Only show the picker on mobile
-  if (!isMobile.value) return
-  pickerTarget = { row, field }
-  pickerConfig.step = step
-  pickerConfig.min = min
-  pickerConfig.max = max
-  pickerConfig.splitDecimals = field === 'weight'
-  pickerConfig.decimalOptions = pickerConfig.splitDecimals ? [0, 0.25, 0.5, 0.75] : [0]
-  pickerConfig.title = title || (field === 'weight' ? 'Gewicht (kg)' : 'Wiederholungen')
-  pickerValue.value = Number(row[field]) || 0
-  pickerVisible.value = true
-}
-
-function onPickerConfirm(val) {
-  armPickerGhostClickGuard()
-  if (!pickerTarget) { pickerVisible.value = false; return }
-  const { row, field } = pickerTarget
-  row[field] = val
-  try { triggerAutoSave() } catch {}
-  pickerVisible.value = false
-  pickerTarget = null
-}
-
-function onPickerCancel() {
-  armPickerGhostClickGuard()
-  pickerVisible.value = false
-  pickerTarget = null
-}
-
 function goToPostWorkoutSummary(workoutId) {
   const id = String(workoutId || '').trim()
   logger.info('[WorkoutDetail] goToPostWorkoutSummary called', { workoutId, id })
+  // DIAGNOSE: einziger Punkt, an dem alle Erfolgs-Zweige von performSaveWorkout() zusammen-
+  // laufen - deckt "doppeltes Save-Event" auf, falls diese Funktion mehrfach aufgerufen wird.
+  logDiagnostic('go-to-post-workout-summary', { workoutId, id })
   if (!id) {
     logger.warn('[WorkoutDetail] No workoutId, redirecting to dashboard')
     router.push('/dashboard')
@@ -2008,7 +2000,6 @@ async function onTimerDecision(mode) {
 }
 
 
-function toggleReorder() { isReordering.value = !isReordering.value }
 
 function askRemoveExercise(exIndex) {
   pendingRemoveExerciseIndex.value = exIndex
@@ -2075,7 +2066,7 @@ function logSetRowTrigger(kind, exIndex, event) {
   logDiagnostic('set-row-add-trigger', {
     kind,
     exIndex,
-    msSincePickerClose: lastPickerCloseAt ? Date.now() - lastPickerCloseAt : null,
+    msSincePickerClose: getLastPickerCloseAt() ? Date.now() - getLastPickerCloseAt() : null,
     x: event?.clientX ?? null,
     y: event?.clientY ?? null,
     isTrusted: event?.isTrusted ?? null
@@ -2107,14 +2098,11 @@ function addWarmupSetRow(exIndex, event = null) {
 function removeSetRow(exIndex, rowIndex) {
   const ex = workout.value?.exercises?.[exIndex]
   if (!ex || !Array.isArray(ex.setDetails)) return
-  const row = ex.setDetails[rowIndex]
-  if (row?.isWarmup) {
-    const warmupCount = ex.setDetails.filter(s => s.isWarmup).length
-    if (warmupCount <= 1) return // keep minimum 1 warmup
-  } else {
-    const workingCount = ex.setDetails.filter(s => !s.isWarmup).length
-    if (workingCount <= 1) return // keep minimum 1 working set
-  }
+  if (!ex.setDetails[rowIndex]) return
+  // Kein Mindest-1-Satz-Zwang mehr: sowohl Warm-up- als auch Arbeitssätze dürfen komplett
+  // entfernt werden, sodass nur noch der jeweilige "+ Satz hinzufügen"-Button sichtbar bleibt
+  // (User-Wunsch). Das Template rendert bei leerem setDetails ohnehin nur die Buttons (siehe
+  // v-for über ex.setDetails im Template), es gibt also keinen leeren/kaputten Zwischenzustand.
   ex.setDetails.splice(rowIndex, 1)
   logger.debug('removeSetRow', 'exIndex:', exIndex, 'rowIndex:', rowIndex, 'remaining:', ex.setDetails.length)
   try { triggerAutoSave() } catch {}
@@ -2317,7 +2305,14 @@ function onSessionTime({ totalMs, formattedTime }) {
 // const sessionStopwatchStore = useSessionStopwatchStore()
 
 async function performSaveWorkout() {
-  if (saving.value) return // Guard gegen Doppel-Aufruf
+  // DIAGNOSE (User-Report "doppeltes Save-Event"): jeden Aufruf loggen, auch den vom Guard
+  // abgewiesenen - bisher gab es dafür keine Sichtbarkeit im Diagnose-Log, nur Draft/Lifecycle-
+  // Events waren dort protokolliert.
+  if (saving.value) {
+    logDiagnostic('save-blocked-duplicate', { id: String(route.params.id || '') })
+    return // Guard gegen Doppel-Aufruf
+  }
+  logDiagnostic('save-start', { id: String(route.params.id || '') })
   // Sofort setzen – schliesst das Race-Window zwischen Guard-Check und erstem await.
   // triggerAutoSave() und runAutoSaveNow() prüfen saving.value als primären Guard,
   // daher muss es vor cancelPendingAutoSave() und vor dem ersten await stehen.
@@ -2614,12 +2609,27 @@ async function performSaveWorkout() {
     saveMsg.value = 'Speichern fehlgeschlagen.'
     saveError.value = true
     releaseSaveKeepAwake()
+    logDiagnostic('save-error', { id: String(route.params.id || ''), message: e?.message || String(e) })
   } finally {
     saving.value = false
+    notesCheckAcknowledged = false
+    logDiagnostic('save-end', { id: String(route.params.id || '') })
   }
 }
 
 async function saveWorkout() {
+  // Notizen-Check zuerst: läuft VOR dem Timer-Guard, damit er auch beim direkten Klick auf
+  // "Speichern" greift (der Timer-Guard deferred den eigentlichen Save ohnehin über
+  // pendingTimerAction -> performSaveWorkout(), würde diesen Check also umgehen, wenn er
+  // erst danach käme). Im Favorit-Anpassen-Modus nicht relevant (kein echtes Workout-Save).
+  if (!isFavoriteAdjustMode.value && !notesCheckAcknowledged) {
+    const missing = getExercisesMissingNotes()
+    if (missing.length > 0) {
+      missingNotesExerciseNames.value = missing
+      showMissingNotesModal.value = true
+      return
+    }
+  }
   // Im Adjust-Modus läuft kein Workout, Timer-Guard nicht anwenden
   if (!isFavoriteAdjustMode.value && timerStore.isRunningLike) {
     pendingTimerAction.value = { kind: 'save' }
@@ -2627,6 +2637,16 @@ async function saveWorkout() {
     return
   }
   await performSaveWorkout()
+}
+
+// Wird vom Bestätigungsmodal (showMissingNotesModal) aufgerufen, wenn der Nutzer trotz
+// fehlender Notizen speichern möchte. Merkt sich das für diesen Speicherversuch, damit
+// saveWorkout() den Check nicht erneut auslöst (z.B. wenn danach noch der Timer-Guard
+// dazwischenkommt), setzt es aber in performSaveWorkout() wieder zurück, damit der nächste
+// Speichervorgang (nächstes Workout) wieder frisch geprüft wird.
+function confirmSaveDespiteMissingNotes() {
+  notesCheckAcknowledged = true
+  saveWorkout()
 }
 
 function getFavoriteUserId() {
@@ -2713,202 +2733,6 @@ function confirmFavoriteSave() {
   if (ok) {
     showFavoriteNameModal.value = false
   }
-}
-
-function onDragStart(index) { if (!isReordering.value) return; draggingIndex.value = index }
-function onDragOver(index) { if (!isReordering.value) return; dropTargetIndex.value = index }
-function onDragLeave(index) { if (!isReordering.value) return; if (dropTargetIndex.value === index) dropTargetIndex.value = null }
-function onDrop(index) {
-  if (!isReordering.value) return
-  const from = draggingIndex.value
-  const to = index
-  if (from === null || to === null || from === to) return
-  const list = workout.value?.exercises
-  if (!Array.isArray(list)) return
-  const [moved] = list.splice(from, 1)
-  list.splice(to, 0, moved)
-  stopDrag()
-}
-
-function onPointerDown(event, index) {
-  if (!isReordering.value || !touchPointerTypes.has(event.pointerType)) return
-  if (activeFallbackTouchId.value !== null) return
-  event.preventDefault()
-  draggingIndex.value = index
-  dropTargetIndex.value = index
-  activeTouchPointerId.value = event.pointerId
-  attachPointerDragListeners()
-}
-
-function attachPointerDragListeners() {
-  if (typeof window === 'undefined' || pointerMoveListener) return
-  pointerMoveListener = handlePointerMove
-  pointerUpListener = handlePointerUp
-  pointerCancelListener = handlePointerCancel
-  window.addEventListener('pointermove', pointerMoveListener, { passive: false })
-  window.addEventListener('pointerup', pointerUpListener)
-  window.addEventListener('pointercancel', pointerCancelListener)
-}
-
-function cleanupPointerDragListeners() {
-  if (typeof window === 'undefined') return
-  if (pointerMoveListener) {
-    window.removeEventListener('pointermove', pointerMoveListener)
-    pointerMoveListener = null
-  }
-  if (pointerUpListener) {
-    window.removeEventListener('pointerup', pointerUpListener)
-    pointerUpListener = null
-  }
-  if (pointerCancelListener) {
-    window.removeEventListener('pointercancel', pointerCancelListener)
-    pointerCancelListener = null
-  }
-  activeTouchPointerId.value = null
-}
-
-function handlePointerMove(event) {
-  if (event.pointerId !== activeTouchPointerId.value) return
-  event.preventDefault()
-  const nextIndex = findExerciseIndexAtPoint(event.clientX, event.clientY)
-  if (nextIndex !== null) {
-    dropTargetIndex.value = nextIndex
-  }
-}
-
-function handlePointerUp(event) {
-  if (event.pointerId !== activeTouchPointerId.value) return
-  const targetIndex = dropTargetIndex.value ?? draggingIndex.value
-  if (targetIndex !== null) {
-    onDrop(targetIndex)
-  }
-  stopDrag()
-}
-
-function handlePointerCancel(event) {
-  if (event.pointerId !== activeTouchPointerId.value) return
-  stopDrag()
-}
-
-function onTouchStart(event, index) {
-  if (!isReordering.value) return
-  if (activeTouchPointerId.value !== null || activeFallbackTouchId.value !== null) return
-  const touch = event.touches && event.touches[0]
-  if (!touch) return
-  draggingIndex.value = index
-  dropTargetIndex.value = index
-  activeFallbackTouchId.value = touch.identifier
-  attachTouchDragListeners()
-}
-
-function attachTouchDragListeners() {
-  if (typeof window === 'undefined' || fallbackTouchMoveListener) return
-  fallbackTouchMoveListener = handleTouchMove
-  fallbackTouchEndListener = handleTouchEnd
-  fallbackTouchCancelListener = handleTouchCancel
-  window.addEventListener('touchmove', fallbackTouchMoveListener, { passive: false })
-  window.addEventListener('touchend', fallbackTouchEndListener)
-  window.addEventListener('touchcancel', fallbackTouchCancelListener)
-}
-
-function cleanupTouchDragListeners() {
-  if (typeof window === 'undefined') return
-  if (fallbackTouchMoveListener) {
-    window.removeEventListener('touchmove', fallbackTouchMoveListener)
-    fallbackTouchMoveListener = null
-  }
-  if (fallbackTouchEndListener) {
-    window.removeEventListener('touchend', fallbackTouchEndListener)
-    fallbackTouchEndListener = null
-  }
-  if (fallbackTouchCancelListener) {
-    window.removeEventListener('touchcancel', fallbackTouchCancelListener)
-    fallbackTouchCancelListener = null
-  }
-  activeFallbackTouchId.value = null
-}
-
-function handleTouchMove(event) {
-  if (!activeFallbackTouchId.value) return
-  const touches = event.touches || []
-  let touch = null
-  for (let i = 0; i < touches.length; i++) {
-    if (touches[i].identifier === activeFallbackTouchId.value) {
-      touch = touches[i]
-      break
-    }
-  }
-  if (!touch) return
-  event.preventDefault()
-  const nextIndex = findExerciseIndexAtPoint(touch.clientX, touch.clientY)
-  if (nextIndex !== null) {
-    dropTargetIndex.value = nextIndex
-  }
-}
-
-function logDiagnostic(event, data = {}) {
-  try {
-    const key = 'bro_split_load_diagnostics_v1'
-    const existing = JSON.parse(localStorage.getItem(key) || '[]')
-    existing.push({
-      event,
-      ...data,
-      timestamp: new Date().toISOString()
-    })
-    const trimmed = existing.slice(-100)
-    localStorage.setItem(key, JSON.stringify(trimmed))
-  } catch {}
-}
-
-function handleTouchEnd(event) {
-  if (!activeFallbackTouchId.value) return
-  const changed = event.changedTouches || []
-  let touch = null
-  for (let i = 0; i < changed.length; i++) {
-    if (changed[i].identifier === activeFallbackTouchId.value) {
-      touch = changed[i]
-      break
-    }
-  }
-  if (!touch) return
-  const targetIndex = dropTargetIndex.value ?? draggingIndex.value
-  if (targetIndex !== null) {
-    onDrop(targetIndex)
-  }
-  stopDrag()
-}
-
-function handleTouchCancel(event) {
-  if (!activeFallbackTouchId.value) return
-  const changed = event.changedTouches || []
-  let touch = null
-  for (let i = 0; i < changed.length; i++) {
-    if (changed[i].identifier === activeFallbackTouchId.value) {
-      touch = changed[i]
-      break
-    }
-  }
-  if (!touch) return
-  stopDrag()
-}
-
-function stopDrag() {
-  draggingIndex.value = null
-  dropTargetIndex.value = null
-  cleanupPointerDragListeners()
-  cleanupTouchDragListeners()
-}
-
-function findExerciseIndexAtPoint(x, y) {
-  if (typeof document === 'undefined') return null
-  const element = document.elementFromPoint(x, y)
-  if (!element || typeof element.closest !== 'function') return null
-  const target = element.closest('[data-ex-index]')
-  if (!target || !exListRef.value || !exListRef.value.contains(target)) return null
-  const raw = target.dataset?.exIndex
-  if (!raw) return null
-  const idx = Number(raw)
-  return Number.isNaN(idx) ? null : idx
 }
 
 /**
@@ -3087,6 +2911,14 @@ watch(() => workout.value?.exercises?.length || 0, async (len) => {
 // Fix: Active-Draft sofort (synchron, im selben Tick wie die ID-Änderung) unter der neuen ID
 // umschreiben, statt auf den asynchronen deep-watch zu warten.
 watch(() => String(route.params.id || ''), (newId, oldId) => {
+  // DIAGNOSE (Temp-ID/Real-ID-Race-Verdacht): jedes Feuern loggen, auch der frühe Return,
+  // inkl. ob gerade ein Auto-Save-Timer aussteht - der könnte mit veralteter ID feuern,
+  // nachdem hier schon auf die neue ID migriert wurde. Rein lesend, kein Verhaltenswechsel.
+  logDiagnostic('route-id-watch-fired', {
+    oldId, newId,
+    pendingAutoSaveTimer: autoSaveTimer !== null,
+    workoutValueId: String(workout.value?._id || '')
+  })
   if (!newId || !oldId || newId === oldId) return
   // workout.value._id auf die neue (echte) ID aktualisieren, wenn wir von einer Draft-ID gewechselt haben
   const wasTempId = workout.value && (
@@ -3264,6 +3096,8 @@ onBeforeUnmount(() => {
 .exercise-item { background: var(--card-bg, #fff); border-radius: 12px; padding: 16px; border: 1px solid var(--card-border, #e5e7eb); box-shadow: 0 2px 8px rgba(0,0,0,0.04); cursor: pointer; transition: all 0.2s; display: flex; flex-direction: column; gap: 6px; }
 .timer-decision-body { display: flex; flex-direction: column; gap: 12px; }
 .timer-decision-body p { margin: 0; }
+.missing-notes-list { margin: 8px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
+.missing-notes-list li { font-weight: 600; }
 .timer-stop-btn {
   align-self: flex-end;
   border: 1px solid color-mix(in srgb, var(--danger-color) 65%, black 35%);

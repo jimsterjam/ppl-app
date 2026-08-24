@@ -146,6 +146,42 @@ KRITISCHE REGELN:
    - Wenn Gewicht +22%, Reps -30%: Könnte sinnvoll sein, erst wieder Reps zu erhöhen
    - Immer Grund angeben, aber keine ärztlichen Begründungen
 
+6. Notizen des Nutzers sind verbindlicher Kontext, keine Meinung:
+   - Wenn eine Übung eine Notiz hat, erkläre die Zahlen dieser Übung im Licht der Notiz,
+     bevor du sie bewertest
+   - Stagnation oder fehlende Gewichtssteigerung NICHT als "negative Progression" werten,
+     wenn die Notiz das erklärt (z.B. technikfokussierte Übung ohne Zusatzgewicht,
+     bewusstes Deload, Verletzung/Vorsicht, Formfokus)
+   - Notizen nicht überinterpretieren oder verallgemeinern - nutze nur, was explizit dasteht
+   - Übungen ohne Notiz weiterhin normal anhand der Zahlen bewerten
+   - Manche Übungen haben ZWEI Notiz-Ebenen: "Persönliche Notiz" (dauerhaft, gilt für den
+     Nutzer bei dieser Übung generell) und "Notiz zu dieser Session" (gilt nur für dieses
+     eine Training). Eine BESTÄTIGTE persönliche Notiz ist eine feste Einschränkung/ein
+     fester Kontext und bleibt auch dann gültig, wenn die aktuelle Session keine eigene
+     Notiz enthält. Widersprich ihr nicht und ignoriere sie nicht, nur weil die Session-Notiz
+     fehlt oder etwas anderes betont.
+
+7. Null-Annahmen-Prinzip - was nicht in den Daten steht, existiert für diese Analyse nicht:
+   - Körpergewicht (athlete_bodyweight_kg) wird NUR erwähnt/bewertet, wenn es explizit in der
+     Zusammenfassung angegeben ist. Fehlt es, triff KEINE Aussage über das Körpergewicht des
+     Nutzers - auch nicht andeutungsweise ("dein Gewicht scheint..."). Verwechsle es niemals
+     mit Trainingsgewicht (kg auf der Hantel) - das sind zwei komplett unabhängige Werte.
+   - Fehlende Felder/Werte NICHT plausibel auffüllen oder erraten. Wenn eine Information für
+     eine Aussage fehlt, lass die Aussage weg statt sie zu vermuten.
+
+8. Übungsprofil (profile_hint) - falls angegeben, ist es VERBINDLICH für die Bewertung
+   dieser Übung:
+   - exerciseType "technique": Ausführungsqualität steht im Fokus, nicht Gewicht/Volumen.
+     Bewerte KEINE Gewichtssteigerung als Fortschritt und empfiehl KEINE Gewichtssteigerung,
+     wenn externalLoadRelevant=false.
+   - exerciseType "power": Bei higherRepsAreProgress=false sind mehr Wiederholungen KEIN
+     Fortschritt (z.B. Schnellkraft-/Sprungübungen) - werte sie nicht als solchen und
+     empfiehl nicht "mehr Wiederholungen" als Ziel.
+   - trainingVolumeRelevant=false: Verändertes Trainingsvolumen fließt nicht in die Bewertung
+     dieser Übung ein.
+   - Übungen ohne profile_hint weiterhin normal anhand von Gewicht/Volumen bewerten (Rückfall
+     auf generische Bewertung, kein Blockieren der Analyse).
+
 OUTPUT-FORMAT:
 Ungefähr 300-500 Wörter. Struktur:
 - Gesamtentwicklung (kurze Zusammenfassung)
@@ -174,7 +210,11 @@ Deutsch, sachlich, konkret.`;
 - Analysierte Übungen: ${trainingAnalysis.total_exercises_analyzed}
 - Positive Entwicklungen: ${trainingAnalysis.progression_summary.positive}
 - Stabile Entwicklungen: ${trainingAnalysis.progression_summary.stable}
-- Negative Entwicklungen: ${trainingAnalysis.progression_summary.negative}
+- Negative Entwicklungen: ${trainingAnalysis.progression_summary.negative}${
+  trainingAnalysis.athlete_bodyweight_kg != null
+    ? `\n- Körpergewicht des Nutzers (diese Session): ${trainingAnalysis.athlete_bodyweight_kg}kg`
+    : ''
+}
 
 ## Top-Fortschritte
 ${topImprovements.length > 0
@@ -210,6 +250,39 @@ ${exercises
 - Gewicht: ${ex.changes.weight_change_kg > 0 ? '+' : ''}${ex.changes.weight_change_kg}kg
 - Wiederholungen: ${ex.changes.reps_change > 0 ? '+' : ''}${ex.changes.reps_change}
 - Volumen: ${ex.changes.volume_change_percent > 0 ? '+' : ''}${ex.changes.volume_change_percent}%`;
+    }
+
+    if (ex.profile_hint?.exerciseType) {
+      const p = ex.profile_hint;
+      const relevantMetrics = [
+        p.externalLoadRelevant ? 'Gewicht' : null,
+        p.trainingVolumeRelevant ? 'Volumen' : null,
+        p.higherRepsAreProgress ? 'Wiederholungen' : null
+      ].filter(Boolean);
+      exPrompt += `
+
+**Übungsprofil:** Typ "${p.exerciseType}"${p.targetRepRange?.min != null || p.targetRepRange?.max != null
+        ? `, Ziel-Wiederholungsbereich ${p.targetRepRange?.min ?? '?'}-${p.targetRepRange?.max ?? '?'}`
+        : ''}. Relevante Fortschrittsmetriken: ${relevantMetrics.length > 0 ? relevantMetrics.join(', ') : 'keine der üblichen (Gewicht/Volumen/Reps) - siehe Regel 8'}.`;
+    }
+
+    // Kap. 25: persistente Notiz (Rang 1/2) und Session-Notiz getrennt ausgeben, damit die AI
+    // sie gemäß Regel 6 unterschiedlich gewichtet, statt sie zu vermischen.
+    if (ex.note_context?.persistent) {
+      exPrompt += `
+
+**Persönliche Notiz${ex.note_context.persistent.confirmed ? ' (bestätigt)' : ' (nicht bestätigt)'}:** "${ex.note_context.persistent.text}"`;
+    }
+    if (ex.note_context?.session) {
+      exPrompt += `
+
+**Notiz zu dieser Session:** "${ex.note_context.session}"`;
+    } else if (ex.note && !ex.note_context?.persistent) {
+      // Rückfallebene für den Fall, dass note_context aus irgendeinem Grund fehlt, aber das
+      // ältere "note"-Feld gesetzt ist (Rückwärtskompatibilität).
+      exPrompt += `
+
+**Notiz des Nutzers zu dieser Übung:** "${ex.note}"`;
     }
 
     return exPrompt;

@@ -38,6 +38,7 @@ import {
   dedupeWorkoutsForStats
 } from '@/utils/workoutMerge'
 import { DETAIL_DRAFT_KEY } from '@/utils/workoutBuilderFlow'
+import { markOriginalCreatePending, clearOriginalCreatePending } from '@/utils/syncManager'
 
 const WORKOUT_STORE_LIMIT = Math.max(0, Number.parseInt(import.meta.env.VITE_WORKOUTS_IN_MEMORY_LIMIT || '', 10) || 0)
 
@@ -581,6 +582,14 @@ export const useUserStore = defineStore("user", {
           logger.warn('⏳ [userStore] createWorkout Timeout, speichere optimistisch lokal weiter')
           const optimistic = await this.createWorkoutOptimistic(enrichedWorkoutData)
 
+          // Verhindert, dass der periodische Auto-Sync (oder ein Sync-Trigger beim
+          // App-Resume) denselben offline_-Eintrag ein zweites Mal auf den Server schreibt,
+          // während apiPromise unten noch im Hintergrund läuft. Ohne diese Sperre kann ein
+          // Sync-Durchlauf zwischen jetzt und dem Abschluss von apiPromise (bis zu
+          // WORKOUTS_CREATE_TIMEOUT_MS) denselben Workout parallel anlegen -> Duplikat in den
+          // Stats. Wird unten in .then()/.catch() wieder freigegeben.
+          markOriginalCreatePending(optimistic._id)
+
           // Die ursprüngliche (schnellere) Anfrage lief unabhängig vom Timeout weiter - kommt
           // sie später doch noch mit Erfolg zurück, den optimistischen offline_-Eintrag durch
           // den echten Server-Datensatz ersetzen UND den zwischenzeitlich von
@@ -589,6 +598,7 @@ export const useUserStore = defineStore("user", {
           // (Duplikat), weil sie nichts von dieser bereits erfolgreichen Anfrage weiß.
           apiPromise
             .then((lateWorkout) => {
+              clearOriginalCreatePending(optimistic._id)
               if (!lateWorkout) return
               const shouldKeepAsDraft = workoutData?.completed !== true && lateWorkout.completed !== true
               const lateIdx = this.workouts.findIndex(w => String(w?._id || '') === String(optimistic._id))
@@ -617,8 +627,10 @@ export const useUserStore = defineStore("user", {
               })
             })
             .catch((lateError) => {
-              // Kein Sonderfall nötig: der optimistische Eintrag bleibt in der Sync-Queue und
-              // wird vom periodischen Auto-Sync später erneut versucht.
+              // Ursprüngliche Anfrage endgültig gescheitert: Sperre aufheben, damit der
+              // optimistische Eintrag (bleibt in der Sync-Queue) vom periodischen Auto-Sync
+              // ganz normal erneut versucht werden kann.
+              clearOriginalCreatePending(optimistic._id)
               logger.warn('⚠️ [userStore] createWorkout (verzögert) endgültig fehlgeschlagen, bleibt in Sync-Queue', lateError?.message)
             })
 

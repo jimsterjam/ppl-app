@@ -132,6 +132,57 @@ export default [
       }
     }
   },
+  // Top-level server .mjs scripts (not covered by server/**/*.js or server/scripts/**/*.mjs)
+  {
+    files: ['server/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: {
+        ...globals.node,
+        console: 'readonly',
+        process: 'readonly',
+        fetch: 'readonly',
+        URL: 'readonly',
+        URLSearchParams: 'readonly'
+      }
+    },
+    rules: {
+      'no-empty': ['warn', { allowEmptyCatch: true }]
+    }
+  },
+  // Root-level Node scripts
+  {
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: {
+        ...globals.node,
+        console: 'readonly',
+        process: 'readonly',
+        fetch: 'readonly',
+        URL: 'readonly',
+        URLSearchParams: 'readonly'
+      }
+    },
+    rules: {
+      'no-empty': ['warn', { allowEmptyCatch: true }]
+    }
+  },
+  // Vitest config (Node context, ESM)
+  {
+    files: ['client/vitest.config.js'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: {
+        ...globals.node,
+        console: 'readonly',
+        __dirname: 'readonly'
+      }
+    }
+  },
   // Turn off rules that conflict with Prettier formatting
   prettier
 ]
