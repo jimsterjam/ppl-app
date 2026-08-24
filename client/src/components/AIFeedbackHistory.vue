@@ -167,7 +167,7 @@ onMounted(() => load(1))
   text-align: center;
   gap: 0.5rem;
   padding: 1.5rem 0.5rem;
-  color: var(--text-secondary, #666);
+  color: var(--muted);
 }
 
 .empty-icon {
@@ -182,14 +182,14 @@ onMounted(() => load(1))
 
 .feedback-item {
   border-radius: 0.75rem;
-  background: var(--secondary-bg, rgba(0, 0, 0, 0.03));
+  background: var(--surface);
   padding: 0.85rem 1rem;
   cursor: pointer;
   transition: background-color 0.15s;
 }
 
 .feedback-item:active {
-  background: rgba(0, 0, 0, 0.06);
+  background: var(--surface-strong);
 }
 
 .feedback-summary {
@@ -216,12 +216,12 @@ onMounted(() => load(1))
 
 .feedback-date {
   font-size: 0.8rem;
-  color: var(--text-secondary, #666);
+  color: var(--muted);
 }
 
 .chevron {
   font-size: 1.4rem;
-  color: var(--text-secondary, #999);
+  color: var(--muted);
   transform: rotate(90deg);
   transition: transform 0.2s;
   flex-shrink: 0;
@@ -234,12 +234,16 @@ onMounted(() => load(1))
 .feedback-text {
   margin-top: 0.75rem;
   padding-top: 0.75rem;
-  border-top: 1px solid var(--border, rgba(0, 0, 0, 0.08));
+  border-top: 1px solid var(--line-soft);
   white-space: pre-wrap;
   word-break: break-word;
   font-size: 0.9rem;
   line-height: 1.6;
-  color: var(--text-primary, #000);
+  /* War fest auf var(--text-primary, #000) - diese Variable existiert im Design-System
+     nicht (style.css definiert --fg/--muted), fiel also immer auf schwarz zurück. Auf dem
+     im Dark Mode dunklen .glass-Panel-Hintergrund war der aufgeklappte Feedback-Text dadurch
+     schwarz auf dunkel - nicht lesbar. */
+  color: var(--fg);
 }
 
 .load-more-btn {
@@ -257,17 +261,8 @@ onMounted(() => load(1))
   opacity: 0.6;
 }
 
-@media (prefers-color-scheme: dark) {
-  .feedback-item {
-    background: rgba(255, 255, 255, 0.06);
-  }
-
-  .feedback-item:active {
-    background: rgba(255, 255, 255, 0.1);
-  }
-
-  .feedback-text {
-    border-top-color: rgba(255, 255, 255, 0.1);
-  }
-}
+/* Der vorherige @media (prefers-color-scheme: dark)-Block wurde entfernt: er reagierte auf
+   die OS-Einstellung statt auf das im Theme-Store gewählte App-Theme ([data-theme] am Root)
+   und deckte ohnehin nicht die eigentliche Ursache ab (siehe .feedback-text oben). Hintergründe
+   kommen jetzt direkt über var(--surface)/var(--surface-strong) theme-aware. */
 </style>

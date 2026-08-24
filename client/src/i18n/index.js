@@ -650,6 +650,12 @@ export const messages = {
       insufficientHistoryDaysMulti: 'noch {days} Tage)',
       networkUnavailable: 'Workout gespeichert. Die Analyse läuft aktuell nur im Heimnetzwerk (Testphase) — du findest sie später in den Stats, sobald du wieder verbunden bist.'
     },
+    feedbackHistory: {
+      title: 'KI-Feedback Verlauf',
+      empty: 'Noch kein KI-Feedback vorhanden. Schließe ein Workout ab, um dein erstes Feedback zu erhalten.',
+      error: 'Feedback-Verlauf konnte nicht geladen werden',
+      loadMore: 'Mehr laden'
+    },
     quickGenerator: {
       title: 'KI-Workout generieren',
       intro: 'Beantworte ein paar kurze Fragen, dann erstellen wir ein passendes Workout für dich.',
@@ -1396,6 +1402,12 @@ export const messages = {
       insufficientHistoryDaySingle: '1 more day)',
       insufficientHistoryDaysMulti: '{days} more days)',
       networkUnavailable: 'Workout saved. Analysis currently only works on the home network (test phase) — you\'ll find it later in Stats once you\'re reconnected.'
+    },
+    feedbackHistory: {
+      title: 'AI Feedback History',
+      empty: 'No AI feedback yet. Complete a workout to get your first feedback.',
+      error: 'Could not load feedback history',
+      loadMore: 'Load more'
     },
     quickGenerator: {
       title: 'Generate AI Workout',
