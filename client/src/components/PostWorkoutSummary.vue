@@ -333,9 +333,15 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 1rem;
 
-  background: rgba(255, 255, 255, 0.95);
+  /* Hintergrund/Rand kommen bewusst NICHT mehr von hier, sondern von der bereits
+     vorhandenen .glass-Klasse (var(--bg-panel)/var(--line-soft)) auf demselben Element -
+     die ist theme-aware (per [data-theme] am Root, siehe stores/themeStore.js). Vorher
+     stand hier ein hart codiertes, immer-weißes Glas + eine separate
+     @media (prefers-color-scheme: dark)-Regel, die auf die OS-Einstellung reagierte statt
+     auf das tatsächlich im Theme-Store gewählte App-Theme - dadurch war der Text im
+     Dark-Mode teils weiß auf weiß (nicht lesbar) bzw. teils grau auf sehr dunklem Grund
+     (schwacher Kontrast beim Laden). */
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
 .summary-header {
@@ -356,7 +362,7 @@ onBeforeUnmount(() => {
   border: none;
   font-size: 2rem;
   cursor: pointer;
-  color: var(--text-secondary, #666);
+  color: var(--muted);
   padding: 0;
   width: 2.5rem;
   height: 2.5rem;
@@ -399,7 +405,10 @@ onBeforeUnmount(() => {
 }
 
 .summary-content.loading p {
-  color: var(--text-secondary, #666);
+  /* var(--text-secondary) existiert im Design-System nicht (siehe style.css: --fg/--muted
+     statt --text-primary/--text-secondary) - war dadurch immer der Fallback #666, was auf
+     dem jetzt korrekt dunklen Panel im Dark Mode kaum lesbar war. */
+  color: var(--muted);
   margin: 0;
   text-align: center;
 }
@@ -429,7 +438,7 @@ onBeforeUnmount(() => {
 }
 
 .feedback-text {
-  color: var(--text-primary, #000);
+  color: var(--fg);
   line-height: 1.6;
   font-size: 0.95rem;
   white-space: pre-wrap;
@@ -481,28 +490,15 @@ onBeforeUnmount(() => {
 
 .summary-content.fallback p {
   margin: 0 0 1rem 0;
-  color: var(--text-secondary, #666);
+  color: var(--muted);
 }
 
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-  .post-workout-summary {
-    background: rgba(20, 20, 20, 0.95);
-    border-color: rgba(255, 255, 255, 0.1);
-  }
-
-  .summary-content.error {
-    background-color: rgba(255, 59, 48, 0.1);
-  }
-
-  .secondary {
-    background-color: rgba(255, 255, 255, 0.1);
-  }
-
-  .secondary:active {
-    background-color: rgba(255, 255, 255, 0.2);
-  }
-}
+/* Der vorherige @media (prefers-color-scheme: dark)-Block wurde entfernt: er reagierte auf
+   die OS-Einstellung des Geräts, nicht auf das im Theme-Store gewählte App-Theme
+   ([data-theme] am Root, siehe stores/themeStore.js). Dadurch konnte er sogar im Light-Mode
+   fälschlich zuschlagen (OS auf Dark, App auf Light) oder im Dark-Mode ausbleiben (OS auf
+   Light, App auf Dark) - beides Ursache der gemeldeten Lesbarkeitsprobleme. Hintergrund/Rand
+   kommen jetzt korrekt theme-aware von der .glass-Klasse, Textfarben von var(--fg)/var(--muted). */
 
 @media (max-height: 600px) {
   .post-workout-summary {
