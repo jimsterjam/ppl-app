@@ -96,12 +96,30 @@ function toggle(id) {
 
 // Nutzt den nativen Share-Sheet (@capacitor/share) statt eines eigenen E-Mail-Versands zu
 // bauen - der Nutzer kann darüber selbst "An Mail senden" o.ä. wählen. Auf Web fällt das
-// Plugin automatisch auf die Web-Share-API zurück (falls vom Browser unterstützt).
+// Plugin auf die Web-Share-API zurück, die aber (a) einen sicheren Kontext (HTTPS) UND
+// (b) Browser-Unterstützung braucht - in vielen Desktop-Browsern (z.B. beim lokalen Testen
+// über `npm run dev`) fehlt navigator.share komplett, dann wirft Share.share() sofort.
+// Deshalb vorher mit canShare() prüfen und in dem Fall in die Zwischenablage kopieren statt
+// nur einen "geht nicht"-Fehler zu zeigen.
 async function shareFeedback(item) {
   const dateLabel = formatDate(item?.ai_generated_at || item?.date)
   const text = [item?.name || 'Workout', dateLabel, '', item?.ai_feedback || '']
     .filter(Boolean)
     .join('\n')
+
+  let canShare = false
+  try {
+    canShare = Boolean((await Share.canShare())?.value)
+  } catch (err) {
+    // canShare() selbst sollte eigentlich nicht werfen, aber sicherheitshalber wie
+    // "nicht verfügbar" behandeln statt die Funktion abzubrechen.
+    logger.debug('[AIFeedbackHistory] Share.canShare check failed', err?.message)
+  }
+
+  if (!canShare) {
+    await copyFeedbackToClipboard(text)
+    return
+  }
 
   try {
     await Share.share({
@@ -114,6 +132,20 @@ async function shareFeedback(item) {
     const message = String(err?.message || '')
     if (/cancel/i.test(message)) return
     logger.warn('[AIFeedbackHistory] shareFeedback failed', message)
+    // Fallback statt hartem Fehler: wenn der native Share-Sheet aus irgendeinem Grund doch
+    // scheitert (z.B. Plugin auf iOS noch nicht per `pod install` eingebunden), versuchen
+    // wir trotzdem noch die Zwischenablage, bevor wir wirklich aufgeben.
+    await copyFeedbackToClipboard(text)
+  }
+}
+
+async function copyFeedbackToClipboard(text) {
+  try {
+    if (!navigator?.clipboard?.writeText) throw new Error('clipboard-unavailable')
+    await navigator.clipboard.writeText(text)
+    toast.success(t('feedbackHistory.copiedToClipboard') || 'In die Zwischenablage kopiert')
+  } catch (err) {
+    logger.warn('[AIFeedbackHistory] clipboard fallback failed', err?.message)
     toast.error(t('feedbackHistory.shareError') || 'Teilen ist gerade nicht möglich')
   }
 }

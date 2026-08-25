@@ -657,7 +657,8 @@ export const messages = {
       loadMore: 'Mehr laden',
       share: 'Teilen',
       shareTitle: 'KI-Feedback teilen',
-      shareError: 'Teilen ist gerade nicht möglich'
+      shareError: 'Teilen ist gerade nicht möglich',
+      copiedToClipboard: 'In die Zwischenablage kopiert'
     },
     quickGenerator: {
       title: 'KI-Workout generieren',
@@ -1413,7 +1414,8 @@ export const messages = {
       loadMore: 'Load more',
       share: 'Share',
       shareTitle: 'Share AI feedback',
-      shareError: 'Sharing is not available right now'
+      shareError: 'Sharing is not available right now',
+      copiedToClipboard: 'Copied to clipboard'
     },
     quickGenerator: {
       title: 'Generate AI Workout',
