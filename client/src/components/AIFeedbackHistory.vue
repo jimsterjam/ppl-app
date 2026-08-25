@@ -60,9 +60,14 @@ import { useI18n } from 'vue-i18n'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { fetchWorkoutFeedbacks } from '@/api/workouts'
 import { logger } from '@/utils/logger'
+import { getMetadata, setMetadata } from '@/utils/offlineStorage'
 
 const { t, locale } = useI18n()
-const { getIdToken } = useFirebaseAuth()
+const { getIdToken, getCurrentUser } = useFirebaseAuth()
+
+// Initial nur die letzten 5 Analysen laden - abgeschlossene Analysen ändern sich nie wieder,
+// ältere holt sich der Nutzer bei Bedarf explizit über "Mehr laden" (loadMore()).
+const FEEDBACK_PAGE_SIZE = 5
 
 const items = ref([])
 const loading = ref(false)
@@ -83,21 +88,72 @@ function formatDate(dateStr) {
   return date.toLocaleDateString(loc, { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
-async function load(targetPage = 1) {
-  loading.value = true
-  error.value = null
+// Cache-Key pro Nutzer (nicht global), damit auf einem geteilten Gerät nach Account-Wechsel
+// nicht versehentlich der Feedback-Verlauf des vorherigen Nutzers aufblitzt. Wird zusätzlich
+// beim Logout ohnehin über clearAllOfflineData() komplett geleert (firebaseAuth.js).
+function getCacheKey() {
+  const uid = getCurrentUser?.()?.uid
+  return uid ? `ai_feedback_history_cache_${uid}` : null
+}
+
+// Lädt die zuletzt angezeigten (letzten 5) Analysen aus dem IndexedDB-Cache
+// (utils/offlineStorage.js), damit fertige Analysen beim App-Start SOFORT sichtbar sind,
+// statt bei jedem Start erneut hinter einem Spinner zu verschwinden.
+async function loadFromCache() {
+  const cacheKey = getCacheKey()
+  if (!cacheKey) return false
+  try {
+    const cached = await getMetadata(cacheKey)
+    if (!cached || !Array.isArray(cached.items) || cached.items.length === 0) return false
+    items.value = cached.items
+    hasMore.value = Boolean(cached.hasMore)
+    page.value = 1
+    return true
+  } catch (err) {
+    logger.warn('[AIFeedbackHistory] loadFromCache failed', err?.message)
+    return false
+  }
+}
+
+async function cacheFirstPage(newItems, hasMoreValue) {
+  const cacheKey = getCacheKey()
+  if (!cacheKey) return
+  try {
+    await setMetadata(cacheKey, { items: newItems, hasMore: hasMoreValue, cachedAt: Date.now() })
+  } catch (err) {
+    logger.warn('[AIFeedbackHistory] cacheFirstPage failed', err?.message)
+  }
+}
+
+// silent: true unterdrückt Spinner/Fehleranzeige, wenn bereits Cache-Daten sichtbar sind -
+// ein Hintergrund-Refresh soll nicht mit dem, was der Nutzer schon sieht, "flackern".
+async function load(targetPage = 1, { silent = false } = {}) {
+  if (!silent) {
+    loading.value = true
+    error.value = null
+  }
   try {
     const token = await getIdToken().catch(() => null)
-    const res = await fetchWorkoutFeedbacks(token, { page: targetPage, limit: 20 })
+    const res = await fetchWorkoutFeedbacks(token, { page: targetPage, limit: FEEDBACK_PAGE_SIZE })
     const newItems = Array.isArray(res?.items) ? res.items : []
     items.value = targetPage === 1 ? newItems : [...items.value, ...newItems]
     hasMore.value = Boolean(res?.hasMore)
     page.value = targetPage
+    if (targetPage === 1) {
+      cacheFirstPage(newItems, hasMore.value)
+    }
   } catch (err) {
     logger.error('[AIFeedbackHistory] load failed', err?.message)
-    error.value = t('feedbackHistory.error') || 'Feedback-Verlauf konnte nicht geladen werden'
+    // Im Hintergrund-Refresh (silent) bleibt der bereits sichtbare Cache-Stand einfach stehen,
+    // statt ihn durch eine Fehlermeldung zu ersetzen - der Nutzer hat ja etwas Nützliches vor
+    // sich, auch wenn der aktuelle Netzwerk-Versuch fehlschlägt.
+    if (!silent) {
+      error.value = t('feedbackHistory.error') || 'Feedback-Verlauf konnte nicht geladen werden'
+    }
   } finally {
-    loading.value = false
+    if (!silent) {
+      loading.value = false
+    }
   }
 }
 
@@ -106,7 +162,12 @@ function loadMore() {
   load(page.value + 1)
 }
 
-onMounted(() => load(1))
+onMounted(async () => {
+  const hadCache = await loadFromCache()
+  // Auch mit Cache immer im Hintergrund frisch nachladen (z.B. neue Analyse seit letztem
+  // App-Start) - nur eben ohne Spinner/Fehlermeldung, wenn schon etwas zu sehen ist.
+  load(1, { silent: hadCache })
+})
 </script>
 
 <style scoped>
