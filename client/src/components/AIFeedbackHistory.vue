@@ -38,6 +38,16 @@
 
         <div v-if="expandedId === item.workoutId" class="feedback-text">
           {{ item.ai_feedback }}
+
+          <button
+            class="share-btn"
+            type="button"
+            :aria-label="t('feedbackHistory.share') || 'Analyse teilen'"
+            @click.stop="shareFeedback(item)"
+          >
+            <Share2 class="share-icon" aria-hidden="true" />
+            <span>{{ t('feedbackHistory.share') || 'Teilen' }}</span>
+          </button>
         </div>
       </div>
 
@@ -57,13 +67,17 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { Share2 } from 'lucide-vue-next'
+import { Share } from '@capacitor/share'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { fetchWorkoutFeedbacks } from '@/api/workouts'
 import { logger } from '@/utils/logger'
 import { getMetadata, setMetadata } from '@/utils/offlineStorage'
+import { useToastStore } from '@/stores/toastStore'
 
 const { t, locale } = useI18n()
 const { getIdToken, getCurrentUser } = useFirebaseAuth()
+const toast = useToastStore()
 
 // Initial nur die letzten 5 Analysen laden - abgeschlossene Analysen ändern sich nie wieder,
 // ältere holt sich der Nutzer bei Bedarf explizit über "Mehr laden" (loadMore()).
@@ -78,6 +92,30 @@ const expandedId = ref(null)
 
 function toggle(id) {
   expandedId.value = expandedId.value === id ? null : id
+}
+
+// Nutzt den nativen Share-Sheet (@capacitor/share) statt eines eigenen E-Mail-Versands zu
+// bauen - der Nutzer kann darüber selbst "An Mail senden" o.ä. wählen. Auf Web fällt das
+// Plugin automatisch auf die Web-Share-API zurück (falls vom Browser unterstützt).
+async function shareFeedback(item) {
+  const dateLabel = formatDate(item?.ai_generated_at || item?.date)
+  const text = [item?.name || 'Workout', dateLabel, '', item?.ai_feedback || '']
+    .filter(Boolean)
+    .join('\n')
+
+  try {
+    await Share.share({
+      title: t('feedbackHistory.shareTitle') || 'KI-Feedback',
+      text,
+      dialogTitle: t('feedbackHistory.shareTitle') || 'KI-Feedback teilen'
+    })
+  } catch (err) {
+    // Nutzer hat den Share-Sheet einfach abgebrochen - das ist kein Fehler, kein Toast.
+    const message = String(err?.message || '')
+    if (/cancel/i.test(message)) return
+    logger.warn('[AIFeedbackHistory] shareFeedback failed', message)
+    toast.error(t('feedbackHistory.shareError') || 'Teilen ist gerade nicht möglich')
+  }
 }
 
 function formatDate(dateStr) {
@@ -307,13 +345,40 @@ onMounted(async () => {
   color: var(--fg);
 }
 
+.share-btn {
+  margin-top: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line-strong));
+  background: var(--accent-soft);
+  color: var(--fg);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.share-btn:active {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.share-icon {
+  width: 16px;
+  height: 16px;
+  stroke: var(--fg);
+  stroke-width: 1.8;
+  fill: none;
+}
+
 .load-more-btn {
   margin-top: 0.25rem;
   padding: 0.65rem;
   border-radius: 0.5rem;
-  border: 1px solid var(--border, #ddd);
+  border: 1px solid var(--line-soft);
   background: transparent;
-  color: var(--primary, #007AFF);
+  color: var(--fg);
   font-weight: 500;
   cursor: pointer;
 }

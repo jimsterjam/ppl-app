@@ -654,7 +654,10 @@ export const messages = {
       title: 'KI-Feedback Verlauf',
       empty: 'Noch kein KI-Feedback vorhanden. Schließe ein Workout ab, um dein erstes Feedback zu erhalten.',
       error: 'Feedback-Verlauf konnte nicht geladen werden',
-      loadMore: 'Mehr laden'
+      loadMore: 'Mehr laden',
+      share: 'Teilen',
+      shareTitle: 'KI-Feedback teilen',
+      shareError: 'Teilen ist gerade nicht möglich'
     },
     quickGenerator: {
       title: 'KI-Workout generieren',
@@ -1407,7 +1410,10 @@ export const messages = {
       title: 'AI Feedback History',
       empty: 'No AI feedback yet. Complete a workout to get your first feedback.',
       error: 'Could not load feedback history',
-      loadMore: 'Load more'
+      loadMore: 'Load more',
+      share: 'Share',
+      shareTitle: 'Share AI feedback',
+      shareError: 'Sharing is not available right now'
     },
     quickGenerator: {
       title: 'Generate AI Workout',
