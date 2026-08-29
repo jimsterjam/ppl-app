@@ -229,11 +229,17 @@ export async function quickGenerateWorkout(context, token = null) {
 }
 
 // Liste aller Workouts mit gespeichertem AI-Feedback (chronologisch, neueste zuerst)
-export async function fetchWorkoutFeedbacks(token = null, { page = 1, limit = 20 } = {}) {
+// timeoutMs: optionaler, kürzerer Timeout als der globale WORKOUTS_TIMEOUT_MS (25s) -
+// diese Liste wird i.d.R. im Hintergrund nachgeladen (siehe AIFeedbackHistory.vue
+// cache-first), es lohnt sich also nicht, bei einem kalt startenden Server (Render Free-Tier
+// Cold-Start) die vollen 25s + LAN-Fallback-Versuch abzuwarten, bevor der Nutzer eine
+// Fehler-/Retry-Möglichkeit sieht.
+export async function fetchWorkoutFeedbacks(token = null, { page = 1, limit = 20, timeoutMs } = {}) {
   try {
     const config = {
       ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
-      params: { page, limit }
+      params: { page, limit },
+      ...(Number.isFinite(timeoutMs) && timeoutMs > 0 ? { timeout: timeoutMs } : {})
     }
     const res = await api.get('/feedbacks', config)
     return res.data

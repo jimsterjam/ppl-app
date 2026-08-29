@@ -74,6 +74,7 @@ import { fetchWorkoutFeedbacks } from '@/api/workouts'
 import { logger } from '@/utils/logger'
 import { getMetadata, setMetadata } from '@/utils/offlineStorage'
 import { useToastStore } from '@/stores/toastStore'
+import { logDiagnostic } from '@/utils/diagnosticsLog'
 
 const { t, locale } = useI18n()
 const { getIdToken, getCurrentUser } = useFirebaseAuth()
@@ -82,6 +83,12 @@ const toast = useToastStore()
 // Initial nur die letzten 5 Analysen laden - abgeschlossene Analysen ändern sich nie wieder,
 // ältere holt sich der Nutzer bei Bedarf explizit über "Mehr laden" (loadMore()).
 const FEEDBACK_PAGE_SIZE = 5
+
+// Kürzerer Timeout als der globale 25s-Default (siehe api/workouts.js) - diese Liste läuft
+// hier meist als Hintergrund-Refresh hinter bereits sichtbaren Cache-Daten, es lohnt sich
+// nicht, bei einem kalt startenden Server minutenlang zu warten, bevor der Nutzer eine
+// Fehler-/Retry-Möglichkeit sieht.
+const FEEDBACK_TIMEOUT_MS = 12000
 
 const items = ref([])
 const loading = ref(false)
@@ -202,9 +209,14 @@ async function load(targetPage = 1, { silent = false } = {}) {
     loading.value = true
     error.value = null
   }
+  const startedAt = Date.now()
   try {
     const token = await getIdToken().catch(() => null)
-    const res = await fetchWorkoutFeedbacks(token, { page: targetPage, limit: FEEDBACK_PAGE_SIZE })
+    const res = await fetchWorkoutFeedbacks(token, {
+      page: targetPage,
+      limit: FEEDBACK_PAGE_SIZE,
+      timeoutMs: FEEDBACK_TIMEOUT_MS
+    })
     const newItems = Array.isArray(res?.items) ? res.items : []
     items.value = targetPage === 1 ? newItems : [...items.value, ...newItems]
     hasMore.value = Boolean(res?.hasMore)
@@ -212,8 +224,14 @@ async function load(targetPage = 1, { silent = false } = {}) {
     if (targetPage === 1) {
       cacheFirstPage(newItems, hasMore.value)
     }
+    logDiagnostic('feedback-history-load', {
+      page: targetPage, silent, ms: Date.now() - startedAt, count: newItems.length
+    })
   } catch (err) {
     logger.error('[AIFeedbackHistory] load failed', err?.message)
+    logDiagnostic('feedback-history-load-failed', {
+      page: targetPage, silent, ms: Date.now() - startedAt, error: err?.message || String(err)
+    })
     // Im Hintergrund-Refresh (silent) bleibt der bereits sichtbare Cache-Stand einfach stehen,
     // statt ihn durch eine Fehlermeldung zu ersetzen - der Nutzer hat ja etwas Nützliches vor
     // sich, auch wenn der aktuelle Netzwerk-Versuch fehlschlägt.
@@ -232,11 +250,24 @@ function loadMore() {
   load(page.value + 1)
 }
 
-onMounted(async () => {
-  const hadCache = await loadFromCache()
-  // Auch mit Cache immer im Hintergrund frisch nachladen (z.B. neue Analyse seit letztem
-  // App-Start) - nur eben ohne Spinner/Fehlermeldung, wenn schon etwas zu sehen ist.
-  load(1, { silent: hadCache })
+onMounted(() => {
+  // Cache-Lesen (schnelles IndexedDB) und Netzwerk-Refresh bewusst NICHT nacheinander
+  // (await ... dann erst starten), sondern parallel anstoßen - der Netzwerk-Request ist der
+  // eigentlich langsame Teil (v.a. bei einem kalt startenden Server), da soll nicht noch
+  // zusätzlich auf den (i.d.R. sehr schnellen) Cache-Read gewartet werden, bevor er überhaupt
+  // losgeht. loadFromCache() setzt items/hasMore direkt bei einem Treffer; egal ob das VOR
+  // oder NACH dem Start des Netzwerk-Requests passiert, das silent-Flag unten entscheidet nur
+  // darüber, ob load() einen Spinner zeigt.
+  const cachePromise = loadFromCache()
+  loading.value = true
+  cachePromise.then((hadCache) => {
+    logDiagnostic('feedback-history-cache', { hit: hadCache })
+    // Sobald der Cache-Status feststeht: bei Treffer sofort den Spinner wegnehmen (Cache-Daten
+    // sind ja schon in items) und den Netzwerk-Request nur noch still im Hintergrund laufen
+    // lassen; ohne Treffer bleibt der Spinner bis der Netzwerk-Request selbst fertig ist.
+    if (hadCache) loading.value = false
+    load(1, { silent: hadCache })
+  })
 })
 </script>
 
