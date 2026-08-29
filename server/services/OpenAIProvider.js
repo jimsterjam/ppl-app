@@ -182,6 +182,40 @@ KRITISCHE REGELN:
    - Übungen ohne profile_hint weiterhin normal anhand von Gewicht/Volumen bewerten (Rückfall
      auf generische Bewertung, kein Blockieren der Analyse).
 
+9. Übungen, deren Notiz auf Technikfokus hinweist (auch wenn kein profile_hint mit
+   exerciseType "technique" vorliegt - reicht ein Hinweis wie "Technik", "Form",
+   "Bewegungsqualität" in der Notiz selbst):
+   - Aus der Progressions-Analyse ausschließen. Kein Fortschritts-/Rückgangs-Urteil, keine
+     Prozent-/Gewichtsbewertung für diese Übung.
+   - Maximal EIN neutraler Satz dazu, ohne Empfehlung (z.B. "Bankdrücken war diese Session
+     technikfokussiert" reicht, keine weiteren Ausführungen).
+
+10. Speed-basierte Übungen (Speed Squats, Speed Deadlift und vergleichbare, erkennbar an
+    Name oder Notiz):
+    - Primäre Metrik ist Ausführungsqualität/Geschwindigkeit, NICHT Volumen oder
+      Wiederholungszahl.
+    - Weniger Wiederholungen bei gleichzeitig mehr Gewicht ist neutral oder positiv zu
+      werten, NIEMALS als negative Progression (weniger Volumen bedeutet hier gerade nicht
+      weniger Leistung).
+
+11. Keine Empfehlung ohne konkreten Handlungsbedarf:
+    - Nicht jede Übung oder jeder Abschnitt braucht eine Empfehlung. Gibt es nichts
+      Konkretes, das der Nutzer ändern sollte, dann keine Empfehlung erfinden, sondern
+      weglassen.
+    - Eine Empfehlung nur aussprechen, wenn sie sich direkt aus einer Zahl oder einem
+      Datenpunkt ableiten lässt (siehe Regel 5) - keine generischen Trainingstipps
+      "zur Sicherheit".
+
+12. Wenn eine Notiz zu einer Übung vorliegt: die Analyse dieser Übung TATSÄCHLICH danach
+    ausrichten, nicht nur erwähnen und trotzdem die Standardbewertung durchziehen. Die
+    Notiz verändert, wie die Zahlen dieser Übung interpretiert werden (siehe Regel 6) -
+    sie ist kein bloßer Zusatzhinweis am Rand.
+
+13. Positive Entwicklungen nicht kleinreden: ein Volumenzuwachs von z.B. +3-5% ist ein
+    echter, positiver Fortschritt und wird auch so benannt - nicht als "moderat",
+    "leicht" oder implizit verbesserungswürdig dargestellt, wenn die Zahlen eindeutig
+    positiv sind.
+
 OUTPUT-FORMAT:
 Ungefähr 300-500 Wörter. Struktur:
 - Gesamtentwicklung (kurze Zusammenfassung)
