@@ -680,44 +680,55 @@ import {
   normalizeWorkoutType
 } from '@/utils/workoutFavorites'
 import { clearActiveDraft, getActiveDraft, setActiveDraft, updateActiveDraft, findActiveDraftByWorkoutId } from '@/utils/activeWorkoutDraft'
+import {
+  clearAllDetailDraftSnapshots as clearAllDetailDraftSnapshotsUtil,
+  clearAllWorkoutMapKeys as clearAllWorkoutMapKeysUtil,
+  getViewStateWorkoutId as getViewStateWorkoutIdUtil,
+  readDetailViewState as readDetailViewStateUtil,
+  writeDetailViewState as writeDetailViewStateUtil
+} from '@/utils/workoutDetailPersistState'
+import {
+  getExercisesMissingNotes,
+  normalizeWorkoutForSave
+} from '@/utils/workoutDetailSaveFlow'
+import {
+  shouldKeepAsDraft as shouldKeepAsDraftUtil,
+  clearActiveDraftForCurrentUser as clearActiveDraftForCurrentUserUtil,
+  saveActiveDraftDirect as saveActiveDraftDirectUtil,
+  persistActiveDraftFromLifecycle as persistActiveDraftFromLifecycleUtil
+} from '@/utils/workoutDetailLifecycle'
+import { discardDraftAndLeaveFlow } from '@/utils/workoutDetailDiscardFlow'
+import {
+  goDashboard as goDashboardFlow,
+  confirmLeave as confirmLeaveFlow,
+  applyPendingTimerAction as applyPendingTimerActionFlow,
+  onTimerDecision as onTimerDecisionFlow
+} from '@/utils/workoutDetailNavigationFlow'
+import {
+  sleep as sleepUtil,
+  resolveActiveWorkoutUserId as resolveActiveWorkoutUserIdUtil,
+  parseUidFromToken as parseUidFromTokenUtil,
+  resolveActiveWorkoutUserIdForSave as resolveActiveWorkoutUserIdForSaveUtil,
+  isFavoriteSourceRoute as isFavoriteSourceRouteUtil,
+  getFavoriteSourceMeta as getFavoriteSourceMetaUtil,
+  getLastSetFromExercise as getLastSetFromExerciseUtil,
+  waitForRealIdFromDraftId as waitForRealIdFromDraftIdUtil
+} from '@/utils/workoutDetailIdentityHelpers'
 import { acquireKeepAwake, releaseKeepAwake } from '@/utils/keepAwakeGuard'
 
 const userStore = useUserStore()
 const authStore = useAuthStore()
-function clearAllDetailDraftSnapshots() {
-  try {
-    const keys = Object.keys(sessionStorage)
-    keys.forEach((key) => {
-      if (key === 'workout_detail_draft' || key.startsWith('workout_detail_draft_')) {
-        sessionStorage.removeItem(key)
-      }
-    })
-  } catch {}
-}
 
 function handleSessionTime({ totalMs, formattedTime }) {
   console.log('Session-Zeit:', formattedTime, totalMs)
   // später: Wert an SaveWorkoutService übergeben
 }
 
-function clearAllWorkoutMapKeys() {
-  try {
-    const keys = Object.keys(sessionStorage)
-    keys.forEach((key) => {
-      if (key.startsWith('workout_map_')) {
-        sessionStorage.removeItem(key)
-      }
-    })
-  } catch {}
-}
-
-
-
 async function postSaveCleanup() {
   clearActiveDraftForCurrentUser('post-save')
   try { await db.workouts.delete('draft') } catch {}
-  clearAllDetailDraftSnapshots()
-  clearAllWorkoutMapKeys()
+  clearAllDetailDraftSnapshotsUtil()
+  clearAllWorkoutMapKeysUtil()
   // IndexedDB-Mappings bereinigen (workout_map_<tempId> → realId)
   try {
     const routeId = String(route.params.id || '')
@@ -763,7 +774,6 @@ const error = ref('')
 const saving = ref(false)
 const saveMsg = ref('')
 const saveError = ref(false)
-const WORKOUT_DETAIL_VIEW_STATE_KEY = 'workout_detail_view_state_v1'
 const lastFieldAnchor = ref(null)
 let viewStatePersistTimer = null
 const favoriteName = ref('')
@@ -839,15 +849,7 @@ const {
 } = useWorkoutExerciseOrdering(workout)
 
 function shouldKeepAsDraft(workoutLike) {
-  if (!workoutLike) return false
-  const routeId = String(route.params.id || '')
-  if (routeId === 'draft' || routeId.startsWith('draft-')) return true
-  if (String(route.query?.created || '') === '1') return true
-  // Favoriten-Start: Workout gilt immer als Draft-in-Progress bis der User explizit speichert.
-  // Der Resume-Snapshot enthält favoriteStart=1 (BuilderFlow setzt es immer mit),
-  // daher greift das auch nach App-Kill + Route-Restore ohne created=1.
-  if (isFavoriteSourceRoute() && workoutLike.completed !== true) return true
-  return workoutLike._isDraft === true || workoutLike.isDraft === true
+  return shouldKeepAsDraftUtil({ route, workoutLike, isFavoriteSourceRoute })
 }
 
 function resolveRealIdFromDraftId(id) {
@@ -855,104 +857,59 @@ function resolveRealIdFromDraftId(id) {
 }
 
 function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
+  return sleepUtil(ms)
 }
 
 async function waitForRealIdFromDraftId(id) {
-  const idStr = String(id || '')
-  if (!idStr.startsWith('draft-') && !idStr.startsWith('offline_')) return ''
-  const realId = await resolveRealIdFromDraftId(id)
+  const realId = await waitForRealIdFromDraftIdUtil({
+    id,
+    resolveRealIdFromDraftId,
+    route
+  })
   if (realId) {
     logger.debug('[WorkoutDetail] realId gefunden', { draftId: id, realId })
   }
   return realId || ''
 }
 
-// function resolveActiveWorkoutUserId() {
-//   return String(
-//     workout.value?.userId
-//     || getCurrentUser?.()?.uid
-//     || store.user?.uid
-//     || store.user?.id
-//     || ''
-//   ).trim()
-// }
-
 function resolveActiveWorkoutUserId() {
-  const result = String(
-    workout.value?.userId
-    || getCurrentUser?.()?.uid
-    || store.user?.uid
-    || store.user?.id
-    || ''
-  ).trim()
-  console.log('[DEBUG-UID] workout.value?.userId:', workout.value?.userId, 'getCurrentUser?.()?.uid:', getCurrentUser?.()?.uid, 'result:', result)
-  return result
+  return resolveActiveWorkoutUserIdUtil({
+    workout: workout.value,
+    getCurrentUser,
+    store,
+    authStore
+  })
 }
 
 function clearActiveDraftForCurrentUser(reason = 'unknown') {
   const uid = resolveActiveWorkoutUserId()
-  if (!uid) return false
-  const cleared = clearActiveDraft(uid)
-  if (cleared) {
-    logger.debug('[WorkoutDetail] active draft cleared', { reason, uid })
-  }
-  return cleared
+  return clearActiveDraftForCurrentUserUtil({ uid, reason, loggerInstance: logger })
 }
 
 function parseUidFromToken(token = null) {
-  const raw = String(token || '').trim()
-  if (!raw) return ''
-  const parts = raw.split('.')
-  if (parts.length < 2) return ''
-  try {
-    const payload = parts[1].replace(/-/g, '+').replace(/_/g, '/')
-    const decoded = atob(payload.padEnd(payload.length + (4 - payload.length % 4) % 4, '='))
-    const json = JSON.parse(decoded)
-    return String(json?.user_id || json?.uid || json?.sub || '').trim()
-  } catch {
-    return ''
-  }
+  return parseUidFromTokenUtil(token)
 }
 
 async function resolveActiveWorkoutUserIdForSave() {
-  const localUid = resolveActiveWorkoutUserId()
-  if (localUid) return localUid
-  const token = await getIdToken().catch(() => null)
-  return parseUidFromToken(token)
+  return resolveActiveWorkoutUserIdForSaveUtil({
+    workout: workout.value,
+    getCurrentUser,
+    store,
+    authStore,
+    getIdToken
+  })
 }
 
 function isFavoriteSourceRoute() {
-  return String(route.query?.favoriteSource || '') === '1' || String(route.query?.favoriteStart || '') === '1'
+  return isFavoriteSourceRouteUtil(route)
 }
 
 function getFavoriteSourceMeta() {
-  const favoriteId = String(route.query?.favoriteId || '').trim()
-  if (!favoriteId) return null
-  return {
-    favoriteId,
-    favoriteName: String(route.query?.favoriteName || '').trim(),
-    favoriteType: normalizeWorkoutType(route.query?.favoriteType || workout.value?.type || route.query?.type || 'push')
-  }
+  return getFavoriteSourceMetaUtil({ route, workout: workout.value, normalizeWorkoutType })
 }
 
 function getLastSetFromExercise(exercise = {}) {
-  const sets = Array.isArray(exercise?.setDetails) ? exercise.setDetails : []
-  if (sets.length) {
-    const last = sets[sets.length - 1] || {}
-    return {
-      reps: Number(last?.reps) || 0,
-      weight: Number(last?.weight) || 0,
-      sets: sets.length,
-      setDetails: sets.map((set) => ({ reps: Number(set?.reps) || 0, weight: Number(set?.weight) || 0, ...(set?.isWarmup ? { isWarmup: true } : {}) }))
-    }
-  }
-  return {
-    reps: Number(exercise?.reps) || 0,
-    weight: Number(exercise?.weight) || 0,
-    sets: Math.max(1, Number(exercise?.sets) || 1),
-    setDetails: [{ reps: Number(exercise?.reps) || 0, weight: Number(exercise?.weight) || 0 }]
-  }
+  return getLastSetFromExerciseUtil(exercise)
 }
 
 function buildExerciseMatchKey(exercise = {}) {
@@ -1260,44 +1217,22 @@ async function runAutoSaveNow() {
 }
 
 function getViewStateWorkoutId() {
-  const routeId = String(route.params.id || '').trim()
-  const workoutId = String(workout.value?._id || '').trim()
-  return workoutId || routeId
+  return getViewStateWorkoutIdUtil({ route, workout: workout.value })
 }
 
 function readDetailViewState() {
-  try {
-    const raw = localStorage.getItem(WORKOUT_DETAIL_VIEW_STATE_KEY)
-    if (!raw) return null
-    const parsed = JSON.parse(raw)
-    if (!parsed || typeof parsed !== 'object') return null
-    return parsed
-  } catch {
-    return null
-  }
+  return readDetailViewStateUtil()
 }
 
 function writeDetailViewState(reason = 'unknown') {
-  try {
-    const workoutId = getViewStateWorkoutId()
-    if (!workoutId) return
-    const scrollY = typeof window !== 'undefined' ? Math.max(0, Math.round(window.scrollY || 0)) : 0
-    const anchor = lastFieldAnchor.value && typeof lastFieldAnchor.value === 'object'
-      ? {
-          exIndex: Number(lastFieldAnchor.value.exIndex) || 0,
-          setIndex: Number(lastFieldAnchor.value.setIndex) || 0,
-          field: String(lastFieldAnchor.value.field || '')
-        }
-      : null
-
-    localStorage.setItem(WORKOUT_DETAIL_VIEW_STATE_KEY, JSON.stringify({
-      workoutId,
-      scrollY,
-      anchor,
-      reason,
-      timestamp: Date.now()
-    }))
-  } catch {}
+  const anchor = lastFieldAnchor.value
+  return writeDetailViewStateUtil({
+    route,
+    workout: workout.value,
+    lastFieldAnchor: anchor,
+    storage: localStorage,
+    reason
+  })
 }
 
 function scheduleViewStatePersist(reason = 'unknown') {
@@ -1380,18 +1315,8 @@ function deleteNote(idx) {
 // Liefert die Namen aller Übungen, zu denen mindestens ein Satz geloggt wurde, aber deren
 // Notiz leer/nur Whitespace ist. Grundlage für das Bestätigungsmodal vor dem finalen
 // Speichern (showMissingNotesModal) - siehe saveWorkout().
-function getExercisesMissingNotes() {
-  const exercisesList = Array.isArray(workout.value?.exercises) ? workout.value.exercises : []
-  const missing = []
-  exercisesList.forEach((ex, idx) => {
-    const hasLoggedSets = Array.isArray(ex?.setDetails) && ex.setDetails.length > 0
-    if (!hasLoggedSets) return
-    const note = getNote(idx)
-    if (!String(note || '').trim()) {
-      missing.push(ex?.name || `Übung ${idx + 1}`)
-    }
-  })
-  return missing
+function getExercisesMissingNotesForCurrentWorkout() {
+  return getExercisesMissingNotes(workout.value?.exercises || [], getNote)
 }
 
 function formatDate(dateStr) {
@@ -1856,147 +1781,66 @@ function shouldAutoScroll() {
 }
 
 async function discardDraftAndLeave() {
-  // Suppress MUSS ganz oben stehen, BEVOR router.push und onBeforeRouteLeave feuert!
-  // Sonst ruft onBeforeRouteLeave persistInProgressDraft() auf und speichert das Workout
-  // als Draft, obwohl der Benutzer "Abbrechen" geklickt hat (BUG: Cancel speichert statt zu canceln)
-  suppressDraftPersistence.value = true
-
-  // Sicherheitsnetz: Falls die Navigation aus irgendeinem Grund nicht durchläuft
-  // (z.B. Router-Guard bricht ab, Promise wird nie aufgelöst), Suppress nach
-  // kurzer Zeit automatisch zurücksetzen, statt die App für den Rest der
-  // Session lautlos vom Speichern zu blockieren.
-  const safetyResetTimer = setTimeout(() => {
-    suppressDraftPersistence.value = false
-    logDiagnostic('suppress-safety-reset', { reason: 'discardDraftAndLeave-timeout' })
-  }, 3000)
-
-  clearActiveDraftForCurrentUser('discard-draft-leave')
-  clearAllDetailDraftSnapshots()
-  clearAllWorkoutMapKeys()
   const routeId = String(route.params.id || '')
-  if (routeId.startsWith('draft-') || routeId.startsWith('offline_')) {
-    await purgePendingCreateQueueForWorkoutId(routeId)
-    try { await db.workouts.delete(routeId) } catch {}
-    try {
-      const idx = store.workouts.findIndex(w => String(w?._id || '') === routeId)
-      if (idx !== -1) store.workouts.splice(idx, 1)
-    } catch {}
-    // Wenn ein draft-* bereits eine echte Server-ID hat, diese ebenfalls löschen
-    try {
-      const mappedReal = await resolveRealIdFromDraftId(routeId)
-      if (mappedReal) {
-        const tk = await getIdToken().catch(() => null)
-        deleteWorkoutApi(mappedReal, tk).catch(() => null)
-        try {
-          const midx = store.workouts.findIndex(w => String(w?._id || '') === mappedReal)
-          if (midx !== -1) store.workouts.splice(midx, 1)
-        } catch {}
-      }
-    } catch {}
-  } else if (routeId && !isFavoriteAdjustMode.value) {
-    // Echte MongoDB-ID nur löschen wenn es ein frisch erstelltes, noch nicht abgeschlossenes Workout
-    // ist (z. B. Background-Create aus WorkoutBuilder lief durch, User cancelt danach).
-    // Ein bereits abgeschlossenes Workout (completed=true) wird NICHT gelöscht – der User hat
-    // lediglich Änderungen verworfen, der ursprüngliche Datensatz auf dem Server bleibt erhalten.
-    const isOrphanNewWorkout =
-      workout.value?.completed !== true &&
-      (String(route.query?.created || '') === '1' ||
-        workout.value?._isDraft === true ||
-        workout.value?.isDraft === true)
-    if (isOrphanNewWorkout) {
-      try {
-        const tk = await getIdToken().catch(() => null)
-        deleteWorkoutApi(routeId, tk).catch(() => null)
-      } catch {}
-      try {
-        const idx = store.workouts.findIndex(w => String(w?._id || '') === routeId)
-        if (idx !== -1) store.workouts.splice(idx, 1)
-      } catch {}
-      try { await db.workouts.delete(routeId) } catch {}
-    }
-  }
-  timerStore.reset()
   bypassTimerLeaveGuard.value = true
-  await router.push('/dashboard')
-  clearTimeout(safetyResetTimer)
+  await discardDraftAndLeaveFlow({
+    route,
+    workout: workout.value,
+    store,
+    db,
+    getIdToken,
+    isFavoriteAdjustMode: isFavoriteAdjustMode.value,
+    suppressDraftPersistence,
+    timerStore,
+    router,
+    clearActiveDraftForCurrentUser,
+    clearAllDetailDraftSnapshots: clearAllDetailDraftSnapshotsUtil,
+    clearAllWorkoutMapKeys: clearAllWorkoutMapKeysUtil,
+    resolveRealIdFromDraftId,
+    deleteWorkoutApiFn: deleteWorkoutApi
+  })
+  if (routeId) {
+    logDiagnostic('discard-draft-and-leave', { routeId })
+  }
 }
 
 function goDashboard() {
-  // Im Adjust-Modus: Timer-Guard entfällt, aber bei ungespeicherten Änderungen
-  // Bestätigungsdialog zeigen. bypassTimerLeaveGuard NICHT setzen,
-  // damit onBeforeRouteLeave den Draft-Cleanup übernimmt.
-  if (isFavoriteAdjustMode.value) {
-    if (isDirty.value) {
-      showLeaveModal.value = true
-      return
-    }
-    router.push('/dashboard')
-    return
-  }
-  if (isDirty.value) {
-    showLeaveModal.value = true
-    return
-  }
-  // if (timerStore.isRunningLike) {
-  //   pendingTimerAction.value = { kind: 'dashboard' }
-  //   showTimerActionModal.value = true
-  //   return
-  // }
-  discardDraftAndLeave()
+  goDashboardFlow({
+    isFavoriteAdjustMode: isFavoriteAdjustMode.value,
+    isDirty: isDirty.value,
+    showLeaveModal,
+    router,
+    discardDraftAndLeave
+  })
 }
 
 function confirmLeave() {
-  // Im Adjust-Modus: bypassTimerLeaveGuard NICHT setzen, sonst überspringt
-  // onBeforeRouteLeave den Draft-Cleanup. Nur suppress setzen und navigieren.
-  if (isFavoriteAdjustMode.value) {
-    suppressDraftPersistence.value = true
-    router.push('/dashboard')
-    return
-  }
-  // if (timerStore.isRunningLike) {
-  //   pendingTimerAction.value = { kind: 'dashboard' }
-  //   showTimerActionModal.value = true
-  //   return
-  // }
-  discardDraftAndLeave()
+  confirmLeaveFlow({
+    isFavoriteAdjustMode: isFavoriteAdjustMode.value,
+    suppressDraftPersistence,
+    router,
+    discardDraftAndLeave
+  })
 }
 
 async function applyPendingTimerAction() {
-  const action = pendingTimerAction.value
-  pendingTimerAction.value = null
-  if (!action) return
-
-  if (action.kind === 'save') {
-    await performSaveWorkout()
-    return
-  }
-
-  if (action.kind === 'dashboard') {
-    await discardDraftAndLeave()
-    return
-  }
-
-  if (action.kind === 'route-leave' && action.targetPath) {
-    bypassTimerLeaveGuard.value = true
-    router.push(action.targetPath)
-  }
+  await applyPendingTimerActionFlow({
+    pendingTimerAction,
+    performSaveWorkout,
+    discardDraftAndLeave,
+    bypassTimerLeaveGuard,
+    router
+  })
 }
 
 async function onTimerDecision(mode) {
-  if (mode === 'continue') {
-    // "Weiterlaufen": Aktion abbrechen, Training fortsetzen
-    pendingTimerAction.value = null
-    showTimerActionModal.value = false
-    return
-  }
-  if (mode === 'pause' && timerStore.isRunning) {
-    timerStore.pause()
-  } else if (mode === 'stop') {
-    timerStore.reset()
-  }
-
-  showTimerActionModal.value = false
-  await applyPendingTimerAction()
+  await onTimerDecisionFlow({
+    mode,
+    pendingTimerAction,
+    showTimerActionModal,
+    timerStore,
+    applyPendingTimerAction
+  })
 }
 
 
@@ -2348,38 +2192,21 @@ async function performSaveWorkout() {
     saveError.value = false
     const id = route.params.id
     const w = workout.value || {}
+    const resolvedUserId = await resolveActiveWorkoutUserIdForSave()
     // Gesamttrainingsdauer kommt aus der Session-Stoppuhr (SessionStopwatch/Pinia-Store),
     // nicht mehr aus dem Pausen-Timer (timerStore) – der lief nur stückweise pro Satz.
-    const timerElapsedSeconds = Math.max(0, Math.round((Number(sessionStopwatchStore.elapsedMs) || 0) / 1000))
-    const timerDurationMinutes = timerElapsedSeconds > 0 ? Math.max(1, Math.round(timerElapsedSeconds / 60)) : 0
-    const existingDuration = Number(w.duration) || 0
-    const finalDurationMinutes = timerDurationMinutes > 0 ? timerDurationMinutes : existingDuration
-    const resolvedUserId = await resolveActiveWorkoutUserIdForSave()
-    const normalized = {
-      name: w.name,
-      type: w.type,
-      date: w.date,
-      userId: resolvedUserId || undefined,
-      duration: finalDurationMinutes,
-      completed: true,
-      _isDraft: false,
-      isDraft: false,
-      exercises: (w.exercises || []).map((ex, idx) => {
-        // Ersten Arbeitssatz (kein Warmup) als Referenzwert für reps/weight verwenden,
-        // damit Exercise-Level-Felder nicht die Warmup-Werte widerspiegeln.
-        const firstWorkingSet = (ex.setDetails || []).find(s => !s.isWarmup)
-        return {
-          exerciseId: ex.exerciseId,
-          name: ex.name,
-          muscleGroup: ex.muscleGroup,
-          reps: firstWorkingSet?.reps ?? ex.reps ?? 10,
-          weight: firstWorkingSet?.weight ?? ex.weight ?? 0,
-          setDetails: ex.setDetails || [],
-          note: (exerciseNotes.value && typeof exerciseNotes.value[idx] !== 'undefined') ? exerciseNotes.value[idx] : ''
-        }
-      })
-    }
-    normalized.notes = buildWorkoutNotesSummary(normalized.exercises)
+    // Normalisierung (Dauer, Warmup-Filterung für reps/weight, Notizen-Zusammenbau) läuft
+    // über den extrahierten Save-Flow-Util statt einer eigenen Inline-Kopie - siehe
+    // utils/workoutDetailSaveFlow.js.
+    const normalized = normalizeWorkoutForSave({
+      workout: w,
+      exerciseNotes: exerciseNotes.value,
+      sessionStopwatchStore,
+      userId: resolvedUserId
+    })
+    // Wird weiter unten für die Erfolgsmeldung ("Gespeichert. Dauer: X min") gebraucht -
+    // aus dem normalisierten Ergebnis lesen statt separat neu zu berechnen.
+    const finalDurationMinutes = normalized.duration
 
     // Favorit-Anpassen: Nur Favorit aktualisieren, kein Stats-Eintrag
     if (String(route.query?.favoriteAdjust || '') === '1') {
@@ -2623,7 +2450,7 @@ async function saveWorkout() {
   // pendingTimerAction -> performSaveWorkout(), würde diesen Check also umgehen, wenn er
   // erst danach käme). Im Favorit-Anpassen-Modus nicht relevant (kein echtes Workout-Save).
   if (!isFavoriteAdjustMode.value && !notesCheckAcknowledged) {
-    const missing = getExercisesMissingNotes()
+    const missing = getExercisesMissingNotesForCurrentWorkout()
     if (missing.length > 0) {
       missingNotesExerciseNames.value = missing
       showMissingNotesModal.value = true
@@ -2745,96 +2572,54 @@ function confirmFavoriteSave() {
  * @returns {boolean} true wenn erfolgreich gespeichert
  */
 function saveActiveDraftDirect(reason = 'unknown', forceIgnoreDirty = false) {
-  if (suppressDraftPersistence.value) return false
-  if (isFavoriteAdjustMode.value) return false
-
-  const w = workout.value
-  if (!w || w.completed === true) return false
-
-  // Guard: Workout muss als Draft behalten werden
-  if (!shouldKeepAsDraft(w)) return false
-
-  // Normale Saves brauchen isDirty = true; Lifecycle-Saves ignorieren das
-  if (!forceIgnoreDirty && !isDirty.value) return false
-
-  const uid = resolveActiveWorkoutUserId()
-  if (!uid) return false
-
-  // Baue exercises mit notes zusammen
-  const exercises = Array.isArray(w.exercises) && Array.isArray(exerciseNotes.value)
-    ? w.exercises.map((ex, idx) => ({
-        ...ex,
-        note: typeof exerciseNotes.value[idx] === 'string' ? exerciseNotes.value[idx] : ex.note || ''
-      }))
-    : (w.exercises || [])
-
-  const notes = buildWorkoutNotesSummary(exercises)
-
-  // Resolve editingWorkoutId: nutze bestehenden oder ermittle aus Route
-  const existing = getActiveDraft(uid)
-  let editingWorkoutId = existing?.editingWorkoutId ?? null
-
-  if (!editingWorkoutId) {
-    const routeId = String(route.params.id || '').trim()
-    if (routeId && routeId !== 'draft' && !routeId.startsWith('draft-') && !routeId.startsWith('offline_')) {
-      editingWorkoutId = routeId
-    }
-  }
-
-  // Speichere
-  const ok = setActiveDraft(uid, {
-    ...w,
-    _id: String(w._id || route.params.id || ''),
-    exercises,
-    notes
-  }, editingWorkoutId || null)
-
-  if (ok) {
-    logger.debug('[WorkoutDetail] active draft saved', {
-      reason,
-      forceIgnoreDirty,
-      editingWorkoutId: editingWorkoutId || null,
-      exerciseCount: exercises.length
-    })
-    // Voller Exercise-Dump (nicht nur Zähler) bei JEDEM Schreibpfad auf den Active-Draft,
-    // damit sich der exakte Moment eines Set-Verlusts im Diagnose-Log nachvollziehen lässt
-    // (vorher loggten lifecycle-persist-Events nur den "reason", ohne Dateninhalt, sodass
-    // ein Datenverlust zwischen zwei "load-before-assign"-Events nicht mehr rekonstruierbar war).
-    logDiagnostic('draft-write', {
-      reason,
-      forceIgnoreDirty,
-      exercises: exercises.map(ex => ({ name: ex.name, setDetails: ex.setDetails }))
-    })
-  }
-  return ok
+  return saveActiveDraftDirectUtil({
+    route,
+    workout: workout.value,
+    exerciseNotes: exerciseNotes.value,
+    isDirty: isDirty.value,
+    suppressDraftPersistence: suppressDraftPersistence.value,
+    isFavoriteAdjustMode: isFavoriteAdjustMode.value,
+    resolveActiveWorkoutUserIdFn: resolveActiveWorkoutUserId,
+    shouldKeepAsDraftFn: shouldKeepAsDraft,
+    getActiveDraftFn: getActiveDraft,
+    setActiveDraftFn: setActiveDraft,
+    loggerInstance: logger,
+    diagnosticLogger: logDiagnostic,
+    reason,
+    forceIgnoreDirty
+  })
 }
 
 async function persistActiveDraft(reason = '') {
-  // Nutze die extrahierte Funktion mit normalem isDirty-Check
   return saveActiveDraftDirect(reason, false)
 }
 
 function persistActiveDraftFromLifecycle(reason = 'unknown') {
   logDiagnostic('lifecycle-persist', { reason })
-  writeDetailViewState(reason)
-  // 🔧 BUGFIX: Speichere direkt ohne auf isDirty-Watch zu warten
-  // Das verhindert das Race Condition Problem wenn die App schnell in den
-  // Hintergrund geht bevor der Watch seinen Callback gefeuert hat.
-  // forceIgnoreDirty=true bedeutet: speichere den aktuellen workout.value sofort
-  // (aber prüfe immer noch shouldKeepAsDraft um leere Drafts zu vermeiden)
-  saveActiveDraftDirect(reason, true)
+  return persistActiveDraftFromLifecycleUtil({
+    route,
+    workout: workout.value,
+    exerciseNotes: exerciseNotes.value,
+    isDirty: isDirty.value,
+    suppressDraftPersistence: suppressDraftPersistence.value,
+    isFavoriteAdjustMode: isFavoriteAdjustMode.value,
+    resolveActiveWorkoutUserIdFn: resolveActiveWorkoutUserId,
+    saveActiveDraftDirectFn: saveActiveDraftDirect,
+    writeDetailViewStateFn: writeDetailViewState,
+    reason
+  })
 }
 
 function onVisibilityChange() {
-try {
-if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
-persistActiveDraftFromLifecycle('visibility-hidden')
-}
-} catch {}
+  try {
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+      persistActiveDraftFromLifecycle('visibility-hidden')
+    }
+  } catch {}
 }
 
 function onPageHide() {
-persistActiveDraftFromLifecycle('pagehide')
+  persistActiveDraftFromLifecycle('pagehide')
 }
 
 function onWindowScroll() {
