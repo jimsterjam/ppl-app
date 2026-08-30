@@ -2300,7 +2300,11 @@ async function performSaveWorkout(updateFavorite = false) {
       // Draft-Workout aus IndexedDB, Store UND sessionStorage entfernen.
       // sessionStorage muss zwingend geleert werden, sonst zeigt Dashboard diesen
       // Draft als "in Bearbeitung" an (readDetailDraft liest workout_detail_draft).
-      clearAllDetailDraftSnapshots()
+      // Bug-Fix: hieß fälschlich ohne "Util"-Suffix - die Funktion ist nur unter
+      // clearAllDetailDraftSnapshotsUtil importiert (siehe oben), der alte Name warf einen
+      // ReferenceError NACHDEM der Favorit bereits erfolgreich aktualisiert war und landete im
+      // äußeren catch, der fälschlich die "Fehler beim Laden des Workouts"-Ansicht anzeigte.
+      clearAllDetailDraftSnapshotsUtil()
       const adjustId = String(id)
       // Wichtig: offline_-IDs (vom schnellen createWorkout()-Race in userStore.js) genauso
       // behandeln wie draft-*-IDs. Vorher wurde hier nur auf 'draft-' geprüft, wodurch eine
@@ -2848,7 +2852,7 @@ onBeforeRouteLeave(async (to) => {
         } catch {}
       }
       clearActiveDraftForCurrentUser('adjust-route-leave')
-      clearAllDetailDraftSnapshots()
+      clearAllDetailDraftSnapshotsUtil()
       clearTimeout(safetyResetTimer)
       return true
     } catch (e) {
