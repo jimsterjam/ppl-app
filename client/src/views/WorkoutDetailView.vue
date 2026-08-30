@@ -418,8 +418,17 @@
             >
               {{ t('workoutDetail.done') }}
             </button>
-            <button v-else class="primary save-btn" :disabled="saving" @click="saveWorkout">
-              {{ saving ? t('workoutDetail.saving') : (isFavoriteAdjustMode ? t('workoutDetail.adjustSave') : t('workoutDetail.save')) }}
+            <button v-else class="primary save-btn" :disabled="saving" @click="saveWorkout(false)">
+              {{ saving ? t('workoutDetail.saving') : (isFavoriteAdjustMode ? t('workoutDetail.adjustSave') : (showFavoriteUpdateOption ? t('workoutDetail.saveOnly') : t('workoutDetail.save'))) }}
+            </button>
+            <button
+              v-if="!isReordering && showFavoriteUpdateOption"
+              class="secondary favorite-save"
+              type="button"
+              :disabled="saving"
+              @click="saveWorkout(true)"
+            >
+              {{ saving ? t('workoutDetail.saving') : t('workoutDetail.saveAndUpdateFavorite') }}
             </button>
             <!-- <button
               v-if="!isReordering && !isFavoriteAdjustMode"
@@ -768,6 +777,12 @@ const toast = useToastStore()
 const timerStore = useTimerStore()
 const hasTimerOverlay = computed(() => Boolean(timerStore?.miniVisible && timerStore?.isActive))
 const isFavoriteAdjustMode = computed(() => String(route.query?.favoriteAdjust || '') === '1')
+// Workout wurde über "Favorit starten" o.ä. mit einem verknüpften Favoriten begonnen (nicht
+// zu verwechseln mit isFavoriteAdjustMode, wo gar keine echte Session läuft, sondern nur das
+// Favoriten-Template bearbeitet wird). In diesem Fall bietet der Abschluss-Dialog zwei
+// Optionen an: nur speichern, oder zusätzlich den verknüpften Favoriten mit den Werten
+// dieser Session aktualisieren (siehe performSaveWorkout(updateFavorite)).
+const showFavoriteUpdateOption = computed(() => isFavoriteSourceRoute() && !isFavoriteAdjustMode.value)
 const workout = ref(null)
 const loading = ref(false)
 const error = ref('')
@@ -814,6 +829,10 @@ const exerciseNotes = ref([])
 const showMissingNotesModal = ref(false)
 const missingNotesExerciseNames = ref([])
 let notesCheckAcknowledged = false
+// Merkt sich die gewählte Speicher-Option ("nur speichern" vs. "speichern + Favorit
+// aktualisieren"), während der Notizen-Check/Timer-Guard-Dialog dazwischenkommt, damit die
+// ursprüngliche Nutzerwahl beim tatsächlichen Speichern (performSaveWorkout) erhalten bleibt.
+let pendingUpdateFavoriteOnSave = false
 // Mobile detection (treat app as mobile-only if touch available or narrow)
 const isMobile = ref(typeof window !== 'undefined' && ('ontouchstart' in window || window.innerWidth <= 768))
 
@@ -2148,7 +2167,11 @@ function onSessionTime({ totalMs, formattedTime }) {
 // import { useSessionStopwatchStore } from '@/stores/sessionStopwatch'
 // const sessionStopwatchStore = useSessionStopwatchStore()
 
-async function performSaveWorkout() {
+// updateFavorite: explizite Nutzerwahl "Speichern + Favorit aktualisieren" (siehe
+// saveWorkout()/showFavoriteUpdateOption). Ersetzt die frühere implizite, für den Nutzer
+// unsichtbare Automatik (syncStartedFavoriteFromWorkout lief bisher immer mit, sobald diese
+// Session aus einem Favoriten gestartet wurde - ohne Wahlmöglichkeit).
+async function performSaveWorkout(updateFavorite = false) {
   // DIAGNOSE (User-Report "doppeltes Save-Event"): jeden Aufruf loggen, auch den vom Guard
   // abgewiesenen - bisher gab es dafür keine Sichtbarkeit im Diagnose-Log, nur Draft/Lifecycle-
   // Events waren dort protokolliert.
@@ -2329,9 +2352,9 @@ async function performSaveWorkout() {
 
       if (realId) {
         await store.updateWorkout(realId, normalized, token)
-        syncStartedFavoriteFromWorkout({ ...normalized, _id: realId })
+        if (updateFavorite) syncStartedFavoriteFromWorkout({ ...normalized, _id: realId })
         saveMsg.value = finalDurationMinutes > 0 ? `Gespeichert. Dauer: ${finalDurationMinutes} min` : 'Gespeichert.'
-        if (String(route.query?.favoriteStart || '') === '1') {
+        if (updateFavorite) {
           saveMsg.value += ' · Favorit aktualisiert'
           try { localStorage.removeItem(`fav_prefill_applied_v1_${realId}`) } catch {}
         }
@@ -2392,12 +2415,12 @@ async function performSaveWorkout() {
       } catch {}
 
       store.invalidateStatsCache()
-      syncStartedFavoriteFromWorkout({ ...createPayload, _id: savedWorkout?._id || id })
+      if (updateFavorite) syncStartedFavoriteFromWorkout({ ...createPayload, _id: savedWorkout?._id || id })
       if (!saveMsg.value) {
         saveMsg.value = finalDurationMinutes > 0 ? `Gespeichert. Dauer: ${finalDurationMinutes} min` : 'Gespeichert.'
         saveError.value = false
       }
-      if (String(route.query?.favoriteStart || '') === '1') {
+      if (updateFavorite) {
         saveMsg.value += ' · Favorit aktualisiert'
         try { localStorage.removeItem(`fav_prefill_applied_v1_${savedWorkout?._id || id}`) } catch {}
       }
@@ -2412,9 +2435,9 @@ async function performSaveWorkout() {
 
     let token = await getIdToken().catch(() => null)
     await store.updateWorkout(id, normalized, token)
-    syncStartedFavoriteFromWorkout({ ...normalized, _id: id })
+    if (updateFavorite) syncStartedFavoriteFromWorkout({ ...normalized, _id: id })
     saveMsg.value = finalDurationMinutes > 0 ? `Gespeichert. Dauer: ${finalDurationMinutes} min` : 'Gespeichert.'
-    if (String(route.query?.favoriteStart || '') === '1') {
+    if (updateFavorite) {
       saveMsg.value += ' · Favorit aktualisiert'
       try { localStorage.removeItem(`fav_prefill_applied_v1_${id}`) } catch {}
     }
@@ -2444,7 +2467,11 @@ async function performSaveWorkout() {
   }
 }
 
-async function saveWorkout() {
+// updateFavorite: true nur, wenn der Nutzer explizit "Speichern + Favorit aktualisieren"
+// gewählt hat (siehe showFavoriteUpdateOption/Template) - ohne diese Wahl bleibt das
+// verknüpfte Favoriten-Template unangetastet, auch wenn diese Session ursprünglich aus einem
+// Favoriten gestartet wurde.
+async function saveWorkout(updateFavorite = false) {
   // Notizen-Check zuerst: läuft VOR dem Timer-Guard, damit er auch beim direkten Klick auf
   // "Speichern" greift (der Timer-Guard deferred den eigentlichen Save ohnehin über
   // pendingTimerAction -> performSaveWorkout(), würde diesen Check also umgehen, wenn er
@@ -2453,17 +2480,18 @@ async function saveWorkout() {
     const missing = getExercisesMissingNotesForCurrentWorkout()
     if (missing.length > 0) {
       missingNotesExerciseNames.value = missing
+      pendingUpdateFavoriteOnSave = updateFavorite
       showMissingNotesModal.value = true
       return
     }
   }
   // Im Adjust-Modus läuft kein Workout, Timer-Guard nicht anwenden
   if (!isFavoriteAdjustMode.value && timerStore.isRunningLike) {
-    pendingTimerAction.value = { kind: 'save' }
+    pendingTimerAction.value = { kind: 'save', updateFavorite }
     showTimerActionModal.value = true
     return
   }
-  await performSaveWorkout()
+  await performSaveWorkout(updateFavorite)
 }
 
 // Wird vom Bestätigungsmodal (showMissingNotesModal) aufgerufen, wenn der Nutzer trotz
@@ -2473,7 +2501,7 @@ async function saveWorkout() {
 // Speichervorgang (nächstes Workout) wieder frisch geprüft wird.
 function confirmSaveDespiteMissingNotes() {
   notesCheckAcknowledged = true
-  saveWorkout()
+  saveWorkout(pendingUpdateFavoriteOnSave)
 }
 
 function getFavoriteUserId() {
@@ -2524,12 +2552,27 @@ function saveAsFavorite() {
   try {
     const sourceWorkout = buildFavoriteSourceWorkout()
     const type = normalizeWorkoutType(sourceWorkout.type || route.query.type || 'push')
-    const result = saveFavoriteWorkout({
-      userId: getFavoriteUserId(),
-      type,
-      name: nameCandidate,
-      workout: sourceWorkout
-    })
+    // Bug-Fix: Wenn dieses Workout bereits von einem Favoriten abstammt (favoriteId in der
+    // Route, z.B. über "Favorit starten"/"Favorit anpassen"), muss der VORHANDENE Favorit
+    // aktualisiert werden statt einen neuen anzulegen - saveFavoriteWorkout() legt immer neu
+    // an und schlägt mit LIMIT_REACHED fehl, sobald der Typ bereits 10 Favoriten hat (leicht
+    // erreicht, wenn man denselben Favoriten wiederholt über diesen Button "speichert" statt
+    // ihn zu aktualisieren).
+    const existingFavoriteId = String(route.query?.favoriteId || '').trim()
+    const result = existingFavoriteId
+      ? updateFavoriteWorkout({
+          userId: getFavoriteUserId(),
+          type,
+          id: existingFavoriteId,
+          name: nameCandidate,
+          workout: sourceWorkout
+        })
+      : saveFavoriteWorkout({
+          userId: getFavoriteUserId(),
+          type,
+          name: nameCandidate,
+          workout: sourceWorkout
+        })
 
     if (!result.success) {
       saveMsg.value = result.message || t('workoutDetail.favoriteSaveFailed')

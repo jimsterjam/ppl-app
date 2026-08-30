@@ -49,7 +49,7 @@ export async function applyPendingTimerAction({
   if (!action) return
 
   if (action.kind === 'save') {
-    await performSaveWorkout()
+    await performSaveWorkout(action.updateFavorite)
     return
   }
 
