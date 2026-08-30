@@ -37,6 +37,11 @@
         </div>
 
         <div v-if="expandedId === item.workoutId" class="feedback-text">
+          <AiFeedbackDeltaSummary
+            v-if="item.ai_analysis_snapshot?.length > 0"
+            class="feedback-delta-summary"
+            :snapshot="item.ai_analysis_snapshot"
+          />
           {{ item.ai_feedback }}
 
           <button
@@ -69,6 +74,7 @@ import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Share2 } from 'lucide-vue-next'
 import { Share } from '@capacitor/share'
+import AiFeedbackDeltaSummary from '@/components/AiFeedbackDeltaSummary.vue'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { fetchWorkoutFeedbacks } from '@/api/workouts'
 import { logger } from '@/utils/logger'
@@ -406,6 +412,10 @@ onMounted(() => {
      im Dark Mode dunklen .glass-Panel-Hintergrund war der aufgeklappte Feedback-Text dadurch
      schwarz auf dunkel - nicht lesbar. */
   color: var(--fg);
+}
+
+.feedback-delta-summary {
+  margin-bottom: 0.85rem;
 }
 
 .share-btn {

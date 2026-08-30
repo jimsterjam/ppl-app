@@ -52,6 +52,13 @@ html {
   --success-bg: rgba(121, 255, 180, 0.2);
   --warning-text: #ffb579;
   --warning-bg: rgba(255, 158, 61, 0.22);
+  /* Neutrale "mehr/weniger"-Richtungsfarbe fürs KI-Feedback (Delta-Zusammenfassung) - bewusst
+     unabhängig vom wählbaren --accent (der je nach Nutzer-Theme z.B. auch orange/lila sein
+     kann), damit "mehr" immer erkennbar blau bleibt. Trägt keine Wertung (gut/schlecht),
+     nur Richtung - "weniger" nutzt das bereits vorhandene --warning (orange). */
+  --info: #58b8ff;
+  --info-text: #8bd0ff;
+  --info-bg: rgba(88, 184, 255, 0.2);
   --danger-text: #ff8a8a;
   --danger-bg: rgba(255, 95, 95, 0.2);
   --peach: #f3c6ad;
@@ -98,6 +105,9 @@ html {
   --success-bg: rgba(44, 143, 90, 0.18);
   --warning-text: #5c3100;
   --warning-bg: rgba(199, 108, 16, 0.2);
+  --info: #1f6fb5;
+  --info-text: #0d3a5c;
+  --info-bg: rgba(31, 111, 181, 0.16);
   --danger-text: #5f0a0a;
   --danger-bg: rgba(212, 58, 58, 0.18);
 }

@@ -854,7 +854,7 @@ router.get("/feedbacks", firebaseAuthMiddleware, async (req, res) => {
         .sort({ ai_generated_at: -1 })
         .skip(skip)
         .limit(limit)
-        .select('_id name type date ai_feedback ai_generated_at ai_metadata')
+        .select('_id name type date ai_feedback ai_generated_at ai_metadata ai_analysis_snapshot')
         .lean(),
       Workout.countDocuments(query)
     ]);
@@ -868,7 +868,11 @@ router.get("/feedbacks", firebaseAuthMiddleware, async (req, res) => {
         date: w.date,
         ai_feedback: w.ai_feedback,
         ai_generated_at: w.ai_generated_at,
-        ai_metadata: w.ai_metadata
+        ai_metadata: w.ai_metadata,
+        // Nur bei ab jetzt neu generiertem Feedback vorhanden (additiv) - ältere Einträge
+        // liefern hier ein leeres Array, das Frontend zeigt dann nur den Fließtext ohne die
+        // kompakte Delta-Liste (siehe AIFeedbackHistory.vue).
+        ai_analysis_snapshot: w.ai_analysis_snapshot || []
       })),
       page,
       limit,
@@ -1324,6 +1328,7 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
         workoutDate: currentWorkout.date,
         ai_feedback: currentWorkout.ai_feedback,
         ai_metadata: currentWorkout.ai_metadata,
+        ai_analysis_snapshot: currentWorkout.ai_analysis_snapshot || [],
         cached: true,
         metadata: {
           requestId,
@@ -1432,6 +1437,7 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
           changes: {
             weight_change: 0,
             rep_change: 0,
+            sets_change: 0,
             volume_change: 0,
             volume_change_percent: 0
           },
@@ -1513,7 +1519,21 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
       // Gib trotzdem die Backend-Analysen zurück
     }
 
-    // 5b. Erfolgreiches Feedback am Workout persistieren (für späteres Wiederabrufen)
+    // 5b. Kompakte Delta-Zusammenfassung je Übung (Sätze/Wdh./Gewicht mehr bzw. weniger) fürs
+    // Frontend - reine Zahlen, keine Wertung. Unabhängig von der AI-Antwort berechenbar, da
+    // sie ausschließlich aus den bereits vorliegenden Backend-Analysen (exerciseAnalyses)
+    // stammt. Wird nur zusammen mit einem erfolgreichen ai_feedback persistiert (siehe unten),
+    // damit Snapshot und Feedback-Text immer im gleichen Zustand bleiben.
+    const analysisSnapshot = exerciseAnalyses.map(ex => ({
+      exercise: ex.exercise,
+      sets_change: ex.changes?.sets_change ?? 0,
+      reps_change: ex.changes?.rep_change ?? 0,
+      weight_change_kg: ex.changes?.weight_change ?? 0,
+      volume_change_percent: ex.changes?.volume_change_percent ?? 0,
+      is_first_session: ex.progression === 'first_session'
+    }));
+
+    // 5c. Erfolgreiches Feedback am Workout persistieren (für späteres Wiederabrufen)
     if (aiResult?.feedback) {
       await Workout.updateOne(
         { _id: workoutId, userId },
@@ -1524,7 +1544,8 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
             ai_metadata: {
               provider: aiService.getProviderName(),
               model: aiService.getModelName()
-            }
+            },
+            ai_analysis_snapshot: analysisSnapshot
           }
         }
       ).catch((e) => {
@@ -1551,6 +1572,9 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
           period_days: ex.period_days
         }))
       },
+
+      // Kompakte, UI-taugliche Delta-Zusammenfassung (siehe ai_analysis_snapshot oben)
+      ai_analysis_snapshot: analysisSnapshot,
 
       // AI-Feedback (Interpretation)
       ...(aiResult ? {

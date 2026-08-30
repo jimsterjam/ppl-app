@@ -21,6 +21,7 @@
     <div v-else-if="feedback" class="summary-content success">
       <div class="feedback-section">
         <h3>{{ t('postWorkout.feedback') || 'Dein Feedback' }}</h3>
+        <AiFeedbackDeltaSummary v-if="analysisSnapshot.length > 0" :snapshot="analysisSnapshot" />
         <div class="feedback-text">{{ feedback }}</div>
       </div>
 
@@ -98,6 +99,7 @@ import { acquireKeepAwake, releaseKeepAwake } from '@/utils/keepAwakeGuard'
 import { resolveRealIdFromDraftId } from '@/utils/workoutHelpers'
 import { logDiagnostic } from '@/utils/diagnosticsLog'
 import { OFFLINE_WORKOUTS_UPDATED_EVENT } from '@/utils/offlineStorage'
+import AiFeedbackDeltaSummary from '@/components/AiFeedbackDeltaSummary.vue'
 
 const props = defineProps({
   workoutId: {
@@ -115,6 +117,7 @@ const { getIdToken } = useFirebaseAuth()
 const showSummary = ref(true)
 const loading = ref(true)
 const feedback = ref(null)
+const analysisSnapshot = ref([])
 const error = ref(null)
 const insufficientHistory = ref(false)
 const remainingCount = ref(0)
@@ -207,6 +210,7 @@ async function loadAIFeedback() {
     loading.value = true
     error.value = null
     feedback.value = null
+    analysisSnapshot.value = []
     insufficientHistory.value = false
     remainingDays.value = 0
     networkUnavailable.value = false
@@ -241,6 +245,9 @@ async function loadAIFeedback() {
 
     if (response.data?.ai_feedback) {
       feedback.value = response.data.ai_feedback
+      analysisSnapshot.value = Array.isArray(response.data?.ai_analysis_snapshot)
+        ? response.data.ai_analysis_snapshot
+        : []
       logger.debug('[PostWorkoutSummary] Feedback loaded', {
         workoutId: props.workoutId,
         provider: response.data.ai_metadata?.provider

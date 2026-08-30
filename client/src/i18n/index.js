@@ -658,7 +658,10 @@ export const messages = {
       share: 'Teilen',
       shareTitle: 'KI-Feedback teilen',
       shareError: 'Teilen ist gerade nicht möglich',
-      copiedToClipboard: 'In die Zwischenablage kopiert'
+      copiedToClipboard: 'In die Zwischenablage kopiert',
+      deltaSets: 'Sätze',
+      deltaReps: 'Wdh.',
+      deltaFirstSession: 'Erstes Training'
     },
     quickGenerator: {
       title: 'KI-Workout generieren',
@@ -1415,7 +1418,10 @@ export const messages = {
       share: 'Share',
       shareTitle: 'Share AI feedback',
       shareError: 'Sharing is not available right now',
-      copiedToClipboard: 'Copied to clipboard'
+      copiedToClipboard: 'Copied to clipboard',
+      deltaSets: 'sets',
+      deltaReps: 'reps',
+      deltaFirstSession: 'First session'
     },
     quickGenerator: {
       title: 'Generate AI Workout',

@@ -105,7 +105,21 @@ const workoutSchema = new mongoose.Schema({
   ai_metadata: {
     provider: String,
     model: String
-  }
+  },
+  // Kompakte, strukturierte Delta-Zusammenfassung je Übung (Sätze/Wdh./Gewicht mehr bzw.
+  // weniger als die vorherige Session) - wird zusammen mit ai_feedback einmalig berechnet und
+  // gespeichert, damit die UI (PostWorkoutSummary/AIFeedbackHistory) eine übersichtliche,
+  // farblich unterscheidbare Zusammenfassung zeigen kann, statt dass der Nutzer die kompletten
+  // Sätze/Wiederholungen aus dem Fließtext der KI heraussuchen muss. Rein additiv, reine
+  // Zahlen (kein "gut"/"schlecht") - siehe server/routes/workouts.js (POST /:id/ai-analysis).
+  ai_analysis_snapshot: [{
+    exercise: String,
+    sets_change: { type: Number, default: 0 },
+    reps_change: { type: Number, default: 0 },
+    weight_change_kg: { type: Number, default: 0 },
+    volume_change_percent: { type: Number, default: 0 },
+    is_first_session: { type: Boolean, default: false }
+  }]
 }, {
   timestamps: true
 });

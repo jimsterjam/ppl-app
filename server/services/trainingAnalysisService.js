@@ -112,6 +112,7 @@ export function analyzeExercise(exerciseName, currentEx, previousEx = null, days
     changes: {
       weight_change: 0,
       rep_change: 0,
+      sets_change: 0,
       volume_change: 0,
       volume_change_percent: 0
     },
@@ -144,6 +145,12 @@ export function analyzeExercise(exerciseName, currentEx, previousEx = null, days
       analysis.changes = {
         weight_change: Math.round((currentStats.weight - prevStats.weight) * 10) / 10,
         rep_change: Math.round((currentStats.reps - prevStats.reps) * 10) / 10,
+        // Additiv (UI-Zusammenfassung "wieviel Sätze mehr/weniger"): Differenz der reinen
+        // Arbeitssatz-Anzahl (Warm-ups bereits in calculateExerciseStats() herausgefiltert).
+        // Fließt NICHT in determineTrendWithProfile()/progression ein (siehe
+        // exerciseAnalysisRules.js) - rein additive Zahl fürs Frontend, ändert nichts an der
+        // bestehenden Trend-Berechnung.
+        sets_change: currentStats.sets - prevStats.sets,
         volume_change: Math.round((currentStats.volume - prevStats.volume) * 10) / 10,
         volume_change_percent: volumeChangePct
       };
@@ -308,11 +315,13 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
       exercise: ex.exercise,
       current_weight: ex.current?.weight || 0,
       current_reps: ex.current?.reps || 0,
+      current_sets: ex.current?.sets || 0,
       current_volume: ex.current?.volume || 0,
 
       ...(ex.previous ? {
         previous_weight: ex.previous.weight,
         previous_reps: ex.previous.reps,
+        previous_sets: ex.previous.sets,
         previous_volume: ex.previous.volume,
       } : {}),
 
@@ -320,6 +329,7 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
       changes: {
         weight_change_kg: ex.changes.weight_change,
         reps_change: ex.changes.rep_change,
+        sets_change: ex.changes.sets_change || 0,
         volume_change_kg: ex.changes.volume_change,
         volume_change_percent: ex.changes.volume_change_percent
       },
