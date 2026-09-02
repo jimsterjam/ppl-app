@@ -300,12 +300,15 @@ onMounted(async () => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2.25rem;
-  height: 2.25rem;
+  /* War vorher 2.25rem/18px-Icon - auf einem Telefon kaum antippbar/erkennbar. Apple/Google
+     empfehlen mind. 44x44px Tap-Ziel für Buttons - jetzt entsprechend größer. */
+  width: 3rem;
+  height: 3rem;
   border-radius: 999px;
   border: 1px solid var(--line-soft);
   background: var(--surface);
   cursor: pointer;
+  flex-shrink: 0;
 }
 
 .rating-thumb:active {
@@ -313,10 +316,10 @@ onMounted(async () => {
 }
 
 .rating-thumb-icon {
-  width: 18px;
-  height: 18px;
+  width: 26px;
+  height: 26px;
   stroke: var(--fg);
-  stroke-width: 1.8;
+  stroke-width: 2;
   fill: none;
 }
 

@@ -358,7 +358,13 @@ onBeforeUnmount(() => {
      auf das tatsächlich im Theme-Store gewählte App-Theme - dadurch war der Text im
      Dark-Mode teils weiß auf weiß (nicht lesbar) bzw. teils grau auf sehr dunklem Grund
      (schwacher Kontrast beim Laden). */
-  backdrop-filter: blur(10px);
+  /* Bug-Fix (App-Absturz beim Fokussieren des Bewertungs-Textfelds, siehe
+     AiFeedbackRatingWidget.vue): backdrop-filter auf einem position:fixed-Element, das beim
+     Aufklappen der nativen Tastatur neu layoutet, ist auf iOS/WKWebView (Capacitor) ein
+     bekanntes Absturzmuster (GPU-Compositing-Konflikt). .glass liefert bereits einen
+     deckenden, theme-aware Hintergrund (var(--bg-panel)) ohne Transparenz - der zusätzliche
+     Weichzeichner hier war rein kosmetisch und nicht nötig für Lesbarkeit.
+  backdrop-filter: blur(10px); */
 }
 
 .summary-header {
