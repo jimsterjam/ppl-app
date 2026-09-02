@@ -7,6 +7,8 @@ import exercises from '../data/exercises.js';
 import Exercise from '../models/Exercise.js';
 import UserExerciseNote from '../models/UserExerciseNote.js';
 import UserProfile from '../models/UserProfile.js';
+import FeedbackRating from '../models/FeedbackRating.js';
+import FeedbackQualitySignal from '../models/FeedbackQualitySignal.js';
 import { logger } from '../utils/logger.js';
 import { getAIService } from '../services/aiService.js';
 import {
@@ -16,6 +18,14 @@ import {
   createSimpleExerciseFeedback,
   buildVolumeHistory
 } from '../services/trainingAnalysisService.js';
+import {
+  buildFeedbackVersion,
+  validateRatingPayload,
+  nextRatingStatus,
+  isCountedStatus,
+  buildQualitySignal,
+  shouldWriteQualitySignal
+} from '../services/feedbackRatingService.js';
 import { resolveEffectiveProfile } from '../services/exerciseAnalysisRules.js';
 import {
   startOfIsoWeek,
@@ -883,6 +893,188 @@ router.get("/feedbacks", firebaseAuthMiddleware, async (req, res) => {
   } catch (err) {
     logger.error('❌ Feedback-Liste Fehler:', err);
     res.status(500).json({ error: 'Feedback-Liste konnte nicht geladen werden', message: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Bewertungsfunktion für KI-Workout-Feedback ("War dieses Feedback hilfreich?")
+// ---------------------------------------------------------------------------
+// feedbackId ist bewusst die Workout-_id selbst (siehe FeedbackRating.js) - alle drei Routen
+// hängen daher unter /:id/feedback-rating, analog zu /:id/ai-analysis. Müssen NICHT vor der
+// generischen GET /:id-Route stehen (anderes Präfix/Methode), aber bewusst thematisch direkt
+// bei den anderen Feedback-Routen platziert.
+
+// Lädt das aktuelle Workout + ai_generated_at/ai_metadata, um die feedbackVersion serverseitig
+// konsistent zu bestimmen (Client schickt sie nicht selbst mit - verhindert, dass ein Client
+// eine Bewertung an eine falsche/veraltete Version hängt).
+async function loadFeedbackVersionForWorkout(workoutId, userId) {
+  const workout = await Workout.findOne({ _id: workoutId, userId }).select('ai_generated_at ai_metadata ai_feedback').lean();
+  if (!workout || !workout.ai_feedback) return { workout: null, feedbackVersion: null };
+  return {
+    workout,
+    feedbackVersion: buildFeedbackVersion({ aiGeneratedAt: workout.ai_generated_at, model: workout.ai_metadata?.model })
+  };
+}
+
+// GET: eigene Bewertung zu einem Feedback abrufen (für UI-Zustand: schon bewertet? womit?)
+router.get("/:id/feedback-rating", firebaseAuthMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.auth;
+    const workoutId = req.params.id;
+    const existing = await FeedbackRating.findOne({ userId, feedbackId: workoutId }).lean();
+    if (!existing || existing.status === 'deleted') {
+      return res.json({ success: true, rating: null });
+    }
+    res.json({
+      success: true,
+      rating: {
+        rating: existing.rating,
+        reasonCodes: existing.reasonCodes || [],
+        correctionText: existing.correctionText || null,
+        status: existing.status,
+        feedbackVersion: existing.feedbackVersion,
+        updatedAt: existing.updatedAt
+      }
+    });
+  } catch (err) {
+    logger.error('❌ Feedback-Rating laden fehlgeschlagen', { message: err.message });
+    res.status(500).json({ error: 'Bewertung konnte nicht geladen werden', message: err.message });
+  }
+});
+
+// POST: Bewertung anlegen ODER aktualisieren (Upsert - siehe FeedbackRating.js: pro Nutzer +
+// Feedback existiert höchstens ein Dokument, "erneute Bewertung aktualisiert bestehenden
+// Eintrag" statt einen neuen anzulegen).
+router.post("/:id/feedback-rating", firebaseAuthMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.auth;
+    const workoutId = req.params.id;
+    const { rating, reasonCodes = [], correctionText = null } = req.body || {};
+
+    const validationErrors = validateRatingPayload({ rating, reasonCodes, correctionText });
+    if (validationErrors.length > 0) {
+      return res.status(400).json({ error: 'Ungültige Bewertung', details: validationErrors });
+    }
+
+    const { feedbackVersion } = await loadFeedbackVersionForWorkout(workoutId, userId);
+    if (!feedbackVersion) {
+      return res.status(404).json({ error: 'Kein KI-Feedback für dieses Workout gefunden' });
+    }
+
+    const existing = await FeedbackRating.findOne({ userId, feedbackId: workoutId }).lean();
+    const status = nextRatingStatus(existing?.status || null, 'save');
+
+    const saved = await FeedbackRating.findOneAndUpdate(
+      { userId, feedbackId: workoutId },
+      {
+        $set: {
+          userId,
+          feedbackId: workoutId,
+          feedbackVersion,
+          rating,
+          reasonCodes,
+          correctionText: correctionText || null,
+          status
+        }
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    ).lean();
+
+    // Anonymisiertes Qualitätssignal separat schreiben (siehe feedbackRatingService.js /
+    // FeedbackQualitySignal.js) - nie personenbezogen, unabhängig von der persönlichen
+    // Bewertung selbst fortbestehend.
+    if (shouldWriteQualitySignal('save')) {
+      FeedbackQualitySignal.create(buildQualitySignal({ feedbackVersion, rating, reasonCodes }))
+        .catch((e) => logger.warn('⚠️ Konnte FeedbackQualitySignal nicht schreiben', { message: e.message }));
+    }
+
+    res.json({
+      success: true,
+      rating: {
+        rating: saved.rating,
+        reasonCodes: saved.reasonCodes || [],
+        correctionText: saved.correctionText || null,
+        status: saved.status,
+        feedbackVersion: saved.feedbackVersion,
+        updatedAt: saved.updatedAt
+      }
+    });
+  } catch (err) {
+    logger.error('❌ Feedback-Rating speichern fehlgeschlagen', { message: err.message });
+    res.status(500).json({ error: 'Bewertung konnte nicht gespeichert werden', message: err.message });
+  }
+});
+
+// DELETE: Bewertung entfernen (Soft-Delete - Status 'deleted', zählt danach nicht mehr in
+// Statistiken, siehe isCountedStatus()). Erzeugt bewusst KEIN neues anonymisiertes Signal.
+router.delete("/:id/feedback-rating", firebaseAuthMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.auth;
+    const workoutId = req.params.id;
+
+    const existing = await FeedbackRating.findOne({ userId, feedbackId: workoutId });
+    if (!existing || existing.status === 'deleted') {
+      return res.json({ success: true, alreadyDeleted: true });
+    }
+
+    existing.status = nextRatingStatus(existing.status, 'delete');
+    await existing.save();
+
+    res.json({ success: true });
+  } catch (err) {
+    logger.error('❌ Feedback-Rating löschen fehlgeschlagen', { message: err.message });
+    res.status(500).json({ error: 'Bewertung konnte nicht entfernt werden', message: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Persönliche Lernlogik: Korrekturtext aus einer Bewertung erst NACH ausdrücklicher
+// Nutzer-Bestätigung als persönliche, übungsgebundene Notiz übernehmen (Prompt: "Nur nach
+// ausdrücklicher Bestätigung darf diese Information im persönlichen Übungsprofil gespeichert
+// werden"). Bewertungen selbst verändern also NIE automatisch UserExerciseNote - nur dieser
+// separate, explizit vom Nutzer ausgelöste Endpunkt tut das.
+// ---------------------------------------------------------------------------
+router.post("/exercise-notes/confirm", firebaseAuthMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.auth;
+    const exerciseName = String(req.body?.exerciseName || '').trim();
+    const noteText = String(req.body?.noteText || '').trim();
+
+    if (!exerciseName) {
+      return res.status(400).json({ error: 'exerciseName ist erforderlich' });
+    }
+    if (!noteText) {
+      return res.status(400).json({ error: 'noteText ist erforderlich' });
+    }
+    if (noteText.length > 500) {
+      return res.status(400).json({ error: 'noteText ist zu lang (max. 500 Zeichen)' });
+    }
+
+    const saved = await UserExerciseNote.findOneAndUpdate(
+      { userId, exerciseName },
+      {
+        $set: {
+          userId,
+          exerciseName,
+          noteText,
+          isConfirmed: true,
+          source: 'user_input'
+        }
+      },
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    ).lean();
+
+    res.json({
+      success: true,
+      note: {
+        exerciseName: saved.exerciseName,
+        noteText: saved.noteText,
+        isConfirmed: saved.isConfirmed
+      }
+    });
+  } catch (err) {
+    logger.error('❌ Exercise-Note bestätigen fehlgeschlagen', { message: err.message });
+    res.status(500).json({ error: 'Notiz konnte nicht gespeichert werden', message: err.message });
   }
 });
 

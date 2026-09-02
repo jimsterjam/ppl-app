@@ -23,6 +23,11 @@
         <h3>{{ t('postWorkout.feedback') || 'Dein Feedback' }}</h3>
         <AiFeedbackDeltaSummary v-if="analysisSnapshot.length > 0" :snapshot="analysisSnapshot" />
         <div class="feedback-text">{{ feedback }}</div>
+        <AiFeedbackRatingWidget
+          v-if="resolvedWorkoutIdForRating"
+          :workout-id="resolvedWorkoutIdForRating"
+          :exercise-names="analysisSnapshot.map(e => e.exercise)"
+        />
       </div>
 
       <div class="summary-actions">
@@ -100,6 +105,7 @@ import { resolveRealIdFromDraftId } from '@/utils/workoutHelpers'
 import { logDiagnostic } from '@/utils/diagnosticsLog'
 import { OFFLINE_WORKOUTS_UPDATED_EVENT } from '@/utils/offlineStorage'
 import AiFeedbackDeltaSummary from '@/components/AiFeedbackDeltaSummary.vue'
+import AiFeedbackRatingWidget from '@/components/AiFeedbackRatingWidget.vue'
 
 const props = defineProps({
   workoutId: {
@@ -118,6 +124,9 @@ const showSummary = ref(true)
 const loading = ref(true)
 const feedback = ref(null)
 const analysisSnapshot = ref([])
+// Die tatsächlich aufgelöste, echte Workout-ID (nicht die evtl. temporäre offline_/draft-ID
+// aus props.workoutId) - die Bewertungs-Route hängt am echten Workout-Dokument.
+const resolvedWorkoutIdForRating = ref('')
 const error = ref(null)
 const insufficientHistory = ref(false)
 const remainingCount = ref(0)
@@ -222,6 +231,7 @@ async function loadAIFeedback() {
       logDiagnostic('ai-feedback-sync-pending', { workoutId: props.workoutId })
       return
     }
+    resolvedWorkoutIdForRating.value = resolvedWorkoutId
 
     const token = await getIdToken().catch(() => null)
 

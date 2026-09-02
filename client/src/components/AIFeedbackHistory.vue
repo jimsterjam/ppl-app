@@ -44,6 +44,11 @@
           />
           {{ item.ai_feedback }}
 
+          <AiFeedbackRatingWidget
+            :workout-id="String(item.workoutId)"
+            :exercise-names="(item.ai_analysis_snapshot || []).map(e => e.exercise)"
+          />
+
           <button
             class="share-btn"
             type="button"
@@ -75,6 +80,7 @@ import { useI18n } from 'vue-i18n'
 import { Share2 } from 'lucide-vue-next'
 import { Share } from '@capacitor/share'
 import AiFeedbackDeltaSummary from '@/components/AiFeedbackDeltaSummary.vue'
+import AiFeedbackRatingWidget from '@/components/AiFeedbackRatingWidget.vue'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { fetchWorkoutFeedbacks } from '@/api/workouts'
 import { logger } from '@/utils/logger'
