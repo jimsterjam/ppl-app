@@ -16,7 +16,8 @@ import {
   analyzeWorkoutProgression,
   structureAnalysisForAI,
   createSimpleExerciseFeedback,
-  buildVolumeHistory
+  buildVolumeHistory,
+  findWorkoutsAffectedByDeletion
 } from '../services/trainingAnalysisService.js';
 import {
   buildFeedbackVersion,
@@ -1186,14 +1187,56 @@ router.delete("/:id", firebaseAuthMiddleware, async (req, res) => {
       return res.status(400).json({ error: 'Ungültige Workout-ID' });
     }
     const workout = await Workout.findOneAndDelete({
-      _id: req.params.id, 
-      userId 
+      _id: req.params.id,
+      userId
     });
-    
+
     if (!workout) {
       return res.status(404).json({ error: "Workout nicht gefunden" });
     }
-    
+
+    // Nach dem Löschen: verhindern, dass künftig angezeigte KI-Analysen auf Daten dieses nun
+    // gelöschten Workouts basieren. Zwei Dinge können sonst veraltet bleiben:
+    // 1. Spätere Workouts, deren bereits zwischengespeichertes ai_feedback/ai_analysis_snapshot
+    //    beim Erzeugen mit DIESEM Workout verglichen wurde (siehe analyzeWorkoutProgression) -
+    //    dieser Cache wird invalidiert (nicht sofort neu berechnet, um kein OpenAI-Kontingent
+    //    zu verbrauchen - die nächste Anzeige berechnet automatisch frisch, siehe
+    //    POST /:id/ai-analysis).
+    // 2. Die eigene FeedbackRating dieses Workouts (falls vorhanden) wird zu einer Daten-
+    //    leiche, sobald das Workout weg ist - wird direkt mitgelöscht.
+    // Bewusst in einem eigenen try/catch: ein Fehler hier darf die bereits erfolgreiche
+    // Löschung des Workouts nicht als Fehler an den Client zurückmelden.
+    try {
+      const laterCandidates = await Workout.find({
+        userId,
+        _id: { $ne: workout._id },
+        ai_feedback: { $exists: true, $ne: null },
+        $or: [
+          { date: { $gt: workout.date } },
+          { date: workout.date, createdAt: { $gt: workout.createdAt || 0 } }
+        ]
+      }).select('_id exercises date createdAt').lean();
+
+      const affected = findWorkoutsAffectedByDeletion(workout, laterCandidates);
+      if (affected.length > 0) {
+        await Workout.updateMany(
+          { _id: { $in: affected.map(w => w._id) } },
+          { $unset: { ai_feedback: '', ai_generated_at: '', ai_metadata: '', ai_analysis_snapshot: '' } }
+        );
+        logger.info('♻️ Zwischengespeichertes KI-Feedback nach Workout-Löschung invalidiert', {
+          deletedWorkoutId: String(workout._id),
+          affectedCount: affected.length
+        });
+      }
+
+      await FeedbackRating.deleteOne({ userId, feedbackId: String(workout._id) });
+    } catch (cleanupErr) {
+      logger.warn('⚠️ Nachbereinigung nach Workout-Löschung teilweise fehlgeschlagen', {
+        deletedWorkoutId: String(workout._id),
+        message: cleanupErr.message
+      });
+    }
+
     res.json({ message: "Workout erfolgreich gelöscht", workout });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1222,10 +1265,21 @@ router.delete("/", firebaseAuthMiddleware, async (req, res) => {
     
     // Lösche alle Workouts des Users
     const result = await Workout.deleteMany({ userId });
-    
+
     logger.debug(`🗑️ Gelöscht: ${result.deletedCount} Workouts für User ${userId}`);
-    
-    res.json({ 
+
+    // Alle Workouts weg -> auch alle personenbezogenen Bewertungen dazu sind jetzt
+    // Datenleichen (siehe DELETE /:id für die Einzel-Löschung-Variante). Anonymisierte
+    // FeedbackQualitySignal-Einträge bleiben unangetastet - kein Rückbezug zu Workouts.
+    try {
+      await FeedbackRating.deleteMany({ userId });
+    } catch (cleanupErr) {
+      logger.warn('⚠️ Konnte FeedbackRatings beim Löschen aller Workouts nicht bereinigen', {
+        userId, message: cleanupErr.message
+      });
+    }
+
+    res.json({
       message: "Alle Workouts erfolgreich gelöscht",
       deletedCount: result.deletedCount,
       userId 

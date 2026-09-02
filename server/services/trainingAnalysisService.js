@@ -425,6 +425,39 @@ export function createSimpleExerciseFeedback(trainingData) {
   };
 }
 
+/**
+ * Bestimmt, welche (bereits mit KI-Feedback versehenen) Workouts von der Löschung eines
+ * anderen Workouts betroffen sein könnten - weil sie beim Erzeugen ihres zwischengespeicherten
+ * ai_feedback/ai_analysis_snapshot möglicherweise gegen das jetzt gelöschte Workout verglichen
+ * wurden (gleicher Übungsname, siehe analyzeWorkoutProgression()).
+ *
+ * Bewusst KONSERVATIV/übervorsichtig: prüft nur "teilt sich mindestens einen Übungsnamen mit
+ * dem gelöschten Workout", nicht ob das gelöschte Workout tatsächlich die NÄCHSTGELEGENE
+ * vorherige Session für diese Übung war (das exakt zu bestimmen würde eine vollständige
+ * Neuberechnung der Vergleichskette erfordern). Ein paar zusätzliche, eigentlich nicht
+ * betroffene Workouts mit-zu-invalidieren ist unkritisch (ihr Feedback wird beim nächsten
+ * Ansehen einfach kostenlos neu berechnet) - eine tatsächlich stale gebliebene Analyse mit
+ * Bezug auf gelöschte Daten wäre dagegen das eigentliche Problem, das vermieden werden soll.
+ *
+ * @param {Object} deletedWorkout - das gerade gelöschte Workout (mit .exercises)
+ * @param {Array} candidateWorkouts - andere Workouts desselben Nutzers, die bereits ein
+ *   zwischengespeichertes ai_feedback haben UND chronologisch NACH deletedWorkout liegen
+ *   (Vorfilterung übernimmt der Aufrufer per DB-Query, siehe routes/workouts.js)
+ * @returns {Array} Teilmenge von candidateWorkouts, deren Cache invalidiert werden sollte
+ */
+export function findWorkoutsAffectedByDeletion(deletedWorkout, candidateWorkouts) {
+  const deletedNames = new Set(
+    (deletedWorkout?.exercises || [])
+      .map(ex => (ex?.name || '').trim().toLowerCase())
+      .filter(Boolean)
+  );
+  if (deletedNames.size === 0) return [];
+
+  return (candidateWorkouts || []).filter(w =>
+    (w?.exercises || []).some(ex => deletedNames.has((ex?.name || '').trim().toLowerCase()))
+  );
+}
+
 export default {
   calculateExerciseStats,
   determineTrend,
@@ -432,7 +465,8 @@ export default {
   analyzeWorkoutProgression,
   structureAnalysisForAI,
   createSimpleExerciseFeedback,
-  buildVolumeHistory
+  buildVolumeHistory,
+  findWorkoutsAffectedByDeletion
 };
 
 // Hinweis: determineTrend() (rein gewicht-/volumenbasiert) bleibt unverändert exportiert und
