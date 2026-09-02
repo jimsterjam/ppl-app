@@ -61,16 +61,23 @@ const router = express.Router();
 
 const exerciseCatalog = Array.isArray(exercises) ? exercises : [];
 
-// Mindestanzahl identischer Wiederholungen desselben Workouts, bevor eine WERTENDE
-// (vergleichende) AI-Analyse generiert wird. Weniger als 8 identische Sessions liefern zu
-// wenig Vergleichsdaten für eine belastbare Fortschrittsaussage - siehe auch
-// AI_FEEDBACK_MIN_HISTORY_DAYS als alternatives (zeitbasiertes) Kriterium.
-const AI_FEEDBACK_MIN_REPETITIONS = 8;
-
-// Alternative zum reinen Wiederholungs-Zähler: liegt die erste identische Session bereits
-// mindestens 4 Wochen zurück, ist genug Trainingszeitraum vergangen, um eine wertende
-// Analyse zuzulassen, auch wenn (noch) keine 8 identischen Workouts erreicht wurden.
-const AI_FEEDBACK_MIN_HISTORY_DAYS = 28;
+// ⚠️ TESTPHASE (temporär, auf Nutzerwunsch): auf 1 gesetzt, damit nach JEDEM Workout sofort
+// eine Analyse entsteht, statt auf 8 identische Sessions bzw. 28 Tage Historie zu warten.
+// VOR EINEM ECHTEN LAUNCH UNBEDINGT WIEDER AUF DIE PRODUKTIONS-WERTE ZURÜCKSETZEN (siehe
+// Fallback-Werte unten, 8 / 28) - sonst bekommen echte Nutzer eine "wertende" Analyse schon
+// nach dem allerersten Workout, ohne dass genug Vergleichsdaten vorliegen.
+// Per Env-Var überschreibbar, damit ein Umschalten später auch ohne Code-Änderung/Deploy
+// möglich ist (z.B. auf Render als Environment Variable setzen).
+//
+// Produktions-Bedeutung der Werte (siehe auch weiter unten im Code):
+// - Mindestanzahl identischer Wiederholungen desselben Workouts, bevor eine WERTENDE
+//   (vergleichende) AI-Analyse generiert wird. Weniger als 8 identische Sessions liefern zu
+//   wenig Vergleichsdaten für eine belastbare Fortschrittsaussage.
+// - Alternative zum reinen Wiederholungs-Zähler: liegt die erste identische Session bereits
+//   mindestens 4 Wochen zurück, ist genug Trainingszeitraum vergangen, auch ohne 8 identische
+//   Workouts.
+const AI_FEEDBACK_MIN_REPETITIONS = Number.parseInt(process.env.AI_FEEDBACK_MIN_REPETITIONS, 10) || 1; // Prod-Default: 8
+const AI_FEEDBACK_MIN_HISTORY_DAYS = Number.parseInt(process.env.AI_FEEDBACK_MIN_HISTORY_DAYS, 10) || 1; // Prod-Default: 28
 
 // Kanonischer Fingerprint der Übungsliste eines Workouts (Namen, sortiert, normalisiert).
 // Zwei Workouts gelten als "gleiches Workout", wenn dieser Fingerprint exakt übereinstimmt.
