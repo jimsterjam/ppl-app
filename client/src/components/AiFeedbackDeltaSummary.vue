@@ -17,6 +17,28 @@
         <span class="delta-chip" :class="chipClass(row.weightChangeKg)">
           {{ formatSigned(row.weightChangeKg) }} kg
         </span>
+
+        <!-- Mini-Trend-Grafik: nur bei tatsächlich auffälliger Veränderung (siehe
+             is_notable, vom Backend anhand der Progression bestimmt) und nur, wenn genug
+             Datenpunkte für eine sinnvolle Linie vorhanden sind. Absichtlich sehr sparsam
+             (reines SVG, keine Chart-Bibliothek) - zeigt den Volumen-Verlauf über die
+             letzten bis zu 4 passenden Sessions. -->
+        <svg
+          v-if="row.isNotable && row.history.length >= 2"
+          class="delta-sparkline"
+          viewBox="0 0 100 30"
+          preserveAspectRatio="none"
+          :aria-label="t('feedbackHistory.deltaTrend') || 'Verlauf über die letzten Sessions'"
+        >
+          <polyline
+            :points="sparklinePoints(row.history)"
+            fill="none"
+            :stroke="sparklineColor(row.history)"
+            stroke-width="3"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
       </template>
     </div>
   </div>
@@ -48,6 +70,8 @@ const rows = computed(() => {
     .map(item => ({
       exercise: item.exercise,
       isFirstSession: !!item.is_first_session,
+      isNotable: !!item.is_notable,
+      history: Array.isArray(item.history) ? item.history.map(Number).filter(Number.isFinite) : [],
       setsChange: Number(item.sets_change) || 0,
       repsChange: Number(item.reps_change) || 0,
       weightChangeKg: Number(item.weight_change_kg) || 0
@@ -64,6 +88,31 @@ function chipClass(value) {
   if (value > 0) return 'delta-chip--up'
   if (value < 0) return 'delta-chip--down'
   return 'delta-chip--neutral'
+}
+
+// Reines SVG-Sparkline ohne Chart-Bibliothek - normalisiert die Werte auf eine feste
+// 100x30-Viewbox. Richtung (letzter vs. erster Punkt) bestimmt nur die Farbe, keine Wertung
+// im Text - siehe chipClass()/style.css für dieselbe Blau/Orange-Konvention.
+function sparklinePoints(history) {
+  const max = Math.max(...history)
+  const min = Math.min(...history)
+  const range = max - min || 1
+  const stepX = history.length > 1 ? 100 / (history.length - 1) : 0
+  return history
+    .map((value, index) => {
+      const x = index * stepX
+      const y = 29 - ((value - min) / range) * 27
+      return `${x.toFixed(1)},${y.toFixed(1)}`
+    })
+    .join(' ')
+}
+
+function sparklineColor(history) {
+  const first = history[0]
+  const last = history[history.length - 1]
+  if (last > first) return 'var(--info)'
+  if (last < first) return 'var(--warning)'
+  return 'var(--muted)'
 }
 </script>
 
@@ -111,5 +160,11 @@ function chipClass(value) {
 .delta-chip--neutral {
   color: var(--muted);
   background: var(--surface-strong);
+}
+
+.delta-sparkline {
+  width: 44px;
+  height: 18px;
+  flex-shrink: 0;
 }
 </style>

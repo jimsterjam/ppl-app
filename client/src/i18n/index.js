@@ -663,7 +663,8 @@ export const messages = {
       copiedToClipboard: 'In die Zwischenablage kopiert',
       deltaSets: 'Sätze',
       deltaReps: 'Wdh.',
-      deltaFirstSession: 'Erstes Training'
+      deltaFirstSession: 'Erstes Training',
+      deltaTrend: 'Verlauf über die letzten Sessions'
     },
     quickGenerator: {
       title: 'KI-Workout generieren',
@@ -1425,7 +1426,8 @@ export const messages = {
       copiedToClipboard: 'Copied to clipboard',
       deltaSets: 'sets',
       deltaReps: 'reps',
-      deltaFirstSession: 'First session'
+      deltaFirstSession: 'First session',
+      deltaTrend: 'Trend over recent sessions'
     },
     quickGenerator: {
       title: 'Generate AI Workout',

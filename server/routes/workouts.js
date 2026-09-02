@@ -13,7 +13,8 @@ import {
   calculateExerciseStats,
   analyzeWorkoutProgression,
   structureAnalysisForAI,
-  createSimpleExerciseFeedback
+  createSimpleExerciseFeedback,
+  buildVolumeHistory
 } from '../services/trainingAnalysisService.js';
 import { resolveEffectiveProfile } from '../services/exerciseAnalysisRules.js';
 import {
@@ -1524,14 +1525,25 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
     // sie ausschließlich aus den bereits vorliegenden Backend-Analysen (exerciseAnalyses)
     // stammt. Wird nur zusammen mit einem erfolgreichen ai_feedback persistiert (siehe unten),
     // damit Snapshot und Feedback-Text immer im gleichen Zustand bleiben.
-    const analysisSnapshot = exerciseAnalyses.map(ex => ({
-      exercise: ex.exercise,
-      sets_change: ex.changes?.sets_change ?? 0,
-      reps_change: ex.changes?.rep_change ?? 0,
-      weight_change_kg: ex.changes?.weight_change ?? 0,
-      volume_change_percent: ex.changes?.volume_change_percent ?? 0,
-      is_first_session: ex.progression === 'first_session'
-    }));
+    // Auffällig = tatsächlich als positive/negative Progression erkannt (siehe
+    // determineTrendWithProfile in exerciseAnalysisRules.js - berücksichtigt bereits
+    // Übungsprofile/Notizen). Nur für diese Übungen wird der kleine Verlauf (bis zu 4
+    // Datenpunkte) für die Mini-Trend-Grafik im Frontend gebaut - für stabile/erste Sessions
+    // lohnt sich das nicht und würde nur unnötig Daten durchreichen (User-Wunsch: "es müssen
+    // nicht alle Werte geladen werden").
+    const analysisSnapshot = exerciseAnalyses.map(ex => {
+      const isNotable = ex.progression === 'positive' || ex.progression === 'negative';
+      return {
+        exercise: ex.exercise,
+        sets_change: ex.changes?.sets_change ?? 0,
+        reps_change: ex.changes?.rep_change ?? 0,
+        weight_change_kg: ex.changes?.weight_change ?? 0,
+        volume_change_percent: ex.changes?.volume_change_percent ?? 0,
+        is_first_session: ex.progression === 'first_session',
+        is_notable: isNotable,
+        history: isNotable ? buildVolumeHistory(ex.exercise, currentWorkout, allWorkouts, 4) : []
+      };
+    });
 
     // 5c. Erfolgreiches Feedback am Workout persistieren (für späteres Wiederabrufen)
     if (aiResult?.feedback) {

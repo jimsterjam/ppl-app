@@ -261,6 +261,51 @@ export function analyzeWorkoutProgression(currentWorkout, allWorkouts, profileMa
 }
 
 /**
+ * Kompakter Volumen-Verlauf einer einzelnen Übung über die letzten paar passenden Sessions
+ * (aktuelle Session + bis zu maxPoints-1 vorherige), für eine Mini-Trend-Grafik im Frontend.
+ * Bewusst NUR für Übungen mit auffälliger Veränderung aufgerufen (siehe routes/workouts.js) -
+ * lädt keine zusätzlichen Daten aus der DB (allWorkouts ist bereits im Speicher), aber es wird
+ * nicht für jede Übung ein voller Verlauf ans Frontend geschickt, sondern nur wo es einen
+ * nennenswerten Unterschied gab (User-Wunsch: "es müssen nicht alle Werte geladen werden").
+ *
+ * @param {string} exerciseName
+ * @param {Object} currentWorkout
+ * @param {Array} allWorkouts - bereits geladen, DESC nach date/createdAt sortiert
+ * @param {number} [maxPoints=4] - Gesamtzahl der Datenpunkte inkl. aktueller Session
+ * @returns {number[]} Volumen-Werte, chronologisch aufsteigend (älteste zuerst, aktuelle zuletzt)
+ */
+export function buildVolumeHistory(exerciseName, currentWorkout, allWorkouts, maxPoints = 4) {
+  const currentStats = calculateExerciseStats(
+    (currentWorkout.exercises || []).find(e => (e.name || '').toLowerCase() === exerciseName.toLowerCase())
+  );
+  if (!currentStats) return [];
+
+  const currentDateMs = new Date(currentWorkout.date).getTime();
+  const currentCreatedMs = currentWorkout.createdAt ? new Date(currentWorkout.createdAt).getTime() : 0;
+
+  const isStrictlyBeforeCurrent = (w) => {
+    const wDateMs = new Date(w.date).getTime();
+    if (wDateMs !== currentDateMs) return wDateMs < currentDateMs;
+    const wCreatedMs = w.createdAt ? new Date(w.createdAt).getTime() : 0;
+    return wCreatedMs < currentCreatedMs;
+  };
+
+  const priorMatches = (allWorkouts || [])
+    .filter(w => w._id.toString() !== currentWorkout._id.toString())
+    .filter(isStrictlyBeforeCurrent)
+    .filter(w => (w.exercises || []).some(e => (e.name || '').toLowerCase() === exerciseName.toLowerCase()))
+    .slice(0, Math.max(0, maxPoints - 1));
+
+  const priorVolumes = priorMatches
+    .map(w => calculateExerciseStats((w.exercises || []).find(e => (e.name || '').toLowerCase() === exerciseName.toLowerCase())))
+    .filter(Boolean)
+    .map(stats => stats.volume)
+    .reverse(); // allWorkouts ist DESC sortiert -> älteste zuerst für die Grafik
+
+  return [...priorVolumes, currentStats.volume];
+}
+
+/**
  * Strukturiere Trainingsanalysen für AI-Eingabe
  * Dies ist der "Mini-Datensatz" den das LLM erhält
  *
@@ -386,7 +431,8 @@ export default {
   analyzeExercise,
   analyzeWorkoutProgression,
   structureAnalysisForAI,
-  createSimpleExerciseFeedback
+  createSimpleExerciseFeedback,
+  buildVolumeHistory
 };
 
 // Hinweis: determineTrend() (rein gewicht-/volumenbasiert) bleibt unverändert exportiert und

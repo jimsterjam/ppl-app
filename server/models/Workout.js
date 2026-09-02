@@ -118,7 +118,12 @@ const workoutSchema = new mongoose.Schema({
     reps_change: { type: Number, default: 0 },
     weight_change_kg: { type: Number, default: 0 },
     volume_change_percent: { type: Number, default: 0 },
-    is_first_session: { type: Boolean, default: false }
+    is_first_session: { type: Boolean, default: false },
+    // Nur gesetzt, wenn die Übung eine tatsächlich auffällige Veränderung zeigt (siehe
+    // routes/workouts.js) - "history" enthält dann bis zu 4 Volumen-Werte (älteste zuerst,
+    // aktuelle Session zuletzt) für eine kleine Trend-Grafik im Frontend.
+    is_notable: { type: Boolean, default: false },
+    history: [{ type: Number }]
   }]
 }, {
   timestamps: true
