@@ -31,16 +31,16 @@
 
         <ul class="nav-list">
           <li
-            v-for="(link, index) in links"
+            v-for="link in visibleLinks"
             :key="link.path"
             class="nav-item"
-            :ref="el => setNavItemRef(el, index)"
+            :ref="el => setNavItemRef(el, link.path)"
           >
             <button
               class="nav-btn"
               :class="{ active: $route.path.startsWith(link.path) }"
               :aria-current="$route.path.startsWith(link.path) ? 'page' : undefined"
-              @click="onNavClick(index, link.path)"
+              @click="onNavClick(link.path, link.path)"
             >
               <span class="icon" aria-hidden="true">
                 <component :is="link.icon" class="icon-svg" />
@@ -50,14 +50,15 @@
           </li>
           <li
             v-if="activeWorkout"
+            key="workout"
             class="nav-item workout-item"
-            :ref="el => setNavItemRef(el, links.length)"
+            :ref="el => setNavItemRef(el, WORKOUT_KEY)"
           >
             <button
               class="nav-btn workout-btn"
               :class="{ active: $route.path.startsWith('/workouts') }"
               :aria-current="$route.path.startsWith('/workouts') ? 'page' : undefined"
-              @click="$router.push(`/workouts/${activeWorkout._id}`)"
+              @click="onNavClick(WORKOUT_KEY, `/workouts/${activeWorkout._id}`)"
               title="Zum laufenden Workout"
             >
               <span class="icon workout-icon" aria-hidden="true">
@@ -123,14 +124,15 @@ const activeWorkout = computed(() => {
 // Kleiner Innenabstand (INSET) sorgt dafür, dass die Pille nicht ganz bis an die Nachbar-Items
 // reicht, wie im Video zu sehen.
 const PILL_INSET = 4
-// Mindestbreite der Pille: sobald der Workout-Tab dazukommt, teilen sich 6 statt 5 Items die
-// Nav-Breite (space-around), jedes Item wird schmaler - ohne Untergrenze würde die Pille dann
-// spürbar kleiner wirken, obwohl der User erwartet, dass sie "ausreichend groß" bleibt.
+// Mindestbreite der Pille: die Tab-Anzahl bleibt jetzt konstant bei 5 (FAQ weicht während eines
+// laufenden Workouts dem Workout-Tab, siehe visibleLinks), trotzdem als defensive Untergrenze für
+// sehr schmale Displays behalten - ohne sie würde die Pille bei sehr wenig Platz pro Item spürbar
+// kleiner wirken, obwohl der User erwartet, dass sie "ausreichend groß" bleibt.
 const PILL_MIN_WIDTH = 48
 
 // Berechnet die Pillen-Position/-Breite für ein Nav-Item, zentriert auf dessen Mittelpunkt,
 // mit Untergrenze PILL_MIN_WIDTH (kann dadurch etwas über die Item-Ränder hinausragen, das ist
-// bei 6 eng gepackten Tabs gewollt statt einer kaum sichtbaren Pille).
+// bei eng gepackten Tabs auf schmalen Displays gewollt statt einer kaum sichtbaren Pille).
 // Zusätzliche Breite gegenüber dem reinen Item-Inset - User-Feedback: Pille wirkte trotz
 // des Höhen-Fixes zu schmal für Icon+Label.
 const PILL_EXTRA_WIDTH = 5
@@ -146,11 +148,11 @@ function computePillRect(rect) {
   return { left, width }
 }
 
-function onNavClick(index, path) {
+function onNavClick(key, path) {
   // Pille sofort optimistisch zum Ziel bewegen, unabhängig davon, ob die
   // Zielseite lazy-geladen wird und die Navigation dadurch etwas dauert —
   // das native Tab-Bar-Gefühl braucht sofortiges visuelles Feedback.
-  const el = navItemRefs.value[index]
+  const el = navItemRefs.value[key]
   const rect = getItemRectRelativeToContainer(el)
   if (rect) {
     pillPosition.value = computePillRect(rect)
@@ -220,9 +222,40 @@ const links = [
   { get label() { return t('nav.settings') }, path: '/settings', icon: Settings }
 ]
 
+// Solange ein Workout läuft, wird FAQ ausgeblendet statt den Workout-Tab einfach als 6.
+// Element anzuhängen - dadurch bleibt die Tab-Anzahl konstant bei 5 und die Pille (bzw. jedes
+// einzelne Tab-Item) ändert beim Start/Ende eines Workouts nicht ihre Breite. FAQ ist inhaltlich
+// am ehesten verzichtbar während eines laufenden Workouts (statische Referenz, kein Zeitdruck)
+// und bleibt über die Route weiterhin erreichbar, nur eben nicht als Tab sichtbar.
+const HIDDEN_DURING_WORKOUT_PATHS = ['/faqs']
+
+const visibleLinks = computed(() => {
+  if (!activeWorkout.value) return links
+  return links.filter(link => !HIDDEN_DURING_WORKOUT_PATHS.includes(link.path))
+})
+
+// Fester Schlüssel für den Workout-Tab (kein echter Route-Pfad, da der Ziel-Pfad die
+// Workout-_id enthält und sich damit während eines laufenden Workouts nicht ändert, aber
+// zwischen verschiedenen Workouts unterscheiden würde).
+const WORKOUT_KEY = '__workout__'
+
+// Alle aktuell sichtbaren Nav-Items in Anzeigereihenfolge, inkl. Workout-Tab - ersetzt die
+// vorherige Index-Rechnung (links.length als "virtueller" Workout-Index), die bei einer
+// dynamisch gefilterten links-Liste nicht mehr stabil wäre.
+const orderedNavItems = computed(() => {
+  const items = visibleLinks.value.map(link => ({ key: link.path, path: link.path }))
+  if (activeWorkout.value) {
+    items.push({ key: WORKOUT_KEY, path: `/workouts/${activeWorkout.value._id}` })
+  }
+  return items
+})
+
 // ── Gooey-Pill: Position, Snap-Animation, Drag-Interaktion ──────────────────
 const navContainerRef = ref(null)
-const navItemRefs = ref([])
+// Key-basiert (Tab-Pfad bzw. WORKOUT_KEY) statt Index-basiert: die Anzahl/Reihenfolge der
+// sichtbaren Tabs ändert sich jetzt zur Laufzeit (FAQ verschwindet/erscheint), Indizes wären
+// dabei nicht stabil zuzuordnen.
+const navItemRefs = ref({})
 const pillPosition = ref({ left: 0, width: 0 })
 const isDragging = ref(false)
 
@@ -234,15 +267,21 @@ const pillStyle = computed(() => ({
     : 'transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1), width 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)'
 }))
 
-function setNavItemRef(el, index) {
-  if (el) navItemRefs.value[index] = el
+function setNavItemRef(el, key) {
+  // Vue ruft Function-Refs beim Unmount des Elements mit null auf (z.B. wenn FAQ beim
+  // Workout-Start aus visibleLinks verschwindet) - alten Eintrag dann entfernen, sonst
+  // würde ein veralteter/nicht mehr im DOM befindlicher Node hier hängen bleiben.
+  if (el) {
+    navItemRefs.value[key] = el
+  } else {
+    delete navItemRefs.value[key]
+  }
 }
 
-function currentActiveIndex() {
-  const workoutIndex = links.length
-  if (activeWorkout.value && route.path.startsWith('/workouts')) return workoutIndex
-  const idx = links.findIndex(link => route.path.startsWith(link.path))
-  return idx === -1 ? 0 : idx
+function currentActiveKey() {
+  if (activeWorkout.value && route.path.startsWith('/workouts')) return WORKOUT_KEY
+  const match = visibleLinks.value.find(link => route.path.startsWith(link.path))
+  return match ? match.path : (visibleLinks.value[0]?.path ?? null)
 }
 
 function getItemRectRelativeToContainer(el) {
@@ -257,8 +296,8 @@ function getItemRectRelativeToContainer(el) {
 }
 
 function updatePillPosition(retriesLeft = 3) {
-  const activeIndex = currentActiveIndex()
-  const el = navItemRefs.value[activeIndex]
+  const activeKey = currentActiveKey()
+  const el = activeKey != null ? navItemRefs.value[activeKey] : null
   const rect = getItemRectRelativeToContainer(el)
   if (!rect) return
   // Defensive Untergrenze: eine plausible Tab-Breite liegt immer deutlich über 20px. Eine
@@ -325,24 +364,22 @@ function onPillPointerUp() {
 
   // Nächstgelegenes Nav-Item anhand der Mittelpunkt-Distanz zur Pille bestimmen
   const pillCenter = pillPosition.value.left + pillPosition.value.width / 2
-  let nearestIndex = 0
+  let nearestItem = null
   let nearestDist = Infinity
 
-  navItemRefs.value.forEach((el, idx) => {
+  orderedNavItems.value.forEach((item) => {
+    const el = navItemRefs.value[item.key]
     const rect = getItemRectRelativeToContainer(el)
     if (!rect) return
     const center = rect.left + rect.width / 2
     const dist = Math.abs(center - pillCenter)
     if (dist < nearestDist) {
       nearestDist = dist
-      nearestIndex = idx
+      nearestItem = item
     }
   })
 
-  const isWorkoutTarget = nearestIndex === links.length
-  const target = isWorkoutTarget
-    ? (activeWorkout.value ? `/workouts/${activeWorkout.value._id}` : null)
-    : links[nearestIndex]?.path
+  const target = nearestItem?.path
 
   if (target && !route.path.startsWith(target)) {
     router.push(target)
