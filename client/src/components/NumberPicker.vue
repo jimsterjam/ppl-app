@@ -467,7 +467,7 @@ onMounted(() => {
   box-shadow: 0 -10px 30px rgba(0,0,0,0.2);
 }
 .picker-header { display:flex; align-items:center; justify-content:space-between; padding:8px 4px }
-.picker-header .title { font-weight:700 }
+.picker-header .title { font-weight:700; font-family: var(--font-heading); }
 .btn { background: transparent; border: none; padding: 8px 12px; font-size: 16px }
 .btn.primary { color: var(--accent) }
 
