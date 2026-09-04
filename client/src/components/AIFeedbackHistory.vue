@@ -79,6 +79,7 @@ import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Share2 } from 'lucide-vue-next'
 import { Share } from '@capacitor/share'
+import { generateFeedbackShareImage } from '@/utils/feedbackShareImage'
 import AiFeedbackDeltaSummary from '@/components/AiFeedbackDeltaSummary.vue'
 import AiFeedbackRatingWidget from '@/components/AiFeedbackRatingWidget.vue'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
@@ -140,10 +141,23 @@ async function shareFeedback(item) {
     return
   }
 
+  // Zusätzlich ein Bild rendern ("Stufe 1" der Instagram-Anbindung, siehe
+  // utils/feedbackShareImage.js), damit Instagram-Stories/-Reels als Ziel im Share-Sheet
+  // auftauchen (die verlangen Bild-/Videoinhalt, reiner Text reicht ihnen nicht). Rein additiv:
+  // schlägt die Erzeugung fehl, bleibt es beim bisherigen Text-Only-Share, kein Fehler sichtbar.
+  const imageUri = await generateFeedbackShareImage(item, {
+    dateLabel,
+    footerText: t('feedbackHistory.shareFooter') || 'Erstellt mit der ppl App'
+  }).catch((err) => {
+    logger.debug('[AIFeedbackHistory] Share-Bild-Erzeugung fehlgeschlagen', err?.message)
+    return null
+  })
+
   try {
     await Share.share({
       title: t('feedbackHistory.shareTitle') || 'KI-Feedback',
       text,
+      ...(imageUri ? { files: [imageUri] } : {}),
       dialogTitle: t('feedbackHistory.shareTitle') || 'KI-Feedback teilen'
     })
   } catch (err) {
