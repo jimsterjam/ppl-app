@@ -397,15 +397,21 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
       ...(ex.profileHint ? { profile_hint: ex.profileHint } : {})
     })),
 
-    // Top-Übungen für AI-Schwerpunkt
+    // Top-Übungen für AI-Schwerpunkt. weight_change_kg bewusst mit ausgegeben (additiv,
+    // gehört bereits zu ex.changes) - eine reine Volumenveränderung ohne Gewichtsbezug kann
+    // die KI sonst dazu verleiten, einen Volumenrückgang isoliert zu bewerten, obwohl im
+    // selben Zeitraum z.B. das Gewicht gestiegen ist (bewusster Tausch Volumen<->Intensität,
+    // siehe "Keine automatische Bewertung von Gewichts-/Volumenveränderungen" im System-Prompt).
     top_improvements: topProgress.map(ex => ({
       exercise: ex.exercise,
-      volume_change_percent: ex.changes.volume_change_percent
+      volume_change_percent: ex.changes.volume_change_percent,
+      weight_change_kg: ex.changes.weight_change
     })),
 
     top_declines: topDeclines.map(ex => ({
       exercise: ex.exercise,
-      volume_change_percent: ex.changes.volume_change_percent
+      volume_change_percent: ex.changes.volume_change_percent,
+      weight_change_kg: ex.changes.weight_change
     }))
   };
 }
