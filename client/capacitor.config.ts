@@ -15,7 +15,10 @@ const config: CapacitorConfig = {
   ios: {
     scheme: 'com.pushpulllegs.com',
     allowsLinkPreview: false,
-    loggingBehavior: 'debug', // oder 'production'
+    // War fest auf 'debug' - das griff dadurch auch in jedem Release/TestFlight-Build (cap sync
+    // unterscheidet hier nicht zwischen Dev und Release). Jetzt 'production' (nur Fehler) als
+    // Default; für lokales Debugging gezielt VITE_CAP_LOGGING_DEBUG=true in der .env setzen.
+    loggingBehavior: String(process.env.VITE_CAP_LOGGING_DEBUG || '').toLowerCase() === 'true' ? 'debug' : 'production',
   },
   plugins: {
     CapacitorHttp: {

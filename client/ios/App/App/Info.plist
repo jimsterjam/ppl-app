@@ -30,6 +30,11 @@
     <key>CFBundleVersion</key>
     <string>$(CURRENT_PROJECT_VERSION)</string>
 
+    <!-- App nutzt ausschließlich Standard-HTTPS (kein eigenes/proprietäres Verschlüsselungsverfahren) -
+         damit fragt App Store Connect nicht mehr bei jedem Upload nach der Export-Compliance-Angabe. -->
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
+
     <key>LSRequiresIPhoneOS</key>
     <true/>
 
