@@ -34,6 +34,13 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     target.build_configurations.each do |config|
       config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '17.0'
+
+      # Fix für "Invalid Signature ... not properly signed" beim App-Store-Connect-Upload:
+      # Pod-Frameworks (z.B. IONFilesystemLib) bekommen sonst beim Build eine eigene, separate
+      # Signatur (oft nur Ad-hoc/"Sign to Run Locally") statt automatisch die Distribution-
+      # Signatur der Haupt-App zu übernehmen. Einzelsignierung der Pod-Targets hier deaktivieren -
+      # beim Einbetten in die App übernimmt Xcode dann automatisch die korrekte Signatur.
+      config.build_settings['CODE_SIGNING_ALLOWED'] = 'NO'
     end
   end
 end
