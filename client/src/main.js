@@ -19,7 +19,10 @@ import { setDownloadConcurrency } from '@/utils/assetResolver'
 import { setupAutoSync, processSyncQueue } from '@/utils/syncManager'
 import { saveWorkoutService } from '@/utils/SaveWorkoutService'
 import { deleteWorkoutOffline, OFFLINE_WORKOUTS_UPDATED_EVENT } from '@/utils/offlineStorage'
-import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
+// Bewusst NICHT statisch importiert (siehe warmupExercisesArea unten): defaultExercisesLoader.js
+// importiert die ~3,3MB große Übungsdatenbank (default-exercises.json) statisch - ein Top-Level-
+// Import hier würde sie fest in den Haupt-Bundle-Chunk backen, obwohl sie erst gebraucht wird,
+// wenn der Übungen-Bereich tatsächlich geöffnet wird (Ursache der "chunk > 500kB"-Build-Warnung).
 
 const APP_RESUME_STATE_KEY = 'app_resume_state_v1'
 const APP_RESUME_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000
@@ -94,7 +97,7 @@ function warmupExercisesArea() {
     Promise.all([
       import('./views/ExercisesView.vue'),
       import('./components/ExerciseList.vue'),
-      loadDefaultExercises().catch(() => null)
+      import('@/utils/defaultExercisesLoader').then((m) => m.loadDefaultExercises()).catch(() => null)
     ]).catch(() => null)
   }
 

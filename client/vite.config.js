@@ -27,6 +27,14 @@ export default defineConfig({
     }
   },
   build: {
+    // Der einzige verbleibende Chunk über der Default-Grenze (500kB) ist die ~3,3MB große
+    // Übungsdatenbank (default-exercises.json, via defaultExercisesLoader.js) - die ist
+    // bewusst per dynamic import() aus dem Haupt-Bundle ausgelagert (siehe main.js,
+    // warmupExercisesArea) und wird erst geladen, wenn der Übungen-Bereich tatsächlich
+    // gebraucht wird bzw. kurz nach App-Start im Hintergrund vorgeladen (requestIdleCallback).
+    // Sie blockiert damit nicht mehr den initialen App-Start - die Standard-Warnung würde hier
+    // trotzdem weiter anschlagen, weil sie pro Chunk und nicht "nur im kritischen Pfad" prüft.
+    chunkSizeWarningLimit: 3000,
     rollupOptions: {
       output: {
         manualChunks(id) {
