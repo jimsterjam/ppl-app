@@ -60,5 +60,13 @@
     "typescript": "^5.9.3",
     "vite": "^7.2.2",
     "vitest": "^2.1.9"
+  },
+  "allowScripts": {
+    "sharp@0.34.5": true,
+    "@clerk/shared@3.47.8": true,
+    "@firebase/util@1.15.3": true,
+    "protobufjs@7.6.6": true,
+    "esbuild@0.28.2": true,
+    "esbuild@0.21.5": true
   }
 }

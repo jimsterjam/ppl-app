@@ -314,7 +314,7 @@ body::before {
 .toast-host.top { top: var(--safe-top); }
 .toast-host.bottom { bottom: var(--safe-bottom); }
 
-img, canvas, svg { max-width: 100%; display: block; }
+img, canvas, svg { max-width: 100%; display: inline-block; }
 .main-content { max-width: 100%; overflow-x: hidden; }
 .safe-area-top { padding-top: var(--safe-top); }
 .safe-area-bottom { padding-bottom: var(--safe-bottom); }
@@ -382,8 +382,8 @@ button,
   border: none;
   border-radius: 18px;
   padding: 14px 20px;
-  font-family: 'Space Grotesk', 'Inter', sans-serif;
-  font-weight: 600;
+  font-family: inherit, 'Inter', sans-serif;
+  /* font-weight: 600; */
   font-size: 0.95rem;
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
