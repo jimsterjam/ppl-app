@@ -302,7 +302,7 @@ onMounted(async () => {
   justify-content: center;
   /* War vorher 2.25rem/18px-Icon - auf einem Telefon kaum antippbar/erkennbar. Apple/Google
      empfehlen mind. 44x44px Tap-Ziel für Buttons - jetzt entsprechend größer. */
-  width: 3rem;
+  /* width: 3rem; */
   height: 3rem;
   border-radius: 999px;
   border: 1px solid var(--line-soft);

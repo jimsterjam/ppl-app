@@ -132,67 +132,73 @@
         </div>
       </section>
 
-      <!-- Development Tools Section -->
-      <section v-if="isDevelopment" class="card dev-tools">
-        <h3>🧪 Developer Tools</h3>
-        <p class="hint">Features testing and debugging tools</p>
-        <button class="dev-btn" @click="goToFeatureTest">
-          🚀 Open Features Test Dashboard
-        </button>
-        <button class="dev-btn" @click="copyIdToken">
-          {{ $t('settings.copyTokenDev') }}
-        </button>
-        <button class="dev-btn" @click="clearDraftDebugLog">
-          🧹 Draft-Debug-Log leeren (vor Reproduce antippen)
-        </button>
-        <button class="dev-btn" @click="copyDraftDebugLog">
-          🩺 Draft-Debug-Log kopieren
-        </button>
-        <div class="dev-plan-toggle">
-          <div class="plan-status">
-            <div>
-              <span>Current plan:</span>
-              <strong>{{ subscription.plan }}</strong>
+      <!-- Development Tools Section - nur im lokalen `npm run dev` sichtbar (import.meta.env.DEV),
+           NICHT in gebauten Builds (TestFlight/App Store). Vorher gab es hier zusätzlich einen
+           Fünffach-Tap-Unlock, der über localStorage auch in Produktions-Builds funktionierte -
+           damit konnte jeder TestFlight-Tester die QA-Tools freischalten. Jetzt komplett aus dem
+           Build-Output entfernt statt nur "versteckt". -->
+      <template v-if="isDevBuild">
+        <section v-if="isDevelopment" class="card dev-tools">
+          <h3>🧪 Developer Tools</h3>
+          <p class="hint">Features testing and debugging tools</p>
+          <button class="dev-btn" @click="goToFeatureTest">
+            🚀 Open Features Test Dashboard
+          </button>
+          <button class="dev-btn" @click="copyIdToken">
+            {{ $t('settings.copyTokenDev') }}
+          </button>
+          <button class="dev-btn" @click="clearDraftDebugLog">
+            🧹 Draft-Debug-Log leeren (vor Reproduce antippen)
+          </button>
+          <button class="dev-btn" @click="copyDraftDebugLog">
+            🩺 Draft-Debug-Log kopieren
+          </button>
+          <div class="dev-plan-toggle">
+            <div class="plan-status">
+              <div>
+                <span>Current plan:</span>
+                <strong>{{ subscription.plan }}</strong>
+              </div>
+              <span v-if="devPlanOverride" class="override-chip">Override: {{ devPlanOverride }}</span>
+              <span v-else class="override-chip ghost">Override inactive</span>
             </div>
-            <span v-if="devPlanOverride" class="override-chip">Override: {{ devPlanOverride }}</span>
-            <span v-else class="override-chip ghost">Override inactive</span>
+            <div class="dev-plan-buttons">
+              <button
+                v-for="plan in devPlanOptions"
+                :key="plan"
+                class="dev-plan-btn"
+                :class="{ active: (devPlanOverride || subscription.plan) === plan }"
+                @click="forcePlan(plan)"
+              >
+                {{ planLabels[plan] }}
+              </button>
+              <button
+                class="dev-plan-btn ghost"
+                :disabled="!devPlanOverride"
+                @click="clearDevPlan"
+              >
+                Clear Override
+              </button>
+              <button
+                class="dev-plan-btn ghost danger"
+                @click="disableDevTools"
+              >
+                Hide Dev Tools
+              </button>
+            </div>
+            <p class="hint tiny">Local-only override. Clear storage to reset.</p>
           </div>
-          <div class="dev-plan-buttons">
-            <button
-              v-for="plan in devPlanOptions"
-              :key="plan"
-              class="dev-plan-btn"
-              :class="{ active: (devPlanOverride || subscription.plan) === plan }"
-              @click="forcePlan(plan)"
-            >
-              {{ planLabels[plan] }}
-            </button>
-            <button
-              class="dev-plan-btn ghost"
-              :disabled="!devPlanOverride"
-              @click="clearDevPlan"
-            >
-              Clear Override
-            </button>
-            <button
-              class="dev-plan-btn ghost danger"
-              @click="disableDevTools"
-            >
-              Hide Dev Tools
-            </button>
-          </div>
-          <p class="hint tiny">Local-only override. Clear storage to reset.</p>
-        </div>
-      </section>
-      <section v-else class="card dev-unlock">
-        <h3>🔒 Developer Tools</h3>
-        <p class="hint">Tap the badge below five times to unlock QA controls on this device.</p>
-        <button class="dev-unlock-badge" @click="handleDevUnlockTap">
-          <span v-if="devTapCount === 0">Tap 5x to unlock</span>
-          <span v-else>{{ tapsRemaining }} more tap{{ tapsRemaining === 1 ? '' : 's' }}</span>
-        </button>
-        <p class="hint tiny">Unlock state lives in localStorage and never syncs to production users.</p>
-      </section>
+        </section>
+        <section v-else class="card dev-unlock">
+          <h3>🔒 Developer Tools</h3>
+          <p class="hint">Tap the badge below five times to unlock QA controls on this device.</p>
+          <button class="dev-unlock-badge" @click="handleDevUnlockTap">
+            <span v-if="devTapCount === 0">Tap 5x to unlock</span>
+            <span v-else>{{ tapsRemaining }} more tap{{ tapsRemaining === 1 ? '' : 's' }}</span>
+          </button>
+          <p class="hint tiny">Unlock state lives in localStorage and never syncs to production users.</p>
+        </section>
+      </template>
 
       <section class="card">
         <h3>{{ $t('settings.legalTitle') }}</h3>
@@ -902,6 +908,11 @@ onBeforeUnmount(() => {
 })
 
 const isDevelopment = computed(() => import.meta.env.DEV || devToolsUnlocked.value)
+
+// Steuert, ob die komplette Developer-Tools-Sektion (inkl. Tap-Unlock-Badge) überhaupt gerendert
+// wird - true nur im lokalen `npm run dev`. In jedem `vite build`-Output (also auch TestFlight)
+// ist das false, die Sektion verschwindet komplett statt nur "versteckt" zu sein.
+const isDevBuild = import.meta.env.DEV
 
 // Navigation to features test
 const goToFeatureTest = () => {
