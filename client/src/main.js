@@ -11,7 +11,7 @@ import { useAuthStore } from './stores/authStore'
 import { useUserStore } from './stores/userStore'
 import { useSettingsStore } from './stores/settingsStore'
 import { useTimerStore } from './stores/timerStore'
-import { initFirebaseAuth, useFirebaseAuth } from './utils/firebaseAuth'
+import { initFirebaseAuth, useFirebaseAuth, isEffectivelyEmailVerified } from './utils/firebaseAuth'
 import { App as CapacitorApp } from '@capacitor/app'
 import { logger } from '@/utils/logger'
 import { setCacheLimits } from '@/utils/assetCache'
@@ -203,7 +203,10 @@ async function bootstrapAuth() {
         // Sicherheitsfix: fehlte bisher komplett - isAuthenticated in authStore.js prüft das
         // jetzt zusätzlich, damit ein Firebase-Session-Objekt mit emailVerified=false (egal auf
         // welchem Weg zustande gekommen) nicht automatisch vollen App-Zugriff gewährt.
-        emailVerified: user.emailVerified,
+        // isEffectivelyEmailVerified() behandelt Apple/Google-Logins zusätzlich als verifiziert,
+        // auch wenn Firebase user.emailVerified dafür nicht zuverlässig auf true setzt (siehe
+        // Kommentar in firebaseAuth.js) - sonst verlieren genau diese Nutzer den Datenzugriff.
+        emailVerified: isEffectivelyEmailVerified(user),
       }, token)
 
       if (token) {

@@ -120,6 +120,22 @@ let initPromise = null
 
 /* ------------------------------ INITIALIZE ------------------------------ */
 
+// BUGFIX: Apple-Sign-In-Nutzer verloren nach der Einführung der E-Mail-Verifizierungspflicht
+// plötzlich den Zugriff auf ihre eigenen Daten. Ursache: Firebase setzt bei "Sign in with Apple"
+// (anders als bei Google) user.emailVerified nicht zuverlässig auf true, obwohl Apple die
+// Kontoinhaberschaft bereits selbst geprüft hat. Eine zusätzliche eigene E-Mail-Bestätigung
+// ergibt bei einem föderierten Login (Google/Apple) ohnehin keinen Sicherheitsgewinn - der
+// Nutzer konnte nie eine ihm nicht gehörende E-Mail-Adresse behaupten, anders als bei der
+// klassischen Registrierung per E-Mail/Passwort, für die diese Prüfung eingeführt wurde.
+// Diese Helper-Funktion wird sowohl in main.js (onAuthStateChanged) als auch im Router-Guard
+// verwendet, damit beide Stellen konsistent entscheiden.
+export function isEffectivelyEmailVerified(user) {
+  if (!user) return false
+  if (user.emailVerified === true) return true
+  const providers = Array.isArray(user.providerData) ? user.providerData : []
+  return providers.some((p) => p?.providerId && p.providerId !== 'password')
+}
+
 export async function initFirebaseAuth() {
   if (initPromise) return initPromise
 

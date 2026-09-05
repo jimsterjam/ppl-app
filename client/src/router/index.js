@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
 import { useAuthStore } from '@/stores/authStore'
-import { useFirebaseAuth } from '@/utils/firebaseAuth'
+import { useFirebaseAuth, isEffectivelyEmailVerified } from '@/utils/firebaseAuth'
 import { logger } from '@/utils/logger'
 import { isOnline } from '@/utils/offlineStorage'
 
@@ -132,7 +132,10 @@ router.beforeEach(async (to, from, next) => {
         // kippen liess. Das umging den Email-Verifizierungs-Schutz und war zugleich Ursache
         // für das kurze "Dashboard blitzt auf und man wird sofort wieder ausgeloggt" beim
         // Registrieren (Firebase loggt beim Signup kurzzeitig echt ein, bevor signOut() greift).
-        emailVerified: currentUser.emailVerified
+        // isEffectivelyEmailVerified() statt currentUser.emailVerified direkt: Apple-Logins
+        // setzen dieses Feld bei Firebase nicht zuverlässig auf true, obwohl der Account bereits
+        // über Apple verifiziert ist - sonst verlieren Apple-Nutzer hier den Datenzugriff.
+        emailVerified: isEffectivelyEmailVerified(currentUser)
       }, token)
     }
   }
