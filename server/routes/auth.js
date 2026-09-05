@@ -395,6 +395,27 @@ router.post('/google-native', async (req, res) => {
       authProvider: 'google-native'
     };
 
+    // Zusätzlich zur Custom Claim (oben) auch das echte emailVerified-Feld auf dem Firebase-
+    // User-Record setzen. Ohne das bleibt das reguläre decodedToken.email_verified auf jedem
+    // späteren, normal ausgestellten ID-Token dieses Nutzers false, obwohl Google die E-Mail
+    // bereits als verifiziert bestätigt hat - das würde seit der neuen Verifizierungspflicht in
+    // firebaseAuthMiddleware.js jeden weiteren Request dieses Nutzers blockieren.
+    if (payload?.email_verified && resolvedEmail) {
+      try {
+        await admin.auth().updateUser(canonicalUid, { email: resolvedEmail, emailVerified: true });
+      } catch (err) {
+        if (err?.code === 'auth/user-not-found') {
+          try {
+            await admin.auth().createUser({ uid: canonicalUid, email: resolvedEmail, emailVerified: true });
+          } catch (createErr) {
+            logger.warn('[auth] could not create Firebase user record for google-native sign-in', createErr?.message || createErr);
+          }
+        } else {
+          logger.warn('[auth] could not update emailVerified on Firebase user record', err?.message || err);
+        }
+      }
+    }
+
     const customToken = await admin.auth().createCustomToken(canonicalUid, additionalClaims);
 
     res.json({

@@ -155,11 +155,34 @@ onMounted(() => {
     syncStoredVerificationLink()
 })
 
+// Eigene Mindestanforderungen fürs Passwort bei der Registrierung - Firebase selbst erzwingt
+// standardmäßig nur "mind. 6 Zeichen", das ist zu schwach. Rein clientseitig (die Firebase-
+// Auth-API wird direkt vom Client aufgerufen, es gibt keinen eigenen Server-Endpunkt für die
+// Kontoerstellung) - für eine strengere, serverseitig erzwungene Passwort-Policy müsste
+// zusätzlich in der Firebase Console unter Authentication -> Settings -> Password Policy
+// "Enforce password policy" aktiviert werden.
+const MIN_PASSWORD_LENGTH = 8
+function validatePasswordStrength(pw) {
+    if (String(pw || '').length < MIN_PASSWORD_LENGTH) {
+        return `Passwort muss mindestens ${MIN_PASSWORD_LENGTH} Zeichen lang sein.`
+    }
+    if (!/[a-zA-Z]/.test(pw) || !/[0-9]/.test(pw)) {
+        return 'Passwort muss mindestens einen Buchstaben und eine Zahl enthalten.'
+    }
+    return null
+}
+
 async function handleEmailAuth() {
     authError.value = ''
     authLoading.value = true
     try {
         if (isSignUp.value) {
+            const passwordError = validatePasswordStrength(password.value)
+            if (passwordError) {
+                authError.value = passwordError
+                authLoading.value = false
+                return
+            }
             const res = await signUpWithEmail(email.value, password.value)
             if (res && res.pendingEmailVerification) {
                 verificationSent.value = true
@@ -407,14 +430,17 @@ watch(() => route.query?.emailVerified, (val) => {
                     required 
                     class="auth-input"
                 >
-                <input 
-                    v-model="password" 
-                    type="password" 
-                    :placeholder="t('auth.password')" 
-                    required 
+                <input
+                    v-model="password"
+                    type="password"
+                    :placeholder="t('auth.password')"
+                    required
+                    :minlength="isSignUp ? 8 : undefined"
+                    :autocomplete="isSignUp ? 'new-password' : 'current-password'"
                     class="auth-input"
                 >
-                <button 
+                <p v-if="isSignUp" class="password-hint">Mindestens 8 Zeichen, mit Buchstaben und Zahl.</p>
+                <button
                     type="submit" 
                     :disabled="authLoading" 
                     class="auth-btn primary"
@@ -622,6 +648,12 @@ watch(() => route.query?.emailVerified, (val) => {
         background: var(--surface);
         color: var(--fg);
         font-size: 16px;
+    }
+
+    .password-hint {
+        margin: -8px 0 0;
+        font-size: 0.8rem;
+        color: var(--muted);
     }
 
     .auth-btn {
