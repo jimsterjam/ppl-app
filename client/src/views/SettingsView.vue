@@ -73,6 +73,15 @@
 
       <h2 class="section-title">{{ $t('settings.profileSection') }}</h2>
 
+      <section v-if="accountEmail || accountProviderLabel" class="card card--profile account-info-card">
+        <h3>{{ $t('settings.accountInfoTitle') || 'Angemeldet als' }}</h3>
+        <p class="account-email">{{ accountEmail || '—' }}</p>
+        <p v-if="accountProviderLabel" class="hint">{{ $t('settings.accountInfoProvider', { provider: accountProviderLabel }) || `Login über ${accountProviderLabel}` }}</p>
+        <p class="hint account-info-note">
+          {{ $t('settings.accountInfoNote') || 'Hinweis: E-Mail/Passwort-, Google- und Apple-Login sind eigenständige Konten. Meldest du dich über einen anderen Anbieter an, siehst du nicht automatisch dieselben Workouts.' }}
+        </p>
+      </section>
+
       <section class="card card--profile">
         <h3>{{ $t('settings.profilePicture') }}</h3>
         <p class="hint">{{ $t('settings.profilePictureHint') }}</p>
@@ -398,6 +407,7 @@ import { useSettingsStore } from '@/stores/settingsStore'
 import { useUserStore } from '@/stores/userStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useToastStore } from '@/stores/toastStore'
+import { useAuthStore } from '@/stores/authStore'
 import { useI18n } from 'vue-i18n'
 import { computed, ref, onBeforeUnmount, onMounted, watch, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
@@ -421,6 +431,20 @@ const colorModeOptions = computed(() => ([
   { value: 'violet', label: $t('settings.colorModeViolet') },
   { value: 'sunset', label: $t('settings.colorModeSunset') }
 ]))
+
+// Konto-Info: zeigt an, mit welcher E-Mail/Anbieter man gerade eingeloggt ist. Wichtig, weil
+// E-Mail/Passwort-, Google- und Apple-Logins bei Firebase eigenständige Konten ohne
+// automatische Verknüpfung sind - ohne diese Anzeige war für Nutzer nicht erkennbar, dass ein
+// "leeres" Konto nach Login mit einem anderen Anbieter schlicht ein anderes Konto ist.
+const authStore = useAuthStore()
+const accountEmail = computed(() => authStore.user?.email || '')
+const accountProviderLabel = computed(() => {
+  const providerId = authStore.user?.providerId || ''
+  if (providerId === 'apple.com') return 'Apple'
+  if (providerId === 'google.com') return 'Google'
+  if (providerId === 'password') return $t('settings.accountProviderPassword') || 'E-Mail/Passwort'
+  return ''
+})
 
 // Wochenziel
 const settings = useSettingsStore()
@@ -1426,6 +1450,18 @@ async function confirmDeleteAccount() {
 }
 
 .hint { color: var(--muted); margin: 4px 0 12px; }
+
+.account-email {
+  font-weight: 600;
+  font-size: 1.05rem;
+  margin: 4px 0 2px;
+  word-break: break-all;
+}
+
+.account-info-note {
+  font-size: 0.82rem;
+  margin-top: 4px;
+}
 
 .username-row {
   display: flex;

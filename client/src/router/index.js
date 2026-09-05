@@ -127,6 +127,7 @@ router.beforeEach(async (to, from, next) => {
         email: currentUser.email,
         displayName: currentUser.displayName,
         photoURL: currentUser.photoURL,
+        providerId: currentUser.providerData?.[0]?.providerId || null,
         // SICHERHEITSFIX: fehlte hier komplett - dadurch wurde emailVerified beim Restore auf
         // undefined gesetzt, was isAuthenticated (prüft nur "!== false") faelschlich auf true
         // kippen liess. Das umging den Email-Verifizierungs-Schutz und war zugleich Ursache

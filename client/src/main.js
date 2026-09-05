@@ -200,6 +200,10 @@ async function bootstrapAuth() {
         email: user.email,
         displayName: user.displayName,
         photoURL: user.photoURL,
+        // Für die Konto-Info-Anzeige in den Einstellungen (welcher Login-Anbieter gerade aktiv
+        // ist) - hilft Nutzern zu erkennen, dass E-Mail/Passwort-, Google- und Apple-Logins bei
+        // Firebase eigenständige, nicht automatisch verknüpfte Konten sind.
+        providerId: user.providerData?.[0]?.providerId || null,
         // Sicherheitsfix: fehlte bisher komplett - isAuthenticated in authStore.js prüft das
         // jetzt zusätzlich, damit ein Firebase-Session-Objekt mit emailVerified=false (egal auf
         // welchem Weg zustande gekommen) nicht automatisch vollen App-Zugriff gewährt.
