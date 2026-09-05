@@ -38,6 +38,16 @@ const suppressWatcher = ref(false)
 const verificationMessage = ref('')
 const showResendForExisting = ref(false)
 const attemptedEmail = ref('')
+// Getrennt von authError: reine Erfolgs-/Status-Meldungen (z.B. "E-Mail wurde gesendet"),
+// damit sie nicht versehentlich mit der roten Fehler-Optik angezeigt werden.
+const statusMessage = ref('')
+
+function toggleAuthMode() {
+    isSignUp.value = !isSignUp.value
+    authError.value = ''
+    statusMessage.value = ''
+    verificationMessage.value = ''
+}
 function getRedirectTarget() {
     const q = route.query?.redirect
     return typeof q === 'string' && q.startsWith('/') ? q : '/dashboard'
@@ -93,6 +103,7 @@ function validatePasswordStrength(pw) {
 
 async function handleEmailAuth() {
     authError.value = ''
+    statusMessage.value = ''
     authLoading.value = true
     try {
         if (isSignUp.value) {
@@ -105,7 +116,7 @@ async function handleEmailAuth() {
             const res = await signUpWithEmail(email.value, password.value)
             if (res && res.pendingEmailVerification) {
                 verificationSent.value = true
-                authError.value = 'Bestätigungs‑E‑Mail wurde gesendet. Bitte bestätige deine E‑Mail, bevor du dich anmeldest.'
+                statusMessage.value = 'Konto erstellt. Bestätigungs‑E‑Mail wurde gesendet - bitte bestätige deine E‑Mail, bevor du dich anmeldest.'
                 // switch back to sign-in view
                 isSignUp.value = false
                 // suppress watcher navigation for a short grace period to avoid brief auto-login redirect
@@ -153,16 +164,17 @@ async function handleRequestVerification() {
 
 async function handlePasswordReset() {
     if (!email.value) {
-        authError.value = 'Bitte E-Mail-Adresse eingeben'
+        authError.value = 'Bitte gib zuerst deine E-Mail-Adresse oben ein.'
         return
     }
     authError.value = ''
+    statusMessage.value = ''
     authLoading.value = true
     try {
         await resetPassword(email.value)
-        authError.value = 'Passwort-Reset-E-Mail wurde gesendet'
+        statusMessage.value = `Passwort-Reset-E-Mail wurde an ${email.value} gesendet. Bitte prüfe dein Postfach (auch den Spam-Ordner).`
     } catch (err) {
-        authError.value = err.message || 'Passwort-Reset fehlgeschlagen'
+        authError.value = err.message || 'Passwort-Reset fehlgeschlagen.'
     } finally {
         authLoading.value = false
     }
@@ -315,8 +327,11 @@ watch(() => route.query?.emailVerified, (val) => {
                 <p>Deine Offline‑Sitzung ist abgelaufen. Bitte einmal online anmelden.</p>
             </div>
             <h2>{{ t('welcome.title') }}</h2>
-            <p>{{ t('welcome.signInPrompt') }}</p>
-            
+            <div class="mode-badge" :class="isSignUp ? 'mode-signup' : 'mode-signin'">
+                {{ isSignUp ? 'Neues Konto registrieren' : 'Anmeldung' }}
+            </div>
+            <p>{{ isSignUp ? 'Erstelle ein neues Konto mit E‑Mail und Passwort.' : t('welcome.signInPrompt') }}</p>
+
             <!-- Email/Passwort Form -->
             <div v-if="verificationSent" class="info-banner">
                 <p>Bestätigungs‑E‑Mail wurde gesendet. Bitte öffne deine E‑Mail und klicke den Bestätigungslink.</p>
@@ -327,6 +342,9 @@ watch(() => route.query?.emailVerified, (val) => {
             </div>
             <div v-else-if="route.query?.emailVerified" class="success-banner">
                 <p>E‑Mail erfolgreich bestätigt. Du kannst dich jetzt anmelden.</p>
+            </div>
+            <div v-if="statusMessage" class="success-banner">
+                <p>{{ statusMessage }}</p>
             </div>
             <form @submit.prevent="handleEmailAuth" class="auth-form">
                 <input 
@@ -367,13 +385,12 @@ watch(() => route.query?.emailVerified, (val) => {
                     </button>
                 </div>
                 <p v-if="authError" class="error">{{ authError }}</p>
-                <p v-if="verificationSent" class="info">{{ 'Bitte bestätige deine E‑Mail-Adresse.' }}</p>
             </form>
-            
+
             <!-- Toggle zwischen Login und Sign Up -->
-            <button 
-                type="button" 
-                @click="isSignUp = !isSignUp" 
+            <button
+                type="button"
+                @click="toggleAuthMode"
                 class="toggle-btn"
             >
                 {{ isSignUp ? t('auth.haveAccount') : t('auth.noAccount') }}
@@ -660,9 +677,74 @@ watch(() => route.query?.emailVerified, (val) => {
     }
 
     .error {
-        color: var(--danger-color);
+        color: var(--danger-text, var(--danger, #ff5f5f));
         font-size: 14px;
+        font-weight: 600;
         text-align: center;
+        background: var(--danger-bg, rgba(255, 95, 95, 0.15));
+        border: 1px solid var(--danger, #ff5f5f);
+        border-radius: 8px;
+        padding: 10px 14px;
+        margin: 0;
+    }
+
+    .mode-badge {
+        display: inline-block;
+        padding: 4px 14px;
+        border-radius: 999px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+    }
+
+    .mode-badge.mode-signin {
+        background: var(--surface);
+        color: var(--accent);
+        border: 1px solid var(--accent);
+    }
+
+    .mode-badge.mode-signup {
+        background: var(--success-bg, rgba(121, 255, 180, 0.2));
+        color: var(--success-text, var(--success, #16a34a));
+        border: 1px solid var(--success, #16a34a);
+    }
+
+    .info-banner,
+    .success-banner {
+        width: 100%;
+        max-width: 300px;
+        border-radius: 10px;
+        padding: 12px 14px;
+        text-align: center;
+        box-sizing: border-box;
+    }
+
+    .info-banner {
+        background: var(--surface);
+        border: 1px solid var(--accent);
+    }
+
+    .success-banner {
+        background: var(--success-bg, rgba(121, 255, 180, 0.2));
+        border: 1px solid var(--success, #16a34a);
+    }
+
+    .info-banner p,
+    .success-banner p {
+        margin: 0;
+        color: var(--fg);
+        font-size: 14px;
+    }
+
+    .success-banner p {
+        color: var(--success-text, var(--success, #16a34a));
+        font-weight: 600;
+    }
+
+    .small-info {
+        font-size: 12px;
+        color: var(--muted);
     }
 
     h2 {
