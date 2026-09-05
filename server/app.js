@@ -9,6 +9,7 @@ import exerciseRoutes from "./routes/exercises.js";
 import subscriptionRoutes from "./routes/subscription.js";
 import accountRoutes from "./routes/account.js";
 import authRoutes from "./routes/auth.js";
+import favoriteWorkoutRoutes from "./routes/favoriteWorkouts.js";
 import { logger } from './utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -81,6 +82,7 @@ app.use("/api/exercises", exerciseRoutes);
 app.use("/api/subscription", subscriptionRoutes);
 app.use("/api/account", accountRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/favorite-workouts", favoriteWorkoutRoutes);
 
 // Healthcheck
 app.get('/api/health', (req, res) => {

@@ -12,6 +12,7 @@ import { useUserStore } from './stores/userStore'
 import { useSettingsStore } from './stores/settingsStore'
 import { useTimerStore } from './stores/timerStore'
 import { initFirebaseAuth, useFirebaseAuth, isEffectivelyEmailVerified } from './utils/firebaseAuth'
+import { reconcileFavoritesWithServer } from './utils/workoutFavorites'
 import { App as CapacitorApp } from '@capacitor/app'
 import { logger } from '@/utils/logger'
 import { setCacheLimits } from '@/utils/assetCache'
@@ -221,6 +222,20 @@ async function bootstrapAuth() {
         processSyncQueue(token).catch((error) => {
           logger.warn('[main] processSyncQueue after auth failed:', error)
         })
+
+        // Favoriten-Workouts liefen bisher rein lokal (localStorage) - bei Geräteverlust,
+        // Neuinstallation oder UID-Wechsel (z.B. Apple-Sign-In-Fall) gingen sie verloren.
+        // Beim Login jetzt zusätzlich mit dem Server abgleichen (Server-Favoriten lokal
+        // ergänzen, lokale Favoriten nachliefern, die der Server noch nicht kennt).
+        if (authStore.isAuthenticated) {
+          reconcileFavoritesWithServer(user.uid, token)
+            .then((result) => {
+              logger.debug('[main] Favoriten-Abgleich abgeschlossen', result)
+            })
+            .catch((error) => {
+              logger.warn('[main] Favoriten-Abgleich fehlgeschlagen:', error)
+            })
+        }
       } else {
         logger.warn('[main] No token after auth state change, starte trotzdem Sync-Versuch', {
           uid: user.uid
