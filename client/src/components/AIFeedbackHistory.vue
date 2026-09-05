@@ -36,7 +36,7 @@
           <span class="chevron" :class="{ open: expandedId === item.workoutId }">›</span>
         </div>
 
-        <div v-if="expandedId === item.workoutId" class="feedback-text">
+        <div v-if="expandedId === item.workoutId" class="feedback-text" @click.stop>
           <AiFeedbackDeltaSummary
             v-if="item.ai_analysis_snapshot?.length > 0"
             class="feedback-delta-summary"
