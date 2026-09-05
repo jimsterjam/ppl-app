@@ -223,7 +223,7 @@
         <h3>{{ $t('settings.dangerZone') }} - Account</h3>
         <p class="hint">{{ $t('settings.dangerZoneHint') }}</p>
         <button class="danger-btn account-delete-btn" @click="showDeleteAccountConfirm = true" :disabled="isDeletingAccount">
-          <span v-if="isDeletingAccount">🔄</span>
+          <span v-if="isDeletingAccount" class="spinner" aria-hidden="true"></span>
           <span v-else>🗑️</span>
           {{ isDeletingAccount ? $t('settings.deletingAccount') : $t('settings.deleteAccount') }}
         </button>
@@ -339,7 +339,7 @@
             :disabled="confirmAccountText.toLowerCase() !== $t('settings.deleteAccountPlaceholder').toLowerCase() || isDeletingAccount"
             @click="confirmDeleteAccount"
           >
-            <span v-if="isDeletingAccount">🔄</span>
+            <span v-if="isDeletingAccount" class="spinner" aria-hidden="true"></span>
             <span v-else>🗑️</span>
             {{ isDeletingAccount ? $t('settings.deletingAccount') : $t('settings.deleteAccountForever') }}
           </button>

@@ -301,8 +301,18 @@ watch(isSignedIn, async (loggedIn) => {
         await new Promise((res) => setTimeout(res, 0))
         logger.debug('[WelcomePage] Auth confirmed via watcher; navigating to:', target)
         router.replace(target)
-        // Nach erfolgreichem Login: aufräumen, falls noch pending verification gesetzt war
+        // Nach erfolgreichem Login: aufräumen, falls noch pending verification gesetzt war.
+        // BUGFIX: Diese Komponente wird beim Ein-/Ausloggen nicht neu gemountet (nur der v-if
+        // im Template wechselt), daher überlebten verificationSent/statusMessage/etc. bisher
+        // einen erfolgreichen Login - beim nächsten Logout tauchte der alte "E-Mail wurde
+        // gesendet"-Hinweis fälschlich wieder auf. Jetzt werden alle Anzeige-States zurückgesetzt.
         try { localStorage.removeItem(PENDING_EMAIL_KEY) } catch(e) {}
+        verificationSent.value = false
+        verificationMessage.value = ''
+        statusMessage.value = ''
+        authError.value = ''
+        showResendForExisting.value = false
+        attemptedEmail.value = ''
     } else {
         logger.debug('[WelcomePage] isSignedIn true but no token yet; holding')
     }

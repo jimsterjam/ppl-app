@@ -222,21 +222,32 @@ async function bootstrapAuth() {
           logger.warn('[main] processSyncQueue without initial token failed:', error)
         })
       }
-      // If the app currently shows the welcome page, navigate to target immediately to avoid race conditions
+      // If the app currently shows the welcome page, navigate to target immediately to avoid race conditions.
+      // Wichtig: nur wenn authStore.isAuthenticated auch wirklich true ist (also E-Mail verifiziert) -
+      // sonst würde z.B. direkt nach der Registrierung (Firebase loggt den neuen, noch unverifizierten
+      // User kurzzeitig automatisch ein) unnötig Richtung Dashboard navigiert und sofort wieder zurück
+      // zur Welcome-Seite gebounct, was als kurzes "Dashboard blitzt auf" sichtbar war.
       try {
-        const current = router.currentRoute.value
-        if (current && current.name === 'welcome') {
-          const redirect = current.query?.redirect
-          const restored = await tryRestoreLastRoute('auth-state-welcome')
-          const target = (typeof redirect === 'string' && redirect.startsWith('/'))
-            ? redirect
-            : (restored ? null : '/dashboard')
-          logger.debug('[main] User signed in and current route is welcome — navigating to', target)
-          if (target) {
-            router.replace(target).catch(() => {})
-          }
+        if (!authStore.isAuthenticated) {
+          // E-Mail noch nicht verifiziert (z.B. gerade erst registriert) - keine Navigation
+          // auslösen, sonst blitzt kurz das Dashboard auf, bevor der Router-Guard wieder zurück
+          // zur Welcome-Seite schickt.
+          logger.debug('[main] Firebase user present but not yet verified/authenticated - skipping auto-redirect')
         } else {
-          await tryRestoreLastRoute('auth-state-general')
+          const current = router.currentRoute.value
+          if (current && current.name === 'welcome') {
+            const redirect = current.query?.redirect
+            const restored = await tryRestoreLastRoute('auth-state-welcome')
+            const target = (typeof redirect === 'string' && redirect.startsWith('/'))
+              ? redirect
+              : (restored ? null : '/dashboard')
+            logger.debug('[main] User signed in and current route is welcome — navigating to', target)
+            if (target) {
+              router.replace(target).catch(() => {})
+            }
+          } else {
+            await tryRestoreLastRoute('auth-state-general')
+          }
         }
       } catch (e) {
         logger.warn('[main] auto-redirect after sign-in failed:', e)

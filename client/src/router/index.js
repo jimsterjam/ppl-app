@@ -126,7 +126,13 @@ router.beforeEach(async (to, from, next) => {
         uid: currentUser.uid,
         email: currentUser.email,
         displayName: currentUser.displayName,
-        photoURL: currentUser.photoURL
+        photoURL: currentUser.photoURL,
+        // SICHERHEITSFIX: fehlte hier komplett - dadurch wurde emailVerified beim Restore auf
+        // undefined gesetzt, was isAuthenticated (prüft nur "!== false") faelschlich auf true
+        // kippen liess. Das umging den Email-Verifizierungs-Schutz und war zugleich Ursache
+        // für das kurze "Dashboard blitzt auf und man wird sofort wieder ausgeloggt" beim
+        // Registrieren (Firebase loggt beim Signup kurzzeitig echt ein, bevor signOut() greift).
+        emailVerified: currentUser.emailVerified
       }, token)
     }
   }
