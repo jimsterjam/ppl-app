@@ -15,6 +15,7 @@ export const messages = {
   de: {
     common: {
       updated: 'Aktualisiert',
+      copy: 'Kopieren',
       confirm: 'Bestätigen',
       cancel: 'Abbrechen',
       done: 'Fertig',
@@ -183,6 +184,7 @@ export const messages = {
       accountInfoProvider: 'Login über {provider}',
       accountInfoNote: 'Hinweis: E-Mail/Passwort-, Google- und Apple-Login sind eigenständige Konten. Meldest du dich über einen anderen Anbieter an, siehst du nicht automatisch dieselben Workouts.',
       accountProviderPassword: 'E-Mail/Passwort',
+      accountUidCopied: 'UID kopiert',
       profilePicture: 'Profilbild',
       profilePictureHint: 'Wird im Dashboard angezeigt. Empfohlen: quadratisches Foto.',
       profilePictureEmpty: 'Kein Foto',
@@ -825,6 +827,7 @@ export const messages = {
   en: {
     common: {
       updated: 'Updated',
+      copy: 'Copy',
       confirm: 'Confirm',
       cancel: 'Cancel',
       done: 'Done',
@@ -992,6 +995,7 @@ export const messages = {
       accountInfoProvider: 'Signed in via {provider}',
       accountInfoNote: 'Note: Email/password, Google, and Apple sign-in are separate accounts. Signing in via a different provider won\'t automatically show the same workouts.',
       accountProviderPassword: 'Email/password',
+      accountUidCopied: 'UID copied',
       profilePicture: 'Profile picture',
       profilePictureHint: 'Shown on the dashboard. Tip: use a square photo.',
       profilePictureEmpty: 'No photo',

@@ -80,6 +80,10 @@
         <p class="hint account-info-note">
           {{ $t('settings.accountInfoNote') || 'Hinweis: E-Mail/Passwort-, Google- und Apple-Login sind eigenständige Konten. Meldest du dich über einen anderen Anbieter an, siehst du nicht automatisch dieselben Workouts.' }}
         </p>
+        <div v-if="accountUid" class="account-uid-row">
+          <code class="account-uid">{{ accountUid }}</code>
+          <button type="button" class="uid-copy-btn" @click="copyAccountUid">{{ $t('common.copy') || 'Kopieren' }}</button>
+        </div>
       </section>
 
       <section class="card card--profile">
@@ -438,6 +442,7 @@ const colorModeOptions = computed(() => ([
 // "leeres" Konto nach Login mit einem anderen Anbieter schlicht ein anderes Konto ist.
 const authStore = useAuthStore()
 const accountEmail = computed(() => authStore.user?.email || '')
+const accountUid = computed(() => authStore.user?.uid || '')
 const accountProviderLabel = computed(() => {
   const providerId = authStore.user?.providerId || ''
   if (providerId === 'apple.com') return 'Apple'
@@ -445,6 +450,19 @@ const accountProviderLabel = computed(() => {
   if (providerId === 'password') return $t('settings.accountProviderPassword') || 'E-Mail/Passwort'
   return ''
 })
+
+// Praktisch fürs Support-/Debugging (z.B. um zwei Konten für eine Migration eindeutig zu
+// identifizieren, siehe scripts/migrateUserId.js) - die UID selbst ist keine geheime
+// Information, sie steht ohnehin in jedem Server-Log und jedem ID-Token.
+async function copyAccountUid() {
+  if (!accountUid.value) return
+  try {
+    await navigator.clipboard.writeText(accountUid.value)
+    toast.show($t('settings.accountUidCopied') || 'UID kopiert', { type: 'success', duration: 2000 })
+  } catch (err) {
+    logger.warn('[Settings] UID konnte nicht kopiert werden', err?.message)
+  }
+}
 
 // Wochenziel
 const settings = useSettingsStore()
@@ -1461,6 +1479,34 @@ async function confirmDeleteAccount() {
 .account-info-note {
   font-size: 0.82rem;
   margin-top: 4px;
+}
+
+.account-uid-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.account-uid {
+  font-size: 0.72rem;
+  color: var(--muted);
+  background: color-mix(in srgb, var(--surface) 60%, transparent);
+  border: 1px solid var(--card-border);
+  border-radius: 6px;
+  padding: 4px 8px;
+  word-break: break-all;
+}
+
+.uid-copy-btn {
+  background: transparent;
+  border: 1px solid var(--card-border);
+  color: var(--fg);
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  cursor: pointer;
 }
 
 .username-row {
