@@ -36,17 +36,26 @@ export async function resolveActiveWorkoutUserIdForSave({ workout, getCurrentUse
   return parseUidFromToken(token)
 }
 
-export function isFavoriteSourceRoute(route = {}) {
-  return String(route.query?.favoriteSource || '') === '1' || String(route.query?.favoriteStart || '') === '1'
+// draftFavoriteSource: optionaler Fallback aus dem persistenten Workout-Draft
+// (activeWorkoutDraft.js), falls die Route-Query-Parameter fehlen - passiert z.B. wenn iOS/
+// Capacitor die App nach dem Backgrounding direkt wieder auf die Workout-Detail-Route
+// zurücksetzt, ohne die App-eigene Resume-Logik (main.js) zu durchlaufen, die die Query sonst
+// wiederherstellen würde. Der Draft selbst übersteht das (localStorage), die Route-Query nicht.
+export function isFavoriteSourceRoute(route = {}, draftFavoriteSource = null) {
+  return String(route.query?.favoriteSource || '') === '1'
+    || String(route.query?.favoriteStart || '') === '1'
+    || Boolean(draftFavoriteSource?.favoriteId)
 }
 
-export function getFavoriteSourceMeta({ route, workout, normalizeWorkoutType }) {
-  const favoriteId = String(route.query?.favoriteId || '').trim()
+export function getFavoriteSourceMeta({ route, workout, normalizeWorkoutType, draftFavoriteSource = null }) {
+  const favoriteId = String(route.query?.favoriteId || draftFavoriteSource?.favoriteId || '').trim()
   if (!favoriteId) return null
   return {
     favoriteId,
-    favoriteName: String(route.query?.favoriteName || '').trim(),
-    favoriteType: normalizeWorkoutType(route.query?.favoriteType || workout?.type || route.query?.type || 'push')
+    favoriteName: String(route.query?.favoriteName || draftFavoriteSource?.favoriteName || '').trim(),
+    favoriteType: normalizeWorkoutType(
+      route.query?.favoriteType || draftFavoriteSource?.favoriteType || workout?.type || route.query?.type || 'push'
+    )
   }
 }
 

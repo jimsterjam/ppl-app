@@ -388,7 +388,17 @@ async function createWorkout() {
 		// Lifecycle-Event (App-Hintergrund etc.). Ohne diesen Eintrag laufen
 		// alle nachfolgenden triggerAutoSave()-Aufrufe in WorkoutDetailView
 		// mangels existierendem Eintrag ins Leere.
-		setActiveDraft(userIdComputed.value, tempWorkout, null)
+		// favoriteContext zusätzlich im Draft mitspeichern (nicht nur als Router-Query) - siehe
+		// activeWorkoutDraft.js für den Hintergrund (Query geht beim App-Resume auf iOS verloren,
+		// der Draft übersteht das).
+		const favoriteSourceForDraft = favoriteContext.value?.favoriteId
+			? {
+				favoriteId: String(favoriteContext.value.favoriteId),
+				favoriteName: favoriteContext.value.favoriteName || null,
+				favoriteType: favoriteContext.value.favoriteType || null
+			}
+			: null
+		setActiveDraft(userIdComputed.value, tempWorkout, null, favoriteSourceForDraft)
 		try {
 			sessionStorage.setItem(getDetailDraftKey(userIdComputed.value), JSON.stringify({
 				...tempWorkout,

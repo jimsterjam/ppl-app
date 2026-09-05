@@ -71,7 +71,14 @@ export function hasActiveDraft(uid) {
   }
 }
 
-export function setActiveDraft(uid, workout, editingWorkoutId = null) {
+// favoriteSource: { favoriteId, favoriteName, favoriteType } | null - wird gesetzt, wenn dieses
+// Workout aus einem Favoriten gestartet wurde. Bisher lebte diese Info NUR im Router-Query
+// (favoriteSource=1&favoriteId=...), das beim App-Resume verloren geht, sobald iOS/Capacitor
+// direkt auf die Workout-Detail-Route zurückspringt statt über die App-eigene Resume-Logik in
+// main.js (die nur beim Landen auf Welcome/Dashboard/Root greift). Jetzt zusätzlich hier im
+// ohnehin schon persistenten Draft mitgespeichert, damit "Favorit aktualisieren"-Button auch
+// nach einem App-Wechsel/-Neustart erhalten bleibt (siehe WorkoutDetailView.vue).
+export function setActiveDraft(uid, workout, editingWorkoutId = null, favoriteSource = null) {
   if (!uid || !workout) return false
   try {
     const key = getStorageKey(uid)
@@ -82,6 +89,10 @@ export function setActiveDraft(uid, workout, editingWorkoutId = null) {
     const draft = {
       workout: { ...workout },
       editingWorkoutId: editingWorkoutId || null,
+      // Explizit übergebener Wert hat Vorrang; ohne neue Angabe bleibt ein bereits gesetzter
+      // favoriteSource aus einem vorherigen setActiveDraft-Aufruf für denselben Draft erhalten
+      // (z.B. wenn der Draft später aus anderen Gründen neu geschrieben wird).
+      favoriteSource: favoriteSource !== null ? favoriteSource : (existing?.favoriteSource || null),
       startedAt,
       lastModifiedAt: new Date().toISOString()
     }
@@ -151,6 +162,11 @@ export function getActiveDraftWorkout(uid) {
 export function getActiveDraftEditingId(uid) {
   const draft = getActiveDraft(uid)
   return draft?.editingWorkoutId || null
+}
+
+export function getActiveDraftFavoriteSource(uid) {
+  const draft = getActiveDraft(uid)
+  return draft?.favoriteSource || null
 }
 
 /**

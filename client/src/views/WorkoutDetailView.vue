@@ -919,12 +919,28 @@ async function resolveActiveWorkoutUserIdForSave() {
   })
 }
 
+// Fallback für den Fall, dass die Route-Query (favoriteSource/favoriteId/...) beim App-Resume
+// verloren gegangen ist (siehe activeWorkoutDraft.js) - sucht den zu diesem Workout gehörenden
+// persistenten Draft und liest favoriteSource von dort. Gleiches Nachschlage-Muster wie an
+// anderen Stellen dieser Datei (siehe findActiveDraftByWorkoutId-Kommentar).
+function getDraftFavoriteSourceForCurrentWorkout() {
+  const id = String(workout.value?._id || route.params.id || '').trim()
+  if (!id) return null
+  const match = findActiveDraftByWorkoutId(id)
+  return match?.draft?.favoriteSource || null
+}
+
 function isFavoriteSourceRoute() {
-  return isFavoriteSourceRouteUtil(route)
+  return isFavoriteSourceRouteUtil(route, getDraftFavoriteSourceForCurrentWorkout())
 }
 
 function getFavoriteSourceMeta() {
-  return getFavoriteSourceMetaUtil({ route, workout: workout.value, normalizeWorkoutType })
+  return getFavoriteSourceMetaUtil({
+    route,
+    workout: workout.value,
+    normalizeWorkoutType,
+    draftFavoriteSource: getDraftFavoriteSourceForCurrentWorkout()
+  })
 }
 
 function getLastSetFromExercise(exercise = {}) {
