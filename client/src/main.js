@@ -200,6 +200,10 @@ async function bootstrapAuth() {
         email: user.email,
         displayName: user.displayName,
         photoURL: user.photoURL,
+        // Sicherheitsfix: fehlte bisher komplett - isAuthenticated in authStore.js prüft das
+        // jetzt zusätzlich, damit ein Firebase-Session-Objekt mit emailVerified=false (egal auf
+        // welchem Weg zustande gekommen) nicht automatisch vollen App-Zugriff gewährt.
+        emailVerified: user.emailVerified,
       }, token)
 
       if (token) {

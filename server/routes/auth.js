@@ -130,9 +130,10 @@ router.post('/resend-verification', resendLimiterMiddleware, async (req, res) =>
 
     const cachedEntry = wantsFreshLink ? null : getCachedLink(email);
     if (cachedEntry) {
-      logger.info('resend-verification: serving cached link', { email });
+      logger.info('resend-verification: serving cached link status', { email });
+      // SICHERHEITSFIX: der rohe Verifizierungs-Link (cachedEntry.link) wird bewusst NICHT mehr
+      // an den Client zurückgegeben - siehe Kommentar weiter unten bei der Erzeugung des Links.
       const cachedPayload = {
-        link: cachedEntry.link,
         cached: true,
         cachedExpiresAt: cachedEntry.expiresAt
       };
@@ -187,7 +188,6 @@ router.post('/resend-verification', resendLimiterMiddleware, async (req, res) =>
       // don't fail the request if logging throws
       logger.warn('Could not log verification link', logErr?.message || logErr);
     }
-    // Return the link so the client can open it or display instructions
     let delivery = null;
     if (!cachedEntry) {
       delivery = await sendVerificationEmailThroughFirebase(email, actionCodeSettings?.url);
@@ -195,7 +195,16 @@ router.post('/resend-verification', resendLimiterMiddleware, async (req, res) =>
         logger.warn('resend-verification: email dispatch skipped/failed', { email, delivery });
       }
     }
-    const payload = warnings.length ? { link, warnings } : { link };
+    // SICHERHEITSFIX: der rohe Verifizierungs-Link (mit gültigem oobCode) wurde bisher IMMER
+    // im JSON-Response an den Client zurückgegeben - unabhängig davon, ob der E-Mail-Versand
+    // selbst erfolgreich war. Da dieser Endpunkt keine Authentifizierung verlangt (nur die
+    // E-Mail-Adresse als Body-Parameter), konnte damit jeder, der eine E-Mail-Adresse kennt
+    // oder errät, einen funktionierenden Verifizierungslink für GENAU DIESE Adresse anfordern
+    // und öffnen - ganz ohne je Zugriff auf das echte Postfach zu haben. Das hebelt den
+    // eigentlichen Zweck der E-Mail-Verifizierung (Adress-Besitz nachweisen) komplett aus. Der
+    // Link wird jetzt nur noch serverseitig verwendet (E-Mail-Versand, ggf. Cache), NIE an den
+    // Client zurückgegeben. Der Client erfährt nur noch, ob der Versand geklappt hat.
+    const payload = warnings.length ? { warnings } : {};
     if (delivery) payload.delivery = delivery;
     if (resendCacheTtlMs) {
       const expiresAt = Date.now() + resendCacheTtlMs;
@@ -215,8 +224,9 @@ router.post('/resend-verification', resendLimiterMiddleware, async (req, res) =>
       const wantsFreshLink = Boolean(req.body && req.body.forceNewLink);
       const cachedEntryOnRateLimit = wantsFreshLink ? null : getCachedLink(req.body && req.body.email);
       if (cachedEntryOnRateLimit) {
+        // SICHERHEITSFIX: auch hier wurde bisher der rohe Link zurückgegeben - siehe
+        // ausführlicher Kommentar weiter oben im Erfolgsfall.
         return res.status(200).json({
-          link: cachedEntryOnRateLimit.link,
           cached: true,
           warnings: [
             ...(cachedEntryOnRateLimit.warnings || []),

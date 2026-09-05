@@ -51,7 +51,13 @@ export const useAuthStore = defineStore('auth', {
     initialized: Boolean(cachedUser),
   }),
   getters: {
-    isAuthenticated: (state) => !!state.user,
+    // Sicherheitsfix: bisher reichte irgendein Firebase-User-Objekt im Store, egal ob die
+    // E-Mail bestätigt war oder nicht - der Router prüfte für geschützte Routen nur diesen
+    // Getter. state.user.emailVerified fehlte bei bereits gecachten Sessions vor diesem Fix
+    // (undefined), deshalb hier bewusst "!== false" statt "=== true": nur ein EXPLIZIT
+    // bekanntes emailVerified=false blockiert, alte gecachte Sessions ohne dieses Feld bleiben
+    // unverändert nutzbar, bis der nächste onAuthStateChanged-Callback es nachträgt.
+    isAuthenticated: (state) => !!state.user && state.user.emailVerified !== false,
     uid: (state) => state.user?.uid || null,
     isOfflineSessionValid: (state) => !!state.user && Boolean(state.tokenExpiresAt) && Date.now() < state.tokenExpiresAt,
   },

@@ -22,9 +22,6 @@ const offlineExpired = computed(() => route.query?.reason === 'offline-expired')
 
 // Persist pending verification across reloads until verified
 const PENDING_EMAIL_KEY = 'pendingVerificationEmail'
-const PENDING_LINK_KEY = 'pendingVerificationLinkUrl'
-const PENDING_LINK_TS_KEY = 'pendingVerificationLinkTs'
-const VERIFICATION_LINK_TTL_MS = 15 * 60 * 1000
 const WARNING_LABELS = {
     'continue-url-rejected': 'Weiterleitungsziel wurde von Firebase ignoriert.',
     'firebase-rate-limited': 'Firebase hat weitere Anfragen vorübergehend blockiert.'
@@ -41,97 +38,21 @@ const suppressWatcher = ref(false)
 const verificationMessage = ref('')
 const showResendForExisting = ref(false)
 const attemptedEmail = ref('')
-const pendingVerificationLink = ref('')
-const pendingVerificationLinkExpiresAt = ref(0)
-
 function getRedirectTarget() {
     const q = route.query?.redirect
     return typeof q === 'string' && q.startsWith('/') ? q : '/dashboard'
 }
 
-function syncStoredVerificationLink() {
-    try {
-        const link = localStorage.getItem(PENDING_LINK_KEY)
-        const ts = Number(localStorage.getItem(PENDING_LINK_TS_KEY) || 0)
-        if (link && ts && Date.now() - ts < VERIFICATION_LINK_TTL_MS) {
-            pendingVerificationLink.value = link
-            pendingVerificationLinkExpiresAt.value = ts + VERIFICATION_LINK_TTL_MS
-            return
-        }
-    } catch (e) {
-        logger.debug('[WelcomePage] syncStoredVerificationLink failed:', e)
-    }
-    clearStoredVerificationLink()
-}
-
-function persistVerificationLink(link) {
-    if (!link) {
-        clearStoredVerificationLink()
-        return
-    }
-    const now = Date.now()
-    pendingVerificationLink.value = link
-    pendingVerificationLinkExpiresAt.value = now + VERIFICATION_LINK_TTL_MS
-    try {
-        localStorage.setItem(PENDING_LINK_KEY, link)
-        localStorage.setItem(PENDING_LINK_TS_KEY, String(now))
-    } catch (e) {
-        logger.debug('[WelcomePage] persistVerificationLink failed:', e)
-    }
-}
-
-function clearStoredVerificationLink() {
-    pendingVerificationLink.value = ''
-    pendingVerificationLinkExpiresAt.value = 0
-    try {
-        localStorage.removeItem(PENDING_LINK_KEY)
-        localStorage.removeItem(PENDING_LINK_TS_KEY)
-    } catch (e) {
-        logger.debug('[WelcomePage] clearStoredVerificationLink failed:', e)
-    }
-}
-
-function hasFreshVerificationLink() {
-    return Boolean(pendingVerificationLink.value && pendingVerificationLinkExpiresAt.value > Date.now())
-}
-
-async function openVerificationLinkInBrowser(link) {
-    if (!link) return false
-    try {
-        if (Capacitor?.openUrl) {
-            await Capacitor.openUrl({ url: link })
-            return true
-        }
-    } catch (err) {
-        logger.warn('[WelcomePage] Capacitor.openUrl failed:', err)
-    }
-    if (typeof window !== 'undefined') {
-        try {
-            const win = window.open(link, '_blank', 'noopener,noreferrer')
-            if (win) return true
-        } catch (e) {
-            logger.warn('[WelcomePage] window.open failed, fallback to location.assign', e)
-        }
-        try {
-            window.location.assign(link)
-            return true
-        } catch (assignErr) {
-            logger.warn('[WelcomePage] window.location.assign failed:', assignErr)
-        }
-    }
-    return false
-}
-
-async function handleOpenVerificationLink() {
-    if (!hasFreshVerificationLink()) {
-        authError.value = 'Kein gespeicherter Verifizierungslink vorhanden. Bitte erneut senden.'
-        return
-    }
-    const opened = await openVerificationLinkInBrowser(pendingVerificationLink.value)
-    verificationMessage.value = opened
-        ? 'Verifizierungslink wurde im Browser geöffnet.'
-        : 'Link konnte nicht automatisch geöffnet werden. Bitte kopiere ihn in deinen Browser.'
-}
+// SICHERHEITSFIX: Es gab hier vorher einen kompletten Mechanismus (persistVerificationLink/
+// openVerificationLinkInBrowser/"Link öffnen"-Button), der den vom Server zurückgegebenen,
+// echten Verifizierungslink lokal speicherte und per Klick direkt öffnete. Der Server gab
+// diesen Link bisher OHNE jede Authentifizierung für JEDE angefragte E-Mail-Adresse zurück -
+// wer also nur eine E-Mail-Adresse kannte/erriet, konnte sich darüber einen funktionierenden
+// Verifizierungslink besorgen und "bestätigen", ohne je Zugriff auf das echte Postfach zu
+// haben. Das hebelte den ganzen Sinn der E-Mail-Verifizierung aus. Der Server gibt den Link
+// jetzt gar nicht mehr zurück (siehe server/routes/auth.js) - dieser gesamte Client-seitige
+// Mechanismus ist damit gegenstandslos und wurde entfernt. Der einzig verbleibende Weg, die
+// E-Mail zu bestätigen, ist der echte Klick auf den Link in der tatsächlich zugestellten E-Mail.
 
 onMounted(() => {
     // Wenn localStorage eine noch nicht verifizierte E‑Mail enthält, Anzeige beibehalten
@@ -147,12 +68,10 @@ onMounted(() => {
             verificationSent.value = false
             attemptedEmail.value = ''
             showResendForExisting.value = false
-            clearStoredVerificationLink()
         }
     } catch (e) {
         logger.debug('[WelcomePage] localStorage access failed:', e)
     }
-    syncStoredVerificationLink()
 })
 
 // Eigene Mindestanforderungen fürs Passwort bei der Registrierung - Firebase selbst erzwingt
@@ -219,10 +138,7 @@ async function handleRequestVerification() {
     try {
         const resp = await requestVerificationLink(attemptedEmail.value, { forceNewLink: true })
         verificationSent.value = true
-        if (resp?.link) {
-            persistVerificationLink(resp.link)
-        }
-        verificationMessage.value = 'Verifizierungslink wurde gesendet. Bitte prüfe dein Postfach und bestätige die E‑Mail. Optional kannst du den gespeicherten Link über „Link öffnen“ starten.'
+        verificationMessage.value = 'Verifizierungslink wurde gesendet. Bitte prüfe dein Postfach und bestätige die E‑Mail.'
         if (resp?.warnings?.length) {
             const readable = resp.warnings.map((w) => WARNING_LABELS[w] || w)
             verificationMessage.value += ' Hinweis: ' + readable.join(' ')
@@ -262,15 +178,10 @@ async function handleResendVerification() {
         if (user) {
             await resendVerification()
             verificationMessage.value = 'Bestätigungs‑E‑Mail wurde erneut gesendet.'
-        } else if (hasFreshVerificationLink()) {
-            verificationMessage.value = 'Es liegt bereits ein Verifizierungslink vor. Bitte öffne ihn über „Link öffnen“ oder kopiere ihn in deinen Browser.'
         } else if (attemptedEmail.value) {
             // Fallback: Admin-Endpoint anfragen, falls kein eingeloggter Nutzer vorhanden
             const resp = await requestVerificationLink(attemptedEmail.value, { forceNewLink: true })
-            if (resp?.link) {
-                persistVerificationLink(resp.link)
-            }
-            verificationMessage.value = 'Verifizierungslink generiert. Bitte öffne deine E‑Mail oder verwende „Link öffnen“, um den Link manuell aufzurufen.'
+            verificationMessage.value = 'Verifizierungslink wurde erneut gesendet. Bitte prüfe dein Postfach.'
             if (resp?.warnings?.length) {
                 const readable = resp.warnings.map((w) => WARNING_LABELS[w] || w)
                 verificationMessage.value += ' Hinweis: ' + readable.join(' ')
@@ -380,7 +291,6 @@ watch(isSignedIn, async (loggedIn) => {
         router.replace(target)
         // Nach erfolgreichem Login: aufräumen, falls noch pending verification gesetzt war
         try { localStorage.removeItem(PENDING_EMAIL_KEY) } catch(e) {}
-        clearStoredVerificationLink()
     } else {
         logger.debug('[WelcomePage] isSignedIn true but no token yet; holding')
     }
@@ -393,7 +303,6 @@ watch(() => route.query?.emailVerified, (val) => {
         verificationSent.value = false
         attemptedEmail.value = ''
         showResendForExisting.value = false
-        clearStoredVerificationLink()
     }
 })
 </script>
@@ -413,9 +322,6 @@ watch(() => route.query?.emailVerified, (val) => {
                 <p>Bestätigungs‑E‑Mail wurde gesendet. Bitte öffne deine E‑Mail und klicke den Bestätigungslink.</p>
                 <div class="resend-row">
                     <button class="resend-btn" @click="handleResendVerification" :disabled="authLoading">E‑Mail erneut senden</button>
-                    <button v-if="pendingVerificationLink" class="resend-btn ghost" @click="handleOpenVerificationLink" :disabled="authLoading">
-                        Link öffnen
-                    </button>
                     <span class="small-info" v-if="verificationMessage">{{ verificationMessage }}</span>
                 </div>
             </div>

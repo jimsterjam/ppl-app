@@ -1262,7 +1262,11 @@ async function confirmDeleteAccount() {
     }, 100)
 
   } catch (error) {
-    logger.error('Account deletion failed:', error)
+    // War vorher "logger.error('...', error)" - Error-Objekte serialisieren über
+    // JSON.stringify/den nativen Log-Bridge-Pfad auf iOS als "{}" (message/stack sind nicht
+    // enumerable), dadurch war der eigentliche Fehlergrund in den Logs unsichtbar. Jetzt
+    // explizit die lesbare Nachricht mitloggen.
+    logger.error('Account deletion failed:', error?.message || String(error))
     toast.show($t('settings.deleteAccountError'), { type: 'error' })
   } finally {
     isDeletingAccount.value = false
