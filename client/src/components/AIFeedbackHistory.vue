@@ -323,23 +323,32 @@ onMounted(() => {
 }
 
 .state-message.error p {
-  color: var(--error, #FF3B30);
+  /* War var(--error, #FF3B30) - --error existiert im Design-System nicht (siehe style.css:
+     --danger/--danger-text), fiel also IMMER auf die feste Farbe zurück statt sich dem
+     gewählten Theme anzupassen. */
+  color: var(--danger-text, var(--danger, #ff5f5f));
   margin: 0;
 }
 
 .retry-btn {
   padding: 0.5rem 1rem;
   border-radius: 0.5rem;
-  border: 1px solid var(--border, #ddd);
-  background: var(--secondary-bg, #f5f5f5);
+  /* War var(--border, #ddd) / var(--secondary-bg, #f5f5f5) - beide Variablen existieren im
+     Design-System nicht, der Button blieb dadurch immer hellgrau/hell umrandet, auch im
+     Dark Mode. */
+  border: 1px solid var(--card-border);
+  background: var(--surface);
+  color: var(--fg);
   cursor: pointer;
 }
 
 .spinner {
   width: 1.75rem;
   height: 1.75rem;
-  border: 2px solid var(--border, #ddd);
-  border-top-color: var(--primary, #007AFF);
+  /* War var(--border, #ddd) / var(--primary, #007AFF) - beide Variablen existieren im
+     Design-System nicht (siehe style.css: --card-border/--accent). */
+  border: 2px solid var(--card-border);
+  border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }

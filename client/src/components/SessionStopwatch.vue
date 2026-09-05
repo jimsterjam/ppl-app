@@ -117,23 +117,30 @@ onBeforeUnmount(() => {
 .sw-trigger {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   padding: 16px 16px;
   border-radius: 10px;
   border: none;
   background: var(--accent);
-  color: #ffffff;
-  font-size: 1.05rem;
+  /* War #ffffff - im Standard-"Lime"-Akzent (heller gelbgrün) war weißer Text darauf sehr
+     schlecht lesbar. var(--accent-contrast) ist die im Rest der App genutzte, zum Akzent
+     passende Kontrastfarbe (siehe z.B. .primary in WorkoutDetailView.vue). */
+  color: var(--accent-contrast, #060606);
+  /* Etwas größer (war 1.05rem) und zentriert (fehlte bisher trotz width:100%, Inhalt hing
+     am linken Rand) - deutlicherer, besser lesbarer Zeit-Anzeiger. */
+  font-size: 1.15rem;
   font-weight: 600;
   cursor: pointer;
   font-family: inherit;
   white-space: nowrap;
   transition: background-color 0.15s;
   width: 100%;
+  text-align: center;
 }
 
 .sw-trigger--running {
-  color: #ffffff;
+  color: var(--accent-contrast, #060606);
   border-color: color-mix(in srgb, var(--accent) 55%, transparent);
   background: var(--accent);
   font-variant-numeric: tabular-nums;
@@ -141,7 +148,6 @@ onBeforeUnmount(() => {
 }
 
 .sw-trigger--paused {
-  color: color-mix(in srgb, var(--fg) 50%, transparent);
   background: #7f1d1d;
   color: #ffffff;
   font-variant-numeric: tabular-nums;

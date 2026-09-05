@@ -417,8 +417,8 @@ onBeforeUnmount(() => {
 .spinner {
   width: 2rem;
   height: 2rem;
-  border: 2px solid var(--border, #ddd);
-  border-top-color: var(--primary, #007AFF);
+  border: 2px solid var(--card-border);
+  border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -443,7 +443,7 @@ onBeforeUnmount(() => {
 }
 
 .error-message {
-  color: var(--error, #FF3B30);
+  color: var(--danger-text, var(--danger, #ff5f5f));
   margin: 0 0 1rem 0;
   font-size: 0.95rem;
 }
@@ -487,8 +487,11 @@ onBeforeUnmount(() => {
 }
 
 .primary {
-  background-color: var(--primary, #007AFF);
-  color: white;
+  /* War var(--primary, #007AFF) / color: white - --primary existiert im Design-System nicht,
+     der Button blieb dadurch immer fest iOS-blau mit weißem Text, unabhängig vom gewählten
+     Theme/Akzent. */
+  background-color: var(--accent);
+  color: var(--accent-contrast, #060606);
 }
 
 .primary:active {
@@ -496,13 +499,13 @@ onBeforeUnmount(() => {
 }
 
 .secondary {
-  background-color: var(--secondary-bg, #f5f5f5);
-  color: var(--primary, #007AFF);
-  border: 1px solid var(--border, #ddd);
+  background-color: var(--surface);
+  color: var(--accent);
+  border: 1px solid var(--card-border);
 }
 
 .secondary:active {
-  background-color: var(--border, #ddd);
+  background-color: var(--surface-strong);
 }
 
 .summary-content.fallback {

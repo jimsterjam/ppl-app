@@ -2948,8 +2948,8 @@ onBeforeUnmount(() => {
 .missing-notes-list li { font-weight: 600; }
 .timer-stop-btn {
   align-self: flex-end;
-  border: 1px solid color-mix(in srgb, var(--danger-color) 65%, black 35%);
-  background: var(--danger-color, #dc2626);
+  border: 1px solid color-mix(in srgb, var(--danger) 65%, black 35%);
+  background: var(--danger, #dc2626);
   color: #fff;
   border-radius: 10px;
   padding: 9px 12px;
@@ -3001,7 +3001,7 @@ onBeforeUnmount(() => {
 .workout-header h2 { margin: 0 0 8px 0; font-size: 1.5rem; }
 .meta { display: flex; gap: 8px; color: var(--muted); align-items: center; font-size: 0.9rem; }
 .badge { background: var(--surface); padding: 3px 8px; border-radius: 6px; font-size: 0.7rem; border: 1px solid var(--card-border); }
-.completed { color: var(--success-color); }
+.completed { color: var(--success); }
 .ex-list { background: transparent; border: 1px solid transparent; border-radius: 12px; padding: 12px; }
 .ex-list input,
 .ex-list button,
@@ -3082,7 +3082,7 @@ onBeforeUnmount(() => {
   /* font-weight: 700; */
   /* text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35); */
 }
-.remove-row-btn { background: var(--danger-color); color: var(--accent-contrast); border: none; border-radius: 4px; width: 28px; height: 28px; cursor: pointer; font-size: 1rem; }
+.remove-row-btn { background: var(--danger); color: var(--accent-contrast); border: none; border-radius: 4px; width: 28px; height: 28px; cursor: pointer; font-size: 1rem; }
 .number-with-spinner { display: flex; align-items: center; gap: 6px; }
 .spinner-vertical { display: flex; flex-direction: column; gap: 2px; }
 .spin-btn { background: transparent; border: 1px solid var(--card-border); padding: 2px 6px; border-radius: 6px; font-size: 0.7rem; line-height: 1; cursor: pointer; }
@@ -3143,8 +3143,8 @@ onBeforeUnmount(() => {
   background: color-mix(in srgb, var(--accent) 24%, var(--bg-panel));
 }
 .link.danger {
-  color: var(--danger-color);
-  border: 1px solid color-mix(in srgb, var(--danger-color) 45%, transparent);
+  color: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, transparent);
   border-radius: 8px;
   padding: 4px 8px;
 }
@@ -3154,15 +3154,15 @@ onBeforeUnmount(() => {
   color: #000000;
 }
 .remove-row-btn {
-  background: var(--danger-color);
-  border: 1px solid color-mix(in srgb, var(--danger-color) 68%, black 32%);
+  background: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 68%, black 32%);
 }
 .banner { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-radius: 6px; margin-bottom: 10px; font-size: 0.85rem; }
-.banner.warning { background: color-mix(in oklab, var(--warning-color) 20%, transparent); border: 1px solid color-mix(in oklab, var(--warning-color) 50%, transparent); color: var(--fg); }
-.banner.dirty { background: color-mix(in oklab, var(--warning-color) 16%, transparent); border: 1px solid color-mix(in oklab, var(--warning-color) 40%, transparent); color: var(--fg); margin-bottom: 6px; }
+.banner.warning { background: color-mix(in oklab, var(--warning) 20%, transparent); border: 1px solid color-mix(in oklab, var(--warning) 50%, transparent); color: var(--fg); }
+.banner.dirty { background: color-mix(in oklab, var(--warning) 16%, transparent); border: 1px solid color-mix(in oklab, var(--warning) 40%, transparent); color: var(--fg); margin-bottom: 6px; }
 .banner .dismiss { background: transparent; border: none; color: inherit; cursor: pointer; font-size: 0.9rem; padding: 0; }
-.save-msg { display: block; margin-top: 6px; color: var(--success-color); font-size: 0.85rem; }
-.save-msg.error { color: var(--danger-color); }
+.save-msg { display: block; margin-top: 6px; color: var(--success); font-size: 0.85rem; }
+.save-msg.error { color: var(--danger); }
 .ex-info { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
 .ex-info.minimal { align-items: center; gap: 12px; min-height: 48px; }
 .ex-name-only { font-size: 1rem; font-weight: 600; }
@@ -3248,16 +3248,16 @@ onBeforeUnmount(() => {
   filter: brightness(1.08);
 }
 .remove-exercise-btn {
-  border: 1px solid color-mix(in srgb, var(--danger-color) 50%, transparent);
-  background: color-mix(in srgb, var(--danger-color) 14%, transparent);
-  color: var(--danger-color);
+  border: 1px solid color-mix(in srgb, var(--danger) 50%, transparent);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger);
   border-radius: 8px;
   padding: 2px 8px;
   font-size: 0.85rem;
   cursor: pointer;
 }
 .remove-exercise-btn:hover {
-  background: color-mix(in srgb, var(--danger-color) 20%, transparent);
+  background: color-mix(in srgb, var(--danger) 20%, transparent);
 }
 
 .actions .primary,

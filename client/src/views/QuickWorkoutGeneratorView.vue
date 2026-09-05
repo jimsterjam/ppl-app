@@ -263,7 +263,7 @@ async function generate() {
 
 .intro {
   margin: 0;
-  color: var(--text-secondary, #666);
+  color: var(--muted);
   font-size: 0.9rem;
   line-height: 1.5;
 }
@@ -286,44 +286,50 @@ async function generate() {
 }
 
 .chip {
+  /* War var(--border, #ddd)/var(--text-primary, #000) - beide Variablen existieren im
+     Design-System nicht (siehe style.css: --card-border/--fg), die Chips fielen dadurch
+     IMMER auf schwarzen Text mit hellgrauem Rahmen zurück, unabhängig vom Theme - im Dark
+     Mode praktisch unsichtbarer schwarzer Text auf dunklem Hintergrund. */
   padding: 0.5rem 0.9rem;
   border-radius: 999px;
-  border: 1px solid var(--border, #ddd);
+  border: 1px solid var(--card-border);
   background: transparent;
-  color: var(--text-primary, #000);
+  color: var(--fg);
   font-size: 0.85rem;
   cursor: pointer;
 }
 
 .chip.active {
-  background: var(--primary, #007AFF);
-  border-color: var(--primary, #007AFF);
-  color: white;
+  /* War var(--primary, #007AFF) - existiert nicht, blieb dadurch immer fest iOS-blau statt
+     der vom Nutzer gewählten Akzentfarbe ("Farbmodus wird nicht übernommen"). */
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-contrast, #060606);
 }
 
 .hint {
   margin: 0;
   font-size: 0.8rem;
-  color: var(--text-secondary, #666);
+  color: var(--muted);
 }
 
 textarea {
   width: 100%;
   border-radius: 0.5rem;
-  border: 1px solid var(--border, #ddd);
+  border: 1px solid var(--card-border);
   padding: 0.6rem;
   font-size: 0.9rem;
   resize: vertical;
   background: transparent;
-  color: var(--text-primary, #000);
+  color: var(--fg);
 }
 
 .generate-btn {
   padding: 0.9rem;
   border-radius: 0.75rem;
   border: none;
-  background: var(--primary, #007AFF);
-  color: white;
+  background: var(--accent);
+  color: var(--accent-contrast, #060606);
   font-weight: 600;
   font-size: 1rem;
   cursor: pointer;
@@ -344,15 +350,15 @@ textarea {
 }
 
 .state-message.error p {
-  color: var(--error, #FF3B30);
+  color: var(--danger-text, var(--danger, #ff5f5f));
   margin: 0;
 }
 
 .spinner {
   width: 2rem;
   height: 2rem;
-  border: 2px solid var(--border, #ddd);
-  border-top-color: var(--primary, #007AFF);
+  border: 2px solid var(--card-border);
+  border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -364,8 +370,9 @@ textarea {
 .secondary {
   padding: 0.6rem 1.2rem;
   border-radius: 0.5rem;
-  border: 1px solid var(--border, #ddd);
+  border: 1px solid var(--card-border);
   background: transparent;
+  color: var(--fg);
   cursor: pointer;
 }
 </style>

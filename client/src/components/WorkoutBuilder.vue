@@ -618,8 +618,8 @@ watch(() => `${route.query.quick || ''}:${route.query.favoriteStart || ''}`, () 
 	color: var(--fg);
 }
 .remove-btn {
-	border: 1px solid color-mix(in srgb, var(--danger-color) 65%, black 35%);
-	background: var(--danger-color, #dc2626);
+	border: 1px solid color-mix(in srgb, var(--danger) 65%, black 35%);
+	background: var(--danger, #dc2626);
 	color: #fff;
 	width: 32px;
 	height: 32px;
@@ -888,6 +888,6 @@ watch(() => `${route.query.quick || ''}:${route.query.favoriteStart || ''}`, () 
 @media (min-width: 481px) { .mobile-ex-picker, .picker-overlay { display: none; } }
 .auth-gate { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
 .auth-gate.compact { margin-bottom: 0; }
-.auth-gate-text { color: var(--warning-color); margin: 0 0 12px 0; }
-.error-hint { margin-top: 8px; color: var(--danger-color); font-size: 0.95rem; }
+.auth-gate-text { color: var(--warning); margin: 0 0 12px 0; }
+.error-hint { margin-top: 8px; color: var(--danger); font-size: 0.95rem; }
 </style>

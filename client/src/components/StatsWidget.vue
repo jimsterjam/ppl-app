@@ -128,7 +128,7 @@ function formatKgValue(value) {
 
   .bar { background: var(--surface); height: 12px; border-radius: 6px; margin-top: 8px; overflow: hidden; box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2); }
 
-  .progress { background: linear-gradient(90deg, var(--success-color) 0%, color-mix(in oklab, var(--success-color) 80%, var(--accent-color)) 100%); height: 100%; border-radius: 6px; transition: width 0.5s ease; box-shadow: 0 2px 4px color-mix(in oklab, var(--success-color) 40%, transparent); }
+  .progress { background: linear-gradient(90deg, var(--success) 0%, color-mix(in oklab, var(--success) 80%, var(--accent-color)) 100%); height: 100%; border-radius: 6px; transition: width 0.5s ease; box-shadow: 0 2px 4px color-mix(in oklab, var(--success) 40%, transparent); }
 
   .widget-skeleton { display: flex; flex-direction: column; gap: 10px; margin: 12px 0 4px; }
   .skeleton-line { height: 12px; width: 100%; border-radius: 999px; background: var(--card-border); animation: shimmer 1.2s ease-in-out infinite; }

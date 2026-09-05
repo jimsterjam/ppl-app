@@ -31,7 +31,7 @@ import HeaderBar from '@/components/HeaderBar.vue'
 }
 
 .test-section h3 {
-  color: var(--text-primary);
+  color: var(--fg);
   margin-bottom: 20px;
   font-size: 1.4rem;
 }
@@ -46,7 +46,7 @@ import HeaderBar from '@/components/HeaderBar.vue'
 }
 
 .test-card h4 {
-  color: var(--text-primary);
+  color: var(--fg);
   margin-bottom: 15px;
   font-size: 1.2rem;
 }
@@ -66,33 +66,33 @@ import HeaderBar from '@/components/HeaderBar.vue'
 
 .status-item label {
   font-weight: 500;
-  color: var(--text-secondary);
+  color: var(--muted);
 }
 
 .success {
-  color: color-mix(in srgb, var(--success-color) 80%, #ffffff 20%);
-  background: color-mix(in srgb, var(--success-color) 15%, transparent);
+  color: color-mix(in srgb, var(--success) 80%, #ffffff 20%);
+  background: color-mix(in srgb, var(--success) 15%, transparent);
   font-weight: bold;
   padding: 2px 8px;
   border-radius: 6px;
 }
 .warning {
-  color: color-mix(in srgb, var(--warning-color) 85%, #ffffff 15%);
-  background: color-mix(in srgb, var(--warning-color) 18%, transparent);
+  color: color-mix(in srgb, var(--warning) 85%, #ffffff 15%);
+  background: color-mix(in srgb, var(--warning) 18%, transparent);
   font-weight: bold;
   padding: 2px 8px;
   border-radius: 6px;
 }
 .error {
-  color: color-mix(in srgb, var(--error-color) 82%, #ffffff 18%);
-  background: color-mix(in srgb, var(--error-color) 18%, transparent);
+  color: color-mix(in srgb, var(--danger) 82%, #ffffff 18%);
+  background: color-mix(in srgb, var(--danger) 18%, transparent);
   font-weight: bold;
   padding: 2px 8px;
   border-radius: 6px;
 }
 
 .ai-consent-card {
-  border: 2px solid color-mix(in srgb, var(--primary-color) 70%, transparent);
+  border: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
   background: color-mix(in srgb, var(--surface) 92%, #ffffff 4%);
 }
 
@@ -105,8 +105,8 @@ import HeaderBar from '@/components/HeaderBar.vue'
 
 .test-actions button,
 .config-actions button {
-  background: var(--primary-color);
-  color: white;
+  background: var(--accent);
+  color: var(--accent-contrast, #060606);
   font-size: 16px;
   font-weight: 600;
   border-radius: 8px;
@@ -125,7 +125,7 @@ import HeaderBar from '@/components/HeaderBar.vue'
 }
 
 .test-actions button.warning {
-  background: var(--warning-color);
+  background: var(--warning);
 }
 
 .test-actions button.warning:hover {
@@ -165,19 +165,19 @@ import HeaderBar from '@/components/HeaderBar.vue'
   justify-content: space-between;
   align-items: center;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--fg);
   font-size: 1rem;
 }
 
 .config-label {
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--fg);
   font-size: 1rem;
 }
 
 .config-value {
   font-weight: 700;
-  color: var(--primary-color);
+  color: var(--accent);
   font-size: 1.1rem;
 }
 
@@ -194,7 +194,7 @@ import HeaderBar from '@/components/HeaderBar.vue'
 
 .config-select:focus {
   outline: none;
-  border-color: var(--primary-color);
+  border-color: var(--accent);
   box-shadow: 0 0 0 2px rgba(0,116,217,0.1);
 }
 
@@ -213,7 +213,7 @@ import HeaderBar from '@/components/HeaderBar.vue'
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--primary-color), var(--primary-hover, #ff3333));
+  background: linear-gradient(135deg, var(--accent), var(--primary-hover, #ff3333));
   cursor: pointer;
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
   border: 2px solid white;
@@ -223,7 +223,7 @@ import HeaderBar from '@/components/HeaderBar.vue'
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: var(--primary-color);
+  background: var(--accent);
   cursor: pointer;
   border: 2px solid white;
   box-shadow: 0 2px 4px rgba(0,0,0,0.2);
@@ -233,7 +233,7 @@ import HeaderBar from '@/components/HeaderBar.vue'
   display: flex;
   justify-content: space-between;
   font-size: 0.85rem;
-  color: var(--text-secondary);
+  color: var(--muted);
   margin-top: 4px;
 }
 
@@ -269,7 +269,7 @@ import HeaderBar from '@/components/HeaderBar.vue'
 
 .ai-result {
   border-radius: 16px;
-  border: 1px solid color-mix(in srgb, var(--primary-color) 50%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
   padding: 24px;
   background: color-mix(in srgb, var(--surface) 90%, #ffffff 6%);
   box-shadow: 0 16px 40px color-mix(in srgb, #000000 15%, transparent);
@@ -283,7 +283,7 @@ import HeaderBar from '@/components/HeaderBar.vue'
 }
 
 .rec-header strong {
-  color: var(--text-primary);
+  color: var(--fg);
   font-size: 1.1rem;
 }
 
@@ -294,9 +294,9 @@ import HeaderBar from '@/components/HeaderBar.vue'
   font-weight: bold;
 }
 
-.ai-source { background: var(--primary-color); color: white; }
-.demo-source { background: var(--warning-color); color: white; }
-.unknown-source { background: var(--text-secondary); color: white; }
+.ai-source { background: var(--accent); color: var(--accent-contrast, #060606); }
+.demo-source { background: var(--warning); color: white; }
+.unknown-source { background: #6b7280; color: white; }
 
 .rec-details {
   display: flex;
@@ -313,7 +313,7 @@ import HeaderBar from '@/components/HeaderBar.vue'
 
 .detail-label {
   font-size: 12px;
-  color: var(--text-secondary);
+  color: var(--muted);
   font-weight: 500;
 }
 
@@ -324,12 +324,12 @@ import HeaderBar from '@/components/HeaderBar.vue'
   font-weight: bold;
 }
 
-.confidence-badge.high { background: var(--success-color); color: white; }
-.confidence-badge.medium { background: var(--warning-color); color: white; }
-.confidence-badge.low { background: var(--error-color); color: white; }
+.confidence-badge.high { background: var(--success); color: white; }
+.confidence-badge.medium { background: var(--warning); color: white; }
+.confidence-badge.low { background: var(--danger); color: white; }
 
 .exercises-preview h5 {
-  color: var(--text-primary);
+  color: var(--fg);
   margin-bottom: 10px;
 }
 
@@ -352,12 +352,12 @@ import HeaderBar from '@/components/HeaderBar.vue'
 
 .exercise-name {
   font-weight: 500;
-  color: var(--text-primary);
+  color: var(--fg);
 }
 
 .exercise-details {
   font-size: 14px;
-  color: var(--text-secondary);
+  color: var(--muted);
   font-weight: bold;
 }
 
@@ -383,14 +383,14 @@ import HeaderBar from '@/components/HeaderBar.vue'
 }
 
 .action-btn.primary {
-  background: var(--primary-color);
+  background: var(--accent);
   color: var(--accent-contrast);
 }
 
 .action-btn.secondary {
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  border: 1px solid var(--border-color);
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--card-border);
 }
 
 @media (max-width: 768px) {

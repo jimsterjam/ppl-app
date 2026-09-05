@@ -460,10 +460,10 @@ function onPillPointerUp() {
      (top/bottom-Inset statt fixer Höhe), Form ist komplett "stadium" (volle Kapsel), und die
      Füllung ist neutral/grau statt akzentfarben — die Akzentfarbe zeigt sich nur an
      Icon+Label (siehe .nav-btn.active), nicht am Pillen-Hintergrund. */
-  /* Etwas mehr Höhe als vorher (war 4px/4px): die Pille deckte Icon+Label nicht ganz komplett
-     ab, an den Rändern blieb ein sichtbarer Spalt. */
-  top: 2px;
-  bottom: 2px;
+  /* Etwas mehr Höhe als vorher (war 4px/4px, dann 2px/2px): Schrift saß bei 2px Inset noch zu
+     nah am oberen/unteren Rand der Pille. */
+  top: 0;
+  bottom: 0;
   left: 0;
   background: rgba(120, 120, 128, 0.24) !important;
   border-radius: 999px;
@@ -513,7 +513,13 @@ function onPillPointerUp() {
   border: 0;
   border-radius: 24px;
   background: transparent;
-  color: #64748b;
+  /* War fest #64748b für beide Themes - zu dunkel/kontrastarm im Dark Mode (nur der aktive
+     Tab war per var(--accent) gut sichtbar). Die eigentlich für Dark Mode gedachte, hellere
+     Farbe steckte bisher hinter @media (prefers-color-scheme: dark) - das reagiert auf die
+     OS-Einstellung, nicht auf den in der App manuell gewählten Hell/Dunkel-Modus. Wählt man
+     im Gerät z.B. "Hell" aber in der App manuell "Dunkel", blieb es beim dunklen #64748b.
+     Jetzt Default = für Dark Mode gedachter Wert, [data-theme="light"] überschreibt gezielt. */
+  color: rgba(235, 235, 245, 0.6);
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', sans-serif;
   font-size: 10px;
   font-weight: 600;
@@ -524,6 +530,10 @@ function onPillPointerUp() {
   touch-action: manipulation;
   user-select: none;
   transition: color 0.3s ease;
+}
+
+[data-theme="light"] .nav-btn:not(.active) {
+  color: #64748b;
 }
 
 .nav-btn:active {
@@ -564,7 +574,9 @@ function onPillPointerUp() {
 }
 
 .nav-btn:not(.active) .icon-svg {
-  stroke: #64748b;
+  /* War #64748b für beide Themes - im Dark Mode zu dunkel/kontrastarm (siehe gleicher Fix bei
+     .nav-btn oben). Default jetzt der hellere, für Dark Mode gedachte Wert. */
+  stroke: rgba(235, 235, 245, 0.6);
 }
 
 [data-theme="light"] .nav-btn:not(.active) .icon-svg {
@@ -609,8 +621,15 @@ function onPillPointerUp() {
   right: -3px;
   border-radius: 50%;
   background: #34C759;
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.95);
+  /* War fest weißer Ring, gedacht für einen hellen Untergrund - Default jetzt der für Dark
+     Mode gedachte dunkle Ring (war vorher hinter @media (prefers-color-scheme: dark) versteckt,
+     reagierte also nicht auf den manuell in der App gewählten Modus). */
+  box-shadow: 0 0 0 3px rgba(28, 28, 30, 0.95);
   animation: workout-pulse 2.5s ease-in-out infinite;
+}
+
+[data-theme="light"] .workout-icon::after {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.95);
 }
 
 @keyframes workout-pulse {
@@ -618,17 +637,10 @@ function onPillPointerUp() {
   50% { opacity: 0.4; transform: scale(0.7); }
 }
 
-@media (prefers-color-scheme: dark) {
-  .nav-btn {
-    color: rgba(235, 235, 245, 0.6);
-  }
-  .nav-btn:not(.active) .icon-svg {
-    stroke: rgba(235, 235, 245, 0.6);
-  }
-  .workout-icon::after {
-    box-shadow: 0 0 0 3px rgba(28, 28, 30, 0.95);
-  }
-}
+/* Die früheren @media (prefers-color-scheme: dark)-Regeln für .nav-btn/.icon-svg/
+   .workout-icon::after wurden entfernt und sind jetzt die direkten Default-Werte oben
+   (mit [data-theme="light"]-Overrides) - sie reagierten sonst auf die OS-Einstellung statt
+   auf den in der App manuell wählbaren Hell/Dunkel-Modus (siehe Kommentare oben). */
 
 @media (min-width: 768px) and (max-width: 1023px) {
   .app-nav {
@@ -683,7 +695,7 @@ function onPillPointerUp() {
   .icon { width: 24px; height: 24px; }
   .icon-svg { width: 20px; height: 20px; }
   .workout-btn { margin-top: 4px; }
-  .workout-btn.active .icon-svg { fill: none; stroke: var(--success-color, #34c759); }
+  .workout-btn.active .icon-svg { fill: none; stroke: var(--success, #34c759); }
   .workout-icon::after { top: 1px; right: -1px; }
 }
 

@@ -42,54 +42,58 @@ const { t } = useI18n()
   /* Animation: von unten ins Bild */
   .toast-enter-from, .toast-leave-to { opacity: 0; transform: translateY(8px); }
   .toast-enter-active, .toast-leave-active { transition: all .2s ease; }
-.toast { 
-  pointer-events: auto; 
-  display: flex; 
-  align-items: center; 
-  gap: 10px; 
-  background: var(--bg-primary, #ffffff); 
-  color: var(--text-primary, #000000); 
-  border: 1px solid var(--border-color, #e5e5e5); 
-  padding: 10px 12px; 
-  border-radius: 10px; 
-  min-width: 240px; 
-  max-width: 90vw; 
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4); 
+.toast {
+  /* War var(--bg-primary, #ffffff)/var(--text-primary, #000000)/var(--border-color, #e5e5e5) -
+     alle drei Variablen existieren im Design-System nicht (siehe style.css: --surface/--fg/
+     --card-border), Toasts waren dadurch IMMER eine weiße Box mit schwarzem Text, unabhängig
+     vom gewählten Theme - im Dark Mode ein grell heller Fremdkörper. */
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--surface);
+  color: var(--fg);
+  border: 1px solid var(--card-border);
+  padding: 10px 12px;
+  border-radius: 10px;
+  min-width: 240px;
+  max-width: 90vw;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
 }
-.toast.success { 
-  border-color: #22c55e; 
-  background: color-mix(in srgb, #22c55e 10%, var(--bg-primary, #ffffff)); 
-  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.2); 
+.toast.success {
+  border-color: #22c55e;
+  background: color-mix(in srgb, #22c55e 10%, var(--surface));
+  box-shadow: 0 8px 24px rgba(34, 197, 94, 0.2);
 }
-.toast.error { 
-  border-color: #ef4444; 
-  background: color-mix(in srgb, #ef4444 10%, var(--bg-primary, #ffffff)); 
-  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.2); 
+.toast.error {
+  border-color: #ef4444;
+  background: color-mix(in srgb, #ef4444 10%, var(--surface));
+  box-shadow: 0 8px 24px rgba(239, 68, 68, 0.2);
 }
-.toast.info { 
-  border-color: #3b82f6; 
-  background: color-mix(in srgb, #3b82f6 10%, var(--bg-primary, #ffffff)); 
-  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.2); 
+.toast.info {
+  border-color: #3b82f6;
+  background: color-mix(in srgb, #3b82f6 10%, var(--surface));
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.2);
 }
-.toast.warning { 
-  border-color: #f59e0b; 
-  background: color-mix(in srgb, #f59e0b 10%, var(--bg-primary, #ffffff)); 
-  box-shadow: 0 8px 24px rgba(245, 158, 11, 0.2); 
+.toast.warning {
+  border-color: #f59e0b;
+  background: color-mix(in srgb, #f59e0b 10%, var(--surface));
+  box-shadow: 0 8px 24px rgba(245, 158, 11, 0.2);
 }
 .icon { font-size: 1.1rem; }
 .text { font-size: .95rem; }
-.close { 
-  margin-left: auto; 
-  background: transparent; 
-  border: none; 
-  color: var(--text-secondary, #666666); 
-  cursor: pointer; 
+.close {
+  margin-left: auto;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
   padding: 2px 4px;
   border-radius: 4px;
   transition: all 0.2s ease;
 }
-.close:hover { 
-  color: var(--text-primary, #000000); 
-  background: var(--bg-secondary, #f5f5f5);
+.close:hover {
+  color: var(--fg);
+  background: var(--surface-strong);
 }
 </style>

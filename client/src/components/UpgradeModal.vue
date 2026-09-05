@@ -204,10 +204,14 @@ const handleUpgrade = async () => {
 }
 
 .upgrade-modal {
-  background: color-mix(in srgb, var(--bg-primary) 85%, transparent);
+  /* War var(--bg-primary)/var(--border-color) - beide Variablen existieren im Design-System
+     nicht (siehe style.css: --surface/--card-border), color-mix() mit einer undefinierten
+     Variable ist ungültig und die gesamte Deklaration wurde ignoriert - Hintergrund/Rahmen
+     kamen dadurch nie zur Anwendung. */
+  background: color-mix(in srgb, var(--surface) 85%, transparent);
   backdrop-filter: blur(20px) saturate(180%);
   border-radius: 24px;
-  border: 1px solid color-mix(in srgb, var(--border-color) 30%, transparent);
+  border: 1px solid var(--card-border);
   max-width: 500px;
   width: 100%;
   max-height: 90vh;
@@ -220,7 +224,7 @@ const handleUpgrade = async () => {
   justify-content: space-between;
   align-items: center;
   padding: 24px 24px 16px;
-  border-bottom: 1px solid color-mix(in srgb, var(--border-color) 20%, transparent);
+  border-bottom: 1px solid var(--card-border);
 }
 
 .modal-header h2 {
@@ -236,7 +240,7 @@ const handleUpgrade = async () => {
   background: none;
   border: none;
   font-size: 1.5rem;
-  color: var(--text-secondary);
+  color: var(--muted);
   cursor: pointer;
   padding: 4px;
   border-radius: 50%;
@@ -244,7 +248,7 @@ const handleUpgrade = async () => {
 }
 
 .close-btn:hover {
-  background: color-mix(in srgb, var(--bg-secondary) 50%, transparent);
+  background: color-mix(in srgb, var(--surface-strong) 50%, transparent);
 }
 
 .modal-content {
@@ -267,14 +271,14 @@ const handleUpgrade = async () => {
 
 .limit-notice h3 {
   margin: 0 0 8px;
-  color: var(--text-primary);
+  color: var(--fg);
   font-size: 1.25rem;
   font-weight: 600;
 }
 
 .limit-notice p {
   margin: 0;
-  color: var(--text-secondary);
+  color: var(--muted);
   font-size: 0.95rem;
 }
 
@@ -285,14 +289,17 @@ const handleUpgrade = async () => {
 }
 
 .plan-card {
-  border: 2px solid color-mix(in srgb, var(--border-color) 30%, transparent);
+  border: 2px solid var(--card-border);
   border-radius: 16px;
   padding: 20px;
   cursor: pointer;
   transition: all 0.3s ease;
   position: relative;
-  background: color-mix(in srgb, var(--bg-secondary) 40%,  #fff 82%);
-  color:  #fff 82%;
+  /* War color-mix(...) mit var(--bg-secondary) (existiert nicht -> ungültig, kein Hintergrund
+     kam an) und "color: #fff 82%;" (ungültige CSS-Syntax, wurde komplett ignoriert - Text
+     hatte dadurch gar keine explizite Farbe und hing vom Elternelement ab). */
+  background: var(--surface);
+  color: var(--fg);
 }
 
 .plan-card:hover {
@@ -384,7 +391,7 @@ const handleUpgrade = async () => {
   display: flex;
   gap: 8px;
   margin-bottom: 32px;
-  background: color-mix(in srgb, var(--bg-secondary) 50%, transparent);
+  background: color-mix(in srgb, var(--surface-strong) 50%, transparent);
   border-radius: 12px;
   padding: 4px;
 }
@@ -474,7 +481,7 @@ const handleUpgrade = async () => {
   display: flex;
   justify-content: space-around;
   padding-top: 24px;
-  border-top: 1px solid color-mix(in srgb, var(--border-color) 20%, transparent);
+  border-top: 1px solid var(--card-border);
 }
 
 .signal {
@@ -491,7 +498,7 @@ const handleUpgrade = async () => {
 }
 
 .signal span:last-child {
-  color: var(--text-secondary);
+  color: var(--muted);
   font-size: 0.8rem;
 }
 

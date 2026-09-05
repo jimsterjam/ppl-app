@@ -132,7 +132,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 .btn { padding: 10px 14px; border-radius: 10px; border: 1px solid transparent; cursor: pointer; font-weight: 600; }
 .btn.secondary { background: var(--surface); border-color: var(--card-border); color: var(--fg); }
 .btn.primary { background: var(--accent); color: var(--accent-contrast); }
-/* .btn.primary.warning { background: color-mix(in oklab, var(--warning-color) 60%, var(--accent-color)); color: #fff; } */
+/* .btn.primary.warning { background: color-mix(in oklab, var(--warning) 60%, var(--accent-color)); color: #fff; } */
 .btn.primary.info { background: color-mix(in oklab, #3b82f6 60%, var(--accent-color)); color: #fff; }
 .btn:hover { filter: brightness(1.02); }
 .btn:active { transform: translateY(1px); }

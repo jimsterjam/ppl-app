@@ -1580,12 +1580,12 @@ async function confirmDeleteAccount() {
 
 /* Danger Zone */
 .danger-zone {
-  border: 1px solid color-mix(in srgb, var(--error-color) 30%, transparent);
-  background: color-mix(in srgb, var(--error-color) 5%, var(--card-bg));
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
+  background: color-mix(in srgb, var(--danger) 5%, var(--card-bg));
 }
 
 .danger-zone h3 {
-  color: var(--error-color);
+  color: var(--danger);
   margin-bottom: 8px;
 }
 
@@ -1594,7 +1594,7 @@ async function confirmDeleteAccount() {
 }
 
 .account-delete-btn {
-  background: linear-gradient(135deg, var(--error-color) 0%, color-mix(in srgb, var(--error-color) 80%, black) 100%);
+  background: linear-gradient(135deg, var(--danger) 0%, color-mix(in srgb, var(--danger) 80%, black) 100%);
   color: white;
   border: none;
   padding: 12px 20px;
@@ -1621,8 +1621,8 @@ async function confirmDeleteAccount() {
 .danger-btn {
   width: 100%;
   background: transparent;
-  border: 2px solid var(--error-color);
-  color: var(--error-color);
+  border: 2px solid var(--danger);
+  color: var(--danger);
   padding: 12px 20px;
   border-radius: 10px;
   font-size: 1rem;
@@ -1633,7 +1633,7 @@ async function confirmDeleteAccount() {
 }
 
 .danger-btn:hover {
-  background: color-mix(in srgb, var(--error-color) 10%, transparent);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
   transform: translateY(-1px);
 }
 
@@ -1693,7 +1693,7 @@ async function confirmDeleteAccount() {
 }
 
 .modal-content.danger-modal .modal-header h3 {
-  color: var(--error-color);
+  color: var(--danger);
 }
 
 .close-btn {
@@ -1726,10 +1726,10 @@ async function confirmDeleteAccount() {
 
 .warning-list {
   margin-bottom: 24px;
-  border: 1px solid color-mix(in srgb, var(--error-color) 30%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 30%, transparent);
   border-radius: 8px;
   padding: 16px;
-  background: color-mix(in srgb, var(--error-color) 5%, transparent);
+  background: color-mix(in srgb, var(--danger) 5%, transparent);
 }
 
 .warning-item {
@@ -1776,7 +1776,7 @@ async function confirmDeleteAccount() {
 
 .confirm-input input:focus {
   outline: none;
-  border-color: var(--error-color);
+  border-color: var(--danger);
 }
 
 .confirm-input input:disabled {
@@ -1806,7 +1806,7 @@ async function confirmDeleteAccount() {
 }
 
 .confirm-danger-btn {
-  background: var(--error-color);
+  background: var(--danger);
   border: none;
   color: white;
   padding: 10px 24px;
@@ -1818,7 +1818,7 @@ async function confirmDeleteAccount() {
 }
 
 .confirm-danger-btn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--error-color) 85%, black);
+  background: color-mix(in srgb, var(--danger) 85%, black);
   transform: translateY(-1px);
 }
 

@@ -391,7 +391,7 @@ function getChartPoints() {
       weight,
       date: labels[idx],
       isPeak: weight === maxWeight,
-      color: weight === maxWeight ? 'var(--success-color)' : 
+      color: weight === maxWeight ? 'var(--success)' : 
              idx === data.length - 1 ? 'var(--accent-color)' : 
              'var(--muted)'
     }
@@ -521,7 +521,7 @@ onMounted(() => {
 .exercise-selector select:focus,
 .time-range-selector select:focus { 
   outline: none; 
-  border-color: var(--success-color); 
+  border-color: var(--success); 
 }
 
 .chart-wrapper {
@@ -582,7 +582,7 @@ onMounted(() => {
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent-color), var(--success-color));
+  background: linear-gradient(90deg, var(--accent-color), var(--success));
   border-radius: 3px;
   transition: width 1s ease-out;
   position: relative;
@@ -679,9 +679,9 @@ onMounted(() => {
 }
 
 .chart-point.peak {
-  background: var(--success-color);
-  border-color: var(--success-color);
-  box-shadow: 0 0 15px color-mix(in srgb, var(--success-color) 40%, transparent);
+  background: var(--success);
+  border-color: var(--success);
+  box-shadow: 0 0 15px color-mix(in srgb, var(--success) 40%, transparent);
 }
 
 .chart-point.current {
@@ -719,13 +719,13 @@ onMounted(() => {
   gap: 6px;
   padding: 6px 12px;
   background: linear-gradient(135deg, 
-    color-mix(in srgb, var(--success-color) 10%, var(--surface)),
-    color-mix(in srgb, var(--success-color) 5%, var(--surface)));
-  border: 1px solid color-mix(in srgb, var(--success-color) 20%, transparent);
+    color-mix(in srgb, var(--success) 10%, var(--surface)),
+    color-mix(in srgb, var(--success) 5%, var(--surface)));
+  border: 1px solid color-mix(in srgb, var(--success) 20%, transparent);
   border-radius: 20px;
   font-size: 0.85rem;
   font-weight: 500;
-  color: var(--success-color);
+  color: var(--success);
   animation: fadeInUp 0.6s ease-out;
 }
 
@@ -799,7 +799,7 @@ onMounted(() => {
   font-weight: 600;
 }
 
-.stat-value.positive { color: var(--success-color); }
+.stat-value.positive { color: var(--success); }
 .stat-value.negative { color: #f87171; }
 .stat-value:not(.positive):not(.negative) { color: #fbbf24; }
 
@@ -820,8 +820,8 @@ onMounted(() => {
 }
 
 .insight-item.positive {
-  background: color-mix(in oklab, var(--success-color) 10%, transparent);
-  color: var(--success-color);
+  background: color-mix(in oklab, var(--success) 10%, transparent);
+  color: var(--success);
 }
 
 .insight-item.negative {

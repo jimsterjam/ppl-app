@@ -148,7 +148,7 @@ export default {
 
 .disclaimer-header h2 {
   margin: 0;
-  color: var(--primary-color);
+  color: var(--accent);
   font-size: 1.5rem;
 }
 
@@ -157,7 +157,7 @@ export default {
   border: none;
   font-size: 24px;
   cursor: pointer;
-  color: var(--text-secondary);
+  color: var(--muted);
   padding: 0;
   width: 32px;
   height: 32px;
@@ -168,8 +168,8 @@ export default {
 }
 
 .close-btn:hover {
-  background: var(--bg-secondary);
-  color: var(--text-primary);
+  background: var(--surface-strong);
+  color: var(--fg);
 }
 
 .disclaimer-content {
@@ -210,14 +210,14 @@ export default {
 
 .beta-info h4, .data-info h4 {
   margin: 0 0 12px 0;
-  color: var(--primary-color);
+  color: var(--accent);
   font-size: 1rem;
 }
 
 .beta-info p, .data-info p {
   margin: 0;
   line-height: 1.5;
-  color: var(--text-secondary);
+  color: var(--muted);
 }
 
 .consent-options {
@@ -251,8 +251,8 @@ export default {
 }
 
 .consent-checkbox:checked + .checkmark {
-  background: var(--primary-color);
-  border-color: var(--primary-color);
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 .consent-checkbox:checked + .checkmark::after {
@@ -291,7 +291,7 @@ export default {
 }
 
 .btn-primary {
-  background: var(--primary-color);
+  background: var(--accent);
   color: var(--accent-contrast);
 }
 

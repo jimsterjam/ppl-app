@@ -1526,7 +1526,7 @@ onActivated(async () => {
 
 .quick-form-error {
   margin: 10px 0 0;
-  color: var(--danger-color);
+  color: var(--danger);
   font-size: 0.82rem;
   font-weight: 700;
 }

@@ -166,7 +166,7 @@ onMounted(() => {
 }
 
 .error {
-  color: color-mix(in srgb, var(--danger-color) 70%, var(--fg));
+  color: color-mix(in srgb, var(--danger) 70%, var(--fg));
   font-size: 0.9rem;
 }
 
