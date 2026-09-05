@@ -47,11 +47,21 @@ function resolveContinueUrl() {
   if (!raw) return null
   try {
     const parsed = new URL(raw)
-    const isLocal = LOCAL_HOSTNAMES.has(parsed.hostname)
+    // Bug: auf iOS/Capacitor ist window.location.origin ein Custom-URL-Scheme
+    // (z.B. "com.pushpulllegs.com://localhost" oder "capacitor://localhost"), dessen Hostname
+    // zufällig "localhost" lautet - das erfüllte die alte isLocal-Prüfung, obwohl das Protokoll
+    // gar nicht http/https ist. Firebase lehnt so eine continueUrl serverseitig als nicht
+    // autorisierte Domain ab (auth/unauthorized-continue-uri), wodurch sendEmailVerification()
+    // wirft - und dieser Fehler wurde in signUpWithEmail() bisher stillschweigend verschluckt,
+    // sodass gar keine Bestätigungs-E-Mail verschickt wurde, die UI aber trotzdem Erfolg meldete.
+    // Fix: "isLocal" nur noch für echtes http/https auf localhost gelten lassen (lokaler
+    // Dev-Server), nicht für beliebige Custom-Schemes mit Hostname "localhost".
+    const isHttpOrHttps = parsed.protocol === 'http:' || parsed.protocol === 'https:'
+    const isLocal = isHttpOrHttps && LOCAL_HOSTNAMES.has(parsed.hostname)
     if (parsed.protocol === 'https:' || isLocal) {
       return parsed.toString()
     }
-    logger.warn('[firebaseAuth] continueUrl verworfen (nur https oder localhost erlaubt):', raw)
+    logger.warn('[firebaseAuth] continueUrl verworfen (nur https oder lokaler http-Dev-Server erlaubt):', raw)
     return null
   } catch (err) {
     logger.warn('[firebaseAuth] continueUrl ungültig, verworfen:', raw, err?.message || err)
@@ -364,8 +374,12 @@ export function useFirebaseAuth() {
         await sendEmailVerification(userCred.user, actionCodeSettings)
         // After sending verification, sign out to prevent unverified users from gaining access
         try { await signOut(auth) } catch { /* ignore signOut failures */ }
-      } catch {
-        // ignore failure to send email here; surface generic message below
+      } catch (verificationErr) {
+        // Bisher wurde hier komplett stillschweigend nichts geloggt - ein Fehler beim
+        // Versand (z.B. Firebase-Rate-Limit, ungültige continueUrl) blieb dadurch unsichtbar,
+        // obwohl dem Nutzer weiterhin "E-Mail wurde gesendet" angezeigt wurde. Jetzt zumindest
+        // geloggt, damit sich ein wiederkehrendes "E-Mail kommt nicht an" diagnostizieren lässt.
+        logger.warn('[firebaseAuth] sendEmailVerification fehlgeschlagen:', verificationErr?.code || verificationErr?.message || verificationErr)
       }
       // Keep user signed in but require verification before granting access
       return { pendingEmailVerification: true }
