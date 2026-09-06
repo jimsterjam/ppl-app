@@ -3472,7 +3472,13 @@ function enforceWorkoutProgrammingRules(payload, context = {}, options = {}) {
     weight: exercise.weight,
     rest: exercise.rest,
     category: requestedType,
-    note: buildExerciseCoachingNote(exercise, goal, index)
+    // War bisher "note" - kollidierte mit dem gleichnamigen Feld für die vom Nutzer selbst
+    // geschriebene Session-Notiz (siehe WorkoutDetailView.vue: getNote/setNote, "Notizen
+    // unvollständig"-Check). Dadurch dachte der Check bei JEDEM per KI generierten Workout,
+    // es seien schon Notizen vorhanden (der statische Technik-Tipp füllte das Feld), und
+    // "Später bewerten" konnte für diese Workouts nie ausgelöst werden. Eigener Feldname,
+    // damit beide Konzepte getrennt bleiben.
+    coachingNote: buildExerciseCoachingNote(exercise, goal, index)
   }));
 
   const fallbackName = requestedType === 'fullbody' ? 'Full Body Session' : `${requestedType.toUpperCase()} Session`;

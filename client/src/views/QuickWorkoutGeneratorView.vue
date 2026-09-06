@@ -220,7 +220,15 @@ async function generate() {
         sets: setsCount,
         reps: Math.max(1, Number(ex.reps) || 10),
         weight: Math.max(0, Number(ex.weight) || 0),
-        note: ex.note || '',
+        // War bisher "note: ex.note || ''" - das ließ das Feld für die Session-Notiz des
+        // Nutzers (siehe WorkoutDetailView.vue "Notiz hinzufügen") fälschlich schon als
+        // "ausgefüllt" erscheinen, weil der Server dort einen statischen Technik-Tipp
+        // mitschickte. Server liefert diesen Tipp jetzt als eigenes Feld coachingNote (siehe
+        // routes/workouts.js) - hier nur noch durchreichen, nicht mehr in note kopieren, damit
+        // "Notizen unvollständig"/"Später bewerten" auch bei KI-generierten Workouts korrekt
+        // erkennt, dass der Nutzer noch keine eigene Notiz geschrieben hat.
+        note: '',
+        coachingNote: ex.coachingNote || '',
         setDetails
       }
     })
