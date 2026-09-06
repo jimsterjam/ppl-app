@@ -29,14 +29,16 @@
           <div class="ex-list-header">
             <div class="ex-list-actions">
               <button class="primary add-exercise-btn" type="button" @click="showAddExerciseModal = true">
-                + {{ t('workoutDetail.addExercise') }}
+                <Plus class="btn-icon" aria-hidden="true" /> {{ t('workoutDetail.addExercise') }}
               </button>
-              <button v-if="!isFavoriteAdjustMode" class="primary timer-config-btn" type="button" @click="showTimerConfig = true">
-                ⏱ Timer einstellen
-              </button>
-              <button class="primary reorder-toggle" type="button" :aria-pressed="isReordering" @click="toggleReorder">
-                {{ isReordering ? t('workoutDetail.done') : t('workoutDetail.editOrder') }}
-              </button>
+              <div class="ex-list-actions-row">
+                <button v-if="!isFavoriteAdjustMode" class="secondary timer-config-btn" type="button" @click="showTimerConfig = true">
+                  <Clock class="btn-icon" aria-hidden="true" /> Timer
+                </button>
+                <button class="secondary reorder-toggle" type="button" :aria-pressed="isReordering" @click="toggleReorder">
+                  {{ isReordering ? t('workoutDetail.done') : t('workoutDetail.editOrder') }}
+                </button>
+              </div>
               <SessionStopwatch @session-time="onSessionTime" />
             </div>
           </div>
@@ -89,7 +91,7 @@
                 :title="t('workoutDetail.dragToReorder')"
                 @touchstart.prevent="onTouchStart($event, i)"
                 @pointerdown="onPointerDown($event, i)"
-              >⋮⋮</button>
+              ><GripVertical class="btn-icon" aria-hidden="true" /></button>
             <div class="ex-info" :class="{ minimal: isReordering }">
               <template v-if="isReordering">
                 <strong class="ex-name-only">{{ getTranslatedExerciseName(ex.name) }}</strong>
@@ -111,7 +113,7 @@
                       :title="t('common.remove')"
                       @click="askRemoveExercise(i)"
                     >
-                      🗑️
+                      <Trash2 class="btn-icon" aria-hidden="true" />
                     </button>
                   </div>
                   <small>{{ getTranslatedMuscleGroup ? getTranslatedMuscleGroup(ex.muscleGroup) : ex.muscleGroup }}</small>
@@ -122,7 +124,7 @@
                   <!-- Notiz-Button und Feld -->
                   <div style="margin-top: 6px;">
                     <button class="link" @click="toggleNote(i)">
-                      📝
+                      <StickyNote class="btn-icon btn-icon--inline" aria-hidden="true" />
                       {{ getNote(i)
                         ? (showNote[i] ? 'ändern' : 'anzeigen')
                         : 'Notiz hinzufügen' }}
@@ -134,7 +136,7 @@
                       @click="askDeleteNote(i)"
                       style="margin-left:8px;"
                     >
-                      🗑️ löschen
+                      <Trash2 class="btn-icon btn-icon--inline" aria-hidden="true" /> löschen
                     </button>
                   </div>
 
@@ -168,14 +170,17 @@
 
             <div class="ex-sets" v-if="!isReordering">
 
-              <!-- Aufwärmsätze -->
-              <div class="sets-section-label warmup-label">{{ t('workoutDetail.warmupSetsLabel') }}</div>
-              <div class="set-row header">
-                <span class="col set">{{ t('workoutDetail.set') }}</span>
-                <span class="col reps">{{ t('workoutDetail.reps') }}</span>
-                <span class="col weight">{{ t('workoutDetail.weight') }}</span>
-                <span class="col actions"></span>
-              </div>
+              <!-- Aufwärmsätze: Label + Tabellenkopf nur zeigen, wenn schon ein Aufwärmsatz
+                   existiert - sonst nur der kompakte "+"-Link weiter unten (siehe warmup-actions). -->
+              <template v-if="hasWarmupSets(ex)">
+                <div class="sets-section-label warmup-label">{{ t('workoutDetail.warmupSetsLabel') }}</div>
+                <div class="set-row header">
+                  <span class="col set">{{ t('workoutDetail.set') }}</span>
+                  <span class="col reps">{{ t('workoutDetail.reps') }}</span>
+                  <span class="col weight">{{ t('workoutDetail.weight') }}</span>
+                  <span class="col actions"></span>
+                </div>
+              </template>
               <template
                 v-for="(row, rIdx) in (ex.setDetails || [])"
                 :key="`${ex.exerciseId || i}-row-${rIdx}`"
@@ -280,16 +285,16 @@
                     </div>
                   </span>
                   <span class="col actions">
-                    <button class="remove-row-btn" :title="t('workoutDetail.removeWarmupSet')" @click="removeSetRow(i, rIdx)">−</button>
+                    <button class="remove-row-btn" :title="t('workoutDetail.removeWarmupSet')" @click="removeSetRow(i, rIdx)"><Minus class="btn-icon" aria-hidden="true" /></button>
                   </span>
                 </div>
               </template>
-              <div class="row-actions warmup-actions">
-                <button class="add-warmup-btn" @click="addWarmupSetRow(i, $event)">＋ {{ t('workoutDetail.addWarmupSet') }}</button>
+              <div class="row-actions warmup-actions" :class="{ 'warmup-actions--empty': !hasWarmupSets(ex) }">
+                <button class="add-warmup-btn" @click="addWarmupSetRow(i, $event)"><Plus class="btn-icon btn-icon--inline" aria-hidden="true" /> {{ t('workoutDetail.addWarmupSet') }}</button>
               </div>
 
               <!-- Arbeitssätze -->
-              <div class="sets-section-divider"></div>
+              <div class="sets-section-divider" v-if="hasWarmupSets(ex)"></div>
               <div class="sets-section-label working-label">{{ t('workoutDetail.workingSetsLabel') }}</div>
               <template
                 v-for="(row, rIdx) in (ex.setDetails || [])"
@@ -398,13 +403,13 @@
                     </div>
                   </span>
                   <span class="col actions">
-                    <button class="remove-row-btn" :title="t('workoutDetail.removeSet')" @click="removeSetRow(i, rIdx)">−</button>
+                    <button class="remove-row-btn" :title="t('workoutDetail.removeSet')" @click="removeSetRow(i, rIdx)"><Minus class="btn-icon" aria-hidden="true" /></button>
                   </span>
                 </div>
               </template>
 
               <div class="row-actions">
-                <button class="add-row-btn" :title="t('workoutDetail.addSet')" @click="addSetRow(i, $event)">＋ {{ t('workoutDetail.addSet') }}</button>
+                <button class="add-row-btn" :title="t('workoutDetail.addSet')" @click="addSetRow(i, $event)"><Plus class="btn-icon btn-icon--inline" aria-hidden="true" /> {{ t('workoutDetail.addSet') }}</button>
               </div>
             </div>
           </div>
@@ -668,6 +673,9 @@ import AppModal from '@/components/AppModal.vue'
 import ExerciseList from '@/components/ExerciseList.vue'
 import WorkoutTimerConfig from '@/components/timer/WorkoutTimerConfig.vue'
 import SessionStopwatch from '@/components/SessionStopwatch.vue'
+// Einheitliches Icon-Set statt Emoji/ASCII-Mix (🗑️/📝/⋮⋮/▲▼/＋/−) - wie im Rest der App
+// (siehe z.B. BottomNav.vue, AiFeedbackRatingWidget.vue) bereits lucide-vue-next genutzt.
+import { Clock, Trash2, StickyNote, GripVertical, Plus, Minus } from 'lucide-vue-next'
 import { useToastStore } from '@/stores/toastStore'
 import { useTimerStore } from '@/stores/timerStore'
 import { useI18n } from 'vue-i18n'
@@ -1962,6 +1970,14 @@ function addSetRow(exIndex, event = null) {
   try { triggerAutoSave() } catch {}
 }
 
+// Ob eine Übung bereits mindestens einen Aufwärmsatz hat - steuert, ob Label + Tabellenkopf
+// für Aufwärmsätze überhaupt angezeigt werden (siehe Template). Vorher erschienen diese immer,
+// auch ohne einen einzigen Aufwärmsatz, was unnötige Leerlauf-Struktur in jeder Übungskarte
+// erzeugt hat.
+function hasWarmupSets(ex) {
+  return Array.isArray(ex?.setDetails) && ex.setDetails.some((row) => row?.isWarmup)
+}
+
 function addWarmupSetRow(exIndex, event = null) {
   logSetRowTrigger('warmup', exIndex, event)
   const ex = workout.value?.exercises?.[exIndex]
@@ -3016,12 +3032,20 @@ onBeforeUnmount(() => {
   line-height: 1.4;
 }
 .ex-list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.ex-list-actions { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; width: 100%; }
+.ex-list-actions { display: flex; flex-direction: column; gap: 8px; align-items: stretch; width: 100%; }
 .ex-list-header h3 { margin: 0; font-size: 1.1rem; }
-.reorder-toggle { background: color-mix(in srgb, var(--accent) 16%, var(--bg-panel)) !important;
+/* Timer/Reihenfolge sind Werkzeuge, kein Haupt-Call-to-Action wie "Übung hinzufügen" -
+   nebeneinander statt gestapelt und in der neutralen .secondary-Optik (siehe unten), damit sie
+   nicht mehr optisch mit derselben Akzent-Intensität konkurrieren. Nur der aktive Reihenfolge-
+   Modus bekommt weiterhin eine Akzent-Hervorhebung (siehe [aria-pressed="true"] unten), damit
+   der Zustand weiterhin erkennbar bleibt. */
+.ex-list-actions-row { display: flex; gap: 8px; width: 100%; }
+.ex-list-actions-row > button { flex: 1; }
+.reorder-toggle[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--accent) 20%, var(--bg-panel));
   color: var(--fg-strong);
-  border: 2px solid color-mix(in srgb, var(--accent) 65%, var(--line-strong)) !important;
-  font-weight: 700; }
+  border-color: color-mix(in srgb, var(--accent) 65%, var(--line-strong));
+}
 .reorder-hint { color: var(--muted); margin: 0 0 8px; font-size: 0.85rem; }
 .ex-item { padding: 10px 0; border-bottom: 1px solid var(--card-border); }
 .ex-item:last-child { border-bottom: none; }
@@ -3064,7 +3088,45 @@ onBeforeUnmount(() => {
   text-align: center;
 }
 .drag-handle { background: transparent; border: none; color: var(--muted); cursor: grab; font-size: 16px; margin-right: 4px; padding: 0; }
-.ex-sets { margin-top: 6px; }
+/* Einheitliches Icon-Set (lucide) statt Emoji/ASCII-Mix (🗑️/📝/⋮⋮/▲▼/＋/−). Icons erben per
+   currentColor die Textfarbe des jeweiligen Buttons, damit z.B. der "Entfernen"-Button weiter
+   rot bleibt, ohne die Farbe an jeder Stelle neu zu definieren. */
+.btn-icon {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  vertical-align: -3px;
+  flex-shrink: 0;
+}
+.btn-icon--inline {
+  width: 14px;
+  height: 14px;
+  vertical-align: -2px;
+}
+.remove-exercise-btn,
+.remove-row-btn,
+.drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.remove-exercise-btn .btn-icon,
+.remove-row-btn .btn-icon,
+.drag-handle .btn-icon {
+  vertical-align: 0;
+}
+/* Eigene, leicht abgesetzte Fläche für den Sätze-Bereich (statt nahtlos in den Info-Teil
+   überzugehen) - macht auf einen Blick klar, wo "Infos zur Übung" aufhört und "Sätze
+   eintragen" anfängt, statt dass die ganze Karte wie ein einziger durchgehender Block wirkt. */
+.ex-sets {
+  margin-top: 10px;
+  padding: 10px 10px 6px;
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+}
 .set-row { display: grid; grid-template-columns: 50px 1fr 1fr 60px; gap: 8px; align-items: center; padding: 4px 0; }
 .set-row.header { color: var(--muted); font-size: 0.75rem; padding-top: 0; }
 .set-row .col input { width: 100%; padding: 5px 6px; border-radius: 6px; border: 1px solid var(--card-border); background: var(--surface); color: var(--fg); text-align: center; font-size: 1rem; }
@@ -3131,15 +3193,6 @@ onBeforeUnmount(() => {
   font-weight: 700;
 }
 .add-exercise-btn:hover {
-  background: color-mix(in srgb, var(--accent) 24%, var(--bg-panel));
-}
-.timer-config-btn {
-  background: color-mix(in srgb, var(--accent) 16%, var(--bg-panel));
-  color: var(--fg-strong);
-  border: 2px solid color-mix(in srgb, var(--accent) 65%, var(--line-strong));
-  font-weight: 700;
-}
-.timer-config-btn:hover {
   background: color-mix(in srgb, var(--accent) 24%, var(--bg-panel));
 }
 .link.danger {
@@ -3230,6 +3283,22 @@ onBeforeUnmount(() => {
 }
 .row-actions.warmup-actions {
   margin-bottom: 4px;
+}
+/* Solange noch kein Aufwärmsatz existiert, fällt der Button dezenter aus (kein Rahmen, keine
+   Box) - er tritt dann als einfacher Text-Link auf statt als weiterer optischer Block direkt
+   über "Arbeitssätze". Sobald ein Aufwärmsatz angelegt wurde, erscheint wieder die normale,
+   etwas betontere Button-Optik (siehe .add-warmup-btn), passend zu den sichtbaren Zeilen darüber. */
+.warmup-actions--empty {
+  margin-bottom: 2px;
+}
+.warmup-actions--empty .add-warmup-btn {
+  border: none;
+  background: transparent;
+  padding: 4px 0;
+  color: var(--muted);
+}
+.warmup-actions--empty .add-warmup-btn:hover {
+  color: color-mix(in srgb, #f59e0b 70%, var(--muted));
 }
 .add-warmup-btn {
   background: transparent;
