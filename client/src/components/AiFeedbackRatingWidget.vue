@@ -56,6 +56,7 @@
       <div class="rating-submit-actions">
         <button type="button" class="rating-cancel-btn" @click="cancel">{{ t('feedbackHistory.ratingCancel') }}</button>
         <button type="button" class="rating-submit-btn" :disabled="submitting" @click="submit">
+          <span v-if="submitting" class="rating-submit-spinner" aria-hidden="true"></span>
           {{ submitting ? t('feedbackHistory.ratingSaving') : t('feedbackHistory.ratingSubmit') }}
         </button>
       </div>
@@ -93,6 +94,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { ThumbsUp, ThumbsDown } from 'lucide-vue-next'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { useToastStore } from '@/stores/toastStore'
@@ -124,8 +126,19 @@ const props = defineProps({
 })
 
 const { t } = useI18n()
+const router = useRouter()
 const { getIdToken } = useFirebaseAuth()
 const toast = useToastStore()
+
+// Nach Abschluss der kompletten Bewertung (inkl. optionaler "welche Übung"-Zuordnung, falls
+// eine Korrektur angegeben wurde) automatisch zurück zum Dashboard springen - auf Wunsch, statt
+// den Nutzer in der Zusammenfassung/im Feedback-Verlauf "hängen" zu lassen. Kurze Verzögerung,
+// damit die Erfolgsmeldung/das Ergebnis noch kurz sichtbar ist, bevor navigiert wird.
+function returnToDashboardAfterRating() {
+  setTimeout(() => {
+    router.push('/dashboard').catch(() => {})
+  }, 700)
+}
 
 const submittedRating = ref(null)
 const editing = ref(false)
@@ -195,6 +208,9 @@ async function submit() {
       } else {
         showExercisePicker.value = true
       }
+    } else {
+      // Keine Übungs-Notiz-Zuordnung nötig - die Bewertung ist damit vollständig abgeschlossen.
+      returnToDashboardAfterRating()
     }
   } catch (err) {
     logger.warn('[AiFeedbackRatingWidget] submit failed', err?.message)
@@ -227,6 +243,8 @@ function skipNoteFlow() {
   showConfirmNote.value = false
   pendingNoteExercise.value = ''
   pendingNoteText.value = ''
+  // Auch wenn die Notiz-Zuordnung übersprungen wird, ist die Bewertung selbst damit fertig.
+  returnToDashboardAfterRating()
 }
 
 async function confirmNote() {
@@ -402,6 +420,10 @@ onMounted(async () => {
 }
 
 .rating-submit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
   padding: 0.5rem 0.9rem;
   border-radius: 0.5rem;
   border: none;
@@ -414,6 +436,23 @@ onMounted(async () => {
 
 .rating-submit-btn:disabled {
   opacity: 0.6;
+  cursor: default;
+}
+
+/* Sichtbarer Ladeindikator, falls das Speichern der Bewertung etwas länger dauert (z.B.
+   langsames Netz) - bisher änderte sich nur der Button-Text, was leicht übersehen wurde. */
+.rating-submit-spinner {
+  width: 0.9rem;
+  height: 0.9rem;
+  border: 2px solid color-mix(in srgb, var(--accent-contrast) 35%, transparent);
+  border-top-color: var(--accent-contrast);
+  border-radius: 50%;
+  animation: rating-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes rating-spin {
+  to { transform: rotate(360deg); }
 }
 
 .rating-note-flow {

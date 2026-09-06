@@ -1,5 +1,8 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
+import { acquireKeepAwake, releaseKeepAwake } from '@/utils/keepAwakeGuard'
+
+const KEEP_AWAKE_TAG = 'session-stopwatch'
 
 const STORAGE_KEY = 'bro_split_session_stopwatch_v1'
 
@@ -70,6 +73,7 @@ export const useSessionStopwatchStore = defineStore('sessionStopwatch', () => {
   // muss der rAF-Loop wieder anlaufen, sonst bleibt die Anzeige stehen.
   if (isRunning.value && startedAt.value) {
     startRaf()
+    acquireKeepAwake(KEEP_AWAKE_TAG)
   }
 
   const elapsedMs = computed(() => {
@@ -91,6 +95,7 @@ export const useSessionStopwatchStore = defineStore('sessionStopwatch', () => {
     pausedTotalMs.value = 0
     isRunning.value = true
     startRaf()
+    acquireKeepAwake(KEEP_AWAKE_TAG)
     persistNow()
   }
 
@@ -99,6 +104,7 @@ export const useSessionStopwatchStore = defineStore('sessionStopwatch', () => {
     pausedAt.value = Date.now()
     isRunning.value = false
     stopRaf()
+    releaseKeepAwake(KEEP_AWAKE_TAG)
     persistNow()
   }
 
@@ -108,11 +114,13 @@ export const useSessionStopwatchStore = defineStore('sessionStopwatch', () => {
     pausedAt.value = null
     isRunning.value = true
     startRaf()
+    acquireKeepAwake(KEEP_AWAKE_TAG)
     persistNow()
   }
 
   function reset() {
     stopRaf()
+    releaseKeepAwake(KEEP_AWAKE_TAG)
     startedAt.value = null
     pausedAt.value = null
     pausedTotalMs.value = 0

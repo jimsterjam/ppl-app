@@ -20,6 +20,7 @@ import { setDownloadConcurrency } from '@/utils/assetResolver'
 import { setupAutoSync, processSyncQueue } from '@/utils/syncManager'
 import { saveWorkoutService } from '@/utils/SaveWorkoutService'
 import { deleteWorkoutOffline, OFFLINE_WORKOUTS_UPDATED_EVENT } from '@/utils/offlineStorage'
+import { processPendingAiFeedback } from '@/utils/pendingAiFeedback'
 // Bewusst NICHT statisch importiert (siehe warmupExercisesArea unten): defaultExercisesLoader.js
 // importiert die ~3,3MB große Übungsdatenbank (default-exercises.json) statisch - ein Top-Level-
 // Import hier würde sie fest in den Haupt-Bundle-Chunk backen, obwohl sie erst gebraucht wird,
@@ -183,6 +184,16 @@ async function bootstrapAuth() {
 
   logger.debug('[main] Initializing auth listener, store auth state:', authStore.isAuthenticated)
 
+  // Globale Warteschlange für nachträgliche KI-Analysen (siehe pendingAiFeedback.js):
+  // bisher lief der erneute Versuch nur innerhalb von PostWorkoutSummary.vue und ging verloren,
+  // sobald diese Ansicht verlassen wurde, bevor die temporäre Workout-ID real aufgelöst war.
+  // Jetzt app-weit registriert - läuft unabhängig davon, ob die Zusammenfassung noch offen ist.
+  window.addEventListener(OFFLINE_WORKOUTS_UPDATED_EVENT, () => {
+    processPendingAiFeedback().catch((error) => {
+      logger.warn('[main] processPendingAiFeedback (Event) fehlgeschlagen:', error)
+    })
+  })
+
   onAuthStateChanged(async (user) => {
     logger.debug('[main] Firebase auth state changed:', user ? user.uid : 'null')
     if (user) {
@@ -235,6 +246,13 @@ async function bootstrapAuth() {
             .catch((error) => {
               logger.warn('[main] Favoriten-Abgleich fehlgeschlagen:', error)
             })
+
+          // Falls beim letzten App-Ende noch nachträgliche KI-Analysen offen waren (z.B. App
+          // wurde geschlossen, bevor eine temporäre Workout-ID real aufgelöst wurde), hier
+          // einmal pro Login/App-Start nachholen statt auf das nächste Sync-Event zu warten.
+          processPendingAiFeedback().catch((error) => {
+            logger.warn('[main] processPendingAiFeedback (Start) fehlgeschlagen:', error)
+          })
         }
       } else {
         logger.warn('[main] No token after auth state change, starte trotzdem Sync-Versuch', {

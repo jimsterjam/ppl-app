@@ -104,6 +104,7 @@ import { acquireKeepAwake, releaseKeepAwake } from '@/utils/keepAwakeGuard'
 import { resolveRealIdFromDraftId } from '@/utils/workoutHelpers'
 import { logDiagnostic } from '@/utils/diagnosticsLog'
 import { OFFLINE_WORKOUTS_UPDATED_EVENT } from '@/utils/offlineStorage'
+import { queuePendingAiFeedback, clearPendingAiFeedback } from '@/utils/pendingAiFeedback'
 import AiFeedbackDeltaSummary from '@/components/AiFeedbackDeltaSummary.vue'
 import AiFeedbackRatingWidget from '@/components/AiFeedbackRatingWidget.vue'
 
@@ -229,8 +230,16 @@ async function loadAIFeedback() {
     if (!resolvedWorkoutId) {
       syncPending.value = true
       logDiagnostic('ai-feedback-sync-pending', { workoutId: props.workoutId })
+      // Bisher wurde hier nur lokal (Event-Listener, siehe handleOfflineWorkoutsUpdated)
+      // erneut versucht - der Versuch ging verloren, sobald diese Ansicht geschlossen/verlassen
+      // wurde, bevor die echte ID vorlag. Zusätzlich global (überlebt Navigation/Unmount/
+      // App-Neustart) einreihen, damit die Analyse auch dann noch nachträglich ausgelöst wird.
+      queuePendingAiFeedback(props.workoutId)
       return
     }
+    // Erfolgreich (oder zumindest final) angefragt - ein evtl. vorheriger globaler
+    // Warteschlangen-Eintrag für diese ID ist damit hinfällig.
+    clearPendingAiFeedback(props.workoutId)
     resolvedWorkoutIdForRating.value = resolvedWorkoutId
 
     const token = await getIdToken().catch(() => null)

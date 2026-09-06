@@ -55,6 +55,7 @@
 <script setup>
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useSessionStopwatch } from '@/composables/useSessionStopwatch'
+import { releaseKeepAwake } from '@/utils/keepAwakeGuard'
 
 const emit = defineEmits(['session-time'])
 
@@ -103,6 +104,11 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', onOutsideClick)
+  // Sicherheitsnetz: falls die Komponente verschwindet (z.B. Workout-Ansicht
+  // verlassen) während die Stoppuhr noch lief, darf der Bildschirm wieder
+  // einschlafen dürfen - der Store selbst gibt den Tag zwar bei stop()/reset()
+  // frei, aber nicht automatisch beim Unmount der Anzeige.
+  releaseKeepAwake('session-stopwatch')
 })
 </script>
 
