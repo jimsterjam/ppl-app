@@ -7,7 +7,12 @@ staticSites:
     name: ppl-app-client
     repo: https://github.com/jimsterjam/ppl-app.git
     branch: main
-    buildCommand: cd client && npm ci && npm test && npm run build
+    # Tests laufen jetzt separat in GitHub Actions (.github/workflows/ci.yml), nicht mehr
+    # als Teil des Render-Build-Commands. Grund: ein Test-Fehlschlag (oder auch nur eine
+    # einmalige Flakiness auf Renders Build-Maschine) hat bisher den kompletten Deploy
+    # blockiert - inkl. Fällen, in denen ein manueller Redeploy Sekunden später ohne jede
+    # Codeänderung durchlief. Render soll nur noch bauen/deployen, nicht mehr testen.
+    buildCommand: cd client && npm ci && npm run build
     publishPath: client/dist
 
 services:
@@ -16,7 +21,8 @@ services:
     runtime: node
     repo: https://github.com/jimsterjam/ppl-app.git
     branch: main
-    buildCommand: cd server && npm ci && npm test
+    # Siehe Kommentar oben bei staticSites - Tests laufen jetzt in GitHub Actions statt hier.
+    buildCommand: cd server && npm ci
     startCommand: cd server && npm run start
     plan: free
     envVars:

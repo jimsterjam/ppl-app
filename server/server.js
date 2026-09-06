@@ -54,14 +54,47 @@ try {
   logger.info("Firebase Admin nicht initialisiert (optional):", e?.message);
 }
 
+// Server SOFORT binden, unabhängig vom Mongo-Verbindungsstatus.
+//
+// Vorher: app.listen() lief erst im .then() von mongoose.connect() - der Prozess hörte also
+// gar nicht auf $PORT, solange die Mongo-Atlas-Verbindung nicht stand. Render prüft beim
+// Deploy aber genau das (Bind auf $PORT) innerhalb eines Zeitfensters. Direkt nach einem
+// `git push` war die Erstverbindung zu Atlas (kalter Cluster/Container, frischer DNS/TLS-
+// Handshake) öfter langsam genug, um dieses Fenster zu verpassen - der Prozess landete dann
+// im .catch() unten, rief process.exit(1) auf, und der Deploy wurde als fehlgeschlagen
+// markiert. Ein manueller Redeploy kurz danach lief über einen bereits "warmen" Netzwerkpfad
+// und schaffte es meist rechtzeitig - reines Timing-Problem, kein Bug in den Deploy-Daten
+// selbst (daher: gleicher Code, unterschiedliches Ergebnis push vs. manueller Redeploy).
+app.listen(PORT, HOST, () => {
+  logger.info(`Server läuft auf http://${HOST}:${PORT}`);
+});
+
+// MongoDB läuft jetzt komplett im Hintergrund, mit explizitem Verbindungs-Timeout (statt
+// Mongoose' Default) und automatischem Wiederholungsversuch bei einer fehlgeschlagenen
+// ERSTverbindung - vorher beendete ein einziger Fehlschlag sofort den ganzen Prozess
+// (process.exit(1)), was serverseitig denselben Health-Check-Race nur nach dem Listen
+// reproduziert hätte. Requests, die währenddessen die DB brauchen, laufen bis zur ersten
+// erfolgreichen Verbindung in den üblichen Mongoose-Timeout statt dass die App abstürzt.
 // MONGO_URI ist an dieser Stelle durch validateEnv() oben bereits als gesetzt und
-// formatgültig garantiert (sonst hätte der Prozess dort schon beendet).
-mongoose.connect(MONGO_URI).then(() => {
-  logger.info("MongoDB verbunden");
-  app.listen(PORT, HOST, () => {
-    logger.info(`Server läuft auf http://${HOST}:${PORT}`);
+// formatgültig garantiert.
+const MONGO_CONNECT_RETRY_MS = 5000;
+
+function connectMongoWithRetry() {
+  mongoose.connect(MONGO_URI, {
+    serverSelectionTimeoutMS: 10000
+  }).then(() => {
+    logger.info("MongoDB verbunden");
+  }).catch((err) => {
+    logger.error(
+      `MongoDB-Verbindung fehlgeschlagen, erneuter Versuch in ${MONGO_CONNECT_RETRY_MS / 1000}s:`,
+      err?.message || err
+    );
+    setTimeout(connectMongoWithRetry, MONGO_CONNECT_RETRY_MS);
   });
-}).catch((err) => {
-  logger.error("MongoDB-Verbindung fehlgeschlagen", err);
-  process.exit(1);
+}
+
+connectMongoWithRetry();
+
+mongoose.connection.on("disconnected", () => {
+  logger.warn("MongoDB-Verbindung getrennt - Mongoose versucht automatisch, erneut zu verbinden");
 });
