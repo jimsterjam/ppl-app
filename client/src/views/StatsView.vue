@@ -15,8 +15,8 @@
         <RecentWorkouts :workouts="recentWorkoutsSource" :show-view-all="false" @delete="handleDeleteRecentWorkout" />
       </section>
 
-      <section class="section">
-        <AIFeedbackHistory />
+      <section class="section" id="feedback-history-section">
+        <AIFeedbackHistory :highlight-workout-id="String(route.query.highlightWorkoutId || '')" />
       </section>
 
       <section v-if="!isPro" class="pro-banner">

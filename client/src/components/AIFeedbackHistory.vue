@@ -23,6 +23,7 @@
     <div v-else class="feedback-list">
       <div
         v-for="item in items"
+        :id="`feedback-item-${item.workoutId}`"
         :key="item.workoutId"
         class="feedback-item"
         :class="{ expanded: expandedId === item.workoutId }"
@@ -98,7 +99,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Share2 } from 'lucide-vue-next'
 import { Share } from '@capacitor/share'
@@ -111,6 +112,18 @@ import { logger } from '@/utils/logger'
 import { getMetadata, setMetadata } from '@/utils/offlineStorage'
 import { useToastStore } from '@/stores/toastStore'
 import { logDiagnostic } from '@/utils/diagnosticsLog'
+
+const props = defineProps({
+  // Von StatsView.vue aus route.query.highlightWorkoutId durchgereicht (siehe
+  // PostWorkoutSummary.vue -> goToAnalytics()): springt beim Laden automatisch zu diesem
+  // Eintrag und klappt ihn auf - v.a. für den "Zum Feedback-Verlauf"-Button beim Feature
+  // "Feedback später bewerten" gedacht, damit der Nutzer den gerade zurückgestellten Eintrag
+  // nicht erst in der Liste suchen muss.
+  highlightWorkoutId: {
+    type: String,
+    default: ''
+  }
+})
 
 const { t, locale } = useI18n()
 const { getIdToken, getCurrentUser } = useFirebaseAuth()
@@ -343,6 +356,23 @@ function loadMore() {
   load(page.value + 1)
 }
 
+// Springt zum per highlightWorkoutId-Prop markierten Eintrag, sobald er in items steht -
+// klappt ihn auf und scrollt ihn in den sichtbaren Bereich. Läuft sowohl beim initialen Laden
+// (Cache-Treffer ODER Netzwerk-Antwort) als auch bei einer späteren Prop-Änderung, falls die
+// Komponente schon vor der Navigation gemountet war.
+function applyHighlight() {
+  const id = String(props.highlightWorkoutId || '').trim()
+  if (!id) return
+  const match = items.value.find((it) => String(it.workoutId) === id)
+  if (!match) return
+  expandedId.value = match.workoutId
+  nextTick(() => {
+    document.getElementById(`feedback-item-${match.workoutId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  })
+}
+
+watch([items, () => props.highlightWorkoutId], applyHighlight)
+
 onMounted(() => {
   // Cache-Lesen (schnelles IndexedDB) und Netzwerk-Refresh bewusst NICHT nacheinander
   // (await ... dann erst starten), sondern parallel anstoßen - der Netzwerk-Request ist der
@@ -450,6 +480,9 @@ onMounted(() => {
   padding: 0.85rem 1rem;
   cursor: pointer;
   transition: background-color 0.15s;
+  /* Damit scrollIntoView() (siehe applyHighlight()) den Eintrag nicht unter dem fixierten
+     Header verschwinden lässt. */
+  scroll-margin-top: 80px;
 }
 
 .feedback-item:active {

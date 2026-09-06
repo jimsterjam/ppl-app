@@ -16,15 +16,16 @@
             <p v-if="message">{{ message }}</p>
           </slot>
         </div>
-        <div class="modal-actions" :class="{ 'has-extra': extraText }">
-          <!-- Optionaler dritter, dezenterer Button für einen alternativen Weg neben
-               Bestätigen/Abbrechen (z.B. "Später bewerten") - additiv, ohne bestehende
-               Verwendungen von AppModal zu beeinflussen, solange extraText leer bleibt. -->
-          <button v-if="extraText" type="button" class="btn ghost extra" @click="onExtra">{{ extraText }}</button>
-          <span v-if="extraText" class="modal-actions-spacer"></span>
+        <div class="modal-actions">
           <button v-if="showCancel" class="btn secondary" @click="onCancel">{{ cancelText || t('common.cancel') }}</button>
           <button ref="confirmBtn" class="btn primary" :class="type" @click="onConfirm">{{ confirmText || t('common.confirm') }}</button>
         </div>
+        <!-- Optionaler dritter, alternativer Weg (z.B. "Später bewerten") - bewusst als eigene,
+             volle Zeile UNTER dem Bestätigen/Abbrechen-Paar statt als dritter Button daneben:
+             drei nebeneinanderliegende Buttons wirkten auf schmalen Bildschirmen überladen/
+             uneinheitlich. Als reiner Text-Link klar als "untergeordnete" Alternative erkennbar,
+             additiv - ohne extraText ändert sich nichts an bestehenden AppModal-Verwendungen. -->
+        <button v-if="extraText" type="button" class="extra-link" @click="onExtra">{{ extraText }}</button>
       </div>
     </div>
   </teleport>
@@ -138,31 +139,34 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
   display: flex;
   justify-content: flex-end;
   gap: 8px;
-  padding: 12px 16px 16px;
+  padding: 12px 16px;
   border-top: 1px solid color-mix(in srgb, var(--card-border) 78%, transparent);
   background: color-mix(in srgb, var(--card-bg) 94%, transparent);
 }
 .btn { padding: 10px 14px; border-radius: 10px; border: 1px solid transparent; cursor: pointer; font-weight: 600; }
 .btn.secondary { background: var(--surface); border-color: var(--card-border); color: var(--fg); }
 .btn.primary { background: var(--accent); color: var(--accent-contrast); }
-/* Dezenter als Abbrechen/Bestätigen - ein dritter Weg ("Später bewerten" o.ä.), der nicht mit
-   der eigentlichen Ja/Nein-Entscheidung um Aufmerksamkeit konkurrieren soll. */
-.btn.ghost.extra {
-  background: transparent;
-  border-color: transparent;
+/* Dritter, alternativer Weg (z.B. "Später bewerten") als eigene, volle Zeile UNTER dem
+   Bestätigen/Abbrechen-Paar statt als weiterer Button daneben - drei nebeneinander wirkten
+   auf schmalen Bildschirmen überladen. Als Text-Link klar als "untergeordnete" Alternative
+   erkennbar, im selben Footer-Bereich (gleicher Hintergrund wie .modal-actions direkt darüber). */
+.extra-link {
+  display: block;
+  width: 100%;
+  text-align: center;
+  background: color-mix(in srgb, var(--card-bg) 94%, transparent);
+  border: none;
+  margin: 0;
+  padding: 0 16px 14px;
   color: var(--muted);
+  font-size: 0.85rem;
   font-weight: 500;
-  padding-left: 4px;
-  padding-right: 4px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
 }
-.btn.ghost.extra:hover {
+.extra-link:hover {
   color: var(--fg);
-}
-.modal-actions.has-extra {
-  flex-wrap: wrap;
-}
-.modal-actions-spacer {
-  flex: 1;
 }
 /* .btn.primary.warning { background: color-mix(in oklab, var(--warning) 60%, var(--accent-color)); color: #fff; } */
 .btn.primary.info { background: color-mix(in oklab, #3b82f6 60%, var(--accent-color)); color: #fff; }
