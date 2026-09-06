@@ -6,7 +6,8 @@
     <PostWorkoutSummary
       v-if="postWorkoutId"
       :workout-id="postWorkoutId"
-      @close="postWorkoutId = null"
+      :deferred="postWorkoutDeferred"
+      @close="postWorkoutId = null; postWorkoutDeferred = false"
     />
 
     <main class="stats-content">
@@ -221,6 +222,8 @@ const loading = ref(true)
 const offlineWorkouts = ref([])
 const authToken = ref(null)
 const postWorkoutId = ref(null)
+// Feature "Feedback später bewerten" (siehe WorkoutDetailView.vue: goToPostWorkoutSummary)
+const postWorkoutDeferred = ref(false)
 
 const statsWorkouts = computed(() => {
   const offlineList = Array.isArray(offlineWorkouts.value) ? offlineWorkouts.value : []
@@ -654,11 +657,13 @@ watch(selectedRangeDays, async (next) => {
 watch(
   () => ({
     postWorkout: route.query.postWorkout,
-    workoutId: route.query.workoutId
+    workoutId: route.query.workoutId,
+    deferred: route.query.deferred
   }),
   (newQuery) => {
     if (newQuery.postWorkout === '1' && newQuery.workoutId) {
       postWorkoutId.value = String(newQuery.workoutId)
+      postWorkoutDeferred.value = newQuery.deferred === '1'
     }
   },
   { immediate: true }

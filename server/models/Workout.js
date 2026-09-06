@@ -106,6 +106,19 @@ const workoutSchema = new mongoose.Schema({
     provider: String,
     model: String
   },
+  // Nutzer-Feature "Feedback später bewerten": beim Speichern eines Workouts mit noch
+  // unvollständigen Notizen kann der Nutzer die KI-Analyse bewusst zurückstellen, um erst in
+  // Ruhe Notizen zu ergänzen, statt sie sofort (mit fehlenden Notizen als Kontext) generieren
+  // zu lassen. 'deferred' markiert genau diesen Fall, damit die Feedback-Verlauf-Ansicht das
+  // Workout als "ausstehend" mit einem "Jetzt generieren"-Button zeigen kann - im Unterschied
+  // zu 'none' (Analyse wurde nie angefragt/ist nicht relevant, z.B. ältere Workouts von vor
+  // diesem Feature) und 'generated' (ai_feedback wurde erfolgreich erzeugt, siehe
+  // POST /:id/ai-analysis in routes/workouts.js).
+  ai_feedback_status: {
+    type: String,
+    enum: ['none', 'deferred', 'generated'],
+    default: 'none'
+  },
   // Kompakte, strukturierte Delta-Zusammenfassung je Übung (Sätze/Wdh./Gewicht mehr bzw.
   // weniger als die vorherige Session) - wird zusammen mit ai_feedback einmalig berechnet und
   // gespeichert, damit die UI (PostWorkoutSummary/AIFeedbackHistory) eine übersichtliche,
@@ -131,6 +144,8 @@ const workoutSchema = new mongoose.Schema({
 
 // Feedback-Liste: userId + ai_generated_at DESC mit Limit
 workoutSchema.index({ userId: 1, ai_generated_at: -1 })
+// Feedback-Verlauf: "ausstehende" (zurückgestellte) Workouts schnell finden
+workoutSchema.index({ userId: 1, ai_feedback_status: 1 })
 
 // 🚀 Database Indexes für Performance-Optimierung
 // Häufige Query-Patterns:

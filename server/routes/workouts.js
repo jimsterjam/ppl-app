@@ -866,15 +866,36 @@ router.get("/feedbacks", firebaseAuthMiddleware, async (req, res) => {
     const limit = Math.min(50, Math.max(1, Number.parseInt(req.query?.limit, 10) || 20));
     const skip = (page - 1) * limit;
 
-    const query = { userId, ai_feedback: { $exists: true, $ne: null } };
+    // Zeigt neben bereits generiertem Feedback auch "zurückgestellte" Workouts (Feature
+    // "Feedback später bewerten": Nutzer hat beim Speichern bewusst auf die sofortige
+    // KI-Analyse verzichtet, um erst Notizen zu ergänzen - siehe ai_feedback_status in
+    // models/Workout.js). Diese haben noch kein ai_feedback, sollen aber trotzdem in dieser
+    // Liste auftauchen, damit der Nutzer sie über den "Jetzt generieren"-Button (siehe
+    // AIFeedbackHistory.vue) wiederfindet.
+    const query = {
+      userId,
+      $or: [
+        { ai_feedback: { $exists: true, $ne: null } },
+        { ai_feedback_status: 'deferred' }
+      ]
+    };
 
     const [items, total] = await Promise.all([
-      Workout.find(query)
-        .sort({ ai_generated_at: -1 })
-        .skip(skip)
-        .limit(limit)
-        .select('_id name type date ai_feedback ai_generated_at ai_metadata ai_analysis_snapshot')
-        .lean(),
+      Workout.aggregate([
+        { $match: query },
+        // Zurückgestellte Workouts oben anpinnen (sie haben kein ai_generated_at, würden bei
+        // einer reinen Sortierung danach sonst je nach Sortierrichtung ganz oben oder unten
+        // "verschwinden" statt als klar sichtbare, offene Aufgabe aufzufallen).
+        { $addFields: { _pendingFirst: { $cond: [{ $eq: ['$ai_feedback_status', 'deferred'] }, 0, 1] } } },
+        { $sort: { _pendingFirst: 1, ai_generated_at: -1, date: -1 } },
+        { $skip: skip },
+        { $limit: limit },
+        { $project: {
+          name: 1, type: 1, date: 1, completed: 1,
+          ai_feedback: 1, ai_generated_at: 1, ai_metadata: 1, ai_analysis_snapshot: 1,
+          ai_feedback_status: 1
+        } }
+      ]),
       Workout.countDocuments(query)
     ]);
 
@@ -891,7 +912,10 @@ router.get("/feedbacks", firebaseAuthMiddleware, async (req, res) => {
         // Nur bei ab jetzt neu generiertem Feedback vorhanden (additiv) - ältere Einträge
         // liefern hier ein leeres Array, das Frontend zeigt dann nur den Fließtext ohne die
         // kompakte Delta-Liste (siehe AIFeedbackHistory.vue).
-        ai_analysis_snapshot: w.ai_analysis_snapshot || []
+        ai_analysis_snapshot: w.ai_analysis_snapshot || [],
+        // 'deferred' = noch kein Feedback, Nutzer hat es bewusst zurückgestellt (zeigt in der
+        // UI ein "ausstehend"-Badge + "Jetzt generieren"-Button statt des Feedback-Texts).
+        ai_feedback_status: w.ai_feedback_status || (w.ai_feedback ? 'generated' : 'none')
       })),
       page,
       limit,
@@ -1221,7 +1245,10 @@ router.delete("/:id", firebaseAuthMiddleware, async (req, res) => {
       if (affected.length > 0) {
         await Workout.updateMany(
           { _id: { $in: affected.map(w => w._id) } },
-          { $unset: { ai_feedback: '', ai_generated_at: '', ai_metadata: '', ai_analysis_snapshot: '' } }
+          {
+            $unset: { ai_feedback: '', ai_generated_at: '', ai_metadata: '', ai_analysis_snapshot: '' },
+            $set: { ai_feedback_status: 'none' }
+          }
         );
         logger.info('♻️ Zwischengespeichertes KI-Feedback nach Workout-Löschung invalidiert', {
           deletedWorkoutId: String(workout._id),
@@ -1810,7 +1837,11 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
               provider: aiService.getProviderName(),
               model: aiService.getModelName()
             },
-            ai_analysis_snapshot: analysisSnapshot
+            ai_analysis_snapshot: analysisSnapshot,
+            // War das Workout zuvor "zurückgestellt" (Feature "Feedback später bewerten"),
+            // ist es jetzt final generiert - Feedback-Verlauf soll dann kein "ausstehend"-
+            // Badge mehr zeigen (siehe GET /feedbacks oben).
+            ai_feedback_status: 'generated'
           }
         }
       ).catch((e) => {

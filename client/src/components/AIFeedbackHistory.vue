@@ -31,12 +31,35 @@
         <div class="feedback-summary">
           <div class="feedback-info">
             <span class="feedback-name">{{ item.name || 'Workout' }}</span>
-            <span class="feedback-date">{{ formatDate(item.ai_generated_at || item.date) }}</span>
+            <span class="feedback-date">
+              {{ formatDate(item.ai_generated_at || item.date) }}
+              <span v-if="item.ai_feedback_status === 'deferred'" class="pending-badge">
+                {{ t('feedbackHistory.pendingBadge') || 'Ausstehend' }}
+              </span>
+            </span>
           </div>
           <span class="chevron" :class="{ open: expandedId === item.workoutId }">›</span>
         </div>
 
-        <div v-if="expandedId === item.workoutId" class="feedback-text" @click.stop>
+        <!-- Feature "Feedback später bewerten": noch kein ai_feedback vorhanden, Nutzer hat die
+             Analyse beim Speichern bewusst zurückgestellt (siehe ai_feedback_status in
+             models/Workout.js) - eigener Zustand mit "Jetzt generieren"-Button statt des
+             normalen Feedback-Texts, der hier ja noch gar nicht existiert. -->
+        <div v-if="expandedId === item.workoutId && item.ai_feedback_status === 'deferred'" class="feedback-text pending" @click.stop>
+          <p class="pending-hint">{{ t('feedbackHistory.pendingHint') || 'Für dieses Workout wurde noch kein KI-Feedback angefordert. Falls du inzwischen Notizen ergänzt hast, kannst du es jetzt generieren.' }}</p>
+          <p v-if="generateError === item.workoutId" class="generate-error">{{ t('feedbackHistory.generateError') || 'Feedback konnte gerade nicht generiert werden. Bitte später erneut versuchen.' }}</p>
+          <button
+            class="generate-now-btn"
+            type="button"
+            :disabled="generatingId === item.workoutId"
+            @click.stop="generateNow(item)"
+          >
+            <span v-if="generatingId === item.workoutId" class="generate-spinner spin-indicator" aria-hidden="true"></span>
+            {{ generatingId === item.workoutId ? (t('feedbackHistory.generating') || 'Generiere…') : (t('feedbackHistory.generateNow') || 'Jetzt generieren') }}
+          </button>
+        </div>
+
+        <div v-else-if="expandedId === item.workoutId" class="feedback-text" @click.stop>
           <AiFeedbackDeltaSummary
             v-if="item.ai_analysis_snapshot?.length > 0"
             class="feedback-delta-summary"
@@ -83,7 +106,7 @@ import { generateFeedbackShareImage } from '@/utils/feedbackShareImage'
 import AiFeedbackDeltaSummary from '@/components/AiFeedbackDeltaSummary.vue'
 import AiFeedbackRatingWidget from '@/components/AiFeedbackRatingWidget.vue'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
-import { fetchWorkoutFeedbacks } from '@/api/workouts'
+import { fetchWorkoutFeedbacks, requestAiAnalysis } from '@/api/workouts'
 import { logger } from '@/utils/logger'
 import { getMetadata, setMetadata } from '@/utils/offlineStorage'
 import { useToastStore } from '@/stores/toastStore'
@@ -109,9 +132,53 @@ const error = ref(null)
 const page = ref(1)
 const hasMore = ref(false)
 const expandedId = ref(null)
+// Feature "Feedback später bewerten": Zustand für den manuellen "Jetzt generieren"-Button.
+const generatingId = ref(null)
+const generateError = ref(null)
 
 function toggle(id) {
   expandedId.value = expandedId.value === id ? null : id
+}
+
+// Stößt die KI-Analyse manuell für ein zuvor zurückgestelltes Workout an (siehe
+// ai_feedback_status === 'deferred') und aktualisiert den Eintrag in-place, sobald das
+// Ergebnis da ist - kein erneutes Laden der ganzen Liste nötig.
+async function generateNow(item) {
+  if (generatingId.value) return
+  generatingId.value = item.workoutId
+  generateError.value = null
+  try {
+    const token = await getIdToken().catch(() => null)
+    const data = await requestAiAnalysis(String(item.workoutId), token, { timeoutMs: 60000 })
+    if (data?.ai_feedback) {
+      item.ai_feedback = data.ai_feedback
+      item.ai_generated_at = new Date().toISOString()
+      item.ai_metadata = data.ai_metadata
+      item.ai_analysis_snapshot = data.ai_analysis_snapshot || []
+      item.ai_feedback_status = 'generated'
+      logDiagnostic('feedback-history-generate-now', { workoutId: item.workoutId, outcome: 'feedback' })
+    } else if (data?.feedback_status === 'insufficient_history') {
+      // Bleibt "ausstehend" (kein Fehler) - nur noch nicht genug Trainingshistorie für eine
+      // wertende Analyse. Gleicher Hinweistext wie in PostWorkoutSummary.vue.
+      toast.show(
+        t('postWorkout.insufficientHistoryExplainer') || 'Eine wertende Analyse ist erst nach mindestens 4 Wochen bzw. 8 identischen Workouts aussagekräftig.',
+        { type: 'info', duration: 4000 }
+      )
+      logDiagnostic('feedback-history-generate-now', { workoutId: item.workoutId, outcome: 'insufficient_history' })
+    } else if (data?.feedback_status === 'network_unavailable') {
+      generateError.value = item.workoutId
+      logDiagnostic('feedback-history-generate-now', { workoutId: item.workoutId, outcome: 'network_unavailable' })
+    } else {
+      generateError.value = item.workoutId
+      logDiagnostic('feedback-history-generate-now', { workoutId: item.workoutId, outcome: 'empty' })
+    }
+  } catch (err) {
+    logger.warn('[AIFeedbackHistory] generateNow failed', err?.message)
+    generateError.value = item.workoutId
+    logDiagnostic('feedback-history-generate-now', { workoutId: item.workoutId, outcome: 'error', message: err?.message })
+  } finally {
+    generatingId.value = null
+  }
 }
 
 // Nutzt den nativen Share-Sheet (@capacitor/share) statt eines eigenen E-Mail-Versands zu
@@ -414,6 +481,80 @@ onMounted(() => {
 .feedback-date {
   font-size: 0.8rem;
   color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+/* Feature "Feedback später bewerten": Hinweis-Badge für Workouts, die beim Speichern bewusst
+   ohne KI-Analyse gespeichert wurden (siehe ai_feedback_status in models/Workout.js). Warm/
+   auffällig, aber nicht "Fehler"-rot - es ist ja kein Problem, sondern eine offene, vom Nutzer
+   selbst gewählte Aufgabe. */
+.pending-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--warning) 20%, transparent);
+  border: 1px solid color-mix(in srgb, var(--warning) 45%, transparent);
+  color: var(--warning-text);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.feedback-text.pending {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.pending-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.generate-error {
+  margin: 0;
+  color: var(--danger-text, var(--danger));
+  font-size: 0.85rem;
+}
+
+.generate-now-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: 0.6rem;
+  border: none;
+  background: var(--accent);
+  color: var(--accent-contrast);
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.generate-now-btn:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.generate-spinner {
+  width: 0.9rem;
+  height: 0.9rem;
+  border: 2px solid color-mix(in srgb, var(--accent-contrast) 35%, transparent);
+  border-top-color: var(--accent-contrast);
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: generate-spin 0.8s linear infinite;
+}
+
+@keyframes generate-spin {
+  to { transform: rotate(360deg); }
 }
 
 .chevron {

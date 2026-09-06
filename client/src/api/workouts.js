@@ -249,6 +249,26 @@ export async function fetchWorkoutFeedbacks(token = null, { page = 1, limit = 20
   }
 }
 
+// Feature "Feedback später bewerten": manuelles Anstoßen der KI-Analyse für ein Workout, das
+// beim Speichern bewusst ohne automatisches Feedback gespeichert wurde (siehe
+// ai_feedback_status in models/Workout.js) - aufgerufen aus AIFeedbackHistory.vue über den
+// "Jetzt generieren"-Button. Derselbe Endpunkt wie der automatische Aufruf aus
+// PostWorkoutSummary.vue (POST /:id/ai-analysis), hier nur als wiederverwendbare Funktion statt
+// einer eigenen axios-Instanz, wie es der Rest dieser Datei bereits macht.
+export async function requestAiAnalysis(workoutId, token = null, { timeoutMs } = {}) {
+  try {
+    const config = {
+      ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+      ...(Number.isFinite(timeoutMs) && timeoutMs > 0 ? { timeout: timeoutMs } : {})
+    }
+    const res = await api.post(`/${workoutId}/ai-analysis`, {}, config)
+    return res.data
+  } catch (error) {
+    logger.warn('⚠️ Workouts API - requestAiAnalysis failed:', error?.message)
+    throw handleAPIError(error, 'KI-Analyse anfordern', { showToast: false })
+  }
+}
+
 // Neues Workout erstellen / offline fallback
 export async function createWorkout(workoutData, token = null, options = {}) {
   const skipOfflineQueue = options?.skipOfflineQueue === true

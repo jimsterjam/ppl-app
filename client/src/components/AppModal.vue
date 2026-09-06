@@ -16,7 +16,12 @@
             <p v-if="message">{{ message }}</p>
           </slot>
         </div>
-        <div class="modal-actions">
+        <div class="modal-actions" :class="{ 'has-extra': extraText }">
+          <!-- Optionaler dritter, dezenterer Button für einen alternativen Weg neben
+               Bestätigen/Abbrechen (z.B. "Später bewerten") - additiv, ohne bestehende
+               Verwendungen von AppModal zu beeinflussen, solange extraText leer bleibt. -->
+          <button v-if="extraText" type="button" class="btn ghost extra" @click="onExtra">{{ extraText }}</button>
+          <span v-if="extraText" class="modal-actions-spacer"></span>
           <button v-if="showCancel" class="btn secondary" @click="onCancel">{{ cancelText || t('common.cancel') }}</button>
           <button ref="confirmBtn" class="btn primary" :class="type" @click="onConfirm">{{ confirmText || t('common.confirm') }}</button>
         </div>
@@ -39,10 +44,14 @@ const props = defineProps({
   modalClass: { type: String, default: '' },
   showCancel: { type: Boolean, default: true },
   persistent: { type: Boolean, default: false },
-  closeOnConfirm: { type: Boolean, default: true }
+  closeOnConfirm: { type: Boolean, default: true },
+  // Optionaler dritter Button (siehe modal-actions oben) - leer = wie bisher nur
+  // Abbrechen/Bestätigen, kein Verhaltensunterschied für bestehende AppModal-Nutzungen.
+  extraText: { type: String, default: '' },
+  closeOnExtra: { type: Boolean, default: true }
 })
 
-const emit = defineEmits(['update:modelValue', 'confirm', 'cancel'])
+const emit = defineEmits(['update:modelValue', 'confirm', 'cancel', 'extra'])
 const { t } = useI18n()
 
 const confirmBtn = ref(null)
@@ -52,6 +61,10 @@ function onCancel() { emit('cancel'); close() }
 function onConfirm() {
   emit('confirm')
   if (props.closeOnConfirm) close()
+}
+function onExtra() {
+  emit('extra')
+  if (props.closeOnExtra) close()
 }
 
 function overlayClick() {
@@ -132,6 +145,25 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 .btn { padding: 10px 14px; border-radius: 10px; border: 1px solid transparent; cursor: pointer; font-weight: 600; }
 .btn.secondary { background: var(--surface); border-color: var(--card-border); color: var(--fg); }
 .btn.primary { background: var(--accent); color: var(--accent-contrast); }
+/* Dezenter als Abbrechen/Bestätigen - ein dritter Weg ("Später bewerten" o.ä.), der nicht mit
+   der eigentlichen Ja/Nein-Entscheidung um Aufmerksamkeit konkurrieren soll. */
+.btn.ghost.extra {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+  font-weight: 500;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+.btn.ghost.extra:hover {
+  color: var(--fg);
+}
+.modal-actions.has-extra {
+  flex-wrap: wrap;
+}
+.modal-actions-spacer {
+  flex: 1;
+}
 /* .btn.primary.warning { background: color-mix(in oklab, var(--warning) 60%, var(--accent-color)); color: #fff; } */
 .btn.primary.info { background: color-mix(in oklab, #3b82f6 60%, var(--accent-color)); color: #fff; }
 .btn:hover { filter: brightness(1.02); }

@@ -513,13 +513,20 @@
       :title="t('workoutDetail.missingNotesTitle') || 'Notizen unvollständig'"
       :confirm-text="t('workoutDetail.missingNotesConfirm') || 'Trotzdem speichern'"
       :cancel-text="t('workoutDetail.missingNotesCancel') || 'Notizen prüfen'"
+      :extra-text="t('workoutDetail.missingNotesDefer') || 'Später bewerten'"
       type="warning"
       @confirm="confirmSaveDespiteMissingNotes"
+      @extra="confirmDeferFeedback"
     >
       <p>{{ t('workoutDetail.missingNotesMessage') || 'Zu folgenden Übungen fehlt noch eine Notiz. Notizen helfen der AI-Analyse, dein Training besser einzuschätzen.' }}</p>
       <ul class="missing-notes-list">
         <li v-for="name in missingNotesExerciseNames" :key="name">{{ name }}</li>
       </ul>
+      <!-- Erklärt sofort die Konsequenz der Zurückstellen-Option (Moment 1) - ohne diesen Satz
+           weiß der Nutzer in genau diesem Moment nicht, dass/wo er das Feedback nachholen kann. -->
+      <p class="missing-notes-defer-hint">
+        {{ t('workoutDetail.missingNotesDeferHint') || 'Workout wird ohne KI-Feedback gespeichert. Sobald du Notizen ergänzt hast, kannst du das Feedback im Feedback-Verlauf nachträglich anfordern.' }}
+      </p>
     </AppModal>
 
     <AppModal
@@ -1798,23 +1805,26 @@ function scrollToExercises() {
   } catch {}
 }
 
-function goToPostWorkoutSummary(workoutId) {
+function goToPostWorkoutSummary(workoutId, { deferred = false } = {}) {
   const id = String(workoutId || '').trim()
-  logger.info('[WorkoutDetail] goToPostWorkoutSummary called', { workoutId, id })
+  logger.info('[WorkoutDetail] goToPostWorkoutSummary called', { workoutId, id, deferred })
   // DIAGNOSE: einziger Punkt, an dem alle Erfolgs-Zweige von performSaveWorkout() zusammen-
   // laufen - deckt "doppeltes Save-Event" auf, falls diese Funktion mehrfach aufgerufen wird.
-  logDiagnostic('go-to-post-workout-summary', { workoutId, id })
+  logDiagnostic('go-to-post-workout-summary', { workoutId, id, deferred })
   if (!id) {
     logger.warn('[WorkoutDetail] No workoutId, redirecting to dashboard')
     router.push('/dashboard')
     return
   }
-  logger.info('[WorkoutDetail] Navigating to stats with postWorkout=1', { id })
+  logger.info('[WorkoutDetail] Navigating to stats with postWorkout=1', { id, deferred })
   router.push({
     name: 'stats',
     query: {
       postWorkout: '1',
-      workoutId: id
+      workoutId: id,
+      // Feature "Feedback später bewerten": PostWorkoutSummary.vue soll die KI-Analyse dann
+      // NICHT automatisch anstoßen, sondern nur bestätigen, dass gespeichert wurde.
+      ...(deferred ? { deferred: '1' } : {})
     }
   })
 }
@@ -2203,7 +2213,7 @@ function onSessionTime({ totalMs, formattedTime }) {
 // saveWorkout()/showFavoriteUpdateOption). Ersetzt die frühere implizite, für den Nutzer
 // unsichtbare Automatik (syncStartedFavoriteFromWorkout lief bisher immer mit, sobald diese
 // Session aus einem Favoriten gestartet wurde - ohne Wahlmöglichkeit).
-async function performSaveWorkout(updateFavorite = false) {
+async function performSaveWorkout(updateFavorite = false, { deferAiFeedback = false } = {}) {
   // DIAGNOSE (User-Report "doppeltes Save-Event"): jeden Aufruf loggen, auch den vom Guard
   // abgewiesenen - bisher gab es dafür keine Sichtbarkeit im Diagnose-Log, nur Draft/Lifecycle-
   // Events waren dort protokolliert.
@@ -2262,6 +2272,14 @@ async function performSaveWorkout(updateFavorite = false) {
     // Wird weiter unten für die Erfolgsmeldung ("Gespeichert. Dauer: X min") gebraucht -
     // aus dem normalisierten Ergebnis lesen statt separat neu zu berechnen.
     const finalDurationMinutes = normalized.duration
+
+    // Feature "Feedback später bewerten": markiert das Workout serverseitig als
+    // "zurückgestellt" (siehe Workout.ai_feedback_status), damit die Feedback-Verlauf-Ansicht
+    // es als ausstehend mit "Jetzt generieren"-Button zeigen kann, statt sofort unten
+    // goToPostWorkoutSummary() die automatische KI-Analyse anzustoßen.
+    if (deferAiFeedback) {
+      normalized.ai_feedback_status = 'deferred'
+    }
 
     // Favorit-Anpassen: Nur Favorit aktualisieren, kein Stats-Eintrag
     if (String(route.query?.favoriteAdjust || '') === '1') {
@@ -2406,7 +2424,7 @@ async function performSaveWorkout(updateFavorite = false) {
         timerStore.reset()
         sessionStopwatchStore.reset()
         bypassTimerLeaveGuard.value = true
-        goToPostWorkoutSummary(realId)
+        goToPostWorkoutSummary(realId, { deferred: deferAiFeedback })
         return
       }
 
@@ -2465,7 +2483,7 @@ async function performSaveWorkout(updateFavorite = false) {
       timerStore.reset()
       sessionStopwatchStore.reset()
       bypassTimerLeaveGuard.value = true
-      goToPostWorkoutSummary(savedWorkout?._id || id)
+      goToPostWorkoutSummary(savedWorkout?._id || id, { deferred: deferAiFeedback })
       return
     }
 
@@ -2483,7 +2501,7 @@ async function performSaveWorkout(updateFavorite = false) {
     timerStore.reset()
     sessionStopwatchStore.reset()
     bypassTimerLeaveGuard.value = true
-    goToPostWorkoutSummary(id)
+    goToPostWorkoutSummary(id, { deferred: deferAiFeedback })
   } catch (e) {
     // workout.value.completed wurde vor dem ersten await auf true gesetzt.
     // Bei Fehler zurücksetzen, damit persistInProgressDraft() den Draft noch retten kann.
@@ -2507,7 +2525,7 @@ async function performSaveWorkout(updateFavorite = false) {
 // gewählt hat (siehe showFavoriteUpdateOption/Template) - ohne diese Wahl bleibt das
 // verknüpfte Favoriten-Template unangetastet, auch wenn diese Session ursprünglich aus einem
 // Favoriten gestartet wurde.
-async function saveWorkout(updateFavorite = false) {
+async function saveWorkout(updateFavorite = false, { deferAiFeedback = false } = {}) {
   // Notizen-Check zuerst: läuft VOR dem Timer-Guard, damit er auch beim direkten Klick auf
   // "Speichern" greift (der Timer-Guard deferred den eigentlichen Save ohnehin über
   // pendingTimerAction -> performSaveWorkout(), würde diesen Check also umgehen, wenn er
@@ -2523,11 +2541,11 @@ async function saveWorkout(updateFavorite = false) {
   }
   // Im Adjust-Modus läuft kein Workout, Timer-Guard nicht anwenden
   if (!isFavoriteAdjustMode.value && timerStore.isRunningLike) {
-    pendingTimerAction.value = { kind: 'save', updateFavorite }
+    pendingTimerAction.value = { kind: 'save', updateFavorite, deferAiFeedback }
     showTimerActionModal.value = true
     return
   }
-  await performSaveWorkout(updateFavorite)
+  await performSaveWorkout(updateFavorite, { deferAiFeedback })
 }
 
 // Wird vom Bestätigungsmodal (showMissingNotesModal) aufgerufen, wenn der Nutzer trotz
@@ -2538,6 +2556,16 @@ async function saveWorkout(updateFavorite = false) {
 function confirmSaveDespiteMissingNotes() {
   notesCheckAcknowledged = true
   saveWorkout(pendingUpdateFavoriteOnSave)
+}
+
+// Wird vom selben Bestätigungsmodal aufgerufen, wenn der Nutzer stattdessen "Später bewerten"
+// wählt (siehe extra-text/@extra an AppModal oben): Workout wird ganz normal gespeichert, aber
+// die automatische KI-Analyse wird für diesen Speichervorgang bewusst übersprungen (siehe
+// deferAiFeedback in performSaveWorkout()/goToPostWorkoutSummary()) - der Nutzer kann sie
+// später, nachdem er Notizen ergänzt hat, im Feedback-Verlauf manuell anstoßen.
+function confirmDeferFeedback() {
+  notesCheckAcknowledged = true
+  saveWorkout(pendingUpdateFavoriteOnSave, { deferAiFeedback: true })
 }
 
 function getFavoriteUserId() {
@@ -2962,6 +2990,7 @@ onBeforeUnmount(() => {
 .timer-decision-body p { margin: 0; }
 .missing-notes-list { margin: 8px 0 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; }
 .missing-notes-list li { font-weight: 600; }
+.missing-notes-defer-hint { margin: 10px 0 0; font-size: 0.82rem; color: var(--muted); line-height: 1.4; }
 .timer-stop-btn {
   align-self: flex-end;
   border: 1px solid color-mix(in srgb, var(--danger) 65%, black 35%);

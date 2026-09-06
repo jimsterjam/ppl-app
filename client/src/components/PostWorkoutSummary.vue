@@ -5,8 +5,25 @@
       <button class="close-btn" type="button" @click="dismissSummary" aria-label="Schließen">×</button>
     </div>
 
+    <!-- Feature "Feedback später bewerten": Workout wurde absichtlich OHNE automatische
+         KI-Analyse gespeichert (Nutzer wollte erst in Ruhe Notizen ergänzen, siehe
+         WorkoutDetailView.vue). Kein Lade-Spinner, da hier gar nichts lädt/läuft - das würde
+         etwas vortäuschen, das nicht passiert. -->
+    <div v-if="deferredConfirmation" class="summary-content fallback">
+      <p>{{ t('postWorkout.deferredSaved') || 'Workout gespeichert - ohne KI-Feedback.' }}</p>
+      <p class="deferred-hint">{{ t('postWorkout.deferredHint') || 'Sobald du Notizen ergänzt hast, kannst du das Feedback im Feedback-Verlauf nachträglich anfordern.' }}</p>
+      <div class="summary-actions">
+        <button class="primary" type="button" @click="dismissSummary">
+          {{ t('common.continue') || 'Weiter' }}
+        </button>
+        <button class="secondary" type="button" @click="goToAnalytics">
+          {{ t('postWorkout.goToFeedbackHistory') || 'Zum Feedback-Verlauf' }}
+        </button>
+      </div>
+    </div>
+
     <!-- Loading State -->
-    <div v-if="loading" class="summary-content loading">
+    <div v-else-if="loading" class="summary-content loading">
       <div class="spinner spin-indicator"></div>
       <p>{{ t('postWorkout.analyzing') || 'Analysiere deinen Trainingsfortschritt...' }}</p>
     </div>
@@ -112,6 +129,14 @@ const props = defineProps({
   workoutId: {
     type: String,
     required: true
+  },
+  // Feature "Feedback später bewerten" (siehe WorkoutDetailView.vue): wenn true, wurde das
+  // Workout absichtlich ohne KI-Analyse gespeichert - onMounted() darf sie dann NICHT
+  // automatisch anstoßen (siehe unten), stattdessen zeigt das Template eine einfache
+  // Bestätigung statt des Lade-Zustands.
+  deferred: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -122,7 +147,8 @@ const router = useRouter()
 const { getIdToken } = useFirebaseAuth()
 
 const showSummary = ref(true)
-const loading = ref(true)
+const deferredConfirmation = ref(props.deferred)
+const loading = ref(!props.deferred)
 const feedback = ref(null)
 const analysisSnapshot = ref([])
 // Die tatsächlich aufgelöste, echte Workout-ID (nicht die evtl. temporäre offline_/draft-ID
@@ -334,6 +360,11 @@ function goToAnalytics() {
 }
 
 onMounted(() => {
+  if (props.deferred) {
+    // Bewusst kein loadAIFeedback()-Aufruf und kein Sync-Retry-Listener - es gibt hier nichts
+    // zu laden, das Workout wurde absichtlich ohne Analyse gespeichert (siehe deferred-Prop).
+    return
+  }
   loadAIFeedback()
   window.addEventListener(OFFLINE_WORKOUTS_UPDATED_EVENT, handleOfflineWorkoutsUpdated)
 })
@@ -526,6 +557,10 @@ onBeforeUnmount(() => {
 .summary-content.fallback p {
   margin: 0 0 1rem 0;
   color: var(--muted);
+}
+
+.deferred-hint {
+  font-size: 0.85rem;
 }
 
 /* Der vorherige @media (prefers-color-scheme: dark)-Block wurde entfernt: er reagierte auf
