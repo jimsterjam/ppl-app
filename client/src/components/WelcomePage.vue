@@ -434,7 +434,7 @@ watch(() => route.query?.emailVerified, (val) => {
             <div class="loading-container">
                 <h2>{{ t('welcome.redirectingTitle') }}</h2>
                 <p>{{ t('welcome.redirectingMsg') }}</p>
-                <div class="spinner"></div>
+                <div class="spinner spin-indicator"></div>
             </div>
         </div>
     </div>

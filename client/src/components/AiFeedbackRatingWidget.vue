@@ -56,7 +56,7 @@
       <div class="rating-submit-actions">
         <button type="button" class="rating-cancel-btn" @click="cancel">{{ t('feedbackHistory.ratingCancel') }}</button>
         <button type="button" class="rating-submit-btn" :disabled="submitting" @click="submit">
-          <span v-if="submitting" class="rating-submit-spinner" aria-hidden="true"></span>
+          <span v-if="submitting" class="rating-submit-spinner spin-indicator" aria-hidden="true"></span>
           {{ submitting ? t('feedbackHistory.ratingSaving') : t('feedbackHistory.ratingSubmit') }}
         </button>
       </div>

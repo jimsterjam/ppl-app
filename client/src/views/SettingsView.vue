@@ -226,7 +226,7 @@
         <h3>{{ $t('settings.dangerZone') }}</h3>
         <p class="hint">{{ $t('settings.dangerZoneHint') }}</p>
         <button class="danger-btn" @click="showDeleteConfirm = true" :disabled="isDeleting">
-          <span v-if="isDeleting" class="spinner" aria-hidden="true"></span>
+          <span v-if="isDeleting" class="spinner spin-indicator" aria-hidden="true"></span>
           <span v-else>🗑️</span>
           {{ isDeleting ? $t('settings.deleting') : $t('settings.deleteAllData') }}
         </button>
@@ -236,7 +236,7 @@
         <h3>{{ $t('settings.dangerZone') }} - Account</h3>
         <p class="hint">{{ $t('settings.dangerZoneHint') }}</p>
         <button class="danger-btn account-delete-btn" @click="showDeleteAccountConfirm = true" :disabled="isDeletingAccount">
-          <span v-if="isDeletingAccount" class="spinner" aria-hidden="true"></span>
+          <span v-if="isDeletingAccount" class="spinner spin-indicator" aria-hidden="true"></span>
           <span v-else>🗑️</span>
           {{ isDeletingAccount ? $t('settings.deletingAccount') : $t('settings.deleteAccount') }}
         </button>
@@ -292,7 +292,7 @@
             :disabled="confirmText.toLowerCase() !== $t('settings.deletePlaceholder').toLowerCase() || isDeleting"
             @click="confirmDelete"
           >
-            <span v-if="isDeleting" class="spinner" aria-hidden="true"></span>
+            <span v-if="isDeleting" class="spinner spin-indicator" aria-hidden="true"></span>
             <span v-else>🗑️</span>
             {{ isDeleting ? $t('settings.deleting') : $t('settings.deleteForever') }}
           </button>
@@ -352,7 +352,7 @@
             :disabled="confirmAccountText.toLowerCase() !== $t('settings.deleteAccountPlaceholder').toLowerCase() || isDeletingAccount"
             @click="confirmDeleteAccount"
           >
-            <span v-if="isDeletingAccount" class="spinner" aria-hidden="true"></span>
+            <span v-if="isDeletingAccount" class="spinner spin-indicator" aria-hidden="true"></span>
             <span v-else>🗑️</span>
             {{ isDeletingAccount ? $t('settings.deletingAccount') : $t('settings.deleteAccountForever') }}
           </button>

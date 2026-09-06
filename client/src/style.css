@@ -624,6 +624,25 @@ p { line-height: 1.6; }
 --------------------------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
+
+  /* Bug-Report: Lade-Spinner (Speichern, KI-Feedback-Erzeugung) drehen sich auf manchen
+     Geräten nicht - Ursache war NICHT das Gerät/iOS-Version, sondern "Bewegung reduzieren"
+     unter Einstellungen > Bedienungshilfen > Bewegung, das hier oben pauschal JEDE Animation
+     abschaltet. Ein Lade-Spinner ist aber keine gratuitous Motion im Sinne von WCAG 2.3.3
+     (Parallax, Auto-Zoom, etc.), sondern die einzige Rückmeldung, dass gerade etwas passiert
+     - ohne ihn wirkt die App eingefroren/hängend. Alle echten Lade-Spinner im Code tragen
+     zusätzlich zu ihrer eigenen Klasse (.spinner/.saving-spinner/...) die Klasse
+     .spin-indicator und werden hier gezielt wieder ausgenommen (Klassen-Selektor hat höhere
+     Spezifität als die universelle Sperre oben, gewinnt also trotz beidseitigem !important).
+     Zahlen-Spinner-Buttons (▲/▼ neben Wiederholungen/Gewicht) sind KEINE Animation und daher
+     nicht betroffen. */
+  .spin-indicator {
+    animation: app-spin 0.8s linear infinite !important;
+  }
+}
+
+@keyframes app-spin {
+  to { transform: rotate(360deg); }
 }
 
 @media (min-width: 768px) {

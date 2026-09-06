@@ -5,7 +5,7 @@
     </div>
 
     <div v-if="loading && items.length === 0" class="state-message">
-      <div class="spinner"></div>
+      <div class="spinner spin-indicator"></div>
     </div>
 
     <div v-else-if="error" class="state-message error">

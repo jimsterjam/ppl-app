@@ -565,7 +565,7 @@
     <Transition name="save-fade">
       <div v-if="saving" class="saving-overlay" role="status" aria-live="assertive" aria-busy="true">
         <div class="saving-card">
-          <div class="saving-spinner" aria-hidden="true"></div>
+          <div class="saving-spinner spin-indicator" aria-hidden="true"></div>
           <span class="saving-label">{{ t('workoutDetail.saving') }}…</span>
         </div>
       </div>

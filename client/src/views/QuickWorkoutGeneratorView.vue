@@ -96,7 +96,7 @@
       </div>
 
       <div v-if="loading" class="state-message">
-        <div class="spinner"></div>
+        <div class="spinner spin-indicator"></div>
         <p>{{ t('quickGenerator.generating') || 'Erstelle dein Workout...' }}</p>
       </div>
 

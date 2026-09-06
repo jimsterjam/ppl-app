@@ -2,7 +2,7 @@
   <div>
     <!-- Splash/Loader bis Firebase bereit ist -->
     <div v-if="!firebaseReady" class="auth-splash">
-      <div class="spinner" />
+      <div class="spinner spin-indicator" />
       <p>Initialisiere...</p>
     </div>
 
@@ -11,7 +11,7 @@
 
     <!-- Ausgeloggt: Einmalig zu Welcome umleiten -->
     <div v-else class="auth-splash">
-      <div class="spinner" />
+      <div class="spinner spin-indicator" />
       <p>Weiterleitung...</p>
     </div>
 

@@ -7,7 +7,7 @@
 
     <!-- Loading State -->
     <div v-if="loading" class="summary-content loading">
-      <div class="spinner"></div>
+      <div class="spinner spin-indicator"></div>
       <p>{{ t('postWorkout.analyzing') || 'Analysiere deinen Trainingsfortschritt...' }}</p>
     </div>
 

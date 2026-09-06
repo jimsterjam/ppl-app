@@ -29,7 +29,7 @@
 
 
       <div v-if="showLoading" class="loading-section">
-        <div class="spinner"></div>
+        <div class="spinner spin-indicator"></div>
         <p>{{ t('stats.loading') }}</p>
       </div>
 
