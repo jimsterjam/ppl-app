@@ -3238,7 +3238,11 @@ onBeforeUnmount(() => {
   /* font-weight: 700; */
   /* text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35); */
 }
-.remove-row-btn { background: var(--danger); color: var(--accent-contrast); border: none; border-radius: 4px; width: 28px; height: 28px; cursor: pointer; font-size: 1rem; }
+/* Kein Hintergrund/Box mehr - ein deutliches, ausreichend großes Minus-Zeichen (siehe
+   .remove-row-btn .btn-icon oben) ist als "Entfernen"-Aktion auch ohne farbige Fläche
+   verständlich; die rote Farbe des Icons selbst signalisiert weiterhin "löschen". Breite/Höhe
+   bleiben als Klick-/Touch-Zielgröße erhalten, nur ohne sichtbaren Kasten drumherum. */
+.remove-row-btn { background: transparent; color: var(--danger); border: none; width: 28px; height: 28px; cursor: pointer; font-size: 1rem; }
 .number-with-spinner { display: flex; align-items: center; gap: 6px; }
 .spinner-vertical { display: flex; flex-direction: column; gap: 2px; }
 .spin-btn { background: transparent; border: 1px solid var(--card-border); padding: 2px 6px; border-radius: 6px; font-size: 0.7rem; line-height: 1; cursor: pointer; }
@@ -3301,8 +3305,8 @@ onBeforeUnmount(() => {
   color: #000000;
 }
 .remove-row-btn {
-  background: var(--danger);
-  border: 1px solid color-mix(in srgb, var(--danger) 68%, black 32%);
+  background: transparent;
+  border: none;
 }
 .banner { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-radius: 6px; margin-bottom: 10px; font-size: 0.85rem; }
 .banner.warning { background: color-mix(in oklab, var(--warning) 20%, transparent); border: 1px solid color-mix(in oklab, var(--warning) 50%, transparent); color: var(--fg); }

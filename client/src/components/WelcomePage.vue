@@ -20,8 +20,14 @@ const authStore = useAuthStore()
 const isSignedIn = computed(() => authStore.isAuthenticated)
 const offlineExpired = computed(() => route.query?.reason === 'offline-expired')
 
-// Persist pending verification across reloads until verified
-const PENDING_EMAIL_KEY = 'pendingVerificationEmail'
+// War früher: "Persist pending verification across reloads until verified" (PENDING_EMAIL_KEY
+// in localStorage). Dadurch blieb der "Bestätigungs-E-Mail wurde gesendet"-Hinweis dauerhaft
+// sichtbar, auch nach Schließen/Neuöffnen der App/des Tabs - sollte laut Feedback nur einmalig
+// direkt beim tatsächlichen Versand erscheinen, nicht bei jedem erneuten Besuch der Seite.
+// Der gesamte localStorage-Persistenz-Mechanismus wurde daher entfernt; verificationSent wird
+// jetzt ausschließlich direkt bei einer Sende-Aktion (Signup/Resend) gesetzt und beim
+// Moduswechsel/erfolgreichem Login/erfolgreicher Verifizierung wieder zurückgesetzt (siehe
+// toggleAuthMode/Watcher unten) - kein Wiederaufleben aus einer vorherigen Sitzung mehr.
 const WARNING_LABELS = {
     'continue-url-rejected': 'Weiterleitungsziel wurde von Firebase ignoriert.',
     'firebase-rate-limited': 'Firebase hat weitere Anfragen vorübergehend blockiert.'
@@ -65,22 +71,13 @@ function getRedirectTarget() {
 // E-Mail zu bestätigen, ist der echte Klick auf den Link in der tatsächlich zugestellten E-Mail.
 
 onMounted(() => {
-    // Wenn localStorage eine noch nicht verifizierte E‑Mail enthält, Anzeige beibehalten
-    try {
-        const pending = localStorage.getItem(PENDING_EMAIL_KEY)
-        if (pending && !route.query?.emailVerified) {
-            verificationSent.value = true
-            attemptedEmail.value = pending
-        }
-        // Falls wir bereits via Query wissen, dass E‑Mail verifiziert wurde, aufräumen
-        if (route.query?.emailVerified) {
-            localStorage.removeItem(PENDING_EMAIL_KEY)
-            verificationSent.value = false
-            attemptedEmail.value = ''
-            showResendForExisting.value = false
-        }
-    } catch (e) {
-        logger.debug('[WelcomePage] localStorage access failed:', e)
+    // Falls wir via Query wissen, dass die E-Mail verifiziert wurde, verbleibende
+    // Anzeige-States zurücksetzen (kein Wiederherstellen eines "E-Mail gesendet"-Zustands aus
+    // einer vorherigen Sitzung mehr - siehe Kommentar bei WARNING_LABELS weiter oben).
+    if (route.query?.emailVerified) {
+        verificationSent.value = false
+        attemptedEmail.value = ''
+        showResendForExisting.value = false
     }
 })
 
@@ -123,7 +120,6 @@ async function handleEmailAuth() {
                 suppressWatcher.value = true
                 setTimeout(() => { suppressWatcher.value = false }, 5000)
                 attemptedEmail.value = email.value
-                try { localStorage.setItem(PENDING_EMAIL_KEY, attemptedEmail.value) } catch(e) {}
                 return
             }
         } else {
@@ -154,7 +150,6 @@ async function handleRequestVerification() {
             const readable = resp.warnings.map((w) => WARNING_LABELS[w] || w)
             verificationMessage.value += ' Hinweis: ' + readable.join(' ')
         }
-        try { localStorage.setItem(PENDING_EMAIL_KEY, attemptedEmail.value) } catch(e) {}
     } catch (e) {
         authError.value = e?.message || 'Fehler beim Anfordern des Verifizierungslinks.'
     } finally {
@@ -201,7 +196,6 @@ async function handleResendVerification() {
         } else {
             throw new Error('Kein eingeloggter Nutzer vorhanden')
         }
-        try { localStorage.setItem(PENDING_EMAIL_KEY, attemptedEmail.value) } catch(e) {}
     } catch (err) {
         authError.value = err.message || 'Fehler beim erneuten Senden der E‑Mail.'
     } finally {
@@ -306,7 +300,6 @@ watch(isSignedIn, async (loggedIn) => {
         // im Template wechselt), daher überlebten verificationSent/statusMessage/etc. bisher
         // einen erfolgreichen Login - beim nächsten Logout tauchte der alte "E-Mail wurde
         // gesendet"-Hinweis fälschlich wieder auf. Jetzt werden alle Anzeige-States zurückgesetzt.
-        try { localStorage.removeItem(PENDING_EMAIL_KEY) } catch(e) {}
         verificationSent.value = false
         verificationMessage.value = ''
         statusMessage.value = ''
@@ -321,7 +314,6 @@ watch(isSignedIn, async (loggedIn) => {
 // Watch für Query-Änderungen (z.B. nach Rückkehr aus Browser mit emailVerified)
 watch(() => route.query?.emailVerified, (val) => {
     if (val) {
-        try { localStorage.removeItem(PENDING_EMAIL_KEY) } catch(e) {}
         verificationSent.value = false
         attemptedEmail.value = ''
         showResendForExisting.value = false
