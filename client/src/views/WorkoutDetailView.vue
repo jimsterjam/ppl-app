@@ -3158,10 +3158,18 @@ onBeforeUnmount(() => {
 }
 .set-row { display: grid; grid-template-columns: 50px 1fr 1fr 60px; gap: 8px; align-items: center; padding: 4px 0; }
 .set-row.header { color: var(--muted); font-size: 0.75rem; padding-top: 0; }
-.set-row .col input { width: 100%; padding: 5px 6px; border-radius: 6px; border: 1px solid var(--card-border); background: var(--surface); color: var(--fg); text-align: center; font-size: 1rem; }
+/* Sets/Reps-Eingabefelder und der Entfernen-Button sollen exakt gleich hoch sein (homogene
+   Zeile) - deshalb feste height + box-sizing: border-box statt sich allein auf Padding zu
+   verlassen, das je nach Inhalt/Font leicht abweichen kann. */
+.set-row .col input { width: 100%; height: 34px; box-sizing: border-box; padding: 5px 6px; border-radius: 6px; border: 1px solid var(--card-border); background: var(--surface); color: var(--fg); text-align: center; font-size: 1rem; }
 .weight-input { position: relative; }
 .weight-input .unit { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 0.75rem; pointer-events: none; }
-.row-actions { padding: 4px 0; }
+/* War "padding: 4px 0" - machte die Actions-Zelle höher als die 34px-Eingabefelder daneben
+   (align-items: center hat das nur optisch kaschiert, nicht die tatsächliche Zeilenhöhe
+   angeglichen). Ohne eigenes Padding übernimmt .set-row (align-items: center) die Zentrierung,
+   und der 34px hohe Button bestimmt die Zeilenhöhe zusammen mit den ebenfalls 34px hohen
+   Inputs - dadurch wirklich homogen. */
+.row-actions { padding: 0; display: flex; align-items: center; }
 .add-row-btn {
   background: transparent;
   color: var(--accent-contrast, #ffffff);
@@ -3173,7 +3181,6 @@ onBeforeUnmount(() => {
   /* font-weight: 700; */
   /* text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35); */
 }
-.remove-row-btn { background: var(--danger); color: var(--accent-contrast); border: none; border-radius: 4px; width: 28px; height: 28px; cursor: pointer; font-size: 1rem; }
 .number-with-spinner { display: flex; align-items: center; gap: 6px; }
 .spinner-vertical { display: flex; flex-direction: column; gap: 2px; }
 .spin-btn { background: transparent; border: 1px solid var(--card-border); padding: 2px 6px; border-radius: 6px; font-size: 0.7rem; line-height: 1; cursor: pointer; }
@@ -3235,9 +3242,43 @@ onBeforeUnmount(() => {
   background: #dc2626;
   color: #000000;
 }
+/* War: rotes Vollflächen-Icon (background: var(--danger)) mit einem sehr kurzen "−"-Zeichen
+   in --accent-contrast - dadurch im hellen Modus kaum lesbar (weißes Minus auf hellrotem
+   Grund) und generell zu klein. Jetzt: dezenter, theme-abhängiger Hintergrund statt fixer
+   Vollfarbe, Icon-Farbe folgt --danger/--danger-text (die pro Theme bereits passend
+   definiert sind, siehe style.css), und feste height/width damit der Button exakt so hoch
+   ist wie die Sets/Reps-Eingabefelder daneben (siehe .set-row .col input). */
 .remove-row-btn {
-  background: var(--danger);
-  border: 1px solid color-mix(in srgb, var(--danger) 68%, black 32%);
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--danger) 55%, transparent);
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--danger-text, var(--danger));
+  cursor: pointer;
+}
+.remove-row-btn:hover {
+  background: color-mix(in srgb, var(--danger) 22%, transparent);
+}
+/* Heller Modus: Vollflächen-Tint durch reine Kontur ersetzen - passt besser zum sonst sehr
+   hellen/weißen Karten-Hintergrund als ein getönter Block. */
+[data-theme="light"] .remove-row-btn {
+  background: transparent;
+  border-color: color-mix(in srgb, var(--danger) 70%, transparent);
+  color: var(--danger);
+}
+[data-theme="light"] .remove-row-btn:hover {
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+.remove-row-btn .btn-icon {
+  width: 20px;
+  height: 20px;
+  stroke-width: 3;
 }
 .banner { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-radius: 6px; margin-bottom: 10px; font-size: 0.85rem; }
 .banner.warning { background: color-mix(in oklab, var(--warning) 20%, transparent); border: 1px solid color-mix(in oklab, var(--warning) 50%, transparent); color: var(--fg); }
