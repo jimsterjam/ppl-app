@@ -1183,16 +1183,39 @@ router.put("/:id", firebaseAuthMiddleware, async (req, res) => {
     }
     // _id aus dem Body entfernen – der Identifikator kommt ausschließlich aus dem URL-Param
     const { _id: _bodyId, ...updateBody } = req.body;
+
+    // Blocker-Fix: ein bereits abgeschlossenes Workout darf nicht mehr über diesen generischen
+    // Update-Endpoint verändert werden. Ohne diese Sperre konnte ein Nutzer (z.B. über einen
+    // Deep-Link auf eine echte Workout-ObjectId oder die Browser-/App-Historie) ein längst
+    // abgeschlossenes Training erneut öffnen und überschreiben - inklusive einer dadurch neu
+    // ausgelösten KI-Analyse auf Basis der veränderten Daten. Hier wird bewusst nur der
+    // VORHERIGE Zustand geprüft, nicht der neue: die einzige legitime completed:false ->
+    // completed:true-Transition beim ersten Abschließen eines bereits vorher server-seitig
+    // existierenden (aber noch nicht abgeschlossenen) Workouts bleibt dadurch weiterhin möglich.
+    const existing = await Workout.findOne({ _id: req.params.id, userId }).select('completed').lean();
+    if (!existing) {
+      return res.status(404).json({ error: "Workout nicht gefunden" });
+    }
+    if (existing.completed === true) {
+      logger.warn('⚠️ Update auf bereits abgeschlossenes Workout abgelehnt', {
+        id: req.params.id, userId, userAgent: req.headers['user-agent']
+      });
+      return res.status(409).json({
+        error: 'Dieses Workout ist bereits abgeschlossen und kann nicht mehr bearbeitet werden.',
+        code: 'WORKOUT_ALREADY_COMPLETED'
+      });
+    }
+
     const workout = await Workout.findOneAndUpdate(
       { _id: req.params.id, userId },
       updateBody,
       { new: true, runValidators: true }
     );
-    
+
     if (!workout) {
       return res.status(404).json({ error: "Workout nicht gefunden" });
     }
-    
+
     res.json(workout);
   } catch (err) {
     res.status(400).json({ error: err.message });

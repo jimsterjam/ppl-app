@@ -1688,6 +1688,28 @@ async function loadWorkout() {
         : loadedWorkout
 
     if (workout.value) {
+      // Blocker-Fix: ein bereits abgeschlossenes Workout (completed:true) darf nicht mehr
+      // über diese View geöffnet/bearbeitet werden. Der reguläre Save-Flow verlässt diese
+      // View nach dem Speichern IMMER (goToPostWorkoutSummary navigiert zu /stats) - ein
+      // Aufruf dieser Route mit einer echten Server-ID eines bereits completed:true-Workouts
+      // kann also nur über einen Deep-Link, die Browser-/App-Historie oder einen manuell
+      // eingegebenen Pfad zustande kommen, nie über einen normalen Klickpfad in der App.
+      // Serverseitig ist PUT /:id für bereits abgeschlossene Workouts ebenfalls gesperrt
+      // (siehe server/routes/workouts.js) - dieser Check verhindert zusätzlich, dass der
+      // Nutzer das Formular überhaupt zu Gesicht bekommt und dort Änderungen einträgt, die
+      // beim Speichern ohnehin serverseitig abgelehnt würden.
+      const isRealServerId = requestedId !== 'draft'
+        && !requestedId.startsWith('draft-')
+        && !requestedId.startsWith('offline_')
+      if (isRealServerId && workout.value.completed === true) {
+        logger.warn('[WorkoutDetail] Zugriff auf bereits abgeschlossenes Workout blockiert', { requestedId })
+        toast.show(
+          t('workoutDetail.alreadyCompletedBlocked') || 'Dieses Workout ist bereits abgeschlossen und kann nicht mehr bearbeitet werden.',
+          { type: 'info', duration: 4000 }
+        )
+        router.replace('/stats')
+        return
+      }
       ensureSetDetailsStructure()
       await enrichExerciseImages()
 
@@ -2935,11 +2957,18 @@ onBeforeRouteLeave(async (to) => {
     return true
   }
 
-  // if (timerStore.isRunningLike) {
-  //   pendingTimerAction.value = { kind: 'route-leave', targetPath: to?.fullPath || '/dashboard' }
-  //   showTimerActionModal.value = true
-  //   return false
-  // }
+  // War auskommentiert (vermutlich zum Debuggen eines anderen Bugs) - dadurch konnte man
+  // während eines laufenden Session-Timers per Zurück-Geste/-Button die Seite verlassen,
+  // ohne gefragt zu werden, ob der Timer weiterlaufen/pausieren/stoppen soll (Datenverlust-
+  // Risiko: Nutzer verlässt versehentlich eine laufende Trainingssession). Infrastruktur
+  // (pendingTimerAction/showTimerActionModal/applyPendingTimerAction 'route-leave'-Zweig in
+  // workoutDetailNavigationFlow.js) war unverändert vorhanden und funktionsfähig, nur dieser
+  // Guard selbst war deaktiviert - deshalb reine Reaktivierung ohne weitere Änderungen nötig.
+  if (timerStore.isRunningLike) {
+    pendingTimerAction.value = { kind: 'route-leave', targetPath: to?.fullPath || '/dashboard' }
+    showTimerActionModal.value = true
+    return false
+  }
 
   return true
 })
