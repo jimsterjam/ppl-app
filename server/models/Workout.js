@@ -86,6 +86,14 @@ const workoutSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  // Zeitpunkt des ERSTEN Übergangs completed:false -> true (siehe PUT /:id in
+  // routes/workouts.js). Wird bewusst nur einmalig gesetzt und bei späteren Bearbeitungen
+  // NICHT mehr verändert, damit er als stabiler Anker für das "Nachträglich bearbeiten"-
+  // Zeitfenster (WORKOUT_EDIT_WINDOW_HOURS, Default 24h) dient - ein erneutes Speichern
+  // innerhalb des Fensters darf dieses Fenster nicht immer wieder neu starten. `date` (vom
+  // Nutzer wählbares Trainingsdatum) und `createdAt` (oft schon beim Draft gesetzt, also vor
+  // dem eigentlichen Abschluss) sind dafür beide ungeeignet.
+  completedAt: { type: Date, default: null },
   notes: String
   ,
   // Optionales Workout-Coverbild

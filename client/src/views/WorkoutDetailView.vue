@@ -24,6 +24,14 @@
           </div>
         </div>
 
+        <!-- Hinweis für den Sonderfall "abgeschlossenes Workout innerhalb des nachträglichen
+             Bearbeitungsfensters geöffnet" - siehe editWindowDeadline in loadWorkout(). Ohne
+             diesen Hinweis wäre für den Nutzer nicht ersichtlich, dass Änderungen hier nur
+             noch begrenzte Zeit möglich sind. -->
+        <div v-if="editWindowDeadline" class="banner warning">
+          <span>{{ t('workoutDetail.editWindowHint', { time: editWindowDeadlineLabel }) || `Du kannst dieses bereits abgeschlossene Workout noch bis ${editWindowDeadlineLabel} bearbeiten.` }}</span>
+        </div>
+
           <div id="exercises" ref="exListRef" class="ex-list glass" :class="{ reordering: isReordering }">
 
           <div class="ex-list-header">
@@ -798,9 +806,19 @@ const isFavoriteAdjustMode = computed(() => String(route.query?.favoriteAdjust |
 // Optionen an: nur speichern, oder zusätzlich den verknüpften Favoriten mit den Werten
 // dieser Session aktualisieren (siehe performSaveWorkout(updateFavorite)).
 const showFavoriteUpdateOption = computed(() => isFavoriteSourceRoute() && !isFavoriteAdjustMode.value)
+// Client-seitiger Näherungswert für das nachträgliche Bearbeitungsfenster abgeschlossener
+// Workouts (siehe loadWorkout()). Rein für UX/Vorabschätzung - maßgeblich ist immer der
+// Server (WORKOUT_EDIT_WINDOW_HOURS Env-Var in server/routes/workouts.js), der bei
+// abweichender Konfiguration das letzte Wort hat.
+const WORKOUT_EDIT_WINDOW_HOURS_CLIENT = 24
 const workout = ref(null)
 const loading = ref(false)
 const error = ref('')
+// Gesetzt, wenn ein bereits abgeschlossenes Workout innerhalb des nachträglichen
+// Bearbeitungsfensters geöffnet wurde (siehe loadWorkout()) - hält die Deadline (ms seit
+// Epoch) für den Hinweisbanner im Template. null = kein abgeschlossenes Workout bzw. kein
+// bekanntes Fenster (z.B. sehr alte Workouts ohne completedAt).
+const editWindowDeadline = ref(null)
 const saving = ref(false)
 const saveMsg = ref('')
 const saveError = ref(false)
@@ -1380,6 +1398,9 @@ function formatDate(dateStr) {
   }
 }
 
+// Für den Hinweisbanner im Template - siehe editWindowDeadline in loadWorkout().
+const editWindowDeadlineLabel = computed(() => editWindowDeadline.value ? formatDate(editWindowDeadline.value) : '')
+
 function getWorkoutTimestamp(workoutLike) {
   if (!workoutLike || typeof workoutLike !== 'object') return 0
   const updatedAt = new Date(workoutLike.updatedAt || 0).getTime()
@@ -1688,27 +1709,36 @@ async function loadWorkout() {
         : loadedWorkout
 
     if (workout.value) {
-      // Blocker-Fix: ein bereits abgeschlossenes Workout (completed:true) darf nicht mehr
-      // über diese View geöffnet/bearbeitet werden. Der reguläre Save-Flow verlässt diese
-      // View nach dem Speichern IMMER (goToPostWorkoutSummary navigiert zu /stats) - ein
-      // Aufruf dieser Route mit einer echten Server-ID eines bereits completed:true-Workouts
-      // kann also nur über einen Deep-Link, die Browser-/App-Historie oder einen manuell
-      // eingegebenen Pfad zustande kommen, nie über einen normalen Klickpfad in der App.
-      // Serverseitig ist PUT /:id für bereits abgeschlossene Workouts ebenfalls gesperrt
-      // (siehe server/routes/workouts.js) - dieser Check verhindert zusätzlich, dass der
-      // Nutzer das Formular überhaupt zu Gesicht bekommt und dort Änderungen einträgt, die
-      // beim Speichern ohnehin serverseitig abgelehnt würden.
+      // Ein bereits abgeschlossenes Workout (completed:true) darf für eine gewisse Zeit nach
+      // dem Abschluss noch nachträglich bearbeitet werden (z.B. vergessene Notiz/Gewicht
+      // nachtragen) - siehe PUT /:id in server/routes/workouts.js für die maßgebliche,
+      // serverseitige Durchsetzung des Fensters (dort per Env-Var konfigurierbar). Diese
+      // clientseitige Prüfung ist nur eine UX-Vorabschätzung mit demselben Default (24h): sie
+      // verhindert, dass der Nutzer ein längst abgelaufenes Workout überhaupt zu Gesicht
+      // bekommt und dort Änderungen einträgt, die beim Speichern ohnehin serverseitig
+      // abgelehnt würden - maßgeblich bleibt aber immer der Server-Check.
+      editWindowDeadline.value = null
       const isRealServerId = requestedId !== 'draft'
         && !requestedId.startsWith('draft-')
         && !requestedId.startsWith('offline_')
       if (isRealServerId && workout.value.completed === true) {
-        logger.warn('[WorkoutDetail] Zugriff auf bereits abgeschlossenes Workout blockiert', { requestedId })
-        toast.show(
-          t('workoutDetail.alreadyCompletedBlocked') || 'Dieses Workout ist bereits abgeschlossen und kann nicht mehr bearbeitet werden.',
-          { type: 'info', duration: 4000 }
-        )
-        router.replace('/stats')
-        return
+        const completedAtMs = workout.value.completedAt ? new Date(workout.value.completedAt).getTime() : null
+        // Fehlt completedAt (Workouts von vor Einführung dieses Felds), wird NICHT blockiert -
+        // unbekannt statt fälschlich "abgelaufen" behandeln, siehe gleiche Logik server-seitig.
+        const deadlineMs = completedAtMs ? completedAtMs + WORKOUT_EDIT_WINDOW_HOURS_CLIENT * 60 * 60 * 1000 : null
+        if (deadlineMs && Date.now() > deadlineMs) {
+          logger.warn('[WorkoutDetail] Zugriff außerhalb des Bearbeitungsfensters blockiert', { requestedId })
+          toast.show(
+            t('workoutDetail.editWindowExpired', { hours: WORKOUT_EDIT_WINDOW_HOURS_CLIENT })
+              || `Das Bearbeitungsfenster von ${WORKOUT_EDIT_WINDOW_HOURS_CLIENT} Stunden nach Abschluss dieses Workouts ist abgelaufen.`,
+            { type: 'info', duration: 5000 }
+          )
+          router.replace('/stats')
+          return
+        }
+        if (deadlineMs) {
+          editWindowDeadline.value = deadlineMs
+        }
       }
       ensureSetDetailsStructure()
       await enrichExerciseImages()

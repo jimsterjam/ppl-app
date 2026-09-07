@@ -23,6 +23,7 @@ import { logger } from './logger'
 import { createWorkout, updateWorkout, deleteWorkout } from '@/api/workouts'
 import { clearTokenCache, getAuthToken, parseUidFromToken } from './authToken'
 import { isWorkoutDeleted } from '@/utils/offlineStorage'
+import { useToastStore } from '@/stores/toastStore'
 
 // Max Retry Attempts für fehlgeschlagene Syncs
 const MAX_RETRY_ATTEMPTS = 3
@@ -255,6 +256,34 @@ export async function processSyncQueue(preferredToken = null) {
         logger.debug('✅ Sync Manager - Action erfolgreich:', item.id, item.action)
       } catch (error) {
         const status = error?.response?.status || null
+        const errorCode = error?.response?.data?.code || null
+
+        // Bearbeitungsfenster für ein bereits abgeschlossenes Workout abgelaufen (siehe
+        // PUT /:id in server/routes/workouts.js): erneutes Retrying ist hier zwecklos, die
+        // Deadline ändert sich durch einen weiteren Versuch nicht - deshalb sofort terminal
+        // markieren statt bis zu MAX_RETRY_ATTEMPTS lang stumm zu versuchen. Ohne die
+        // Toast-Meldung hier würde eine offline vorgenommene Änderung sonst einfach
+        // "verschwinden", ohne dass der Nutzer je erfährt, warum sie nie ankam.
+        if (status === 409 && (errorCode === 'WORKOUT_EDIT_WINDOW_EXPIRED' || errorCode === 'WORKOUT_ALREADY_COMPLETED')) {
+          logger.warn('🚫 Sync Manager - Update außerhalb des Bearbeitungsfensters, gebe sofort auf:', {
+            queueId: item?.id,
+            action: item?.action,
+            errorCode
+          })
+          await markActionFailed(item.id, error?.message || errorCode, { terminal: true })
+          try {
+            useToastStore().show(
+              error?.response?.data?.error
+                || 'Eine Workout-Änderung konnte nicht gespeichert werden, da das Bearbeitungsfenster für dieses Workout abgelaufen ist.',
+              { type: 'warning', duration: 6000 }
+            )
+          } catch (toastErr) {
+            logger.warn('⚠️ Sync Manager - Toast-Hinweis auf abgelaufenes Bearbeitungsfenster fehlgeschlagen:', toastErr?.message)
+          }
+          failedCount++
+          continue
+        }
+
         const retryable = isRetryableSyncError(error)
         if (status === 401) {
           logger.warn('🔐 Sync Manager - 401 bei Sync Action, Token-Cache wird geleert und Retry geplant', {

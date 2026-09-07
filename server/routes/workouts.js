@@ -1150,9 +1150,15 @@ router.post("/", firebaseAuthMiddleware, async (req, res) => {
       name: req.body?.name,
       exercises: Array.isArray(req.body?.exercises) ? req.body.exercises.length : 0
     });
+    // completedAt kommt nie vom Client (siehe Feld-Kommentar in models/Workout.js) - wird beim
+    // Anlegen eines bereits als "completed" markierten Workouts (Nutzer schließt direkt beim
+    // ersten Speichern ab, ohne vorherigen unvollständigen Server-Stand) hier gesetzt, analog
+    // zur Logik in PUT /:id.
+    const { completedAt: _bodyCompletedAt, ...bodyRest } = req.body;
     const workout = await Workout.create({
-      ...req.body,
-      userId
+      ...bodyRest,
+      userId,
+      completedAt: bodyRest.completed === true ? new Date() : null
     });
     logger.info("[POST /api/workouts] saved", {
       requestId,
@@ -1181,29 +1187,50 @@ router.put("/:id", firebaseAuthMiddleware, async (req, res) => {
       });
       return res.status(400).json({ error: 'Ungültige Workout-ID' });
     }
-    // _id aus dem Body entfernen – der Identifikator kommt ausschließlich aus dem URL-Param
-    const { _id: _bodyId, ...updateBody } = req.body;
+    // _id und completedAt aus dem Body entfernen - _id kommt ausschließlich aus dem URL-Param,
+    // completedAt wird ausschließlich server-seitig gesetzt (siehe Kommentar am Feld in
+    // models/Workout.js), damit der Client das Ende des Bearbeitungsfensters nicht manipulieren
+    // kann.
+    const { _id: _bodyId, completedAt: _bodyCompletedAt, ...updateBody } = req.body;
 
-    // Blocker-Fix: ein bereits abgeschlossenes Workout darf nicht mehr über diesen generischen
-    // Update-Endpoint verändert werden. Ohne diese Sperre konnte ein Nutzer (z.B. über einen
-    // Deep-Link auf eine echte Workout-ObjectId oder die Browser-/App-Historie) ein längst
-    // abgeschlossenes Training erneut öffnen und überschreiben - inklusive einer dadurch neu
-    // ausgelösten KI-Analyse auf Basis der veränderten Daten. Hier wird bewusst nur der
-    // VORHERIGE Zustand geprüft, nicht der neue: die einzige legitime completed:false ->
-    // completed:true-Transition beim ersten Abschließen eines bereits vorher server-seitig
-    // existierenden (aber noch nicht abgeschlossenen) Workouts bleibt dadurch weiterhin möglich.
-    const existing = await Workout.findOne({ _id: req.params.id, userId }).select('completed').lean();
+    const existing = await Workout.findOne({ _id: req.params.id, userId }).select('completed completedAt').lean();
     if (!existing) {
       return res.status(404).json({ error: "Workout nicht gefunden" });
     }
+
     if (existing.completed === true) {
-      logger.warn('⚠️ Update auf bereits abgeschlossenes Workout abgelehnt', {
-        id: req.params.id, userId, userAgent: req.headers['user-agent']
-      });
-      return res.status(409).json({
-        error: 'Dieses Workout ist bereits abgeschlossen und kann nicht mehr bearbeitet werden.',
-        code: 'WORKOUT_ALREADY_COMPLETED'
-      });
+      // Nachträgliches Bearbeiten eines bereits abgeschlossenen Workouts ist bewusst erlaubt
+      // (z.B. vergessene Angaben nachtragen), aber nur innerhalb eines Zeitfensters nach dem
+      // ERSTEN Abschluss - danach soll ein Deep-Link/eine alte Browser-/App-Historie ein
+      // Training nicht mehr rückwirkend verändern können. Das Fenster läuft bewusst unabhängig
+      // vom Online-Status des Nutzers (rein zeitbasiert anhand `completedAt`), nicht erst ab
+      // dem nächsten erfolgreichen Sync.
+      // `existing.completedAt` kann bei Workouts von vor Einführung dieses Felds fehlen
+      // (`null`) - in dem Fall wird NICHT blockiert (unbekannt statt fälschlich "abgelaufen"),
+      // um bereits bestehende abgeschlossene Workouts aus der Zeit vor diesem Feature nicht
+      // pauschal für immer zu sperren.
+      const windowHours = Number(process.env.WORKOUT_EDIT_WINDOW_HOURS) > 0
+        ? Number(process.env.WORKOUT_EDIT_WINDOW_HOURS)
+        : 24;
+      if (existing.completedAt) {
+        const deadline = new Date(existing.completedAt).getTime() + windowHours * 60 * 60 * 1000;
+        if (Date.now() > deadline) {
+          logger.warn('⚠️ Update außerhalb des Bearbeitungsfensters abgelehnt', {
+            id: req.params.id, userId, completedAt: existing.completedAt, windowHours
+          });
+          return res.status(409).json({
+            error: `Das Bearbeitungsfenster von ${windowHours} Stunden nach Abschluss dieses Workouts ist abgelaufen. Änderungen können nicht mehr gespeichert werden.`,
+            code: 'WORKOUT_EDIT_WINDOW_EXPIRED',
+            completedAt: existing.completedAt,
+            windowHours
+          });
+        }
+      }
+    } else if (updateBody.completed === true) {
+      // Erster Übergang zu "abgeschlossen" - Anker für das Bearbeitungsfenster setzen. Bei
+      // erneuten Speicherungen INNERHALB des Fensters bleibt completedAt unverändert (wird
+      // oben aus dem Body entfernt), das Fenster startet also nicht bei jedem Save neu.
+      updateBody.completedAt = new Date();
     }
 
     const workout = await Workout.findOneAndUpdate(
