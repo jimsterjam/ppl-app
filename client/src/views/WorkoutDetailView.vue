@@ -303,6 +303,7 @@
                 <div v-if="!row.isWarmup" class="set-row" :class="{ 'set-row-empty': isRowEmpty(row) }" :data-set-index="rIdx">
                   <span class="col set">
                     {{ getSetLabel(ex.setDetails, rIdx) }}
+                    <span v-if="Number(row.reps) >= 6" class="weight-progress-hint" :title="t('workoutDetail.progressionHint')">&#8593;</span>
                   </span>
                   <span class="col reps">
                     <div class="number-with-spinner">
@@ -3155,33 +3156,12 @@ onBeforeUnmount(() => {
   border: 1px solid var(--card-border);
   border-radius: 10px;
 }
-/* Alle Elemente (Set-Nr., Eingabefelder, Remove-Button) um ca. 20% vergrößert (vorher 50px/
-   60px Spalten, 34px Feldhöhe) - siehe .set-row .col input / .remove-row-btn unten. */
-.set-row { display: grid; grid-template-columns: 60px 1fr 1fr 72px; gap: 10px; align-items: stretch; padding: 4px 0; }
+.set-row { display: grid; grid-template-columns: 50px 1fr 1fr 60px; gap: 8px; align-items: center; padding: 4px 0; }
 .set-row.header { color: var(--muted); font-size: 0.75rem; padding-top: 0; }
-/* Jede Spalte bekommt denselben Höhen-Anker: align-items:stretch oben lässt jede .col-Spalte
-   die volle Zeilenhöhe einnehmen, und jede Spalte zentriert ihren Inhalt selbst per Flexbox.
-   Vorher war der Remove-Button (eigene Spalte "col actions") ohne diese Regel dem
-   Grid-Default überlassen, wodurch er - je nach Inline-Box-Verhalten des <button> vs. <input> -
-   leicht nach unten versetzt saß, statt exakt auf gleicher Höhe wie die Eingabefelder zu
-   sitzen. Jetzt zentrieren alle vier Spalten identisch. */
-.col.set,
-.col.reps,
-.col.weight,
-.col.actions {
-  display: flex;
-  align-items: center;
-}
-.col.actions {
-  justify-content: center;
-}
-/* Sets/Reps-Eingabefelder und der Entfernen-Button sollen exakt gleich hoch sein (homogene
-   Zeile) - deshalb feste height + box-sizing: border-box statt sich allein auf Padding zu
-   verlassen, das je nach Inhalt/Font leicht abweichen kann. */
-.set-row .col input { width: 100%; height: 41px; box-sizing: border-box; padding: 7px 8px; border-radius: 7px; border: 1px solid var(--card-border); background: var(--surface); color: var(--fg); text-align: center; font-size: 1.15rem; }
-.weight-input { position: relative; width: 100%; }
-.weight-input .unit { position: absolute; right: 7px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 0.85rem; pointer-events: none; }
-.row-actions { padding: 4px 0; display: flex; align-items: center; }
+.set-row .col input { width: 100%; padding: 5px 6px; border-radius: 6px; border: 1px solid var(--card-border); background: var(--surface); color: var(--fg); text-align: center; font-size: 1rem; }
+.weight-input { position: relative; }
+.weight-input .unit { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 0.75rem; pointer-events: none; }
+.row-actions { padding: 4px 0; }
 .add-row-btn {
   background: transparent;
   color: var(--accent-contrast, #ffffff);
@@ -3193,6 +3173,7 @@ onBeforeUnmount(() => {
   /* font-weight: 700; */
   /* text-shadow: 0 1px 1px rgba(0, 0, 0, 0.35); */
 }
+.remove-row-btn { background: var(--danger); color: var(--accent-contrast); border: none; border-radius: 4px; width: 28px; height: 28px; cursor: pointer; font-size: 1rem; }
 .number-with-spinner { display: flex; align-items: center; gap: 6px; }
 .spinner-vertical { display: flex; flex-direction: column; gap: 2px; }
 .spin-btn { background: transparent; border: 1px solid var(--card-border); padding: 2px 6px; border-radius: 6px; font-size: 0.7rem; line-height: 1; cursor: pointer; }
@@ -3254,50 +3235,9 @@ onBeforeUnmount(() => {
   background: #dc2626;
   color: #000000;
 }
-/* War: rotes Vollflächen-Icon (background: var(--danger)) mit einem sehr kurzen "−"-Zeichen
-   in --accent-contrast - dadurch im hellen Modus kaum lesbar (weißes Minus auf hellrotem
-   Grund) und generell zu klein. Jetzt: dezenter, theme-abhängiger Hintergrund statt fixer
-   Vollfarbe, Icon-Farbe folgt --danger/--danger-text (die pro Theme bereits passend
-   definiert sind, siehe style.css), und feste height/width damit der Button exakt so hoch
-   ist wie die Sets/Reps-Eingabefelder daneben (siehe .set-row .col input). */
 .remove-row-btn {
-  /* Die globale button{}-Regel (style.css) setzt min-height/min-width: 48px - das hebelt eine
-     reine height hier aus, da min-height Vorrang vor height hat. Deshalb min-height/min-width
-     explizit mitsetzen, sonst bleibt der Button höher als die Sets/Reps-Eingabefelder.
-     Größe an .set-row .col input angeglichen (41px, ca. 20% größer als zuvor). */
-  width: 41px;
-  height: 41px;
-  min-width: 41px;
-  min-height: 41px;
-  padding: 0;
-  margin: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-  border-radius: 7px;
-  border: 1px solid color-mix(in srgb, var(--danger) 55%, transparent);
-  background: color-mix(in srgb, var(--danger) 14%, transparent);
-  color: var(--danger-text, var(--danger));
-  cursor: pointer;
-}
-.remove-row-btn:hover {
-  background: color-mix(in srgb, var(--danger) 22%, transparent);
-}
-/* Heller Modus: Vollflächen-Tint durch reine Kontur ersetzen - passt besser zum sonst sehr
-   hellen/weißen Karten-Hintergrund als ein getönter Block. */
-[data-theme="light"] .remove-row-btn {
-  background: transparent;
-  border-color: color-mix(in srgb, var(--danger) 70%, transparent);
-  color: var(--danger);
-}
-[data-theme="light"] .remove-row-btn:hover {
-  background: color-mix(in srgb, var(--danger) 10%, transparent);
-}
-.remove-row-btn .btn-icon {
-  width: 24px;
-  height: 24px;
-  stroke-width: 3;
+  background: var(--danger);
+  border: 1px solid color-mix(in srgb, var(--danger) 68%, black 32%);
 }
 .banner { display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; border-radius: 6px; margin-bottom: 10px; font-size: 0.85rem; }
 .banner.warning { background: color-mix(in oklab, var(--warning) 20%, transparent); border: 1px solid color-mix(in oklab, var(--warning) 50%, transparent); color: var(--fg); }
@@ -3317,6 +3257,24 @@ onBeforeUnmount(() => {
   margin: 6px 0 0;
   color: var(--fg-soft, #9fb0c2);
   font-size: 0.78rem;
+}
+.weight-progress-hint {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin-left: 4px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #22c55e;
+  background: rgba(34, 197, 94, 0.15);
+  border: 1px solid rgba(34, 197, 94, 0.35);
+  border-radius: 50%;
+  flex-shrink: 0;
+  user-select: none;
+  cursor: default;
+  vertical-align: middle;
 }
 .col.set {
   display: flex;
