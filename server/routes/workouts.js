@@ -10,6 +10,7 @@ import UserProfile from '../models/UserProfile.js';
 import FeedbackRating from '../models/FeedbackRating.js';
 import FeedbackQualitySignal from '../models/FeedbackQualitySignal.js';
 import { logger } from '../utils/logger.js';
+import { isWorkoutEditWindowExpired } from '../utils/workoutEditWindow.js';
 import { getAIService } from '../services/aiService.js';
 import {
   calculateExerciseStats,
@@ -1204,27 +1205,21 @@ router.put("/:id", firebaseAuthMiddleware, async (req, res) => {
       // ERSTEN Abschluss - danach soll ein Deep-Link/eine alte Browser-/App-Historie ein
       // Training nicht mehr rückwirkend verändern können. Das Fenster läuft bewusst unabhängig
       // vom Online-Status des Nutzers (rein zeitbasiert anhand `completedAt`), nicht erst ab
-      // dem nächsten erfolgreichen Sync.
-      // `existing.completedAt` kann bei Workouts von vor Einführung dieses Felds fehlen
-      // (`null`) - in dem Fall wird NICHT blockiert (unbekannt statt fälschlich "abgelaufen"),
-      // um bereits bestehende abgeschlossene Workouts aus der Zeit vor diesem Feature nicht
-      // pauschal für immer zu sperren.
-      const windowHours = Number(process.env.WORKOUT_EDIT_WINDOW_HOURS) > 0
-        ? Number(process.env.WORKOUT_EDIT_WINDOW_HOURS)
-        : 24;
-      if (existing.completedAt) {
-        const deadline = new Date(existing.completedAt).getTime() + windowHours * 60 * 60 * 1000;
-        if (Date.now() > deadline) {
-          logger.warn('⚠️ Update außerhalb des Bearbeitungsfensters abgelehnt', {
-            id: req.params.id, userId, completedAt: existing.completedAt, windowHours
-          });
-          return res.status(409).json({
-            error: `Das Bearbeitungsfenster von ${windowHours} Stunden nach Abschluss dieses Workouts ist abgelaufen. Änderungen können nicht mehr gespeichert werden.`,
-            code: 'WORKOUT_EDIT_WINDOW_EXPIRED',
-            completedAt: existing.completedAt,
-            windowHours
-          });
-        }
+      // dem nächsten erfolgreichen Sync. Die eigentliche Entscheidungslogik steckt in
+      // isWorkoutEditWindowExpired() (server/utils/workoutEditWindow.js) - dorthin ausgelagert,
+      // damit sie ohne DB-Verbindung isoliert testbar ist (siehe
+      // server/utils/__tests__/workoutEditWindow.test.js).
+      const { expired, windowHours } = isWorkoutEditWindowExpired(existing);
+      if (expired) {
+        logger.warn('⚠️ Update außerhalb des Bearbeitungsfensters abgelehnt', {
+          id: req.params.id, userId, completedAt: existing.completedAt, windowHours
+        });
+        return res.status(409).json({
+          error: `Das Bearbeitungsfenster von ${windowHours} Stunden nach Abschluss dieses Workouts ist abgelaufen. Änderungen können nicht mehr gespeichert werden.`,
+          code: 'WORKOUT_EDIT_WINDOW_EXPIRED',
+          completedAt: existing.completedAt,
+          windowHours
+        });
       }
     } else if (updateBody.completed === true) {
       // Erster Übergang zu "abgeschlossen" - Anker für das Bearbeitungsfenster setzen. Bei
