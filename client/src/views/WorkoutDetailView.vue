@@ -3205,6 +3205,12 @@ onBeforeUnmount(() => {
 .drag-handle .btn-icon {
   vertical-align: 0;
 }
+/* Minus-Icon im Remove-Button etwas fetter (dickerer Strich) und länger (breiter) als die
+   sonstigen .btn-icon-Icons, damit es als "−" gut erkennbar ist statt als winziger Punkt. */
+.remove-row-btn .btn-icon {
+  width: 20px;
+  stroke-width: 3;
+}
 /* Eigene, leicht abgesetzte Fläche für den Sätze-Bereich (statt nahtlos in den Info-Teil
    überzugehen) - macht auf einen Blick klar, wo "Infos zur Übung" aufhört und "Sätze
    eintragen" anfängt, statt dass die ganze Karte wie ein einziger durchgehender Block wirkt. */
@@ -3239,7 +3245,7 @@ onBeforeUnmount(() => {
 .spin-btn.up { transform-origin: center; }
 .spin-btn.down { transform-origin: center; }
 .spin-btn:active { transform: scale(0.98); }
-.actions { margin-top: 12px; display: flex; gap: 8px; }
+.actions { margin: 6px; display: flex; gap: 8px; }
 .primary {
   width: 100%;
   padding: 12px;
