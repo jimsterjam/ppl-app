@@ -3249,8 +3249,14 @@ onBeforeUnmount(() => {
    definiert sind, siehe style.css), und feste height/width damit der Button exakt so hoch
    ist wie die Sets/Reps-Eingabefelder daneben (siehe .set-row .col input). */
 .remove-row-btn {
+  /* Die globale button{}-Regel (style.css) setzt min-height/min-width: 48px - das hebelt eine
+     reine height:34px hier aus, da min-height Vorrang vor height hat. Deshalb min-height/
+     min-width explizit mit auf 34px setzen, sonst bleibt der Button trotz height:34px höher
+     als die Sets/Reps-Eingabefelder. */
   width: 34px;
   height: 34px;
+  min-width: 34px;
+  min-height: 34px;
   padding: 0;
   display: inline-flex;
   align-items: center;
