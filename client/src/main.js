@@ -149,6 +149,33 @@ async function tryRestoreLastRoute(reason = 'unknown') {
 }
 
 const app = createApp(App)
+
+// Globaler Vue-Error-Handler (bisher nicht vorhanden, siehe TESTPHASE-TESTMATRIX.md Blocker #6):
+// ohne ihn führte ein unerwarteter Rendering-Fehler in einer Komponente zu einem stillen weißen
+// Screen - Vue fängt den Fehler zwar intern ab (App stürzt nicht komplett ab), aber es gab
+// weder ein Log noch irgendeine Nutzer-sichtbare Reaktion. Wichtig für die Testphase: Diagnose-
+// Log-Export (copyDraftDebugLog in den Einstellungen) ist aktuell der einzige Weg, wie ein
+// Tester-Bugreport überhaupt nachvollziehbar wird - ohne diesen Handler landet ein Komponenten-
+// Fehler dort gar nicht erst im Log.
+app.config.errorHandler = (err, instance, info) => {
+  logger.error('💥 Unbehandelter Vue-Fehler', {
+    message: err?.message || String(err),
+    stack: err?.stack || null,
+    componentName: instance?.$options?.name || instance?.$?.type?.name || 'unknown',
+    info
+  })
+}
+
+// Vue-Warnungen (z.B. fehlerhafte Props, Render-Function-Probleme) landen sonst nur in der
+// Browser-Konsole und damit außerhalb des Diagnose-Log-Exports - hier zusätzlich ins
+// strukturierte Logging aufgenommen, nur im Dev-Modus um Produktions-Logs nicht mit Vue-
+// internen Warnungen zu fluten.
+if (import.meta.env.DEV) {
+  app.config.warnHandler = (msg, instance, trace) => {
+    logger.warn('⚠️ Vue-Warnung', { msg, trace })
+  }
+}
+
 const pinia = createPinia()
 const i18n = createI18nInstance()
 app.use(pinia)
