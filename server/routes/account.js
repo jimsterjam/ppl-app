@@ -216,15 +216,117 @@ router.post('/delete', firebaseAuthMiddleware, async (req, res) => {
 // Profile (Username)
 // ---------------------------
 
+// Reine Ableitung, kein eigenes DB-Feld: "erledigt" bedeutet bewusst abgeschlossen ODER
+// übersprungen - beides soll die automatische erneute Anzeige gleichermaßen verhindern
+// (siehe Onboarding-Auftrag "Verhalten: Nach Abschluss oder Überspringen darf der Flow beim
+// nächsten App-Start nicht erneut automatisch erscheinen").
+function summarizeOnboarding(profile) {
+  const onboarding = profile?.onboarding || {};
+  return {
+    completed: !!(onboarding.completedAt || onboarding.skippedAt),
+    completedAt: onboarding.completedAt || null,
+    skippedAt: onboarding.skippedAt || null,
+    dismissedHints: Array.isArray(onboarding.dismissedHints) ? onboarding.dismissedHints : []
+  };
+}
+
 router.get('/profile', firebaseAuthMiddleware, async (req, res) => {
   try {
     const uid = req.auth?.userId;
     if (!uid) return res.status(401).json({ error: 'Unauthenticated' });
 
     const profile = await getOrCreateProfile(uid);
-    res.json({ uid, username: profile.username || '', avatarUrl: profile.avatarUrl || '' });
+    res.json({
+      uid,
+      username: profile.username || '',
+      avatarUrl: profile.avatarUrl || '',
+      // Additiv: bestehende Konsumenten von GET /profile (settingsStore.js) lesen nur
+      // username/avatarUrl und ignorieren unbekannte Felder - kein Breaking Change.
+      onboarding: summarizeOnboarding(profile)
+    });
   } catch (e) {
     res.status(500).json({ error: 'Failed to load profile', message: e?.message || String(e) });
+  }
+});
+
+// ---------------------------
+// Onboarding-Status
+// ---------------------------
+// Getrennt von /profile (PUT), da hier ausschließlich der Onboarding-Teilbaum geschrieben wird -
+// vermeidet versehentliches Überschreiben von username/avatarUrl durch einen unvollständigen
+// Onboarding-Request und umgekehrt.
+
+router.post('/onboarding/complete', firebaseAuthMiddleware, async (req, res) => {
+  try {
+    const uid = req.auth?.userId;
+    if (!uid) return res.status(401).json({ error: 'Unauthenticated' });
+
+    const updated = await UserProfile.findOneAndUpdate(
+      { uid },
+      { $set: { 'onboarding.completedAt': new Date() } },
+      { upsert: true, new: true }
+    ).lean();
+
+    res.json({ uid, onboarding: summarizeOnboarding(updated) });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to complete onboarding', message: e?.message || String(e) });
+  }
+});
+
+router.post('/onboarding/skip', firebaseAuthMiddleware, async (req, res) => {
+  try {
+    const uid = req.auth?.userId;
+    if (!uid) return res.status(401).json({ error: 'Unauthenticated' });
+
+    const updated = await UserProfile.findOneAndUpdate(
+      { uid },
+      { $set: { 'onboarding.skippedAt': new Date() } },
+      { upsert: true, new: true }
+    ).lean();
+
+    res.json({ uid, onboarding: summarizeOnboarding(updated) });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to skip onboarding', message: e?.message || String(e) });
+  }
+});
+
+// Für "Einführungsguide erneut starten" in den Einstellungen - setzt NUR completedAt/skippedAt
+// zurück, nicht dismissedHints (die kontextuellen Einzel-Hinweise sind ein separates Feature,
+// siehe Onboarding-Auftrag: "erneut starten" bezieht sich explizit auf den 5-seitigen Guide).
+router.post('/onboarding/restart', firebaseAuthMiddleware, async (req, res) => {
+  try {
+    const uid = req.auth?.userId;
+    if (!uid) return res.status(401).json({ error: 'Unauthenticated' });
+
+    const updated = await UserProfile.findOneAndUpdate(
+      { uid },
+      { $set: { 'onboarding.completedAt': null, 'onboarding.skippedAt': null } },
+      { upsert: true, new: true }
+    ).lean();
+
+    res.json({ uid, onboarding: summarizeOnboarding(updated) });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to restart onboarding', message: e?.message || String(e) });
+  }
+});
+
+router.post('/onboarding/dismiss-hint', firebaseAuthMiddleware, async (req, res) => {
+  try {
+    const uid = req.auth?.userId;
+    if (!uid) return res.status(401).json({ error: 'Unauthenticated' });
+
+    const hintId = String(req.body?.hintId || '').trim().slice(0, 100);
+    if (!hintId) return res.status(400).json({ error: 'hintId required' });
+
+    const updated = await UserProfile.findOneAndUpdate(
+      { uid },
+      { $addToSet: { 'onboarding.dismissedHints': hintId } },
+      { upsert: true, new: true }
+    ).lean();
+
+    res.json({ uid, onboarding: summarizeOnboarding(updated) });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to dismiss hint', message: e?.message || String(e) });
   }
 });
 

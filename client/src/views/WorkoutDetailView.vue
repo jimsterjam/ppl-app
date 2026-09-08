@@ -32,6 +32,12 @@
           <span>{{ t('workoutDetail.editWindowHint', { time: editWindowDeadlineLabel }) || `Du kannst dieses bereits abgeschlossene Workout noch bis ${editWindowDeadlineLabel} bearbeiten.` }}</span>
         </div>
 
+        <OneTimeHint
+          hint-id="first-workout-open"
+          :title="t('onboarding.hintFirstWorkoutTitle')"
+          :text="t('onboarding.hintFirstWorkoutText')"
+        />
+
           <div id="exercises" ref="exListRef" class="ex-list glass" :class="{ reordering: isReordering }">
 
           <div class="ex-list-header">
@@ -149,6 +155,11 @@
                   </div>
 
                   <div v-if="showNote && showNote[i]" style="margin-top: 4px;">
+                    <OneTimeHint
+                      hint-id="first-exercise-note"
+                      :title="t('onboarding.hintFirstNoteTitle')"
+                      :text="t('onboarding.hintFirstNoteText')"
+                    />
                     <textarea :value="getNote(i)" @input="setNote(i, $event.target.value)" rows="2" style="width:100%;resize:vertical" placeholder="Notiz zu dieser Übung..."></textarea>
                   </div>
                   <div v-if="mediaExercise" class="media-overlay" @click.self="closeExerciseMedia">
@@ -684,6 +695,7 @@ import { useUserStore } from '@/stores/userStore'
 import { useAuthStore } from '@/stores/authStore'
 import HeaderBar from '@/components/HeaderBar.vue'
 import BottomNav from '@/components/BottomNav.vue'
+import OneTimeHint from '@/components/OneTimeHint.vue'
 import AppModal from '@/components/AppModal.vue'
 import ExerciseList from '@/components/ExerciseList.vue'
 import WorkoutTimerConfig from '@/components/timer/WorkoutTimerConfig.vue'

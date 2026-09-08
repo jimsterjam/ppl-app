@@ -33,6 +33,7 @@
     "@capacitor/app": "^7.1.1",
     "@capacitor/camera": "^7.0.3",
     "@capacitor/core": "^7.4.4",
+    "@capacitor/device": "^7.0.5",
     "@capacitor/filesystem": "^7.1.1",
     "@capacitor/local-notifications": "^7.0.6",
     "@capacitor/screen-orientation": "^7.0.0",

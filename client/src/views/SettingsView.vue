@@ -213,6 +213,27 @@
         </section>
       </template>
 
+      <h2 class="section-title">{{ $t('appFeedback.entryTitle') }}</h2>
+
+      <section class="card">
+        <h3>{{ $t('appFeedback.entryTitle') }}</h3>
+        <p class="hint">{{ $t('appFeedback.entrySubtitle') }}</p>
+        <button class="legal-btn" @click="showFeedbackDialog = true">
+          <span>💬</span>
+          <span>{{ $t('appFeedback.entryTitle') }}</span>
+        </button>
+      </section>
+
+      <section class="card">
+        <h3>{{ $t('onboarding.restartTitle') }}</h3>
+        <p class="hint">{{ $t('onboarding.restartSubtitle') }}</p>
+        <button class="legal-btn" :disabled="restartingOnboarding" @click="handleRestartOnboarding">
+          <span v-if="restartingOnboarding" class="spinner spin-indicator" aria-hidden="true"></span>
+          <span v-else>🔄</span>
+          <span>{{ $t('onboarding.restartTitle') }}</span>
+        </button>
+      </section>
+
       <section class="card">
         <h3>{{ $t('settings.legalTitle') }}</h3>
         <p class="hint">{{ $t('settings.legalHint') }}</p>
@@ -400,16 +421,20 @@
         </div>
       </div>
     </Transition>
+
+    <AppFeedbackDialog v-if="showFeedbackDialog" @close="showFeedbackDialog = false" />
   </div>
 </template>
 
 <script setup>
 import HeaderBar from '../components/HeaderBar.vue'
+import AppFeedbackDialog from '../components/AppFeedbackDialog.vue'
 import { storeToRefs } from 'pinia'
 import { useThemeStore } from '@/stores/themeStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useUserStore } from '@/stores/userStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
+import { useOnboardingStore } from '@/stores/onboardingStore'
 import { useToastStore } from '@/stores/toastStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useI18n } from 'vue-i18n'
@@ -450,6 +475,26 @@ const accountProviderLabel = computed(() => {
   if (providerId === 'password') return $t('settings.accountProviderPassword') || 'E-Mail/Passwort'
   return ''
 })
+
+// Allgemeiner Feedback-Bereich (siehe AppFeedbackDialog.vue) + "Einführungsguide erneut
+// starten" (setzt nur completedAt/skippedAt zurück, siehe onboardingStore.js/restartFlow).
+const onboardingStore = useOnboardingStore()
+const showFeedbackDialog = ref(false)
+const restartingOnboarding = ref(false)
+
+async function handleRestartOnboarding() {
+  if (restartingOnboarding.value) return
+  restartingOnboarding.value = true
+  try {
+    const token = await getIdTokenSafe()
+    await onboardingStore.restartFlow(token)
+    toast.show($t('common.updated'), { type: 'success', duration: 1400 })
+  } catch (e) {
+    toast.show(e?.message || $t('common.error'), { type: 'error', duration: 2200 })
+  } finally {
+    restartingOnboarding.value = false
+  }
+}
 
 // Praktisch fürs Support-/Debugging (z.B. um zwei Konten für eine Migration eindeutig zu
 // identifizieren, siehe scripts/migrateUserId.js) - die UID selbst ist keine geheime

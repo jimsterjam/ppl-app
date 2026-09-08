@@ -5,6 +5,21 @@
       <button class="close-btn" type="button" @click="dismissSummary" aria-label="Schließen">×</button>
     </div>
 
+    <!-- Einmalige Feedback-Einladung nach dem ersten erfolgreich gespeicherten Workout (siehe
+         Onboarding-Auftrag) - bewusst UNABHÄNGIG vom AI-Analyse-Status (deferred/loading/error/
+         success/insufficientHistory/...): das Workout selbst ist in allen diesen Zuständen
+         bereits erfolgreich gespeichert, nur die nachgelagerte KI-Analyse hat unterschiedliche
+         Ausgänge. Komplett getrennt von AiFeedbackRatingWidget (Bewertung EINES KI-Feedback-
+         Texts) - hier geht es um allgemeines App-Feedback zum Ablauf. -->
+    <OneTimeHint
+      hint-id="first-workout-saved"
+      :title="t('onboarding.hintFirstSaveTitle')"
+      :text="t('onboarding.hintFirstSaveText')"
+      :primary-label="t('onboarding.hintGiveFeedback')"
+      :secondary-label="t('onboarding.hintLater')"
+      @primary="showFeedbackDialog = true"
+    />
+
     <!-- Feature "Feedback später bewerten": Workout wurde absichtlich OHNE automatische
          KI-Analyse gespeichert (Nutzer wollte erst in Ruhe Notizen ergänzen, siehe
          WorkoutDetailView.vue). Kein Lade-Spinner, da hier gar nichts lädt/läuft - das würde
@@ -106,6 +121,8 @@
         {{ t('common.continue') || 'Weiter' }}
       </button>
     </div>
+
+    <AppFeedbackDialog v-if="showFeedbackDialog" @close="showFeedbackDialog = false" />
   </div>
 </template>
 
@@ -124,6 +141,10 @@ import { OFFLINE_WORKOUTS_UPDATED_EVENT } from '@/utils/offlineStorage'
 import { queuePendingAiFeedback, clearPendingAiFeedback } from '@/utils/pendingAiFeedback'
 import AiFeedbackDeltaSummary from '@/components/AiFeedbackDeltaSummary.vue'
 import AiFeedbackRatingWidget from '@/components/AiFeedbackRatingWidget.vue'
+import OneTimeHint from '@/components/OneTimeHint.vue'
+import AppFeedbackDialog from '@/components/AppFeedbackDialog.vue'
+
+const showFeedbackDialog = ref(false)
 
 const props = defineProps({
   workoutId: {

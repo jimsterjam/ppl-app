@@ -107,3 +107,43 @@ export async function listWorkoutChatThreads(token, limit = 30) {
   }
 }
 
+// ---------------------------
+// Onboarding-Status (siehe server/routes/account.js onboarding/*)
+// ---------------------------
+
+export async function completeOnboarding(token) {
+  try {
+    const res = await api.post('/onboarding/complete', {}, authConfig(token))
+    return res.data || {}
+  } catch (error) {
+    throw handleAPIError(error, 'Onboarding abschließen')
+  }
+}
+
+export async function skipOnboarding(token) {
+  try {
+    const res = await api.post('/onboarding/skip', {}, authConfig(token))
+    return res.data || {}
+  } catch (error) {
+    throw handleAPIError(error, 'Onboarding überspringen')
+  }
+}
+
+export async function restartOnboarding(token) {
+  try {
+    const res = await api.post('/onboarding/restart', {}, authConfig(token))
+    return res.data || {}
+  } catch (error) {
+    throw handleAPIError(error, 'Einführungsguide erneut starten')
+  }
+}
+
+export async function dismissOnboardingHint(token, hintId) {
+  try {
+    const res = await api.post('/onboarding/dismiss-hint', { hintId }, authConfig(token))
+    return res.data || {}
+  } catch (error) {
+    throw handleAPIError(error, 'Hinweis ausblenden')
+  }
+}
+
