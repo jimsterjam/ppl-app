@@ -1,15 +1,12 @@
 // server/middleware/firebaseAuth.js
 import { admin } from '../utils/firebaseAdmin.js';
-
-// Als eigene, pure Funktion exportiert (statt inline im Handler), damit sie ohne Express-
-// Request/Response und ohne den echten Firebase-Admin-SDK-Aufruf testbar ist.
-export function isEmailVerifiedFromToken(decodedToken) {
-  const signInProvider = decodedToken?.firebase?.sign_in_provider || null
-  const isFederatedProvider = !!signInProvider && signInProvider !== 'password'
-  return decodedToken?.email_verified === true
-    || decodedToken?.emailVerified === true
-    || isFederatedProvider
-}
+// Reine Logik ausgelagert nach utils/emailVerification.js (kein Firebase-Admin-SDK-Import dort),
+// damit sie ohne Firebase-Zugangsdaten testbar ist - siehe Kommentar dort für den Hintergrund.
+// Lokal importiert (für die Nutzung unten in firebaseAuthMiddleware) UND re-exportiert, damit
+// bestehender Code, der isEmailVerifiedFromToken bisher von diesem Pfad importiert hat,
+// unverändert weiterfunktioniert.
+import { isEmailVerifiedFromToken } from '../utils/emailVerification.js';
+export { isEmailVerifiedFromToken };
 
 export async function firebaseAuthMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
