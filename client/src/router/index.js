@@ -15,7 +15,6 @@ const SettingsView = () => import('../views/SettingsView.vue')
 const WorkoutBuilder = () => import('../components/WorkoutBuilder.vue')
 const QuickWorkoutGeneratorView = () => import('../views/QuickWorkoutGeneratorView.vue')
 const WorkoutDetailView = () => import('../views/WorkoutDetailView.vue')
-const FeedbackInboxView = () => import('../views/FeedbackInboxView.vue')
 const FaqsView = () => import('../views/FaqsView.vue')
 const FeaturesTestView = () => import('../views/FeaturesTestView.vue')
 const LegalNoticeView = () => import('../views/LegalNoticeView.vue')
@@ -43,7 +42,6 @@ const routes = [
       { path: 'stats', name: 'stats', component: StatsView },
       { path: 'exercises', name: 'exercises', component: ExercisesView },
       { path: 'settings', name: 'settings', component: SettingsView },
-      { path: 'feedback', name: 'feedback', component: FeedbackInboxView },
       { path: 'workout-builder', name: 'workout-builder', component: WorkoutBuilder },
       { path: 'quick-workout-generator', name: 'quick-workout-generator', component: QuickWorkoutGeneratorView },
       { path: 'faqs', name: 'faqs', component: FaqsView },

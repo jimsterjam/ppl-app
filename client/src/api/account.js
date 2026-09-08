@@ -72,41 +72,6 @@ export async function uploadProfileAvatar(token, file) {
   }
 }
 
-// Client: Chat/Feedback zu einem eigenen Workout
-export async function listWorkoutChat(token, workoutId, limit = 100) {
-  try {
-    const res = await api.get(
-      `/workouts/${encodeURIComponent(workoutId)}/chat?limit=${encodeURIComponent(limit)}`,
-      authConfig(token)
-    )
-    return Array.isArray(res.data) ? res.data : []
-  } catch (error) {
-    throw handleAPIError(error, 'Chat laden')
-  }
-}
-
-export async function sendWorkoutChatMessage(token, workoutId, text) {
-  try {
-    const res = await api.post(
-      `/workouts/${encodeURIComponent(workoutId)}/chat`,
-      { text },
-      authConfig(token)
-    )
-    return res.data || {}
-  } catch (error) {
-    throw handleAPIError(error, 'Nachricht senden')
-  }
-}
-
-export async function listWorkoutChatThreads(token, limit = 30) {
-  try {
-    const res = await api.get(`/workouts/chat/threads?limit=${encodeURIComponent(limit)}`, authConfig(token))
-    return Array.isArray(res.data) ? res.data : []
-  } catch (error) {
-    throw handleAPIError(error, 'Feedback laden')
-  }
-}
-
 // ---------------------------
 // Onboarding-Status (siehe server/routes/account.js onboarding/*)
 // ---------------------------

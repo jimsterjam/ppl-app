@@ -7,7 +7,6 @@ import mongoose from 'mongoose';
 import Workout from '../models/Workout.js';
 import Exercise from '../models/Exercise.js';
 import UserProfile from '../models/UserProfile.js';
-import CoachChatMessage from '../models/CoachChatMessage.js';
 import { firebaseAuthMiddleware } from '../middleware/firebaseAuth.js';
 import multer from 'multer';
 import sharp from 'sharp';
@@ -45,13 +44,6 @@ async function getOrCreateProfile(uid) {
     if (again) return again;
     throw e;
   }
-}
-
-function normalizeChatText(input) {
-  const raw = String(input ?? '').replace(/\r\n/g, '\n').trim();
-  // avoid huge payloads; keep it simple/plain text
-  const collapsed = raw.replace(/[\t\r]/g, '');
-  return collapsed.slice(0, 1500);
 }
 
 // NOTE: use centralized `firebaseAuthMiddleware` (sets `req.auth.userId`)
@@ -400,139 +392,6 @@ router.post('/profile/avatar', firebaseAuthMiddleware, avatarUpload.single('imag
     res.status(500).json({ error: 'Failed to upload avatar', message: e?.message || String(e) });
   }
 });
-
-// Client: Chat/Notizen zu einem eigenen Workout (Client <-> Coaches)
-router.get('/workouts/:workoutId/chat', firebaseAuthMiddleware, async (req, res) => {
-  try {
-    const clientUid = req.auth?.userId;
-    const workoutId = req.params.workoutId;
-    if (!clientUid) return res.status(401).json({ error: 'Unauthenticated' });
-    if (!mongoose.Types.ObjectId.isValid(workoutId)) return res.status(400).json({ error: 'Invalid workoutId' });
-
-    const workoutExists = await Workout.findOne({ _id: workoutId, userId: clientUid }).select({ _id: 1 }).lean();
-    if (!workoutExists) return res.status(404).json({ error: 'Workout not found' });
-
-    const limit = Math.max(1, Math.min(200, Number.parseInt(req.query?.limit || '100', 10) || 100));
-    const msgs = await CoachChatMessage.find({ clientUid, workoutId })
-      .sort({ createdAt: 1 })
-      .limit(limit)
-      .lean();
-
-    res.json((msgs || []).map(m => ({
-      id: String(m._id),
-      sender: m.sender,
-      text: m.text,
-      coachUid: m.coachUid || '',
-      createdAt: m.createdAt
-    })));
-  } catch (e) {
-    res.status(500).json({ error: 'Failed to load workout chat', message: e?.message || String(e) });
-  }
-});
-
-router.post('/workouts/:workoutId/chat', firebaseAuthMiddleware, async (req, res) => {
-  try {
-    const clientUid = req.auth?.userId;
-    const workoutId = req.params.workoutId;
-    if (!clientUid) return res.status(401).json({ error: 'Unauthenticated' });
-    if (!mongoose.Types.ObjectId.isValid(workoutId)) return res.status(400).json({ error: 'Invalid workoutId' });
-
-    const text = normalizeChatText(req.body?.text);
-    if (!text) return res.status(400).json({ error: 'text required' });
-
-    const workoutExists = await Workout.findOne({ _id: workoutId, userId: clientUid }).select({ _id: 1 }).lean();
-    if (!workoutExists) return res.status(404).json({ error: 'Workout not found' });
-
-    const doc = await CoachChatMessage.create({
-      clientUid,
-      coachUid: '',
-      workoutId,
-      sender: 'client',
-      text
-    });
-
-    res.status(201).json({ id: String(doc._id), sender: 'client', text: doc.text, coachUid: '', createdAt: doc.createdAt });
-  } catch (e) {
-    res.status(500).json({ error: 'Failed to send workout chat message', message: e?.message || String(e) });
-  }
-});
-
-// Client: Inbox/Threads (letzte Nachricht pro Workout)
-router.get('/workouts/chat/threads', firebaseAuthMiddleware, async (req, res) => {
-  try {
-    const clientUid = req.auth?.userId;
-    if (!clientUid) return res.status(401).json({ error: 'Unauthenticated' });
-
-    const limit = Math.max(1, Math.min(100, Number.parseInt(req.query?.limit || '30', 10) || 30));
-
-    const rows = await CoachChatMessage.aggregate([
-      { $match: { clientUid } },
-      { $sort: { createdAt: -1 } },
-      {
-        $group: {
-          _id: '$workoutId',
-          lastMessage: { $first: '$$ROOT' }
-        }
-      },
-      {
-        $lookup: {
-          from: 'workouts',
-          let: { wid: '$_id' },
-          pipeline: [
-            {
-              $match: {
-                $expr: {
-                  $and: [
-                    { $eq: ['$_id', '$$wid'] },
-                    { $eq: ['$userId', clientUid] }
-                  ]
-                }
-              }
-            },
-            { $project: { _id: 1, name: 1, date: 1, type: 1, completed: 1 } }
-          ],
-          as: 'workout'
-        }
-      },
-      { $unwind: { path: '$workout', preserveNullAndEmptyArrays: true } },
-      {
-        $project: {
-          workoutId: '$_id',
-          workoutName: '$workout.name',
-          workoutDate: '$workout.date',
-          workoutType: '$workout.type',
-          workoutCompleted: '$workout.completed',
-          lastMessageText: '$lastMessage.text',
-          lastMessageSender: '$lastMessage.sender',
-          lastMessageAt: '$lastMessage.createdAt'
-        }
-      },
-      { $sort: { lastMessageAt: -1 } },
-      { $limit: limit }
-    ]);
-
-    res.json(
-      (rows || []).map(r => ({
-        workoutId: String(r.workoutId),
-        workout: {
-          name: r.workoutName || '',
-          date: r.workoutDate || null,
-          type: r.workoutType || '',
-          completed: Boolean(r.workoutCompleted)
-        },
-        lastMessage: {
-          text: r.lastMessageText || '',
-          sender: r.lastMessageSender || 'coach',
-          createdAt: r.lastMessageAt || null
-        }
-      }))
-    );
-  } catch (e) {
-    res.status(500).json({ error: 'Failed to load chat threads', message: e?.message || String(e) });
-  }
-});
-
-
 
 // Admin status diagnostic
 router.get('/admin-status', async (req, res) => {

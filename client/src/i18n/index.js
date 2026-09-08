@@ -294,17 +294,6 @@ export const messages = {
       resetConfirmTitle: 'Timer zurücksetzen?',
       resetConfirmMsg: 'Zeit und Fortschritt werden zurückgesetzt.'
     },
-    feedback: {
-      title: 'Feedback',
-      inboxTitle: 'Inbox',
-      inboxHint: 'Hier findest du Feedback deines Coaches – pro Workout als Thread.',
-      refresh: 'Aktualisieren',
-      empty: 'Noch keine Feedback-Threads',
-      offlineHint: 'Offline: Feedback-Inbox ist nur online verfügbar.',
-      unknownWorkout: 'Workout',
-      you: 'Du',
-      coach: 'Coach'
-    },
   exercises: {
       title: 'Übungen',
       allTitle: 'Übersicht aller Übungen:',
@@ -1162,17 +1151,6 @@ export const messages = {
       closeConfirmMsg: 'The current timer will be reset.',
       resetConfirmTitle: 'Reset timer?',
       resetConfirmMsg: 'Time and progress will be reset.'
-    },
-    feedback: {
-      title: 'Feedback',
-      inboxTitle: 'Inbox',
-      inboxHint: 'Your coach feedback – one thread per workout.',
-      refresh: 'Refresh',
-      empty: 'No feedback threads yet',
-      offlineHint: 'Offline: feedback inbox is only available online.',
-      unknownWorkout: 'Workout',
-      you: 'You',
-      coach: 'Coach'
     },
     exercises: {
       title: 'Exercises',
