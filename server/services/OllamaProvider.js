@@ -139,14 +139,14 @@ ${exercises
 
 **Aktuelle Leistung:**
 - Gewicht: ${ex.current_weight}kg
-- Wiederholungen: ${ex.current_reps}`;
+- Wiederholungen (gesamt über alle Sätze): ${ex.current_reps}`;
 
     if (ex.previous_weight !== undefined) {
       exPrompt += `
 
 **Vorherige Leistung:**
 - Gewicht: ${ex.previous_weight}kg
-- Wiederholungen: ${ex.previous_reps}
+- Wiederholungen (gesamt über alle Sätze): ${ex.previous_reps}
 
 **Veränderung:**
 - Gewicht: ${ex.changes.weight_change_kg > 0 ? '+' : ''}${ex.changes.weight_change_kg}kg

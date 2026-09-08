@@ -381,7 +381,7 @@ ${exercises
 
 **Aktuelle Leistung:**
 - Gewicht: ${ex.current_weight}kg
-- Wiederholungen: ${ex.current_reps}
+- Wiederholungen (gesamt über alle Sätze): ${ex.current_reps}
 - Volumen: ${ex.current_volume}kg (kumulativ)`;
 
     if (ex.previous_weight !== undefined) {
@@ -389,7 +389,7 @@ ${exercises
 
 **Vorherige Leistung:**
 - Gewicht: ${ex.previous_weight}kg
-- Wiederholungen: ${ex.previous_reps}
+- Wiederholungen (gesamt über alle Sätze): ${ex.previous_reps}
 - Volumen: ${ex.previous_volume}kg
 
 **Veränderung:**

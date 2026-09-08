@@ -9,13 +9,13 @@
 
       <template v-else>
         <span class="delta-chip" :class="chipClass(row.setsChange)">
-          {{ formatSigned(row.setsChange) }} {{ t('feedbackHistory.deltaSets') || 'Sätze' }}
+          {{ formatChipText(row.setsChange, t('feedbackHistory.deltaSets') || 'Sätze', t('feedbackHistory.deltaSetsUnchanged') || 'Sätze unverändert') }}
         </span>
         <span class="delta-chip" :class="chipClass(row.repsChange)">
-          {{ formatSigned(row.repsChange) }} {{ t('feedbackHistory.deltaReps') || 'Wdh.' }}
+          {{ formatChipText(row.repsChange, t('feedbackHistory.deltaReps') || 'Wdh.', t('feedbackHistory.deltaRepsUnchanged') || 'Wdh. unverändert') }}
         </span>
         <span class="delta-chip" :class="chipClass(row.weightChangeKg)">
-          {{ formatSigned(row.weightChangeKg) }} kg
+          {{ formatChipText(row.weightChangeKg, 'kg', t('feedbackHistory.deltaWeightUnchanged') || 'Gewicht unverändert') }}
         </span>
 
         <!-- Mini-Trend-Grafik: nur bei tatsächlich auffälliger Veränderung (siehe
@@ -82,6 +82,15 @@ function formatSigned(value) {
   const rounded = Math.round(value * 10) / 10
   if (rounded > 0) return `+${rounded}`
   return `${rounded}`
+}
+
+// Reine "0 Sätze"/"0 Wdh."/"0kg"-Ausgabe war für User missverständlich (siehe Feedback: klang
+// wie eine Fehlermeldung statt "keine Veränderung zur letzten Session"). Bei exakt 0 daher einen
+// eindeutigen "unverändert"-Text statt der bloßen Zahl+Einheit anzeigen.
+function formatChipText(value, unitLabel, unchangedLabel) {
+  const rounded = Math.round(value * 10) / 10
+  if (rounded === 0) return unchangedLabel
+  return `${formatSigned(value)} ${unitLabel}`
 }
 
 function chipClass(value) {

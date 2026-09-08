@@ -18,6 +18,14 @@ import { determineTrendWithProfile, resolveEffectiveProfile, buildNoteContext } 
  * Nutzt setDetails wenn vorhanden (modern), sonst weight/reps/sets (legacy)
  * Ignoriert Warm-up Sets
  *
+ * WICHTIG zu "reps": das ist die GESAMTZAHL der Wiederholungen über alle Arbeitssätze
+ * (nicht der Durchschnitt pro Satz). War bisher ein Durchschnitt - das erzeugte bei der
+ * Session-zu-Session-Differenz (rep_change) bedeutungslose Bruchzahlen wie "-0,2
+ * Wiederholungen" (z.B. wenn sich nur die Verteilung zwischen den Sätzen leicht ändert, ohne
+ * dass der Athlet real "0,2 Wiederholungen weniger" gemacht hat) - für den Nutzer nicht
+ * nachvollziehbar/umsetzbar. Die Gesamtsumme liefert dagegen immer eine ganze, direkt
+ * verständliche Zahl ("28 statt 24 Wiederholungen insgesamt").
+ *
  * @param {Object} exercise - Exercise-Objekt aus Workout
  * @returns {Object|null} { weight, reps, sets, volume } oder null wenn keine echten Sets
  */
@@ -30,22 +38,24 @@ export function calculateExerciseStats(exercise) {
     if (workingSets.length === 0) return null; // Keine echten Sets
 
     const avgWeight = workingSets.reduce((sum, set) => sum + (set.weight || 0), 0) / workingSets.length;
-    const avgReps = workingSets.reduce((sum, set) => sum + (set.reps || 0), 0) / workingSets.length;
+    const totalReps = workingSets.reduce((sum, set) => sum + (set.reps || 0), 0);
     const totalVolume = workingSets.reduce((sum, set) => sum + ((set.weight || 0) * (set.reps || 0)), 0);
 
     return {
       weight: Math.round(avgWeight * 10) / 10,
-      reps: Math.round(avgReps * 10) / 10,
+      reps: totalReps,
       sets: workingSets.length,
       volume: totalVolume
     };
   }
 
-  // Legacy-Struktur: weight/reps/sets direkt
+  // Legacy-Struktur: weight/reps/sets direkt (reps hier ist Wdh. PRO SATZ, nicht Gesamtsumme -
+  // anders als bei setDetails oben. Für einheitliche "reps"-Semantik (Gesamtsumme, s.o.)
+  // hier mit sets multiplizieren; volume-Berechnung bleibt unverändert korrekt.)
   if (exercise.weight && exercise.reps && exercise.sets) {
     return {
       weight: exercise.weight,
-      reps: exercise.reps,
+      reps: exercise.reps * exercise.sets,
       sets: exercise.sets,
       volume: exercise.weight * exercise.reps * exercise.sets
     };
@@ -144,7 +154,9 @@ export function analyzeExercise(exerciseName, currentEx, previousEx = null, days
       analysis.previous = prevStats;
       analysis.changes = {
         weight_change: Math.round((currentStats.weight - prevStats.weight) * 10) / 10,
-        rep_change: Math.round((currentStats.reps - prevStats.reps) * 10) / 10,
+        // reps ist jetzt eine Gesamtsumme (siehe calculateExerciseStats), die Differenz ist
+        // dadurch immer eine ganze Zahl - kein Runden auf Nachkommastellen mehr nötig.
+        rep_change: currentStats.reps - prevStats.reps,
         // Additiv (UI-Zusammenfassung "wieviel Sätze mehr/weniger"): Differenz der reinen
         // Arbeitssatz-Anzahl (Warm-ups bereits in calculateExerciseStats() herausgefiltert).
         // Fließt NICHT in determineTrendWithProfile()/progression ein (siehe
