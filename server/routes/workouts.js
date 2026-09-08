@@ -31,6 +31,7 @@ import {
 import { resolveEffectiveProfile } from '../services/exerciseAnalysisRules.js';
 import {
   startOfIsoWeek,
+  startOfMonth,
   normalizeCategory,
   calculateExerciseVolume,
   getExerciseBestWeight,
@@ -247,7 +248,12 @@ const exerciseNameMapping = {
 const DEFAULT_PROGRESS_RANGE_DAYS = 120;
 const MIN_STATS_SESSIONS = 7;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
-const FREE_AI_WEEKLY_LIMIT = 1;
+// Umgestellt von 1x/Woche auf 60x/Monat (User-Entscheidung, September 2026): bei gpt-4o-mini-
+// Preisen ($0.15/1M Input-, $0.60/1M Output-Tokens) und ca. 4-5k Input-/200-350 Output-Tokens
+// pro Call liegen die Kosten bei ca. $0.05-0.08 pro User und Monat selbst bei voller Ausschöpfung
+// - das alte Wochenlimit von 1 war primär Missbrauchsschutz, kein echtes Kostenproblem. 60/Monat
+// deckt selbst tägliches Training (max. ~30 Workouts/Monat) komfortabel ab.
+const FREE_AI_MONTHLY_LIMIT = 60;
 const SUBSCRIPTION_FORCE_PLAN = String(process.env.SUBSCRIPTION_FORCE_PLAN || '').trim().toLowerCase();
 const SUBSCRIPTION_FORCE_SCOPE = String(process.env.SUBSCRIPTION_FORCE_SCOPE || 'all').trim().toLowerCase();
 const SUBSCRIPTION_FORCE_ALLOWLIST = String(process.env.SUBSCRIPTION_FORCE_ALLOWLIST || '')
@@ -306,56 +312,56 @@ async function getEntitlements(userId) {
     plan,
     paid,
     canUseAnalytics: true,
-    weeklyAiLimit: paid ? Number.POSITIVE_INFINITY : FREE_AI_WEEKLY_LIMIT
+    monthlyAiLimit: paid ? Number.POSITIVE_INFINITY : FREE_AI_MONTHLY_LIMIT
   };
 }
 
-function getCurrentAiWeekWindowStart() {
-  return startOfIsoWeek(new Date());
+function getCurrentAiMonthWindowStart() {
+  return startOfMonth(new Date());
 }
 
-function getAiWeekState(profile) {
-  const nowWindow = getCurrentAiWeekWindowStart();
-  const savedWindowRaw = profile?.aiUsage?.weekWindowStart;
-  const savedWindow = savedWindowRaw ? startOfIsoWeek(savedWindowRaw) : null;
+function getAiMonthState(profile) {
+  const nowWindow = getCurrentAiMonthWindowStart();
+  const savedWindowRaw = profile?.aiUsage?.monthWindowStart;
+  const savedWindow = savedWindowRaw ? startOfMonth(savedWindowRaw) : null;
   if (!savedWindow || savedWindow.getTime() !== nowWindow.getTime()) {
-    return { weekWindowStart: nowWindow, weeklyCount: 0 };
+    return { monthWindowStart: nowWindow, monthlyCount: 0 };
   }
   return {
-    weekWindowStart: savedWindow,
-    weeklyCount: Math.max(0, Number(profile?.aiUsage?.weeklyCount) || 0)
+    monthWindowStart: savedWindow,
+    monthlyCount: Math.max(0, Number(profile?.aiUsage?.monthlyCount) || 0)
   };
 }
 
-function canUseAiThisWeek(entitlements) {
+function canUseAiThisMonth(entitlements) {
   if (!entitlements?.profile) return false;
-  if (!Number.isFinite(entitlements.weeklyAiLimit)) return true;
-  const usage = getAiWeekState(entitlements.profile);
-  return usage.weeklyCount < entitlements.weeklyAiLimit;
+  if (!Number.isFinite(entitlements.monthlyAiLimit)) return true;
+  const usage = getAiMonthState(entitlements.profile);
+  return usage.monthlyCount < entitlements.monthlyAiLimit;
 }
 
 async function markAiUse(entitlements) {
   if (!entitlements?.profile) return;
-  if (!Number.isFinite(entitlements.weeklyAiLimit)) return;
-  const usage = getAiWeekState(entitlements.profile);
+  if (!Number.isFinite(entitlements.monthlyAiLimit)) return;
+  const usage = getAiMonthState(entitlements.profile);
   entitlements.profile.aiUsage = {
-    weekWindowStart: usage.weekWindowStart,
-    weeklyCount: usage.weeklyCount + 1
+    monthWindowStart: usage.monthWindowStart,
+    monthlyCount: usage.monthlyCount + 1
   };
   await entitlements.profile.save();
 }
 
 function getAiLimitSnapshot(entitlements) {
   if (!entitlements?.profile) return null;
-  const usage = getAiWeekState(entitlements.profile);
-  const limit = entitlements.weeklyAiLimit;
-  const remaining = Number.isFinite(limit) ? Math.max(0, limit - usage.weeklyCount) : null;
+  const usage = getAiMonthState(entitlements.profile);
+  const limit = entitlements.monthlyAiLimit;
+  const remaining = Number.isFinite(limit) ? Math.max(0, limit - usage.monthlyCount) : null;
   return {
     plan: entitlements.plan,
-    weekWindowStart: usage.weekWindowStart,
-    weeklyCount: usage.weeklyCount,
-    weeklyLimit: Number.isFinite(limit) ? limit : null,
-    weeklyRemaining: remaining
+    monthWindowStart: usage.monthWindowStart,
+    monthlyCount: usage.monthlyCount,
+    monthlyLimit: Number.isFinite(limit) ? limit : null,
+    monthlyRemaining: remaining
   };
 }
 
@@ -727,7 +733,7 @@ router.post('/quick-generator', aiAuthMiddleware, async (req, res) => {
     }
 
     const openaiClient = await initializeOpenAI();
-    const aiAllowedForUser = canUseAiThisWeek(entitlements);
+    const aiAllowedForUser = canUseAiThisMonth(entitlements);
 
     let suggestion = null;
     let usedRemote = false;
@@ -1418,7 +1424,7 @@ router.post("/ai-suggestion", aiAuthMiddleware, async (req, res) => {
     delete context.mode;
 
     const forceDemo = requestedMode === 'demo';
-    const aiAllowedForUser = canUseAiThisWeek(entitlements);
+    const aiAllowedForUser = canUseAiThisMonth(entitlements);
     const tryRemote = !forceDemo && aiAllowedForUser && canUseRemoteAI(userId);
 
     logger.debug('🤖 AI Suggestion requested', {
@@ -1513,7 +1519,7 @@ router.post("/ai-suggestion", aiAuthMiddleware, async (req, res) => {
         isDemoData: true,
         exercisesValidated: true,
         mode: 'demo',
-        fallbackReason: fallbackReason || (aiAllowedForUser ? 'demo_mode' : 'weekly_quota_limited'),
+        fallbackReason: fallbackReason || (aiAllowedForUser ? 'demo_mode' : 'monthly_quota_limited'),
         errorType: errorType || null
       };
 
@@ -1662,6 +1668,28 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
           aiProvider: currentWorkout.ai_metadata?.provider,
           aiModel: currentWorkout.ai_metadata?.model,
           aiAvailable: true
+        }
+      });
+    }
+
+    // 1c. Free-Plan-Kontingent (siehe FREE_AI_MONTHLY_LIMIT oben) - bisher wurde dieser
+    // Haupt-Feedback-Endpoint als einziger der drei AI-Endpunkte NICHT gegen das Kontingent
+    // geprüft (bekannte Lücke, siehe TESTPHASE-TESTMATRIX.md Blocker #3). Direkt nach dem
+    // Cache-Check, damit weder ein bereits vorhandenes Feedback (oben) noch ein Kontingent-
+    // Fehlschlag unnötig die folgenden DB-Queries/den Health-Check auslöst.
+    const entitlements = await getEntitlements(userId);
+    if (!canUseAiThisMonth(entitlements)) {
+      logger.info('🚫 Workout analysis: Free-Plan-Kontingent erschöpft', { requestId, workoutId, userId });
+      return res.json({
+        success: true,
+        workoutId: currentWorkout._id,
+        workoutDate: currentWorkout.date,
+        feedback_status: 'quota_limited',
+        aiUsage: getAiLimitSnapshot(entitlements),
+        metadata: {
+          requestId,
+          timestamp: new Date().toISOString(),
+          aiAvailable: false
         }
       });
     }
@@ -1872,6 +1900,10 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
 
     // 5c. Erfolgreiches Feedback am Workout persistieren (für späteres Wiederabrufen)
     if (aiResult?.feedback) {
+      // Kontingent erst bei tatsächlich erfolgreicher Generierung verbrauchen (nicht bei
+      // Health-Check-Fehlschlag/network_unavailable oben oder einem AI-Fehler unten) - konsistent
+      // mit /quick-generator und /ai-suggestion, die ebenfalls nur bei echtem Erfolg zählen.
+      await markAiUse(entitlements);
       await Workout.updateOne(
         { _id: workoutId, userId },
         {
@@ -1916,6 +1948,9 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
 
       // Kompakte, UI-taugliche Delta-Zusammenfassung (siehe ai_analysis_snapshot oben)
       ai_analysis_snapshot: analysisSnapshot,
+
+      // Kontingent-Stand nach diesem Aufruf (konsistent mit /quick-generator, /ai-suggestion)
+      aiUsage: getAiLimitSnapshot(entitlements),
 
       // AI-Feedback (Interpretation)
       ...(aiResult ? {

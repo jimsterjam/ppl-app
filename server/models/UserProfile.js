@@ -37,12 +37,16 @@ const userProfileSchema = new mongoose.Schema({
       default: null
     }
   },
+  // Umgestellt von wöchentlichem auf monatliches Kontingent-Fenster (Feld hieß vorher
+  // weekWindowStart/weeklyCount) - bestehende Dokumente mit den alten Feldnamen starten dadurch
+  // einmalig wieder bei 0 Aufrufen in diesem Monat, was unkritisch ist (reine Nutzungszählung,
+  // keine Trainingsdaten).
   aiUsage: {
-    weekWindowStart: {
+    monthWindowStart: {
       type: Date,
       default: null
     },
-    weeklyCount: {
+    monthlyCount: {
       type: Number,
       default: 0,
       min: 0

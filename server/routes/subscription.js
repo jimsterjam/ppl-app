@@ -24,10 +24,15 @@ import express from 'express'
 import { firebaseAuthMiddleware } from '../middleware/firebaseAuth.js';
 import UserProfile from '../models/UserProfile.js'
 import Workout from '../models/Workout.js'
+import { startOfMonth } from '../utils/workoutMetrics.js'
 
 const router = express.Router()
 
-const FREE_AI_WEEKLY_LIMIT = 1
+// Muss synchron zu FREE_AI_MONTHLY_LIMIT in routes/workouts.js bleiben (dort auch die
+// Begründung/Kostenkalkulation) - beide Dateien lesen/schreiben dasselbe UserProfile.aiUsage-Feld,
+// haben aber historisch eigene Konstanten (keine gemeinsame Datei dafür, um den Umbau klein zu
+// halten).
+const FREE_AI_MONTHLY_LIMIT = 60
 const SUBSCRIPTION_FORCE_PLAN = String(process.env.SUBSCRIPTION_FORCE_PLAN || '').trim().toLowerCase()
 const SUBSCRIPTION_FORCE_SCOPE = String(process.env.SUBSCRIPTION_FORCE_SCOPE || 'all').trim().toLowerCase()
 const SUBSCRIPTION_FORCE_ALLOWLIST = String(process.env.SUBSCRIPTION_FORCE_ALLOWLIST || '')
@@ -73,19 +78,19 @@ async function getOrCreateUserProfile(uid) {
   return profile
 }
 
-function getAiWeeklyUsage(profile) {
-  const weekWindowStart = startOfIsoWeek(new Date())
-  const savedStartRaw = profile?.aiUsage?.weekWindowStart
-  const savedStart = savedStartRaw ? startOfIsoWeek(savedStartRaw) : null
-  const isCurrentWindow = savedStart && savedStart.getTime() === weekWindowStart.getTime()
-  const weeklyCount = isCurrentWindow ? Math.max(0, Number(profile?.aiUsage?.weeklyCount) || 0) : 0
+function getAiMonthlyUsage(profile) {
+  const monthWindowStart = startOfMonth(new Date())
+  const savedStartRaw = profile?.aiUsage?.monthWindowStart
+  const savedStart = savedStartRaw ? startOfMonth(savedStartRaw) : null
+  const isCurrentWindow = savedStart && savedStart.getTime() === monthWindowStart.getTime()
+  const monthlyCount = isCurrentWindow ? Math.max(0, Number(profile?.aiUsage?.monthlyCount) || 0) : 0
   return {
-    weekWindowStart,
-    weeklyCount,
-    weeklyLimit: isPaidPlan(profile?.subscription?.plan || 'free') ? null : FREE_AI_WEEKLY_LIMIT,
-    weeklyRemaining: isPaidPlan(profile?.subscription?.plan || 'free')
+    monthWindowStart,
+    monthlyCount,
+    monthlyLimit: isPaidPlan(profile?.subscription?.plan || 'free') ? null : FREE_AI_MONTHLY_LIMIT,
+    monthlyRemaining: isPaidPlan(profile?.subscription?.plan || 'free')
       ? null
-      : Math.max(0, FREE_AI_WEEKLY_LIMIT - weeklyCount)
+      : Math.max(0, FREE_AI_MONTHLY_LIMIT - monthlyCount)
   }
 }
 
@@ -103,7 +108,7 @@ router.get('/status', firebaseAuthMiddleware, async (req, res) => {
     const persistedPlan = profile?.subscription?.plan || 'free'
     const { effectivePlan, planSource } = resolveEffectivePlan(persistedPlan, userId)
     const paidPlan = isPaidPlan(effectivePlan)
-    const aiUsage = getAiWeeklyUsage({
+    const aiUsage = getAiMonthlyUsage({
       ...profile?.toObject?.(),
       subscription: {
         ...(profile?.subscription || {}),

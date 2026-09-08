@@ -11,6 +11,15 @@ export function startOfIsoWeek(dateInput) {
   return date;
 }
 
+// Erster Tag des Kalendermonats (UTC 00:00) - für monatliche Nutzungsfenster (z.B. AI-Feedback-
+// Kontingent, siehe routes/workouts.js/subscription.js). UTC statt Server-Lokalzeit, damit das
+// Fenster unabhängig von der Deployment-Zeitzone konsistent ist.
+export function startOfMonth(dateInput) {
+  const date = new Date(dateInput);
+  const start = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1, 0, 0, 0, 0));
+  return start;
+}
+
 export function normalizeCategory(input, workoutType) {
   const source = (input || workoutType || 'push').toString().toLowerCase();
   if (source.includes('pull') || source.includes('rück') || source.includes('back')) return 'pull';

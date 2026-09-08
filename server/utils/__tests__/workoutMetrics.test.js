@@ -6,11 +6,42 @@ import { dirname, join } from 'node:path'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const {
   startOfIsoWeek,
+  startOfMonth,
   normalizeCategory,
   calculateExerciseVolume,
   getExerciseBestWeight,
   computeWorkoutMetrics
 } = await import(join(__dirname, '../workoutMetrics.js'))
+
+// ------------------------------------
+// startOfMonth
+// ------------------------------------
+describe('startOfMonth', () => {
+  test('Datum mitten im Monat -> erster Tag desselben Monats, 00:00 UTC', () => {
+    const result = startOfMonth(new Date('2024-03-17T15:42:00Z'))
+    assert.equal(result.getTime(), new Date('2024-03-01T00:00:00Z').getTime())
+  })
+
+  test('erster Tag des Monats bleibt erster Tag des Monats', () => {
+    const result = startOfMonth(new Date('2024-03-01T08:00:00Z'))
+    assert.equal(result.getTime(), new Date('2024-03-01T00:00:00Z').getTime())
+  })
+
+  test('letzter Tag des Monats -> erster Tag desselben Monats (kein Überlauf in den Folgemonat)', () => {
+    const result = startOfMonth(new Date('2024-03-31T23:59:59Z'))
+    assert.equal(result.getTime(), new Date('2024-03-01T00:00:00Z').getTime())
+  })
+
+  test('Jahreswechsel: Dezember -> 1. Dezember desselben Jahres, nicht Januar des Folgejahres', () => {
+    const result = startOfMonth(new Date('2024-12-25T10:00:00Z'))
+    assert.equal(result.getTime(), new Date('2024-12-01T00:00:00Z').getTime())
+  })
+
+  test('Februar in Schaltjahr wird korrekt behandelt', () => {
+    const result = startOfMonth(new Date('2024-02-29T12:00:00Z'))
+    assert.equal(result.getTime(), new Date('2024-02-01T00:00:00Z').getTime())
+  })
+})
 
 // ------------------------------------
 // startOfIsoWeek

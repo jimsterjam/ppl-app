@@ -72,9 +72,12 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     workoutsThisMonth: 0,
     totalWorkouts: 0,
     lastWorkoutDate: null,
-    aiWeeklyCount: 0,
-    aiWeeklyLimit: 1,
-    aiWeekWindowStart: null,
+    // Umgestellt von wöchentlichem auf monatliches Kontingent (server-seitig FREE_AI_MONTHLY_LIMIT,
+    // siehe server/routes/workouts.js) - Default-Limit hier nur ein Platzhalter bis zur ersten
+    // echten Server-Antwort (checkSubscription), aktueller Server-Wert ist 60.
+    aiMonthlyCount: 0,
+    aiMonthlyLimit: 60,
+    aiMonthWindowStart: null,
     quickGenerationsThisMonth: 0,
     quickGenerationMonth: null
   })
@@ -227,11 +230,11 @@ export const useSubscriptionStore = defineStore('subscription', () => {
               workoutsThisMonth: Number(remoteUsage.workoutsThisMonth) || 0,
               totalWorkouts: Number(remoteUsage.totalWorkouts) || 0,
               lastWorkoutDate: remoteUsage.lastWorkoutDate || null,
-              aiWeeklyCount: Number(remoteUsage?.ai?.weeklyCount) || 0,
-              aiWeeklyLimit: Number.isFinite(Number(remoteUsage?.ai?.weeklyLimit))
-                ? Number(remoteUsage?.ai?.weeklyLimit)
+              aiMonthlyCount: Number(remoteUsage?.ai?.monthlyCount) || 0,
+              aiMonthlyLimit: Number.isFinite(Number(remoteUsage?.ai?.monthlyLimit))
+                ? Number(remoteUsage?.ai?.monthlyLimit)
                 : -1,
-              aiWeekWindowStart: remoteUsage?.ai?.weekWindowStart || null
+              aiMonthWindowStart: remoteUsage?.ai?.monthWindowStart || null
             }
             persistUsage()
           }
@@ -325,7 +328,7 @@ export const useSubscriptionStore = defineStore('subscription', () => {
   const trackQuickGeneration = () => {
     ensureQuickGeneratorMonthWindow()
     usage.value.quickGenerationsThisMonth += 1
-    usage.value.aiWeeklyCount = (Number(usage.value.aiWeeklyCount) || 0) + 1
+    usage.value.aiMonthlyCount = (Number(usage.value.aiMonthlyCount) || 0) + 1
     persistUsage()
   }
 
@@ -333,9 +336,9 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     if (!ai || typeof ai !== 'object') return
     usage.value = {
       ...usage.value,
-      aiWeeklyCount: Number(ai.weeklyCount) || 0,
-      aiWeeklyLimit: Number.isFinite(Number(ai.weeklyLimit)) ? Number(ai.weeklyLimit) : -1,
-      aiWeekWindowStart: ai.weekWindowStart || usage.value.aiWeekWindowStart
+      aiMonthlyCount: Number(ai.monthlyCount) || 0,
+      aiMonthlyLimit: Number.isFinite(Number(ai.monthlyLimit)) ? Number(ai.monthlyLimit) : -1,
+      aiMonthWindowStart: ai.monthWindowStart || usage.value.aiMonthWindowStart
     }
     persistUsage()
   }
@@ -374,32 +377,34 @@ export const useSubscriptionStore = defineStore('subscription', () => {
 
   const canUseQuickGenerator = computed(() => {
     if (subscription.value.plan !== 'free') return true
-    const limit = Number(usage.value.aiWeeklyLimit)
+    const limit = Number(usage.value.aiMonthlyLimit)
     if (!Number.isFinite(limit) || limit < 0) return true
-    return (Number(usage.value.aiWeeklyCount) || 0) < limit
+    return (Number(usage.value.aiMonthlyCount) || 0) < limit
   })
 
   const quickGenerationsRemaining = computed(() => {
     if (subscription.value.plan !== 'free') return Infinity
-    const limit = Number(usage.value.aiWeeklyLimit)
+    const limit = Number(usage.value.aiMonthlyLimit)
     if (!Number.isFinite(limit) || limit < 0) return Infinity
-    return Math.max(0, limit - (Number(usage.value.aiWeeklyCount) || 0))
+    return Math.max(0, limit - (Number(usage.value.aiMonthlyCount) || 0))
   })
 
+  // Nächster Monatsbeginn (UTC) nach dem gespeicherten Fenster-Start - ersetzt die alte
+  // "+7 Tage"-Schätzung, die noch vom wöchentlichen Kontingent stammte und nach der Umstellung
+  // auf ein monatliches Fenster ein falsches (viel zu frühes) Reset-Datum angezeigt hätte.
   const quickGeneratorResetDate = computed(() => {
-    const startRaw = usage.value.aiWeekWindowStart
+    const startRaw = usage.value.aiMonthWindowStart
     const start = startRaw ? new Date(startRaw) : null
     if (start && !Number.isNaN(start.getTime())) {
-      const end = new Date(start)
-      end.setUTCDate(end.getUTCDate() + 7)
+      const end = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 1, 0, 0, 0, 0))
       return end
     }
     const now = new Date()
-    return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7)
+    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0))
   })
 
   const quickGenerationsUsedThisMonth = computed(() => {
-    return Number(usage.value.aiWeeklyCount) || 0
+    return Number(usage.value.aiMonthlyCount) || 0
   })
   
   const shouldShowUpgrade = computed(() => {
