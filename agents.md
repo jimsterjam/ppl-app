@@ -122,7 +122,9 @@ Maintain this section as the project evolves:
 
 ● Test command:
   - Both at once (from repo root): `npm test` (runs server tests, then client tests).
-  - Server only: `cd server && npm test` → `node --test utils/__tests__/*.test.js middleware/__tests__/*.test.js` (Node's built-in test runner, no Jest/Mocha). New server tests must live in one of those two `__tests__` directories or be added to this glob, or they will silently not run.
+  - Server only: `cd server && npm test` → `node --test utils/__tests__/*.test.js` (Node's built-in test runner, no Jest/Mocha). New server tests must live in `utils/__tests__/` or be added to this glob, or they will silently not run.
+  - Do NOT add a second glob segment (e.g. `middleware/__tests__/*.test.js`) for a directory that currently has no `.test.js` files in it - Node's test runner CLI errors out with "Could not find '<path>'" if a glob segment matches zero files (confirmed: passed locally under bash, failed on GitHub Actions' shell - do not assume "works locally" is enough proof here). If middleware tests are reintroduced later, add the segment back once at least one matching file exists, and verify in CI, not just locally.
+  - Do NOT use bare `node --test` (no path args) as a "just discover everything" shortcut either - tried once during this project's setup and it recursively picked up unrelated files and hung indefinitely (over 120s, had to be killed). Stick to explicit `<dir>/__tests__/*.test.js` globs per directory that actually contains tests.
   - Client only: `cd client && npm test` → `vitest run` (Vitest). Client tests live in `client/src/**/__tests__/*.test.js`.
   - Client test caveat: IndexedDB (Dexie) is not available in the Vitest/jsdom environment - `offlineStorage.js`-dependent code logs a `DexieError [MissingAPIError]` during test runs; this is expected noise, not a failure, as long as the test still reports pass.
 
