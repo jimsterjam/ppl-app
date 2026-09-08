@@ -20,7 +20,21 @@ export function classifyAiError(error) {
 
   if (status === 429) return 'rate_limited';
   if (status >= 500 && status < 600) return 'provider_server_error';
-  if (code.includes('TIMEOUT') || code === 'ABORT_ERR' || msg.includes('timeout')) return 'timeout';
+  // Node/axios/fetch liefern bei echten Netzwerk-Timeouts üblicherweise den Code 'ETIMEDOUT'
+  // (bzw. 'ECONNABORTED') mit Nachrichten wie "connect ETIMEDOUT 1.2.3.4:443" - das enthält
+  // NICHT den Teilstring "TIMEOUT" ('ETIMEDOUT' hat ein zusätzliches 'D'), wodurch der bisherige
+  // Check solche Fehler fälschlich als 'unknown' statt 'timeout' einstufte und sie dadurch nie
+  // automatisch retried wurden (siehe isRetryableAiError/withAiRetry). Bug gefunden durch Test.
+  if (
+    code.includes('TIMEOUT') ||
+    code.includes('TIMEDOUT') ||
+    code === 'ABORT_ERR' ||
+    code === 'ECONNABORTED' ||
+    msg.includes('timeout') ||
+    msg.includes('timedout')
+  ) {
+    return 'timeout';
+  }
   if (msg.includes('json') && msg.includes('parse')) return 'invalid_json';
   if (status >= 400 && status < 500) return 'provider_client_error';
   return 'unknown';
