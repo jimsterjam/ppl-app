@@ -9,12 +9,21 @@
         </p>
         <AdminFeedbackPanel />
       </section>
+
+      <section class="glass admin-card">
+        <h1 class="admin-title">KI-Feedback-Analyse (Admin)</h1>
+        <p class="muted">
+          Negativ bewertete KI-Trainingsanalysen auswerten und Verbesserungsvorschläge für den System-Prompt freigeben.
+        </p>
+        <AiInsightsPanel />
+      </section>
     </main>
   </div>
 </template>
 
 <script setup>
 import AdminFeedbackPanel from '@/components/AdminFeedbackPanel.vue'
+import AiInsightsPanel from '@/components/AiInsightsPanel.vue'
 
 // Eigenständige Seite unter /admin/feedback - für den Zugriff aus einem normalen Web-Browser
 // ohne App-Login (z.B. vom Laptop aus). Der Panel-Inhalt selbst steckt in

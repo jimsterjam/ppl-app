@@ -11,6 +11,7 @@ import accountRoutes from "./routes/account.js";
 import authRoutes from "./routes/auth.js";
 import favoriteWorkoutRoutes from "./routes/favoriteWorkouts.js";
 import feedbackRoutes from "./routes/feedback.js";
+import adminFeedbackInsightsRoutes from "./routes/adminFeedbackInsights.js";
 import { logger } from './utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -85,6 +86,7 @@ app.use("/api/account", accountRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/favorite-workouts", favoriteWorkoutRoutes);
 app.use("/api/feedback", feedbackRoutes);
+app.use("/api/admin/feedback-insights", adminFeedbackInsightsRoutes);
 
 // Healthcheck
 app.get('/api/health', (req, res) => {

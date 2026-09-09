@@ -240,6 +240,12 @@
         <AdminFeedbackPanel />
       </section>
 
+      <section v-if="isAdminUser" class="card">
+        <h3>🔍 KI-Feedback-Analyse (Admin)</h3>
+        <p class="hint">Nur für dich sichtbar: negativ bewertete KI-Trainingsanalysen auswerten und Verbesserungsvorschläge für den System-Prompt freigeben.</p>
+        <AiInsightsPanel />
+      </section>
+
       <section class="card">
         <h3>{{ $t('settings.legalTitle') }}</h3>
         <p class="hint">{{ $t('settings.legalHint') }}</p>
@@ -436,6 +442,7 @@
 import HeaderBar from '../components/HeaderBar.vue'
 import AppFeedbackDialog from '../components/AppFeedbackDialog.vue'
 import AdminFeedbackPanel from '../components/AdminFeedbackPanel.vue'
+import AiInsightsPanel from '../components/AiInsightsPanel.vue'
 import { storeToRefs } from 'pinia'
 import { useThemeStore } from '@/stores/themeStore'
 import { useSettingsStore } from '@/stores/settingsStore'

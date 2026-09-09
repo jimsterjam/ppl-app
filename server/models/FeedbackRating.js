@@ -6,11 +6,20 @@ import mongoose from "mongoose";
 // KI-Workout-Feedback").
 //
 // WICHTIG (Datenschutz-Trennung, siehe Prompt Punkt "Datenmodell und Datenschutz"): Dieses
-// Dokument ist PERSONENBEZOGEN (userId + freier Korrekturtext) und wird NIEMALS direkt für
-// globale Auswertungen gelesen. Für aggregierte, anonymisierte Qualitätssignale existiert
-// separat FeedbackQualitySignal.js - beim Anlegen/Ändern einer Bewertung wird dort zusätzlich
-// ein abstrahierter Eintrag ohne userId/feedbackId/Freitext geschrieben (siehe
-// feedbackRatingService.js -> buildQualitySignal()).
+// Dokument ist PERSONENBEZOGEN (userId + freier Korrekturtext) und wird NICHT für Auswertungen
+// gelesen, die für andere Nutzer sichtbar sind oder Nutzer-Identifikatoren offenlegen. Für
+// aggregierte, anonymisierte Qualitätssignale existiert separat FeedbackQualitySignal.js -
+// beim Anlegen/Ändern einer Bewertung wird dort zusätzlich ein abstrahierter Eintrag ohne
+// userId/feedbackId/Freitext geschrieben (siehe feedbackRatingService.js -> buildQualitySignal()).
+//
+// Bewusste, eng begrenzte Ausnahme (Admin-Feedback-Loop, siehe feedbackInsightService.js /
+// routes/adminFeedbackInsights.js): Ein Admin-only, per separatem Schlüssel geschützter
+// Analyse-Endpunkt liest rating/reasonCodes/correctionText mehrerer Nutzer gebündelt, um daraus
+// Verbesserungsvorschläge für den KI-Analyse-System-Prompt abzuleiten. Dabei werden userId und
+// feedbackId NIE an den KI-Provider übergeben und NIE in den generierten Vorschlägen
+// gespeichert - nur die reinen Bewertungsinhalte. Diese Ausnahme wurde bewusst vom
+// Projektverantwortlichen freigegeben (Abwägung: aussagekräftigere Verbesserungsvorschläge vs.
+// bisherige striktere Trennung) und ist auf genau diesen einen Anwendungsfall beschränkt.
 //
 // feedbackId ist bewusst die bestehende Workout-_id (jedes Workout hat höchstens ein aktives
 // ai_feedback zur Zeit) statt eines neuen UUID-Feldes - so bleibt es stabil referenzierbar,
