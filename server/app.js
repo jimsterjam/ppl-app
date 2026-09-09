@@ -56,7 +56,7 @@ app.use(cors({
     logger.warn('[CORS] blockiert:', origin)
     return cb(null, false);
   },
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   credentials: true
 }));
 
