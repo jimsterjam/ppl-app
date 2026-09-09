@@ -55,6 +55,14 @@
         <h3>{{ t('postWorkout.feedback') || 'Dein Feedback' }}</h3>
         <AiFeedbackDeltaSummary v-if="analysisSnapshot.length > 0" :snapshot="analysisSnapshot" />
         <div class="feedback-text">{{ feedback }}</div>
+        <!-- Erklärt NUR, wofür die Bewertung da ist - rührt AiFeedbackRatingWidget selbst nicht
+             an (siehe Kommentar dort: vollständig implementiert, darf nicht verändert werden). -->
+        <OneTimeHint
+          v-if="resolvedWorkoutIdForRating"
+          hint-id="first-ai-rating"
+          :title="t('onboarding.hintAiRatingTitle')"
+          :text="t('onboarding.hintAiRatingText')"
+        />
         <AiFeedbackRatingWidget
           v-if="resolvedWorkoutIdForRating"
           :workout-id="resolvedWorkoutIdForRating"

@@ -18,6 +18,7 @@ const WorkoutDetailView = () => import('../views/WorkoutDetailView.vue')
 const FaqsView = () => import('../views/FaqsView.vue')
 const FeaturesTestView = () => import('../views/FeaturesTestView.vue')
 const LegalNoticeView = () => import('../views/LegalNoticeView.vue')
+const AdminFeedbackView = () => import('../views/AdminFeedbackView.vue')
 
 const routes = [
   {
@@ -57,6 +58,15 @@ const routes = [
     path: '/legal',
     name: 'legal',
     component: LegalNoticeView,
+    meta: { requiresAuth: false }
+  },
+  {
+    // Interne Admin-Übersicht für AppFeedback - bewusst außerhalb von AuthLayout/Firebase-Login,
+    // da der Schutz über einen separaten Admin-Schlüssel läuft (siehe AdminFeedbackView.vue /
+    // server/middleware/adminAuth.js). Kein Link in der App-Navigation, nur per direkter URL.
+    path: '/admin/feedback',
+    name: 'admin-feedback',
+    component: AdminFeedbackView,
     meta: { requiresAuth: false }
   },
   {

@@ -4,6 +4,12 @@
       <h3>Workout-Vergleich</h3>
     </div>
 
+    <OneTimeHint
+      hint-id="estimated-1rm-explainer"
+      title="Was bedeutet „Geschätztes 1RM“?"
+      text="1RM = das Gewicht, das du für eine einzige Wiederholung maximal schaffen würdest. Die App schätzt diesen Wert aus Gewicht und Wiederholungen deiner Sätze. Der Pfeil (↑/↓) zeigt, ob sich der geschätzte Wert seit der letzten vergleichbaren Einheit verbessert oder verschlechtert hat."
+    />
+
     <div class="type-grid">
       <details
         v-for="entry in comparisonEntries"
@@ -49,6 +55,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getTypeComparison } from '@/utils/workoutComparison'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
+import OneTimeHint from '@/components/OneTimeHint.vue'
 
 const props = defineProps({
   workouts: {

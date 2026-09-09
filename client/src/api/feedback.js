@@ -18,3 +18,27 @@ export async function submitAppFeedback(token, { category, text = '', context = 
     throw handleAPIError(error, 'Feedback senden')
   }
 }
+
+// ---------------------------------------------------------------------------
+// Admin-Übersicht: liest gesammeltes App-Feedback (siehe server/routes/feedback.js GET /).
+// Geschützt per statischem Schlüssel (Header x-admin-key), NICHT per normalem Firebase-Login -
+// bewusst getrennt, da hier userübergreifend gelesen wird. Siehe AdminFeedbackView.vue.
+export async function listAppFeedback(adminKey, { category = '', status = '', limit = 100 } = {}) {
+  try {
+    const params = {}
+    if (category) params.category = category
+    if (status) params.status = status
+    if (limit) params.limit = limit
+
+    const res = await api.get('/', {
+      headers: { 'x-admin-key': adminKey },
+      params
+    })
+    return Array.isArray(res.data) ? res.data : []
+  } catch (error) {
+    // redirectOnAuth: false - bei falschem/leerem Admin-Schlüssel (401) soll der Nutzer auf der
+    // Admin-Seite bleiben und den Schlüssel korrigieren können, statt zur Welcome-Seite
+    // weitergeleitet zu werden (das ist kein normaler Firebase-Login-401).
+    throw handleAPIError(error, 'Feedback-Übersicht laden', { redirectOnAuth: false })
+  }
+}

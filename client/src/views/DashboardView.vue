@@ -116,6 +116,11 @@
           </div>
 
           <template v-if="!showFavoritesSelection">
+            <OneTimeHint
+              hint-id="favorites-explainer"
+              :title="$t('onboarding.hintFavoritesTitle')"
+              :text="$t('onboarding.hintFavoritesText')"
+            />
             <button class="quick-mode-btn" type="button" @click="onManualSelected">
               {{ $t('dashboard.startModeManual') }}
             </button>
@@ -248,6 +253,7 @@ import HeaderBar from "../components/HeaderBar.vue";
 import WorkoutCard from "../components/WorkoutCard.vue";
 import AppModal from "../components/AppModal.vue";
 import WorkoutTimerConfig from '@/components/timer/WorkoutTimerConfig.vue'
+import OneTimeHint from '@/components/OneTimeHint.vue'
 import { logger } from '@/utils/logger'
 import SessionStopwatch from '@/components/SessionStopwatch.vue'
 

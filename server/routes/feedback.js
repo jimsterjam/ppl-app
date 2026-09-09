@@ -1,6 +1,7 @@
 import express from 'express';
 import AppFeedback from '../models/AppFeedback.js';
 import { firebaseAuthMiddleware } from '../middleware/firebaseAuth.js';
+import { requireAdminKey } from '../middleware/adminAuth.js';
 import { logger } from '../utils/logger.js';
 
 // ---------------------------------------------------------------------------
@@ -81,6 +82,52 @@ router.post('/', firebaseAuthMiddleware, async (req, res) => {
   } catch (e) {
     logger.error('❌ Failed to save app feedback', { message: e?.message });
     res.status(500).json({ error: 'Failed to save feedback', message: e?.message || String(e) });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Admin: gesammeltes App-Feedback lesen (Review-Übersicht für die Testphase). Geschützt über
+// requireAdminKey (statischer Schlüssel per Header, siehe middleware/adminAuth.js) - bewusst
+// getrennt von der normalen Nutzer-Authentifizierung, da hier userübergreifend gelesen wird.
+// Nur lesend: kein Status-Update, kein Löschen - siehe Kommentar in AppFeedback.js zum status-
+// Feld ("aktuell nur 'new', kein UI dafür vorgesehen").
+router.get('/', requireAdminKey, async (req, res) => {
+  try {
+    const filter = {};
+
+    const category = String(req.query?.category || '').trim();
+    if (category && ALLOWED_CATEGORIES.has(category)) {
+      filter.category = category;
+    }
+
+    const ALLOWED_STATUS = new Set(['new', 'reviewed', 'resolved']);
+    const status = String(req.query?.status || '').trim();
+    if (status && ALLOWED_STATUS.has(status)) {
+      filter.status = status;
+    }
+
+    const limit = Math.max(1, Math.min(200, Number.parseInt(req.query?.limit || '100', 10) || 100));
+
+    const entries = await AppFeedback.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .lean();
+
+    res.json(
+      (entries || []).map(e => ({
+        id: String(e._id),
+        userId: e.userId,
+        category: e.category,
+        text: e.text || '',
+        context: e.context || null,
+        consentGiven: !!e.consentGiven,
+        status: e.status || 'new',
+        createdAt: e.createdAt
+      }))
+    );
+  } catch (e) {
+    logger.error('❌ Failed to list app feedback (admin)', { message: e?.message });
+    res.status(500).json({ error: 'Failed to load feedback', message: e?.message || String(e) });
   }
 });
 

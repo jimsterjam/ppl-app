@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "media:sync:local": "node scripts/sync-local-media.mjs",
+    "fix:deps": "rm -rf node_modules package-lock.json && npm install",
     "predev": "npm run media:sync:local",
     "dev": "vite",
     "dev:lan": "vite --host",
