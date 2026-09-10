@@ -4,7 +4,8 @@ import {
   selectUnanalyzedRatings,
   buildInsightPrompt,
   getInsightSystemPrompt,
-  wrapCorrectionText
+  wrapCorrectionText,
+  promptContainsSearchText
 } from '../../services/feedbackInsightService.js'
 
 // feedbackInsightService.js: Admin-only Analyse-Feature (siehe Kommentar dort + in
@@ -85,6 +86,19 @@ describe('buildInsightPrompt', () => {
     assert.equal(typeof prompt, 'string')
     assert.ok(prompt.includes('0 anonymisierte'))
   })
+
+  test('bettet den aktuellen System-Prompt-Text in <current_system_prompt>-Tags ein', () => {
+    const prompt = buildInsightPrompt([{ rating: 'not_helpful' }], 'REGEL 1: Test-Prompt-Inhalt')
+    assert.ok(prompt.includes('<current_system_prompt>'))
+    assert.ok(prompt.includes('REGEL 1: Test-Prompt-Inhalt'))
+    assert.ok(prompt.includes('</current_system_prompt>'))
+  })
+
+  test('fehlender currentPromptText crasht nicht (leerer Block)', () => {
+    const prompt = buildInsightPrompt([{ rating: 'not_helpful' }])
+    assert.equal(typeof prompt, 'string')
+    assert.ok(prompt.includes('<current_system_prompt>'))
+  })
 })
 
 describe('getInsightSystemPrompt', () => {
@@ -99,6 +113,39 @@ describe('getInsightSystemPrompt', () => {
     const prompt = getInsightSystemPrompt()
     assert.ok(prompt.includes('<user_correction>'))
     assert.ok(prompt.toLowerCase().includes('niemals eine'))
+  })
+
+  test('fordert zusätzlich searchText und replaceText (strukturiertes Diff-Format)', () => {
+    const prompt = getInsightSystemPrompt()
+    assert.ok(prompt.includes('"searchText"'))
+    assert.ok(prompt.includes('"replaceText"'))
+  })
+
+  test('verlangt ein wortgenaues Zitat aus dem gelieferten System-Prompt', () => {
+    const prompt = getInsightSystemPrompt()
+    assert.ok(prompt.toLowerCase().includes('wortgenau'))
+    assert.ok(prompt.includes('<current_system_prompt>'))
+  })
+})
+
+describe('promptContainsSearchText', () => {
+  test('true, wenn der Text wortgenau im Prompt vorkommt', () => {
+    assert.equal(promptContainsSearchText('REGEL 1: Test', 'Vorher REGEL 1: Test nachher'), true)
+  })
+
+  test('false, wenn der Text nicht (mehr) vorkommt', () => {
+    assert.equal(promptContainsSearchText('REGEL 99: Existiert nicht', 'Vorher REGEL 1: Test nachher'), false)
+  })
+
+  test('false bei leerem searchText', () => {
+    assert.equal(promptContainsSearchText('', 'Irgendein Prompt-Text'), false)
+    assert.equal(promptContainsSearchText(null, 'Irgendein Prompt-Text'), false)
+  })
+
+  test('nutzt standardmäßig den echten aktuellen Coach-System-Prompt, wenn kein zweiter Parameter übergeben wird', () => {
+    // Kein currentPromptText übergeben -> Funktion lädt selbst getCoachSystemPromptText().
+    // Ein garantiert nicht vorkommender Text muss false liefern, ohne zu crashen.
+    assert.equal(promptContainsSearchText('DIESER TEXT KOMMT GANZ SICHER NICHT IM PROMPT VOR - XYZ123'), false)
   })
 })
 

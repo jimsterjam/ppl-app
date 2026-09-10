@@ -13,115 +13,13 @@ import AIProvider from './AIProvider.js';
 // WICHTIG: Lazy-Load von ENV-Variablen (nicht beim Import)
 // Sonst sind sie noch undefined wenn dotenv.config() nicht aufgerufen wurde
 
-export class OpenAIProvider extends AIProvider {
-  constructor() {
-    super();
-
-    // Lazy-Load: Lies ENV-Variablen hier im Constructor, nicht beim Module-Import
-    const apiKey = process.env.OPENAI_API_KEY;
-    const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-    const timeout = Math.max(5000, Number(process.env.OPENAI_TIMEOUT_MS) || 30000);
-
-    this.model = model;
-    this.timeout = timeout;
-
-    if (!apiKey) {
-      logger.warn('⚠️ OPENAI_API_KEY not configured. OpenAI provider will not work.');
-      this.client = null;
-    } else {
-      try {
-        this.client = new OpenAI({
-          apiKey: apiKey,
-          timeout: timeout
-        });
-        logger.info(`✅ OpenAI Provider initialized (model: ${model})`);
-      } catch (error) {
-        logger.error('❌ Failed to initialize OpenAI client:', error.message);
-        this.client = null;
-      }
-    }
-  }
-
-  /**
-   * Generiere Trainings-Analyse mittels OpenAI
-   *
-   * @param {Object} trainingAnalysis - Strukturierte Trainingsanalyse von Backend
-   * @param {Object} options - { requestId, temperature }
-   * @returns {Promise<string>} Generiertes Feedback
-   */
-  async generateTrainingAnalysis(trainingAnalysis, options = {}) {
-    const { requestId = 'unknown', temperature = 0.7 } = options;
-
-    if (!this.client) {
-      throw new Error('OpenAI client not initialized. Check OPENAI_API_KEY.');
-    }
-
-    try {
-      logger.debug('🔄 OpenAI request started', {
-        requestId,
-        model: this.model,
-        exerciseCount: trainingAnalysis.total_exercises_analyzed
-      });
-
-      // Baue strukturierten Prompt
-      const prompt = this.buildPrompt(trainingAnalysis);
-
-      // Rufe OpenAI auf
-      // WICHTIG: `timeout` ist beim openai-SDK ein Request-OPTIONS-Parameter (2. Argument),
-      // kein Feld des Request-Bodys. Stand er im Body-Objekt, schickte der SDK-Client ihn als
-      // unbekanntes JSON-Feld mit an die API -> "400 Unrecognized request argument supplied:
-      // timeout". Der Client-Timeout (this.timeout) greift ohnehin schon global über die
-      // `new OpenAI({ timeout })`-Konfiguration im Constructor; hier zusätzlich als
-      // Options-Argument gesetzt, falls ein Request abweichend länger/kürzer dauern soll.
-      const response = await this.client.chat.completions.create({
-        model: this.model,
-        messages: [
-          {
-            role: 'system',
-            content: this.getSystemPrompt()
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature,
-        max_tokens: 800
-      }, {
-        timeout: this.timeout
-      });
-
-      const feedback = response.choices?.[0]?.message?.content?.trim();
-
-      if (!feedback) {
-        throw new Error('OpenAI returned empty response');
-      }
-
-      logger.debug('✅ OpenAI request completed', {
-        requestId,
-        model: this.model,
-        feedbackLength: feedback.length,
-        tokensUsed: response.usage?.total_tokens
-      });
-
-      return feedback;
-
-    } catch (error) {
-      logger.error('❌ OpenAI request failed', {
-        requestId,
-        error: error.message,
-        code: error.code
-      });
-      throw error;
-    }
-  }
-
-  /**
-   * System-Prompt mit Regeln
-   * Definiert was das Modell darf und darf nicht
-   */
-  getSystemPrompt() {
-    return `Du bist ein Fitness-Coach, der seinem Klienten direkt nach dem Training kurz
+// Extrahiert als eigenständige, exportierte Funktion (statt nur als Klassenmethode), damit
+// andere Module (aktuell: services/feedbackInsightService.js für die Vorschlags-Analyse) den
+// exakt gleichen, produktionskritischen Prompt-Text lesen können, ohne eine OpenAIProvider-
+// Instanz zu erzeugen (die einen konfigurierten API-Key voraussetzt) und ohne den Text zu
+// duplizieren (Duplizierung würde unweigerlich auseinanderlaufen). Inhaltlich unverändert.
+export function getCoachSystemPromptText() {
+  return `Du bist ein Fitness-Coach, der seinem Klienten direkt nach dem Training kurz
 per Chat schreibt - so wie ein guter Coach, der sich wirklich mit den Zahlen befasst hat und
 das dem Klienten in eigenen, direkten Worten mitteilt. Kein Analyse-Bericht, kein Fließtext
 mit Überschriften - eine kurze, persönliche Nachricht. Das Ziel des Nutzers ist langfristige
@@ -317,6 +215,117 @@ Kein separates "Fazit" oder "Zusammenfassung" am Ende - der Einstieg und die Fok
 reichen. Priorisiere statt alle Daten zu wiederholen.
 Spreche den Nutzer direkt an (Du/Dein, nicht "Der Nutzer").
 Deutsch, warm, direkt, wie ein Coach im Chat - nicht wie ein Bericht.`;
+}
+
+export class OpenAIProvider extends AIProvider {
+  constructor() {
+    super();
+
+    // Lazy-Load: Lies ENV-Variablen hier im Constructor, nicht beim Module-Import
+    const apiKey = process.env.OPENAI_API_KEY;
+    const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+    const timeout = Math.max(5000, Number(process.env.OPENAI_TIMEOUT_MS) || 30000);
+
+    this.model = model;
+    this.timeout = timeout;
+
+    if (!apiKey) {
+      logger.warn('⚠️ OPENAI_API_KEY not configured. OpenAI provider will not work.');
+      this.client = null;
+    } else {
+      try {
+        this.client = new OpenAI({
+          apiKey: apiKey,
+          timeout: timeout
+        });
+        logger.info(`✅ OpenAI Provider initialized (model: ${model})`);
+      } catch (error) {
+        logger.error('❌ Failed to initialize OpenAI client:', error.message);
+        this.client = null;
+      }
+    }
+  }
+
+  /**
+   * Generiere Trainings-Analyse mittels OpenAI
+   *
+   * @param {Object} trainingAnalysis - Strukturierte Trainingsanalyse von Backend
+   * @param {Object} options - { requestId, temperature }
+   * @returns {Promise<string>} Generiertes Feedback
+   */
+  async generateTrainingAnalysis(trainingAnalysis, options = {}) {
+    const { requestId = 'unknown', temperature = 0.7 } = options;
+
+    if (!this.client) {
+      throw new Error('OpenAI client not initialized. Check OPENAI_API_KEY.');
+    }
+
+    try {
+      logger.debug('🔄 OpenAI request started', {
+        requestId,
+        model: this.model,
+        exerciseCount: trainingAnalysis.total_exercises_analyzed
+      });
+
+      // Baue strukturierten Prompt
+      const prompt = this.buildPrompt(trainingAnalysis);
+
+      // Rufe OpenAI auf
+      // WICHTIG: `timeout` ist beim openai-SDK ein Request-OPTIONS-Parameter (2. Argument),
+      // kein Feld des Request-Bodys. Stand er im Body-Objekt, schickte der SDK-Client ihn als
+      // unbekanntes JSON-Feld mit an die API -> "400 Unrecognized request argument supplied:
+      // timeout". Der Client-Timeout (this.timeout) greift ohnehin schon global über die
+      // `new OpenAI({ timeout })`-Konfiguration im Constructor; hier zusätzlich als
+      // Options-Argument gesetzt, falls ein Request abweichend länger/kürzer dauern soll.
+      const response = await this.client.chat.completions.create({
+        model: this.model,
+        messages: [
+          {
+            role: 'system',
+            content: this.getSystemPrompt()
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        temperature,
+        max_tokens: 800
+      }, {
+        timeout: this.timeout
+      });
+
+      const feedback = response.choices?.[0]?.message?.content?.trim();
+
+      if (!feedback) {
+        throw new Error('OpenAI returned empty response');
+      }
+
+      logger.debug('✅ OpenAI request completed', {
+        requestId,
+        model: this.model,
+        feedbackLength: feedback.length,
+        tokensUsed: response.usage?.total_tokens
+      });
+
+      return feedback;
+
+    } catch (error) {
+      logger.error('❌ OpenAI request failed', {
+        requestId,
+        error: error.message,
+        code: error.code
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * System-Prompt mit Regeln
+   * Definiert was das Modell darf und darf nicht
+   */
+  getSystemPrompt() {
+    return getCoachSystemPromptText();
   }
 
   /**

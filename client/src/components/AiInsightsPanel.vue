@@ -50,6 +50,31 @@
         <h4 class="proposal-summary">{{ p.summary }}</h4>
         <p class="proposal-text">{{ p.proposalText }}</p>
 
+        <div v-if="p.searchText && p.replaceText" class="diff-block">
+          <p v-if="p.matchesCurrentPrompt === false" class="stale-hint">
+            ⚠️ Dieser Textausschnitt kommt nicht mehr wortgenau im aktuellen System-Prompt vor
+            (der Prompt wurde vermutlich seitdem geändert) – vor dem Übernehmen manuell prüfen.
+          </p>
+          <div class="diff-row">
+            <div class="diff-label-row">
+              <span class="diff-label">Alter Text (in OpenAIProvider.js suchen)</span>
+              <button class="copy-btn" @click="copyText(p.searchText, `${p.id}-search`)">
+                {{ copiedKey === `${p.id}-search` ? 'Kopiert ✓' : '📋 Kopieren' }}
+              </button>
+            </div>
+            <pre class="diff-text diff-old">{{ p.searchText }}</pre>
+          </div>
+          <div class="diff-row">
+            <div class="diff-label-row">
+              <span class="diff-label">Neuer Text (damit ersetzen)</span>
+              <button class="copy-btn" @click="copyText(p.replaceText, `${p.id}-replace`)">
+                {{ copiedKey === `${p.id}-replace` ? 'Kopiert ✓' : '📋 Kopieren' }}
+              </button>
+            </div>
+            <pre class="diff-text diff-new">{{ p.replaceText }}</pre>
+          </div>
+        </div>
+
         <div class="proposal-meta">
           Basiert auf {{ p.sourceRatingCount }} Bewertung{{ p.sourceRatingCount === 1 ? '' : 'en' }}
           <span v-if="p.reviewedAt"> · geprüft am {{ formatDateTime(p.reviewedAt) }}</span>
@@ -100,6 +125,23 @@ const analyzeMessage = ref('')
 const updatingId = ref('')
 const reviewNotes = ref({})
 const pendingCount = ref(0)
+const copiedKey = ref('')
+let copiedTimeout = null
+
+async function copyText(text, key) {
+  try {
+    await navigator.clipboard.writeText(text)
+  } catch {
+    // Clipboard-API evtl. nicht verfügbar (z.B. unsicherer Kontext) - stiller Fallback, der
+    // Admin kann den Text notfalls manuell markieren/kopieren, daher kein Fehlertext nötig.
+    return
+  }
+  copiedKey.value = key
+  if (copiedTimeout) clearTimeout(copiedTimeout)
+  copiedTimeout = setTimeout(() => {
+    copiedKey.value = ''
+  }, 2000)
+}
 
 function statusLabel(status) {
   return { pending: 'Offen', approved: 'Freigegeben', rejected: 'Abgelehnt' }[status] || status
@@ -326,6 +368,81 @@ if (adminKey.value) {
   white-space: pre-wrap;
   word-break: break-word;
   font-size: 0.92rem;
+}
+
+.diff-block {
+  margin: 10px 0;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--bg-panel) 92%, transparent);
+}
+
+.stale-hint {
+  margin: 0 0 10px;
+  font-size: 0.85rem;
+  color: var(--fg);
+  background: color-mix(in srgb, #f5a623 22%, var(--bg-elevated));
+  border: 1px solid color-mix(in srgb, #f5a623 40%, var(--line-soft));
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.diff-row {
+  margin-bottom: 10px;
+}
+
+.diff-row:last-child {
+  margin-bottom: 0;
+}
+
+.diff-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.diff-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.copy-btn {
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid var(--line-soft);
+  background: transparent;
+  color: var(--fg);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.diff-text {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: 0.85rem;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.diff-old {
+  background: color-mix(in srgb, var(--danger) 12%, var(--bg-elevated));
+  border: 1px solid color-mix(in srgb, var(--danger) 22%, var(--line-soft));
+}
+
+.diff-new {
+  background: color-mix(in srgb, #2ecc71 14%, var(--bg-elevated));
+  border: 1px solid color-mix(in srgb, #2ecc71 26%, var(--line-soft));
 }
 
 .proposal-meta {

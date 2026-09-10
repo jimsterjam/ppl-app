@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 import FeedbackRating from '../models/FeedbackRating.js';
 import PromptImprovementProposal from '../models/PromptImprovementProposal.js';
 import { requireAdminKey } from '../middleware/adminAuth.js';
-import { selectUnanalyzedRatings, generateInsightProposal } from '../services/feedbackInsightService.js';
+import { selectUnanalyzedRatings, generateInsightProposal, promptContainsSearchText } from '../services/feedbackInsightService.js';
 import { logger } from '../utils/logger.js';
 
 // ---------------------------------------------------------------------------
@@ -65,11 +65,13 @@ router.post('/analyze', requireAdminKey, async (req, res) => {
       return res.json({ skipped: true, message: 'Keine neuen Bewertungen seit der letzten Analyse.' });
     }
 
-    const { summary, proposalText } = await generateInsightProposal(selected);
+    const { summary, proposalText, searchText, replaceText } = await generateInsightProposal(selected);
 
     const created = await PromptImprovementProposal.create({
       summary,
       proposalText,
+      searchText,
+      replaceText,
       sourceRatingCount: selected.length,
       sourceRatingIds: selected.map((r) => String(r._id))
     });
@@ -85,6 +87,9 @@ router.post('/analyze', requireAdminKey, async (req, res) => {
       status: created.status,
       summary: created.summary,
       proposalText: created.proposalText,
+      searchText: created.searchText,
+      replaceText: created.replaceText,
+      matchesCurrentPrompt: promptContainsSearchText(created.searchText),
       sourceRatingCount: created.sourceRatingCount,
       createdAt: created.createdAt
     });
@@ -116,6 +121,13 @@ router.get('/', requireAdminKey, async (req, res) => {
         status: p.status,
         summary: p.summary,
         proposalText: p.proposalText,
+        searchText: p.searchText || null,
+        replaceText: p.replaceText || null,
+        // Nur relevant, wenn searchText vorhanden ist (ältere Proposals ohne Diff-Felder haben
+        // keins) - zeigt an, ob der zitierte Textausschnitt noch wortgenau im aktuellen
+        // System-Prompt vorkommt, oder ob sich der Prompt seitdem geändert hat (siehe
+        // AiInsightsPanel.vue: "Vorschlag evtl. veraltet"-Hinweis).
+        matchesCurrentPrompt: p.searchText ? promptContainsSearchText(p.searchText) : null,
         sourceRatingCount: p.sourceRatingCount,
         reviewedAt: p.reviewedAt,
         reviewNote: p.reviewNote,

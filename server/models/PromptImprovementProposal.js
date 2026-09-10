@@ -31,6 +31,22 @@ const promptImprovementProposalSchema = new mongoose.Schema({
     required: true,
     maxlength: 4000
   },
+  // searchText/replaceText: strukturierter Such-Ersetzen-Vorschlag für den System-Prompt-Text
+  // (OpenAIProvider.getCoachSystemPromptText()) - searchText soll ein wortgenaues Zitat aus dem
+  // Prompt sein, replaceText der vorgeschlagene Ersatz dafür. Bewusst NUR als Kopiervorlage für
+  // den Admin gedacht (siehe AiInsightsPanel.vue) - kein automatischer Patch/PR, der Admin
+  // wendet die Änderung selbst lokal an. Optional/nullable, da ältere, vor diesem Feature
+  // erstellte Proposals diese Felder nicht haben.
+  searchText: {
+    type: String,
+    default: null,
+    maxlength: 4000
+  },
+  replaceText: {
+    type: String,
+    default: null,
+    maxlength: 4000
+  },
   sourceRatingCount: {
     type: Number,
     required: true,
