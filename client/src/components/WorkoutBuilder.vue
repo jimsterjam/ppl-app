@@ -48,6 +48,8 @@ const isSignedIn = computed(() => !!effectiveAuthUser.value)
 const loadingUser = computed(() => authStore.initialized === false)
 const userIdComputed = computed(() => effectiveAuthUser.value?.uid || effectiveAuthUser.value?.id || 'guest')
 const canRenderBuilder = computed(() => initialReady.value || loadingUser.value || isSignedIn.value)
+// Eigene Übungen sind userId-gebunden - nur für echte (angemeldete) User anbieten, nicht für 'guest'.
+const customExerciseUserId = computed(() => isSignedIn.value ? userIdComputed.value : '')
 
 const selectedType = ref('push')
 const selectedExercises = ref([])
@@ -251,7 +253,7 @@ async function loadExercises() {
 	loading.value = true
 	try {
 		const categoryMap = { push: 'Push', pull: 'Pull', legs: 'Legs', fullbody: null }
-		const params = { equipment: selectedEquipment.value, locale: String(locale.value) }
+		const params = { equipment: selectedEquipment.value, locale: String(locale.value), userId: customExerciseUserId.value }
 		const categoryKey = categoryMap[selectedType.value]
 		if (categoryKey) params.category = categoryKey
 		logger.debug('[Builder] loadExercises start — type:', selectedType.value, 'category:', categoryKey, 'equipment:', selectedEquipment.value)
@@ -525,10 +527,12 @@ watch(() => `${route.query.quick || ''}:${route.query.favoriteStart || ''}`, () 
 					v-else
 					:show-title="false"
 					:show-controls="false"
+					:user-id="customExerciseUserId"
 					:items="filteredExercises"
 					:selectable="true"
 					:selected-ids="selectedExerciseIds"
 					@toggle="toggleExercise"
+					@custom-added="loadExercises"
 				/>
 			</template>
 			<div v-if="isMobile && showMobilePicker" class="picker-overlay" @click.self="showMobilePicker = false">
@@ -558,10 +562,12 @@ watch(() => `${route.query.quick || ''}:${route.query.favoriteStart || ''}`, () 
 							v-else
 							:show-title="false"
 							:show-controls="false"
+							:user-id="customExerciseUserId"
 							:items="filteredExercises"
 							:selectable="true"
 							:selected-ids="selectedExerciseIds"
 							@toggle="toggleExercise"
+							@custom-added="loadExercises"
 						/>
 					</div>
 					<div class="picker-actions">

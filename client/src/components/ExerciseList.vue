@@ -44,15 +44,21 @@
       </button>
     </div>
 
-    <div v-if="showControls" class="search-row">
-      <input
-        v-model="searchDraft"
-        class="equipment-filter-select search-input"
-        type="search"
-        :placeholder="t('exercises.searchPlaceholder') || 'Suchen…'"
-        @input="onSearchInput"
-      />
-      <p v-if="searchError" class="search-error">{{ searchError }}</p>
+    <!-- Eigene Filter/Such-UI nur wenn showControls aktiv ist (verhindert doppelte Such-/
+         Filterzeilen, wenn eine einbettende Ansicht - z.B. WorkoutBuilder - bereits ihre eigene
+         Filterung/Suche hat). Der "Eigene Übung hinzufügen"-Button ist davon unabhängig: er
+         soll überall sichtbar sein, wo eine userId vorhanden ist, auch wenn showControls aus ist. -->
+    <div v-if="showControls || userId" class="search-row">
+      <template v-if="showControls">
+        <input
+          v-model="searchDraft"
+          class="equipment-filter-select search-input"
+          type="search"
+          :placeholder="t('exercises.searchPlaceholder') || 'Suchen…'"
+          @input="onSearchInput"
+        />
+        <p v-if="searchError" class="search-error">{{ searchError }}</p>
+      </template>
       <button
         v-if="userId"
         class="add-custom-exercise-btn"
