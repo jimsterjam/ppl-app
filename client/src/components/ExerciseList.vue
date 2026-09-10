@@ -20,7 +20,7 @@
         </label>
         <select id="equipment-filter-select" v-model="selectedEquipment" @change="setEquipment($event.target.value)" class="equipment-filter-select">
           <option :value="''">{{ t('exercises.filters.all') || 'Alle' }}</option>
-          <option v-for="equip in allEquipmentTypes" :key="equip" :value="equip">{{ equipmentTranslation(equip) }}</option>
+          <option v-for="equip in allEquipmentTypes" :key="equip" :value="equip">{{ getTranslatedEquipment(equip) }}</option>
         </select>
       </div>
 
@@ -79,7 +79,7 @@
           v-for="(ex, index) in visibleExercises"
           :key="ex?._id || ex?.exerciseId || ex?.id || index"
           class="exercise-card"
-          :class="{ selected: selectable && isSelected(ex) }"
+          :class="{ selected: selectable && isSelected(ex), 'exercise-card--selectable': selectable }"
           @click="onCardClick(ex)"
         >
           <div class="thumb-row">
@@ -273,33 +273,6 @@ const allEquipmentTypes = computed(() => {
   })
   return Array.from(set)
 })
-const equipmentTranslation = (equip) => {
-  const keyMap = {
-    'Körpergewicht': 'bodyweight',
-    'Langhantel': 'barbell',
-    'Hanteln': 'dumbbell',
-    'Maschine': 'machine',
-    'Kabelzug': 'cable',
-    'Band': 'band',
-    'Kettlebell': 'kettlebell',
-    'Medizinball': 'medicineball',
-    'Sandbag': 'sandbag',
-    'Eigengewicht': 'bodyweight',
-    'Bodyweight': 'bodyweight',
-    'Barbell': 'barbell',
-    'Dumbbells': 'dumbbell',
-    'Dumbbell': 'dumbbell',
-    'Cable': 'cable',
-    'Machine': 'machine',
-    'Medicineball': 'medicineball',
-  }
-  const key = keyMap[equip] || equip.toLowerCase()
-  const translated = t(`exercises.equipment.${key}`)
-  if (translated && !translated.startsWith('exercises.equipment.')) return translated
-  const found = normalizedExercises.value.find(e => e.equipment === equip)
-  if (found && found.equipment_en) return found.equipment_en
-  return equip
-}
 function setEquipment(equip) {
   selectedEquipment.value = equip
   loadExercises()
@@ -619,6 +592,10 @@ function closeMedia() {
   cursor: not-allowed;
 }
 
+.add-custom-exercise-btn:active {
+  transform: scale(0.96);
+}
+
 .custom-badge {
   display: inline-block;
   margin-left: 6px;
@@ -658,6 +635,10 @@ function closeMedia() {
   opacity: 0.4;
   cursor: not-allowed;
   background: none;
+}
+
+.custom-action-btn:active {
+  transform: scale(0.9);
 }
 
 .exercise-list-root {
@@ -733,6 +714,9 @@ function closeMedia() {
   opacity: 0.5;
   cursor: not-allowed;
 }
+.filter-btn:active {
+  transform: scale(0.97);
+}
 .filter-btn.active {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent);
@@ -807,6 +791,9 @@ function closeMedia() {
 .exercise-card:hover {
   border-color: color-mix(in srgb, var(--accent) 35%, var(--card-border));
 }
+.exercise-card--selectable:active {
+  transform: scale(0.985);
+}
 .exercise-card.selected {
   position: relative;
   border-color: var(--accent);
@@ -841,6 +828,10 @@ function closeMedia() {
   padding: 8px;
   box-sizing: border-box;
   cursor: pointer;
+  transition: transform 0.1s ease;
+}
+.thumb:active {
+  transform: scale(0.92);
 }
 .thumb-fallback {
   padding: 0;
@@ -879,6 +870,10 @@ function closeMedia() {
 .load-more-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.load-more-btn:active {
+  transform: scale(0.97);
 }
 .meta { display: flex; flex-direction: column; min-width: 0; }
 .title {

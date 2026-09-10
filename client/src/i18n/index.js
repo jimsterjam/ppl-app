@@ -294,6 +294,18 @@ export const messages = {
       resetConfirmTitle: 'Timer zurücksetzen?',
       resetConfirmMsg: 'Zeit und Fortschritt werden zurückgesetzt.'
     },
+    // Für das Muskelgruppen-Dropdown beim Anlegen einer eigenen Übung (AddCustomExerciseModal.vue)
+    muscleGroups: {
+      chest: 'Brust',
+      back: 'Rücken',
+      shoulders: 'Schultern',
+      biceps: 'Bizeps',
+      triceps: 'Trizeps',
+      legs: 'Beine',
+      glutes: 'Gesäß',
+      abs: 'Bauch',
+      other: 'Sonstiges'
+    },
   exercises: {
       title: 'Übungen',
       allTitle: 'Übersicht aller Übungen:',
@@ -1174,6 +1186,17 @@ export const messages = {
       closeConfirmMsg: 'The current timer will be reset.',
       resetConfirmTitle: 'Reset timer?',
       resetConfirmMsg: 'Time and progress will be reset.'
+    },
+    muscleGroups: {
+      chest: 'Chest',
+      back: 'Back',
+      shoulders: 'Shoulders',
+      biceps: 'Biceps',
+      triceps: 'Triceps',
+      legs: 'Legs',
+      glutes: 'Glutes',
+      abs: 'Abs',
+      other: 'Other'
     },
     exercises: {
       title: 'Exercises',

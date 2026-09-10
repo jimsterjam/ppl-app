@@ -423,7 +423,11 @@ button:disabled {
 input,
 textarea,
 select {
-  font-family: 'Inter', sans-serif;
+  /* Vorher fest 'Inter' - dadurch sahen alle Formularfelder app-weit anders aus als der
+     restliche Text/Buttons (die die html-Schriftart 'Sora'/'Space Grotesk' erben). Jetzt
+     konsistent mit dem Rest der App (siehe Rückmeldung: "Schriftart sieht anders aus in den
+     Filtern"). */
+  font-family: inherit;
   font-size: 1rem;
   border-radius: 18px;
   border: 1px solid var(--line-soft);

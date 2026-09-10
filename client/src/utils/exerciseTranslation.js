@@ -25,6 +25,11 @@ export function useExerciseTranslation() {
     return (str || '').trim().toLowerCase()
   }
 
+  function capitalizeFirst(str) {
+    const s = String(str || '')
+    return s ? s.charAt(0).toUpperCase() + s.slice(1) : s
+  }
+
   const isGerman = () => locale.value.startsWith('de')
 
   const getTranslatedExerciseName = (exerciseName) => {
@@ -49,11 +54,57 @@ export function useExerciseTranslation() {
     return isGerman() ? found.muscleGroup : (found.muscleGroup_en || muscleGroup)
   }
 
+  // Sinngemäße Anzeige-Begriffe statt wörtlicher Übersetzung (z.B. "leverage machine" ->
+  // "Kraftmaschine" statt "Hebelmaschine" - im Fitnessstudio üblicher Sprachgebrauch, siehe
+  // Rückmeldung). Notwendig, weil in default-exercises.json ein Teil der "equipment"-Werte
+  // (deutsches Feld) NIE übersetzt wurde - dort steht z.B. "bosu ball" identisch in equipment
+  // UND equipment_en, ein reiner Datensatz-Lookup liefert also weiterhin Rohenglisch/
+  // Kleinschreibung. Keys hier sind normalisiert (trim + lowercase) gegen equipment/equipment_en.
+  const EQUIPMENT_LABELS = {
+    'kabelzug': { de: 'Kabelzug', en: 'Cable' },
+    'cable': { de: 'Kabelzug', en: 'Cable' },
+    'kettlebell': { de: 'Kettlebell', en: 'Kettlebell' },
+    'kurzhanteln': { de: 'Kurzhanteln', en: 'Dumbbells' },
+    'dumbbells': { de: 'Kurzhanteln', en: 'Dumbbells' },
+    'dumbbell': { de: 'Kurzhanteln', en: 'Dumbbells' },
+    'körpergewicht': { de: 'Körpergewicht', en: 'Bodyweight' },
+    'bodyweight': { de: 'Körpergewicht', en: 'Bodyweight' },
+    'eigengewicht': { de: 'Körpergewicht', en: 'Bodyweight' },
+    'langhantel': { de: 'Langhantel', en: 'Barbell' },
+    'barbell': { de: 'Langhantel', en: 'Barbell' },
+    'maschine': { de: 'Maschine', en: 'Machine' },
+    'machine': { de: 'Maschine', en: 'Machine' },
+    'leverage machine': { de: 'Kraftmaschine', en: 'Leverage Machine' },
+    'medizinball': { de: 'Medizinball', en: 'Medicine Ball' },
+    'medicine ball': { de: 'Medizinball', en: 'Medicine Ball' },
+    'medicineball': { de: 'Medizinball', en: 'Medicine Ball' },
+    'resistance band': { de: 'Widerstandsband', en: 'Resistance Band' },
+    'band': { de: 'Widerstandsband', en: 'Resistance Band' },
+    'sandbag': { de: 'Sandsack', en: 'Sandbag' },
+    'assisted': { de: 'Unterstützte Maschine', en: 'Assisted Machine' },
+    'assisted (towel)': { de: 'Unterstützt (Handtuch)', en: 'Assisted (Towel)' },
+    'bosu ball': { de: 'Bosu-Ball', en: 'Bosu Ball' },
+    'hammer': { de: 'Hammer-Maschine', en: 'Hammer Machine' },
+    'roller': { de: 'Rolle', en: 'Roller' },
+    'rope': { de: 'Seil', en: 'Rope' },
+    'stability ball': { de: 'Gymnastikball', en: 'Stability Ball' },
+    'stationary bike': { de: 'Ergometer', en: 'Stationary Bike' },
+    'tire': { de: 'Reifen', en: 'Tire' },
+    'upper body ergometer': { de: 'Armergometer', en: 'Upper Body Ergometer' },
+    'weighted': { de: 'Zusatzgewicht', en: 'Added Weight' },
+    'wheel roller': { de: 'Ab-Roller', en: 'Ab Wheel' }
+  }
+
   const getTranslatedEquipment = (equipment) => {
     if (!equipment) return ''
+    const override = EQUIPMENT_LABELS[normalize(equipment)]
+    if (override) return isGerman() ? override.de : override.en
+
     const found = findByField('equipment', equipment)
-    if (!found) return equipment
-    return isGerman() ? found.equipment : (found.equipment_en || equipment)
+    const resolved = found ? (isGerman() ? found.equipment : (found.equipment_en || equipment)) : equipment
+    // Kein Eintrag in EQUIPMENT_LABELS und auch kein Datensatz-Treffer (oder der Datensatz
+    // selbst liefert Rohtext) - zumindest sicherstellen, dass nichts kleingeschrieben beginnt.
+    return capitalizeFirst(resolved)
   }
 
   const getLocalizedDescription = (exercise) => {
