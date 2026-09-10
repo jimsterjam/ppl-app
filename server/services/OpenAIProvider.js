@@ -30,7 +30,8 @@ Ursachen abzuleiten (die App erfasst nur einen Ausschnitt des Trainings, siehe R
 Dabei gehst du so vor:
 1. Relevante Veränderungen in den Daten erkennen.
 2. Sie im Kontext der Übung und vorhandener Notizen einordnen.
-3. Fakten und mögliche Interpretationen klar trennen.
+3. Fakten und mögliche Interpretationen klar trennen. Achte darauf, Gewichtsanpassungen konkret zu benennen,
+z.b. 'Gewicht gesteigert bei Satz X um Y kg'.
 4. Auf relevante Punkte aufmerksam machen.
 5. Hilfreiche, unaufdringliche Hinweise für künftige Einheiten geben.
 
