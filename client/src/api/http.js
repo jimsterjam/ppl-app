@@ -39,7 +39,7 @@ function getConfiguredApiPrefixes() {
 
 const API_PREFIXES = getConfiguredApiPrefixes()
 
-function createFallbackAxios(baseCandidates, config = {}) {
+export function createFallbackAxios(baseCandidates, config = {}) {
   const candidates = Array.isArray(baseCandidates) && baseCandidates.length > 0
     ? baseCandidates
     : ['/api']
@@ -95,11 +95,23 @@ function createFallbackAxios(baseCandidates, config = {}) {
       const req = error?.config
       if (!req || !isRetryableTransportError(error)) throw error
 
+      // WICHTIG: zyklisch weiterprobieren (nicht nur vorwärts bis zum Ende der Liste) - sonst
+      // bleibt die App dauerhaft hängen, sobald der per sessionStorage gemerkte "preferredIndex"
+      // NICHT der erste Kandidat ist (z.B. LAN-Fallback, weil man mal im selben WLAN wie der
+      // lokale Dev-Server war) und dieser Kandidat unerreichbar wird: der vorherige Code sprang
+      // von diesem Index nur noch weiter nach vorn, erreichte sofort das Ende der Liste und gab
+      // auf, OHNE es nochmal mit der eigentlichen (Render-)API zu versuchen. Symptom: App zeigt
+      // dauerhaft "Lokale API nicht erreichbar"/lädt nichts mehr, bis die Session komplett neu
+      // startet (sessionStorage wird geleert). Jetzt: jeder der `candidates.length` Kandidaten
+      // wird in genau einem Zyklus einmal versucht, unabhängig vom Startindex.
+      const attempts = Number(req.__apiBaseAttempts || 1)
+      if (attempts >= candidates.length) throw error
+
       const currentIndex = Number(req.__apiBaseIndex || 0)
-      const nextIndex = currentIndex + 1
-      if (nextIndex >= candidates.length) throw error
+      const nextIndex = (currentIndex + 1) % candidates.length
 
       req.__apiBaseIndex = nextIndex
+      req.__apiBaseAttempts = attempts + 1
       req.baseURL = candidates[nextIndex]
       return instance.request(req)
     }
