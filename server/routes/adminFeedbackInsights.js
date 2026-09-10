@@ -16,29 +16,50 @@ import { logger } from '../utils/logger.js';
 // Datenschutz-Hinweis in models/FeedbackRating.js und feedbackInsightService.js).
 const router = express.Router();
 
+// Kandidaten: alles, was auf ein Problem hindeutet (nicht hilfreich ODER mit Korrekturtext),
+// und noch aktiv gültig ist (siehe isCountedStatus-Konzept in feedbackRatingService.js - hier
+// direkt inline, da diese Route bewusst unabhängig von der personenbezogenen Bewertungslogik
+// bleibt). Von /analyze UND /pending-count genutzt, damit beide exakt dieselbe Definition von
+// "relevante Bewertung" verwenden und nicht auseinanderlaufen können.
+async function findUnanalyzedRatings() {
+  const candidates = await FeedbackRating.find({
+    status: { $in: ['active', 'edited'] },
+    $or: [
+      { rating: 'not_helpful' },
+      { correctionText: { $nin: [null, ''] } }
+    ]
+  })
+    .sort({ createdAt: -1 })
+    .limit(200)
+    .lean();
+
+  const existingProposals = await PromptImprovementProposal.find({}, { sourceRatingIds: 1 }).lean();
+  const alreadyIncludedIds = new Set(
+    existingProposals.flatMap((p) => (Array.isArray(p.sourceRatingIds) ? p.sourceRatingIds : []))
+  );
+
+  return selectUnanalyzedRatings(candidates, alreadyIncludedIds);
+}
+
+// Zeigt an, ob es neue, noch nicht in einen Vorschlag eingeflossene Bewertungen gibt - ohne
+// gleich eine (kostenpflichtige) Analyse anzustoßen. Wichtig für die Admin-UI: "Aktualisieren"
+// lädt nur die bestehende Vorschlagsliste neu, zeigt also KEINE rohen Bewertungen an - ohne
+// diesen Zähler war für den Admin nicht erkennbar, ob überhaupt neue Daten für eine Analyse
+// vorliegen (siehe Rückmeldung: neue Bewertung landet zwar in FeedbackRating, aber "erscheint"
+// nirgends in der Oberfläche, bis man aktiv "Neue Analyse starten" klickt).
+router.get('/pending-count', requireAdminKey, async (req, res) => {
+  try {
+    const pending = await findUnanalyzedRatings();
+    res.json({ count: pending.length });
+  } catch (e) {
+    logger.error('❌ Feedback-Insight pending-count fehlgeschlagen', { message: e?.message });
+    res.status(500).json({ error: 'Failed to count pending ratings', message: e?.message || String(e) });
+  }
+});
+
 router.post('/analyze', requireAdminKey, async (req, res) => {
   try {
-    // Kandidaten: alles, was auf ein Problem hindeutet (nicht hilfreich ODER mit Korrekturtext),
-    // und noch aktiv gültig ist (siehe isCountedStatus-Konzept in feedbackRatingService.js -
-    // hier direkt inline, da diese Route bewusst unabhängig von der personenbezogenen
-    // Bewertungslogik bleibt).
-    const candidates = await FeedbackRating.find({
-      status: { $in: ['active', 'edited'] },
-      $or: [
-        { rating: 'not_helpful' },
-        { correctionText: { $nin: [null, ''] } }
-      ]
-    })
-      .sort({ createdAt: -1 })
-      .limit(200)
-      .lean();
-
-    const existingProposals = await PromptImprovementProposal.find({}, { sourceRatingIds: 1 }).lean();
-    const alreadyIncludedIds = new Set(
-      existingProposals.flatMap((p) => (Array.isArray(p.sourceRatingIds) ? p.sourceRatingIds : []))
-    );
-
-    const selected = selectUnanalyzedRatings(candidates, alreadyIncludedIds);
+    const selected = await findUnanalyzedRatings();
 
     if (selected.length === 0) {
       return res.json({ skipped: true, message: 'Keine neuen Bewertungen seit der letzten Analyse.' });

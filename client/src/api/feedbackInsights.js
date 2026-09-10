@@ -24,6 +24,17 @@ export async function listInsightProposals(adminKey, { status = '', limit = 50 }
   }
 }
 
+export async function getPendingInsightCount(adminKey) {
+  try {
+    const res = await api.get('/pending-count', {
+      headers: { 'x-admin-key': adminKey }
+    })
+    return Number(res.data?.count) || 0
+  } catch (error) {
+    throw handleAPIError(error, 'Anzahl neuer Bewertungen laden', { redirectOnAuth: false })
+  }
+}
+
 export async function analyzeFeedbackInsights(adminKey) {
   try {
     const res = await api.post('/analyze', {}, {

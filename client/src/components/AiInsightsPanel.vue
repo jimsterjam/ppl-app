@@ -27,6 +27,15 @@
       </button>
     </div>
 
+    <!-- "Aktualisieren" lädt NUR die Vorschlagsliste neu, zeigt also keine rohen Bewertungen -
+         ohne diesen Hinweis war nicht erkennbar, ob neue FeedbackRating-Einträge überhaupt zur
+         Analyse bereitstehen (siehe Rückmeldung: neue Bewertung landet in der DB, "erscheint"
+         aber nirgends, bis man aktiv "Neue Analyse starten" klickt). -->
+    <p v-if="loaded && pendingCount > 0" class="pending-hint">
+      🆕 {{ pendingCount }} neue Bewertung{{ pendingCount === 1 ? '' : 'en' }} noch nicht analysiert – klicke "Neue Analyse starten", um daraus einen Vorschlag zu erzeugen.
+    </p>
+    <p v-else-if="loaded && pendingCount === 0" class="muted">Keine neuen, unanalysierten Bewertungen.</p>
+
     <p v-if="error" class="error-text">{{ error }}</p>
     <p v-if="analyzeMessage" class="info-text">{{ analyzeMessage }}</p>
     <p v-else-if="loaded && !loading && !proposals.length" class="muted">Keine Vorschläge gefunden.</p>
@@ -70,7 +79,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { listInsightProposals, analyzeFeedbackInsights, updateInsightProposal } from '@/api/feedbackInsights'
+import { listInsightProposals, analyzeFeedbackInsights, updateInsightProposal, getPendingInsightCount } from '@/api/feedbackInsights'
 
 // Admin-only Review-Oberfläche für KI-generierte Verbesserungsvorschläge zum KI-Feedback-
 // System-Prompt (siehe server/routes/adminFeedbackInsights.js). Nutzt denselben localStorage-
@@ -90,6 +99,7 @@ const error = ref('')
 const analyzeMessage = ref('')
 const updatingId = ref('')
 const reviewNotes = ref({})
+const pendingCount = ref(0)
 
 function statusLabel(status) {
   return { pending: 'Offen', approved: 'Freigegeben', rejected: 'Abgelehnt' }[status] || status
@@ -112,6 +122,7 @@ async function load() {
   try {
     localStorage.setItem(STORAGE_KEY, adminKey.value)
     proposals.value = await listInsightProposals(adminKey.value, { status: statusFilter.value, limit: 50 })
+    pendingCount.value = await getPendingInsightCount(adminKey.value)
     loaded.value = true
   } catch (e) {
     error.value = e?.message || 'Laden fehlgeschlagen.'
@@ -244,6 +255,16 @@ if (adminKey.value) {
 .info-text {
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.pending-hint {
+  color: var(--fg);
+  font-size: 0.9rem;
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-elevated));
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--line-soft));
+  border-radius: 10px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
 }
 
 .muted {
