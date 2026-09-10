@@ -297,8 +297,8 @@ export const messages = {
   exercises: {
       title: 'Übungen',
       allTitle: 'Übersicht aller Übungen:',
-      loading: 'Lade MongoDB-Übungen...',
-      none: 'Keine Übungen aus MongoDB gefunden. Backend prüfen!',
+      loading: 'Übungen werden geladen…',
+      none: 'Keine Übungen gefunden. Versuch einen anderen Suchbegriff oder Filter.',
       searchPlaceholder: 'Übung suchen…',
       equipment: 'Equipment',
       bodyweight: 'Bodyweight',
@@ -311,7 +311,11 @@ export const messages = {
       toastUploaded: 'Foto hochgeladen.',
       toastRemoved: 'Foto entfernt.',
       toastRemoveFailed: 'Entfernen fehlgeschlagen.',
+      customBadge: 'Eigene Übung',
+      loadMore: 'Mehr Übungen laden',
+      mediaDisclaimer: 'Visualisierung dient nur zur Orientierung. Keine Garantie für technisch korrekte Ausführung.',
       filters: {
+        type: 'Typ',
         pushDay: 'Push Day',
         pullDay: 'Pull Day',
         legDay: 'Leg Day',
@@ -494,6 +498,7 @@ export const messages = {
     builder: {
       backToDashboard: '← Zurück',
       backToDashboardTitle: 'Zurück zum Dashboard',
+      filterEquipment: 'Equipment filtern',
       createTitle: 'Workout erstellen',
       authGate: 'Du musst angemeldet sein, um ein Workout zu erstellen.',
       impulseTitle: 'Kurzer Impuls',
@@ -1173,8 +1178,8 @@ export const messages = {
     exercises: {
       title: 'Exercises',
       allTitle: 'All exercises overview:',
-      loading: 'Loading MongoDB exercises...',
-      none: 'No exercises from MongoDB found. Check backend!',
+      loading: 'Loading exercises…',
+      none: 'No exercises found. Try a different search term or filter.',
       searchPlaceholder: 'Search exercise…',
       equipment: 'Equipment',
       bodyweight: 'Bodyweight',
@@ -1184,7 +1189,11 @@ export const messages = {
       toastUploaded: 'Photo uploaded.',
       toastRemoved: 'Photo removed.',
       toastRemoveFailed: 'Remove failed.',
+      customBadge: 'Custom exercise',
+      loadMore: 'Load more exercises',
+      mediaDisclaimer: 'Visualization is for reference only. No guarantee of technically correct execution.',
       filters: {
+        type: 'Type',
         pushDay: 'Push Day',
         pullDay: 'Pull Day',
         legDay: 'Leg Day',
@@ -1359,6 +1368,7 @@ export const messages = {
     builder: {
       backToDashboard: '← Back',
       backToDashboardTitle: 'Back to dashboard',
+      filterEquipment: 'Filter equipment',
       createTitle: 'Create workout',
       authGate: 'You must be signed in to create a workout.',
       impulseTitle: 'Quick boost',

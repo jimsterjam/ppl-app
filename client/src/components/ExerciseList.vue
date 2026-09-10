@@ -6,7 +6,7 @@
     <div v-if="showControls" class="filter-row">
       <div class="equipment-filter-wrap">
         <label for="type-filter-select" class="equipment-filter-label">
-          {{ t('exercises.filters.type') !== 'exercises.filters.type' ? t('exercises.filters.type') : 'Typ' }}
+          {{ t('exercises.filters.type') }}
         </label>
         <select id="type-filter-select" v-model="selectedCategory" @change="setCategory($event.target.value)" class="equipment-filter-select">
           <option :value="''">{{ t('exercises.filters.all') || 'Alle' }}</option>
@@ -16,7 +16,7 @@
 
       <div class="equipment-filter-wrap">
         <label for="equipment-filter-select" class="equipment-filter-label">
-          {{ t('builder.filterEquipment') !== 'builder.filterEquipment' ? t('builder.filterEquipment') : 'Equipment filtern' }}
+          {{ t('builder.filterEquipment') }}
         </label>
         <select id="equipment-filter-select" v-model="selectedEquipment" @change="setEquipment($event.target.value)" class="equipment-filter-select">
           <option :value="''">{{ t('exercises.filters.all') || 'Alle' }}</option>
@@ -34,7 +34,7 @@
         >
           <option value="">{{ t('exercises.filters.all') }}</option>
           <option v-for="group in muscleGroups" :key="group" :value="group">
-            {{ group }}
+            {{ getTranslatedMuscleGroup(group) }}
           </option>
         </select>
       </div>
@@ -95,7 +95,7 @@
             <div class="meta">
               <h2 class="title">
                 {{ ex.renderedName || ex.name }}
-                <span v-if="ex._isCustom" class="custom-badge">Eigene Übung</span>
+                <span v-if="ex._isCustom" class="custom-badge">{{ t('exercises.customBadge') }}</span>
               </h2>
               <p class="sub">{{ ex.renderedCategory || ex.category }} · {{ ex.renderedMuscle || ex.muscleGroup || (ex.muscleGroups?.[0] || '') }}</p>
             </div>
@@ -124,7 +124,7 @@
       </div>
 
       <button v-if="canLoadMore" class="load-more-btn" type="button" @click="loadMore">
-        Mehr Übungen laden
+        {{ t('exercises.loadMore') }}
       </button>
     </div>
 
@@ -150,8 +150,8 @@
           :alt="mediaExercise.name"
           class="media-image"
         />
-        <p class="media-disclaimer">Visualisierung dient nur zur Orientierung. Keine Garantie für technisch korrekte Ausführung.</p>
-        <button class="close-btn" @click="closeMedia">OK</button>
+        <p class="media-disclaimer">{{ t('exercises.mediaDisclaimer') }}</p>
+        <button class="close-btn" @click="closeMedia">{{ t('common.close') }}</button>
       </div>
     </div>
   </div>
@@ -606,6 +606,17 @@ function closeMedia() {
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.add-custom-exercise-btn:hover {
+  background: color-mix(in srgb, var(--accent, #4f9dff) 12%, transparent);
+  border-color: var(--accent, #4f9dff);
+}
+
+.add-custom-exercise-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .custom-badge {
@@ -630,14 +641,23 @@ function closeMedia() {
 .custom-action-btn {
   background: none;
   border: none;
+  border-radius: 8px;
   font-size: 0.9rem;
   cursor: pointer;
   padding: 4px;
   opacity: 0.8;
+  transition: opacity 0.15s ease, background 0.15s ease;
 }
 
 .custom-action-btn:hover {
   opacity: 1;
+  background: color-mix(in srgb, var(--fg, #fff) 8%, transparent);
+}
+
+.custom-action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  background: none;
 }
 
 .exercise-list-root {
@@ -674,6 +694,17 @@ function closeMedia() {
   min-width: 140px;
   background: var(--bg-panel);
   color: var(--fg);
+  transition: border-color 0.15s ease;
+}
+
+.equipment-filter-select:hover {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--card-border));
+}
+
+.equipment-filter-select:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 .filter-row.secondary {
   width: auto;
@@ -695,6 +726,13 @@ function closeMedia() {
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
+.filter-btn:hover {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--line-strong));
+}
+.filter-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 .filter-btn.active {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent);
@@ -702,6 +740,9 @@ function closeMedia() {
 .filter-btn.ghost {
   background: transparent;
   color: var(--fg);
+}
+.filter-btn.ghost:hover {
+  background: color-mix(in srgb, var(--fg) 6%, transparent);
 }
 .filter-select {
   flex: 1;
@@ -727,6 +768,13 @@ function closeMedia() {
   border: 1px solid var(--card-border);
   background: var(--bg-panel);
   color: var(--fg);
+  transition: border-color 0.15s ease;
+}
+
+.search-input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
 }
 .search-error {
   margin-top: 6px;
@@ -820,6 +868,17 @@ function closeMedia() {
   color: var(--fg);
   font-weight: 700;
   cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.load-more-btn:hover {
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--card-border));
+  background: color-mix(in srgb, var(--accent) 8%, var(--bg-panel));
+}
+
+.load-more-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .meta { display: flex; flex-direction: column; min-width: 0; }
 .title {
