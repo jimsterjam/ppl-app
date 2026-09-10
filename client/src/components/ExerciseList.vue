@@ -59,6 +59,7 @@
         type="button"
         @click="editingCustomExercise = null; showAddCustomModal = true"
         >
+        <span class="add-custom-exercise-icon" aria-hidden="true">+</span>
         {{ t('exercises.addCustom') || 'Eigene Übung' }}
       </button>
     </div>
@@ -570,26 +571,45 @@ function closeMedia() {
 </script>
 
 <style scoped>
+/* Bewusst als gefüllter Akzent-Button statt (vorher) unauffälligem Outline-Button - Rückmeldung:
+   Nutzer bemerken die Möglichkeit, eigene Übungen hinzuzufügen, sonst kaum. Style/Farbverlauf
+   angelehnt an button.primary in style.css (App-weite CTA-Konvention). */
 .add-custom-exercise-btn {
-  padding: 6px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--card-border, rgba(255,255,255,0.15));
-  background: transparent;
-  color: var(--accent, #4f9dff);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  border: none;
+  background: linear-gradient(120deg, var(--accent), var(--accent-strong));
+  color: var(--accent-contrast, #0b1220);
   font-size: 0.85rem;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 35%, transparent);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.add-custom-exercise-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent-contrast, #0b1220) 18%, transparent);
+  font-size: 0.85rem;
+  line-height: 1;
 }
 
 .add-custom-exercise-btn:hover {
-  background: color-mix(in srgb, var(--accent, #4f9dff) 12%, transparent);
-  border-color: var(--accent, #4f9dff);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 45%, transparent);
 }
 
 .add-custom-exercise-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  box-shadow: none;
 }
 
 .add-custom-exercise-btn:active {
