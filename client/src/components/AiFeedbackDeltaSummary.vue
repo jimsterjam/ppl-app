@@ -1,46 +1,9 @@
 <template>
   <div v-if="rows.length > 0" class="delta-summary">
-    <div v-for="row in rows" :key="row.exercise" class="delta-row">
-      <span class="delta-exercise">{{ row.exercise }}</span>
-
-      <span v-if="row.isFirstSession" class="delta-chip delta-chip--neutral">
-        {{ t('feedbackHistory.deltaFirstSession') || 'Erstes Training' }}
-      </span>
-
-      <template v-else>
-        <span class="delta-chip" :class="chipClass(row.setsChange)">
-          {{ formatChipText(row.setsChange, t('feedbackHistory.deltaSets') || 'Sätze', t('feedbackHistory.deltaSetsUnchanged') || 'Sätze unverändert') }}
-        </span>
-        <span class="delta-chip" :class="chipClass(row.repsChange)">
-          {{ formatChipText(row.repsChange, t('feedbackHistory.deltaReps') || 'Wdh.', t('feedbackHistory.deltaRepsUnchanged') || 'Wdh. unverändert') }}
-        </span>
-        <span class="delta-chip" :class="chipClass(row.weightChangeKg)">
-          {{ formatChipText(row.weightChangeKg, 'kg', t('feedbackHistory.deltaWeightUnchanged') || 'Gewicht unverändert') }}
-        </span>
-
-        <!-- Mini-Trend-Grafik: nur bei tatsächlich auffälliger Veränderung (siehe
-             is_notable, vom Backend anhand der Progression bestimmt) und nur, wenn genug
-             Datenpunkte für eine sinnvolle Linie vorhanden sind. Absichtlich sehr sparsam
-             (reines SVG, keine Chart-Bibliothek) - zeigt den Volumen-Verlauf über die
-             letzten bis zu 4 passenden Sessions. -->
-        <svg
-          v-if="row.isNotable && row.history.length >= 2"
-          class="delta-sparkline"
-          viewBox="0 0 100 30"
-          preserveAspectRatio="none"
-          :aria-label="t('feedbackHistory.deltaTrend') || 'Verlauf über die letzten Sessions'"
-        >
-          <polyline
-            :points="sparklinePoints(row.history)"
-            fill="none"
-            :stroke="sparklineColor(row.history)"
-            stroke-width="3"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          />
-        </svg>
-      </template>
-    </div>
+    <p v-for="row in rows" :key="row.exercise" class="delta-sentence">
+      <span class="delta-exercise">{{ row.exercise }}:</span>
+      {{ row.isFirstSession ? t('feedbackHistory.deltaFirstSession') : row.sentence }}
+    </p>
   </div>
 </template>
 
@@ -48,12 +11,13 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-// Kompakte, farblich unterscheidbare Zusammenfassung der wichtigsten Zahlen je Übung
-// (Sätze/Wiederholungen/Gewicht mehr bzw. weniger als die letzte Session), als Ersatz für das
-// vollständige Aufzählen jeder einzelnen Übung im KI-Fließtext (siehe OpenAIProvider.js -
-// die Prompt-Ausgabe konzentriert sich jetzt auf Zusammenfassung/Einordnung/Empfehlungen,
-// die reinen Zahlen kommen strukturiert von hier). Farbe zeigt NUR die Richtung der Zahl
-// (mehr/weniger), keine Wertung gut/schlecht - siehe --info/--warning in style.css.
+// Zusammenhängender, natürlichsprachlicher Vergleichssatz je Übung (Sätze/Wiederholungen/
+// Gewicht vs. letzte Session) statt der früheren drei isolierten Chips + SVG-Sparkline. Die
+// Chips zeigten Rohzahlen wie "+6,7kg" ganz ohne Einordnung - laut Rückmeldung unverständlich
+// und ohne Mehrwert für den Nutzer. Bewusst KEINE Aufschlüsselung pro einzelnem Satz (z.B.
+// "in Satz 4 ...") - dafür würden feinere, pro-Satz-aufgelöste Rohdaten benötigt, die aktuell
+// nicht bis hierher durchgereicht werden; die vorhandenen Werte sind bereits Session-vs-Session-
+// Summen (sets_change/reps_change/weight_change_kg).
 const props = defineProps({
   snapshot: {
     type: Array,
@@ -61,119 +25,105 @@ const props = defineProps({
   }
 })
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
+
+function formatNumber(value) {
+  const isDe = String(locale.value || 'de').toLowerCase().startsWith('de')
+  const rounded = Math.round(Math.abs(value) * 10) / 10
+  return new Intl.NumberFormat(isDe ? 'de-DE' : 'en-US', { maximumFractionDigits: 1 }).format(rounded)
+}
+
+/**
+ * Baut aus den drei Delta-Werten EINEN Satz. Nennt nur die Werte, die sich tatsächlich
+ * verändert haben, und ergänzt explizit, was gleich geblieben ist (sonst wirkt z.B. "20 kg
+ * mehr" isoliert, ohne dass klar ist, ob auch mehr/weniger Sätze oder Wiederholungen
+ * dahinterstecken). "Steigerung" wird nur angehängt, wenn ALLE veränderten Werte in dieselbe
+ * (positive) Richtung zeigen - bei gegenläufigen Änderungen (z.B. mehr Gewicht, aber weniger
+ * Wiederholungen) bewusst keine automatische Wertung, analog zur Zurückhaltung in
+ * OpenAIProvider.js Regel 8/9 (keine automatische Bewertung von Gewichts-/Volumenänderungen).
+ */
+function buildSentence({ setsChange, repsChange, weightChangeKg }) {
+  const clauses = []
+  if (weightChangeKg !== 0) {
+    clauses.push(t(
+      weightChangeKg > 0 ? 'feedbackHistory.deltaWeightMore' : 'feedbackHistory.deltaWeightLess',
+      { kg: formatNumber(weightChangeKg) }
+    ))
+  }
+  if (repsChange !== 0) {
+    clauses.push(t(
+      repsChange > 0 ? 'feedbackHistory.deltaRepsMore' : 'feedbackHistory.deltaRepsLess',
+      { n: formatNumber(repsChange) }
+    ))
+  }
+  if (setsChange !== 0) {
+    clauses.push(t(
+      setsChange > 0 ? 'feedbackHistory.deltaSetsMore' : 'feedbackHistory.deltaSetsLess',
+      { n: formatNumber(setsChange) }
+    ))
+  }
+
+  if (clauses.length === 0) {
+    return t('feedbackHistory.deltaNoChange')
+  }
+
+  let suffix = ''
+  if (clauses.length === 1) {
+    // Genau EIN Wert verändert - benennt die beiden gleich gebliebenen Werte zusammen.
+    if (weightChangeKg !== 0) suffix = t('feedbackHistory.deltaSuffixWeightChanged')
+    else if (repsChange !== 0) suffix = t('feedbackHistory.deltaSuffixRepsChanged')
+    else suffix = t('feedbackHistory.deltaSuffixSetsChanged')
+  } else if (clauses.length === 2) {
+    // Genau EIN Wert unverändert - nur den einen benennen.
+    if (weightChangeKg === 0) suffix = t('feedbackHistory.deltaSuffixOnlyWeightUnchanged')
+    else if (repsChange === 0) suffix = t('feedbackHistory.deltaSuffixOnlyRepsUnchanged')
+    else suffix = t('feedbackHistory.deltaSuffixOnlySetsUnchanged')
+  }
+  // Bei allen drei Werten verändert (clauses.length === 3): kein Suffix nötig, ist bereits
+  // vollständig durch die drei Klauseln beschrieben.
+
+  const changedValues = [weightChangeKg, repsChange, setsChange].filter((v) => v !== 0)
+  const isImprovement = changedValues.length > 0 && changedValues.every((v) => v > 0)
+
+  let sentence = clauses.join(` ${t('feedbackHistory.deltaAnd')} `)
+  if (suffix) sentence += `, ${suffix}`
+  sentence += isImprovement ? ` – ${t('feedbackHistory.deltaImprovement')}.` : '.'
+  return sentence
+}
 
 const rows = computed(() => {
   if (!Array.isArray(props.snapshot)) return []
   return props.snapshot
     .filter(item => item && item.exercise)
-    .map(item => ({
-      exercise: item.exercise,
-      isFirstSession: !!item.is_first_session,
-      isNotable: !!item.is_notable,
-      history: Array.isArray(item.history) ? item.history.map(Number).filter(Number.isFinite) : [],
-      setsChange: Number(item.sets_change) || 0,
-      repsChange: Number(item.reps_change) || 0,
-      weightChangeKg: Number(item.weight_change_kg) || 0
-    }))
-})
-
-function formatSigned(value) {
-  const rounded = Math.round(value * 10) / 10
-  if (rounded > 0) return `+${rounded}`
-  return `${rounded}`
-}
-
-// Reine "0 Sätze"/"0 Wdh."/"0kg"-Ausgabe war für User missverständlich (siehe Feedback: klang
-// wie eine Fehlermeldung statt "keine Veränderung zur letzten Session"). Bei exakt 0 daher einen
-// eindeutigen "unverändert"-Text statt der bloßen Zahl+Einheit anzeigen.
-function formatChipText(value, unitLabel, unchangedLabel) {
-  const rounded = Math.round(value * 10) / 10
-  if (rounded === 0) return unchangedLabel
-  return `${formatSigned(value)} ${unitLabel}`
-}
-
-function chipClass(value) {
-  if (value > 0) return 'delta-chip--up'
-  if (value < 0) return 'delta-chip--down'
-  return 'delta-chip--neutral'
-}
-
-// Reines SVG-Sparkline ohne Chart-Bibliothek - normalisiert die Werte auf eine feste
-// 100x30-Viewbox. Richtung (letzter vs. erster Punkt) bestimmt nur die Farbe, keine Wertung
-// im Text - siehe chipClass()/style.css für dieselbe Blau/Orange-Konvention.
-function sparklinePoints(history) {
-  const max = Math.max(...history)
-  const min = Math.min(...history)
-  const range = max - min || 1
-  const stepX = history.length > 1 ? 100 / (history.length - 1) : 0
-  return history
-    .map((value, index) => {
-      const x = index * stepX
-      const y = 29 - ((value - min) / range) * 27
-      return `${x.toFixed(1)},${y.toFixed(1)}`
+    .map(item => {
+      const setsChange = Number(item.sets_change) || 0
+      const repsChange = Number(item.reps_change) || 0
+      const weightChangeKg = Number(item.weight_change_kg) || 0
+      return {
+        exercise: item.exercise,
+        isFirstSession: !!item.is_first_session,
+        sentence: buildSentence({ setsChange, repsChange, weightChangeKg })
+      }
     })
-    .join(' ')
-}
-
-function sparklineColor(history) {
-  const first = history[0]
-  const last = history[history.length - 1]
-  if (last > first) return 'var(--info)'
-  if (last < first) return 'var(--warning)'
-  return 'var(--muted)'
-}
+})
 </script>
 
 <style scoped>
 .delta-summary {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: 0.5rem;
 }
 
-.delta-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 0.4rem;
+.delta-sentence {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  color: var(--fg);
 }
 
 .delta-exercise {
   font-weight: 600;
-  font-size: 0.88rem;
-  color: var(--fg);
-  margin-right: 0.15rem;
-}
-
-.delta-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.2rem 0.6rem;
-  border-radius: var(--chip-radius, 16px);
-  font-size: 0.78rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.delta-chip--up {
-  color: var(--info-text);
-  background: var(--info-bg);
-}
-
-.delta-chip--down {
-  color: var(--warning-text);
-  background: var(--warning-bg);
-}
-
-.delta-chip--neutral {
-  color: var(--muted);
-  background: var(--surface-strong);
-}
-
-.delta-sparkline {
-  width: 44px;
-  height: 18px;
-  flex-shrink: 0;
+  margin-right: 0.25rem;
 }
 </style>
