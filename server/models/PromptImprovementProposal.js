@@ -56,6 +56,20 @@ const promptImprovementProposalSchema = new mongoose.Schema({
     type: [String],
     default: []
   },
+  // Hält zusätzlich fest, in welchem Bearbeitungsstand (updatedAt) jedes Rating zum
+  // Analysezeitpunkt einbezogen wurde - ermöglicht findUnanalyzedRatings() in
+  // adminFeedbackInsights.js zu erkennen, wenn ein Rating NACH dieser Analyse noch einmal
+  // bearbeitet wurde, und es dann erneut (statt fälschlich als "schon analysiert") für die
+  // nächste Analyse vorzuschlagen. Ältere Proposals ohne dieses Feld nutzen ersatzweise
+  // createdAt des Proposals als Näherung (siehe findUnanalyzedRatings()).
+  sourceRatingSnapshots: {
+    type: [{
+      _id: false,
+      ratingId: { type: String, required: true },
+      updatedAt: { type: Date, required: true }
+    }],
+    default: []
+  },
   reviewedAt: {
     type: Date,
     default: null

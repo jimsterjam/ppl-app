@@ -5,7 +5,8 @@ import {
   buildInsightPrompt,
   getInsightSystemPrompt,
   wrapCorrectionText,
-  promptContainsSearchText
+  promptContainsSearchText,
+  computeCorrectionDelta
 } from '../../services/feedbackInsightService.js'
 
 // feedbackInsightService.js: Admin-only Analyse-Feature (siehe Kommentar dort + in
@@ -41,6 +42,85 @@ describe('selectUnanalyzedRatings', () => {
   test('leere/undefined Eingaben crashen nicht', () => {
     assert.deepEqual(selectUnanalyzedRatings(undefined, new Set()), [])
     assert.deepEqual(selectUnanalyzedRatings([], undefined), [])
+  })
+
+  describe('Map-Modus (versioniert, erkennt Bearbeitungen)', () => {
+    test('Rating, das noch nie enthalten war, wird ausgewählt (auch ohne Map-Eintrag)', () => {
+      const ratings = [{ _id: 'a', updatedAt: '2026-01-01T00:00:00Z' }]
+      const result = selectUnanalyzedRatings(ratings, new Map())
+      assert.deepEqual(result.map((r) => r._id), ['a'])
+      assert.equal(result[0]._wasPreviouslyIncluded, false)
+    })
+
+    test('Rating, das seit der letzten Einbeziehung NICHT bearbeitet wurde, wird ausgeschlossen', () => {
+      const ratings = [{ _id: 'a', updatedAt: '2026-01-01T00:00:00Z' }]
+      const versions = new Map([['a', '2026-01-02T00:00:00Z']]) // später einbezogen als updatedAt
+      const result = selectUnanalyzedRatings(ratings, versions)
+      assert.deepEqual(result, [])
+    })
+
+    test('Rating, das NACH der letzten Einbeziehung bearbeitet wurde, wird erneut ausgewählt und markiert', () => {
+      const ratings = [{ _id: 'a', updatedAt: '2026-01-05T00:00:00Z' }]
+      const versions = new Map([['a', '2026-01-02T00:00:00Z']]) // Einbeziehung liegt VOR der Bearbeitung
+      const result = selectUnanalyzedRatings(ratings, versions)
+      assert.deepEqual(result.map((r) => r._id), ['a'])
+      assert.equal(result[0]._wasPreviouslyIncluded, true)
+    })
+
+    test('Ratings ohne updatedAt werden bei vorhandenem Map-Eintrag sicherheitshalber ausgeschlossen', () => {
+      const ratings = [{ _id: 'a' }]
+      const versions = new Map([['a', '2026-01-02T00:00:00Z']])
+      const result = selectUnanalyzedRatings(ratings, versions)
+      assert.deepEqual(result, [])
+    })
+
+    test('Set-Fallback (Altverhalten) funktioniert weiterhin unverändert', () => {
+      const ratings = [{ _id: 'a', updatedAt: '2026-01-05T00:00:00Z' }, { _id: 'b', updatedAt: '2026-01-05T00:00:00Z' }]
+      const result = selectUnanalyzedRatings(ratings, new Set(['a']))
+      assert.deepEqual(result.map((r) => r._id), ['b'])
+    })
+  })
+})
+
+describe('computeCorrectionDelta', () => {
+  test('kein vorheriger Text -> kompletter aktueller Text, nicht partiell', () => {
+    const result = computeCorrectionDelta('Ganz neuer Text.', '')
+    assert.deepEqual(result, { text: 'Ganz neuer Text.', isPartial: false, isUnchanged: false })
+  })
+
+  test('identischer Text -> isUnchanged, kein Text', () => {
+    const result = computeCorrectionDelta('Gleicher Text.', 'Gleicher Text.')
+    assert.equal(result.isUnchanged, true)
+    assert.equal(result.text, '')
+  })
+
+  test('reines Anhängen -> nur der neu hinzugefügte Teil, isPartial', () => {
+    const result = computeCorrectionDelta(
+      'Die Notiz wurde ignoriert. Außerdem war der Ton zu förmlich.',
+      'Die Notiz wurde ignoriert.'
+    )
+    assert.equal(result.isPartial, true)
+    assert.equal(result.text, 'Außerdem war der Ton zu förmlich.')
+  })
+
+  test('Umformulierung (kein reines Anhängen) -> vollständiger neuer Text, nicht partiell', () => {
+    const result = computeCorrectionDelta(
+      'Der Ton war insgesamt zu förmlich für einen Coach.',
+      'Die Notiz wurde ignoriert.'
+    )
+    assert.equal(result.isPartial, false)
+    assert.equal(result.isUnchanged, false)
+    assert.equal(result.text, 'Der Ton war insgesamt zu förmlich für einen Coach.')
+  })
+
+  test('leerer aktueller Text -> leeres Ergebnis, kein Crash', () => {
+    const result = computeCorrectionDelta('', 'Vorheriger Text.')
+    assert.deepEqual(result, { text: '', isPartial: false, isUnchanged: false })
+  })
+
+  test('nur Whitespace angehängt -> gilt nicht als partielle Ergänzung (kein neuer Inhalt)', () => {
+    const result = computeCorrectionDelta('Text.   ', 'Text.')
+    assert.equal(result.isPartial, false)
   })
 })
 
@@ -98,6 +178,58 @@ describe('buildInsightPrompt', () => {
     const prompt = buildInsightPrompt([{ rating: 'not_helpful' }])
     assert.equal(typeof prompt, 'string')
     assert.ok(prompt.includes('<current_system_prompt>'))
+  })
+
+  describe('Delta-Verhalten bei erneut einbezogenen (bearbeiteten) Ratings', () => {
+    test('bei reiner Ergänzung wird nur der neue Teil eingebettet, nicht der komplette Text', () => {
+      const ratings = [{
+        rating: 'not_helpful',
+        correctionText: 'Die Notiz wurde ignoriert. Außerdem war der Ton zu förmlich.',
+        previousCorrectionText: 'Die Notiz wurde ignoriert.',
+        _wasPreviouslyIncluded: true
+      }]
+      const prompt = buildInsightPrompt(ratings)
+      assert.ok(prompt.includes('Ergänzung zur vorherigen Korrektur'))
+      assert.ok(prompt.includes('<user_correction>Außerdem war der Ton zu förmlich.</user_correction>'))
+      assert.ok(!prompt.includes('Die Notiz wurde ignoriert. Außerdem'))
+    })
+
+    test('bei Umformulierung wird der komplette neue Text als "überarbeitet" markiert', () => {
+      const ratings = [{
+        rating: 'not_helpful',
+        correctionText: 'Der Ton war insgesamt zu förmlich.',
+        previousCorrectionText: 'Die Notiz wurde ignoriert.',
+        _wasPreviouslyIncluded: true
+      }]
+      const prompt = buildInsightPrompt(ratings)
+      assert.ok(prompt.includes('Überarbeitete Korrektur'))
+      assert.ok(prompt.includes('<user_correction>Der Ton war insgesamt zu förmlich.</user_correction>'))
+    })
+
+    test('unveränderter Korrekturtext wird nicht erneut eingebettet', () => {
+      const ratings = [{
+        rating: 'not_helpful',
+        correctionText: 'Gleicher Text.',
+        previousCorrectionText: 'Gleicher Text.',
+        _wasPreviouslyIncluded: true
+      }]
+      const prompt = buildInsightPrompt(ratings)
+      assert.ok(!prompt.includes('<user_correction>'))
+      assert.ok(!prompt.includes('Ergänzung zur vorherigen Korrektur'))
+      assert.ok(!prompt.includes('Überarbeitete Korrektur'))
+    })
+
+    test('ohne _wasPreviouslyIncluded-Flag wird trotz vorhandenem previousCorrectionText der volle Text normal eingebettet (Erstanalyse)', () => {
+      const ratings = [{
+        rating: 'not_helpful',
+        correctionText: 'Kompletter Text bei erster Analyse.',
+        previousCorrectionText: 'Alter Text vor einer Bearbeitung, die vor der ersten Analyse geschah.'
+      }]
+      const prompt = buildInsightPrompt(ratings)
+      assert.ok(prompt.includes('Korrektur des Nutzers:'))
+      assert.ok(prompt.includes('<user_correction>Kompletter Text bei erster Analyse.</user_correction>'))
+      assert.ok(!prompt.includes('Ergänzung zur vorherigen Korrektur'))
+    })
   })
 })
 

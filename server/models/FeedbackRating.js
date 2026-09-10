@@ -58,6 +58,18 @@ const feedbackRatingSchema = new mongoose.Schema({
     default: null,
     maxlength: 1000
   },
+  // Snapshot des correctionText VOR der letzten Änderung (nur gesetzt, wenn sich der Text bei
+  // einem Update tatsächlich geändert hat - siehe routes/workouts.js POST /:id/feedback-rating).
+  // Ermöglicht feedbackInsightService.js, bei einer erneuten Analyse nach einer Bearbeitung nur
+  // den NEU hinzugekommenen/geänderten Teil zu betrachten, statt den kompletten Text erneut zu
+  // bewerten (siehe computeCorrectionDelta()). Bildet nur EINEN Bearbeitungsschritt ab (keine
+  // vollständige Versionshistorie) - bei mehreren Bearbeitungen zwischen zwei Analysen ist das
+  // eine bewusste Vereinfachung.
+  previousCorrectionText: {
+    type: String,
+    default: null,
+    maxlength: 1000
+  },
   // aktiv = aktuell gültig (neu oder unverändert), geändert = aktiv, aber schon mindestens
   // einmal bearbeitet, gelöscht = vom Nutzer entfernt (Soft-Delete, zählt nicht mehr in
   // Statistiken - siehe feedbackRatingService.js/isCountedStatus()).

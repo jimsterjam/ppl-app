@@ -33,12 +33,36 @@ async function findUnanalyzedRatings() {
     .limit(200)
     .lean();
 
-  const existingProposals = await PromptImprovementProposal.find({}, { sourceRatingIds: 1 }).lean();
-  const alreadyIncludedIds = new Set(
-    existingProposals.flatMap((p) => (Array.isArray(p.sourceRatingIds) ? p.sourceRatingIds : []))
-  );
+  const existingProposals = await PromptImprovementProposal.find(
+    {},
+    { sourceRatingIds: 1, sourceRatingSnapshots: 1, createdAt: 1 }
+  ).lean();
 
-  return selectUnanalyzedRatings(candidates, alreadyIncludedIds);
+  // Baut eine Map ratingId -> "zuletzt einbezogen zu diesem Zeitpunkt" auf, damit
+  // selectUnanalyzedRatings() erkennen kann, ob ein Rating seit seiner letzten Einbeziehung
+  // bearbeitet wurde (updatedAt neuer als dieser Zeitpunkt) und dann erneut vorgeschlagen
+  // werden sollte, statt fälschlich als "schon analysiert" übersprungen zu werden.
+  const alreadyIncludedVersions = new Map();
+  for (const p of existingProposals) {
+    const snapshotMap = new Map(
+      (Array.isArray(p.sourceRatingSnapshots) ? p.sourceRatingSnapshots : [])
+        .map((s) => [String(s.ratingId), s.updatedAt])
+    );
+    const ids = Array.isArray(p.sourceRatingIds) ? p.sourceRatingIds : [];
+    for (const rawId of ids) {
+      const id = String(rawId);
+      // Bevorzugt den exakten Snapshot-Zeitstempel (neueres Format, siehe
+      // PromptImprovementProposal.js). Ältere Proposals ohne Snapshot nutzen ersatzweise das
+      // createdAt des Proposals als Näherung ("Stand des Ratings zum Analysezeitpunkt").
+      const versionAt = snapshotMap.get(id) || p.createdAt;
+      const existingVersionAt = alreadyIncludedVersions.get(id);
+      if (!existingVersionAt || new Date(versionAt).getTime() > new Date(existingVersionAt).getTime()) {
+        alreadyIncludedVersions.set(id, versionAt);
+      }
+    }
+  }
+
+  return selectUnanalyzedRatings(candidates, alreadyIncludedVersions);
 }
 
 // Zeigt an, ob es neue, noch nicht in einen Vorschlag eingeflossene Bewertungen gibt - ohne
@@ -73,7 +97,8 @@ router.post('/analyze', requireAdminKey, async (req, res) => {
       searchText,
       replaceText,
       sourceRatingCount: selected.length,
-      sourceRatingIds: selected.map((r) => String(r._id))
+      sourceRatingIds: selected.map((r) => String(r._id)),
+      sourceRatingSnapshots: selected.map((r) => ({ ratingId: String(r._id), updatedAt: r.updatedAt }))
     });
 
     logger.info('🔍 Feedback-Insight-Analyse erstellt', {

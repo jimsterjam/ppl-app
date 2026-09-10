@@ -62,18 +62,91 @@ export function wrapCorrectionText(text, maxLength = MAX_CORRECTION_LENGTH) {
 
 /**
  * Wählt aus allen relevanten Ratings (rating='not_helpful' ODER correctionText vorhanden,
- * status aktiv/geändert) diejenigen aus, die noch in keinem bisherigen Proposal referenziert
- * wurden - reine Funktion, keine DB-Zugriffe, daher gut testbar.
+ * status aktiv/geändert) diejenigen aus, die noch NICHT im aktuellen Bearbeitungsstand in einem
+ * bisherigen Proposal referenziert wurden - reine Funktion, keine DB-Zugriffe, daher gut
+ * testbar.
+ *
+ * Unterstützt zwei Aufrufformen für `alreadyIncluded`:
+ * - Map<string, Date|string> (empfohlen): ratingId -> Zeitpunkt (updatedAt), zu dem dieses
+ *   Rating zuletzt in ein Proposal einbezogen wurde. Ein Rating gilt dann als "neu zu
+ *   analysieren", wenn es entweder noch nie enthalten war ODER sein aktuelles `updatedAt`
+ *   NEUER ist als der gespeicherte Zeitpunkt (= wurde seitdem bearbeitet/neu abgesendet).
+ * - Set<string> (Altverhalten, z.B. in älterem Testcode): einmal enthalten = für immer
+ *   ausgeschlossen, da keine Zeitinformation vorliegt, um eine Bearbeitung zu erkennen.
+ *
+ * Ratings, die aufgrund einer Bearbeitung erneut ausgewählt werden, bekommen zusätzlich das
+ * Flag `_wasPreviouslyIncluded: true` - buildInsightPrompt() nutzt das, um bei vorhandenem
+ * previousCorrectionText nur den neuen/geänderten Teil des Korrekturtexts einzubeziehen (siehe
+ * computeCorrectionDelta()), statt den kompletten Text erneut vollständig zu bewerten.
  *
  * @param {Array} allRatings - Kandidaten (bereits serverseitig nach rating/status gefiltert)
- * @param {Set<string>} alreadyIncludedIds - IDs aus sourceRatingIds bisheriger Proposals
+ * @param {Map<string, Date|string>|Set<string>} alreadyIncluded
  * @param {number} limit
  * @returns {Array}
  */
-export function selectUnanalyzedRatings(allRatings = [], alreadyIncludedIds = new Set(), limit = MAX_RATINGS_PER_ANALYSIS) {
+export function selectUnanalyzedRatings(allRatings = [], alreadyIncluded = new Map(), limit = MAX_RATINGS_PER_ANALYSIS) {
   const safeRatings = Array.isArray(allRatings) ? allRatings : [];
-  const fresh = safeRatings.filter((r) => !alreadyIncludedIds.has(String(r._id)));
-  return fresh.slice(0, Math.max(1, limit));
+  const isVersionedMap = alreadyIncluded instanceof Map;
+
+  const fresh = safeRatings.filter((r) => {
+    const id = String(r._id);
+
+    if (!isVersionedMap) {
+      // Set-Fallback (Altverhalten): keine Zeitinformation vorhanden, einmal enthalten bleibt
+      // dauerhaft ausgeschlossen.
+      return !(alreadyIncluded && typeof alreadyIncluded.has === 'function' && alreadyIncluded.has(id));
+    }
+
+    if (!alreadyIncluded.has(id)) return true;
+
+    const lastIncludedAt = alreadyIncluded.get(id);
+    const updatedAt = r.updatedAt ? new Date(r.updatedAt).getTime() : NaN;
+    const lastIncludedTime = lastIncludedAt ? new Date(lastIncludedAt).getTime() : NaN;
+
+    // Ohne verwertbare Zeitstempel (z.B. Testdaten ohne updatedAt) sicherheitshalber als
+    // "schon analysiert" behandeln statt versehentlich unendlich oft erneut vorzuschlagen.
+    if (Number.isNaN(updatedAt) || Number.isNaN(lastIncludedTime)) return false;
+
+    return updatedAt > lastIncludedTime;
+  });
+
+  return fresh
+    .map((r) => ({
+      ...r,
+      _wasPreviouslyIncluded: isVersionedMap && alreadyIncluded.has(String(r._id))
+    }))
+    .slice(0, Math.max(1, limit));
+}
+
+/**
+ * Vergleicht den aktuellen Korrekturtext mit dem vor der letzten Bearbeitung gespeicherten Text
+ * (FeedbackRating.previousCorrectionText) und liefert nur den NEUEN/geänderten Anteil, wenn der
+ * Nutzer erkennbar nur etwas ERGÄNZT hat (aktueller Text beginnt mit dem alten Text). Bei jeder
+ * anderen Art von Änderung (umformuliert, gekürzt, komplett ersetzt) lässt sich der "neue Teil"
+ * nicht zuverlässig isolieren - dann wird sicherheitshalber der komplette aktuelle Text als
+ * "überarbeitet" zurückgegeben, statt fälschlich etwas wegzulassen.
+ *
+ * Bewusst nur EIN Vergleichsschritt (aktuell vs. unmittelbar vorheriger Stand), keine
+ * vollständige Versionshistorie - siehe Kommentar an FeedbackRating.previousCorrectionText.
+ *
+ * @param {string} currentText
+ * @param {string} previousText
+ * @returns {{ text: string, isPartial: boolean, isUnchanged: boolean }}
+ */
+export function computeCorrectionDelta(currentText, previousText) {
+  const current = String(currentText || '').trim();
+  const previous = String(previousText || '').trim();
+
+  if (!current) return { text: '', isPartial: false, isUnchanged: false };
+  if (!previous) return { text: current, isPartial: false, isUnchanged: false };
+  if (current === previous) return { text: '', isPartial: false, isUnchanged: true };
+
+  if (current.startsWith(previous)) {
+    const added = current.slice(previous.length).trim();
+    if (added) return { text: added, isPartial: true, isUnchanged: false };
+  }
+
+  return { text: current, isPartial: false, isUnchanged: false };
 }
 
 /**
@@ -92,10 +165,34 @@ export function buildInsightPrompt(ratings = [], currentPromptText = '') {
     if (Array.isArray(r.reasonCodes) && r.reasonCodes.length > 0) {
       lines.push(`   Gründe: ${r.reasonCodes.join(', ')}`);
     }
-    const correction = wrapCorrectionText(r.correctionText);
-    if (correction) {
-      lines.push(`   Korrektur des Nutzers: ${correction}`);
+
+    // Bei einem Rating, das wegen einer Bearbeitung erneut ausgewählt wurde (siehe
+    // selectUnanalyzedRatings -> _wasPreviouslyIncluded), nur den neuen/geänderten Teil des
+    // Korrekturtexts einbeziehen, statt den bereits einmal analysierten Teil zu wiederholen.
+    if (r._wasPreviouslyIncluded && r.previousCorrectionText) {
+      const delta = computeCorrectionDelta(r.correctionText, r.previousCorrectionText);
+      if (delta.isUnchanged) {
+        // Korrekturtext unverändert - schon in einer früheren Analyse berücksichtigt. Dieses
+        // Rating wurde nur wegen einer Änderung an rating/reasonCodes erneut ausgewählt, dazu
+        // ist oben bereits alles Nötige aufgeführt.
+      } else if (delta.isPartial) {
+        const correction = wrapCorrectionText(delta.text);
+        if (correction) {
+          lines.push(`   Ergänzung zur vorherigen Korrektur (nur der neu hinzugefügte Teil): ${correction}`);
+        }
+      } else {
+        const correction = wrapCorrectionText(delta.text);
+        if (correction) {
+          lines.push(`   Überarbeitete Korrektur (vollständig neu formuliert, vorherige Version bereits berücksichtigt): ${correction}`);
+        }
+      }
+    } else {
+      const correction = wrapCorrectionText(r.correctionText);
+      if (correction) {
+        lines.push(`   Korrektur des Nutzers: ${correction}`);
+      }
     }
+
     return lines.join('\n');
   });
 
@@ -246,6 +343,7 @@ export async function generateInsightProposal(ratings, options = {}) {
 
 export default {
   selectUnanalyzedRatings,
+  computeCorrectionDelta,
   buildInsightPrompt,
   getInsightSystemPrompt,
   promptContainsSearchText,

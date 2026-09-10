@@ -1003,6 +1003,16 @@ router.post("/:id/feedback-rating", firebaseAuthMiddleware, async (req, res) => 
     const existing = await FeedbackRating.findOne({ userId, feedbackId: workoutId }).lean();
     const status = nextRatingStatus(existing?.status || null, 'save');
 
+    // Vorherigen Korrekturtext nur festhalten, wenn sich der Text durch dieses Update
+    // TATSÄCHLICH ändert (nicht bei jedem Speichern neu überschreiben) - sonst würde ein
+    // zweimaliges Speichern ohne Textänderung den "vorherigen" Text auf null zurücksetzen und
+    // die Delta-Erkennung in feedbackInsightService.js verlöre den Bezugspunkt. Siehe
+    // FeedbackRating.js für die Erläuterung, wofür dieses Feld genutzt wird.
+    const normalizedNewCorrection = correctionText || null;
+    const previousCorrectionText = existing && existing.correctionText !== normalizedNewCorrection
+      ? (existing.correctionText || null)
+      : (existing?.previousCorrectionText ?? null);
+
     const saved = await FeedbackRating.findOneAndUpdate(
       { userId, feedbackId: workoutId },
       {
@@ -1012,7 +1022,8 @@ router.post("/:id/feedback-rating", firebaseAuthMiddleware, async (req, res) => 
           feedbackVersion,
           rating,
           reasonCodes,
-          correctionText: correctionText || null,
+          correctionText: normalizedNewCorrection,
+          previousCorrectionText,
           status
         }
       },
