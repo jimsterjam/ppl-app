@@ -298,7 +298,13 @@ const {
   getTranslatedCategory
 } = useExerciseTranslation()
 
-// Muskelgruppen (Dropdown)
+// Muskelgruppen (Dropdown). Die Werte entsprechen dem "muscleGroup"-Feld in den Übungsdaten und
+// sind bewusst der Filterwert (nicht der Anzeigetext) - die Anzeige läuft über
+// getTranslatedMuscleGroup() (siehe exerciseTranslation.js), die z.B. "Quadrizeps" als "Beine"
+// zeigt. "Hamstrings"/"Gluteus" waren früher eigene Einträge hier, obwohl die Daten Beinmuskeln
+// gar nicht so fein unterscheiden (alle stehen dort als "Quadrizeps") - die beiden Filter
+// matchten deshalb nie echte Übungen und ihre Anzeige kollidierte mit "Quadrizeps". Entfernt,
+// zusammengeführt zu einem einzigen "Quadrizeps"-Eintrag, der als "Beine" angezeigt wird.
 const muscleGroups = [
   'Brust',
   'Schultern',
@@ -306,8 +312,6 @@ const muscleGroups = [
   'Bizeps',
   'Rücken',
   'Quadrizeps',
-  'Hamstrings',
-  'Gluteus',
   'Waden'
 ];
 

@@ -47,8 +47,24 @@ export function useExerciseTranslation() {
     return exercisesData.value.find(ex => normalize(ex[field]) === normValue || normalize(ex[`${field}_en`]) === normValue)
   }
 
+  // Die Übungsdaten unterscheiden Beinmuskeln im deutschen muscleGroup-Feld NICHT fein -
+  // Quadrizeps, Beinbeuger, Gesäß, Adduktoren und Abduktoren stehen dort alle als "Quadrizeps"
+  // (nur das englische muscleGroup_en-Feld ist feiner, wird aber nicht zum Filtern verwendet).
+  // Statt der irreführenden Fachbezeichnung "Quadrizeps" für alle Beinübungen zeigen wir
+  // sinngemäß "Beine"/"Legs" - laienverständlicher und passt zu dem, was die Daten tatsächlich
+  // hergeben (siehe Rückmeldung: "Quadrizeps" tauchte im Filter durch einen Seiteneffekt sogar
+  // doppelt auf, weil "Hamstrings"/"Gluteus" als eigene Filterwerte in den Daten gar nicht
+  // existieren). Der zugrunde liegende Filterwert bleibt "Quadrizeps" (siehe ExerciseList.vue),
+  // nur die Anzeige ändert sich - hier zentral, damit Übungskarten und Filter-Dropdown
+  // konsistent bleiben.
+  const MUSCLE_GROUP_LABELS = {
+    'quadrizeps': { de: 'Beine', en: 'Legs' }
+  }
+
   const getTranslatedMuscleGroup = (muscleGroup) => {
     if (!muscleGroup) return ''
+    const override = MUSCLE_GROUP_LABELS[normalize(muscleGroup)]
+    if (override) return isGerman() ? override.de : override.en
     const found = findByField('muscleGroup', muscleGroup)
     if (!found) return muscleGroup
     return isGerman() ? found.muscleGroup : (found.muscleGroup_en || muscleGroup)
