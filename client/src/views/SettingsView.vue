@@ -511,7 +511,9 @@ async function handleRestartOnboarding() {
   try {
     const token = await getIdTokenSafe()
     await onboardingStore.restartFlow(token)
-    toast.show($t('common.updated'), { type: 'success', duration: 1400 })
+    // Kein Erfolgs-Toast hier: das Öffnen des Einführungsguide-Overlays direkt danach ist
+    // selbst schon die sichtbare Bestätigung - ein zusätzlicher "Aktualisiert"-Toast war
+    // redundant und wirkte irritierend (Rückmeldung: "unnötig").
   } catch (e) {
     toast.show(e?.message || $t('common.error'), { type: 'error', duration: 2200 })
   } finally {

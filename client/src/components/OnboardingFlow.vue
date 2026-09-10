@@ -1,5 +1,5 @@
 <template>
-  <div class="onboarding-overlay safe-area-top safe-area-bottom">
+  <div class="onboarding-overlay">
     <div class="onboarding-topbar">
       <div class="onboarding-dots" role="progressbar" :aria-valuenow="step + 1" :aria-valuemin="1" :aria-valuemax="totalSteps">
         <span
@@ -75,7 +75,12 @@ function handleSkip() {
   color: var(--fg);
   display: flex;
   flex-direction: column;
-  padding: 1.25rem 1.5rem;
+  /* env(safe-area-inset-*) direkt hier statt über die globalen .safe-area-top/-bottom-Klassen
+     (siehe style.css): die waren zwar im Template gesetzt, aber diese Regel hier hatte durch
+     das automatisch angehängte Scoped-Attribut höhere Spezifität und überschrieb deren
+     padding-top/-bottom vollständig mit dem festen 1.25rem - der "Überspringen"-Button landete
+     dadurch zu nah an Notch/Dynamic Island statt darunter (Rückmeldung: "zu weit oben"). */
+  padding: calc(1.25rem + env(safe-area-inset-top, 0px)) 1.5rem calc(1.25rem + env(safe-area-inset-bottom, 0px));
 }
 
 .onboarding-topbar {
