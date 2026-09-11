@@ -1,6 +1,7 @@
 import express from "express";
 import Workout from "../models/Workout.js";
 import { firebaseAuthMiddleware } from '../middleware/firebaseAuth.js';
+import { requireAdminKey } from '../middleware/adminAuth.js';
 // Clerk-Import entfernt
 import { OpenAI } from 'openai';
 import exercises from '../data/exercises.js';
@@ -529,7 +530,18 @@ async function initializeOpenAI() {
 
 // Alle Workouts für den eingeloggten User holen (mit optionaler Pagination)
 // 🧪 TEST: Alle Workouts OHNE Auth (für lokale Tests und Debugging)
-router.get("/test", async (req, res) => {
+// Sicherheitslücke geschlossen: dieser Endpunkt lief bisher komplett ohne Auth UND ohne
+// userId-Filter (Workout.find({})) - jeder, der die URL kannte, konnte die 50 neuesten Workouts
+// ALLER Nutzer einsehen (Namen, Typ, Datum, Übungsanzahl). Da es sich erkennbar um einen
+// Debug-/Test-Endpunkt aus der frühen Entwicklung handelt (keine produktive Verwendung im
+// Client gefunden), analog zum bestehenden Muster bei /:id/ai-analysis-test nur außerhalb von
+// production erreichbar - in production liefert er 404 wie eine nicht existierende Route.
+router.get("/test", (req, res, next) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(404).json({ error: 'Not Found', path: req.originalUrl });
+  }
+  return next();
+}, async (req, res) => {
   try {
     const workouts = await Workout.find({})
       .sort({ date: -1 })
@@ -2129,7 +2141,16 @@ router.post("/:id/ai-analysis-test", (req, res, next) => {
 });
 
 // 🧪 TEST: Einfaches Feedback OHNE Auth (für lokale Tests)
-router.post("/ai-progress-feedback-test", async (req, res) => {
+// Sicherheitslücke geschlossen: ruft den echten AI-Service auf (OpenAI-Kosten pro Aufruf),
+// lief bisher ohne Auth UND ohne Prod-Gate - anders als die Schwester-Route /:id/ai-analysis-test,
+// die beides schon hatte. Gleiches Muster jetzt auch hier: außerhalb von production per 404
+// gesperrt, innerhalb dessen zusätzlich Firebase-Auth-pflichtig.
+router.post("/ai-progress-feedback-test", (req, res, next) => {
+  if (process.env.NODE_ENV === 'production') {
+    return res.status(404).json({ error: 'Not Found', path: req.originalUrl });
+  }
+  return next();
+}, firebaseAuthMiddleware, async (req, res) => {
   const requestId = `progress_test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
   try {
@@ -3939,7 +3960,10 @@ async function generateDemoSuggestion(context) {
 }
 
 // 🤖 Admin: Lasse KI Übungen generieren und befülle Datenbank (45 Push, 45 Pull, 45 Legs)
-router.post("/admin/populate-db-with-ai", async (req, res) => {
+// Sicherheitslücke geschlossen: löscht/befüllt die komplette Exercise-Datenbank neu und kann
+// dabei echte OpenAI-Kosten auslösen - bisher ohne jede Authentifizierung erreichbar. Analog zu
+// adminFeedbackInsights.js jetzt per requireAdminKey (statischer Admin-Key im Header) geschützt.
+router.post("/admin/populate-db-with-ai", requireAdminKey, async (req, res) => {
   try {
     logger.debug('🤖 Admin: Starte KI-basierte Datenbank-Befüllung...');
     
@@ -4149,9 +4173,15 @@ Generiere jetzt 45 ${category}-Übungen:`;
 });
 
 // 🔄 EXERCISE DATABASE SYNC - Bestehende Übungen in DB übertragen (Public für Setup)
-router.post("/sync-exercises", async (req, res) => {
+// Sicherheitslücke geschlossen: lief bisher ohne Auth-Middleware, UND `req.auth()` wurde als
+// Funktion aufgerufen statt als das von firebaseAuthMiddleware gesetzte Objekt gelesen zu werden
+// (req.auth ist ohne die Middleware ohnehin undefined) - der Endpunkt ist dadurch bisher bei
+// jedem Aufruf mit einem Fehler abgestürzt, bevor er überhaupt etwas schreiben konnte. Fix: wie
+// bei allen anderen userId-abhängigen Routen firebaseAuthMiddleware davorschalten und req.auth
+// korrekt als Objekt lesen.
+router.post("/sync-exercises", firebaseAuthMiddleware, async (req, res) => {
   try {
-    const { userId } = req.auth();
+    const { userId } = req.auth;
     
     logger.debug('🔄 Synchronizing exercises to database...');
     

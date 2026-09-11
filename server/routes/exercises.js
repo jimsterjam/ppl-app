@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import mongoose from 'mongoose';
 import { ObjectId } from 'mongodb';
 import { firebaseAuthMiddleware } from '../middleware/firebaseAuth.js';
+import { requireAdminKey } from '../middleware/adminAuth.js';
 // Clerk-Import entfernt
 import { logger } from '../utils/logger.js';
 
@@ -312,7 +313,10 @@ router.delete('/:id/image', firebaseAuthMiddleware, async (req, res) => {
 });
 
 // 🔧 Admin: Alle Übungen löschen und neu befüllen (für Testing)
-router.post('/admin/reset-all', async (req, res) => {
+// Sicherheitslücke geschlossen: löscht die komplette Exercise-Datenbank für ALLE Nutzer, lief
+// bisher ohne jede Authentifizierung. Jetzt wie andere destruktive Admin-Endpunkte per
+// requireAdminKey (statischer Admin-Key im Header) geschützt.
+router.post('/admin/reset-all', requireAdminKey, async (req, res) => {
   try {
     logger.debug('🧹 Admin: Lösche alle Übungen aus der Datenbank...');
     

@@ -8,6 +8,7 @@ import Workout from '../models/Workout.js';
 import Exercise from '../models/Exercise.js';
 import UserProfile from '../models/UserProfile.js';
 import { firebaseAuthMiddleware } from '../middleware/firebaseAuth.js';
+import { requireAdminKey } from '../middleware/adminAuth.js';
 import multer from 'multer';
 import sharp from 'sharp';
 
@@ -394,7 +395,10 @@ router.post('/profile/avatar', firebaseAuthMiddleware, avatarUpload.single('imag
 });
 
 // Admin status diagnostic
-router.get('/admin-status', async (req, res) => {
+// Sicherheitslücke geschlossen: gab bisher ohne jede Auth Infrastruktur-Details preis (Firebase
+// Project ID, ob die Server-Credentials gültig sind) - jetzt wie andere Admin-Diagnose-Routen
+// per requireAdminKey geschützt.
+router.get('/admin-status', requireAdminKey, async (req, res) => {
   try {
     const apps = admin.apps || [];
     const opts = apps[0]?.options || {};
