@@ -49,17 +49,30 @@ const run = async () => {
   let copied = 0
   let skipped = 0
 
+  // Fortschrittsanzeige: bei vielen Dateien (aktuell >1000 Videos) kann der erste vollständige
+  // Kopiervorgang mehrere Minuten dauern. Ohne jede Zwischenausgabe sah das bisher wie ein
+  // hängender Prozess aus (User-Report: "npm run rebuild hängt seit 4min", tatsächlich lief nur
+  // dieser Schritt still im Hintergrund). Alle 100 Dateien sowie ganz am Ende eine Statuszeile,
+  // damit erkennbar bleibt, dass tatsächlich etwas passiert.
+  const total = files.length
+  const logInterval = Math.max(1, Math.floor(total / 10)) || 100
+  let processed = 0
+
   for (const fileName of files) {
     const srcPath = path.join(sourceDir, fileName)
     const destPath = path.join(targetDir, fileName)
 
     if (!(await shouldCopy(srcPath, destPath))) {
       skipped += 1
-      continue
+    } else {
+      await fs.copyFile(srcPath, destPath)
+      copied += 1
     }
 
-    await fs.copyFile(srcPath, destPath)
-    copied += 1
+    processed += 1
+    if (processed % logInterval === 0 || processed === total) {
+      console.log(`[media-sync] ${processed}/${total} geprüft (${copied} kopiert, ${skipped} übersprungen)…`)
+    }
   }
 
   console.log(`[media-sync] Done. Copied: ${copied}, Skipped: ${skipped}, Total: ${files.length}`)
