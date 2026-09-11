@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const { calculateExerciseStats, analyzeExercise } = await import(
+const { calculateExerciseStats, analyzeExercise, buildSetsComparison } = await import(
   join(__dirname, '../../services/trainingAnalysisService.js')
 )
 
@@ -183,5 +183,114 @@ describe('analyzeExercise', () => {
     const currentExWithoutNote = { setDetails: [{ weight: 80, reps: 8, isWarmup: false }] }
     assert.equal(analyzeExercise('X', currentExWithNote).note, 'Technik gefühlt besser')
     assert.equal(analyzeExercise('X', currentExWithoutNote).note, null)
+  })
+
+  test('setsComparison wird bei vorhandener vorheriger Session mitberechnet', () => {
+    const currentEx = { setDetails: [{ weight: 85, reps: 8, isWarmup: false }] }
+    const previousEx = { setDetails: [{ weight: 82.5, reps: 8, isWarmup: false }] }
+    const analysis = analyzeExercise('Bankdrücken', currentEx, previousEx, 7)
+    assert.equal(analysis.setsComparison.length, 1)
+    assert.equal(analysis.setsComparison[0].weight_change_kg, 2.5)
+  })
+})
+
+// Deckt den eigentlichen User-Report ab: ein Durchschnittsgewicht-Delta wie "0,8kg mehr" ist für
+// den Nutzer bedeutungslos, wenn es nur aus einer veränderten Satzverteilung entsteht - der
+// Pro-Satz-Vergleich soll stattdessen die tatsächliche, satzgenaue Veränderung liefern (siehe
+// JSDoc bei buildSetsComparison in trainingAnalysisService.js).
+describe('buildSetsComparison', () => {
+  test('gleiche Satzzahl: jeder Satz bekommt seinen eigenen Vergleichswert (kein Durchschnitts-Delta)', () => {
+    const currentEx = {
+      setDetails: [
+        { weight: 82.5, reps: 8, isWarmup: false },
+        { weight: 85, reps: 8, isWarmup: false }
+      ]
+    }
+    const previousEx = {
+      setDetails: [
+        { weight: 82.5, reps: 8, isWarmup: false },
+        { weight: 82.5, reps: 8, isWarmup: false }
+      ]
+    }
+    const result = buildSetsComparison(currentEx, previousEx)
+    assert.equal(result.length, 2)
+    assert.equal(result[0].weight_change_kg, 0)
+    assert.equal(result[0].is_new_set, false)
+    assert.equal(result[1].weight_change_kg, 2.5)
+    assert.equal(result[1].reps_change, 0)
+    assert.equal(result[1].is_new_set, false)
+  })
+
+  test('mehr Sätze als vorher: überzählige Sätze bekommen is_new_set=true statt einen Vergleichswert', () => {
+    const currentEx = {
+      setDetails: [
+        { weight: 80, reps: 8, isWarmup: false },
+        { weight: 80, reps: 8, isWarmup: false },
+        { weight: 80, reps: 8, isWarmup: false }
+      ]
+    }
+    const previousEx = {
+      setDetails: [
+        { weight: 80, reps: 8, isWarmup: false },
+        { weight: 80, reps: 8, isWarmup: false }
+      ]
+    }
+    const result = buildSetsComparison(currentEx, previousEx)
+    assert.equal(result.length, 3)
+    assert.equal(result[2].is_new_set, true)
+    assert.equal(result[2].weight_change_kg, undefined)
+    assert.equal(result[2].previous_weight, undefined)
+  })
+
+  test('previous_weight 0 (reine Körpergewichtsübung) -> is_added_weight=true statt normaler Gewichtssteigerung', () => {
+    const currentEx = { setDetails: [{ weight: 3, reps: 10, isWarmup: false }] }
+    const previousEx = { setDetails: [{ weight: 0, reps: 10, isWarmup: false }] }
+    const result = buildSetsComparison(currentEx, previousEx)
+    assert.equal(result[0].is_added_weight, true)
+    assert.equal(result[0].weight_change_kg, 3)
+  })
+
+  test('kein previousEx -> alle aktuellen Sätze sind is_new_set=true', () => {
+    const currentEx = {
+      setDetails: [
+        { weight: 50, reps: 10, isWarmup: false },
+        { weight: 50, reps: 10, isWarmup: false }
+      ]
+    }
+    const result = buildSetsComparison(currentEx, null)
+    assert.equal(result.length, 2)
+    assert.equal(result.every(s => s.is_new_set), true)
+  })
+
+  test('currentEx ohne echte Arbeitssätze -> leeres Array', () => {
+    const currentEx = { setDetails: [{ weight: 20, reps: 15, isWarmup: true }] }
+    assert.deepEqual(buildSetsComparison(currentEx, null), [])
+  })
+
+  test('Warm-ups fließen nicht in den Vergleich ein', () => {
+    const currentEx = {
+      setDetails: [
+        { weight: 20, reps: 15, isWarmup: true },
+        { weight: 80, reps: 8, isWarmup: false }
+      ]
+    }
+    const previousEx = {
+      setDetails: [
+        { weight: 20, reps: 15, isWarmup: true },
+        { weight: 75, reps: 8, isWarmup: false }
+      ]
+    }
+    const result = buildSetsComparison(currentEx, previousEx)
+    assert.equal(result.length, 1)
+    assert.equal(result[0].set_number, 1)
+    assert.equal(result[0].weight_change_kg, 5)
+  })
+
+  test('Legacy-Struktur (weight/reps/sets ohne setDetails): alle Sätze identisch, Vergleich funktioniert trotzdem', () => {
+    const currentEx = { weight: 60, reps: 8, sets: 3 }
+    const previousEx = { weight: 55, reps: 8, sets: 3 }
+    const result = buildSetsComparison(currentEx, previousEx)
+    assert.equal(result.length, 3)
+    assert.equal(result.every(s => s.weight_change_kg === 5), true)
   })
 })

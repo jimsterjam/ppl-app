@@ -65,6 +65,87 @@ export function calculateExerciseStats(exercise) {
 }
 
 /**
+ * Working-Sets (ohne Warm-ups) als flache {weight, reps}-Liste, in Satz-Reihenfolge.
+ * Grundlage für den Pro-Satz-Vergleich (buildSetsComparison) - siehe dort für den Hintergrund.
+ *
+ * @param {Object} exercise
+ * @returns {{weight:number, reps:number}[]}
+ */
+function getWorkingSetsArray(exercise) {
+  if (!exercise) return [];
+  if (Array.isArray(exercise.setDetails) && exercise.setDetails.length > 0) {
+    return exercise.setDetails
+      .filter(set => !set?.isWarmup)
+      .map(set => ({
+        weight: Math.round((Number(set?.weight) || 0) * 10) / 10,
+        reps: Number(set?.reps) || 0
+      }));
+  }
+  // Legacy-Struktur: kein echter Pro-Satz-Verlauf vorhanden, alle Sätze hatten laut
+  // Datenmodell zwangsläufig das gleiche Gewicht/die gleichen Wiederholungen.
+  if (exercise.weight && exercise.reps && exercise.sets) {
+    return Array.from({ length: Math.max(0, Number(exercise.sets) || 0) }, () => ({
+      weight: Number(exercise.weight) || 0,
+      reps: Number(exercise.reps) || 0
+    }));
+  }
+  return [];
+}
+
+/**
+ * Pro-Satz-Vergleich zur letzten Session einer Übung.
+ *
+ * Hintergrund (User-Report): das bisher an die AI gelieferte "Gewicht" ist ein Durchschnitt
+ * über alle Arbeitssätze (siehe calculateExerciseStats). Die Differenz zweier Durchschnitte
+ * kann ein für den Nutzer bedeutungsloses Bruchergebnis sein (z.B. "0,8kg mehr"), obwohl real
+ * z.B. genau EIN Satz um 2,5kg gesteigert wurde - ohne Pro-Satz-Daten kann die AI weder das
+ * erkennen noch benennen, in welchem Satz sich etwas geändert hat ("eine Wiederholung
+ * weniger" - aber wo?). Dieser Vergleich liefert die fehlende Grundlage dafür.
+ *
+ * Sätze werden ausschließlich über ihre Position einander zugeordnet (Satz 1 zu Satz 1 usw.) -
+ * es gibt keine andere Möglichkeit, Sätze zwischen zwei Sessions zu identifizieren. Hat die
+ * aktuelle Session mehr Arbeitssätze als die vorherige, bekommen die überzähligen Sätze KEINEN
+ * Vergleichswert (is_new_set: true), statt einen erfundenen/irreführenden Vergleich (z.B. gegen
+ * 0 oder gegen den letzten bekannten Satz).
+ *
+ * @param {Object} currentEx
+ * @param {Object|null} previousEx
+ * @returns {Array<Object>} leer, wenn currentEx keine echten Arbeitssätze hat
+ */
+export function buildSetsComparison(currentEx, previousEx) {
+  const currentSets = getWorkingSetsArray(currentEx);
+  if (currentSets.length === 0) return [];
+  const previousSets = getWorkingSetsArray(previousEx);
+
+  return currentSets.map((set, idx) => {
+    const prev = previousSets[idx];
+    if (!prev) {
+      return {
+        set_number: idx + 1,
+        current_weight: set.weight,
+        current_reps: set.reps,
+        is_new_set: true
+      };
+    }
+    return {
+      set_number: idx + 1,
+      current_weight: set.weight,
+      current_reps: set.reps,
+      previous_weight: prev.weight,
+      previous_reps: prev.reps,
+      weight_change_kg: Math.round((set.weight - prev.weight) * 10) / 10,
+      reps_change: set.reps - prev.reps,
+      is_new_set: false,
+      // Vorher kein Trainingsgewicht (reine Körpergewichtsübung) -> die jetzige Last ist ein
+      // Zusatzgewicht, keine "normale" Gewichtssteigerung (User-Report: z.B. Dips mit +3kg
+      // sollen als Zusatzgewicht benannt werden, nicht als hätte vorher schon ein
+      // Trainingsgewicht bestanden).
+      is_added_weight: prev.weight === 0 && set.weight > 0
+    };
+  });
+}
+
+/**
  * Bestimme Trend basierend auf Gewichts- und Volumenveränderung
  *
  * @param {number} weightChange - Kg-Differenz
@@ -152,6 +233,8 @@ export function analyzeExercise(exerciseName, currentEx, previousEx = null, days
         : 0;
 
       analysis.previous = prevStats;
+      // Pro-Satz-Vergleich, ergänzend zu den Aggregat-Werten oben (siehe buildSetsComparison).
+      analysis.setsComparison = buildSetsComparison(currentEx, previousEx);
       analysis.changes = {
         weight_change: Math.round((currentStats.weight - prevStats.weight) * 10) / 10,
         // reps ist jetzt eine Gesamtsumme (siehe calculateExerciseStats), die Differenz ist
@@ -381,6 +464,12 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
         previous_sets: ex.previous.sets,
         previous_volume: ex.previous.volume,
       } : {}),
+
+      // Pro-Satz-Vergleich (siehe buildSetsComparison) - nur wenn tatsächlich vorhanden
+      // (vorherige Session mit echten Arbeitssätzen zu dieser Übung).
+      ...(Array.isArray(ex.setsComparison) && ex.setsComparison.length > 0
+        ? { sets_comparison: ex.setsComparison }
+        : {}),
 
       // Veränderungen (Fakten)
       changes: {
