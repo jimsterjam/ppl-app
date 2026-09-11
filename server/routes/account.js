@@ -6,6 +6,11 @@ import { fileURLToPath } from 'url';
 import mongoose from 'mongoose';
 import Workout from '../models/Workout.js';
 import Exercise from '../models/Exercise.js';
+import CustomExercise from '../models/CustomExercise.js';
+import FavoriteWorkout from '../models/FavoriteWorkout.js';
+import FeedbackRating from '../models/FeedbackRating.js';
+import UserExerciseNote from '../models/UserExerciseNote.js';
+import AppFeedback from '../models/AppFeedback.js';
 import UserProfile from '../models/UserProfile.js';
 import { firebaseAuthMiddleware } from '../middleware/firebaseAuth.js';
 import { requireAdminKey } from '../middleware/adminAuth.js';
@@ -48,6 +53,65 @@ async function getOrCreateProfile(uid) {
 }
 
 // NOTE: use centralized `firebaseAuthMiddleware` (sets `req.auth.userId`)
+
+// ---------------------------------------------------------------------------
+// Datenexport (DSGVO Art. 15 Auskunftsrecht / Art. 20 Datenübertragbarkeit).
+// Liefert alle personenbezogenen Daten des angemeldeten Nutzers als herunterladbare JSON-Datei
+// - maschinenlesbar, deckt Art. 20 direkt mit ab. Umfasst bewusst genau die Collections, die
+// tatsächlich eine userId/uid-Bindung an diesen Nutzer haben:
+//   UserProfile (uid), Workout, Exercise (eigene Übungen), CustomExercise, FavoriteWorkout,
+//   FeedbackRating, UserExerciseNote, AppFeedback.
+// Bewusst NICHT enthalten: FeedbackQualitySignal (laut eigenem Modell-Kommentar absichtlich
+// nicht mit einer userId verknüpfbar/anonymisiert) und PromptImprovementProposal (aggregierter
+// Admin-Vorschlag ohne userId-Feld - kein personenbezogenes Datum dieses Nutzers).
+router.get('/export', firebaseAuthMiddleware, async (req, res) => {
+  const tokenUid = req.auth?.userId;
+  if (!tokenUid) {
+    return res.status(400).json({ error: 'Invalid token: no UID' });
+  }
+
+  try {
+    const [
+      profile,
+      workouts,
+      exercises,
+      customExercises,
+      favoriteWorkouts,
+      feedbackRatings,
+      exerciseNotes,
+      appFeedback
+    ] = await Promise.all([
+      UserProfile.findOne({ uid: tokenUid }).lean(),
+      Workout.find({ userId: tokenUid }).lean(),
+      Exercise.find({ userId: tokenUid }).lean(),
+      CustomExercise.find({ userId: tokenUid }).lean(),
+      FavoriteWorkout.find({ userId: tokenUid }).lean(),
+      FeedbackRating.find({ userId: tokenUid }).lean(),
+      UserExerciseNote.find({ userId: tokenUid }).lean(),
+      AppFeedback.find({ userId: tokenUid }).lean()
+    ]);
+
+    const exportPayload = {
+      exportedAt: new Date().toISOString(),
+      uid: tokenUid,
+      profile: profile || null,
+      workouts,
+      customExercises: [...exercises, ...customExercises],
+      favoriteWorkouts,
+      feedbackRatings,
+      exerciseNotes,
+      appFeedback
+    };
+
+    console.info(`[account/export] Datenexport erstellt (uid=${tokenUid}, workouts=${workouts.length})`);
+
+    res.set('Content-Disposition', `attachment; filename="ppl-fundamentals-daten-${tokenUid}.json"`);
+    res.json(exportPayload);
+  } catch (error) {
+    console.error('[account/export] Datenexport fehlgeschlagen:', error?.message || error);
+    res.status(500).json({ error: 'Failed to export account data', message: error?.message });
+  }
+});
 
 // Delete account and all associated data
 

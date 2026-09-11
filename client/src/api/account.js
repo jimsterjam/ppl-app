@@ -112,3 +112,16 @@ export async function dismissOnboardingHint(token, hintId) {
   }
 }
 
+// ---------------------------
+// Datenexport (DSGVO Art. 15/20, siehe server/routes/account.js GET /export)
+// ---------------------------
+
+export async function exportAccountData(token) {
+  try {
+    const res = await api.get('/export', authConfig(token))
+    return res.data || {}
+  } catch (error) {
+    throw handleAPIError(error, 'Daten exportieren')
+  }
+}
+

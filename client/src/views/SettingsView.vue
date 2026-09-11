@@ -264,6 +264,16 @@
         </button>
       </section>
 
+      <section class="card">
+        <h3>{{ $t('settings.exportDataTitle') }}</h3>
+        <p class="hint">{{ $t('settings.exportDataHint') }}</p>
+        <button class="legal-btn" :disabled="isExporting" @click="handleExportData">
+          <span v-if="isExporting" class="spinner spin-indicator" aria-hidden="true"></span>
+          <span v-else>⬇️</span>
+          <span>{{ isExporting ? $t('settings.exportDataInProgress') : $t('settings.exportDataTitle') }}</span>
+        </button>
+      </section>
+
       <section class="card danger-zone">
         <h3>{{ $t('settings.dangerZone') }}</h3>
         <p class="hint">{{ $t('settings.dangerZoneHint') }}</p>
@@ -470,7 +480,8 @@ import { logger } from '@/utils/logger'
 import { deleteAllWorkouts } from '@/api/workouts'
 import { isOnline, db } from '@/utils/offlineStorage'
 import {
-  uploadProfileAvatar
+  uploadProfileAvatar,
+  exportAccountData
 } from '@/api/account'
 
 const themeStore = useThemeStore()
@@ -1180,6 +1191,36 @@ const clearDevPlan = () => {
 const showDeleteAccountConfirm = ref(false)
 const confirmAccountText = ref('')
 const isDeletingAccount = ref(false)
+
+const isExporting = ref(false)
+
+// DSGVO Art. 15/20: lädt alle personenbezogenen Daten des Nutzers als JSON-Datei herunter
+// (siehe server/routes/account.js GET /export). Der Download läuft rein clientseitig über einen
+// Blob - keine serverseitige Datei, nichts bleibt auf dem Gerät liegen außer der vom Nutzer
+// selbst gespeicherten Datei.
+async function handleExportData() {
+  if (isExporting.value) return
+  isExporting.value = true
+  try {
+    const token = await getIdTokenSafe()
+    const data = await exportAccountData(token)
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `ppl-fundamentals-daten-${data?.uid || 'export'}.json`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+    toast.show($t('settings.exportDataSuccess'), { type: 'success', duration: 3000 })
+  } catch (e) {
+    logger.warn('[SettingsView] Datenexport fehlgeschlagen:', e?.message || e)
+    toast.show($t('settings.exportDataError'), { type: 'error' })
+  } finally {
+    isExporting.value = false
+  }
+}
 
 function withTimeout(promise, ms, label) {
   return Promise.race([
