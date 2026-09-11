@@ -19,6 +19,9 @@
         <div :key="step" class="onboarding-step">
           <h1 class="onboarding-title">{{ t(`onboarding.step${step + 1}Title`) }}</h1>
           <p class="onboarding-text">{{ t(`onboarding.step${step + 1}Text`) }}</p>
+          <ul v-if="isRulesStep" class="onboarding-rules-list">
+            <li v-for="n in 5" :key="n">{{ t(`onboarding.rulesItem${n}`) }}</li>
+          </ul>
         </div>
       </Transition>
     </div>
@@ -39,7 +42,11 @@ import { useI18n } from 'vue-i18n'
 // eine eigene Route hätte sich mit dem bestehenden, bereits fragilen Zusammenspiel aus
 // Router-Guards/Resume-Snapshot/Auth-Redirect in main.js überschnitten. Als reines Overlay über
 // der aktuellen Seite blockiert es keine bestehende Navigation.
-const totalSteps = 5
+// Schritt 2 ("So machst du wirklich Fortschritte") ist die einzige Seite mit einer Liste statt
+// Fließtext - daher totalSteps 5 -> 6 und ein eigenes Flag, das im Template die Regel-Liste
+// zusätzlich zum normalen step2Text rendert (siehe onboarding.rulesItem1-5 in i18n/index.js).
+const totalSteps = 6
+const RULES_STEP_INDEX = 1
 
 const emit = defineEmits(['complete', 'skip'])
 
@@ -47,6 +54,7 @@ const { t } = useI18n()
 
 const step = ref(0)
 const isLastStep = computed(() => step.value === totalSteps - 1)
+const isRulesStep = computed(() => step.value === RULES_STEP_INDEX)
 
 function handleNext() {
   if (isLastStep.value) {
@@ -151,6 +159,31 @@ function handleSkip() {
   line-height: 1.55;
   color: var(--muted);
   margin: 0;
+}
+
+.onboarding-rules-list {
+  list-style: none;
+  margin: 1.25rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.onboarding-rules-list li {
+  position: relative;
+  padding-left: 1.6rem;
+  font-size: clamp(0.98rem, 3.6vw, 1.08rem);
+  line-height: 1.4;
+  color: var(--fg);
+}
+
+.onboarding-rules-list li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+  font-weight: 700;
 }
 
 .onboarding-footer {

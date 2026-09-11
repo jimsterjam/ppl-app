@@ -13,6 +13,15 @@
         </button>
       </section>
 
+      <section class="card">
+        <h3>{{ $t('settings.progressRulesTitle') }}</h3>
+        <p class="hint">{{ $t('settings.progressRulesSubtitle') }}</p>
+        <button class="legal-btn" @click="$router.push({ name: 'faqs', query: { open: 'progressRules' } })">
+          <span>📈</span>
+          <span>{{ $t('settings.progressRulesTitle') }}</span>
+        </button>
+      </section>
+
       <h2 class="section-title">{{ $t('settings.app') }}</h2>
 
       <section class="card card--app">

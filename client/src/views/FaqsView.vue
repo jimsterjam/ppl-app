@@ -51,6 +51,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import HeaderBar from '@/components/HeaderBar.vue'
 import pkg from '../../package.json'
 
@@ -58,11 +59,20 @@ const version = computed(() => pkg?.version || '0.0.0')
 
 // FAQ modal state
 const selectedFaqKey = ref('')
-const baseKeys = ['gettingStarted', 'pushPullLegs', 'navigation', 'workouts', 'progression', 'aiCoach', 'uploads', 'privacy', 'statsReading']
+const baseKeys = ['gettingStarted', 'pushPullLegs', 'navigation', 'workouts', 'progressRules', 'progression', 'aiCoach', 'uploads', 'privacy', 'statsReading']
 const items = computed(() => baseKeys.map(key => ({ key })))
 
 function openFaq(faqKey) {
   selectedFaqKey.value = faqKey
+}
+
+// Erlaubt Deep-Links auf einen konkreten FAQ-Eintrag (z.B. von Settings aus auf die
+// Fortschritts-Regeln, siehe SettingsView.vue) über ?open=<key> - nur ein bekannter Key wird
+// akzeptiert, kein beliebiger Wert aus der URL wird ungeprüft als selectedFaqKey übernommen.
+const route = useRoute()
+const requestedOpenKey = route.query?.open
+if (typeof requestedOpenKey === 'string' && baseKeys.includes(requestedOpenKey)) {
+  selectedFaqKey.value = requestedOpenKey
 }
 
 function closeFaq() {
