@@ -1,5 +1,6 @@
 
 import express from "express";
+import helmet from "helmet";
 import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -18,6 +19,18 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
+// Standard-HTTP-Security-Header (X-Content-Type-Options, X-Frame-Options, HSTS, etc.).
+// CSP bewusst deaktiviert: dieser Server liefert keine eigene HTML-Seite aus (public/ enthält
+// nur hochgeladene Bilder, siehe express.static unten) - er ist reine JSON-API für die
+// Vue-SPA/Capacitor-App. Eine Content-Security-Policy ist daher hier ohne Nutzen und könnte bei
+// künftigen statischen Inhalten (z.B. Debug-Seiten) unerwartet etwas blockieren, ohne dass
+// bewusst eine passende Policy dafür entworfen wurde - crossOriginEmbedderPolicy aus dem
+// gleichen Grund (kann sonst das Laden hochgeladener Bilder aus anderen Origins stören).
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false
+}));
 
 const isProd = process.env.NODE_ENV === 'production'
 const envOrigins = String(process.env.CORS_ALLOWED_ORIGINS || '')
