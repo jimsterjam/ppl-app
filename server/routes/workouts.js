@@ -13,6 +13,7 @@ import FeedbackQualitySignal from '../models/FeedbackQualitySignal.js';
 import { logger } from '../utils/logger.js';
 import { isWorkoutEditWindowExpired } from '../utils/workoutEditWindow.js';
 import { getAIService } from '../services/aiService.js';
+import { runVerificationLoop } from '../services/feedbackVerificationService.js';
 import {
   calculateExerciseStats,
   analyzeWorkoutProgression,
@@ -1946,6 +1947,20 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
         }
       ).catch((e) => {
         logger.warn('⚠️ Konnte AI-Feedback nicht persistieren', { requestId, error: e.message });
+      });
+
+      // Feedback-Qualitäts-Loop (Phase 1: Shadow-Modus, siehe feedbackVerificationService.js).
+      // Bewusst NICHT awaited - der Prüf-Loop (inkl. eines zweiten, kleinen OpenAI-Calls) darf
+      // die Antwortzeit für den Nutzer nicht verlängern und greift in dieser Phase ohnehin nie
+      // in den bereits gesendeten Entwurf ein (reines Beobachten/Protokollieren). Läuft nur,
+      // wenn AI_VERIFIER_MODE (Env) auf 'shadow'/'active' steht - Standard ist 'off' (keine
+      // zusätzlichen Kosten).
+      runVerificationLoop({
+        structuredAnalysis,
+        feedbackText: aiResult.feedback,
+        requestId
+      }).catch((e) => {
+        logger.warn('⚠️ Feedback-Verifier-Loop fehlgeschlagen', { requestId, error: e.message });
       });
     }
 
