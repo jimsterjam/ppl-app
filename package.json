@@ -16,7 +16,8 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier -w .",
-    "build": "cd client && npm run build"
+    "build": "cd client && npm run build",
+    "rebuild": "cd client && npm run rebuild"
   },
   "devDependencies": {
     "@eslint/js": "^9.38.0",
