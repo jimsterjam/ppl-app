@@ -8,7 +8,9 @@ import {
   runDeterministicChecks,
   getVerifierChecklistText,
   buildVerifierUserPrompt,
-  getVerifierMode
+  getVerifierMode,
+  getRuleLabel,
+  RULE_LABELS
 } from '../../services/feedbackVerificationService.js'
 
 // feedbackVerificationService.js: Phase 1 (Shadow-Modus) des Feedback-Qualitäts-Loops. Getestet
@@ -172,5 +174,28 @@ describe('getVerifierMode', () => {
     assert.equal(getVerifierMode(), 'off')
     if (original !== undefined) process.env.AI_VERIFIER_MODE = original
     else delete process.env.AI_VERIFIER_MODE
+  })
+})
+
+describe('getRuleLabel', () => {
+  test('liefert die hinterlegte Klartext-Bezeichnung für eine bekannte Regel-Nummer', () => {
+    assert.equal(getRuleLabel(1), RULE_LABELS[1])
+    assert.match(getRuleLabel(1), /Datenwahrheit/)
+  })
+
+  test('funktioniert auch mit String-Nummern (z.B. aus MongoDB/JSON)', () => {
+    assert.equal(getRuleLabel('7'), RULE_LABELS[7])
+  })
+
+  test('unbekannte Regel-Nummer liefert einen Fallback-Text statt undefined/Crash', () => {
+    const label = getRuleLabel(999)
+    assert.match(label, /999/)
+    assert.match(label, /keine Beschreibung/)
+  })
+
+  test('alle 17 Regeln aus dem System-Prompt sind hinterlegt', () => {
+    for (let rule = 1; rule <= 17; rule++) {
+      assert.ok(RULE_LABELS[rule], `Regel ${rule} fehlt in RULE_LABELS`)
+    }
   })
 })

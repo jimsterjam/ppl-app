@@ -40,8 +40,19 @@
     <p v-if="analyzeMessage" class="info-text">{{ analyzeMessage }}</p>
     <p v-else-if="loaded && !loading && !proposals.length" class="muted">Keine Vorschläge gefunden.</p>
 
-    <div v-if="proposals.length" class="proposal-list">
-      <article v-for="p in proposals" :key="p.id" class="proposal">
+    <!-- User-Wunsch: Liste soll nicht endlos wachsen (jede "Neue Analyse starten" fügt einen
+         weiteren Eintrag hinzu, alte bleiben stehen). Standardmäßig nur den neuesten Vorschlag
+         zeigen, Rest per Toggle einblendbar statt komplett zu verstecken/zu löschen. -->
+    <button
+      v-if="proposals.length > 1"
+      class="outline-btn toggle-history-btn"
+      @click="showAllProposals = !showAllProposals"
+    >
+      {{ showAllProposals ? 'Nur neuesten Vorschlag anzeigen' : `${proposals.length - 1} ältere anzeigen` }}
+    </button>
+
+    <div v-if="visibleProposals.length" class="proposal-list">
+      <article v-for="p in visibleProposals" :key="p.id" class="proposal">
         <div class="proposal-top">
           <span class="badge" :class="`badge-${p.status}`">{{ statusLabel(p.status) }}</span>
           <span class="proposal-time">{{ formatDateTime(p.createdAt) }}</span>
@@ -103,7 +114,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { listInsightProposals, analyzeFeedbackInsights, updateInsightProposal, getPendingInsightCount } from '@/api/feedbackInsights'
 
 // Admin-only Review-Oberfläche für KI-generierte Verbesserungsvorschläge zum KI-Feedback-
@@ -126,7 +137,14 @@ const updatingId = ref('')
 const reviewNotes = ref({})
 const pendingCount = ref(0)
 const copiedKey = ref('')
+const showAllProposals = ref(false)
 let copiedTimeout = null
+
+// proposals ist bereits nach createdAt DESC sortiert (siehe adminFeedbackInsights.js) - der
+// erste Eintrag ist damit immer der neueste.
+const visibleProposals = computed(() => (
+  showAllProposals.value ? proposals.value : proposals.value.slice(0, 1)
+))
 
 async function copyText(text, key) {
   try {
@@ -312,6 +330,11 @@ if (adminKey.value) {
 .muted {
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.toggle-history-btn {
+  display: block;
+  margin-bottom: 12px;
 }
 
 .proposal-list {

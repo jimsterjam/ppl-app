@@ -327,6 +327,36 @@ export async function verifyFeedbackWithAI(structuredAnalysis, feedbackText, opt
 // Orchestrierung (Shadow-Modus, Phase 1)
 // ---------------------------------------------------------------------------------------------
 
+/**
+ * Klartext-Bezeichnungen der Regeln aus getCoachSystemPromptText() (OpenAIProvider.js) - für
+ * die Admin-Auswertung (VerifierAudit.triggeredRules enthält nur Regel-Nummern). Nummerierung
+ * identisch zum System-Prompt, damit ein Admin eine dort beanstandete Regel direkt im
+ * Prompt-Text wiederfindet.
+ */
+export const RULE_LABELS = {
+  1: 'Datenwahrheit (Zahlen im Text stimmen mit den Rohdaten überein)',
+  2: 'Null-Annahmen-Prinzip (keine Aussage zu nicht vorhandenen Werten)',
+  3: 'Keine halluzinierten Ursachen für eine Veränderung',
+  4: 'Keine Aussage zu Ausführung/Technik/Tempo/Schmerz ohne explizite Notiz',
+  5: 'Keine medizinischen Diagnosen',
+  6: 'Fakten und Interpretation nicht klar genug getrennt',
+  7: 'Endgültiges Urteil statt bedingtem Hinweis bei mehrdeutiger Datenlage',
+  8: 'Automatische Wertung einer Gewichts-/Volumenveränderung als positiv/negativ',
+  9: 'Einzelne Trainingseinheit überinterpretiert',
+  10: 'Trend über mehrere Einheiten unzulässig verallgemeinert',
+  11: 'Erfundene Empfehlung ohne Datenbezug oder mehr als 3 Hinweise',
+  12: 'Notiz des Nutzers nicht korrekt berücksichtigt',
+  13: 'Übungsprofil (profile_hint) nicht beachtet',
+  14: 'Technikfokus-Übung anhand von Gewicht/Volumen bewertet',
+  15: 'Speed-/Power-Übung anhand von Volumen/Wiederholungen bewertet',
+  16: 'Rohzahlen einer Übung stumpf wiederholt (Dopplung zur UI-Übersicht)',
+  17: 'Ton/Format: liest sich wie ein Report statt einer kurzen Chat-Nachricht'
+};
+
+export function getRuleLabel(ruleNumber) {
+  return RULE_LABELS[Number(ruleNumber)] || `Regel ${ruleNumber} (keine Beschreibung hinterlegt)`;
+}
+
 export function getVerifierMode() {
   const raw = String(process.env.AI_VERIFIER_MODE || 'off').trim().toLowerCase();
   return raw === 'shadow' || raw === 'active' ? raw : 'off';
@@ -419,5 +449,7 @@ export default {
   buildVerifierUserPrompt,
   verifyFeedbackWithAI,
   getVerifierMode,
-  runVerificationLoop
+  runVerificationLoop,
+  RULE_LABELS,
+  getRuleLabel
 };

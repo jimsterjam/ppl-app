@@ -255,6 +255,12 @@
         <AiInsightsPanel />
       </section>
 
+      <section v-if="isAdminUser" class="card">
+        <h3>🧪 Feedback-Qualitäts-Loop (Admin)</h3>
+        <p class="hint">Nur für dich sichtbar: automatische Prüfung des KI-Trainingsfeedbacks gegen die System-Prompt-Regeln (Shadow-Modus, siehe AI_VERIFIER_MODE).</p>
+        <VerifierAuditPanel />
+      </section>
+
       <section class="card">
         <h3>{{ $t('settings.legalTitle') }}</h3>
         <p class="hint">{{ $t('settings.legalHint') }}</p>
@@ -461,6 +467,7 @@
 import HeaderBar from '../components/HeaderBar.vue'
 import AppFeedbackDialog from '../components/AppFeedbackDialog.vue'
 import AdminFeedbackPanel from '../components/AdminFeedbackPanel.vue'
+import VerifierAuditPanel from '../components/VerifierAuditPanel.vue'
 import AiInsightsPanel from '../components/AiInsightsPanel.vue'
 import { storeToRefs } from 'pinia'
 import { useThemeStore } from '@/stores/themeStore'
