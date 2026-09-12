@@ -20,7 +20,7 @@ import { setCacheLimits } from '@/utils/assetCache'
 import { setDownloadConcurrency } from '@/utils/assetResolver'
 import { setupAutoSync, processSyncQueue } from '@/utils/syncManager'
 import { saveWorkoutService } from '@/utils/SaveWorkoutService'
-import { deleteWorkoutOffline, OFFLINE_WORKOUTS_UPDATED_EVENT } from '@/utils/offlineStorage'
+import { deleteWorkoutOffline, setMetadata, OFFLINE_WORKOUTS_UPDATED_EVENT } from '@/utils/offlineStorage'
 import { processPendingAiFeedback } from '@/utils/pendingAiFeedback'
 // Bewusst NICHT statisch importiert (siehe warmupExercisesArea unten): defaultExercisesLoader.js
 // importiert die ~3,3MB große Übungsdatenbank (default-exercises.json) statisch - ein Top-Level-
@@ -419,6 +419,21 @@ saveWorkoutService.init(async (tempId, workout) => {
     userStore.workouts.splice(idx, 1, { ...workout, _offlineCreated: false })
     logger.debug('[main] reconcileCallback: Store-Eintrag ersetzt', { tempId, realId: workout._id })
   }
+  // Bug-Fix (User-Report "kein Feedback erscheint, obwohl das Workout längst synchronisiert
+  // ist"): resolveRealIdFromDraftId() (workoutHelpers.js) sucht ausschließlich in
+  // 'workout_map_<tempId>' (sessionStorage/IndexedDB) nach der echten Server-ID. Dieses
+  // Mapping wurde bisher NUR vom schnellen 2s-Race-Pfad in userStore.js.createWorkout()
+  // geschrieben - für Workouts, die stattdessen über die allgemeine Offline-Sync-Queue
+  // (dieser Reconcile-Callback hier, z.B. weil das Gerät beim Speichern komplett offline war
+  // oder syncManager erst deutlich später erfolgreich pusht) synchronisiert wurden, fehlte das
+  // Mapping komplett. Dadurch blieb resolveRealIdFromDraftId() für diese Workouts dauerhaft
+  // ergebnislos, obwohl der Workout auf dem Server längst mit echter ID existierte - jede
+  // spätere KI-Analyse-Anfrage (PostWorkoutSummary.vue, pendingAiFeedback.js) blieb im
+  // 'syncPending'-Zustand hängen. Gleicher Mechanismus wie in userStore.js ergänzt.
+  try {
+    sessionStorage.setItem(`workout_map_${tempId}`, String(workout._id))
+  } catch {}
+  setMetadata(`workout_map_${tempId}`, String(workout._id)).catch(() => {})
   userStore.invalidateStatsCache()
   logger.debug('[main] reconcileCallback: Stats-Cache invalidiert')
   try {

@@ -288,6 +288,23 @@ export async function resolveRealIdFromDraftId(id, route = null) {
   return realId
 }
 
+/**
+ * Prüft, ob eine ID das Format einer echten MongoDB-ObjectId hat (24-stelliger Hex-String).
+ *
+ * Bug-Fix-Absicherung (siehe main.js reconcileCallback-Kommentar): eine fehlende/fehlerhafte
+ * 'workout_map_<id>'-Auflösung konnte bisher dazu führen, dass eine temporäre offline_-/draft-
+ * ID unverändert an den Server geschickt wurde (KI-Analyse-Anfrage schlug dann serverseitig mit
+ * 400 fehl, verbrauchte aber unnötig Burst-Rate-Limit-Kontingent). Alle Aufrufstellen, die eine
+ * (potenziell temporäre) ID an /:id/ai-analysis schicken, prüfen jetzt zusätzlich hiermit VOR
+ * dem Request - unabhängig davon, woher eine ungültige ID im Einzelfall stammt.
+ *
+ * @param {string} id
+ * @returns {boolean}
+ */
+export function isValidObjectId(id) {
+  return /^[0-9a-fA-F]{24}$/.test(String(id || ''))
+}
+
 export default {
   matchExerciseByIdOrName,
   prefillExercises,
@@ -295,5 +312,6 @@ export default {
   validateWorkout,
   estimateWorkoutDuration,
   resolveRealIdFromDraftId,
+  isValidObjectId,
   snapshotCore
 }

@@ -108,6 +108,7 @@ import AiFeedbackDeltaSummary from '@/components/AiFeedbackDeltaSummary.vue'
 import AiFeedbackRatingWidget from '@/components/AiFeedbackRatingWidget.vue'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { fetchWorkoutFeedbacks, requestAiAnalysis } from '@/api/workouts'
+import { isValidObjectId } from '@/utils/workoutHelpers'
 import { logger } from '@/utils/logger'
 import { getMetadata, setMetadata } from '@/utils/offlineStorage'
 import { useToastStore } from '@/stores/toastStore'
@@ -158,6 +159,15 @@ function toggle(id) {
 // Ergebnis da ist - kein erneutes Laden der ganzen Liste nötig.
 async function generateNow(item) {
   if (generatingId.value) return
+  // Sicherheitsnetz (siehe isValidObjectId-Kommentar in workoutHelpers.js): sollte item.workoutId
+  // aus irgendeinem Grund keine gültige Server-ID sein (z.B. ein noch nicht synchronisierter
+  // lokaler Eintrag), gar nicht erst anfragen statt eine sicher fehlschlagende Anfrage zu
+  // verschicken.
+  if (!isValidObjectId(item.workoutId)) {
+    logger.warn('[AIFeedbackHistory] generateNow: ungültige workoutId, breche ab', { workoutId: item.workoutId })
+    generateError.value = item.workoutId
+    return
+  }
   generatingId.value = item.workoutId
   generateError.value = null
   try {

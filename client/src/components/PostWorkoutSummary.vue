@@ -143,7 +143,7 @@ import { logger } from '@/utils/logger'
 import { apiUrl } from '@/api/http'
 import axios from 'axios'
 import { acquireKeepAwake, releaseKeepAwake } from '@/utils/keepAwakeGuard'
-import { resolveRealIdFromDraftId } from '@/utils/workoutHelpers'
+import { resolveRealIdFromDraftId, isValidObjectId } from '@/utils/workoutHelpers'
 import { logDiagnostic } from '@/utils/diagnosticsLog'
 import { OFFLINE_WORKOUTS_UPDATED_EVENT } from '@/utils/offlineStorage'
 import { queuePendingAiFeedback, clearPendingAiFeedback } from '@/utils/pendingAiFeedback'
@@ -238,9 +238,15 @@ async function resolveWorkoutIdForAnalysis(rawId) {
   let waited = 0
   while (waited < maxWaitMs) {
     const realId = await resolveRealIdFromDraftId(id).catch(() => '')
-    if (realId) {
+    // Sicherheitsnetz (siehe isValidObjectId-Kommentar in workoutHelpers.js): eine aufgelöste,
+    // aber nicht wie eine echte ObjectId aussehende ID wird wie "nicht aufgelöst" behandelt,
+    // statt sie unverändert an den Server weiterzureichen.
+    if (realId && isValidObjectId(realId)) {
       logger.debug('[PostWorkoutSummary] Temp-ID aufgelöst', { tempId: id, realId })
       return realId
+    }
+    if (realId) {
+      logger.warn('[PostWorkoutSummary] Aufgelöste ID hat kein gültiges Format, ignoriere', { tempId: id, realId })
     }
     await sleep(intervalMs)
     waited += intervalMs

@@ -19,7 +19,7 @@
  */
 import axios from 'axios'
 import { apiUrl } from '@/api/http'
-import { resolveRealIdFromDraftId } from './workoutHelpers'
+import { resolveRealIdFromDraftId, isValidObjectId } from './workoutHelpers'
 import { useFirebaseAuth } from './firebaseAuth'
 import { logger } from './logger'
 
@@ -27,6 +27,14 @@ const STORAGE_KEY = 'bro_split_pending_ai_feedback_v1'
 // Defensive Obergrenze: falls eine temporäre ID nie aufgelöst wird (z.B. Workout wurde nie
 // erfolgreich angelegt), soll die Queue nicht unbegrenzt wachsen.
 const MAX_AGE_MS = 1000 * 60 * 60 * 24 * 3 // 3 Tage
+// Bug-Fix (User-Report "429 Too Many Requests" + Server-Logs zeigten denselben ungelösten
+// Eintrag über Stunden hinweg bei praktisch jedem App-Start/Reconnect erneut versucht): ohne
+// Mindestabstand konnte ein dauerhaft unauflösbarer Eintrag (z.B. wegen des in main.js
+// gefixten fehlenden workout_map_-Mappings) bei jedem OFFLINE_WORKOUTS_UPDATED_EVENT erneut
+// versucht werden - das verbrauchte unnötig das server-seitige Burst-Rate-Limit-Kontingent
+// (6 Anfragen/Minute, siehe aiUtils.js) und blockierte dadurch echte, neue Anfragen.
+const RETRY_COOLDOWN_MS = 1000 * 60 * 5 // 5 Minuten zwischen zwei Versuchen für denselben Eintrag
+const MAX_ATTEMPTS = 20 // zusätzlich zur 3-Tage-Altersgrenze: harte Obergrenze an Versuchen
 
 function loadQueue() {
   try {
@@ -85,10 +93,32 @@ export async function processPendingAiFeedback() {
         continue
       }
 
-      const realId = await resolveRealIdFromDraftId(entry.id).catch(() => '')
-      if (!realId) {
-        // Noch keine Reconciliation vorhanden - beim nächsten Aufruf erneut versuchen.
+      if ((entry.attempts || 0) >= MAX_ATTEMPTS) {
+        logger.warn('[pendingAiFeedback] Eintrag verworfen (zu viele erfolglose Versuche)', {
+          id: entry.id, attempts: entry.attempts
+        })
+        continue
+      }
+
+      // Mindestabstand zwischen zwei Versuchen für denselben Eintrag (siehe RETRY_COOLDOWN_MS-
+      // Kommentar oben) - ohne diesen konnte derselbe dauerhaft ungelöste Eintrag bei jedem
+      // App-Start/Reconnect erneut versucht werden und unnötig das Burst-Rate-Limit belegen.
+      if (entry.lastAttemptAt && now - entry.lastAttemptAt < RETRY_COOLDOWN_MS) {
         stillPending.push(entry)
+        continue
+      }
+
+      const realId = await resolveRealIdFromDraftId(entry.id).catch(() => '')
+      // Sicherheitsnetz (siehe isValidObjectId-Kommentar in workoutHelpers.js): eine aufgelöste,
+      // aber nicht wie eine echte ObjectId aussehende ID wird wie "nicht aufgelöst" behandelt.
+      if (!realId || !isValidObjectId(realId)) {
+        if (realId) {
+          logger.warn('[pendingAiFeedback] Aufgelöste ID hat kein gültiges Format, ignoriere', { tempId: entry.id, realId })
+        }
+        // Noch keine (gültige) Reconciliation vorhanden - beim nächsten Aufruf erneut versuchen,
+        // aber Versuch zählen, damit ein dauerhaft unauflösbarer Eintrag nicht endlos oft pro
+        // Tag angefasst wird.
+        stillPending.push({ ...entry, attempts: (entry.attempts || 0) + 1, lastAttemptAt: now })
         continue
       }
 
@@ -112,7 +142,7 @@ export async function processPendingAiFeedback() {
           tempId: entry.id,
           error: err?.message
         })
-        stillPending.push(entry)
+        stillPending.push({ ...entry, attempts: (entry.attempts || 0) + 1, lastAttemptAt: now })
       }
     }
 
