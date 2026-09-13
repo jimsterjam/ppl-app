@@ -8,7 +8,7 @@
 
 import { logger } from '../utils/logger.js';
 import AIProvider from './AIProvider.js';
-import { createOpenAIClient, describeAiClientMode } from '../utils/aiClientFactory.js';
+import { createOpenAIClient, describeAiClientMode, ensureRelayAwake, markRelayContact } from '../utils/aiClientFactory.js';
 import { withAiRetry } from '../utils/aiUtils.js';
 
 // WICHTIG: Lazy-Load von ENV-Variablen (nicht beim Import)
@@ -295,6 +295,11 @@ export class OpenAIProvider extends AIProvider {
       // Baue strukturierten Prompt
       const prompt = this.buildPrompt(trainingAnalysis);
 
+      // Relay ggf. erst aufwecken (Render Free-Plan, siehe Kommentar in aiClientFactory.js) -
+      // spart im Normalfall (Relay schon wach) einen No-Op-Check, verhindert im Kaltstart-Fall
+      // aber, dass der teure/limitiert wiederholte Completion-Call selbst als Wecker dient.
+      await ensureRelayAwake();
+
       // Rufe OpenAI auf
       // WICHTIG: `timeout` ist beim openai-SDK ein Request-OPTIONS-Parameter (2. Argument),
       // kein Feld des Request-Bodys. Stand er im Body-Objekt, schickte der SDK-Client ihn als
@@ -327,6 +332,8 @@ export class OpenAIProvider extends AIProvider {
       }, {
         timeout: this.timeout
       }));
+
+      markRelayContact();
 
       const feedback = response.choices?.[0]?.message?.content?.trim();
 

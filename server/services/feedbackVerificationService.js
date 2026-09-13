@@ -24,7 +24,7 @@
 
 import { logger } from '../utils/logger.js';
 import { withAiRetry, parseJsonSafely } from '../utils/aiUtils.js';
-import { createOpenAIClient } from '../utils/aiClientFactory.js';
+import { createOpenAIClient, ensureRelayAwake, markRelayContact } from '../utils/aiClientFactory.js';
 import VerifierAudit from '../models/VerifierAudit.js';
 
 const MIN_EXPECTED_WORDS = 40;
@@ -290,6 +290,11 @@ export async function verifyFeedbackWithAI(structuredAnalysis, feedbackText, opt
 
   const userPrompt = buildVerifierUserPrompt(structuredAnalysis, feedbackText, deterministicViolations);
 
+  // Siehe Kommentar in aiClientFactory.js - schützt vor demselben Render-Free-Kaltstart-502
+  // wie beim Haupt-Generierungscall (in der Praxis meist ein No-Op, da dieser Verifier-Call
+  // typischerweise direkt NACH einem bereits erfolgreichen Generierungscall läuft).
+  await ensureRelayAwake();
+
   const response = await withAiRetry(async () => {
     return client.chat.completions.create({
       model,
@@ -302,6 +307,8 @@ export async function verifyFeedbackWithAI(structuredAnalysis, feedbackText, opt
       response_format: { type: 'json_object' }
     });
   });
+
+  markRelayContact();
 
   const raw = response.choices?.[0]?.message?.content?.trim();
   const parsed = parseJsonSafely(raw, { requestId, context: 'feedback-verifier' });

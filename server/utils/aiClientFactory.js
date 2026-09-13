@@ -105,4 +105,84 @@ export function logAiClientMode(context = '') {
   logger.info(`🔌 AI-Client-Modus${context ? ` (${context})` : ''}: ${label} [${mode}]`);
 }
 
-export default { getAiClientMode, describeAiClientMode, createOpenAIClient, logAiClientMode };
+// ---------------------------------------------------------------------------
+// Relay-Wake-Up (Kostenkompromiss: Render Free-Plan statt Starter, siehe Diskussion mit User -
+// ein Upgrade auf Starter (kein Einschlafen des Dienstes) würde das Problem strukturell lösen,
+// kostet aber ~25€/Monat zusätzlich und ist in der aktuellen Testphase bewusst nicht gewünscht).
+// ---------------------------------------------------------------------------
+// Render Free-Web-Services schlafen nach ~15 Min. Inaktivität ein und brauchen beim Aufwachen
+// mehrere zehn Sekunden - eine einzelne echte Chat-Completion-Anfrage (die dabei zusätzlich noch
+// echtes OpenAI-Geld kostet) ist dafür der falsche Wecker: sie hat ein festes Timeout/Retry-Budget
+// und Renders eigenes Edge-Gateway kann währenddessen bereits mit einer 502-HTML-Seite aufgeben,
+// bevor der Relay-Container überhaupt bereit ist (beobachtetes Symptom: 502 nach ~4-5s, obwohl der
+// Relay laut Render-Dashboard "live" ist - er war schlicht noch am Hochfahren).
+//
+// Fix: VOR dem eigentlichen (kostenpflichtigen) Completion-Call wird der Relay separat über seinen
+// unauthentifizierten /healthz-Endpunkt (siehe relay/app.js) "geweckt" und wiederholt angefragt,
+// bis er antwortet oder maxWaitMs erreicht ist - kostet kein OpenAI-Token, nur Zeit. Ein
+// Zeitstempel des letzten erfolgreichen Kontakts wird gemerkt, damit nicht JEDE Anfrage diesen
+// Wake-Up-Umweg nehmen muss, solange der Relay mit hoher Wahrscheinlichkeit noch wach ist
+// (deutliche Sicherheitsmarge unter den ~15 Min., nach denen Render ihn einschlafen lässt).
+let lastRelayContactAt = 0;
+const RELAY_WARM_ASSUMPTION_MS = 8 * 60 * 1000;
+
+/**
+ * Merkt sich, dass der Relay gerade erfolgreich reagiert hat (Healthcheck ODER ein echter,
+ * erfolgreicher Completion-Call) - von Aufrufern nach jedem erfolgreichen Request aufzurufen.
+ */
+export function markRelayContact() {
+  lastRelayContactAt = Date.now();
+}
+
+/**
+ * Wartet ggf., bis der Relay erreichbar ist (siehe Kommentar oben). No-op im Direkt-Modus
+ * (kein Relay konfiguriert) und no-op, wenn der letzte bekannte Kontakt noch "frisch" ist.
+ * Wirft NICHT bei Ausbleiben der Antwort - der eigentliche Call versucht es danach trotzdem
+ * (klassifiziert einen erneuten 502 ganz normal über classifyAiError/withAiRetry), diese
+ * Funktion verschafft ihm nur eine deutlich bessere Ausgangslage.
+ *
+ * @param {Object} [options]
+ * @param {number} [options.maxWaitMs] - maximale Wartezeit insgesamt (Default 50s)
+ * @param {number} [options.pollIntervalMs] - Abstand zwischen Healthcheck-Versuchen (Default 3s)
+ */
+export async function ensureRelayAwake({ maxWaitMs = 50000, pollIntervalMs = 3000 } = {}) {
+  if (getAiClientMode() !== 'relay') return;
+  if (Date.now() - lastRelayContactAt < RELAY_WARM_ASSUMPTION_MS) return;
+
+  const healthUrl = `${String(process.env.AI_RELAY_URL).trim().replace(/\/+$/, '')}/healthz`;
+  const deadline = Date.now() + maxWaitMs;
+  let attempt = 0;
+  let lastErrorMessage = '';
+
+  while (Date.now() < deadline) {
+    attempt += 1;
+    try {
+      const response = await fetch(healthUrl, { signal: AbortSignal.timeout(5000) });
+      if (response.ok) {
+        markRelayContact();
+        if (attempt > 1) {
+          logger.info('✅ Relay aufgeweckt', { attempt, elapsedMs: Date.now() - (deadline - maxWaitMs) });
+        }
+        return;
+      }
+      lastErrorMessage = `Status ${response.status}`;
+    } catch (error) {
+      lastErrorMessage = error.message;
+    }
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+  }
+
+  logger.warn('⚠️ Relay antwortete auch nach Wake-Up-Versuchen nicht - versuche echten Call trotzdem', {
+    attempts: attempt,
+    lastError: lastErrorMessage
+  });
+}
+
+export default {
+  getAiClientMode,
+  describeAiClientMode,
+  createOpenAIClient,
+  logAiClientMode,
+  ensureRelayAwake,
+  markRelayContact
+};

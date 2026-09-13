@@ -11,10 +11,10 @@
  * übergibt bewusst NIE userId/feedbackId an OpenAI - nur die reine Bewertungsinhalte.
  */
 
-import { OpenAI } from 'openai';
 import { logger } from '../utils/logger.js';
 import { withAiRetry, parseJsonSafely } from '../utils/aiUtils.js';
 import { getCoachSystemPromptText } from './OpenAIProvider.js';
+import { createOpenAIClient, ensureRelayAwake, markRelayContact } from '../utils/aiClientFactory.js';
 
 const MAX_RATINGS_PER_ANALYSIS = 40;
 const MAX_CORRECTION_LENGTH = 400;
@@ -255,15 +255,13 @@ Antworte AUSSCHLIESSLICH als valides JSON-Objekt, keine Erklärung davor/danach:
 }`;
 }
 
+// Bug-Fix: baute bisher IMMER new OpenAI({ apiKey: process.env.OPENAI_API_KEY }) direkt, ohne
+// die zentrale, relay-fähige createOpenAIClient()-Fabrik zu nutzen (gleicher Fehler wie zuvor
+// in routes/workouts.js initializeOpenAI() und OpenAIProvider.js gefunden/behoben) - im
+// Relay-Betrieb ist OPENAI_API_KEY auf diesem Server bewusst nicht gesetzt, wodurch dieser
+// admin-seitige KI-Insight-Vorschlag hier immer mit AI_NOT_CONFIGURED fehlgeschlagen wäre.
 function getClient() {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    const err = new Error('OPENAI_API_KEY not configured');
-    err.code = 'AI_NOT_CONFIGURED';
-    throw err;
-  }
-  const timeout = Math.max(5000, Number(process.env.OPENAI_TIMEOUT_MS) || 30000);
-  return new OpenAI({ apiKey, timeout });
+  return createOpenAIClient();
 }
 
 /**
@@ -296,6 +294,8 @@ export async function generateInsightProposal(ratings, options = {}) {
   const currentPromptText = getCoachSystemPromptText();
   const userPrompt = buildInsightPrompt(ratings, currentPromptText);
 
+  await ensureRelayAwake();
+
   const response = await withAiRetry(async () => {
     return client.chat.completions.create({
       model,
@@ -310,6 +310,8 @@ export async function generateInsightProposal(ratings, options = {}) {
       response_format: { type: 'json_object' }
     });
   });
+
+  markRelayContact();
 
   const raw = response.choices?.[0]?.message?.content?.trim();
   const parsed = parseJsonSafely(raw, { requestId, context: 'feedback-insight' });

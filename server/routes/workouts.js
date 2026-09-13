@@ -45,7 +45,7 @@ import {
   getQuickGeneratorMissingInputs
 } from '../utils/workoutSanitizer.js';
 import { decideExerciseMatch } from '../utils/exerciseMatching.js';
-import { createOpenAIClient, describeAiClientMode } from '../utils/aiClientFactory.js';
+import { createOpenAIClient, describeAiClientMode, ensureRelayAwake, markRelayContact } from '../utils/aiClientFactory.js';
 import {
   classifyAiError,
   isRetryableAiError,
@@ -2617,6 +2617,9 @@ async function generateGPT4Suggestion(workoutContext, openaiClient, options = {}
 
   const prompt = createWorkoutPrompt(workoutContext);
 
+  // Relay ggf. erst aufwecken (Render Free-Plan, siehe Kommentar in utils/aiClientFactory.js).
+  await ensureRelayAwake();
+
   const completion = await withAiRetry(async () => openaiClient.chat.completions.create({
     model: "gpt-4o-mini",
     messages: [
@@ -2669,6 +2672,8 @@ async function generateGPT4Suggestion(workoutContext, openaiClient, options = {}
     timeout: AI_OPENAI_TIMEOUT_MS
   }));
 
+  markRelayContact();
+
   const response = completion?.choices?.[0]?.message?.content || '';
   const parsed = parseJsonSafely(response, { requestId, context: 'ai-suggestion' });
   return validateAiSuggestionPayload(parsed);
@@ -2677,6 +2682,13 @@ async function generateGPT4Suggestion(workoutContext, openaiClient, options = {}
 async function generateQuickGeneratorWithOpenAI(context, openaiClient, options = {}) {
   const requestId = options.requestId || '';
   const prompt = createQuickGeneratorPrompt(context);
+
+  // Relay ggf. erst aufwecken (Render Free-Plan, siehe Kommentar in utils/aiClientFactory.js) -
+  // sonst riskiert genau dieser Call denselben 502-Kaltstart-Fehlschlag, der beim User zum
+  // "Quick-Generator liefert immer dasselbe (Demo-)Workout"-Symptom führte (siehe initializeOpenAI-
+  // Fix weiter oben - DIESER Call hier lief bereits vorher korrekt über den Relay, sobald
+  // initializeOpenAI() überhaupt erst einen Client zurückgab).
+  await ensureRelayAwake();
 
   const completion = await withAiRetry(async () => openaiClient.chat.completions.create({
     model: 'gpt-4o-mini',
@@ -2708,6 +2720,8 @@ Fallback auf sinnvolle Standardwerte bei fehlenden Parametern.`
     // Siehe Kommentar bei generateGPT4Suggestion() weiter oben - derselbe Bug.
     timeout: AI_OPENAI_TIMEOUT_MS
   }));
+
+  markRelayContact();
 
   const raw = completion?.choices?.[0]?.message?.content || '{}';
   const parsed = parseJsonSafely(raw, { requestId, context: 'quick-generator' });
