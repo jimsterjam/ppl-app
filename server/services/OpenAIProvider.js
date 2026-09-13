@@ -9,6 +9,7 @@
 import { logger } from '../utils/logger.js';
 import AIProvider from './AIProvider.js';
 import { createOpenAIClient, describeAiClientMode } from '../utils/aiClientFactory.js';
+import { withAiRetry } from '../utils/aiUtils.js';
 
 // WICHTIG: Lazy-Load von ENV-Variablen (nicht beim Import)
 // Sonst sind sie noch undefined wenn dotenv.config() nicht aufgerufen wurde
@@ -301,7 +302,15 @@ export class OpenAIProvider extends AIProvider {
       // timeout". Der Client-Timeout (this.timeout) greift ohnehin schon global über die
       // `new OpenAI({ timeout })`-Konfiguration im Constructor; hier zusätzlich als
       // Options-Argument gesetzt, falls ein Request abweichend länger/kürzer dauern soll.
-      const response = await this.client.chat.completions.create({
+      // Bug-Fix (Relay-Kaltstart auf Render Free-Tier): dieser Call schlug bei kaltem Relay
+      // mit einem 502-Gateway-Fehler (HTML-Seite statt JSON) fehl, obwohl der Health-Check
+      // davor bereits entschärft wurde (siehe routes/workouts.js POST /ai-analysis). Anders als
+      // der strukturell identische Call in feedbackVerificationService.js/feedbackInsightService.js
+      // war DIESER Call hier nicht mit withAiRetry() umschlossen - ein einzelner 502 während des
+      // Kaltstarts (typ. 20-50s) führte damit sofort zum kompletten Fehlschlagen der Feedback-
+      // Generierung statt automatisch (mit Backoff) erneut zu versuchen. classifyAiError()
+      // erkennt 5xx-Antworten als 'provider_server_error' -> retryable.
+      const response = await withAiRetry(async () => this.client.chat.completions.create({
         model: this.model,
         messages: [
           {
@@ -317,7 +326,7 @@ export class OpenAIProvider extends AIProvider {
         max_tokens: 800
       }, {
         timeout: this.timeout
-      });
+      }));
 
       const feedback = response.choices?.[0]?.message?.content?.trim();
 

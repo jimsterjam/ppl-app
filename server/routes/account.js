@@ -434,17 +434,16 @@ router.post('/profile/avatar', firebaseAuthMiddleware, avatarUpload.single('imag
       .jpeg({ quality: 82, mozjpeg: true })
       .toBuffer();
 
-    const avatarsDir = path.join(__dirname, '../public/uploads/avatars');
-    await fs.mkdir(avatarsDir, { recursive: true });
-
+    // Bug-Fix: nicht mehr auf lokale Festplatte schreiben (siehe Kommentar bei
+    // avatarImage in models/UserProfile.js - Render-Dateisystem ist flüchtig und wird bei
+    // jedem Deploy zurückgesetzt, wodurch hochgeladene Avatare verschwanden). Stattdessen
+    // Bild-Binärdaten direkt im UserProfile-Dokument speichern; avatarUrl bleibt als
+    // Auslieferungs-Pfad bestehen (siehe GET /uploads/avatars/:filename in app.js).
     const filename = `${uid}.jpg`;
-    const absPath = path.join(avatarsDir, filename);
-    await fs.writeFile(absPath, out);
-
     const avatarUrl = `/uploads/avatars/${filename}`;
     const updated = await UserProfile.findOneAndUpdate(
       { uid },
-      { $set: { avatarUrl } },
+      { $set: { avatarUrl, avatarImage: { data: out, contentType: 'image/jpeg' } } },
       { upsert: true, new: true }
     ).lean();
 

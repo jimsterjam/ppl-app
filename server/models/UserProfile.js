@@ -12,9 +12,23 @@ const userProfileSchema = new mongoose.Schema({
     default: ''
   },
   avatarUrl: {
-    // Stored as relative path under /uploads (e.g. /uploads/avatars/<uid>.jpg)
+    // Stored as relative path under /uploads (e.g. /uploads/avatars/<uid>.jpg) - wird von
+    // GET /uploads/avatars/:filename in app.js ausgeliefert, siehe avatarImage unten.
     type: String,
     default: ''
+  },
+  // Bug-Fix: Avatare wurden bisher als Datei auf der lokalen Festplatte des Servers gespeichert
+  // (server/public/uploads/avatars/<uid>.jpg, siehe früher routes/account.js). Render-Web-Services
+  // haben (ohne kostenpflichtiges Persistent-Disk-Add-on) ein FLÜCHTIGES Dateisystem: bei jedem
+  // Deploy/Neustart bekommt der Container ein frisches Dateisystem, wodurch hochgeladene Avatare
+  // nach dem nächsten Deploy spurlos verschwanden (404 beim Laden, obwohl avatarUrl in der DB noch
+  // korrekt gesetzt war). Fix: Bild-Binärdaten direkt in MongoDB speichern (256x256 JPEG, ~20-60KB
+  // durch das bestehende sharp-Resizing in routes/account.js - weit unter dem 16MB-Dokumentlimit,
+  // GridFS wäre hier unnötiger Overhead) statt auf Festplatte. Bleibt damit über Deploys hinweg
+  // erhalten, genau wie die restrichen Profildaten in diesem Dokument.
+  avatarImage: {
+    data: { type: Buffer, default: null },
+    contentType: { type: String, default: '' }
   },
   subscription: {
     plan: {

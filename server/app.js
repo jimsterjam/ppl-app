@@ -15,6 +15,7 @@ import feedbackRoutes from "./routes/feedback.js";
 import adminFeedbackInsightsRoutes from "./routes/adminFeedbackInsights.js";
 import adminVerifierAuditRoutes from "./routes/adminVerifierAudit.js";
 import { logger } from './utils/logger.js';
+import UserProfile from './models/UserProfile.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -96,6 +97,39 @@ app.use(express.json());
 app.use('/api', (req, res, next) => {
   res.set('Cache-Control', 'no-store');
   next();
+});
+
+// Avatar-Auslieferung aus MongoDB statt Festplatte (Bug-Fix: Render-Web-Services haben ein
+// flüchtiges Dateisystem, das bei jedem Deploy/Neustart zurückgesetzt wird - hochgeladene
+// Avatare unter public/uploads/avatars/ verschwanden dadurch nach dem nächsten Deploy und
+// lieferten 404. Siehe models/UserProfile.js (avatarImage) und routes/account.js
+// (POST /profile/avatar) für die Speicherseite. MUSS vor express.static stehen, damit diese
+// Route Vorrang vor eventuell noch vorhandenen alten Dateien im public-Verzeichnis hat.
+// Bewusst ohne Auth (wie zuvor über express.static) - Avatare sind keine sensiblen Daten und
+// werden clientseitig direkt als <img src> geladen, ohne Firebase-Token mitzusenden.
+app.get('/uploads/avatars/:filename', async (req, res, next) => {
+  try {
+    const filename = String(req.params.filename || '');
+    const match = filename.match(/^([^./]+)\.jpg$/);
+    if (!match) return next();
+
+    const uid = match[1];
+    const profile = await UserProfile.findOne({ uid }, { avatarImage: 1 }).lean();
+    const image = profile?.avatarImage;
+    if (!image?.data) {
+      return res.status(404).json({ error: 'Not Found', path: req.originalUrl });
+    }
+
+    res.set('Content-Type', image.contentType || 'image/jpeg');
+    // Moderat cachebar: Avatare ändern sich selten, aber die URL bleibt bei einem Update gleich
+    // (kein Cache-Busting-Suffix) - kurze max-age statt "immutable", damit ein neu hochgeladenes
+    // Bild nicht tagelang aus dem Cache ausgeliefert wird.
+    res.set('Cache-Control', 'public, max-age=300');
+    res.send(Buffer.isBuffer(image.data) ? image.data : Buffer.from(image.data.buffer || image.data));
+  } catch (error) {
+    logger.error('❌ Avatar-Auslieferung fehlgeschlagen', { error: error.message, filename: req.params.filename });
+    res.status(500).json({ error: 'Failed to load avatar' });
+  }
 });
 
 // Statische Dateien (Rollback: gesamtes public-Verzeichnis)
