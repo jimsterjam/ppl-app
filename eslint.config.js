@@ -69,6 +69,31 @@ export default [
       'no-empty': ['warn', { allowEmptyCatch: true }]
     }
   },
+  // Relay-Service (server/utils/aiClientFactory.js spricht ihn an, siehe relay/README.md) -
+  // eigenständiges Node/Express-Projekt mit eigenem package.json, war bisher hier nicht
+  // gelistet und fiel dadurch ohne Node-Globals (process/fetch/console) durch die
+  // CI-Lint-Prüfung (15 no-undef-Fehler in relay/app.js, relay/app.test.js, relay/server.js).
+  {
+    files: ['relay/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: {
+        ...globals.node,
+        console: 'readonly',
+        process: 'readonly',
+        fetch: 'readonly'
+      }
+    },
+    plugins: {
+      'unused-imports': unusedImports
+    },
+    rules: {
+      'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      'unused-imports/no-unused-imports': 'warn',
+      'no-empty': ['warn', { allowEmptyCatch: true }]
+    }
+  },
   // Node-specific files outside server folder
   {
     files: ['client/vite.config.js'],
