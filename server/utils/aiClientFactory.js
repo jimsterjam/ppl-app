@@ -123,6 +123,21 @@ export function logAiClientMode(context = '') {
 // Zeitstempel des letzten erfolgreichen Kontakts wird gemerkt, damit nicht JEDE Anfrage diesen
 // Wake-Up-Umweg nehmen muss, solange der Relay mit hoher Wahrscheinlichkeit noch wach ist
 // (deutliche Sicherheitsmarge unter den ~15 Min., nach denen Render ihn einschlafen lässt).
+//
+// Nachtrag (2026-09-13, User-Report "seit dem Umbau mit dem Relay funktioniert es nicht mehr"):
+// ursprünglich war maxWaitMs=50s/pollIntervalMs=3s - live per Browser nachgestellt (direkter
+// Aufruf von /healthz während des Hochfahrens) dauerte ein Kaltstart dabei einmal ÜBER 50
+// Sekunden (Renders eigene "Application loading"-Zwischenseite). Production-Logs zeigten
+// mehrfach GENAU dieses Muster: alle ~17 Versuche über die vollen 50s scheiterten mit Status
+// 502, der Relay-Dienst selbst loggte in der gesamten Zeit nichts (bestätigt: die Anfragen
+// erreichten den Container nie, sie wurden von Renders Edge-Gateway abgewiesen, während der
+// Container noch hochfuhr) - das Zeitbudget war schlicht zu knapp bemessen. Ohne kostenpflichtiges
+// Starter-Upgrade (siehe Kommentar oben) bleibt das ein Wahrscheinlichkeits-Kompromiss: 100s
+// deckt die bisher beobachteten Fälle ab, kann aber bei einem noch längeren Kaltstart erneut
+// nicht ausreichen. Empfehlung an den User: einen externen, kostenlosen Keep-Alive-Pinger (z.B.
+// cron-job.org, UptimeRobot) alle 5-10 Minuten auf https://ppl-app-ai-relay.onrender.com/healthz
+// einrichten - das hält den Dienst dauerhaft wach und umgeht das Problem strukturell, ohne für
+// Render Starter zu bezahlen.
 let lastRelayContactAt = 0;
 const RELAY_WARM_ASSUMPTION_MS = 8 * 60 * 1000;
 
@@ -142,10 +157,15 @@ export function markRelayContact() {
  * Funktion verschafft ihm nur eine deutlich bessere Ausgangslage.
  *
  * @param {Object} [options]
- * @param {number} [options.maxWaitMs] - maximale Wartezeit insgesamt (Default 50s)
- * @param {number} [options.pollIntervalMs] - Abstand zwischen Healthcheck-Versuchen (Default 3s)
+ * @param {number} [options.maxWaitMs] - maximale Wartezeit insgesamt (Default 100s - live
+ *   beobachtet, dass ein Render-Free-Kaltstart gelegentlich deutlich über 50s dauert, siehe
+ *   Kommentar am Dateianfang zur Diagnose vom 2026-09-13)
+ * @param {number} [options.pollIntervalMs] - Abstand zwischen Healthcheck-Versuchen (Default 4s,
+ *   etwas entzerrt gegenüber vorher 3s, um ein mögliches gegenseitiges Stören durch zu dichte
+ *   Anfragen während des Hochfahrens zu vermeiden - nicht bestätigt, aber als Vorsichtsmaßnahme
+ *   günstig)
  */
-export async function ensureRelayAwake({ maxWaitMs = 50000, pollIntervalMs = 3000 } = {}) {
+export async function ensureRelayAwake({ maxWaitMs = 100000, pollIntervalMs = 4000 } = {}) {
   if (getAiClientMode() !== 'relay') return;
   if (Date.now() - lastRelayContactAt < RELAY_WARM_ASSUMPTION_MS) return;
 
