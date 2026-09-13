@@ -6,9 +6,9 @@
  * Sendet NUR strukturierte Backend-Daten, keine Rohdaten.
  */
 
-import { OpenAI } from 'openai';
 import { logger } from '../utils/logger.js';
 import AIProvider from './AIProvider.js';
+import { createOpenAIClient, describeAiClientMode } from '../utils/aiClientFactory.js';
 
 // WICHTIG: Lazy-Load von ENV-Variablen (nicht beim Import)
 // Sonst sind sie noch undefined wenn dotenv.config() nicht aufgerufen wurde
@@ -31,7 +31,7 @@ Dabei gehst du so vor:
 1. Relevante Veränderungen in den Daten erkennen.
 2. Sie im Kontext der Übung und vorhandener Notizen einordnen.
 3. Fakten und mögliche Interpretationen klar trennen. Gewichtsanpassungen konkret benennen, aber
-NUR auf Basis der tatsächlich gelieferten Daten:
+NUR auf Basis der tatsächlich gelieferten Daten und im Vergleich zur letzten Session:
    - Liegt zu einer Übung ein Pro-Satz-Vergleich (sets_comparison) vor, nenne die
      Gewichts-/Wiederholungsänderung satzgenau, z.B. "im zweiten Satz 2,5kg mehr bei
      gleichbleibenden Wiederholungen" oder "im dritten Satz eine Wiederholung weniger bei 5kg
@@ -247,27 +247,26 @@ export class OpenAIProvider extends AIProvider {
     super();
 
     // Lazy-Load: Lies ENV-Variablen hier im Constructor, nicht beim Module-Import
-    const apiKey = process.env.OPENAI_API_KEY;
     const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
     const timeout = Math.max(5000, Number(process.env.OPENAI_TIMEOUT_MS) || 30000);
 
     this.model = model;
     this.timeout = timeout;
 
-    if (!apiKey) {
-      logger.warn('⚠️ OPENAI_API_KEY not configured. OpenAI provider will not work.');
-      this.client = null;
-    } else {
-      try {
-        this.client = new OpenAI({
-          apiKey: apiKey,
-          timeout: timeout
-        });
-        logger.info(`✅ OpenAI Provider initialized (model: ${model})`);
-      } catch (error) {
+    // createOpenAIClient() entscheidet selbst, ob direkt gegen OpenAI (OPENAI_API_KEY) oder
+    // über den geschützten Relay (AI_RELAY_URL + AI_RELAY_SHARED_SECRET) verbunden wird - siehe
+    // utils/aiClientFactory.js. Für diese Klasse macht das keinen Unterschied: das SDK-Interface
+    // bleibt identisch, nur baseURL/apiKey unterscheiden sich.
+    try {
+      this.client = createOpenAIClient({ timeoutMs: timeout });
+      logger.info(`✅ OpenAI Provider initialized (model: ${model}, ${describeAiClientMode()})`);
+    } catch (error) {
+      if (error.code === 'AI_NOT_CONFIGURED') {
+        logger.warn(`⚠️ ${error.message}. OpenAI provider will not work.`);
+      } else {
         logger.error('❌ Failed to initialize OpenAI client:', error.message);
-        this.client = null;
       }
+      this.client = null;
     }
   }
 

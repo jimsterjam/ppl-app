@@ -8,6 +8,7 @@ import { validateEnv } from "./utils/validateEnv.js";
 import { initializeAIService } from "./services/aiService.js";
 import OpenAIProvider from "./services/OpenAIProvider.js";
 import OllamaProvider from "./services/OllamaProvider.js";
+import { logAiClientMode } from "./utils/aiClientFactory.js";
 
 // Lade .env mit absolutem Pfad
 const __filename = fileURLToPath(import.meta.url);
@@ -36,6 +37,9 @@ try {
     aiProvider = new OllamaProvider();
   } else {
     logger.info('🔧 AI Provider: OpenAI (production)');
+    // Ollama läuft nie über den Relay (nur relevant für den OpenAI-Provider + den
+    // KI-Prüfaufruf in feedbackVerificationService.js) - Log hier bewusst nur im OpenAI-Zweig.
+    logAiClientMode('OpenAIProvider');
     aiProvider = new OpenAIProvider();
   }
   initializeAIService(aiProvider);

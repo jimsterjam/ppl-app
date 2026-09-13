@@ -8,7 +8,9 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "seed": "node seedExercises.js",
-    "normalize:workouts": "node scripts/normalizeWorkouts.js"
+    "normalize:workouts": "node scripts/normalizeWorkouts.js",
+    "eval": "node scripts/evalRunner.js",
+    "eval:ai": "node scripts/evalRunner.js --with-ai"
   },
   "keywords": [],
   "author": "",

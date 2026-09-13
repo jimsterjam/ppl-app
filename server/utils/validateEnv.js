@@ -29,9 +29,21 @@ const REQUIRED_VARS = [
 const OPTIONAL_VARS = [
   {
     name: 'OPENAI_API_KEY',
-    description: 'OpenAI API Key für AI Workout Coach',
+    description: 'OpenAI API Key für AI Workout Coach (nur nötig, wenn AI_RELAY_URL NICHT gesetzt ist - siehe AI_RELAY_URL unten)',
     fallback: 'Demo-Modus mit statischen Übungen',
     example: 'sk-proj-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX'
+  },
+  {
+    name: 'AI_RELAY_URL',
+    description: 'Basis-URL des geschützten OpenAI-Relays (siehe /relay). Wenn gesetzt, läuft dieser Server NICHT mehr direkt gegen OpenAI, sondern über den Relay - OPENAI_API_KEY wird dann auf diesem Server nicht mehr benötigt.',
+    fallback: 'Direktverbindung zu OpenAI mit OPENAI_API_KEY',
+    example: 'https://bro-split-ai-relay.onrender.com'
+  },
+  {
+    name: 'AI_RELAY_SHARED_SECRET',
+    description: 'Geteiltes Secret zur Authentifizierung gegenüber dem Relay (nur relevant, wenn AI_RELAY_URL gesetzt ist). Muss exakt dem Secret entsprechen, das der Relay selbst als RELAY_SHARED_SECRET erwartet.',
+    fallback: 'nur relevant mit AI_RELAY_URL',
+    example: 'ein langer, zufälliger String (z.B. via `openssl rand -hex 32` erzeugt)'
   },
   // Clerk-Variablen entfernt
   {
@@ -74,7 +86,13 @@ const validateFormat = (varName, value) => {
         return 'Muss mit sk- beginnen'
       }
       break
-    
+
+    case 'AI_RELAY_URL':
+      if (!/^https?:\/\/.+/.test(value)) {
+        return 'Muss eine vollständige URL sein (http:// oder https://)'
+      }
+      break
+
     case 'PORT': {
       const port = parseInt(value)
       if (isNaN(port) || port < 1 || port > 65535) {
@@ -188,7 +206,10 @@ export const validateEnv = () => {
   logger.info(`   Port: ${process.env.PORT || '3001'}`)
   logger.info(`   Database: ${process.env.MONGO_URI ? '✅ Konfiguriert' : '❌ Fehlt'}`)
   // Clerk-Status entfernt
-  logger.info(`   AI: ${process.env.OPENAI_API_KEY ? '✅ OpenAI' : '⚠️  Demo-Modus'}`)
+  const aiRelayConfigured = isSet('AI_RELAY_URL')
+  logger.info(`   AI: ${aiRelayConfigured
+    ? `✅ OpenAI über Relay (${process.env.AI_RELAY_URL})`
+    : process.env.OPENAI_API_KEY ? '✅ OpenAI (direkt)' : '⚠️  Demo-Modus'}`)
   logger.info('')
 }
 
