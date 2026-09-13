@@ -22,9 +22,9 @@
  * auf 'active' vor Phase 2 nicht zu unerwartetem Verhalten führt.
  */
 
-import { OpenAI } from 'openai';
 import { logger } from '../utils/logger.js';
 import { withAiRetry, parseJsonSafely } from '../utils/aiUtils.js';
+import { createOpenAIClient } from '../utils/aiClientFactory.js';
 import VerifierAudit from '../models/VerifierAudit.js';
 
 const MIN_EXPECTED_WORDS = 40;
@@ -267,15 +267,11 @@ ENTWURFSTEXT DES COACHES:
 Prüfe den Entwurfstext gegen die Checkliste und die Trainingsdaten.`;
 }
 
+// Nutzt denselben Relay-fähigen Client wie OpenAIProvider.js (siehe utils/aiClientFactory.js) -
+// im Relay-Modus läuft der KI-Prüfaufruf also über denselben geschützten Relay wie die
+// Haupt-Feedback-Generierung, ohne dass hier ein eigener OPENAI_API_KEY nötig ist.
 function getClient() {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    const err = new Error('OPENAI_API_KEY not configured');
-    err.code = 'AI_NOT_CONFIGURED';
-    throw err;
-  }
-  const timeout = Math.max(5000, Number(process.env.OPENAI_TIMEOUT_MS) || 30000);
-  return new OpenAI({ apiKey, timeout });
+  return createOpenAIClient();
 }
 
 /**
