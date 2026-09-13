@@ -45,6 +45,7 @@ import {
   getQuickGeneratorMissingInputs
 } from '../utils/workoutSanitizer.js';
 import { decideExerciseMatch } from '../utils/exerciseMatching.js';
+import { createOpenAIClient, describeAiClientMode } from '../utils/aiClientFactory.js';
 import {
   classifyAiError,
   isRetryableAiError,
@@ -664,23 +665,31 @@ async function resolveQuickGeneratorExercises(suggestedExercises, options = {}) 
 
 async function initializeOpenAI() {
   if (openaiInitialized) return openai;
-  
+
   openaiInitialized = true;
-  
-  if (process.env.OPENAI_API_KEY) {
-    try {
-      const OpenAI = (await import('openai')).default;
-      openai = new OpenAI({
-        apiKey: process.env.OPENAI_API_KEY,
-      });
-      logger.debug('✅ OpenAI initialized successfully');
-      return openai;
-    } catch (error) {
+
+  // Bug-Fix: prüfte bisher NUR process.env.OPENAI_API_KEY direkt und baute bei fehlendem Key
+  // sofort new OpenAI({ apiKey: undefined }) NIE auf, sondern gab schon vorher null zurück -
+  // ohne die zentrale, relay-fähige createOpenAIClient()-Fabrik (utils/aiClientFactory.js) zu
+  // nutzen, die auch services/OpenAIProvider.js verwendet. Im aktuellen Relay-Betrieb ist
+  // OPENAI_API_KEY auf ppl-app-server bewusst NICHT gesetzt (der echte Key liegt nur auf dem
+  // Relay-Service, siehe relay/DEPLOYMENT.md) - hier gab es dadurch IMMER null zurück, egal ob
+  // der Relay konfiguriert und erreichbar war. Symptom (User-Report): der KI-Quick-Generator
+  // erzeugte immer wieder dasselbe (deterministische Demo-)Workout, weil er nie über die
+  // tatsächliche OpenAI-API/den Relay lief, sondern lautlos in generateQuickGeneratorDemo()
+  // fiel - ohne Fehlermeldung, da openaiClient bereits null war, bevor überhaupt ein Call
+  // versucht wurde.
+  try {
+    openai = createOpenAIClient({ timeoutMs: AI_OPENAI_TIMEOUT_MS });
+    logger.debug(`✅ OpenAI initialized successfully (${describeAiClientMode()})`);
+    return openai;
+  } catch (error) {
+    if (error.code === 'AI_NOT_CONFIGURED') {
+      logger.debug('ℹ️ Kein OpenAI-Key/Relay konfiguriert - Demo-Modus');
+    } else {
       logger.warn('⚠️ OpenAI initialization failed:', error.message);
-      return null;
     }
-  } else {
-    logger.debug('ℹ️ No OpenAI API key found - using demo mode');
+    openai = null;
     return null;
   }
 }
