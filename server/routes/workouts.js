@@ -44,6 +44,7 @@ import {
   sanitizeQuickGeneratorRequest,
   getQuickGeneratorMissingInputs
 } from '../utils/workoutSanitizer.js';
+import { decideExerciseMatch } from '../utils/exerciseMatching.js';
 import {
   classifyAiError,
   isRetryableAiError,
@@ -506,6 +507,161 @@ async function validateAndMapExercisesWithAutoAdd(exercises, userId = null) {
   return validatedExercises;
 }
 
+// ---------------------------------------------------------------------------------------------
+// Fuzzy-Übungsabgleich für den KI-Quick-Generator (siehe utils/exerciseMatching.js für die
+// reine Entscheidungslogik: exact/similar/none). Ergänzt validateAndMapExercisesWithAutoAdd()
+// um die zwei Fälle, die dort fehlten: ähnliche (aber nicht identische) und komplett neue
+// Übungsnamen werden nicht mehr als unverknüpfter Freitext durchgereicht, sondern als neue
+// Exercise-Dokumente angelegt - mit einem Verweis (similarTo) auf die ähnlichste bestehende
+// Übung, falls eine gefunden wurde.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Grobe Kategorie-Zuordnung für neu anzulegende Quick-Generator-Übungen: primär aus dem
+ * angefragten Split (requestedType - der Prompt verlangt strikte Einhaltung, daher zuverlässig),
+ * sekundär aus Namens-Schlüsselwörtern (nötig bei requestedType 'fullbody', das keine
+ * eindeutige Kategorie vorgibt).
+ */
+function guessCategoryForQuickGeneratorExercise(exerciseName, requestedType) {
+  const directMap = { push: 'Push', pull: 'Pull', legs: 'Legs' };
+  if (directMap[requestedType]) return directMap[requestedType];
+
+  const name = String(exerciseName || '').toLowerCase();
+  if (/bein|quad|hamstring|gesäß|glute|wade|kniebeuge|lunge|ausfallschritt/.test(name)) return 'Legs';
+  if (/rücken|latzug|rudern|klimmzug|bizeps|curl/.test(name)) return 'Pull';
+  if (/bauch|core|plank|crunch/.test(name)) return 'Core';
+  if (/cardio|lauf|rudergerät|sprint/.test(name)) return 'Cardio';
+  return 'Push'; // Default, konsistent mit addNewExercisesToDatabase() weiter oben
+}
+
+/**
+ * Grobe Equipment-Zuordnung: die KI liefert im Quick-Generator-Schema kein separates
+ * Equipment-Feld pro Übung (nur name/sets/reps/weight/rest), daher wird primär aus
+ * Namens-Schlüsselwörtern geraten, mit dem angefragten equipmentMode als Fallback.
+ */
+function guessEquipmentForQuickGeneratorExercise(exerciseName, equipmentMode) {
+  const name = String(exerciseName || '').toLowerCase();
+  if (/kurzhantel/.test(name)) return 'Kurzhanteln';
+  if (/langhantel/.test(name)) return 'Langhantel';
+  if (/kabelzug|kabel/.test(name)) return 'Kabelzug';
+  if (/maschine/.test(name)) return 'Maschine';
+  if (/kettlebell/.test(name)) return 'Kettlebell';
+  if (/band/.test(name)) return 'Resistance Band';
+  if (equipmentMode === 'bodyweight_only') return 'Körpergewicht';
+  if (/liegestütz|klimmzug|dip|plank|ausfallschritt/.test(name)) return 'Körpergewicht';
+  return 'Körpergewicht'; // Default, konsistent mit addNewExercisesToDatabase() weiter oben
+}
+
+function guessMuscleGroupsForCategory(category) {
+  switch (category) {
+    case 'Pull': return ['Rücken'];
+    case 'Legs': return ['Quadrizeps'];
+    case 'Core': return ['Bauch'];
+    case 'Cardio': return ['Cardio'];
+    case 'Push':
+    default: return ['Brust'];
+  }
+}
+
+/**
+ * Gleicht die vom KI-Quick-Generator gelieferten Übungsnamen gegen die bestehende
+ * Exercise-Datenbank ab und ergänzt jede Übung um eine exerciseId:
+ * - exact:   vorhandene Übung wiederverwendet, NICHTS Neues angelegt.
+ * - similar: neue Übung angelegt (source: 'ai_suggestion', needsReview: true), similarTo zeigt
+ *            auf die ähnlichste bestehende Übung - bewusst kein Merge, siehe utils/exerciseMatching.js.
+ * - none:    neue Übung angelegt (source: 'ai_suggestion', needsReview: true), similarTo bleibt null.
+ *
+ * Schlägt der DB-Zugriff fehl, werden die Übungen unverändert (ohne exerciseId) zurückgegeben -
+ * das darf die Quick-Generator-Antwort selbst nicht zum Scheitern bringen.
+ *
+ * @param {Array<{name: string, sets: number, reps: number, weight: number, rest: number}>} suggestedExercises
+ * @param {Object} options
+ * @param {string} [options.requestedType] - push|pull|legs|fullbody
+ * @param {string} [options.equipmentMode] - gym_only|gym_plus_bodyweight|bodyweight_only
+ * @param {string} [options.userId]
+ * @returns {Promise<{ exercises: Array<Object>, summary: { matchedExisting: number, createdSimilar: number, createdNew: number } }>}
+ */
+async function resolveQuickGeneratorExercises(suggestedExercises, options = {}) {
+  const { requestedType = null, equipmentMode = null, userId = null } = options;
+  const summary = { matchedExisting: 0, createdSimilar: 0, createdNew: 0 };
+
+  if (!Array.isArray(suggestedExercises) || suggestedExercises.length === 0) {
+    return { exercises: suggestedExercises || [], summary };
+  }
+
+  let existingExercises;
+  try {
+    existingExercises = await Exercise.find({})
+      .select('_id name names.de names.en')
+      .lean()
+      .exec();
+  } catch (error) {
+    logger.error('⚠️ resolveQuickGeneratorExercises - Laden bestehender Übungen fehlgeschlagen:', error.message);
+    return { exercises: suggestedExercises, summary };
+  }
+
+  const candidates = existingExercises.map((ex) => ({
+    id: String(ex._id),
+    names: [ex.name, ex.names?.de, ex.names?.en].filter(Boolean)
+  }));
+
+  const resolved = [];
+  for (const exercise of suggestedExercises) {
+    const candidateName = exercise?.name;
+    if (!candidateName) {
+      resolved.push(exercise);
+      continue;
+    }
+
+    const { matchType, match } = decideExerciseMatch(candidateName, candidates);
+
+    if (matchType === 'exact') {
+      summary.matchedExisting++;
+      resolved.push({ ...exercise, exerciseId: match.id });
+      continue;
+    }
+
+    // 'similar' oder 'none': neue Übung anlegen. Kategorie/Equipment sind Best-Effort-
+    // Schätzungen (siehe guess*-Helfer oben) - die KI liefert dafür keine strukturierten Daten
+    // mit, daher needsReview: true, damit das später im Admin-Bereich sichtbar/korrigierbar ist.
+    try {
+      const category = guessCategoryForQuickGeneratorExercise(candidateName, requestedType);
+      const newExercise = new Exercise({
+        name: candidateName,
+        names: { de: candidateName, en: candidateName },
+        category,
+        muscleGroups: guessMuscleGroupsForCategory(category),
+        equipment: guessEquipmentForQuickGeneratorExercise(candidateName, equipmentMode),
+        difficulty: 'Anfänger',
+        source: 'ai_suggestion',
+        needsReview: true,
+        similarTo: matchType === 'similar' ? match.id : null,
+        addedBy: userId
+      });
+      await newExercise.save();
+
+      // Neu angelegte Übung selbst als Kandidat für nachfolgende Übungen DIESER Anfrage
+      // aufnehmen - verhindert Dubletten, falls dieselbe erfundene Übung zweimal im selben
+      // Vorschlag vorkommt (z.B. leicht unterschiedlich geschrieben).
+      candidates.push({ id: String(newExercise._id), names: [candidateName] });
+
+      if (matchType === 'similar') summary.createdSimilar++;
+      else summary.createdNew++;
+
+      resolved.push({
+        ...exercise,
+        exerciseId: String(newExercise._id),
+        similarTo: matchType === 'similar' ? match.id : null
+      });
+    } catch (error) {
+      logger.error(`⚠️ resolveQuickGeneratorExercises - Anlegen fehlgeschlagen für "${candidateName}":`, error.message);
+      resolved.push(exercise);
+    }
+  }
+
+  return { exercises: resolved, summary };
+}
+
 async function initializeOpenAI() {
   if (openaiInitialized) return openai;
   
@@ -773,6 +929,17 @@ router.post('/quick-generator', aiAuthMiddleware, async (req, res) => {
     }
 
     const normalized = normalizeQuickGeneratorResponse(suggestion, context);
+
+    // Fuzzy-Abgleich gegen die Exercise-Datenbank (siehe resolveQuickGeneratorExercises oben) -
+    // läuft für AI- UND Demo-Vorschläge gleichermaßen, damit auch der Demo-Fallback konsistent
+    // eine exerciseId bekommt, wo möglich. Läuft der DB-Zugriff ins Leere, bleiben die
+    // Übungsnamen unverändert (kein Absturz der Quick-Generator-Antwort deswegen).
+    const { exercises: resolvedExercises, summary: exerciseMatchSummary } = await resolveQuickGeneratorExercises(
+      normalized.exercises,
+      { requestedType: context.requestedType, equipmentMode: context.equipmentMode, userId }
+    );
+    normalized.exercises = resolvedExercises;
+
     normalized.metadata = {
       ...(normalized.metadata || {}),
       aiUsage: getAiLimitSnapshot(entitlements),
@@ -781,6 +948,7 @@ router.post('/quick-generator', aiAuthMiddleware, async (req, res) => {
       fallbackReason: errorType,
       errorType,
       missingRequiredInputs,
+      exerciseMatching: exerciseMatchSummary,
       ruleset: {
         professionalMode: true,
         strictStructure: true,
@@ -1852,20 +2020,37 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
     let aiError = null;
 
     // Schneller Erreichbarkeits-Check vor dem eigentlichen (bis zu 120s dauernden) Generierungs-
-    // Aufruf. Grund (User-Report "Speichern dauert sehr lange"): in der Testphase läuft die
-    // Analyse über Ollama im Heimnetzwerk — ist das Handy woanders, ist die IP schlicht nicht
-    // erreichbar, und der User starrt bis zu 2 Minuten auf "Analysiere...", bevor überhaupt der
-    // harmlose Fallback ("Workout gespeichert") kommt. Mit einem kurzen Health-Check (max. 3s,
-    // siehe Fix in OllamaProvider.healthCheck) lässt sich das vorher erkennen und der Client
-    // bekommt sofort eine ehrliche, spezifische Meldung statt eines langen Hängers.
-    const networkCheckStart = Date.now();
-    const providerReachable = await aiService.healthCheck().catch(() => false);
-    logger.debug('🌐 AI provider reachability check', {
-      requestId,
-      provider: aiService.getProviderName(),
-      reachable: providerReachable,
-      durationMs: Date.now() - networkCheckStart
-    });
+    // Aufruf - ursprünglich (User-Report "Speichern dauert sehr lange") NUR für Ollama gedacht:
+    // in der Testphase lief die Analyse über Ollama im Heimnetzwerk - ist das Handy woanders,
+    // ist die IP schlicht nicht erreichbar, und der User starrte bis zu 2 Minuten auf
+    // "Analysiere...", bevor überhaupt der harmlose Fallback ("Workout gespeichert") kam. Mit
+    // einem kurzen Health-Check (max. 3s, siehe Fix in OllamaProvider.healthCheck) lässt sich
+    // das vorher erkennen.
+    //
+    // Bug-Fix (User-Report "Feedback wird nie generiert, obwohl 'Workout gespeichert'
+    // erscheint" - reproduziert mit Server-Logs): dieser Gate lief bisher UNVERÄNDERT auch für
+    // OpenAI, seit OpenAIProvider optional über den geschützten Relay läuft (siehe
+    // utils/aiClientFactory.js). Ein kurz aufwachender Render-Kaltstart des Relays lieferte für
+    // den Health-Check-Request (client.models.list()) Renders eigene 502-Fehlerseite (HTML statt
+    // JSON) zurück - der Health-Check wertete das als "nicht erreichbar" und brach die GESAMTE
+    // Anfrage sofort ab, OBWOHL der eigentliche Generierungs-Call (deutlich längerer Timeout,
+    // siehe OpenAIProvider.js) den Kaltstart locker überstanden hätte. Für OpenAI (Cloud, kein
+    // "falsches WLAN"-Szenario wie bei Ollama) bringt dieser Vorab-Check ohnehin keinen Nutzen,
+    // der die Fehlerquelle rechtfertigt - daher nur noch für Ollama aktiv; für OpenAI greift
+    // direkt der try/catch unten (liefert bei einem echten Fehler weiterhin die
+    // Backend-Analysen ohne KI-Text zurück, statt abzustürzen).
+    const providerName = aiService.getProviderName();
+    let providerReachable = true;
+    if (providerName !== 'OpenAI') {
+      const networkCheckStart = Date.now();
+      providerReachable = await aiService.healthCheck().catch(() => false);
+      logger.debug('🌐 AI provider reachability check', {
+        requestId,
+        provider: providerName,
+        reachable: providerReachable,
+        durationMs: Date.now() - networkCheckStart
+      });
+    }
 
     if (!providerReachable) {
       return res.json({
@@ -2461,12 +2646,17 @@ async function generateGPT4Suggestion(workoutContext, openaiClient, options = {}
         }`
       },
       {
-        role: "user", 
+        role: "user",
         content: prompt
       }
     ],
     max_tokens: 1000,
-    temperature: 0.8,
+    temperature: 0.8
+  }, {
+    // `timeout` ist ein Request-OPTIONS-Parameter des openai-SDK (2. Argument), kein Feld des
+    // Request-Bodys - stand es im Body-Objekt, schickte der SDK-Client es als unbekanntes
+    // JSON-Feld mit an die API -> "400 Unrecognized request argument supplied: timeout"
+    // (identischer Bug wie in services/OpenAIProvider.js, dort schon behoben).
     timeout: AI_OPENAI_TIMEOUT_MS
   }));
 
@@ -2504,8 +2694,10 @@ Fallback auf sinnvolle Standardwerte bei fehlenden Parametern.`
     ],
     temperature: 0.2,
     max_tokens: 360,
-    timeout: AI_OPENAI_TIMEOUT_MS,
     response_format: { type: 'json_object' }
+  }, {
+    // Siehe Kommentar bei generateGPT4Suggestion() weiter oben - derselbe Bug.
+    timeout: AI_OPENAI_TIMEOUT_MS
   }));
 
   const raw = completion?.choices?.[0]?.message?.content || '{}';

@@ -684,7 +684,7 @@ export const messages = {
       insufficientHistoryOr: '(oder',
       insufficientHistoryDaySingle: 'noch 1 Tag)',
       insufficientHistoryDaysMulti: 'noch {days} Tage)',
-      networkUnavailable: 'Workout gespeichert. Die Analyse läuft aktuell nur im Heimnetzwerk (Testphase) — du findest sie später in den Stats, sobald du wieder verbunden bist.'
+      networkUnavailable: 'Workout gespeichert. Die KI-Analyse ist gerade kurz nicht erreichbar — du findest sie in Kürze automatisch in den Stats.'
     },
     feedbackHistory: {
       title: 'KI-Feedback Verlauf',
@@ -1591,7 +1591,7 @@ export const messages = {
       insufficientHistoryOr: '(or',
       insufficientHistoryDaySingle: '1 more day)',
       insufficientHistoryDaysMulti: '{days} more days)',
-      networkUnavailable: 'Workout saved. Analysis currently only works on the home network (test phase) — you\'ll find it later in Stats once you\'re reconnected.'
+      networkUnavailable: 'Workout saved. AI analysis is briefly unavailable — you\'ll find it in Stats shortly, automatically.'
     },
     feedbackHistory: {
       title: 'AI Feedback History',

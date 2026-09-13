@@ -63,6 +63,27 @@ const exerciseSchema = new mongoose.Schema({
   addedBy: {
     type: String, // userId
     required: false
+  },
+  // Verweis auf eine ähnliche, bereits vorhandene Übung (siehe utils/exerciseMatching.js) -
+  // gesetzt, wenn diese Übung als neue, aber einer vorhandenen Übung ähnliche Variante
+  // angelegt wurde (z.B. eine vom KI-Quick-Generator vorgeschlagene Übung, deren Name keiner
+  // vorhandenen Übung exakt entspricht, aber deutlich ähnelt - z.B. "Schrägbankdrücken" bei
+  // vorhandenem "Bankdrücken"). Bewusst KEIN automatisches Merge - nur ein Verweis, damit ein
+  // Mensch später einordnen kann, ob es sich um eine echte Variante oder eine Dublette handelt.
+  // NICHT gesetzt bei komplett neuen, unähnlichen Übungen und NICHT bei exakten Treffern (dort
+  // wird gar keine neue Übung angelegt, siehe resolveQuickGeneratorExercises in routes/workouts.js).
+  similarTo: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Exercise',
+    default: null
+  },
+  // true bei automatisch (ohne menschliche Prüfung) angelegten Übungen, z.B. aus KI-Vorschlägen
+  // mit unsicherer Namensauflösung (Fall 'similar' oder 'none' in exerciseMatching.js) - reiner
+  // Marker für eine spätere Admin-Sichtung/Bereinigung (Dubletten, falsche Kategorie/Equipment-
+  // Zuordnung o.ä.), blockiert aber nichts funktional.
+  needsReview: {
+    type: Boolean,
+    default: false
   }
 }, {
   timestamps: true
@@ -79,6 +100,7 @@ exerciseSchema.index({ category: 1, name: 1 })     // Compound Index für gefilt
 exerciseSchema.index({ 'names.en': 1 })            // AI-Mapping via englischer Name
 exerciseSchema.index({ source: 1 })                // Filter nach Quelle (ai_generated, etc.)
 exerciseSchema.index({ addedBy: 1 }, { sparse: true }) // User-spezifische Übungen
+exerciseSchema.index({ needsReview: 1 }, { sparse: true }) // Admin-Sichtung ausstehender KI-Übungen
 
 // Medien-Felder (Optional): Pfade/URLs zu Bild und Thumbnail
 exerciseSchema.add({

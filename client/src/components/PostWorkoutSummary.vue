@@ -105,9 +105,10 @@
       </button>
     </div>
 
-    <!-- Netzwerk nicht erreichbar: Analyse läuft aktuell nur im Heimnetzwerk (Testphase) -->
+    <!-- KI-Provider kurz nicht erreichbar (z.B. Ollama im Heimnetz nicht im selben WLAN, oder
+         ein Cold-Start beim OpenAI-Relay) - Workout ist trotzdem gespeichert. -->
     <div v-else-if="networkUnavailable" class="summary-content fallback">
-      <p>{{ t('postWorkout.networkUnavailable') || 'Dein Workout ist gespeichert. Die Analyse ist gerade nicht erreichbar (Testphase, nur im Heimnetzwerk verfügbar) — du kannst sie später in den Stats nachholen.' }}</p>
+      <p>{{ t('postWorkout.networkUnavailable') || 'Dein Workout ist gespeichert. Die KI-Analyse ist gerade kurz nicht erreichbar — du findest sie in Kürze automatisch in den Stats.' }}</p>
       <button class="primary" type="button" @click="dismissSummary">
         {{ t('common.continue') || 'Weiter' }}
       </button>

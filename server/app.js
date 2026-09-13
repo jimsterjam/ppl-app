@@ -28,9 +28,19 @@ const app = express();
 // künftigen statischen Inhalten (z.B. Debug-Seiten) unerwartet etwas blockieren, ohne dass
 // bewusst eine passende Policy dafür entworfen wurde - crossOriginEmbedderPolicy aus dem
 // gleichen Grund (kann sonst das Laden hochgeladener Bilder aus anderen Origins stören).
+//
+// Bug-Fix (User-Report + Safari-Web-Inspector-Log: "Cancelled load ... because it violates the
+// resource's Cross-Origin-Resource-Policy response header" beim Laden eines Avatar-Bilds aus
+// public/uploads/avatars/ in der Capacitor-App): Helmets Default für crossOriginResourcePolicy
+// ist 'same-origin' - blockiert damit genau den Fall, den der Kommentar oben schon für
+// crossOriginEmbedderPolicy beschreibt (Laden hochgeladener Bilder von einer anderen Origin,
+// hier: der App-Origin capacitor://localhost bzw. https://ppl-app-client.onrender.com lädt Bilder
+// von https://ppl-app-server.onrender.com). 'cross-origin' erlaubt das explizit, ändert nichts
+// an der Zugriffskontrolle selbst (die läuft weiterhin über CORS oben in dieser Datei).
 app.use(helmet({
   contentSecurityPolicy: false,
-  crossOriginEmbedderPolicy: false
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: 'cross-origin' }
 }));
 
 const isProd = process.env.NODE_ENV === 'production'
