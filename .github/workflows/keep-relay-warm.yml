@@ -1,0 +1,30 @@
+name: Keep AI Relay Warm
+
+# Pingt den separaten AI-Relay-Dienst (relay/, siehe relay/README.md) regelmäßig über seinen
+# unauthentifizierten /healthz-Endpunkt an, damit er auf Renders kostenlosem Plan nicht nach
+# ~15 Min. Inaktivität einschläft.
+#
+# Hintergrund (User-Report, 2026-09-13): ein Kaltstart des Relays kann live beobachtet über 50
+# Sekunden dauern (Renders eigene "Application loading"-Zwischenseite) und blockierte dadurch
+# wiederholt die Feedback-Generierung, selbst mit Wake-Up-Retry-Logik (siehe
+# server/utils/aiClientFactory.js ensureRelayAwake()). Ein Render-Starter-Upgrade (~25€/Monat)
+# würde das Einschlafen strukturell verhindern, ist in der aktuellen Testphase aber bewusst zu
+# teuer. Dieser Workflow erreicht denselben Effekt kostenlos, indem er den Dienst schlicht nie
+# 15 Minuten ungenutzt lässt - nutzt dafür dieselbe GitHub-Actions-Infrastruktur, die ohnehin
+# schon ci.yml ausführt (kein neuer Account, keine Secrets nötig).
+on:
+  schedule:
+    # Alle 10 Minuten - mit deutlicher Sicherheitsmarge unter Renders ~15-Minuten-Grenze, auch
+    # falls ein Lauf durch GitHub-eigene Verzögerungen mal ein paar Minuten später startet.
+    - cron: '*/10 * * * *'
+  # Manuelles Anstoßen zum Testen (Actions-Tab -> "Keep AI Relay Warm" -> "Run workflow").
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Relay-Healthcheck anpingen
+        run: |
+          curl -sS --max-time 30 -o /dev/null -w "HTTP-Status: %{http_code}\n" \
+            https://ppl-app-ai-relay.onrender.com/healthz || true
