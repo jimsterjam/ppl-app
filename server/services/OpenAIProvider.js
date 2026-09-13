@@ -31,13 +31,17 @@ Ursachen abzuleiten (die App erfasst nur einen Ausschnitt des Trainings, siehe R
 Dabei gehst du so vor:
 1. Relevante Veränderungen in den Daten erkennen.
 2. Sie im Kontext der Übung und vorhandener Notizen einordnen.
-3. Fakten und mögliche Interpretationen klar trennen. Gewichtsanpassungen konkret benennen, aber
-NUR auf Basis der tatsächlich gelieferten Daten und im Vergleich zur letzten Session:
-   - Liegt zu einer Übung ein Pro-Satz-Vergleich (sets_comparison) vor, nenne die
-     Gewichts-/Wiederholungsänderung satzgenau, z.B. "im zweiten Satz 2,5kg mehr bei
-     gleichbleibenden Wiederholungen" oder "im dritten Satz eine Wiederholung weniger bei 5kg
-     mehr Gewicht". Nutze dafür ausschließlich Sätze, die in sets_comparison stehen - erfinde
-     niemals eine Satznummer oder einen Wert, der dort nicht steht.
+3. Fakten und mögliche Interpretationen klar trennen. Gewichts-/Wiederholungsangaben IMMER
+   satzgenau aus der Sätze-Liste (sets_comparison), NIEMALS als Durchschnitt oder Summe über
+   mehrere Sätze hinweg gebildet oder genannt (ein Durchschnitt verschleiert z.B., dass nur EIN
+   Satz gesteigert wurde, und "Wiederholungen gesamt über alle Sätze" ist für den Nutzer keine
+   handlungsrelevante Zahl - er trainiert Satz für Satz, nicht im Durchschnitt):
+   - Nenne Gewichts-/Wiederholungsänderungen ausschließlich anhand der Sätze-Liste, z.B. "im
+     zweiten Satz 2,5kg mehr bei gleichbleibenden Wiederholungen" oder "im dritten Satz eine
+     Wiederholung weniger bei 5kg mehr Gewicht". Nutze dafür ausschließlich Sätze, die dort
+     stehen - erfinde niemals eine Satznummer oder einen Wert, der dort nicht steht. Bilde
+     selbst KEINEN Durchschnitt und KEINE Summe über mehrere Sätze, auch nicht näherungsweise
+     ("im Schnitt", "insgesamt X Wiederholungen" o.ä. zu Gewicht/Wiederholungen sind tabu).
    - Ein Satz mit is_new_set=true hat keinen Vergleichswert aus der letzten Session (z.B. ein
      zusätzlicher Satz gegenüber vorher) - benenne ihn als zusätzlichen Satz, nicht als
      Steigerung.
@@ -45,10 +49,12 @@ NUR auf Basis der tatsächlich gelieferten Daten und im Vergleich zur letzten Se
      ohne Zusatzgewicht (z.B. reine Körpergewichtsübung wie Dips). Sprich dann konkret von
      "Zusatzgewicht" (z.B. "3kg Zusatzgewicht dazugenommen"), nicht von einer allgemeinen
      Gewichtssteigerung, die einen bereits vorhandenen Wert suggeriert.
-   - Fehlt sets_comparison zu einer Übung (keine passende vorherige Session mit echten
-     Arbeitssätzen), bleib bei den Aggregat-Werten (Gewicht/Wiederholungen als Durchschnitt/
-     Summe über alle Sätze, siehe "Veränderung") und formuliere ausschließlich das, was diese
-     Zahlen tatsächlich hergeben - keine Satz-genaue Aussage ohne sets_comparison erfinden.
+   - Liegen zu einer Übung KEINE Sätze in der Sätze-Liste vor, triff dazu KEINE Gewichts-/
+     Wiederholungsaussage - auch keine geschätzte oder aus dem Gesamtvolumen abgeleitete.
+   - Das Gesamtvolumen (Gewicht × Wiederholungen, über alle Sätze summiert) ist eine zulässige
+     Kennzahl für die grobe Gesamttendenz einer Übung (z.B. "dein Volumen ist insgesamt
+     gestiegen") - ersetzt aber NIE eine konkrete Gewichts-/Wiederholungsaussage, die bleibt
+     immer satzgenau.
 4. Auf relevante Punkte aufmerksam machen.
 5. Hilfreiche, unaufdringliche Hinweise für künftige Einheiten geben.
 
@@ -425,41 +431,40 @@ ${topDeclines.length > 0
 ## Detaillierte Übungsdaten
 ${exercises
   .map(ex => {
+    // Bug-Fix (User-Report): buildPrompt() zeigte bisher IMMER zusätzlich Durchschnitts-/Summen-
+    // Werte über alle Sätze hinweg (Gewicht als Ø, Wiederholungen als Summe) - das sind für den
+    // Nutzer keine handlungsrelevanten Zahlen (er trainiert Satz für Satz) und können einen
+    // Satz-Ausreißer verschleiern (z.B. EIN gesteigerter Satz geht im Ø unter). Jetzt: einzige
+    // Grundlage für Gewichts-/Wiederholungsangaben ist die satzgenaue Sätze-Liste unten (siehe
+    // Regel 3) - Gesamtvolumen bleibt als reine Tendenz-Kennzahl bestehen (das ist eine legitime
+    // Summe, keine irreführende Durchschnittsbildung von Gewicht/Wiederholungen).
     let exPrompt = `### ${ex.exercise}
 - Zeitraum: ${ex.period_description} (${ex.period_days} Tage)
+- Gesamtvolumen (Gewicht × Wiederholungen, Summe über alle Sätze) aktuell: ${ex.current_volume}kg`;
 
-**Aktuelle Leistung:**
-- Gewicht: ${ex.current_weight}kg
-- Wiederholungen (gesamt über alle Sätze): ${ex.current_reps}
-- Volumen: ${ex.current_volume}kg (kumulativ)`;
-
-    if (ex.previous_weight !== undefined) {
-      exPrompt += `
-
-**Vorherige Leistung:**
-- Gewicht: ${ex.previous_weight}kg
-- Wiederholungen (gesamt über alle Sätze): ${ex.previous_reps}
-- Volumen: ${ex.previous_volume}kg
-
-**Veränderung (Durchschnitt/Summe über alle Sätze):**
-- Gewicht: ${ex.changes.weight_change_kg > 0 ? '+' : ''}${ex.changes.weight_change_kg}kg
-- Wiederholungen: ${ex.changes.reps_change > 0 ? '+' : ''}${ex.changes.reps_change}
-- Volumen: ${ex.changes.volume_change_percent > 0 ? '+' : ''}${ex.changes.volume_change_percent}%`;
+    if (ex.previous_volume !== undefined) {
+      exPrompt += `, vorherige Session: ${ex.previous_volume}kg (${ex.changes.volume_change_percent > 0 ? '+' : ''}${ex.changes.volume_change_percent}%)`;
     }
 
     if (Array.isArray(ex.sets_comparison) && ex.sets_comparison.length > 0) {
       exPrompt += `
 
-**Sätze im Vergleich zur letzten Session (verbindliche Grundlage für konkrete Satz-Aussagen, siehe Regel 3):**
+**Sätze satzgenau (einzige verbindliche Grundlage für JEDE Gewichts-/Wiederholungsaussage, siehe Regel 3 - kein Durchschnitt/keine Summe über Sätze hinweg bilden):**
 ${ex.sets_comparison.map(s => {
+        const currentSetVolume = Math.round(s.current_weight * s.current_reps * 10) / 10;
         if (s.is_new_set) {
-          return `- Satz ${s.set_number}: ${s.current_weight}kg × ${s.current_reps} Wdh. - zusätzlicher Satz, keine vorherige Session zum Vergleich`;
+          return `- Satz ${s.set_number}: ${s.current_weight}kg × ${s.current_reps} Wdh. (Volumen ${currentSetVolume}kg) - zusätzlicher Satz, keine vorherige Session zum Vergleich`;
         }
         const weightLabel = s.is_added_weight ? 'Zusatzgewicht' : 'Gewicht';
         const weightDelta = `${s.weight_change_kg > 0 ? '+' : ''}${s.weight_change_kg}kg`;
         const repsDelta = `${s.reps_change > 0 ? '+' : ''}${s.reps_change}`;
-        return `- Satz ${s.set_number}: ${s.current_weight}kg × ${s.current_reps} Wdh. (vorher ${s.previous_weight}kg × ${s.previous_reps} Wdh.) - ${weightLabel} ${weightDelta}, Wiederholungen ${repsDelta}`;
+        const previousSetVolume = Math.round(s.previous_weight * s.previous_reps * 10) / 10;
+        return `- Satz ${s.set_number}: ${s.current_weight}kg × ${s.current_reps} Wdh. (Volumen ${currentSetVolume}kg), vorher ${s.previous_weight}kg × ${s.previous_reps} Wdh. (Volumen ${previousSetVolume}kg) - ${weightLabel} ${weightDelta}, Wiederholungen ${repsDelta}`;
       }).join('\n')}`;
+    } else {
+      exPrompt += `
+
+**Keine Satzdaten erfasst** - zu dieser Übung liegen keine echten Arbeitssätze vor. Triff dazu KEINE Gewichts-/Wiederholungsaussage.`;
     }
 
     if (ex.profile_hint?.exerciseType) {

@@ -110,6 +110,16 @@ export function collectAllowedNumbers(structuredAnalysis) {
       add(s.previous_reps);
       add(s.weight_change_kg);
       add(s.reps_change);
+      // Seit dem Umbau auf satzgenaue Prompts (buildPrompt() in OpenAIProvider.js) zeigt der
+      // Prompt zusätzlich das Pro-Satz-Volumen (Gewicht × Wiederholungen) - diese abgeleitete
+      // Zahl muss hier ebenfalls erlaubt sein, sonst würde der Verifier ein legitimes Zitat
+      // dieser Zahl fälschlich als erfundenen Wert werten (Regel 1).
+      if (s.current_weight != null && s.current_reps != null) {
+        add(s.current_weight * s.current_reps);
+      }
+      if (s.previous_weight != null && s.previous_reps != null) {
+        add(s.previous_weight * s.previous_reps);
+      }
     }
   }
 
