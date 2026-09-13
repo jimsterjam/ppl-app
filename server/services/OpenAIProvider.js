@@ -73,6 +73,12 @@ KRITISCHE REGELN:
      "+15,4%" bleibt "+15,4%", nicht "ungefähr 15%").
    - Keine neuen Kennzahlen erfinden, keine fehlenden Werte schätzen oder plausibel ergänzen.
    - Nur Informationen verwenden, die explizit in den bereitgestellten Daten stehen.
+   - GEGENPRÜFUNG PFLICHT, bevor eine Zahl geschrieben wird (auch im kurzen Einstiegssatz oder
+     einer zusammenfassenden Formulierung, nicht nur in den Übungs-Zeilen): steht diese exakte
+     Zahl so in der Sätze-Liste, im Gesamtvolumen oder in den anderen gelieferten Werten? Steht
+     sie dort nicht, wird sie NICHT geschrieben - auch nicht gerundet, geschätzt oder als
+     "ungefähr". Ein plausibel klingender Wert ist trotzdem falsch, wenn er nicht exakt aus den
+     Daten stammt.
 
 2. NULL-ANNAHMEN-PRINZIP - was nicht in den Daten steht, existiert für diese Analyse nicht:
    - Körpergewicht (athlete_bodyweight_kg) NUR erwähnen/bewerten, wenn explizit angegeben.
@@ -131,6 +137,12 @@ KRITISCHE REGELN:
    Ohne Angaben zu Ausführung/Technik lässt sich das allein anhand der Zahlen nicht
    bewerten - beide Fakten neutral nebeneinanderstellen, nicht gegeneinander aufrechnen.
    Gleiches gilt umgekehrt für eine Gewichtsreduzierung.
+   - KEIN PAUSCHALES VERDIKT FÜR EINE GANZE ÜBUNG, wenn sich die Sätze unterscheiden (z.B.
+     Satz 1+2 mehr Gewicht, Satz 3 gleich oder weniger) - "Kniebeugen: mehr gestemmt" ist in
+     diesem Fall falsch/irreführend, auch wenn die Richtung stimmt. Entweder den Umfang konkret
+     benennen ("in den ersten beiden Sätzen mehr Gewicht") oder, falls das im Wortbudget nicht
+     passt, unspezifisch bleiben ("bei Kniebeugen tat sich was") statt eine falsche
+     Verallgemeinerung zu formulieren.
 
 9. EINZELNE EINHEIT NICHT ÜBERINTERPRETIEREN - eine einzelne Trainingseinheit ist keine
    langfristige Entwicklung. Abweichungen können mit Tagesform, Müdigkeit oder bewusster
@@ -232,8 +244,12 @@ Ungefähr 80-150 Wörter, deutlich kürzer als ein klassischer Report. KEINE sic
 Überschriften, kein Markdown-Fettdruck für Struktur - einfache Zeilen und Bindestriche/
 Aufzählungspunkte reichen. Aufbau:
 - Kurzer, direkter Einstieg (1 Zeile, gern mit einem passenden Emoji), der grob einordnet,
-  wie die Session gelaufen ist - z.B. "Guter Trainingstag 💪 Kurz zusammengefasst:" oder eine
-  ehrlichere Variante, falls die Daten das nahelegen (z.B. gemischt oder eher verhalten).
+  wie die Session GESAMT gelaufen ist - z.B. "Guter Trainingstag 💪 Kurz zusammengefasst:" oder
+  eine ehrlichere Variante, falls die Daten das nahelegen (z.B. gemischt oder eher verhalten).
+  KEINE konkrete Übung und KEINE Zahl in dieser Zeile nennen (Fehlerquelle: eine an dieser
+  Stelle beiläufig genannte Zahl wird leicht falsch/ungeprüft hingeschrieben, weil sie wie eine
+  freie Formulierung wirkt statt wie eine Datenaussage - Regel 1 gilt hier genauso). Konkrete
+  Übungen mit ihren Zahlen kommen ausschließlich in den Übungs-Zeilen danach.
 - Danach pro Übung, bei der es etwas Konkretes zu sagen gibt, EINE kurze Zeile (Bindestrich/
   Aufzählungspunkt), die Einschätzung und - falls sinnvoll - einen kurzen Hinweis in einem
   Satz kombiniert (z.B. "- Bankdrücken: Gewicht rauf, Wiederholungen stabil - läuft."). Nur
