@@ -197,8 +197,12 @@ function render() {
     const detail = document.createElement('tr');
     detail.className = 'detail';
     const blocks = [];
-    if (e.originalFeedbackText) blocks.push(\`<div class="textlabel">Original-Feedback</div><div class="textblock">\${e.originalFeedbackText.replace(/</g, '&lt;')}</div>\`);
-    if (e.revisedFeedbackText) blocks.push(\`<div class="textlabel">Korrigierte Fassung</div><div class="textblock">\${e.revisedFeedbackText.replace(/</g, '&lt;')}</div>\`);
+    if (e.originalFeedbackText) blocks.push(\`<div class="textlabel">Original-Feedback\${(e.originalTriggeredRules||[]).length ? ' - Regel(n) ' + e.originalTriggeredRules.join(', ') : ''}</div><div class="textblock">\${e.originalFeedbackText.replace(/</g, '&lt;')}</div>\`);
+    if (e.revisedFeedbackText) blocks.push(\`<div class="textlabel">Korrekturversuch\${e.revisionSucceeded ? ' - übernommen' : ' - VERWORFEN (Original bleibt final)'}</div><div class="textblock">\${e.revisedFeedbackText.replace(/</g, '&lt;')}</div>\`);
+    if (e.revisionAttempted && e.revisionSucceeded === false) {
+      const recheck = (e.revisionRecheckRules || []).length ? 'Regel(n) ' + e.revisionRecheckRules.join(', ') : 'keine (Re-Prüfung selbst ist fehlgeschlagen/uneindeutig, siehe Konsolen-Log dieses Laufs)';
+      blocks.push(\`<div class="textlabel">Warum verworfen - Re-Prüfung der Korrektur ergab</div><div class="textblock">\${recheck}</div>\`);
+    }
     if (e.error) blocks.push(\`<div class="textlabel">Fehler</div><div class="textblock">\${e.error.replace(/</g, '&lt;')}</div>\`);
     detail.innerHTML = \`<td colspan="5">\${blocks.join('') || '(keine Details)'}</td>\`;
     row.addEventListener('click', () => detail.classList.toggle('open'));

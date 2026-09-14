@@ -105,13 +105,20 @@ async function runOnce(provider, scenario, iteration) {
   }
 
   const allViolations = [...deterministic.violations, ...(aiResult?.violations || [])];
-  let triggeredRules = sortedUnique(allViolations.map((v) => v.rule).filter(Boolean));
+  // Regeln, die der URSPRÜNGLICHE Entwurf verletzt - bleibt unverändert erhalten, unabhängig
+  // davon, was ein späterer Korrekturversuch findet (siehe Bug-Fix-Kommentar unten).
+  const originalTriggeredRules = sortedUnique(allViolations.map((v) => v.rule).filter(Boolean));
   const hasViolation = !deterministic.ok || (aiCheckFailed ? false : !(aiResult?.ok ?? true));
 
   let revisionAttempted = false;
   let revisionSucceeded = null;
   let revisedFeedbackText = null;
   let finalFeedbackText = originalFeedbackText;
+  // Regeln, die die Re-Prüfung NACH der Korrektur gefunden hat (nur befüllt, wenn tatsächlich
+  // ein Korrekturversuch lief) - getrennt von originalTriggeredRules, damit sich nachvollziehen
+  // lässt, ob eine gescheiterte Korrektur denselben Fehler nicht behoben hat oder einen neuen,
+  // anderen eingeführt/gefunden hat.
+  let revisionRecheckRules = null;
 
   if (hasViolation && allViolations.length > 0) {
     revisionAttempted = true;
@@ -131,21 +138,34 @@ async function runOnce(provider, scenario, iteration) {
         console.log(`    ⚠️  Re-Prüfung der Korrektur fehlgeschlagen: ${error.message}`);
       }
 
+      const revisedViolations = [...revisedDeterministic.violations, ...(revisedAiResult?.violations || [])];
+      revisionRecheckRules = sortedUnique(revisedViolations.map((v) => v.rule).filter(Boolean));
+
       const revisedOk = revisedDeterministic.ok && (revisedAiCheckFailed || (revisedAiResult?.ok ?? true));
       if (revisedOk) {
         revisionSucceeded = true;
         finalFeedbackText = revisedFeedbackText;
-        triggeredRules = [];
       } else {
+        // Bug-Fix (User-Report "27 Verstöße, nur 1 korrigiert"): hier wurden früher
+        // originalTriggeredRules UND revisionRecheckRules zusammengeworfen ("triggeredRules =
+        // union(...)") - dadurch tauchte z.B. Regel 4 im Endergebnis weiter auf, selbst wenn der
+        // korrigierte Text die Technik-Formulierung längst entfernt hatte und die Re-Prüfung aus
+        // einem GANZ ANDEREN (oder falsch-positiven) Grund fehlschlug. Da bei einer gescheiterten
+        // Korrektur ohnehin der URSPRÜNGLICHE Text ausgeliefert wird (siehe finalFeedbackText),
+        // sind für "welche Regeln verletzt der TATSÄCHLICH ausgelieferte Text" ausschließlich
+        // originalTriggeredRules relevant - revisionRecheckRules bleibt als separates Feld nur
+        // zur Fehlerdiagnose erhalten (siehe Report: "Re-Prüfung ergab").
         revisionSucceeded = false;
-        const revisedViolations = [...revisedDeterministic.violations, ...(revisedAiResult?.violations || [])];
-        triggeredRules = sortedUnique([...triggeredRules, ...revisedViolations.map((v) => v.rule).filter(Boolean)]);
       }
     } catch (error) {
       revisionSucceeded = false;
       console.log(`    ⚠️  Korrektur fehlgeschlagen: ${error.message}`);
     }
   }
+
+  // triggeredRules = Regeln des Textes, der TATSÄCHLICH als finalFeedbackText landet (bei
+  // Erfolg: keine mehr; sonst: die des unverändert beibehaltenen Originals).
+  const triggeredRules = revisionSucceeded ? [] : originalTriggeredRules;
 
   const entry = {
     requestId,
@@ -156,8 +176,10 @@ async function runOnce(provider, scenario, iteration) {
     aiOk: aiCheckFailed ? null : (aiResult?.ok ?? null),
     aiCheckFailed,
     triggeredRules,
+    originalTriggeredRules,
     revisionAttempted,
     revisionSucceeded,
+    revisionRecheckRules,
     originalFeedbackText,
     revisedFeedbackText,
     finalFeedbackText
