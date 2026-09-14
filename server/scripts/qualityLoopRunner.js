@@ -39,6 +39,7 @@ import {
   getRuleLabel
 } from '../services/feedbackVerificationService.js';
 import { mockWorkoutScenarios } from './evalCases/mockWorkoutScenarios.js';
+import { generateReport } from './lib/qualityLoopReportBuilder.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -53,6 +54,7 @@ function parseArg(name, defaultValue) {
 
 const ITERATIONS = Math.max(1, Number(parseArg('iterations', 3)) || 3);
 const OUT_PATH = path.resolve(process.cwd(), parseArg('out', path.join(__dirname, 'evalResults', 'quality-loop-log.jsonl')));
+const REPORT_PATH = path.resolve(process.cwd(), parseArg('report', path.join(path.dirname(OUT_PATH), 'quality-loop-report.html')));
 const scenarioFilterRaw = parseArg('scenarios', null);
 const scenarioFilter = scenarioFilterRaw
   ? scenarioFilterRaw.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
@@ -251,6 +253,12 @@ async function main() {
   }
 
   console.log(`\nVollständige Rohdaten (ein JSON-Objekt pro Durchlauf): ${OUT_PATH}`);
+
+  // Lokaler HTML-Report (statisch, kein Server nötig) - liest die gesamte JSONL (nicht nur
+  // diesen Lauf) neu ein, damit er immer den kompletten Verlauf über alle bisherigen Aufrufe
+  // von `npm run quality-loop` zeigt, nicht nur den gerade abgeschlossenen.
+  const { entryCount } = generateReport({ inPath: OUT_PATH, outPath: REPORT_PATH });
+  console.log(`\n📊 HTML-Report aktualisiert (${entryCount} Einträge insgesamt): file://${REPORT_PATH}`);
 }
 
 main()
