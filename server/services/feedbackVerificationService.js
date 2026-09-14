@@ -1,12 +1,8 @@
 /**
  * feedbackVerificationService
  *
- * Feedback-Qualitäts-Loop, Phase 1 (Shadow-Modus): prüft den vom Coach-Prompt (OpenAIProvider.js)
- * erzeugten Feedback-Entwurf zusätzlich gegen die Regeln des Systems-Prompts, BEVOR der Nutzer
- * das Feedback sieht. Läuft ausschließlich beobachtend (Shadow) - findet die Prüfung einen
- * Verstoß, wird das protokolliert (siehe models/VerifierAudit.js), aber NICHT in den Entwurf
- * eingegriffen. Erst in einer späteren Phase (AI_VERIFIER_MODE=active) würde eine Korrektur
- * tatsächlich ausgelöst.
+ * Feedback-Qualitäts-Loop: prüft den vom Coach-Prompt (OpenAIProvider.js) erzeugten Feedback-
+ * Entwurf zusätzlich gegen die Regeln des System-Prompts, BEVOR der Nutzer das Feedback sieht.
  *
  * Zwei Prüfstufen:
  * 1. Deterministischer Zahlen-/Wortbudget-Check (reiner Code, kein KI-Aufruf, kostenlos) -
@@ -17,14 +13,23 @@
  *    hält Kosten/Tokens klein.
  *
  * Steuerung über AI_VERIFIER_MODE (Env-Variable): 'off' (Standard) | 'shadow' | 'active'.
- * In dieser Phase 1 wird nur 'off' und 'shadow' unterstützt - 'active' verhält sich aktuell
- * identisch zu 'shadow' (keine Revision implementiert), damit ein versehentliches Umschalten
- * auf 'active' vor Phase 2 nicht zu unerwartetem Verhalten führt.
+ * - 'shadow' (Phase 1): findet die Prüfung einen Verstoß, wird das protokolliert (siehe
+ *   models/VerifierAudit.js), aber NICHT in den Entwurf eingegriffen - der Nutzer sieht immer
+ *   den ursprünglichen Text. Läuft fire-and-forget NACH dem Versenden der Antwort (siehe
+ *   routes/workouts.js), verlängert also nie die Antwortzeit.
+ * - 'active' (Phase 2): wird ein Verstoß gefunden, wird GENAU EIN gezielter Korrektur-Versuch
+ *   unternommen (reviseFeedback()), der NUR die konkret beanstandeten Punkte behebt und den
+ *   Rest des Textes unverändert lässt. Die Korrektur wird anschließend selbst erneut komplett
+ *   geprüft (beide Stufen) - schlägt auch das fehl, wird sicherheitshalber der URSPRÜNGLICHE
+ *   Entwurf ausgeliefert statt eines zweiten, ungeprüft schlechteren Textes. In diesem Modus
+ *   MUSS der Aufrufer die Prüfung awaiten (verlängert die Antwortzeit nur dann, wenn tatsächlich
+ *   ein Verstoß gefunden wurde - im Normalfall keine zusätzliche Latenz).
  */
 
 import { logger } from '../utils/logger.js';
 import { withAiRetry, parseJsonSafely } from '../utils/aiUtils.js';
 import { createOpenAIClient, ensureRelayAwake, markRelayContact } from '../utils/aiClientFactory.js';
+import { getCoachSystemPromptText } from './OpenAIProvider.js';
 import VerifierAudit from '../models/VerifierAudit.js';
 
 const MIN_EXPECTED_WORDS = 40;
@@ -337,7 +342,94 @@ export async function verifyFeedbackWithAI(structuredAnalysis, feedbackText, opt
 }
 
 // ---------------------------------------------------------------------------------------------
-// Orchestrierung (Shadow-Modus, Phase 1)
+// Stufe 3 (nur AI_VERIFIER_MODE=active): gezielte Korrektur eines beanstandeten Entwurfs
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Baut den User-Prompt für den Korrektur-Call: anders als der Verifier-Prompt (der nur prüft)
+ * bekommt dieser Call den Auftrag, NUR die konkret aufgelisteten Punkte zu beheben und sonst
+ * NICHTS am Text zu ändern - bewusst kein "schreib das Feedback nochmal neu", weil eine
+ * komplette Neugenerierung neue, andere Fehler einführen könnte, statt gezielt den bekannten zu
+ * beheben.
+ *
+ * @param {Object} structuredAnalysis
+ * @param {string} feedbackText
+ * @param {Array<{rule:number, issue:string, quote?:string, value?:number}>} violations
+ * @returns {string}
+ */
+export function buildRevisionUserPrompt(structuredAnalysis, feedbackText, violations = []) {
+  const violationList = violations
+    .map((v) => `- Regel ${v.rule}${v.quote ? ` (betroffene Stelle: "${v.quote}")` : ''}: ${v.issue}`)
+    .join('\n');
+
+  return `TRAININGSDATEN (JSON, verbindliche Fakten):
+${JSON.stringify(structuredAnalysis)}
+
+BISHERIGER ENTWURFSTEXT (enthält mindestens einen bestätigten Regelverstoß):
+<draft>${String(feedbackText ?? '').replace(/[<>]/g, '')}</draft>
+
+BEANSTANDETE PUNKTE (nur diese beheben, sonst NICHTS am Text ändern):
+${violationList}
+
+Schreibe den Entwurfstext neu und behebe dabei AUSSCHLIESSLICH die oben genannten Punkte (z.B.
+eine falsche Zahl korrigieren oder ganz entfernen, eine pauschale Aussage differenzieren oder
+weglassen). Ton, Länge, Struktur und alle nicht beanstandeten Aussagen bleiben unverändert.
+Erfinde KEINE neue Zahl, um eine entstehende Lücke zu füllen - ist eine Aussage ohne die falsche
+Zahl nicht mehr haltbar, lass sie ersatzlos weg, statt sie zu ersetzen. Antworte NUR mit dem
+neuen Feedback-Text selbst, keine Erklärung, kein JSON, keine Anführungszeichen darum.`;
+}
+
+/**
+ * Dritter OpenAI-Call (nur bei AI_VERIFIER_MODE=active UND tatsächlich gefundenem Verstoß):
+ * korrigiert einen beanstandeten Entwurf gezielt. Nutzt denselben System-Prompt wie die
+ * Haupt-Generierung (getCoachSystemPromptText), damit Ton/Regeln konsistent bleiben - nur der
+ * User-Prompt unterscheidet sich (Korrektur-Auftrag statt Trainingsdaten-Analyse).
+ *
+ * @param {Object} structuredAnalysis
+ * @param {string} feedbackText
+ * @param {Array} violations
+ * @param {Object} [options] - { requestId }
+ * @returns {Promise<string>} korrigierter Feedback-Text
+ */
+export async function reviseFeedback(structuredAnalysis, feedbackText, violations, options = {}) {
+  const { requestId = `revise_${Date.now()}` } = options;
+  const client = getClient();
+  const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+
+  const userPrompt = buildRevisionUserPrompt(structuredAnalysis, feedbackText, violations);
+
+  logger.debug('🔧 Feedback-Revision gestartet', {
+    requestId,
+    model,
+    violationCount: violations.length,
+    rules: violations.map((v) => v.rule)
+  });
+
+  await ensureRelayAwake();
+
+  const response = await withAiRetry(async () => client.chat.completions.create({
+    model,
+    messages: [
+      { role: 'system', content: getCoachSystemPromptText() },
+      { role: 'user', content: userPrompt }
+    ],
+    temperature: 0.3,
+    max_tokens: 500
+  }));
+
+  markRelayContact();
+
+  const revised = response.choices?.[0]?.message?.content?.trim();
+  if (!revised) {
+    const err = new Error('Revision lieferte leere Antwort');
+    err.code = 'AI_EMPTY_REVISION';
+    throw err;
+  }
+  return revised;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Orchestrierung (Shadow-Modus Phase 1 + aktive Korrektur Phase 2)
 // ---------------------------------------------------------------------------------------------
 
 /**
@@ -376,25 +468,37 @@ export function getVerifierMode() {
 }
 
 /**
- * Führt den kompletten Prüf-Loop aus (Phase 1: nur Shadow - es wird NIE in den Entwurf
- * eingegriffen, egal was gefunden wird). Gedacht als Fire-and-Forget-Aufruf NACH dem Versenden
- * der eigentlichen AI-Antwort an den Nutzer, damit die Prüfung die Antwortzeit nicht verlängert
- * (siehe Aufruf in routes/workouts.js).
+ * Führt den kompletten Prüf-Loop aus.
  *
- * Schlägt der KI-Prüfaufruf selbst fehl (Netzwerk, Timeout, ungültiges JSON), wird das
- * geloggt/protokolliert, aber NIE nach oben geworfen - ein fehlgeschlagener Prüf-Loop darf
- * niemals den eigentlichen Analyse-Flow beeinträchtigen.
+ * 'shadow': verhält sich wie bisher - es wird NIE in den Entwurf eingegriffen, egal was
+ * gefunden wird. Gedacht als Fire-and-Forget-Aufruf NACH dem Versenden der eigentlichen
+ * AI-Antwort an den Nutzer, damit die Prüfung die Antwortzeit nicht verlängert (siehe Aufruf in
+ * routes/workouts.js) - `feedbackText` im Rückgabewert entspricht in diesem Modus immer exakt
+ * dem übergebenen Text.
+ *
+ * 'active' (Phase 2): wird ein Verstoß gefunden, unternimmt diese Funktion GENAU EINEN
+ * Korrektur-Versuch (reviseFeedback()) und prüft dessen Ergebnis erneut vollständig (beide
+ * Stufen). Nur wenn diese Re-Prüfung sauber ist, wird der korrigierte Text zurückgegeben -
+ * andernfalls sicherheitshalber der URSPRÜNGLICHE Entwurf (kein zweiter, ungeprüft
+ * möglicherweise schlechterer Text). In diesem Modus MUSS der Aufrufer awaiten UND den
+ * zurückgegebenen `feedbackText` verwenden (statt des selbst übergebenen), siehe Aufruf in
+ * routes/workouts.js.
+ *
+ * Schlägt ein KI-Aufruf (Prüfung oder Korrektur) selbst fehl (Netzwerk, Timeout, ungültiges
+ * JSON), wird das geloggt/protokolliert, aber NIE nach oben geworfen - ein fehlgeschlagener
+ * Prüf-/Korrektur-Loop darf niemals den eigentlichen Analyse-Flow beeinträchtigen; der Nutzer
+ * bekommt in diesem Fall einfach den ursprünglichen (ungeprüften/unkorrigierten) Entwurf.
  *
  * @param {Object} params
  * @param {Object} params.structuredAnalysis
  * @param {string} params.feedbackText
  * @param {string} [params.requestId]
- * @returns {Promise<{ mode: string, ran: boolean, ok: boolean, triggeredRules: number[] }>}
+ * @returns {Promise<{ mode: string, ran: boolean, ok: boolean, triggeredRules: number[], revisionAttempted: boolean, revisionSucceeded: boolean|null, feedbackText: string }>}
  */
 export async function runVerificationLoop({ structuredAnalysis, feedbackText, requestId = 'unknown' }) {
   const mode = getVerifierMode();
   if (mode === 'off') {
-    return { mode, ran: false, ok: true, triggeredRules: [] };
+    return { mode, ran: false, ok: true, triggeredRules: [], revisionAttempted: false, revisionSucceeded: null, feedbackText };
   }
 
   const deterministic = runDeterministicChecks(feedbackText, structuredAnalysis);
@@ -415,19 +519,79 @@ export async function runVerificationLoop({ structuredAnalysis, feedbackText, re
     });
   }
 
-  const allViolations = [
+  let allViolations = [
     ...deterministic.violations,
     ...(aiResult?.violations || [])
   ];
-  const triggeredRules = [...new Set(allViolations.map((v) => v.rule).filter(Boolean))].sort((a, b) => a - b);
+  let triggeredRules = [...new Set(allViolations.map((v) => v.rule).filter(Boolean))].sort((a, b) => a - b);
+  let finalFeedbackText = feedbackText;
+  let revisionAttempted = false;
+  let revisionSucceeded = null;
 
-  logger.debug('🔍 Feedback-Verifier: Shadow-Prüfung abgeschlossen', {
+  const hasViolation = !deterministic.ok || (aiCheckFailed ? false : !(aiResult?.ok ?? true));
+
+  // Phase 2: aktive Korrektur - nur im 'active'-Modus, nur bei tatsächlich gefundenem Verstoß,
+  // nur EIN Versuch (kein Loop/keine mehrfache Selbstkorrektur), um Kosten/Latenz kontrolliert
+  // zu halten. Im Normalfall (kein Verstoß) läuft dieser Block gar nicht - keine zusätzlichen
+  // Kosten/Latenz gegenüber Shadow-Modus, wenn der Entwurf ohnehin sauber ist.
+  if (mode === 'active' && hasViolation && allViolations.length > 0) {
+    revisionAttempted = true;
+    try {
+      const revisedText = await reviseFeedback(structuredAnalysis, feedbackText, allViolations, { requestId });
+
+      // Re-Prüfung der Korrektur (beide Stufen) - ohne das wüssten wir nicht, ob sie
+      // tatsächlich gewirkt hat oder das Problem nur verschoben/ein neues erzeugt wurde.
+      const revisedDeterministic = runDeterministicChecks(revisedText, structuredAnalysis);
+      let revisedAiResult = null;
+      let revisedAiCheckFailed = false;
+      try {
+        revisedAiResult = await verifyFeedbackWithAI(structuredAnalysis, revisedText, {
+          requestId,
+          deterministicViolations: revisedDeterministic.violations
+        });
+      } catch (error) {
+        revisedAiCheckFailed = true;
+        logger.warn('⚠️ Feedback-Verifier: Re-Prüfung der Korrektur fehlgeschlagen', {
+          requestId,
+          error: error.message
+        });
+      }
+
+      const revisedOk = revisedDeterministic.ok && (revisedAiCheckFailed || (revisedAiResult?.ok ?? true));
+
+      if (revisedOk) {
+        finalFeedbackText = revisedText;
+        revisionSucceeded = true;
+        triggeredRules = [];
+        allViolations = [];
+      } else {
+        // Sicherheitsentscheidung: lieber den geprüft-fehlerhaften ORIGINALTEXT behalten als
+        // einen zweiten, nicht sauber verifizierten Text auszuliefern.
+        revisionSucceeded = false;
+        const revisedViolations = [
+          ...revisedDeterministic.violations,
+          ...(revisedAiResult?.violations || [])
+        ];
+        triggeredRules = [...new Set([
+          ...triggeredRules,
+          ...revisedViolations.map((v) => v.rule).filter(Boolean)
+        ])].sort((a, b) => a - b);
+      }
+    } catch (error) {
+      revisionSucceeded = false;
+      logger.warn('⚠️ Feedback-Revision fehlgeschlagen', { requestId, error: error.message });
+    }
+  }
+
+  logger.debug('🔍 Feedback-Verifier: Prüfung abgeschlossen', {
     requestId,
     mode,
     deterministicOk: deterministic.ok,
     aiOk: aiResult?.ok ?? null,
     aiCheckFailed,
-    triggeredRules
+    triggeredRules,
+    revisionAttempted,
+    revisionSucceeded
   });
 
   // Anonymisierte, fire-and-forget Protokollierung (siehe VerifierAudit.js) - darf den
@@ -437,8 +601,8 @@ export async function runVerificationLoop({ structuredAnalysis, feedbackText, re
     deterministicViolation: !deterministic.ok,
     aiViolation: aiCheckFailed ? null : !(aiResult?.ok ?? true),
     triggeredRules,
-    revisionAttempted: false,
-    revisionSucceeded: null,
+    revisionAttempted,
+    revisionSucceeded,
     aiCheckFailed
   }).catch((e) => {
     logger.warn('⚠️ Konnte VerifierAudit nicht schreiben', { requestId, error: e.message });
@@ -447,8 +611,11 @@ export async function runVerificationLoop({ structuredAnalysis, feedbackText, re
   return {
     mode,
     ran: true,
-    ok: deterministic.ok && (aiCheckFailed || (aiResult?.ok ?? true)),
-    triggeredRules
+    ok: triggeredRules.length === 0,
+    triggeredRules,
+    revisionAttempted,
+    revisionSucceeded,
+    feedbackText: finalFeedbackText
   };
 }
 
@@ -461,6 +628,8 @@ export default {
   getVerifierChecklistText,
   buildVerifierUserPrompt,
   verifyFeedbackWithAI,
+  buildRevisionUserPrompt,
+  reviseFeedback,
   getVerifierMode,
   runVerificationLoop,
   RULE_LABELS,

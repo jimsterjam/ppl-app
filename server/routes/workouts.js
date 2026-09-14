@@ -13,7 +13,7 @@ import FeedbackQualitySignal from '../models/FeedbackQualitySignal.js';
 import { logger } from '../utils/logger.js';
 import { isWorkoutEditWindowExpired } from '../utils/workoutEditWindow.js';
 import { getAIService } from '../services/aiService.js';
-import { runVerificationLoop } from '../services/feedbackVerificationService.js';
+import { runVerificationLoop, getVerifierMode } from '../services/feedbackVerificationService.js';
 import {
   calculateExerciseStats,
   analyzeWorkoutProgression,
@@ -2118,6 +2118,34 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
 
     // 5c. Erfolgreiches Feedback am Workout persistieren (für späteres Wiederabrufen)
     if (aiResult?.feedback) {
+      const verifierMode = getVerifierMode();
+      let verifierMetadata = null;
+
+      // Feedback-Qualitäts-Loop, Phase 2 (AI_VERIFIER_MODE=active): VOR dem Persistieren/
+      // Versenden prüfen und bei einem bestätigten Verstoß gezielt korrigieren (siehe
+      // runVerificationLoop in feedbackVerificationService.js) - deshalb hier bewusst awaited,
+      // aber NUR in diesem Modus. Im Normalfall (Entwurf ohne Verstoß) fällt dabei nur der
+      // ohnehin nötige Verifier-Call an, keine zusätzliche Korrektur-Latenz. Schlägt der Loop
+      // selbst fehl (Netzwerk etc.), bleibt der ursprüngliche, unkorrigierte Entwurf bestehen -
+      // ein fehlgeschlagener Qualitäts-Check darf nie dazu führen, dass gar kein Feedback
+      // ankommt.
+      if (verifierMode === 'active') {
+        try {
+          const verification = await runVerificationLoop({
+            structuredAnalysis,
+            feedbackText: aiResult.feedback,
+            requestId
+          });
+          aiResult.feedback = verification.feedbackText || aiResult.feedback;
+          verifierMetadata = {
+            revisionAttempted: verification.revisionAttempted,
+            revisionSucceeded: verification.revisionSucceeded
+          };
+        } catch (e) {
+          logger.warn('⚠️ Feedback-Verifier-Loop (active) fehlgeschlagen', { requestId, error: e.message });
+        }
+      }
+
       // Kontingent erst bei tatsächlich erfolgreicher Generierung verbrauchen (nicht bei
       // Health-Check-Fehlschlag/network_unavailable oben oder einem AI-Fehler unten) - konsistent
       // mit /quick-generator und /ai-suggestion, die ebenfalls nur bei echtem Erfolg zählen.
@@ -2130,7 +2158,8 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
             ai_generated_at: new Date(),
             ai_metadata: {
               provider: aiService.getProviderName(),
-              model: aiService.getModelName()
+              model: aiService.getModelName(),
+              ...(verifierMetadata || {})
             },
             ai_analysis_snapshot: analysisSnapshot,
             // War das Workout zuvor "zurückgestellt" (Feature "Feedback später bewerten"),
@@ -2143,19 +2172,20 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
         logger.warn('⚠️ Konnte AI-Feedback nicht persistieren', { requestId, error: e.message });
       });
 
-      // Feedback-Qualitäts-Loop (Phase 1: Shadow-Modus, siehe feedbackVerificationService.js).
-      // Bewusst NICHT awaited - der Prüf-Loop (inkl. eines zweiten, kleinen OpenAI-Calls) darf
-      // die Antwortzeit für den Nutzer nicht verlängern und greift in dieser Phase ohnehin nie
-      // in den bereits gesendeten Entwurf ein (reines Beobachten/Protokollieren). Läuft nur,
-      // wenn AI_VERIFIER_MODE (Env) auf 'shadow'/'active' steht - Standard ist 'off' (keine
-      // zusätzlichen Kosten).
-      runVerificationLoop({
-        structuredAnalysis,
-        feedbackText: aiResult.feedback,
-        requestId
-      }).catch((e) => {
-        logger.warn('⚠️ Feedback-Verifier-Loop fehlgeschlagen', { requestId, error: e.message });
-      });
+      // Shadow-Modus (Phase 1, unverändertes Verhalten) bzw. 'off': bewusst NICHT awaited - der
+      // Prüf-Loop darf die Antwortzeit für den Nutzer nicht verlängern und greift hier ohnehin
+      // nie in den bereits gesendeten Entwurf ein (reines Beobachten/Protokollieren). Im
+      // 'active'-Modus ist der Loop bereits oben (awaited) gelaufen - hier dann kein zweiter,
+      // redundanter Durchlauf.
+      if (verifierMode !== 'active') {
+        runVerificationLoop({
+          structuredAnalysis,
+          feedbackText: aiResult.feedback,
+          requestId
+        }).catch((e) => {
+          logger.warn('⚠️ Feedback-Verifier-Loop fehlgeschlagen', { requestId, error: e.message });
+        });
+      }
     }
 
     // 6. Kombiniere Backend-Analysen + AI-Feedback
