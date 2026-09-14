@@ -76,6 +76,22 @@ describe('collectAllowedNumbers', () => {
     assert.deepEqual(collectAllowedNumbers(null), new Set())
     assert.deepEqual(collectAllowedNumbers({}), new Set())
   })
+
+  test('Zahlen aus Notiz-Texten (persistent, Session, Legacy-Feld) gelten als erlaubt', () => {
+    const allowed = collectAllowedNumbers({
+      exercises: [{
+        note_context: {
+          persistent: { text: 'Bewusster Deload alle 6 Wochen, danach wieder steigern.' },
+          session: 'Heute nur 2 Sätze wegen Zeitmangel.'
+        }
+      }, {
+        note: 'Vor 12 Monaten Bandscheibenvorfall gehabt.'
+      }]
+    })
+    assert.ok(allowed.has(6))
+    assert.ok(allowed.has(2))
+    assert.ok(allowed.has(12))
+  })
 })
 
 describe('checkNumberConsistency', () => {

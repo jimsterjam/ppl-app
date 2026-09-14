@@ -148,6 +148,20 @@ export function collectAllowedNumbers(structuredAnalysis) {
     add(ex.changes?.volume_change_kg);
     add(ex.changes?.volume_change_percent);
 
+    // Bug-Fix (Quality-Loop-Analyse): Zahlen, die direkt aus einer Nutzer-Notiz zitiert werden
+    // (z.B. "Bewusster Deload alle 6 Wochen" in note_context.persistent.text), sind eine
+    // legitime Quelle (Regel 12 verlangt sogar, Notizen zu berücksichtigen) - standen bisher
+    // aber nicht in der erlaubten Zahlenmenge, wurden also fälschlich als "erfundene Zahl"
+    // markiert, sobald der Coach sie im Fließtext wiederholte.
+    const noteTexts = [
+      ex.note_context?.persistent?.text,
+      ex.note_context?.session,
+      ex.note
+    ].filter(Boolean);
+    for (const noteText of noteTexts) {
+      for (const n of extractNumbersFromText(noteText)) add(n);
+    }
+
     for (const s of ex.sets_comparison || []) {
       add(s.set_number);
       add(s.current_weight);
@@ -263,7 +277,13 @@ Entwurfstext. Du generierst KEIN neues Feedback, du prüfst nur.
 1. Datenwahrheit: Zahlen im Text müssen exakt den gelieferten Daten entsprechen (nicht neu
    berechnet, nicht erfunden, nicht geschätzt und keine Durchschnittswerte berechnen).
 2. Null-Annahmen: keine Aussage zu Werten, die nicht in den Daten stehen (z.B. Körpergewicht
-   nur wenn athlete_bodyweight_kg vorhanden).
+   nur wenn athlete_bodyweight_kg vorhanden). WICHTIG: ein Satz, der explizit sagt, dass zu einer
+   Übung KEINE Satzdaten/Werte vorliegen und DESHALB bewusst keine Gewichts-/Wiederholungsaussage
+   getroffen wird (z.B. "Es liegen keine Satzdaten vor, daher kann ich dazu nichts sagen"), ist
+   KEIN Regel-2-Verstoß, sondern genau das geforderte Verhalten bei fehlenden Daten - das
+   Gegenteil einer unbelegten Behauptung. Melde Regel 2 nur, wenn der Text tatsächlich einen
+   KONKRETEN Wert nennt/behauptet, der nicht in den Daten steht - nicht, wenn er das Fehlen von
+   Daten nur beschreibt.
 3. Keine halluzinierten Ursachen (z.B. "Fett verloren", "Muskeln gewachsen") ohne Beleg in den
    Daten - mögliche Ursachen nur als "könnte" formuliert.
 4. Keine Aussage zu tatsächlicher Bewegungsausführung, Technik, Tempo, subjektivem Schmerz/
