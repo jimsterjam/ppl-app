@@ -332,11 +332,15 @@ function getClient() {
  *
  * @param {Object} structuredAnalysis
  * @param {string} feedbackText
- * @param {Object} [options] - { requestId, deterministicViolations }
+ * @param {Object} [options] - { requestId, deterministicViolations, onRawResponse }
+ * @param {(raw: string) => void} [options.onRawResponse] - NUR für Diagnose (siehe
+ *   scripts/qualityLoopRunner.js): bekommt, falls gesetzt, den unveränderten Rohtext der
+ *   KI-Antwort (vor JSON-Parsing/Keyword-Filter). Im Produktions-Betrieb (routes/workouts.js)
+ *   wird dieser Callback NIE übergeben - ohne ihn verhält sich diese Funktion exakt wie zuvor.
  * @returns {Promise<{ ok: boolean, violations: Array<{rule:number, issue:string, quote?:string}> }>}
  */
 export async function verifyFeedbackWithAI(structuredAnalysis, feedbackText, options = {}) {
-  const { requestId = `verify_${Date.now()}`, deterministicViolations = [] } = options;
+  const { requestId = `verify_${Date.now()}`, deterministicViolations = [], onRawResponse } = options;
   const client = getClient();
   const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
 
@@ -363,6 +367,9 @@ export async function verifyFeedbackWithAI(structuredAnalysis, feedbackText, opt
   markRelayContact();
 
   const raw = response.choices?.[0]?.message?.content?.trim();
+  if (typeof onRawResponse === 'function') {
+    try { onRawResponse(raw); } catch { /* Diagnose-Callback darf den Verifier nie stören */ }
+  }
   const parsed = parseJsonSafely(raw, { requestId, context: 'feedback-verifier' });
 
   const rawViolations = Array.isArray(parsed?.violations)

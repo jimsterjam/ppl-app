@@ -227,6 +227,12 @@ function render() {
       blocks.push(\`<div class="textlabel">Warum verworfen - Re-Prüfung der Korrektur ergab</div><div class="textblock">\${recheck.replace(/</g, '&lt;')}</div>\`);
     }
     if (e.error) blocks.push(\`<div class="textlabel">Fehler</div><div class="textblock">\${e.error.replace(/</g, '&lt;')}</div>\`);
+    if (e.rawVerifyResponse || e.rawRecheckResponse) {
+      const rawParts = [];
+      if (e.rawVerifyResponse) rawParts.push(\`ERST-PRÜFUNG (roh):\\n\${e.rawVerifyResponse}\`);
+      if (e.rawRecheckResponse) rawParts.push(\`RE-PRÜFUNG NACH KORREKTUR (roh):\\n\${e.rawRecheckResponse}\`);
+      blocks.push(\`<details style="margin-top:8px;"><summary style="cursor:pointer; color: var(--muted); font-size: 12px;">Rohe API-Antwort(en) des Verifiers</summary><div class="textblock" style="margin-top:6px;">\${rawParts.join('\\n\\n').replace(/</g, '&lt;')}</div></details>\`);
+    }
     detail.innerHTML = \`<td colspan="5">\${blocks.join('') || '(keine Details)'}</td>\`;
     row.addEventListener('click', () => detail.classList.toggle('open'));
     tbody.appendChild(row);

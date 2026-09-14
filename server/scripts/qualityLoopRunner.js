@@ -119,10 +119,12 @@ async function runOnce(provider, scenario, iteration, learningState) {
 
   let aiResult = null;
   let aiCheckFailed = false;
+  let rawVerifyResponse = null;
   try {
     aiResult = await verifyFeedbackWithAI(scenario.structuredAnalysis, originalFeedbackText, {
       requestId,
-      deterministicViolations: deterministic.violations
+      deterministicViolations: deterministic.violations,
+      onRawResponse: (raw) => { rawVerifyResponse = raw; }
     });
   } catch (error) {
     aiCheckFailed = true;
@@ -148,6 +150,10 @@ async function runOnce(provider, scenario, iteration, learningState) {
   // revisionRecheckRules (nur Nummern) hilft das bei der Diagnose, WARUM eine Korrektur konkret
   // scheiterte, ohne dafür extra einen neuen Lauf fahren zu müssen.
   let revisionRecheckDetails = null;
+  // Rohe API-Antworttexte (unveränderter Modell-Output, vor JSON-Parsing/Keyword-Filter) - nur
+  // zur Diagnose, warum der Verifier etwas gefunden/nicht gefunden hat (siehe onRawResponse in
+  // verifyFeedbackWithAI). Kein Produktions-Feature, existiert nur in diesem lokalen Log.
+  let rawRecheckResponse = null;
 
   if (hasViolation && allViolations.length > 0) {
     revisionAttempted = true;
@@ -160,7 +166,8 @@ async function runOnce(provider, scenario, iteration, learningState) {
       try {
         revisedAiResult = await verifyFeedbackWithAI(scenario.structuredAnalysis, revisedFeedbackText, {
           requestId,
-          deterministicViolations: revisedDeterministic.violations
+          deterministicViolations: revisedDeterministic.violations,
+          onRawResponse: (raw) => { rawRecheckResponse = raw; }
         });
       } catch (error) {
         revisedAiCheckFailed = true;
@@ -228,6 +235,8 @@ async function runOnce(provider, scenario, iteration, learningState) {
     revisionSucceeded,
     revisionRecheckRules,
     revisionRecheckDetails,
+    rawVerifyResponse,
+    rawRecheckResponse,
     usedLearnedExamples,
     originalFeedbackText,
     revisedFeedbackText,
