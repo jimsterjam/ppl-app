@@ -374,6 +374,23 @@ export function buildRevisionUserPrompt(structuredAnalysis, feedbackText, violat
     .map((v) => `- Regel ${v.rule}${v.quote ? ` (betroffene Stelle: "${v.quote}")` : ''}: ${v.issue}`)
     .join('\n');
 
+  // Bug-Fix (Quality-Loop-Analyse, scripts/qualityLoopRunner.js): bei Regel-4-/11-Verstößen
+  // ("Aussage zu Ausführung/Technik/Tempo/Schmerz" bzw. "erfundene/generische Empfehlung ohne
+  // Datenbezug") ersetzte das Modell die beanstandete Stelle in der Praxis sehr häufig durch eine
+  // ANDERE, ähnlich geartete Formulierung (z.B. "achte auf die Technik" -> "achte darauf, wie
+  // sich das Gewicht anfühlt" - beides eine unzulässige Aussage zu subjektivem Empfinden/
+  // Ausführung) - die Re-Prüfung schlug dadurch mit derselben Regel erneut fehl. Explizite
+  // Gegenmaßnahme unten: bei diesen beiden Regeln lieber ersatzlos weglassen statt umformulieren.
+  const hasExecutionOrGenericAdviceViolation = violations.some((v) => v.rule === 4 || v.rule === 11);
+  const executionAdviceWarning = hasExecutionOrGenericAdviceViolation
+    ? `\n\nWICHTIG bei Regel 4/11: ersetze eine beanstandete Ausführungs-/Technik-/Gefühls-Aussage
+oder eine generische Empfehlung NICHT durch eine ähnlich geartete neue Formulierung (z.B. "achte
+auf die Technik" durch "achte darauf, wie sich das Gewicht anfühlt" zu ersetzen behebt den
+Verstoß NICHT, da beides eine unzulässige Aussage zu subjektivem Empfinden/Ausführung ist) -
+lass die Stelle in diesem Fall ERSATZLOS weg oder ersetze sie durch eine rein aus den
+Trainingsdaten ableitbare, konkrete Aussage (z.B. eine Zahl oder einen Trend aus den Daten).`
+    : '';
+
   return `TRAININGSDATEN (JSON, verbindliche Fakten):
 ${JSON.stringify(structuredAnalysis)}
 
@@ -387,8 +404,9 @@ Schreibe den Entwurfstext neu und behebe dabei AUSSCHLIESSLICH die oben genannte
 eine falsche Zahl korrigieren oder ganz entfernen, eine pauschale Aussage differenzieren oder
 weglassen). Ton, Länge, Struktur und alle nicht beanstandeten Aussagen bleiben unverändert.
 Erfinde KEINE neue Zahl, um eine entstehende Lücke zu füllen - ist eine Aussage ohne die falsche
-Zahl nicht mehr haltbar, lass sie ersatzlos weg, statt sie zu ersetzen. Antworte NUR mit dem
-neuen Feedback-Text selbst, keine Erklärung, kein JSON, keine Anführungszeichen darum.`;
+Zahl nicht mehr haltbar, lass sie ersatzlos weg, statt sie zu ersetzen.${executionAdviceWarning}
+Antworte NUR mit dem neuen Feedback-Text selbst, keine Erklärung, kein JSON, keine
+Anführungszeichen darum.`;
 }
 
 /**

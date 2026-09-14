@@ -144,6 +144,10 @@ async function runOnce(provider, scenario, iteration, learningState) {
   // lässt, ob eine gescheiterte Korrektur denselben Fehler nicht behoben hat oder einen neuen,
   // anderen eingeführt/gefunden hat.
   let revisionRecheckRules = null;
+  // Rohe Verstoß-Details (Regel + Begründung + ggf. Zitat) der Re-Prüfung - anders als
+  // revisionRecheckRules (nur Nummern) hilft das bei der Diagnose, WARUM eine Korrektur konkret
+  // scheiterte, ohne dafür extra einen neuen Lauf fahren zu müssen.
+  let revisionRecheckDetails = null;
 
   if (hasViolation && allViolations.length > 0) {
     revisionAttempted = true;
@@ -165,6 +169,7 @@ async function runOnce(provider, scenario, iteration, learningState) {
 
       const revisedViolations = [...revisedDeterministic.violations, ...(revisedAiResult?.violations || [])];
       revisionRecheckRules = sortedUnique(revisedViolations.map((v) => v.rule).filter(Boolean));
+      revisionRecheckDetails = revisedViolations.map((v) => ({ rule: v.rule, issue: v.issue, quote: v.quote }));
 
       const revisedOk = revisedDeterministic.ok && (revisedAiCheckFailed || (revisedAiResult?.ok ?? true));
       if (revisedOk) {
@@ -218,9 +223,11 @@ async function runOnce(provider, scenario, iteration, learningState) {
     aiCheckFailed,
     triggeredRules,
     originalTriggeredRules,
+    originalViolationDetails: allViolations.map((v) => ({ rule: v.rule, issue: v.issue, quote: v.quote })),
     revisionAttempted,
     revisionSucceeded,
     revisionRecheckRules,
+    revisionRecheckDetails,
     usedLearnedExamples,
     originalFeedbackText,
     revisedFeedbackText,

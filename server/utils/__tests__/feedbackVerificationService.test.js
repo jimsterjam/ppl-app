@@ -191,6 +191,17 @@ describe('buildRevisionUserPrompt', () => {
     assert.ok(prompt.includes('Regel 1: Falsche Zahl'))
     assert.ok(prompt.includes('Regel 8: Pauschales Verdikt'))
   })
+
+  test('Regel 4/11 lösen den Zusatzhinweis "nicht durch ähnliche Formulierung ersetzen" aus', () => {
+    const prompt = buildRevisionUserPrompt({}, 'Text', [{ rule: 4, issue: 'Ausführungsbezug' }])
+    assert.match(prompt, /ERSATZLOS weg/)
+    assert.match(prompt, /Regel 4\/11/)
+  })
+
+  test('andere Regeln (z.B. 1, 8) lösen den Zusatzhinweis NICHT aus', () => {
+    const prompt = buildRevisionUserPrompt({}, 'Text', [{ rule: 1, issue: 'Falsche Zahl' }])
+    assert.ok(!prompt.includes('WICHTIG bei Regel 4/11'))
+  })
 })
 
 describe('getVerifierMode', () => {
