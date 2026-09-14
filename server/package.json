@@ -10,7 +10,8 @@
     "seed": "node seedExercises.js",
     "normalize:workouts": "node scripts/normalizeWorkouts.js",
     "eval": "node scripts/evalRunner.js",
-    "eval:ai": "node scripts/evalRunner.js --with-ai"
+    "eval:ai": "node scripts/evalRunner.js --with-ai",
+    "quality-loop": "node scripts/qualityLoopRunner.js"
   },
   "keywords": [],
   "author": "",
