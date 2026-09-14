@@ -35,6 +35,23 @@ import VerifierAudit from '../models/VerifierAudit.js';
 const MIN_EXPECTED_WORDS = 40;
 const MAX_EXPECTED_WORDS = 220;
 
+// Deterministisches Sicherheitsnetz gegen Regel-4-Fehlklassifizierung durch den KI-Verifier
+// (siehe verifyFeedbackWithAI): trotz Few-Shot-Beispielen in getVerifierChecklistText() stempelte
+// das Modell wiederholt reine Gewichts-/Wiederholungs-Empfehlungen ohne jeden Bezug zu
+// Ausführung/Technik als Regel-4-Verstoß (per Quality-Loop-Batch-Analyse gefunden). Ein
+// gemeldeter Regel-4-Fund wird deshalb NUR akzeptiert, wenn eines dieser Wörter im Zitat oder in
+// der Begründung selbst vorkommt - sonst wird der Fund verworfen (nicht: der ganze restliche
+// Verifier-Lauf).
+const RULE_4_REQUIRED_KEYWORDS = [
+  'technik', 'ausführung', 'ausfuhrung', 'tempo', 'anfühlt', 'anfuhlt', 'fühlt sich', 'fuhlt sich',
+  'schmerz', 'verletzung', 'bewegungsqualität', 'bewegungsqualitat', 'bewegungsgefühl', 'bewegungsgefuhl'
+];
+
+export function isKeywordBackedRule4Violation(violation) {
+  const haystack = `${violation.quote || ''} ${violation.issue || ''}`.toLowerCase();
+  return RULE_4_REQUIRED_KEYWORDS.some((kw) => haystack.includes(kw));
+}
+
 // ---------------------------------------------------------------------------------------------
 // Stufe 1: Deterministischer Zahlen-Check (kein KI-Aufruf)
 // ---------------------------------------------------------------------------------------------
@@ -226,10 +243,18 @@ Entwurfstext. Du generierst KEIN neues Feedback, du prüfst nur.
 3. Keine halluzinierten Ursachen (z.B. "Fett verloren", "Muskeln gewachsen") ohne Beleg in den
    Daten - mögliche Ursachen nur als "könnte" formuliert.
 4. Keine Aussage zu tatsächlicher Bewegungsausführung, Technik, Tempo, subjektivem Schmerz/
-   Verletzung, außer eine Notiz erwähnt das explizit. NICHT hierunter fallen rein datenbasierte
-   Vorwärts-Empfehlungen zu Gewicht/Wiederholungen/Sätzen (z.B. "steigere im dritten Satz das
-   Gewicht") - das ist Regel 11, nicht Regel 4, solange kein Wort zu Ausführungsqualität,
-   Bewegungstempo oder Körperempfinden fällt.
+   Verletzung, außer eine Notiz erwähnt das explizit.
+   BEISPIELE (wichtig, da hier häufig falsch zugeordnet wird):
+   - VERSTÖSST gegen Regel 4: "Achte auf deine Technik", "achte darauf, wie sich das Gewicht
+     anfühlt", "achte auf eine saubere Ausführung", "halte das Tempo langsam" - hier geht es um
+     Ausführungsqualität, Bewegungsgefühl oder Tempo.
+   - VERSTÖSST NICHT gegen Regel 4 (auch wenn es wie eine ähnliche "Für nächstes Mal..."-
+     Empfehlung klingt): "steigere im dritten Satz das Gewicht", "versuch die Wiederholungen zu
+     halten", "behalte das Gewicht im Auge und steigere es, wenn es passt" - das sind reine
+     Gewichts-/Wiederholungs-/Satz-Empfehlungen OHNE ein Wort zu Technik/Ausführung/Tempo/
+     Körperempfinden. Das fällt höchstens unter Regel 11 (falls ohne Datenbezug erfunden), NIEMALS
+     unter Regel 4. Melde Regel 4 NUR, wenn das Zitat selbst ein Wort wie "Technik", "Ausführung",
+     "Tempo", "anfühlt"/"fühlt sich", "Schmerz" oder "Verletzung" enthält.
 5. Keine medizinischen Diagnosen (Verletzung, Überlastung, Gelenkproblem, Regenerationsproblem).
 6. Fakt und Interpretation klar getrennt, keine Interpretation als Tatsache formuliert.
 7. Keine endgültigen Urteile/Anweisungen bei mehrdeutiger Datenlage - nur bedingte Hinweise.
@@ -331,7 +356,7 @@ export async function verifyFeedbackWithAI(structuredAnalysis, feedbackText, opt
   const raw = response.choices?.[0]?.message?.content?.trim();
   const parsed = parseJsonSafely(raw, { requestId, context: 'feedback-verifier' });
 
-  const violations = Array.isArray(parsed?.violations)
+  const rawViolations = Array.isArray(parsed?.violations)
     ? parsed.violations
       .map((v) => ({
         rule: Number(v?.rule) || 0,
@@ -340,6 +365,17 @@ export async function verifyFeedbackWithAI(structuredAnalysis, feedbackText, opt
       }))
       .filter((v) => v.issue)
     : [];
+
+  // Keyword-Filter (siehe RULE_4_REQUIRED_KEYWORDS oben) - nur Regel-4-Funde ohne jeden Bezug zu
+  // Ausführung/Technik/Tempo/Körperempfinden werden verworfen, alle anderen Regeln unberührt.
+  const droppedRule4 = rawViolations.filter((v) => v.rule === 4 && !isKeywordBackedRule4Violation(v));
+  if (droppedRule4.length > 0) {
+    logger.debug('🧹 Verifier: Regel-4-Fund ohne Ausführungs-/Technik-Bezug verworfen (Keyword-Filter)', {
+      requestId,
+      dropped: droppedRule4.map((v) => ({ issue: v.issue, quote: v.quote }))
+    });
+  }
+  const violations = rawViolations.filter((v) => v.rule !== 4 || isKeywordBackedRule4Violation(v));
 
   // Bug-Fix (per Quality-Loop-Batch-Analyse gefunden, scripts/qualityLoopRunner.js): `ok`
   // ausschließlich anhand der tatsächlich benannten `violations` bestimmen, NICHT zusätzlich am
@@ -385,13 +421,28 @@ export function buildRevisionUserPrompt(structuredAnalysis, feedbackText, violat
   // Ausführung) - die Re-Prüfung schlug dadurch mit derselben Regel erneut fehl. Explizite
   // Gegenmaßnahme unten: bei diesen beiden Regeln lieber ersatzlos weglassen statt umformulieren.
   const hasExecutionOrGenericAdviceViolation = violations.some((v) => v.rule === 4 || v.rule === 11);
+  // Bug-Fix Nr. 2 (Quality-Loop-Analyse): "ersatzlos weglassen" führte in der Praxis oft dazu,
+  // dass der Text auf 30-40 Wörter zusammenschrumpfte und dadurch NEU gegen Regel 17
+  // (Wortbudget ~80-150) verstieß - eine Regel wurde behoben, eine andere dafür provoziert.
+  // Deshalb jetzt an die tatsächliche aktuelle Wortzahl gekoppelt: nur wirklich ersatzlos
+  // weglassen, wenn danach noch genug Text übrig bleibt, sonst durch eine kurze, aus den Daten
+  // ableitbare Aussage ersetzen (damit die Länge erhalten bleibt).
+  const currentWordCount = String(feedbackText ?? '').trim().split(/\s+/).filter(Boolean).length;
+  const closeToMinWords = currentWordCount < MIN_EXPECTED_WORDS + 25;
   const executionAdviceWarning = hasExecutionOrGenericAdviceViolation
     ? `\n\nWICHTIG bei Regel 4/11: ersetze eine beanstandete Ausführungs-/Technik-/Gefühls-Aussage
 oder eine generische Empfehlung NICHT durch eine ähnlich geartete neue Formulierung (z.B. "achte
 auf die Technik" durch "achte darauf, wie sich das Gewicht anfühlt" zu ersetzen behebt den
-Verstoß NICHT, da beides eine unzulässige Aussage zu subjektivem Empfinden/Ausführung ist) -
-lass die Stelle in diesem Fall ERSATZLOS weg oder ersetze sie durch eine rein aus den
-Trainingsdaten ableitbare, konkrete Aussage (z.B. eine Zahl oder einen Trend aus den Daten).`
+Verstoß NICHT, da beides eine unzulässige Aussage zu subjektivem Empfinden/Ausführung ist).
+${closeToMinWords
+    ? `Der Entwurf hat aktuell nur ca. ${currentWordCount} Wörter (Ziel: ca. 80-150) - lass die
+beanstandete Stelle deshalb NICHT ersatzlos weg (der Text würde sonst zu kurz werden und gegen
+Regel 17 verstoßen), sondern ERSETZE sie durch eine kurze, rein aus den Trainingsdaten
+ableitbare, konkrete Aussage (z.B. eine Zahl oder einen Trend aus den Daten), die ungefähr
+gleich lang ist wie die gestrichene Stelle.`
+    : `Lass die Stelle ERSATZLOS weg (der Text ist lang genug, das verkraftet die Wortzahl) oder
+ersetze sie durch eine rein aus den Trainingsdaten ableitbare, konkrete Aussage (z.B. eine Zahl
+oder einen Trend aus den Daten) - beides ist hier möglich.`}`
     : '';
 
   return `TRAININGSDATEN (JSON, verbindliche Fakten):
@@ -658,6 +709,7 @@ export default {
   checkNumberConsistency,
   checkWordBudget,
   runDeterministicChecks,
+  isKeywordBackedRule4Violation,
   getVerifierChecklistText,
   buildVerifierUserPrompt,
   verifyFeedbackWithAI,

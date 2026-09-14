@@ -6,6 +6,7 @@ import {
   checkNumberConsistency,
   checkWordBudget,
   runDeterministicChecks,
+  isKeywordBackedRule4Violation,
   getVerifierChecklistText,
   buildVerifierUserPrompt,
   buildRevisionUserPrompt,
@@ -123,6 +124,20 @@ describe('checkWordBudget', () => {
   })
 })
 
+describe('isKeywordBackedRule4Violation', () => {
+  test('echte Ausführungs-/Technik-Zitate werden akzeptiert', () => {
+    assert.equal(isKeywordBackedRule4Violation({ quote: 'Achte auf deine Technik', issue: '' }), true)
+    assert.equal(isKeywordBackedRule4Violation({ quote: 'achte darauf, wie sich das Gewicht anfühlt', issue: '' }), true)
+    assert.equal(isKeywordBackedRule4Violation({ quote: '', issue: 'Aussage zum Schmerzempfinden' }), true)
+  })
+
+  test('reine Gewichts-/Wiederholungs-Empfehlungen ohne Ausführungsbezug werden verworfen', () => {
+    assert.equal(isKeywordBackedRule4Violation({ quote: 'steigere im dritten Satz das Gewicht', issue: 'Aussage zur Bewegungsausführung' }) , true) // "Bewegungsausführung" enthält "ausführung"
+    assert.equal(isKeywordBackedRule4Violation({ quote: 'steigere im dritten Satz das Gewicht', issue: '' }), false)
+    assert.equal(isKeywordBackedRule4Violation({ quote: 'behalte die Wiederholungen im Auge', issue: 'generische Empfehlung' }), false)
+  })
+})
+
 describe('runDeterministicChecks', () => {
   test('kombiniert Zahlen- und Wortbudget-Verstöße', () => {
     const structuredAnalysis = { exercises: [{ current_weight: 80, current_reps: 10, current_sets: 1, current_volume: 800, changes: { weight_change_kg: 0, reps_change: 0, sets_change: 0, volume_change_kg: 0, volume_change_percent: 0 } }] }
@@ -192,10 +207,18 @@ describe('buildRevisionUserPrompt', () => {
     assert.ok(prompt.includes('Regel 8: Pauschales Verdikt'))
   })
 
-  test('Regel 4/11 lösen den Zusatzhinweis "nicht durch ähnliche Formulierung ersetzen" aus', () => {
-    const prompt = buildRevisionUserPrompt({}, 'Text', [{ rule: 4, issue: 'Ausführungsbezug' }])
+  test('Regel 4/11 lösen den Zusatzhinweis "nicht durch ähnliche Formulierung ersetzen" aus (langer Entwurf: ersatzlos weglassen erlaubt)', () => {
+    const longText = Array(100).fill('Wort').join(' ')
+    const prompt = buildRevisionUserPrompt({}, longText, [{ rule: 4, issue: 'Ausführungsbezug' }])
     assert.match(prompt, /ERSATZLOS weg/)
     assert.match(prompt, /Regel 4\/11/)
+  })
+
+  test('Regel 4/11 bei kurzem Entwurf: NICHT ersatzlos weglassen, sondern datenbasiert ersetzen (Regel-17-Schutz)', () => {
+    const shortText = Array(50).fill('Wort').join(' ')
+    const prompt = buildRevisionUserPrompt({}, shortText, [{ rule: 4, issue: 'Ausführungsbezug' }])
+    assert.match(prompt, /NICHT ersatzlos weg/)
+    assert.match(prompt, /Regel 17/)
   })
 
   test('andere Regeln (z.B. 1, 8) lösen den Zusatzhinweis NICHT aus', () => {
