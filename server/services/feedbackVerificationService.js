@@ -39,8 +39,8 @@ const MAX_EXPECTED_WORDS = 220;
 // (siehe verifyFeedbackWithAI): trotz Few-Shot-Beispielen in getVerifierChecklistText() stempelte
 // das Modell wiederholt reine Gewichts-/Wiederholungs-Empfehlungen ohne jeden Bezug zu
 // Ausführung/Technik als Regel-4-Verstoß (per Quality-Loop-Batch-Analyse gefunden). Ein
-// gemeldeter Regel-4-Fund wird deshalb NUR akzeptiert, wenn eines dieser Wörter im Zitat oder in
-// der Begründung selbst vorkommt - sonst wird der Fund verworfen (nicht: der ganze restliche
+// gemeldeter Regel-4-Fund wird deshalb NUR akzeptiert, wenn eines dieser Wörter im ZITAT
+// (`quote`) selbst vorkommt - sonst wird der Fund verworfen (nicht: der ganze restliche
 // Verifier-Lauf).
 const RULE_4_REQUIRED_KEYWORDS = [
   'technik', 'ausführung', 'ausfuhrung', 'tempo', 'anfühlt', 'anfuhlt', 'fühlt sich', 'fuhlt sich',
@@ -48,8 +48,17 @@ const RULE_4_REQUIRED_KEYWORDS = [
 ];
 
 export function isKeywordBackedRule4Violation(violation) {
-  const haystack = `${violation.quote || ''} ${violation.issue || ''}`.toLowerCase();
-  return RULE_4_REQUIRED_KEYWORDS.some((kw) => haystack.includes(kw));
+  // Bug-Fix Nr. 2 (Quality-Loop-Analyse, zweite Runde): NUR `quote` (das tatsächliche Zitat aus
+  // dem Entwurf) zählt, NICHT `issue` (die Begründung). Grund: das Modell schreibt in `issue`
+  // so gut wie immer pauschal "Aussage zur Technik/Ausführung" als Label - selbst wenn das
+  // zitierte `quote` selbst gar nichts mit Technik zu tun hat (z.B. quote: "das läuft!" oder
+  // "schau, ob du die Wiederholungen bei 8 halten kannst"). Mit `issue` im Suchtext griff der
+  // Filter praktisch NIE, weil das Boilerplate-Label das Keyword fast immer enthält, unabhängig
+  // vom eigentlichen Fund. Fehlt `quote` komplett (Modell hat keins geliefert), gilt der Fund als
+  // NICHT belegt und wird verworfen - ein Regel-4-Vorwurf ohne Zitat ist nicht überprüfbar.
+  const quote = String(violation.quote || '').trim().toLowerCase();
+  if (!quote) return false;
+  return RULE_4_REQUIRED_KEYWORDS.some((kw) => quote.includes(kw));
 }
 
 // ---------------------------------------------------------------------------------------------

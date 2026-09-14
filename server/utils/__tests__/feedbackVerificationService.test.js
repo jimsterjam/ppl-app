@@ -125,16 +125,24 @@ describe('checkWordBudget', () => {
 })
 
 describe('isKeywordBackedRule4Violation', () => {
-  test('echte Ausführungs-/Technik-Zitate werden akzeptiert', () => {
+  test('echte Ausführungs-/Technik-Zitate werden akzeptiert (nur das ZITAT zählt)', () => {
     assert.equal(isKeywordBackedRule4Violation({ quote: 'Achte auf deine Technik', issue: '' }), true)
     assert.equal(isKeywordBackedRule4Violation({ quote: 'achte darauf, wie sich das Gewicht anfühlt', issue: '' }), true)
-    assert.equal(isKeywordBackedRule4Violation({ quote: '', issue: 'Aussage zum Schmerzempfinden' }), true)
+    assert.equal(isKeywordBackedRule4Violation({ quote: 'Achte auf dein Schmerzempfinden', issue: '' }), true)
   })
 
-  test('reine Gewichts-/Wiederholungs-Empfehlungen ohne Ausführungsbezug werden verworfen', () => {
-    assert.equal(isKeywordBackedRule4Violation({ quote: 'steigere im dritten Satz das Gewicht', issue: 'Aussage zur Bewegungsausführung' }) , true) // "Bewegungsausführung" enthält "ausführung"
-    assert.equal(isKeywordBackedRule4Violation({ quote: 'steigere im dritten Satz das Gewicht', issue: '' }), false)
+  test('reine Gewichts-/Wiederholungs-Zitate ohne Ausführungsbezug werden verworfen, auch wenn "issue" das Wort Technik enthält', () => {
+    // Bug-Fix Nr. 2: die Begründung (issue) des Modells ist oft ein pauschales "Aussage zur
+    // Technik/Ausführung"-Label, UNABHÄNGIG vom tatsächlich zitierten Text - deshalb zählt seit
+    // diesem Fix ausschließlich das Zitat (quote), nie mehr "issue".
+    assert.equal(isKeywordBackedRule4Violation({ quote: 'steigere im dritten Satz das Gewicht', issue: 'Aussage zur Bewegungsausführung' }), false)
+    assert.equal(isKeywordBackedRule4Violation({ quote: 'das läuft!', issue: 'Aussage zur Technik oder Ausführung' }), false)
     assert.equal(isKeywordBackedRule4Violation({ quote: 'behalte die Wiederholungen im Auge', issue: 'generische Empfehlung' }), false)
+  })
+
+  test('fehlendes Zitat gilt als nicht belegt und wird verworfen, auch wenn issue ein Keyword enthält', () => {
+    assert.equal(isKeywordBackedRule4Violation({ quote: '', issue: 'Aussage zum Schmerzempfinden' }), false)
+    assert.equal(isKeywordBackedRule4Violation({ issue: 'Aussage zur Technik' }), false)
   })
 })
 
