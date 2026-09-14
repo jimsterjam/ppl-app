@@ -30,30 +30,6 @@
         <p class="metric-value">{{ avgDurationLabel }}</p>
       </article>
     </div>
-
-    <div v-if="hasData" class="trend-grid">
-      <article class="metric-card trend-card" :class="volumeTrend.directionClass">
-        <p class="metric-label">Trend Volumen</p>
-        <p class="metric-value trend-value">
-          <span>{{ volumeTrend.arrow }}</span>
-          <span>{{ volumeTrend.percentLabel }}</span>
-        </p>
-        <p class="trend-sub">
-          Vorherige 45 Tage: {{ formatCompactNumber(firstHalfVolume) }} · Letzte 45 Tage: {{ formatCompactNumber(secondHalfVolume) }}
-        </p>
-      </article>
-
-      <article class="metric-card trend-card" :class="frequencyTrend.directionClass">
-        <p class="metric-label">Trend Häufigkeit</p>
-        <p class="metric-value trend-value">
-          <span>{{ frequencyTrend.arrow }}</span>
-          <span>{{ frequencyTrend.percentLabel }}</span>
-        </p>
-        <p class="trend-sub">
-          Vorherige 45 Tage: {{ firstHalfCount }} Workouts · Letzte 45 Tage: {{ secondHalfCount }} Workouts
-        </p>
-      </article>
-    </div>
   </section>
 </template>
 
@@ -69,13 +45,11 @@ const props = defineProps({
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000
 const WINDOW_DAYS = 90
-const HALF_WINDOW_DAYS = 45
 const WEEK_DIVISOR = WINDOW_DAYS / 7
 
 const now = new Date()
 const endTime = now.getTime()
 const windowStart = endTime - WINDOW_DAYS * MS_PER_DAY
-const halfSplit = windowStart + HALF_WINDOW_DAYS * MS_PER_DAY
 
 const normalizedWorkouts = computed(() => {
   return (Array.isArray(props.workouts) ? props.workouts : [])
@@ -133,23 +107,6 @@ const avgDurationLabel = computed(() => {
   return `${minutes} min`
 })
 
-const firstHalf = computed(() => {
-  return normalizedWorkouts.value.filter((item) => item.timestamp >= windowStart && item.timestamp < halfSplit)
-})
-
-const secondHalf = computed(() => {
-  return normalizedWorkouts.value.filter((item) => item.timestamp >= halfSplit && item.timestamp <= endTime)
-})
-
-const firstHalfVolume = computed(() => firstHalf.value.reduce((sum, item) => sum + item.volume, 0))
-const secondHalfVolume = computed(() => secondHalf.value.reduce((sum, item) => sum + item.volume, 0))
-
-const firstHalfCount = computed(() => firstHalf.value.length)
-const secondHalfCount = computed(() => secondHalf.value.length)
-
-const volumeTrend = computed(() => buildTrend(firstHalfVolume.value, secondHalfVolume.value))
-const frequencyTrend = computed(() => buildTrend(firstHalfCount.value, secondHalfCount.value))
-
 function getWorkoutTimestamp(workout) {
   const candidates = [workout?.date, workout?.updatedAt, workout?.createdAt]
   for (const candidate of candidates) {
@@ -182,48 +139,6 @@ function calcWorkoutVolume(workout) {
   }
 
   return total
-}
-
-function buildTrend(previous, current) {
-  const prev = Number(previous) || 0
-  const curr = Number(current) || 0
-
-  if (prev === 0 && curr === 0) {
-    return {
-      deltaPercent: 0,
-      percentLabel: '0%',
-      arrow: '→',
-      directionClass: 'neutral'
-    }
-  }
-
-  const deltaPercent = ((curr - prev) / Math.max(prev, 1)) * 100
-  const rounded = Number(deltaPercent.toFixed(1))
-
-  if (rounded > 0) {
-    return {
-      deltaPercent: rounded,
-      percentLabel: `+${rounded}%`,
-      arrow: '↑',
-      directionClass: 'up'
-    }
-  }
-
-  if (rounded < 0) {
-    return {
-      deltaPercent: rounded,
-      percentLabel: `${rounded}%`,
-      arrow: '↓',
-      directionClass: 'down'
-    }
-  }
-
-  return {
-    deltaPercent: 0,
-    percentLabel: '0%',
-    arrow: '→',
-    directionClass: 'neutral'
-  }
 }
 
 function formatCompactNumber(value) {
@@ -267,13 +182,6 @@ function formatCompactNumber(value) {
   gap: 10px;
 }
 
-.trend-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 10px;
-}
-
 .metric-card {
   border: 1px solid var(--line-soft, rgba(255, 255, 255, 0.08));
   border-radius: 14px;
@@ -294,33 +202,4 @@ function formatCompactNumber(value) {
   line-height: 1.1;
 }
 
-.trend-card.up {
-  border-color: color-mix(in srgb, #16a34a 60%, var(--line-soft, #999));
-}
-
-.trend-card.down {
-  border-color: color-mix(in srgb, #dc2626 60%, var(--line-soft, #999));
-}
-
-.trend-card.neutral {
-  border-color: color-mix(in srgb, #6b7280 50%, var(--line-soft, #999));
-}
-
-.trend-value {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.trend-sub {
-  margin: 6px 0 0;
-  font-size: 0.78rem;
-  opacity: 0.7;
-}
-
-@media (max-width: 380px) {
-  .trend-grid {
-    grid-template-columns: 1fr;
-  }
-}
 </style>
