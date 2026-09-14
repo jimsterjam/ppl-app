@@ -27,8 +27,10 @@ function parseArg(name, defaultValue) {
 
 const inPath = path.resolve(process.cwd(), parseArg('in', path.join(__dirname, 'evalResults', 'quality-loop-log.jsonl')));
 const outPath = path.resolve(process.cwd(), parseArg('out', path.join(__dirname, 'evalResults', 'quality-loop-report.html')));
+const learnedArg = parseArg('learned', null);
+const learnedPath = learnedArg ? path.resolve(process.cwd(), learnedArg) : undefined;
 
-const { entryCount, outPath: written } = generateReport({ inPath, outPath });
+const { entryCount, outPath: written } = generateReport({ inPath, outPath, learnedPath });
 
 if (entryCount === 0) {
   console.log(`⚠️  Keine Einträge in ${inPath} gefunden - Report wurde trotzdem (leer) erzeugt.`);

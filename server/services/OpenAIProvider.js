@@ -297,11 +297,16 @@ export class OpenAIProvider extends AIProvider {
    * Generiere Trainings-Analyse mittels OpenAI
    *
    * @param {Object} trainingAnalysis - Strukturierte Trainingsanalyse von Backend
-   * @param {Object} options - { requestId, temperature }
+   * @param {Object} options - { requestId, temperature, systemPrompt }
+   * @param {string} [options.systemPrompt] - NUR für scripts/qualityLoopRunner.js: überschreibt
+   *   den System-Prompt (z.B. um gelernte "Schlecht → Gut"-Beispiele aus früheren Korrekturen
+   *   anzuhängen, siehe scripts/lib/learnedExamplesStore.js). Im normalen Produktions-Betrieb
+   *   (routes/workouts.js) wird diese Option NIE gesetzt - ohne sie verhält sich diese Methode
+   *   exakt wie zuvor (this.getSystemPrompt()).
    * @returns {Promise<string>} Generiertes Feedback
    */
   async generateTrainingAnalysis(trainingAnalysis, options = {}) {
-    const { requestId = 'unknown', temperature = 0.7 } = options;
+    const { requestId = 'unknown', temperature = 0.7, systemPrompt } = options;
 
     if (!this.client) {
       throw new Error('OpenAI client not initialized. Check OPENAI_API_KEY.');
@@ -342,7 +347,7 @@ export class OpenAIProvider extends AIProvider {
         messages: [
           {
             role: 'system',
-            content: this.getSystemPrompt()
+            content: systemPrompt || this.getSystemPrompt()
           },
           {
             role: 'user',

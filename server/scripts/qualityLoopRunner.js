@@ -18,11 +18,23 @@
  * anhängend, ein JSON-Objekt pro Zeile), damit Test-Läufe nicht mit echten Nutzer-Statistiken
  * vermischt werden. Läuft daher auch OHNE MongoDB-Verbindung.
  *
+ * SELBSTLERN-MECHANIK (User-Vorgabe: "mit jedem Run muss das Feedback etwas besser werden"):
+ * jede erfolgreich re-verifizierte Korrektur wird als "So nicht → So besser"-Beispiel in einer
+ * lokalen Bibliothek gespeichert (scripts/lib/learnedExamplesStore.js) und ab dem nächsten
+ * Generierungs-Call (auch noch INNERHALB desselben Laufs) dem System-Prompt angehängt - NUR für
+ * die Generierungs-Calls dieses Skripts, der echte Produktions-Prompt (routes/workouts.js) bleibt
+ * unangetastet, bis jemand die reifsten Beispiele bewusst manuell übernimmt. Über mehrere Läufe
+ * hinweg sollte dadurch die Verstoßrate pro Regel im Report sichtbar sinken - das ist der
+ * eigentliche "Loop"-Effekt. Mit --no-learn lässt sich das für einen Baseline-Vergleich abschalten,
+ * mit --reset-learned die Bibliothek vor dem Lauf leeren.
+ *
  * Aufruf:
  *   node server/scripts/qualityLoopRunner.js
  *   node server/scripts/qualityLoopRunner.js --iterations=5
  *   node server/scripts/qualityLoopRunner.js --scenarios="Gemischte Sätze,Speed Squats"
  *   node server/scripts/qualityLoopRunner.js --out=./meine-ergebnisse.jsonl
+ *   node server/scripts/qualityLoopRunner.js --no-learn        (Baseline ohne gelernte Beispiele)
+ *   node server/scripts/qualityLoopRunner.js --reset-learned   (Bibliothek vor dem Lauf leeren)
  *
  * (npm-Skript: npm run quality-loop -- --iterations=5)
  */
@@ -31,7 +43,7 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { OpenAIProvider } from '../services/OpenAIProvider.js';
+import { OpenAIProvider, getCoachSystemPromptText } from '../services/OpenAIProvider.js';
 import {
   runDeterministicChecks,
   verifyFeedbackWithAI,
@@ -40,6 +52,7 @@ import {
 } from '../services/feedbackVerificationService.js';
 import { mockWorkoutScenarios } from './evalCases/mockWorkoutScenarios.js';
 import { generateReport } from './lib/qualityLoopReportBuilder.js';
+import { loadLearnedExamples, addLearnedExample, buildLearnedExamplesSection } from './lib/learnedExamplesStore.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -55,6 +68,9 @@ function parseArg(name, defaultValue) {
 const ITERATIONS = Math.max(1, Number(parseArg('iterations', 3)) || 3);
 const OUT_PATH = path.resolve(process.cwd(), parseArg('out', path.join(__dirname, 'evalResults', 'quality-loop-log.jsonl')));
 const REPORT_PATH = path.resolve(process.cwd(), parseArg('report', path.join(path.dirname(OUT_PATH), 'quality-loop-report.html')));
+const LEARNED_PATH = path.resolve(process.cwd(), parseArg('learned', path.join(path.dirname(OUT_PATH), 'learned-examples.json')));
+const LEARN_ENABLED = !process.argv.includes('--no-learn');
+const RESET_LEARNED = process.argv.includes('--reset-learned');
 const scenarioFilterRaw = parseArg('scenarios', null);
 const scenarioFilter = scenarioFilterRaw
   ? scenarioFilterRaw.split(',').map((s) => s.trim().toLowerCase()).filter(Boolean)
@@ -84,11 +100,20 @@ function appendResult(entry) {
  * ('active'-Zweig), aber ohne die dortige VerifierAudit-Persistierung (siehe Modul-Kommentar
  * oben) - stattdessen wird hier der komplette Datensatz (inkl. Originaltext) lokal protokolliert.
  */
-async function runOnce(provider, scenario, iteration) {
+async function runOnce(provider, scenario, iteration, learningState) {
   const requestId = `qloop_${scenario.name.slice(0, 20).replace(/\W+/g, '_')}_${iteration}_${Date.now()}`;
   const startedAt = new Date().toISOString();
 
-  const originalFeedbackText = await provider.generateTrainingAnalysis(scenario.structuredAnalysis, { requestId });
+  // Selbstlern-Mechanik: hängt gelernte "So nicht → So besser"-Beispiele aus früheren,
+  // erfolgreich re-verifizierten Korrekturen an den Coach-System-Prompt an - NUR für diesen
+  // Generierungs-Call (siehe generateTrainingAnalysis()-Kommentar in OpenAIProvider.js), der
+  // echte Produktions-Prompt bleibt unverändert. Ohne --no-learn und ohne bisherige Beispiele
+  // ist learnedSection ein leerer String, der Prompt also identisch zum Original.
+  const learnedSection = learningState.enabled ? buildLearnedExamplesSection(learningState.examples) : '';
+  const usedLearnedExamples = learnedSection.length > 0;
+  const systemPrompt = usedLearnedExamples ? `${getCoachSystemPromptText()}${learnedSection}` : undefined;
+
+  const originalFeedbackText = await provider.generateTrainingAnalysis(scenario.structuredAnalysis, { requestId, systemPrompt });
 
   const deterministic = runDeterministicChecks(originalFeedbackText, scenario.structuredAnalysis);
 
@@ -145,6 +170,22 @@ async function runOnce(provider, scenario, iteration) {
       if (revisedOk) {
         revisionSucceeded = true;
         finalFeedbackText = revisedFeedbackText;
+
+        // Genau HIER entsteht der eigentliche "Loop"-Effekt: eine bestätigt erfolgreiche
+        // Korrektur wird sofort gelernt (Datei wird synchron geschrieben) - schon das NÄCHSTE
+        // runOnce() (auch innerhalb desselben Laufs, auch für ein anderes Szenario) bekommt das
+        // Beispiel bereits im Prompt, siehe learnedSection oben.
+        if (learningState.enabled) {
+          for (const rule of originalTriggeredRules) {
+            const matchingIssue = allViolations.find((v) => v.rule === rule)?.issue;
+            learningState.examples = addLearnedExample(learningState.storePath, learningState.examples, rule, {
+              badText: originalFeedbackText,
+              goodText: revisedFeedbackText,
+              scenario: scenario.name,
+              issue: matchingIssue
+            });
+          }
+        }
       } else {
         // Bug-Fix (User-Report "27 Verstöße, nur 1 korrigiert"): hier wurden früher
         // originalTriggeredRules UND revisionRecheckRules zusammengeworfen ("triggeredRules =
@@ -180,6 +221,7 @@ async function runOnce(provider, scenario, iteration) {
     revisionAttempted,
     revisionSucceeded,
     revisionRecheckRules,
+    usedLearnedExamples,
     originalFeedbackText,
     revisedFeedbackText,
     finalFeedbackText
@@ -214,6 +256,20 @@ async function main() {
     return;
   }
 
+  if (RESET_LEARNED && fs.existsSync(LEARNED_PATH)) {
+    fs.unlinkSync(LEARNED_PATH);
+    console.log(`🗑️  Gelernte Beispiele zurückgesetzt (${LEARNED_PATH})`);
+  }
+  const learningState = {
+    enabled: LEARN_ENABLED,
+    storePath: LEARNED_PATH,
+    examples: LEARN_ENABLED ? loadLearnedExamples(LEARNED_PATH) : {}
+  };
+  const startLearnedCount = Object.values(learningState.examples).reduce((sum, list) => sum + list.length, 0);
+  console.log(LEARN_ENABLED
+    ? `🧠 Selbstlern-Mechanik aktiv (${startLearnedCount} gelernte Beispiele aus früheren Läufen): ${LEARNED_PATH}`
+    : '🧠 Selbstlern-Mechanik deaktiviert (--no-learn) - reiner Baseline-Lauf.');
+
   const ruleCounts = {};
   let violationRuns = 0;
   let revisionAttempts = 0;
@@ -225,7 +281,7 @@ async function main() {
     console.log(`▶ ${scenario.name}`);
     for (let i = 1; i <= ITERATIONS; i++) {
       try {
-        const result = await runOnce(provider, scenario, i);
+        const result = await runOnce(provider, scenario, i, learningState);
         completedRuns++;
 
         if (result.triggeredRules.length > 0) {
@@ -274,12 +330,20 @@ async function main() {
     }
   }
 
+  if (LEARN_ENABLED) {
+    const endLearnedCount = Object.values(learningState.examples).reduce((sum, list) => sum + list.length, 0);
+    console.log(`\n🧠 Gelernte Beispiele: ${startLearnedCount} → ${endLearnedCount} (${LEARNED_PATH})`);
+    console.log('   Ob der Loop tatsächlich "besser" wird, zeigt sich über mehrere Läufe hinweg: sinkt');
+    console.log('   die Verstoßrate/Regel-Häufigkeit oben bei wiederholten Aufrufen mit denselben');
+    console.log('   Szenarien? Das ist im HTML-Report unten sichtbar (Filter nach Regel + Zeitraum).');
+  }
+
   console.log(`\nVollständige Rohdaten (ein JSON-Objekt pro Durchlauf): ${OUT_PATH}`);
 
   // Lokaler HTML-Report (statisch, kein Server nötig) - liest die gesamte JSONL (nicht nur
   // diesen Lauf) neu ein, damit er immer den kompletten Verlauf über alle bisherigen Aufrufe
   // von `npm run quality-loop` zeigt, nicht nur den gerade abgeschlossenen.
-  const { entryCount } = generateReport({ inPath: OUT_PATH, outPath: REPORT_PATH });
+  const { entryCount } = generateReport({ inPath: OUT_PATH, outPath: REPORT_PATH, learnedPath: LEARNED_PATH });
   console.log(`\n📊 HTML-Report aktualisiert (${entryCount} Einträge insgesamt): file://${REPORT_PATH}`);
 }
 

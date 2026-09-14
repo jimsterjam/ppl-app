@@ -45,9 +45,11 @@ function escapeHtml(str) {
 
 /**
  * @param {Array<Object>} entries
+ * @param {Object<string, Array>} [learnedExamplesByRule] - aktueller Stand der Selbstlern-
+ *   Bibliothek (scripts/lib/learnedExamplesStore.js), nur zur Anzeige.
  * @returns {string} vollständiges HTML-Dokument
  */
-export function buildReportHtml(entries) {
+export function buildReportHtml(entries, learnedExamplesByRule = {}) {
   const validEntries = entries.filter((e) => !e.error);
   const errorEntries = entries.filter((e) => e.error);
 
@@ -129,6 +131,23 @@ export function buildReportHtml(entries) {
 
 ${allRules.length ? `<div class="rules">${allRules.map((r) => `<span class="rule-chip">Regel <b>${r}</b>: ${ruleCounts[r]}×</span>`).join('')}</div>` : ''}
 
+${(() => {
+  const learnedRuleCount = Object.keys(learnedExamplesByRule).length;
+  const learnedTotal = Object.values(learnedExamplesByRule).reduce((sum, list) => sum + list.length, 0);
+  if (learnedTotal === 0) return '';
+  const rows = Object.entries(learnedExamplesByRule)
+    .flatMap(([rule, list]) => list.map((e) => ({ rule, ...e })))
+    .sort((a, b) => new Date(b.capturedAt) - new Date(a.capturedAt))
+    .map((e) => `<div class="textlabel">Regel ${escapeHtml(e.rule)}${e.issue ? ` - ${escapeHtml(e.issue)}` : ''}</div>
+      <div class="textblock">FALSCH: ${escapeHtml(e.badText)}\n\nBESSER: ${escapeHtml(e.goodText)}</div>`).join('');
+  return `<div class="rules" style="padding-top:0;">
+    <details>
+      <summary style="cursor:pointer; color: var(--muted); font-size: 13px;">🧠 Gelernte Beispiele-Bibliothek (${learnedTotal} Beispiele über ${learnedRuleCount} Regel(n)) - beeinflusst nur die Generierungs-Calls dieses Quality-Loops, nicht die Produktion</summary>
+      <div style="margin-top:10px;">${rows}</div>
+    </details>
+  </div>`;
+})()}
+
 <div class="controls">
   <select id="filterScenario"><option value="">Alle Szenarien</option>${scenarios.map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('')}</select>
   <select id="filterRule"><option value="">Alle Regeln</option>${allRules.map((r) => `<option value="${r}">Regel ${r}</option>`).join('')}</select>
@@ -189,7 +208,7 @@ function render() {
     row.className = 'row';
     row.innerHTML = \`
       <td>\${fmtTime(e.startedAt)}</td>
-      <td>\${(e.scenario || '').replace(/</g, '&lt;')}</td>
+      <td>\${(e.scenario || '').replace(/</g, '&lt;')}\${e.usedLearnedExamples ? ' 🧠' : ''}</td>
       <td>\${e.iteration ?? ''}</td>
       <td class="\${st.cls}">\${st.text}</td>
       <td>\${(e.triggeredRules || []).map((r) => \`<span class="rule-badge">Regel \${r}</span>\`).join('') || '–'}</td>
@@ -225,11 +244,22 @@ render();
  * @param {Object} params
  * @param {string} params.inPath - Pfad zur quality-loop-log.jsonl
  * @param {string} params.outPath - Zielpfad der HTML-Datei
+ * @param {string} [params.learnedPath] - Pfad zur learned-examples.json (Standard: gleicher
+ *   Ordner wie inPath) - fehlt die Datei, wird die Bibliothek im Report einfach leer angezeigt.
  * @returns {{ entryCount: number, outPath: string }}
  */
-export function generateReport({ inPath, outPath }) {
+export function generateReport({ inPath, outPath, learnedPath }) {
   const entries = readEntries(inPath);
-  const html = buildReportHtml(entries);
+  const resolvedLearnedPath = learnedPath || path.join(path.dirname(inPath), 'learned-examples.json');
+  let learnedExamplesByRule = {};
+  if (fs.existsSync(resolvedLearnedPath)) {
+    try {
+      learnedExamplesByRule = JSON.parse(fs.readFileSync(resolvedLearnedPath, 'utf8'));
+    } catch {
+      learnedExamplesByRule = {};
+    }
+  }
+  const html = buildReportHtml(entries, learnedExamplesByRule);
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, html, 'utf8');
   return { entryCount: entries.length, outPath };
