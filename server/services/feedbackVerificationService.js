@@ -47,6 +47,21 @@ const RULE_4_REQUIRED_KEYWORDS = [
   'schmerz', 'verletzung', 'bewegungsqualität', 'bewegungsqualitat', 'bewegungsgefühl', 'bewegungsgefuhl'
 ];
 
+// Zweites deterministisches Sicherheitsnetz (per Quality-Loop-Roh-Antwort-Analyse gefunden): das
+// Modell lieferte in Einzelfällen ein KOMPLETT ERFUNDENES `quote` - ein Zitat, das im Entwurfstext
+// gar nicht vorkommt (z.B. "achte darauf, wie sich das Gewicht anfühlt" bei einem Text, der diesen
+// Satz nirgends enthält). Enthält ein solches Fantasie-Zitat zufällig ein Regel-4-Keyword, rutscht
+// es am Filter oben vorbei - die anschließende Korrektur kann dann naturgemäß nichts Passendes
+// finden/entfernen und scheitert. Gilt für ALLE Regeln, nicht nur Regel 4: ein Zitat, das nicht
+// (auch nicht ungefähr, Groß-/Kleinschreibung und Mehrfach-Leerzeichen egal) im Text vorkommt, ist
+// keine verwertbare Grundlage für einen Verstoß.
+export function isQuoteVerifiable(violation, feedbackText) {
+  const quote = String(violation.quote || '').trim();
+  if (!quote) return true; // kein Zitat angegeben - dieser Check greift dann einfach nicht
+  const normalize = (s) => String(s).toLowerCase().replace(/\s+/g, ' ').trim();
+  return normalize(feedbackText).includes(normalize(quote));
+}
+
 export function isKeywordBackedRule4Violation(violation) {
   // Bug-Fix Nr. 2 (Quality-Loop-Analyse, zweite Runde): NUR `quote` (das tatsächliche Zitat aus
   // dem Entwurf) zählt, NICHT `issue` (die Begründung). Grund: das Modell schreibt in `issue`
@@ -382,16 +397,28 @@ export async function verifyFeedbackWithAI(structuredAnalysis, feedbackText, opt
       .filter((v) => v.issue)
     : [];
 
-  // Keyword-Filter (siehe RULE_4_REQUIRED_KEYWORDS oben) - nur Regel-4-Funde ohne jeden Bezug zu
-  // Ausführung/Technik/Tempo/Körperempfinden werden verworfen, alle anderen Regeln unberührt.
-  const droppedRule4 = rawViolations.filter((v) => v.rule === 4 && !isKeywordBackedRule4Violation(v));
+  // Filter 1: Zitat-Existenz-Check (siehe isQuoteVerifiable oben) - gilt für ALLE Regeln. Zuerst,
+  // damit ein erfundenes Zitat gar nicht erst durch den Regel-4-Keyword-Filter rutschen kann.
+  const droppedHallucinatedQuote = rawViolations.filter((v) => !isQuoteVerifiable(v, feedbackText));
+  if (droppedHallucinatedQuote.length > 0) {
+    logger.debug('🧹 Verifier: Verstoß mit nicht im Text vorkommendem Zitat verworfen (Halluzinations-Filter)', {
+      requestId,
+      dropped: droppedHallucinatedQuote.map((v) => ({ rule: v.rule, issue: v.issue, quote: v.quote }))
+    });
+  }
+  const verifiableViolations = rawViolations.filter((v) => isQuoteVerifiable(v, feedbackText));
+
+  // Filter 2: Keyword-Filter (siehe RULE_4_REQUIRED_KEYWORDS oben) - nur Regel-4-Funde ohne jeden
+  // Bezug zu Ausführung/Technik/Tempo/Körperempfinden werden verworfen, alle anderen Regeln
+  // unberührt.
+  const droppedRule4 = verifiableViolations.filter((v) => v.rule === 4 && !isKeywordBackedRule4Violation(v));
   if (droppedRule4.length > 0) {
     logger.debug('🧹 Verifier: Regel-4-Fund ohne Ausführungs-/Technik-Bezug verworfen (Keyword-Filter)', {
       requestId,
       dropped: droppedRule4.map((v) => ({ issue: v.issue, quote: v.quote }))
     });
   }
-  const violations = rawViolations.filter((v) => v.rule !== 4 || isKeywordBackedRule4Violation(v));
+  const violations = verifiableViolations.filter((v) => v.rule !== 4 || isKeywordBackedRule4Violation(v));
 
   // Bug-Fix (per Quality-Loop-Batch-Analyse gefunden, scripts/qualityLoopRunner.js): `ok`
   // ausschließlich anhand der tatsächlich benannten `violations` bestimmen, NICHT zusätzlich am
@@ -726,6 +753,7 @@ export default {
   checkWordBudget,
   runDeterministicChecks,
   isKeywordBackedRule4Violation,
+  isQuoteVerifiable,
   getVerifierChecklistText,
   buildVerifierUserPrompt,
   verifyFeedbackWithAI,

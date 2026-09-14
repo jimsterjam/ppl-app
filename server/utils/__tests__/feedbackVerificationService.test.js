@@ -7,6 +7,7 @@ import {
   checkWordBudget,
   runDeterministicChecks,
   isKeywordBackedRule4Violation,
+  isQuoteVerifiable,
   getVerifierChecklistText,
   buildVerifierUserPrompt,
   buildRevisionUserPrompt,
@@ -143,6 +144,27 @@ describe('isKeywordBackedRule4Violation', () => {
   test('fehlendes Zitat gilt als nicht belegt und wird verworfen, auch wenn issue ein Keyword enthält', () => {
     assert.equal(isKeywordBackedRule4Violation({ quote: '', issue: 'Aussage zum Schmerzempfinden' }), false)
     assert.equal(isKeywordBackedRule4Violation({ issue: 'Aussage zur Technik' }), false)
+  })
+})
+
+describe('isQuoteVerifiable', () => {
+  const text = 'Guter Trainingstag! Bankdrücken lief sauber - 2,5kg mehr im ersten Satz.'
+
+  test('Zitat, das wortgenau im Text vorkommt, gilt als verifizierbar', () => {
+    assert.equal(isQuoteVerifiable({ quote: 'Bankdrücken lief sauber' }, text), true)
+  })
+
+  test('Groß-/Kleinschreibung und mehrfache Leerzeichen werden ignoriert', () => {
+    assert.equal(isQuoteVerifiable({ quote: 'BANKDRÜCKEN   lief SAUBER' }, text), true)
+  })
+
+  test('erfundenes Zitat, das im Text nicht vorkommt, wird verworfen', () => {
+    assert.equal(isQuoteVerifiable({ quote: 'Achte darauf, wie sich das Gewicht anfühlt' }, text), false)
+  })
+
+  test('fehlendes Zitat blockiert nichts (Check greift dann einfach nicht)', () => {
+    assert.equal(isQuoteVerifiable({ quote: '' }, text), true)
+    assert.equal(isQuoteVerifiable({}, text), true)
   })
 })
 
