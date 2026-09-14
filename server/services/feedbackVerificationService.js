@@ -299,6 +299,12 @@ Entwurfstext. Du generierst KEIN neues Feedback, du prüfst nur.
      Körperempfinden. Das fällt höchstens unter Regel 11 (falls ohne Datenbezug erfunden), NIEMALS
      unter Regel 4. Melde Regel 4 NUR, wenn das Zitat selbst ein Wort wie "Technik", "Ausführung",
      "Tempo", "anfühlt"/"fühlt sich", "Schmerz" oder "Verletzung" enthält.
+   - AUSNAHME: hat eine Übung profile_hint.exerciseType = "technique" ODER erwähnt ihre Notiz
+     Technikfokus, ist laut Regel 13/14 GENAU EIN neutraler Satz zur Technik dieser Übung
+     ausdrücklich erlaubt und KEIN Regel-4-Verstoß (z.B. "Diese Übung war technikfokussiert" oder
+     ein einzelner Hinweis, weiter an der Technik zu arbeiten). Melde Regel 4 in diesem Fall nur,
+     wenn es MEHR als ein solcher Satz zu dieser Übung ist oder eine konkrete Ausführungs-/
+     Tempo-/Schmerz-Bewertung dazukommt.
 5. Keine medizinischen Diagnosen (Verletzung, Überlastung, Gelenkproblem, Regenerationsproblem).
 6. Fakt und Interpretation klar getrennt, keine Interpretation als Tatsache formuliert.
 7. Keine endgültigen Urteile/Anweisungen bei mehrdeutiger Datenlage - nur bedingte Hinweise.
@@ -438,7 +444,21 @@ export async function verifyFeedbackWithAI(structuredAnalysis, feedbackText, opt
       dropped: droppedRule4.map((v) => ({ issue: v.issue, quote: v.quote }))
     });
   }
-  const violations = verifiableViolations.filter((v) => v.rule !== 4 || isKeywordBackedRule4Violation(v));
+  // Filter 3: Regel-1-Funde der KI werden verworfen - für Regel 1 (Datenwahrheit/Zahlen) gibt es
+  // bereits einen zuverlässigen, deterministischen Check (checkNumberConsistency, reiner Code,
+  // vergleicht JEDE Zahl im Text exakt gegen die erlaubte Zahlenmenge aus den echten Daten). Die
+  // KI-eigene, freie Einschätzung "diese Zahl stimmt nicht" ist dagegen per Quality-Loop-Analyse
+  // nachweislich unzuverlässiger (z.B. wurde "100%" als falsch moniert, obwohl genau dieser Wert
+  // in den Daten steht) - ein rein KI-basierter Regel-1-Fund fügt also nur Rauschen/False-
+  // Positives hinzu, ohne echten zusätzlichen Nutzen gegenüber dem Code-Check.
+  const droppedAiRule1 = verifiableViolations.filter((v) => v.rule === 1);
+  if (droppedAiRule1.length > 0) {
+    logger.debug('🧹 Verifier: KI-eigener Regel-1-Fund verworfen (deterministischer Check ist bereits maßgeblich)', {
+      requestId,
+      dropped: droppedAiRule1.map((v) => ({ issue: v.issue, quote: v.quote }))
+    });
+  }
+  const violations = verifiableViolations.filter((v) => v.rule !== 1 && (v.rule !== 4 || isKeywordBackedRule4Violation(v)));
 
   // Bug-Fix (per Quality-Loop-Batch-Analyse gefunden, scripts/qualityLoopRunner.js): `ok`
   // ausschließlich anhand der tatsächlich benannten `violations` bestimmen, NICHT zusätzlich am
