@@ -338,7 +338,19 @@ export async function verifyFeedbackWithAI(structuredAnalysis, feedbackText, opt
       .filter((v) => v.issue)
     : [];
 
-  return { ok: parsed?.ok !== false && violations.length === 0, violations };
+  // Bug-Fix (per Quality-Loop-Batch-Analyse gefunden, scripts/qualityLoopRunner.js): `ok`
+  // ausschließlich anhand der tatsächlich benannten `violations` bestimmen, NICHT zusätzlich am
+  // rohen `parsed.ok`-Flag der KI. Grund: bei der Re-Prüfung nach einer Korrektur lieferte das
+  // Modell in ca. der Hälfte der Fälle ein in sich widersprüchliches Ergebnis - `"ok": false`
+  // bei gleichzeitig LEERER `violations`-Liste (keine einzige konkret benannte Regel). Mit der
+  // alten Logik (`parsed?.ok !== false && violations.length === 0`) wurde das als Ablehnung
+  // gewertet, obwohl kein einziger konkreter Verstoß vorlag - dadurch scheiterte die aktive
+  // Korrektur (reviseFeedback, siehe runVerificationLoop) an ihrer eigenen Re-Prüfung, obwohl der
+  // korrigierte Text laut den einzelnen Prüfpunkten sauber war. Jetzt zählt ausschließlich, ob
+  // die KI mindestens einen KONKRETEN Verstoß benennen konnte - ein pauschales "ok: false" ohne
+  // Begründung wird nicht mehr als Verstoß gewertet (das reine Vorhandensein von `violations` ist
+  // ohnehin die einzige nutzbare/nachvollziehbare Information aus dieser Antwort).
+  return { ok: violations.length === 0, violations };
 }
 
 // ---------------------------------------------------------------------------------------------
