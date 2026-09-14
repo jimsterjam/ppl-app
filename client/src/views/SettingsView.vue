@@ -243,24 +243,6 @@
         </button>
       </section>
 
-      <section v-if="isAdminUser" class="card">
-        <h3>🛠️ App-Feedback (Admin)</h3>
-        <p class="hint">Nur für dich sichtbar: gesammeltes Testerfeedback (Bug/Idee/Unklar) durchsehen.</p>
-        <AdminFeedbackPanel />
-      </section>
-
-      <section v-if="isAdminUser" class="card">
-        <h3>🔍 KI-Feedback-Analyse (Admin)</h3>
-        <p class="hint">Nur für dich sichtbar: negativ bewertete KI-Trainingsanalysen auswerten und Verbesserungsvorschläge für den System-Prompt freigeben.</p>
-        <AiInsightsPanel />
-      </section>
-
-      <section v-if="isAdminUser" class="card">
-        <h3>🧪 Feedback-Qualitäts-Loop (Admin)</h3>
-        <p class="hint">Nur für dich sichtbar: automatische Prüfung des KI-Trainingsfeedbacks gegen die System-Prompt-Regeln (Shadow-Modus, siehe AI_VERIFIER_MODE).</p>
-        <VerifierAuditPanel />
-      </section>
-
       <section class="card">
         <h3>{{ $t('settings.legalTitle') }}</h3>
         <p class="hint">{{ $t('settings.legalHint') }}</p>
@@ -466,9 +448,6 @@
 <script setup>
 import HeaderBar from '../components/HeaderBar.vue'
 import AppFeedbackDialog from '../components/AppFeedbackDialog.vue'
-import AdminFeedbackPanel from '../components/AdminFeedbackPanel.vue'
-import VerifierAuditPanel from '../components/VerifierAuditPanel.vue'
-import AiInsightsPanel from '../components/AiInsightsPanel.vue'
 import { storeToRefs } from 'pinia'
 import { useThemeStore } from '@/stores/themeStore'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -516,15 +495,6 @@ const accountProviderLabel = computed(() => {
   if (providerId === 'password') return $t('settings.accountProviderPassword') || 'E-Mail/Passwort'
   return ''
 })
-
-// Admin-Bereich (App-Feedback-Übersicht) nur für den eigenen Account sichtbar - rein clientseitige
-// UI-Sichtbarkeit, KEIN echter Zugriffsschutz (der läuft serverseitig über den separaten
-// Admin-Schlüssel in AdminFeedbackPanel.vue / server/middleware/adminAuth.js). Bewusst per
-// fester Firebase-UID statt E-Mail: bei Apple-Login liefert Firebase die E-Mail nicht immer
-// zuverlässig bei jedem Login (private Relay-Adresse), die UID bleibt dagegen unabhängig vom
-// verwendeten Login-Provider stabil.
-const ADMIN_UID = '6zCFJN4TH3eqm470FiLgGBG337r2'
-const isAdminUser = computed(() => (authStore.user?.uid || '') === ADMIN_UID)
 
 // Allgemeiner Feedback-Bereich (siehe AppFeedbackDialog.vue) + "Einführungsguide erneut
 // starten" (setzt nur completedAt/skippedAt zurück, siehe onboardingStore.js/restartFlow).
