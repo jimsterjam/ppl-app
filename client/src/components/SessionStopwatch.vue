@@ -1,5 +1,5 @@
 <template>
-  <div class="session-stopwatch" ref="rootRef">
+  <div class="session-stopwatch" :class="{ 'session-stopwatch--compact': props.compact }" ref="rootRef">
     <!-- Trigger Button -->
     <button
       class="sw-trigger"
@@ -10,7 +10,7 @@
       type="button"
       @click="toggleOverlay"
     >
-      <span v-if="!isRunning && elapsedMs === 0">⏱ Gesamtzeit</span>
+      <span v-if="!isRunning && elapsedMs === 0">{{ props.compact ? '⏱ 00:00' : '⏱ Gesamtzeit' }}</span>
       <span v-else>{{ formattedTime }}</span>
     </button>
 
@@ -56,6 +56,14 @@
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { useSessionStopwatch } from '@/composables/useSessionStopwatch'
 import { releaseKeepAwake } from '@/utils/keepAwakeGuard'
+
+// compact: schlanke Darstellung für die Platzierung im sticky Header (siehe WorkoutDetailView.vue -
+// dort soll die Gesamtzeit immer im Sichtfeld bleiben, statt beim Scrollen durch die Übungsliste
+// zu verschwinden). Im Standard-Kontext (volle Breite in der Übungsliste) bleibt das Verhalten
+// unverändert.
+const props = defineProps({
+  compact: { type: Boolean, default: false }
+})
 
 const emit = defineEmits(['session-time'])
 
@@ -117,6 +125,27 @@ onBeforeUnmount(() => {
   position: relative;
   display: flex;
   width: 100%;
+}
+
+/* Kompakte Variante für die Platzierung im sticky Header (siehe compact-Prop oben) - dort ist
+   nur wenig horizontaler Platz neben Titel und "Abmelden"-Button, die volle Breite/Größe der
+   Standard-Variante würde dort umbrechen/überlaufen. */
+.session-stopwatch--compact {
+  width: auto;
+  flex-shrink: 0;
+}
+
+.session-stopwatch--compact .sw-trigger {
+  width: auto;
+  padding: 7px 12px;
+  font-size: 0.85rem;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.session-stopwatch--compact .sw-overlay {
+  left: auto;
+  right: 0;
 }
 
 /* Trigger */

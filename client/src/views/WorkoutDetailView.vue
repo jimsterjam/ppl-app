@@ -1,6 +1,14 @@
 <template>
     <div class="workout-detail">
-      <HeaderBar title="Workout" />
+      <HeaderBar title="Workout">
+        <!-- Gesamtzeit (SessionStopwatch) hier statt weiter unten in der Übungsliste (siehe
+             ex-list-header) platziert - Header ist sticky (siehe HeaderBar.vue), bleibt also
+             beim Scrollen durch eine lange Übungsliste immer im Sichtfeld. Nur sichtbar, wenn
+             ein Workout tatsächlich geladen ist (kein Timer während Lade-/Fehlerzustand). -->
+        <template #actions>
+          <SessionStopwatch v-if="workout" compact @session-time="onSessionTime" />
+        </template>
+      </HeaderBar>
 
     <div class="content" :class="{ 'timer-offset': hasTimerOverlay }">
       <div v-if="loading" class="loading">{{ t('workoutDetail.loading') }}</div>
@@ -53,7 +61,6 @@
                   {{ isReordering ? t('workoutDetail.done') : t('workoutDetail.editOrder') }}
                 </button>
               </div>
-              <SessionStopwatch @session-time="onSessionTime" />
             </div>
           </div>
     <!-- Modal für Übungsauswahl -->
