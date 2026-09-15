@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const { calculateExerciseStats, analyzeExercise, buildSetsComparison, resolveSatzgenauWeightChange, structureAnalysisForAI } = await import(
+const { calculateExerciseStats, analyzeExercise, buildSetsComparison, resolveSatzgenauWeightChange } = await import(
   join(__dirname, '../../services/trainingAnalysisService.js')
 )
 
@@ -361,51 +361,5 @@ describe('resolveSatzgenauWeightChange', () => {
     const result = resolveSatzgenauWeightChange(setsComparison, 5)
     assert.equal(result.scope, 'uniform')
     assert.equal(result.weightChangeKg, 5)
-  })
-})
-
-// Deckt die neue, freiwillige Profildaten-Anbindung ab (User-Anfrage: Alter/Geschlecht/Größe/
-// Gewicht könnten das Feedback beeinflussen) - dasselbe Null-Annahmen-Prinzip wie bei
-// athlete_bodyweight_kg: nur tatsächlich ausgefüllte Felder landen im AI-Datensatz, 'unspecified'
-// (Enum-Default für gender) zählt wie "nicht angegeben".
-describe('structureAnalysisForAI: user_profile (freiwillige Profilangaben)', () => {
-  const minimalExerciseAnalyses = [{
-    exercise: 'Bankdrücken',
-    current: { weight: 80, reps: 8, sets: 3, volume: 1920 },
-    changes: { weight_change: 0, rep_change: 0, sets_change: 0, volume_change: 0, volume_change_percent: 0 },
-    progression: 'stable',
-    period_days: 7,
-    period: '1 week'
-  }]
-
-  test('kein userProfile übergeben -> user_profile fehlt komplett im Output', () => {
-    const structured = structureAnalysisForAI(minimalExerciseAnalyses)
-    assert.equal('user_profile' in structured, false)
-  })
-
-  test('userProfile mit lauter null/unspecified-Werten -> user_profile fehlt trotzdem (kein leeres Objekt)', () => {
-    const structured = structureAnalysisForAI(minimalExerciseAnalyses, {
-      userProfile: { ageYears: null, gender: 'unspecified', heightCm: null, weightKg: null }
-    })
-    assert.equal('user_profile' in structured, false)
-  })
-
-  test('userProfile vollständig ausgefüllt -> alle vier Felder unter den erwarteten Snake-Case-Namen', () => {
-    const structured = structureAnalysisForAI(minimalExerciseAnalyses, {
-      userProfile: { ageYears: 32, gender: 'male', heightCm: 182, weightKg: 84.5 }
-    })
-    assert.deepEqual(structured.user_profile, {
-      age_years: 32,
-      gender: 'male',
-      height_cm: 182,
-      weight_kg: 84.5
-    })
-  })
-
-  test('userProfile nur teilweise ausgefüllt -> nur die vorhandenen Felder erscheinen', () => {
-    const structured = structureAnalysisForAI(minimalExerciseAnalyses, {
-      userProfile: { ageYears: 28, gender: 'unspecified', heightCm: null, weightKg: null }
-    })
-    assert.deepEqual(structured.user_profile, { age_years: 28 })
   })
 })

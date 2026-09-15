@@ -2016,17 +2016,12 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
       })
     }
 
-    // 3b. Freiwillige Profilangaben (Alter/Geschlecht/Größe/Gewicht) laden - additiv, wie
-    // athleteBodyweightKg unten nur weitergegeben, wenn tatsächlich ausgefüllt.
-    const userProfileForFeedback = await getOrCreateUserProfile(userId);
-
     // 4. Strukturiere Daten für AI (Mini-Datensatz)
     const structuredAnalysis = structureAnalysisForAI(exerciseAnalyses, {
       // Null-Annahmen-Prinzip (Kap. 24): nur ausgeben, wenn für DIESE Session tatsächlich
       // erfasst - aktuell noch kein Client-UI zum Erfassen vorhanden, daher in der Praxis
       // meist null, was structureAnalysisForAI() korrekt als "weglassen" behandelt.
-      athleteBodyweightKg: currentWorkout.athleteBodyweightKg ?? null,
-      userProfile: userProfileForFeedback?.personalData || null
+      athleteBodyweightKg: currentWorkout.athleteBodyweightKg ?? null
     });
 
     // 5. Rufe AI-Service auf (OpenAI oder Ollama, abhängig von Konfiguration)

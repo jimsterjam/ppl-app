@@ -344,19 +344,6 @@ function summarizeOnboarding(profile) {
   };
 }
 
-// Freiwillige persönliche Angaben (siehe UserProfile.js personalData) - jedes Feld einzeln
-// null/'unspecified', wenn (noch) nicht angegeben, damit das Frontend zwischen "bewusst leer"
-// und "0 eingetragen" unterscheiden kann.
-function summarizePersonalData(profile) {
-  const personalData = profile?.personalData || {};
-  return {
-    ageYears: personalData.ageYears ?? null,
-    gender: personalData.gender || 'unspecified',
-    heightCm: personalData.heightCm ?? null,
-    weightKg: personalData.weightKg ?? null
-  };
-}
-
 router.get('/profile', firebaseAuthMiddleware, async (req, res) => {
   try {
     const uid = req.auth?.userId;
@@ -369,8 +356,7 @@ router.get('/profile', firebaseAuthMiddleware, async (req, res) => {
       avatarUrl: profile.avatarUrl || '',
       // Additiv: bestehende Konsumenten von GET /profile (settingsStore.js) lesen nur
       // username/avatarUrl und ignorieren unbekannte Felder - kein Breaking Change.
-      onboarding: summarizeOnboarding(profile),
-      personalData: summarizePersonalData(profile)
+      onboarding: summarizeOnboarding(profile)
     });
   } catch (e) {
     res.status(500).json({ error: 'Failed to load profile', message: e?.message || String(e) });
@@ -474,62 +460,6 @@ router.put('/profile', firebaseAuthMiddleware, async (req, res) => {
     res.json({ uid, username: updated?.username || '', avatarUrl: updated?.avatarUrl || '' });
   } catch (e) {
     res.status(500).json({ error: 'Failed to update profile', message: e?.message || String(e) });
-  }
-});
-
-// ---------------------------
-// Persönliche Angaben (freiwillig, siehe UserProfile.js personalData)
-// ---------------------------
-// Eigener Endpunkt statt Erweiterung von PUT /profile oben: dort wird bei jedem Aufruf
-// bedingungslos `username` neu gesetzt (auch leer, falls nicht mitgeschickt) - ein
-// Personal-Data-Request soll das niemals versehentlich überschreiben können, analog zur
-// bestehenden Trennung der Onboarding-Endpunkte (siehe Kommentar oben).
-const GENDER_VALUES = new Set(['male', 'female', 'diverse', 'unspecified']);
-
-// undefined -> Feld im Request gar nicht mitgeschickt (bleibt unverändert, $set wird für dieses
-// Feld übersprungen); null/'' -> Nutzer hat das Feld bewusst geleert (explizit auf null setzen).
-// Nur ein tatsächlich vorhandener, gültiger Wert wird übernommen; ungültige Werte (z.B. Text im
-// Zahlenfeld, Zahl außerhalb des Schema-min/max) werden statt eines 400-Fehlers still ignoriert
-// (Feld bleibt unverändert) - für ein rein freiwilliges Komfort-Feld unnötig streng.
-function parseOptionalNumberField(value, { min, max }) {
-  if (value === undefined) return undefined;
-  if (value === null || value === '') return null;
-  const num = Number(value);
-  if (!Number.isFinite(num) || num < min || num > max) return undefined;
-  return Math.round(num * 10) / 10;
-}
-
-router.put('/profile/personal-data', firebaseAuthMiddleware, async (req, res) => {
-  try {
-    const uid = req.auth?.userId;
-    if (!uid) return res.status(401).json({ error: 'Unauthenticated' });
-
-    const body = req.body || {};
-    const set = {};
-
-    const ageYears = parseOptionalNumberField(body.ageYears, { min: 10, max: 120 });
-    if (ageYears !== undefined) set['personalData.ageYears'] = ageYears;
-
-    if (body.gender !== undefined) {
-      const gender = GENDER_VALUES.has(body.gender) ? body.gender : 'unspecified';
-      set['personalData.gender'] = gender;
-    }
-
-    const heightCm = parseOptionalNumberField(body.heightCm, { min: 100, max: 250 });
-    if (heightCm !== undefined) set['personalData.heightCm'] = heightCm;
-
-    const weightKg = parseOptionalNumberField(body.weightKg, { min: 30, max: 300 });
-    if (weightKg !== undefined) set['personalData.weightKg'] = weightKg;
-
-    const updated = await UserProfile.findOneAndUpdate(
-      { uid },
-      Object.keys(set).length > 0 ? { $set: set } : {},
-      { upsert: true, new: true }
-    ).lean();
-
-    res.json({ uid, personalData: summarizePersonalData(updated) });
-  } catch (e) {
-    res.status(500).json({ error: 'Failed to update personal data', message: e?.message || String(e) });
   }
 });
 

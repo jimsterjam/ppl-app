@@ -286,14 +286,6 @@ async function bootstrapAuth() {
             logger.warn('[main] processPendingAiFeedback (Start) fehlgeschlagen:', error)
           })
 
-          // Bug-Fix (User-Report "Onboarding ausgefüllt, aber in den Einstellungen leer"): eine
-          // wegen fehlendem/frischem Token direkt nach der Registrierung fehlgeschlagene
-          // savePersonalData()-Eingabe (siehe settingsStore.js) hier nachholen, sobald ein
-          // gültiges Token sicher vorliegt.
-          settingsStore.flushPendingPersonalData(token).catch((error) => {
-            logger.warn('[main] flushPendingPersonalData fehlgeschlagen:', error)
-          })
-
           // Onboarding-Status mit dem Server abgleichen (geräteübergreifend konsistent, siehe
           // onboardingStore.js) - fire-and-forget, App.vue zeigt den Flow erst, sobald
           // statusReady true ist.

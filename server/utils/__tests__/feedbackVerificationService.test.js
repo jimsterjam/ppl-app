@@ -93,21 +93,6 @@ describe('collectAllowedNumbers', () => {
     assert.ok(allowed.has(12))
   })
 
-  // Neue, freiwillige Profilangaben (siehe structureAnalysisForAI userProfile) - erwähnt die AI
-  // z.B. das Alter beiläufig, darf der Verifier das nicht als "erfundene Zahl" (Regel 1) werten.
-  test('Zahlen aus user_profile (Alter/Größe/Gewicht) gelten als erlaubt', () => {
-    const allowed = collectAllowedNumbers({
-      user_profile: { age_years: 32, gender: 'male', height_cm: 182, weight_kg: 84.5 }
-    })
-    assert.ok(allowed.has(32))
-    assert.ok(allowed.has(182))
-    assert.ok(allowed.has(84.5))
-  })
-
-  test('fehlendes user_profile crasht nicht und fügt keine Zahlen hinzu', () => {
-    const allowed = collectAllowedNumbers({ total_exercises_analyzed: 1 })
-    assert.equal(allowed.has(undefined), false)
-  })
 })
 
 describe('checkNumberConsistency', () => {

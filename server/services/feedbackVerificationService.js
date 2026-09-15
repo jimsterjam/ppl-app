@@ -127,15 +127,6 @@ export function collectAllowedNumbers(structuredAnalysis) {
   add(structuredAnalysis.total_exercises_analyzed);
   add(structuredAnalysis.athlete_bodyweight_kg);
 
-  // Freiwillige Profilangaben (siehe structureAnalysisForAI userProfile) - werden dem Prompt
-  // nur mitgegeben, wenn tatsächlich ausgefüllt, sollen dann aber genau wie athlete_bodyweight_kg
-  // nicht fälschlich als "erfundene Zahl" markiert werden, wenn die AI sie beiläufig erwähnt.
-  if (structuredAnalysis.user_profile) {
-    add(structuredAnalysis.user_profile.age_years);
-    add(structuredAnalysis.user_profile.height_cm);
-    add(structuredAnalysis.user_profile.weight_kg);
-  }
-
   for (const ex of structuredAnalysis.exercises || []) {
     add(ex.current_weight);
     add(ex.current_reps);

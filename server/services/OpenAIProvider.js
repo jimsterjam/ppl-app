@@ -84,15 +84,6 @@ KRITISCHE REGELN:
    - Körpergewicht (athlete_bodyweight_kg) NUR erwähnen/bewerten, wenn explizit angegeben.
      Verwechsle es niemals mit Trainingsgewicht (kg auf der Hantel) - komplett unabhängige
      Werte.
-   - Profilangaben (user_profile: age_years, gender, height_cm, weight_kg) sind FREIWILLIG und
-     fehlen bei den meisten Nutzern - NUR erwähnen, wenn tatsächlich im Datensatz vorhanden.
-     Verwechsle user_profile.weight_kg NICHT mit athlete_bodyweight_kg (Session-Messwert) oder
-     Trainingsgewicht - drei unabhängige Werte. KEINE Alters-/Geschlechts-/Größen-/
-     Gewichtsnormen, Kraftstandards, BMI-Berechnungen oder sonstige daraus abgeleiteten Werte
-     erfinden - diese Felder dürfen höchstens als beiläufiger Kontext in die Formulierung
-     einfließen (z.B. eine altersgerechtere Anrede), NIEMALS als Grundlage für eine
-     Bewertung, einen Vergleich mit "Normwerten" oder eine Diagnose. Fehlt user_profile
-     komplett, wird es schlicht ignoriert - keine Rückfrage, kein Hinweis auf das Fehlen.
    - Fehlende Felder/Trainingsdaten NICHT rekonstruieren oder vermuten. Fehlt eine
      Information für eine Aussage, lass die Aussage weg statt sie zu erraten.
 
@@ -439,29 +430,12 @@ export class OpenAIProvider extends AIProvider {
     const topImprovements = trainingAnalysis.top_improvements || [];
     const topDeclines = trainingAnalysis.top_declines || [];
 
-    // Freiwillige Profilangaben (siehe Regel 2, NULL-ANNAHMEN-PRINZIP oben) - nur die
-    // tatsächlich vorhandenen Unterfelder als EINE Zeile, damit fehlende Felder gar nicht erst
-    // als "leer" auftauchen (kein Platzhalter wie "Alter: unbekannt").
-    const profile = trainingAnalysis.user_profile || null;
-    const GENDER_LABELS_DE = { male: 'männlich', female: 'weiblich', diverse: 'divers' };
-    const profileParts = [];
-    if (profile) {
-      if (profile.age_years != null) profileParts.push(`${profile.age_years} Jahre`);
-      if (profile.gender && GENDER_LABELS_DE[profile.gender]) profileParts.push(GENDER_LABELS_DE[profile.gender]);
-      if (profile.height_cm != null) profileParts.push(`${profile.height_cm}cm groß`);
-      if (profile.weight_kg != null) profileParts.push(`${profile.weight_kg}kg (laut Profil)`);
-    }
-
     let prompt = `# Trainingsdaten-Übersicht
 
 ## Zusammenfassung
 - Analysierte Übungen: ${trainingAnalysis.total_exercises_analyzed}${
   trainingAnalysis.athlete_bodyweight_kg != null
     ? `\n- Körpergewicht des Nutzers (diese Session): ${trainingAnalysis.athlete_bodyweight_kg}kg`
-    : ''
-}${
-  profileParts.length > 0
-    ? `\n- Profilangaben des Nutzers (freiwillig, NUR als beiläufiger Kontext, KEINE Normwerte/Kraftstandards/BMI ableiten): ${profileParts.join(', ')}`
     : ''
 }
 

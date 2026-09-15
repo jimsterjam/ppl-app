@@ -61,19 +61,6 @@ export async function updateAccountProfile(token, payload) {
   }
 }
 
-// ---------------------------
-// Persönliche Angaben (freiwillig, siehe server/routes/account.js PUT /profile/personal-data)
-// ---------------------------
-
-export async function updatePersonalData(token, payload) {
-  try {
-    const res = await api.put('/profile/personal-data', payload, authConfig(token))
-    return res.data || {}
-  } catch (error) {
-    throw handleAPIError(error, 'Persönliche Daten speichern')
-  }
-}
-
 export async function uploadProfileAvatar(token, file) {
   try {
     const form = new FormData()

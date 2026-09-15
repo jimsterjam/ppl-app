@@ -8,7 +8,6 @@ import { initializeDefaultExercises } from './utils/offlineStorage'
 import { logger } from './utils/logger'
 import { useAuthStore } from '@/stores/authStore'
 import { useOnboardingStore } from '@/stores/onboardingStore'
-import { useSettingsStore } from '@/stores/settingsStore'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
 
 // Setup Offline Support
@@ -25,7 +24,6 @@ onMounted(async () => {
 // existiert und ein Overlay unabhängig von der aktuellen Route rendern kann.
 const authStore = useAuthStore()
 const onboardingStore = useOnboardingStore()
-const settingsStore = useSettingsStore()
 
 // Erst anzeigen, wenn: eingeloggt (authStore.isAuthenticated berücksichtigt bereits
 // E-Mail-Verifizierung, siehe main.js), der Server-Abgleich abgeschlossen ist (statusReady,
@@ -44,24 +42,9 @@ async function getIdTokenSafe() {
   }
 }
 
-// personalData kommt aus dem letzten, freiwilligen Onboarding-Schritt (siehe OnboardingFlow.vue)
-// - nur speichern, wenn tatsächlich mindestens ein Feld ausgefüllt wurde, um bei jedem
-// Onboarding-Abschluss (auch ohne Eingabe) keinen unnötigen zusätzlichen Request zu feuern.
-function hasAnyPersonalDataValue(personalData) {
-  if (!personalData) return false
-  const hasGender = personalData.gender && personalData.gender !== 'unspecified'
-  return personalData.ageYears != null || personalData.heightCm != null || personalData.weightKg != null || hasGender
-}
-
-async function handleOnboardingComplete(payload) {
+async function handleOnboardingComplete() {
   const token = await getIdTokenSafe()
-  const tasks = [onboardingStore.completeFlow(token)]
-  if (hasAnyPersonalDataValue(payload?.personalData)) {
-    tasks.push(settingsStore.savePersonalData(token, payload.personalData).catch((e) => {
-      logger.warn('[App] savePersonalData (Onboarding) failed:', e?.message || e)
-    }))
-  }
-  await Promise.all(tasks)
+  await onboardingStore.completeFlow(token)
 }
 
 async function handleOnboardingSkip() {

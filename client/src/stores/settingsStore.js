@@ -1,12 +1,6 @@
 import { defineStore } from 'pinia'
-import { fetchAccountProfile, updateAccountProfile, updatePersonalData } from '@/api/account'
+import { fetchAccountProfile, updateAccountProfile } from '@/api/account'
 import { logger } from '@/utils/logger'
-
-// Default-Objekt für personalData - 'unspecified' statt leerem String, damit direkt der
-// gültige Enum-Wert des Backends verwendet wird (siehe UserProfile.js personalData.gender).
-function emptyPersonalData() {
-  return { ageYears: null, gender: 'unspecified', heightCm: null, weightKg: null }
-}
 
 const PROFILE_REQUEST_COOLDOWN_MS = 15000
 let profileLoadPromise = null
@@ -36,33 +30,6 @@ function lsSet(uid, base, value) {
   } catch {}
 }
 
-// Bug-Fix (User-Report "Onboarding ausgefüllt, aber in den Einstellungen leer"): savePersonalData()
-// wird direkt nach Onboarding-Abschluss aufgerufen - genau der Moment, in dem ein frisch
-// registrierter Firebase-Nutzer noch kein zuverlässig verfügbares ID-Token hat bzw. die
-// Verbindung noch nicht steht. Schlug der PUT-Request bisher fehl (oder lag noch gar kein Token
-// vor), ging die Eingabe komplett verloren: der lokale State (nicht gecacht, siehe State-
-// Kommentar unten) wurde beim nächsten loadProfile()-Aufruf (Settings-Screen) durch den -
-// weiterhin leeren - Server-Stand überschrieben. Diese kleine, dedizierte Pending-Queue (gleiches
-// Muster wie pendingAiFeedback.js) merkt sich einen fehlgeschlagenen Speicherversuch lokal und
-// wird beim nächsten App-Start/Login (main.js) automatisch nachgeholt.
-const PENDING_PERSONAL_DATA_BASE = 'pending-personal-data'
-
-function lsGetJSON(uid, base) {
-  try {
-    const raw = localStorage.getItem(pKey(uid, base))
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
-  }
-}
-
-function lsSetJSON(uid, base, value) {
-  try {
-    if (value == null) localStorage.removeItem(pKey(uid, base))
-    else localStorage.setItem(pKey(uid, base), JSON.stringify(value))
-  } catch {}
-}
-
 export const useSettingsStore = defineStore('settings', {
   state: () => ({
     // Geräte-Einstellungen – keine UID-Bindung
@@ -81,11 +48,6 @@ export const useSettingsStore = defineStore('settings', {
     username: '',
     avatarUrl: '',
     avatarData: '',
-    // Freiwillige persönliche Angaben (Alter/Geschlecht/Größe/Gewicht) - bewusst NICHT in
-    // localStorage gecacht wie username/avatarUrl (sensiblere Daten als ein Anzeigename) -
-    // wird ausschließlich über loadProfile() vom Server geladen, geht also bei jedem
-    // App-Neustart zunächst auf den Default zurück, bis loadProfile() einmal durchgelaufen ist.
-    personalData: emptyPersonalData(),
   }),
   actions: {
     // Muss aus main.js nach jedem Firebase-onAuthStateChanged aufgerufen werden.
@@ -101,7 +63,6 @@ export const useSettingsStore = defineStore('settings', {
         this.username = ''
         this.avatarUrl = ''
         this.avatarData = ''
-        this.personalData = emptyPersonalData()
         profileCooldownUntil = 0
         profileLoadPromise = null
         profileLoadPromiseToken = ''
@@ -125,14 +86,6 @@ export const useSettingsStore = defineStore('settings', {
       this.username = lsGet(newUid, 'app-username')
       this.avatarUrl = lsGet(newUid, 'app-avatar-url')
       this.avatarData = lsGet(newUid, 'app-avatar-data')
-      // Kein lokaler Cache für personalData (siehe State-Kommentar oben) - auf Default
-      // zurücksetzen, bis loadProfile() die Daten des neuen Accounts vom Server geladen hat,
-      // damit nicht kurzzeitig die Angaben des vorherigen Accounts sichtbar sind. Eine noch
-      // nicht erfolgreich gespeicherte Eingabe (siehe PENDING_PERSONAL_DATA_BASE oben) wird
-      // trotzdem sofort optimistisch übernommen, damit sie z.B. direkt nach dem Onboarding nicht
-      // kurz "leer" aussieht, bevor main.js flushPendingPersonalData() nachgeholt hat.
-      const pending = lsGetJSON(newUid, PENDING_PERSONAL_DATA_BASE)
-      this.personalData = pending ? { ...emptyPersonalData(), ...pending } : emptyPersonalData()
 
       // Cooldown zurücksetzen für neuen Account
       profileCooldownUntil = 0
@@ -170,17 +123,6 @@ export const useSettingsStore = defineStore('settings', {
           const avatarUrl = String(profile?.avatarUrl ?? '').trim()
           this.username = username
           this.avatarUrl = avatarUrl
-          if (profile?.personalData) {
-            this.personalData = { ...emptyPersonalData(), ...profile.personalData }
-          }
-          // Eine noch nicht erfolgreich übertragene lokale Eingabe (siehe savePersonalData/
-          // flushPendingPersonalData) ist NEUER als dieser Server-Stand - überschreibt ihn
-          // deshalb hier bewusst wieder, statt dass ein frisch geladenes (noch leeres)
-          // Server-Profil eine wartende Eingabe fälschlich wie "verworfen" aussehen lässt.
-          const pendingPersonalData = lsGetJSON(this._uid, PENDING_PERSONAL_DATA_BASE)
-          if (pendingPersonalData) {
-            this.personalData = { ...emptyPersonalData(), ...pendingPersonalData }
-          }
           profileCooldownUntil = 0
           lsSet(this._uid, 'app-username', username)
           lsSet(this._uid, 'app-avatar-url', avatarUrl)
@@ -218,57 +160,6 @@ export const useSettingsStore = defineStore('settings', {
       this.username = serverName
       lsSet(this._uid, 'app-username', serverName)
       return updated
-    },
-
-    // Speichert nur die tatsächlich übergebenen Felder (partial update) - siehe PUT
-    // /profile/personal-data: ein Feld, das im payload fehlt (undefined), bleibt server-seitig
-    // unverändert; null/'' löscht ein Feld bewusst (Nutzer hat es geleert).
-    //
-    // Robustheit (User-Report "Onboarding ausgefüllt, aber in den Einstellungen leer"): schlägt
-    // der Request fehl (z.B. kein/abgelaufenes Token direkt nach frischer Registrierung, oder
-    // Netzwerkfehler), geht die Eingabe NICHT mehr verloren - sie landet in der lokalen
-    // Pending-Queue und wird beim nächsten App-Start/Login automatisch nachgeholt (siehe
-    // flushPendingPersonalData, aufgerufen aus main.js). Der Fehler wird trotzdem weitergereicht,
-    // damit ein Aufruf aus den Einstellungen (mit sichtbarem Speichern-Button) weiterhin eine
-    // Fehlermeldung zeigen kann.
-    async savePersonalData(token, payload) {
-      this.personalData = { ...this.personalData, ...payload }
-      if (!token) {
-        lsSetJSON(this._uid, PENDING_PERSONAL_DATA_BASE, this.personalData)
-        return { personalData: this.personalData }
-      }
-      try {
-        const updated = await updatePersonalData(token, payload)
-        if (updated?.personalData) {
-          this.personalData = { ...emptyPersonalData(), ...updated.personalData }
-        }
-        // Erfolgreich übertragen - eine evtl. noch offene ältere Pending-Eingabe ist damit
-        // hinfällig (der gerade erfolgreiche Request enthält den aktuellsten Stand).
-        lsSetJSON(this._uid, PENDING_PERSONAL_DATA_BASE, null)
-        return updated
-      } catch (error) {
-        lsSetJSON(this._uid, PENDING_PERSONAL_DATA_BASE, this.personalData)
-        logger.warn('⚠️ [settingsStore] savePersonalData fehlgeschlagen, für späteren Retry gequeued:', error?.message)
-        throw error
-      }
-    },
-
-    // Wird aus main.js einmal pro Login/App-Start aufgerufen (analog processPendingAiFeedback) -
-    // holt eine wegen fehlendem Token/Netzwerkfehler zuvor fehlgeschlagene savePersonalData()-
-    // Eingabe nach. Kein-Op, wenn nichts aussteht.
-    async flushPendingPersonalData(token) {
-      const pending = lsGetJSON(this._uid, PENDING_PERSONAL_DATA_BASE)
-      if (!pending || !token) return
-      try {
-        const updated = await updatePersonalData(token, pending)
-        if (updated?.personalData) {
-          this.personalData = { ...emptyPersonalData(), ...updated.personalData }
-        }
-        lsSetJSON(this._uid, PENDING_PERSONAL_DATA_BASE, null)
-        logger.debug('✅ [settingsStore] flushPendingPersonalData erfolgreich nachgeholt')
-      } catch (error) {
-        logger.warn('⚠️ [settingsStore] flushPendingPersonalData fehlgeschlagen, versuche es beim nächsten Start erneut:', error?.message)
-      }
     },
 
     setAvatarUrl(url) {
