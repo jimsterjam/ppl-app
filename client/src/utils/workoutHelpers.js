@@ -254,6 +254,21 @@ export function snapshotCore(w) {
   }
 }
 
+// Löst genau EINEN 'workout_map_<id>'-Eintrag auf (sessionStorage, dann IndexedDB-Fallback).
+// Ausgelagert aus resolveRealIdFromDraftId(), damit diese mehrfach hintereinander (Ketten-
+// Auflösung, siehe dort) aufgerufen werden kann, ohne den Lookup-Code zu duplizieren.
+async function lookupWorkoutMapEntry(id) {
+  try {
+    const fromSession = String(sessionStorage.getItem(`workout_map_${id}`) || '')
+    if (fromSession) return fromSession
+  } catch {}
+  try {
+    return String((await getMetadata(`workout_map_${id}`)) || '')
+  } catch {
+    return ''
+  }
+}
+
 /**
  * Löst eine temporäre lokale ID ('draft-xyz' ODER 'offline_xyz') in die zugehörige
  * echte MongoDB-ID auf. Beide Präfixe nutzen denselben 'workout_map_<id>'-Mechanismus:
@@ -264,28 +279,53 @@ export function snapshotCore(w) {
  *   2. sessionStorage  key 'workout_map_<id>'
  *   3. IndexedDB       key 'workout_map_<id>'  (via getMetadata)
  *
+ * Bug-Fix (User-Report/Log "Aufgelöste ID hat kein gültiges Format, ignoriere" mit einer
+ * ZWEITEN offline_-ID als "realId"): wenn der schnelle 2s-Race-Timeout in userStore.js
+ * createWorkout() zuschlägt UND die währenddessen im Hintergrund weiterlaufende ursprüngliche
+ * Anfrage selbst NOCHMAL in den Offline-Fallback läuft (z.B. weiterhin schlechtes Netz), erzeugt
+ * createWorkout() in api/workouts.js eine ZWEITE, neue offline_-ID und legt
+ * 'workout_map_<ersteId> -> <zweiteId>' an - erst wenn diese zweite ID später über die normale
+ * Sync-Queue erfolgreich angelegt wird, entsteht zusätzlich 'workout_map_<zweiteId> -> <echteId>'.
+ * Ein einzelner Lookup-Schritt (wie vorher) löst deshalb bestenfalls die ZWISCHEN-ID auf, nie die
+ * echte ID - jede spätere KI-Analyse-Anfrage blieb dadurch dauerhaft im 'syncPending'-Zustand
+ * hängen, obwohl die Kette inzwischen vollständig aufgelöst wäre. Fix: der Kette bis zu 5 Hops
+ * folgen (mehr als genug für diesen zweistufigen Fall, verhindert aber eine Endlosschleife bei
+ * einer - eigentlich unmöglichen - zirkulären Verkettung).
+ *
  * @param {string} id - Die temporäre ID die aufgelöst werden soll
  * @param {object|null} route - Vue Router route-Objekt (optional)
- * @returns {Promise<string>} Echte ID oder '' wenn nicht gefunden
+ * @returns {Promise<string>} Echte ID oder '' wenn (noch) nicht vollständig aufgelöst
  */
 export async function resolveRealIdFromDraftId(id, route = null) {
-  const isTemp = String(id || '').startsWith('draft-') || String(id || '').startsWith('offline_')
+  const originalId = String(id || '')
+  const isTemp = originalId.startsWith('draft-') || originalId.startsWith('offline_')
   if (!isTemp) return ''
-  // 1. Route-Query (schnellster Pfad, immer synchron verfügbar)
-  let realId = String(route?.query?.realId || '')
-  // 2. sessionStorage (überlebt keinen iOS-Kill, aber deckt den Normal-Fall)
-  if (!realId) {
-    try {
-      realId = String(sessionStorage.getItem(`workout_map_${String(id)}`) || '')
-    } catch {}
+
+  // 1. Route-Query (schnellster Pfad, immer synchron verfügbar) - kann bereits die echte ID
+  // sein, ODER (theoretisch) selbst wieder eine Zwischen-ID, daher unten in dieselbe
+  // Ketten-Auflösung einspeisen statt hier direkt zurückzugeben.
+  let current = String(route?.query?.realId || '') || originalId
+
+  const MAX_HOPS = 5
+  for (let hop = 0; hop < MAX_HOPS; hop += 1) {
+    const isStillTemp = current.startsWith('draft-') || current.startsWith('offline_')
+    if (!isStillTemp) {
+      // Kette komplett aufgelöst (oder war von Anfang an schon eine echte ID) - unabhängig
+      // davon, ob es sich um eine gültige ObjectId handelt: das prüft isValidObjectId() beim
+      // Aufrufer, hier wird nur so weit wie möglich aufgelöst.
+      return current === originalId ? '' : current
+    }
+    const next = await lookupWorkoutMapEntry(current)
+    if (!next || next === current) {
+      // Kein weiteres Mapping vorhanden (oder ein - eigentlich unmögliches - Mapping auf sich
+      // selbst) - Kette endet hier, (noch) keine echte ID bekannt.
+      return current === originalId ? '' : current
+    }
+    current = next
   }
-  // 3. IndexedDB (überlebt App-Kill — Fallback wenn sessionStorage leer)
-  if (!realId) {
-    try {
-      realId = String((await getMetadata(`workout_map_${String(id)}`)) || '')
-    } catch {}
-  }
-  return realId
+  // MAX_HOPS erreicht, ohne eine terminale (nicht-temporäre) ID zu finden - defensiv wie
+  // "nicht aufgelöst" behandeln, statt eine potenziell noch temporäre ID zurückzugeben.
+  return ''
 }
 
 /**
