@@ -20,7 +20,8 @@ import {
   structureAnalysisForAI,
   createSimpleExerciseFeedback,
   buildVolumeHistory,
-  findWorkoutsAffectedByDeletion
+  findWorkoutsAffectedByDeletion,
+  resolveSatzgenauWeightChange
 } from '../services/trainingAnalysisService.js';
 import {
   buildFeedbackVersion,
@@ -2104,11 +2105,16 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
     // nicht alle Werte geladen werden").
     const analysisSnapshot = exerciseAnalyses.map(ex => {
       const isNotable = ex.progression === 'positive' || ex.progression === 'negative';
+      // Bug-Fix (User-Report): weight_change_kg satzgenau statt als Session-Ø-Differenz
+      // auflösen - siehe ausführlichen Kommentar bei resolveSatzgenauWeightChange().
+      const weightChange = resolveSatzgenauWeightChange(ex.setsComparison, ex.changes?.weight_change ?? 0);
       return {
         exercise: ex.exercise,
         sets_change: ex.changes?.sets_change ?? 0,
         reps_change: ex.changes?.rep_change ?? 0,
-        weight_change_kg: ex.changes?.weight_change ?? 0,
+        weight_change_kg: weightChange.weightChangeKg,
+        weight_change_scope: weightChange.scope,
+        weight_change_set_numbers: weightChange.setNumbers,
         volume_change_percent: ex.changes?.volume_change_percent ?? 0,
         is_first_session: ex.progression === 'first_session',
         is_notable: isNotable,

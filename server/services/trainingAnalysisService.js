@@ -146,6 +146,67 @@ export function buildSetsComparison(currentEx, previousEx) {
 }
 
 /**
+ * Löst die "wie viel Gewicht mehr/weniger" - Aussage satzgenau auf, statt (wie zuvor) einen
+ * blanken Durchschnitt über alle Sätze zu bilden (Session-Ø-Gewicht aktuell minus Session-Ø-
+ * Gewicht vorher, siehe calculateExerciseStats/analyzeExercise -> changes.weight_change).
+ *
+ * User-Bug-Report: Bankdrücken mit 3 Sätzen, nur im dritten Satz +2,5kg, die anderen beiden
+ * Sätze unverändert -> Session-Ø-Differenz ist (2,5+0+0)/3 = 0,83 ≈ 0,5-1kg, was das Frontend
+ * (AiFeedbackDeltaSummary.vue, feedbackShareImage.js) bisher als "0,5kg mehr gestemmt bei
+ * gleicher Satz-/Wiederholungszahl" anzeigte - komplett irreführend, exakt das Muster, das für
+ * den KI-Feedbacktext bereits mit Regel 3 (satzgenau, siehe OpenAIProvider.js) behoben wurde,
+ * hier aber in einem separaten, rein deterministischen UI-Pfad (kein AI-Call) unverändert blieb.
+ *
+ * Diese Funktion wird zentral hier aufgerufen (routes/workouts.js baut daraus
+ * Workout.ai_analysis_snapshot) - beide Frontend-Verbraucher (die Delta-Zusammenfassung UND das
+ * Teilen-Bild) lesen nur noch das bereits korrekt aufgelöste Ergebnis, keine eigene Logik nötig.
+ *
+ * @param {Array<Object>} setsComparison - Ergebnis von buildSetsComparison()
+ * @param {number} fallbackWeightChangeKg - Session-Ø-Differenz (bisheriges Verhalten) - wird
+ *   nur genutzt, wenn kein satzgenauer Vergleich möglich ist (fehlende Sätze-Daten) oder die
+ *   Sätze wirklich gegenläufig verändert wurden (scope 'mixed', siehe unten).
+ * @returns {{ weightChangeKg: number, scope: 'none'|'uniform'|'partial'|'mixed'|'unknown', setNumbers: number[] }}
+ *   - 'none': keine Gewichtsveränderung.
+ *   - 'uniform': ALLE vergleichbaren Sätze haben sich um denselben Betrag verändert - ein
+ *     einzelner Satz-Vergleich fehlt hier extra zu nennen (setNumbers bleibt leer).
+ *   - 'partial': NUR einzelne Sätze (setNumbers) haben sich verändert, der Rest blieb gleich -
+ *     UI sollte die konkreten Satznummern nennen, statt den (irreführenden) Durchschnitt.
+ *   - 'mixed': verschiedene Sätze haben sich UNTERSCHIEDLICH verändert (z.B. +2,5kg und -1kg) -
+ *     keine einzelne Zahl kann das ehrlich zusammenfassen, UI sollte neutral/vorsichtig
+ *     formulieren statt eine Zahl zu nennen.
+ *   - 'unknown': keine satzgenauen Vergleichsdaten vorhanden (z.B. Legacy-Struktur ohne
+ *     setDetails) - Fallback auf die bisherige Session-Ø-Differenz.
+ */
+export function resolveSatzgenauWeightChange(setsComparison, fallbackWeightChangeKg = 0) {
+  const round1 = (n) => Math.round(Number(n) * 10) / 10;
+  const fallbackKg = round1(Number(fallbackWeightChangeKg) || 0);
+
+  const comparable = (Array.isArray(setsComparison) ? setsComparison : [])
+    .filter((s) => s && s.is_new_set !== true && typeof s.weight_change_kg === 'number');
+
+  if (comparable.length === 0) {
+    return { weightChangeKg: fallbackKg, scope: 'unknown', setNumbers: [] };
+  }
+
+  const changed = comparable.filter((s) => round1(s.weight_change_kg) !== 0);
+  if (changed.length === 0) {
+    return { weightChangeKg: 0, scope: 'none', setNumbers: [] };
+  }
+
+  const distinctValues = [...new Set(changed.map((s) => round1(s.weight_change_kg)))];
+  if (distinctValues.length > 1) {
+    return { weightChangeKg: fallbackKg, scope: 'mixed', setNumbers: changed.map((s) => s.set_number) };
+  }
+
+  const uniform = changed.length === comparable.length;
+  return {
+    weightChangeKg: distinctValues[0],
+    scope: uniform ? 'uniform' : 'partial',
+    setNumbers: uniform ? [] : changed.map((s) => s.set_number)
+  };
+}
+
+/**
  * Bestimme Trend basierend auf Gewichts- und Volumenveränderung
  *
  * @param {number} weightChange - Kg-Differenz

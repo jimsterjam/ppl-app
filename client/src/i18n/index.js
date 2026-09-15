@@ -705,6 +705,14 @@ export const messages = {
       deltaNoChange: 'Keine Veränderung zur letzten Session.',
       deltaWeightMore: '{kg} kg mehr gestemmt',
       deltaWeightLess: '{kg} kg weniger gestemmt',
+      // Satzgenaue Varianten (Bug-Fix "0,5kg statt 2,5kg"): nur EIN Teil der Sätze hat sich
+      // verändert (scope='partial') - benennt konkret den/die betroffenen Satz/Sätze statt
+      // einer Session-Ø-Zahl (siehe resolveSatzgenauWeightChange in trainingAnalysisService.js).
+      deltaWeightMoreInSet: '{kg} kg mehr gestemmt (Satz {sets})',
+      deltaWeightLessInSet: '{kg} kg weniger gestemmt (Satz {sets})',
+      // scope='mixed': Sätze haben sich gegenläufig verändert (z.B. Satz 1 +2,5kg, Satz 2 -2,5kg)
+      // - bewusst KEINE einzelne Zahl behaupten, nur den Sachverhalt benennen.
+      deltaWeightMixed: 'unterschiedliche Gewichtsänderungen je Satz',
       deltaRepsMore: '{n} Wiederholungen mehr geschafft',
       deltaRepsLess: '{n} Wiederholungen weniger geschafft',
       deltaSetsMore: '{n} Sätze mehr gemacht',
@@ -1612,6 +1620,9 @@ export const messages = {
       deltaNoChange: 'No change from your last session.',
       deltaWeightMore: 'lifted {kg} kg more',
       deltaWeightLess: 'lifted {kg} kg less',
+      deltaWeightMoreInSet: 'lifted {kg} kg more (set {sets})',
+      deltaWeightLessInSet: 'lifted {kg} kg less (set {sets})',
+      deltaWeightMixed: 'weight changed differently across sets',
       deltaRepsMore: 'did {n} more reps',
       deltaRepsLess: 'did {n} fewer reps',
       deltaSetsMore: 'did {n} more sets',

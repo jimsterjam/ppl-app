@@ -138,6 +138,13 @@ const workoutSchema = new mongoose.Schema({
     sets_change: { type: Number, default: 0 },
     reps_change: { type: Number, default: 0 },
     weight_change_kg: { type: Number, default: 0 },
+    // Bug-Fix (User-Report "0,5kg statt 2,5kg"): weight_change_kg wird jetzt satzgenau
+    // aufgelöst (siehe resolveSatzgenauWeightChange in trainingAnalysisService.js) statt als
+    // Session-Ø-Differenz - diese beiden Felder geben dem Frontend (AiFeedbackDeltaSummary.vue)
+    // den nötigen Kontext, um bei "partial" die betroffenen Sätze konkret zu benennen statt
+    // eine pauschale Zahl zu behaupten.
+    weight_change_scope: { type: String, enum: ['none', 'uniform', 'partial', 'mixed', 'unknown'], default: 'unknown' },
+    weight_change_set_numbers: [{ type: Number }],
     volume_change_percent: { type: Number, default: 0 },
     is_first_session: { type: Boolean, default: false },
     // Nur gesetzt, wenn die Übung eine tatsächlich auffällige Veränderung zeigt (siehe

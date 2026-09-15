@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const { calculateExerciseStats, analyzeExercise, buildSetsComparison } = await import(
+const { calculateExerciseStats, analyzeExercise, buildSetsComparison, resolveSatzgenauWeightChange } = await import(
   join(__dirname, '../../services/trainingAnalysisService.js')
 )
 
@@ -292,5 +292,74 @@ describe('buildSetsComparison', () => {
     const result = buildSetsComparison(currentEx, previousEx)
     assert.equal(result.length, 3)
     assert.equal(result.every(s => s.weight_change_kg === 5), true)
+  })
+})
+
+// Deckt den konkreten User-Report ab (Bankdrücken: nur der dritte Satz +2,5kg, Session-Ø
+// zeigte fälschlich "0,5kg mehr") - resolveSatzgenauWeightChange löst weight_change_kg jetzt
+// satzgenau statt als Durchschnitt auf (siehe JSDoc dort und in AiFeedbackDeltaSummary.vue).
+describe('resolveSatzgenauWeightChange', () => {
+  test('uniform: alle veränderten Sätze haben denselben Wert -> scope "uniform", einfache Zahl', () => {
+    const setsComparison = [
+      { set_number: 1, weight_change_kg: 2.5, is_new_set: false },
+      { set_number: 2, weight_change_kg: 2.5, is_new_set: false },
+      { set_number: 3, weight_change_kg: 2.5, is_new_set: false }
+    ]
+    const result = resolveSatzgenauWeightChange(setsComparison, 2.5)
+    assert.equal(result.weightChangeKg, 2.5)
+    assert.equal(result.scope, 'uniform')
+    assert.deepEqual(result.setNumbers, [])
+  })
+
+  test('partial: nur ein Satz verändert (User-Report) -> konkrete Satznummer statt Ø-Wert', () => {
+    const setsComparison = [
+      { set_number: 1, weight_change_kg: 0, is_new_set: false },
+      { set_number: 2, weight_change_kg: 0, is_new_set: false },
+      { set_number: 3, weight_change_kg: 2.5, is_new_set: false }
+    ]
+    // Fallback (Session-Ø) wäre hier 0,83 - das darf NICHT zurückgegeben werden.
+    const result = resolveSatzgenauWeightChange(setsComparison, 0.83)
+    assert.equal(result.weightChangeKg, 2.5)
+    assert.equal(result.scope, 'partial')
+    assert.deepEqual(result.setNumbers, [3])
+  })
+
+  test('mixed: Sätze verändern sich gegenläufig -> Fallback-Zahl, aber scope "mixed" markiert sie als unsicher', () => {
+    const setsComparison = [
+      { set_number: 1, weight_change_kg: 2.5, is_new_set: false },
+      { set_number: 2, weight_change_kg: -2.5, is_new_set: false }
+    ]
+    const result = resolveSatzgenauWeightChange(setsComparison, 0)
+    assert.equal(result.scope, 'mixed')
+    assert.deepEqual(result.setNumbers, [1, 2])
+  })
+
+  test('none: kein Satz hat sich verändert -> 0, scope "none"', () => {
+    const setsComparison = [
+      { set_number: 1, weight_change_kg: 0, is_new_set: false },
+      { set_number: 2, weight_change_kg: 0, is_new_set: false }
+    ]
+    const result = resolveSatzgenauWeightChange(setsComparison, 0)
+    assert.equal(result.weightChangeKg, 0)
+    assert.equal(result.scope, 'none')
+    assert.deepEqual(result.setNumbers, [])
+  })
+
+  test('unknown: keine vergleichbaren Sätze (z.B. leer oder alle neu) -> Fallback-Wert, scope "unknown"', () => {
+    assert.deepEqual(resolveSatzgenauWeightChange([], 1.2), { weightChangeKg: 1.2, scope: 'unknown', setNumbers: [] })
+    const onlyNewSets = [{ set_number: 1, is_new_set: true }]
+    assert.deepEqual(resolveSatzgenauWeightChange(onlyNewSets, 0), { weightChangeKg: 0, scope: 'unknown', setNumbers: [] })
+    assert.deepEqual(resolveSatzgenauWeightChange(undefined, 3), { weightChangeKg: 3, scope: 'unknown', setNumbers: [] })
+  })
+
+  test('partial: uniform über ALLE vergleichbaren Sätze (kein is_new_set dabei) -> trotzdem scope "uniform"', () => {
+    const setsComparison = [
+      { set_number: 1, weight_change_kg: 5, is_new_set: false },
+      { set_number: 2, weight_change_kg: 5, is_new_set: false },
+      { set_number: 3, is_new_set: true } // neuer Satz, fließt nicht in den Vergleich ein
+    ]
+    const result = resolveSatzgenauWeightChange(setsComparison, 5)
+    assert.equal(result.scope, 'uniform')
+    assert.equal(result.weightChangeKg, 5)
   })
 })
