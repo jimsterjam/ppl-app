@@ -46,7 +46,13 @@ export function normalizeWorkoutForSave({ workout, exerciseNotes, sessionStopwat
     completed: true,
     _isDraft: false,
     isDraft: false,
-    exercises
+    exercises,
+    // Optionales, pro Session erfasstes Körpergewicht (siehe WorkoutDetailView.vue). Null-
+    // Annahmen-Prinzip: nur ein tatsächlich eingegebener Zahlenwert wird durchgereicht, sonst
+    // null - niemals geschätzt oder aus anderen Feldern abgeleitet.
+    athleteBodyweightKg: (typeof w.athleteBodyweightKg === 'number' && Number.isFinite(w.athleteBodyweightKg))
+      ? w.athleteBodyweightKg
+      : null
   }
 
   normalized.notes = buildWorkoutNotesSummary(normalized.exercises)

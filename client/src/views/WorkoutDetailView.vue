@@ -433,6 +433,27 @@
             </div>
           </div>
 
+          <div
+            v-if="!isReordering && !isFavoriteAdjustMode"
+            class="bodyweight-field"
+          >
+            <label for="athlete-bodyweight-input">{{ t('workoutDetail.bodyweightLabel') }}</label>
+            <div class="bodyweight-input-row">
+              <input
+                id="athlete-bodyweight-input"
+                type="number"
+                min="0"
+                max="400"
+                step="0.1"
+                inputmode="decimal"
+                :placeholder="t('workoutDetail.bodyweightPlaceholder')"
+                v-model="athleteBodyweightKg"
+              />
+              <span class="unit">kg</span>
+            </div>
+            <small class="bodyweight-hint">{{ t('workoutDetail.bodyweightHint') }}</small>
+          </div>
+
           <div class="actions">
             <button
               v-if="isReordering"
@@ -826,6 +847,25 @@ const WORKOUT_EDIT_WINDOW_HOURS_CLIENT = 24
 const workout = ref(null)
 const loading = ref(false)
 const error = ref('')
+// Körpergewicht heute (optional, pro Workout) - Feld existiert im Backend bereits seit längerem
+// (Workout.athleteBodyweightKg), hatte aber bisher kein Client-UI zum Erfassen. Bewusst als
+// eigenständiger, reiner Zahlenwert erfasst statt als Teil eines Profils (siehe Rückbau der
+// früheren "persönliche Angaben"-Funktion) - erlaubt eine echte Zeitreihe pro Session statt
+// eines einzelnen, selten aktualisierten Profilwerts. Null-Annahmen-Prinzip: leer/ungültig -> null,
+// niemals ein Platzhalter- oder geschätzter Wert.
+const athleteBodyweightKg = computed({
+  get() {
+    const v = workout.value?.athleteBodyweightKg
+    return (typeof v === 'number' && Number.isFinite(v)) ? v : null
+  },
+  set(val) {
+    if (!workout.value) return
+    const num = Number(val)
+    const clean = (val === null || val === '' || !Number.isFinite(num)) ? null : Math.max(0, Math.min(400, num))
+    workout.value = { ...workout.value, athleteBodyweightKg: clean }
+    triggerAutoSave()
+  }
+})
 // Gesetzt, wenn ein bereits abgeschlossenes Workout innerhalb des nachträglichen
 // Bearbeitungsfensters geöffnet wurde (siehe loadWorkout()) - hält die Deadline (ms seit
 // Epoch) für den Hinweisbanner im Template. null = kein abgeschlossenes Workout bzw. kein
@@ -3261,6 +3301,44 @@ onBeforeUnmount(() => {
 .spin-btn.up { transform-origin: center; }
 .spin-btn.down { transform-origin: center; }
 .spin-btn:active { transform: scale(0.98); }
+.bodyweight-field {
+  margin: 6px;
+  padding: 12px 14px;
+  border-radius: var(--panel-radius, 16px);
+  border: 1px solid var(--line-soft);
+  background: var(--bg-elevated, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.bodyweight-field label {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--fg);
+}
+.bodyweight-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.bodyweight-input-row input {
+  width: 100px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line-soft);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 1rem;
+}
+.bodyweight-input-row .unit {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.bodyweight-hint {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
 .actions { margin: 6px; display: flex; gap: 8px; }
 .primary {
   width: 100%;
