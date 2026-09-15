@@ -22,6 +22,7 @@
           <ul v-if="isRulesStep" class="onboarding-rules-list">
             <li v-for="n in 5" :key="n">{{ t(`onboarding.rulesItem${n}`) }}</li>
           </ul>
+          <PersonalDataFields v-if="isProfileStep" v-model="personalData" class="onboarding-profile-fields" />
         </div>
       </Transition>
     </div>
@@ -37,6 +38,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import PersonalDataFields from '@/components/PersonalDataFields.vue'
 
 // Vollbild-Overlay statt eigener Router-Route (siehe Begründung in onboardingStore.js/main.js):
 // eine eigene Route hätte sich mit dem bestehenden, bereits fragilen Zusammenspiel aus
@@ -45,8 +47,13 @@ import { useI18n } from 'vue-i18n'
 // Schritt 2 ("So machst du wirklich Fortschritte") ist die einzige Seite mit einer Liste statt
 // Fließtext - daher totalSteps 5 -> 6 und ein eigenes Flag, das im Template die Regel-Liste
 // zusätzlich zum normalen step2Text rendert (siehe onboarding.rulesItem1-5 in i18n/index.js).
-const totalSteps = 6
+// Letzter Schritt (7.) fragt freiwillig Alter/Geschlecht/Größe/Gewicht ab (User-Anfrage: "könnte
+// die Feedbacks beeinflussen") - komplett optional, "Weiter"/"Fertig" funktioniert auch mit
+// leeren Feldern genau wie bisher, es gibt keinen eigenen "Überspringen"-Zustand PRO Schritt
+// (der bestehende Skip-Button überspringt weiterhin den gesamten Flow).
+const totalSteps = 7
 const RULES_STEP_INDEX = 1
+const PROFILE_STEP_INDEX = 6
 
 const emit = defineEmits(['complete', 'skip'])
 
@@ -55,10 +62,15 @@ const { t } = useI18n()
 const step = ref(0)
 const isLastStep = computed(() => step.value === totalSteps - 1)
 const isRulesStep = computed(() => step.value === RULES_STEP_INDEX)
+const isProfileStep = computed(() => step.value === PROFILE_STEP_INDEX)
+
+const personalData = ref({ ageYears: null, gender: 'unspecified', heightCm: null, weightKg: null })
 
 function handleNext() {
   if (isLastStep.value) {
-    emit('complete')
+    // personalData wird nur mitgegeben, wenn der Flow tatsächlich bis hierhin durchlaufen wurde
+    // (nicht bei handleSkip) - App.vue speichert es nur, wenn mindestens ein Feld ausgefüllt ist.
+    emit('complete', { personalData: personalData.value })
     return
   }
   step.value += 1
@@ -184,6 +196,10 @@ function handleSkip() {
   left: 0;
   color: var(--accent);
   font-weight: 700;
+}
+
+.onboarding-profile-fields {
+  margin-top: 1.5rem;
 }
 
 .onboarding-footer {

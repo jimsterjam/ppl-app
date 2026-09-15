@@ -470,6 +470,16 @@ export function buildVolumeHistory(exerciseName, currentWorkout, allWorkouts, ma
  * @param {number|null} [options.athleteBodyweightKg] - Kap. 24: nur ausgeben, wenn tatsächlich
  *   erfasst (Null-Annahmen-Prinzip) - fehlt der Wert, wird das Feld schlicht weggelassen statt
  *   mit einem Platzhalter gefüllt, damit die AI keine Annahme über das Körpergewicht trifft.
+ * @param {Object|null} [options.userProfile] - Freiwillige, persistente Profilangaben (siehe
+ *   UserProfile.js personalData) - jedes Unterfeld einzeln optional, nur gesetzte Felder werden
+ *   ausgegeben (gleiches Null-Annahmen-Prinzip wie athleteBodyweightKg). Bewusst GETRENNT von
+ *   athlete_bodyweight_kg (Session-Messwert) - dies hier ist ein allgemeiner, seltener
+ *   aktualisierter Profilwert ("Gewicht laut Profil"), kein Wert für diese eine Session.
+ * @param {number|null} [options.userProfile.ageYears]
+ * @param {string|null} [options.userProfile.gender] - 'male'|'female'|'diverse', 'unspecified'
+ *   wird wie "nicht angegeben" behandelt und nicht ausgegeben.
+ * @param {number|null} [options.userProfile.heightCm]
+ * @param {number|null} [options.userProfile.weightKg]
  * @returns {Object} Strukturierte Daten für AI
  */
 export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
@@ -477,7 +487,18 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
     return null;
   }
 
-  const { athleteBodyweightKg = null } = options || {};
+  const { athleteBodyweightKg = null, userProfile = null } = options || {};
+
+  // Nur tatsächlich ausgefüllte Felder übernehmen - 'unspecified' (Default-Enum-Wert) zählt wie
+  // ein leeres Feld, damit die AI hier keine Wahl "keine Angabe" fälschlich als Datenpunkt liest.
+  const userProfileForAI = {};
+  if (userProfile) {
+    if (userProfile.ageYears != null) userProfileForAI.age_years = userProfile.ageYears;
+    if (userProfile.gender && userProfile.gender !== 'unspecified') userProfileForAI.gender = userProfile.gender;
+    if (userProfile.heightCm != null) userProfileForAI.height_cm = userProfile.heightCm;
+    if (userProfile.weightKg != null) userProfileForAI.weight_kg = userProfile.weightKg;
+  }
+  const hasUserProfileForAI = Object.keys(userProfileForAI).length > 0;
 
   // Statistiken über alle Übungen
   const positiveExercises = exerciseAnalyses.filter(e => e.progression === 'positive');
@@ -503,6 +524,10 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
     // Nur ausgegeben, wenn tatsächlich für diese Session erfasst (Null-Annahmen-Prinzip,
     // Kap. 24) - kein Fallback/Platzhalter.
     ...(athleteBodyweightKg != null ? { athlete_bodyweight_kg: athleteBodyweightKg } : {}),
+
+    // Freiwillige Profilangaben (Alter/Geschlecht/Größe/Gewicht laut Profil) - nur das
+    // Unterobjekt anhängen, wenn mindestens ein Feld tatsächlich ausgefüllt wurde.
+    ...(hasUserProfileForAI ? { user_profile: userProfileForAI } : {}),
 
     // Zusammenfassung Progressionen
     progression_summary: {

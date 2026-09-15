@@ -164,6 +164,14 @@
         </div>
       </section>
 
+      <section class="card card--profile">
+        <h3>{{ $t('settings.personalDataTitle') }}</h3>
+        <PersonalDataFields v-model="personalDataDraft" />
+        <button class="save-btn personal-data-save-btn" :disabled="personalDataSaving" @click="savePersonalData">
+          {{ personalDataSaving ? $t('common.saving') : $t('common.save') }}
+        </button>
+      </section>
+
       <!-- Development Tools Section - nur im lokalen `npm run dev` sichtbar (import.meta.env.DEV),
            NICHT in gebauten Builds (TestFlight/App Store). Vorher gab es hier zusätzlich einen
            Fünffach-Tap-Unlock, der über localStorage auch in Produktions-Builds funktionierte -
@@ -448,6 +456,7 @@
 <script setup>
 import HeaderBar from '../components/HeaderBar.vue'
 import AppFeedbackDialog from '../components/AppFeedbackDialog.vue'
+import PersonalDataFields from '../components/PersonalDataFields.vue'
 import { storeToRefs } from 'pinia'
 import { useThemeStore } from '@/stores/themeStore'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -536,6 +545,8 @@ const settings = useSettingsStore()
 const { weeklyGoal } = storeToRefs(settings)
 const usernameDraft = ref(settings.username || '')
 const usernameSaving = ref(false)
+const personalDataDraft = ref({ ...settings.personalData })
+const personalDataSaving = ref(false)
 
 // Avatar/Profile picture
 const AVATAR_MAX_BYTES = 12 * 1024 * 1024
@@ -1116,6 +1127,7 @@ async function loadProfileIntoForm() {
     if (!token) return
     await settings.loadProfile(token)
     usernameDraft.value = settings.username || ''
+    personalDataDraft.value = { ...settings.personalData }
   } catch (e) {
     logger.warn('[SettingsView] loadProfileIntoForm failed:', e?.message || e)
   }
@@ -1137,6 +1149,25 @@ async function saveUsername() {
     toast.show($t('common.error'), { type: 'error', duration: 2000 })
   } finally {
     usernameSaving.value = false
+  }
+}
+
+async function savePersonalData() {
+  if (personalDataSaving.value) return
+  personalDataSaving.value = true
+  try {
+    const token = await getIdTokenSafe()
+    if (!token) {
+      toast.show($t('auth.signIn'), { type: 'info', duration: 1800 })
+      return
+    }
+    await settings.savePersonalData(token, personalDataDraft.value)
+    personalDataDraft.value = { ...settings.personalData }
+    toast.show($t('common.updated'), { type: 'success', duration: 1500 })
+  } catch (e) {
+    toast.show($t('common.error'), { type: 'error', duration: 2000 })
+  } finally {
+    personalDataSaving.value = false
   }
 }
 
@@ -1621,6 +1652,10 @@ async function confirmDeleteAccount() {
   font-weight: 700;
   cursor: pointer;
   min-width: 110px;
+}
+
+.personal-data-save-btn {
+  margin-top: 1rem;
 }
 
 .save-btn:disabled {

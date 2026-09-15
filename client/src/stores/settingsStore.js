@@ -1,6 +1,12 @@
 import { defineStore } from 'pinia'
-import { fetchAccountProfile, updateAccountProfile } from '@/api/account'
+import { fetchAccountProfile, updateAccountProfile, updatePersonalData } from '@/api/account'
 import { logger } from '@/utils/logger'
+
+// Default-Objekt für personalData - 'unspecified' statt leerem String, damit direkt der
+// gültige Enum-Wert des Backends verwendet wird (siehe UserProfile.js personalData.gender).
+function emptyPersonalData() {
+  return { ageYears: null, gender: 'unspecified', heightCm: null, weightKg: null }
+}
 
 const PROFILE_REQUEST_COOLDOWN_MS = 15000
 let profileLoadPromise = null
@@ -48,6 +54,11 @@ export const useSettingsStore = defineStore('settings', {
     username: '',
     avatarUrl: '',
     avatarData: '',
+    // Freiwillige persönliche Angaben (Alter/Geschlecht/Größe/Gewicht) - bewusst NICHT in
+    // localStorage gecacht wie username/avatarUrl (sensiblere Daten als ein Anzeigename) -
+    // wird ausschließlich über loadProfile() vom Server geladen, geht also bei jedem
+    // App-Neustart zunächst auf den Default zurück, bis loadProfile() einmal durchgelaufen ist.
+    personalData: emptyPersonalData(),
   }),
   actions: {
     // Muss aus main.js nach jedem Firebase-onAuthStateChanged aufgerufen werden.
@@ -63,6 +74,7 @@ export const useSettingsStore = defineStore('settings', {
         this.username = ''
         this.avatarUrl = ''
         this.avatarData = ''
+        this.personalData = emptyPersonalData()
         profileCooldownUntil = 0
         profileLoadPromise = null
         profileLoadPromiseToken = ''
@@ -86,6 +98,10 @@ export const useSettingsStore = defineStore('settings', {
       this.username = lsGet(newUid, 'app-username')
       this.avatarUrl = lsGet(newUid, 'app-avatar-url')
       this.avatarData = lsGet(newUid, 'app-avatar-data')
+      // Kein lokaler Cache für personalData (siehe State-Kommentar oben) - auf Default
+      // zurücksetzen, bis loadProfile() die Daten des neuen Accounts vom Server geladen hat,
+      // damit nicht kurzzeitig die Angaben des vorherigen Accounts sichtbar sind.
+      this.personalData = emptyPersonalData()
 
       // Cooldown zurücksetzen für neuen Account
       profileCooldownUntil = 0
@@ -123,6 +139,9 @@ export const useSettingsStore = defineStore('settings', {
           const avatarUrl = String(profile?.avatarUrl ?? '').trim()
           this.username = username
           this.avatarUrl = avatarUrl
+          if (profile?.personalData) {
+            this.personalData = { ...emptyPersonalData(), ...profile.personalData }
+          }
           profileCooldownUntil = 0
           lsSet(this._uid, 'app-username', username)
           lsSet(this._uid, 'app-avatar-url', avatarUrl)
@@ -159,6 +178,19 @@ export const useSettingsStore = defineStore('settings', {
       const serverName = String(updated?.username ?? clean).trim().slice(0, 24)
       this.username = serverName
       lsSet(this._uid, 'app-username', serverName)
+      return updated
+    },
+
+    // Speichert nur die tatsächlich übergebenen Felder (partial update) - siehe PUT
+    // /profile/personal-data: ein Feld, das im payload fehlt (undefined), bleibt server-seitig
+    // unverändert; null/'' löscht ein Feld bewusst (Nutzer hat es geleert).
+    async savePersonalData(token, payload) {
+      this.personalData = { ...this.personalData, ...payload }
+      if (!token) return { personalData: this.personalData }
+      const updated = await updatePersonalData(token, payload)
+      if (updated?.personalData) {
+        this.personalData = { ...emptyPersonalData(), ...updated.personalData }
+      }
       return updated
     },
 

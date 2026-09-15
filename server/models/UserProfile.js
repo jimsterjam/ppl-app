@@ -95,6 +95,39 @@ const userProfileSchema = new mongoose.Schema({
       type: [String],
       default: []
     }
+  },
+  // Freiwillige, persönliche Angaben (User-Anfrage: "könnte die Feedbacks beeinflussen") - JEDES
+  // einzelne Feld ist optional und default null/leer, es gibt bewusst KEINEN Zwang, irgendetwas
+  // hiervon auszufüllen (weder im Onboarding noch in den Einstellungen). Analog zum bereits
+  // bestehenden Null-Annahmen-Prinzip für athleteBodyweightKg (siehe Workout.js/OpenAIProvider.js):
+  // fehlt ein Feld, wird es dem KI-Prompt schlicht nicht mitgegeben statt mit einem Platzhalter
+  // aufgefüllt. Bewusst GETRENNT vom Session-Feld Workout.athleteBodyweightKg (dortiger Kommentar:
+  // "strikt getrennt von athleteBodyweightKg") - dieses hier ist ein allgemeiner Profilwert, kein
+  // Session-Messwert.
+  personalData: {
+    ageYears: {
+      type: Number,
+      default: null,
+      min: 10,
+      max: 120
+    },
+    gender: {
+      type: String,
+      enum: ['male', 'female', 'diverse', 'unspecified'],
+      default: 'unspecified'
+    },
+    heightCm: {
+      type: Number,
+      default: null,
+      min: 100,
+      max: 250
+    },
+    weightKg: {
+      type: Number,
+      default: null,
+      min: 30,
+      max: 300
+    }
   }
 }, {
   timestamps: true
