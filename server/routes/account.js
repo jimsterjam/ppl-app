@@ -172,7 +172,23 @@ router.post('/delete', firebaseAuthMiddleware, async (req, res) => {
       exercisesFound: userExercises.length,
       filesDeleted: [],
       gridfsDeleted: [],
-      dbDeleted: { workouts: 0, exercises: 0 },
+      // Bug-Fix (DSGVO Art. 17 "Recht auf Vergessenwerden"): dbDeleted deckte bisher NUR
+      // workouts/exercises ab - UserProfile (inkl. username/avatarImage und seit Kurzem auch den
+      // freiwilligen personalData-Angaben Alter/Geschlecht/Größe/Gewicht) sowie CustomExercise/
+      // FavoriteWorkout/FeedbackRating/UserExerciseNote/AppFeedback blieben nach "Account
+      // löschen" dauerhaft in der Datenbank stehen, obwohl GET /export (siehe oben) genau diese
+      // Collections als "an diesen Nutzer gebundene Daten" behandelt. Jetzt symmetrisch zum
+      // Export: alle sieben dort gelisteten Collections werden hier auch tatsächlich gelöscht.
+      dbDeleted: {
+        workouts: 0,
+        exercises: 0,
+        userProfile: 0,
+        customExercises: 0,
+        favoriteWorkouts: 0,
+        feedbackRatings: 0,
+        exerciseNotes: 0,
+        appFeedback: 0
+      },
       deletedAuth: false,
       errors: []
     };
@@ -244,6 +260,47 @@ router.post('/delete', firebaseAuthMiddleware, async (req, res) => {
       report.dbDeleted.exercises = exerciseDeleteResult.deletedCount || 0;
     } catch (e) {
       report.errors.push(`DB delete failed: ${e?.message || e}`);
+    }
+
+    // --- Step 4b: Weitere an diesen Nutzer gebundene Collections löschen (siehe Kommentar bei
+    // report.dbDeleted oben - bisher fehlte dieser Schritt komplett). Jede Collection einzeln in
+    // try/catch, damit ein Fehler bei einer Collection nicht die Löschung der übrigen verhindert
+    // (gleiches Prinzip wie die bestehenden Steps 2/3 oben, die auch einzeln fehlertolerant sind).
+    try {
+      const userProfileDeleteResult = await UserProfile.deleteOne({ uid: tokenUid });
+      report.dbDeleted.userProfile = userProfileDeleteResult.deletedCount || 0;
+    } catch (e) {
+      report.errors.push(`UserProfile delete failed: ${e?.message || e}`);
+    }
+    try {
+      const customExerciseDeleteResult = await CustomExercise.deleteMany({ userId: tokenUid });
+      report.dbDeleted.customExercises = customExerciseDeleteResult.deletedCount || 0;
+    } catch (e) {
+      report.errors.push(`CustomExercise delete failed: ${e?.message || e}`);
+    }
+    try {
+      const favoriteWorkoutDeleteResult = await FavoriteWorkout.deleteMany({ userId: tokenUid });
+      report.dbDeleted.favoriteWorkouts = favoriteWorkoutDeleteResult.deletedCount || 0;
+    } catch (e) {
+      report.errors.push(`FavoriteWorkout delete failed: ${e?.message || e}`);
+    }
+    try {
+      const feedbackRatingDeleteResult = await FeedbackRating.deleteMany({ userId: tokenUid });
+      report.dbDeleted.feedbackRatings = feedbackRatingDeleteResult.deletedCount || 0;
+    } catch (e) {
+      report.errors.push(`FeedbackRating delete failed: ${e?.message || e}`);
+    }
+    try {
+      const exerciseNoteDeleteResult = await UserExerciseNote.deleteMany({ userId: tokenUid });
+      report.dbDeleted.exerciseNotes = exerciseNoteDeleteResult.deletedCount || 0;
+    } catch (e) {
+      report.errors.push(`UserExerciseNote delete failed: ${e?.message || e}`);
+    }
+    try {
+      const appFeedbackDeleteResult = await AppFeedback.deleteMany({ userId: tokenUid });
+      report.dbDeleted.appFeedback = appFeedbackDeleteResult.deletedCount || 0;
+    } catch (e) {
+      report.errors.push(`AppFeedback delete failed: ${e?.message || e}`);
     }
 
     // --- Step 5: Delete Firebase Auth account (best effort) ---
