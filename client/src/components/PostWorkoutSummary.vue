@@ -146,7 +146,7 @@ import axios from 'axios'
 import { acquireKeepAwake, releaseKeepAwake } from '@/utils/keepAwakeGuard'
 import { resolveRealIdFromDraftId, isValidObjectId } from '@/utils/workoutHelpers'
 import { logDiagnostic } from '@/utils/diagnosticsLog'
-import { OFFLINE_WORKOUTS_UPDATED_EVENT } from '@/utils/offlineStorage'
+import { OFFLINE_WORKOUTS_UPDATED_EVENT, AI_FEEDBACK_UPDATED_EVENT } from '@/utils/offlineStorage'
 import { queuePendingAiFeedback, clearPendingAiFeedback } from '@/utils/pendingAiFeedback'
 import AiFeedbackDeltaSummary from '@/components/AiFeedbackDeltaSummary.vue'
 import AiFeedbackRatingWidget from '@/components/AiFeedbackRatingWidget.vue'
@@ -334,6 +334,12 @@ async function loadAIFeedback() {
         provider: response.data.ai_metadata?.provider
       })
       logDiagnostic('ai-feedback-result', { workoutId: props.workoutId, outcome: 'feedback', provider: response.data.ai_metadata?.provider, cached: !!response.data.cached })
+      // Bug-Fix (User-Report "Feedback-Verlauf aktualisiert sich nicht automatisch"): eine
+      // bereits gemountete AIFeedbackHistory.vue (z.B. im Hintergrund-Tab) lädt sonst nur einmalig
+      // beim Mount - dieses Event stößt dort einen stillen Reload an, sobald frisches Feedback da ist.
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent(AI_FEEDBACK_UPDATED_EVENT, { detail: { workoutId: resolvedWorkoutId } }))
+      }
     } else if (response.data?.feedback_status === 'network_unavailable') {
       networkUnavailable.value = true
       logger.debug('[PostWorkoutSummary] AI provider not reachable (network)', {

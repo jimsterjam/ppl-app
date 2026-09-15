@@ -13,6 +13,13 @@ import { normalizeDefaultExercises } from './normalizeDefaultExercises'
 import { ensureWorkoutNotes } from './workoutNotes'
 
 export const OFFLINE_WORKOUTS_UPDATED_EVENT = 'offline-workouts-updated'
+// Eigenes, dediziertes Event (statt OFFLINE_WORKOUTS_UPDATED_EVENT zweckzuentfremden) für den
+// Fall "KI-Feedback wurde (neu) generiert" - ausgelöst in PostWorkoutSummary.vue (Feedback direkt
+// nach Workout-Abschluss) und AIFeedbackHistory.vue (manuelles "Jetzt generieren"), damit JEDE
+// gemountete Instanz von AIFeedbackHistory.vue (auch eine bereits vor dem Ereignis gemountete,
+// die kein onMounted-Refresh mehr durchläuft) automatisch aktualisiert - siehe User-Report
+// "Feedback-Verlauf aktualisiert sich nicht automatisch".
+export const AI_FEEDBACK_UPDATED_EVENT = 'ai-feedback-updated'
 const MAX_OFFLINE_WORKOUTS = 400
 const DELETED_WORKOUT_TOMBSTONES_KEY = 'deleted_workout_ids_v1'
 

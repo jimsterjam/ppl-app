@@ -99,7 +99,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch, nextTick } from 'vue'
+import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Share2 } from 'lucide-vue-next'
 import { Share } from '@capacitor/share'
@@ -110,7 +110,7 @@ import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { fetchWorkoutFeedbacks, requestAiAnalysis } from '@/api/workouts'
 import { isValidObjectId } from '@/utils/workoutHelpers'
 import { logger } from '@/utils/logger'
-import { getMetadata, setMetadata } from '@/utils/offlineStorage'
+import { getMetadata, setMetadata, AI_FEEDBACK_UPDATED_EVENT } from '@/utils/offlineStorage'
 import { useToastStore } from '@/stores/toastStore'
 import { logDiagnostic } from '@/utils/diagnosticsLog'
 
@@ -180,6 +180,11 @@ async function generateNow(item) {
       item.ai_analysis_snapshot = data.ai_analysis_snapshot || []
       item.ai_feedback_status = 'generated'
       logDiagnostic('feedback-history-generate-now', { workoutId: item.workoutId, outcome: 'feedback' })
+      // Andere gemountete Instanzen (z.B. diese Ansicht in einem Hintergrund-Tab) über das
+      // frisch generierte Feedback informieren - siehe Listener in onMounted() unten.
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent(AI_FEEDBACK_UPDATED_EVENT, { detail: { workoutId: item.workoutId } }))
+      }
     } else if (data?.feedback_status === 'insufficient_history') {
       // Bleibt "ausstehend" (kein Fehler) - nur noch nicht genug Trainingshistorie für eine
       // wertende Analyse. Gleicher Hinweistext wie in PostWorkoutSummary.vue.
@@ -383,7 +388,19 @@ function applyHighlight() {
 
 watch([items, () => props.highlightWorkoutId], applyHighlight)
 
+// Bug-Fix (User-Report "Feedback-Verlauf aktualisiert sich nicht automatisch"): bisher lud diese
+// Komponente die Liste NUR einmalig in onMounted() - blieb sie danach im Speicher (kein Remount
+// beim Tab-Wechsel), bekam sie neu generiertes Feedback aus PostWorkoutSummary.vue nie mit. Ein
+// stiller Reload (kein Spinner/Flackern, da bereits Daten sichtbar sind) auf dieses Event behebt
+// das, unabhängig davon, ob die Komponente frisch gemountet wurde oder schon länger sichtbar ist.
+function handleAiFeedbackUpdated() {
+  load(1, { silent: true })
+}
+
 onMounted(() => {
+  if (typeof window !== 'undefined') {
+    window.addEventListener(AI_FEEDBACK_UPDATED_EVENT, handleAiFeedbackUpdated)
+  }
   // Cache-Lesen (schnelles IndexedDB) und Netzwerk-Refresh bewusst NICHT nacheinander
   // (await ... dann erst starten), sondern parallel anstoßen - der Netzwerk-Request ist der
   // eigentlich langsame Teil (v.a. bei einem kalt startenden Server), da soll nicht noch
@@ -401,6 +418,12 @@ onMounted(() => {
     if (hadCache) loading.value = false
     load(1, { silent: hadCache })
   })
+})
+
+onBeforeUnmount(() => {
+  if (typeof window !== 'undefined') {
+    window.removeEventListener(AI_FEEDBACK_UPDATED_EVENT, handleAiFeedbackUpdated)
+  }
 })
 </script>
 
