@@ -21,7 +21,8 @@ import {
   createSimpleExerciseFeedback,
   buildVolumeHistory,
   findWorkoutsAffectedByDeletion,
-  resolveSatzgenauWeightChange
+  resolveSatzgenauWeightChange,
+  resolveBodyweightCorrelation
 } from '../services/trainingAnalysisService.js';
 import {
   buildFeedbackVersion,
@@ -2016,12 +2017,18 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
       })
     }
 
+    // 3b. Körpergewicht-Kraft-Korrelation (rein deterministisch, siehe
+    // resolveBodyweightCorrelation) - liefert null, wenn für diese oder die letzte Session mit
+    // erfasstem Körpergewicht keine Daten vorliegen (Null-Annahmen-Prinzip).
+    const bodyweightCorrelation = resolveBodyweightCorrelation(currentWorkout, allWorkouts, exerciseAnalyses);
+
     // 4. Strukturiere Daten für AI (Mini-Datensatz)
     const structuredAnalysis = structureAnalysisForAI(exerciseAnalyses, {
       // Null-Annahmen-Prinzip (Kap. 24): nur ausgeben, wenn für DIESE Session tatsächlich
-      // erfasst - aktuell noch kein Client-UI zum Erfassen vorhanden, daher in der Praxis
-      // meist null, was structureAnalysisForAI() korrekt als "weglassen" behandelt.
-      athleteBodyweightKg: currentWorkout.athleteBodyweightKg ?? null
+      // erfasst (siehe optionales Eingabefeld in WorkoutDetailView.vue) - sonst korrekt
+      // weggelassen.
+      athleteBodyweightKg: currentWorkout.athleteBodyweightKg ?? null,
+      bodyweightCorrelation
     });
 
     // 5. Rufe AI-Service auf (OpenAI oder Ollama, abhängig von Konfiguration)

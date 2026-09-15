@@ -239,6 +239,30 @@ KRITISCHE REGELN:
     - Trotzdem ehrlich bleiben: keine übertriebene Motivationsfloskel-Positivität, wenn die
       Daten das nicht hergeben - dann lieber neutral-direkt benennen statt schönzureden.
 
+18. KÖRPERGEWICHT-KRAFT-GEGENÜBERSTELLUNG (bodyweight_correlation, falls vorhanden) - liefert
+    ZWEI unabhängig voneinander berechnete Fakten: die Körpergewichtsveränderung seit der
+    letzten Session mit erfasstem Gewicht (current_bodyweight_kg/previous_bodyweight_kg/
+    bodyweight_change_kg/period_days) und eine rein gezählte Zusammenfassung, bei wie vielen
+    Übungen dieser Session das Trainingsgewicht gestiegen/gesunken/stabil war
+    (strength_context). Das Backend hat KEINEN Zusammenhang zwischen beiden berechnet - das ist
+    KEINE Korrelation, keine Kausalität, nur eine zeitliche Gegenüberstellung zweier Zahlen.
+    - Nenne beide Fakten NEBENEINANDER, klar als zwei getrennte Beobachtungen, z.B. "Dein
+      Körpergewicht ist um 2kg gestiegen. Im selben Zeitraum hast du bei 3 von 5 Übungen mehr
+      Gewicht bewegt." NIEMALS als Ursache-Wirkung formulieren ("weil du zugenommen hast, bist
+      du stärker geworden", "das erklärt deine Steigerung") - das ist exakt der in Regel 3
+      verbotene Fall einer halluzinierten Ursache, nur mit Körpergewicht statt einer anderen
+      Variable.
+    - Kein Werturteil über die Gewichtsveränderung selbst ("gut, dass du zugenommen hast", "du
+      solltest abnehmen") - ob eine Gewichtsveränderung im Sinne des Nutzers ist, hängt von
+      Zielen ab, die der App nicht bekannt sind (siehe Regel 4, begrenzte Datenperspektive).
+    - Nur erwähnen, wenn bodyweight_correlation im Datensatz vorhanden ist. Fehlt es (z.B. weil
+      noch keine zweite Session mit erfasstem Gewicht existiert), dazu KEINE Aussage treffen -
+      kein "dein Gewicht wurde nicht erfasst"-Hinweis, das wäre unaufgefordertes Nachfragen
+      statt Feedback zum tatsächlichen Training.
+    - Bei geringer Datenbasis (z.B. period_days sehr klein, nur 1-2 Tage) die Gegenüberstellung
+      entsprechend vorsichtig/beiläufig einordnen, nicht mit gleicher Sicherheit wie einen
+      etablierten Trend über Wochen präsentieren.
+
 OUTPUT-FORMAT (Variante "kurze Chat-Nachricht" - das ist jetzt der Standard-Ton):
 Ungefähr 80-150 Wörter, deutlich kürzer als ein klassischer Report. KEINE sichtbaren
 Überschriften, kein Markdown-Fettdruck für Struktur - einfache Zeilen und Bindestriche/
@@ -438,6 +462,11 @@ export class OpenAIProvider extends AIProvider {
     ? `\n- Körpergewicht des Nutzers (diese Session): ${trainingAnalysis.athlete_bodyweight_kg}kg`
     : ''
 }
+${trainingAnalysis.bodyweight_correlation ? `
+## Körpergewicht-Kraft-Gegenüberstellung (siehe Regel 18 - zwei getrennte Fakten, KEINE berechnete Korrelation/Kausalität)
+- Körpergewicht: ${trainingAnalysis.bodyweight_correlation.previous_bodyweight_kg}kg vor ${trainingAnalysis.bodyweight_correlation.period_days} Tagen -> jetzt ${trainingAnalysis.bodyweight_correlation.current_bodyweight_kg}kg (${trainingAnalysis.bodyweight_correlation.bodyweight_change_kg > 0 ? '+' : ''}${trainingAnalysis.bodyweight_correlation.bodyweight_change_kg}kg)
+- Trainingsgewicht in dieser Session (nur Übungen mit Vorher-Vergleich, ${trainingAnalysis.bodyweight_correlation.strength_context.exercises_compared} insgesamt): ${trainingAnalysis.bodyweight_correlation.strength_context.exercises_with_weight_increase} gestiegen, ${trainingAnalysis.bodyweight_correlation.strength_context.exercises_with_weight_decrease} gesunken, ${trainingAnalysis.bodyweight_correlation.strength_context.exercises_stable} stabil
+` : ''}
 
 ## Größte Volumenveränderungen nach oben
 ${topImprovements.length > 0

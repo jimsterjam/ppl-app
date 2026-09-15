@@ -77,6 +77,35 @@ describe('collectAllowedNumbers', () => {
     assert.deepEqual(collectAllowedNumbers({}), new Set())
   })
 
+  test('Zahlen aus bodyweight_correlation (Körpergewicht-Kraft-Gegenüberstellung) gelten als erlaubt', () => {
+    const structuredAnalysis = {
+      bodyweight_correlation: {
+        current_bodyweight_kg: 82,
+        previous_bodyweight_kg: 80,
+        bodyweight_change_kg: 2,
+        period_days: 14,
+        strength_context: {
+          exercises_compared: 3,
+          exercises_with_weight_increase: 1,
+          exercises_with_weight_decrease: 1,
+          exercises_stable: 1
+        }
+      }
+    }
+    const allowed = collectAllowedNumbers(structuredAnalysis)
+    assert.ok(allowed.has(82))
+    assert.ok(allowed.has(80))
+    assert.ok(allowed.has(2))
+    assert.ok(allowed.has(14))
+    assert.ok(allowed.has(3))
+  })
+
+  test('fehlendes bodyweight_correlation crasht nicht und fügt keine Zahlen hinzu', () => {
+    const withoutIt = collectAllowedNumbers({ total_exercises_analyzed: 1 })
+    const withNullField = collectAllowedNumbers({ total_exercises_analyzed: 1, bodyweight_correlation: null })
+    assert.deepEqual(withoutIt, withNullField)
+  })
+
   test('Zahlen aus Notiz-Texten (persistent, Session, Legacy-Feld) gelten als erlaubt', () => {
     const allowed = collectAllowedNumbers({
       exercises: [{

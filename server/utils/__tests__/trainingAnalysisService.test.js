@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const { calculateExerciseStats, analyzeExercise, buildSetsComparison, resolveSatzgenauWeightChange } = await import(
+const { calculateExerciseStats, analyzeExercise, buildSetsComparison, resolveSatzgenauWeightChange, resolveBodyweightCorrelation, structureAnalysisForAI } = await import(
   join(__dirname, '../../services/trainingAnalysisService.js')
 )
 
@@ -361,5 +361,97 @@ describe('resolveSatzgenauWeightChange', () => {
     const result = resolveSatzgenauWeightChange(setsComparison, 5)
     assert.equal(result.scope, 'uniform')
     assert.equal(result.weightChangeKg, 5)
+  })
+})
+
+// Deckt die deterministische Körpergewicht-Kraft-Gegenüberstellung ab (siehe JSDoc in
+// trainingAnalysisService.js) - bewusst KEINE Kausal-/Korrelationsberechnung, nur zwei
+// nebeneinandergestellte Fakten. Null-Annahmen-Prinzip: ohne zwei echte Messpunkte gibt die
+// Funktion null zurück statt zu schätzen.
+describe('resolveBodyweightCorrelation', () => {
+  test('null, wenn für die aktuelle Session kein Körpergewicht erfasst wurde', () => {
+    const current = { _id: 'w3', date: '2026-01-10', athleteBodyweightKg: null }
+    const all = [
+      { _id: 'w3', date: '2026-01-10', athleteBodyweightKg: null },
+      { _id: 'w1', date: '2026-01-01', athleteBodyweightKg: 80 }
+    ]
+    assert.equal(resolveBodyweightCorrelation(current, all, []), null)
+  })
+
+  test('null, wenn keine vorherige Session mit erfasstem Körpergewicht existiert', () => {
+    const current = { _id: 'w2', date: '2026-01-10', athleteBodyweightKg: 81 }
+    const all = [
+      { _id: 'w2', date: '2026-01-10', athleteBodyweightKg: 81 },
+      { _id: 'w1', date: '2026-01-01', athleteBodyweightKg: null }
+    ]
+    assert.equal(resolveBodyweightCorrelation(current, all, []), null)
+  })
+
+  test('berechnet Gewichtsänderung, Tage-Differenz und Kraft-Kontext korrekt', () => {
+    const current = { _id: 'w3', date: '2026-01-15', athleteBodyweightKg: 82 }
+    const all = [
+      { _id: 'w3', date: '2026-01-15', athleteBodyweightKg: 82 },
+      { _id: 'w2', date: '2026-01-08', athleteBodyweightKg: null }, // ohne Gewicht - wird übersprungen
+      { _id: 'w1', date: '2026-01-01', athleteBodyweightKg: 80 }
+    ]
+    const exerciseAnalyses = [
+      { previous: { weight: 90 }, changes: { weight_change: 5 } },
+      { previous: { weight: 60 }, changes: { weight_change: -2.5 } },
+      { previous: { weight: 40 }, changes: { weight_change: 0 } },
+      { previous: null, changes: { weight_change: 0 } } // kein Vorher-Vergleich -> zählt nicht mit
+    ]
+    const result = resolveBodyweightCorrelation(current, all, exerciseAnalyses)
+    assert.deepEqual(result, {
+      current_bodyweight_kg: 82,
+      previous_bodyweight_kg: 80,
+      bodyweight_change_kg: 2,
+      period_days: 14,
+      strength_context: {
+        exercises_compared: 3,
+        exercises_with_weight_increase: 1,
+        exercises_with_weight_decrease: 1,
+        exercises_stable: 1
+      }
+    })
+  })
+
+  test('nutzt die chronologisch NÄCHSTGELEGENE vorherige Session mit Körpergewicht, nicht die älteste', () => {
+    const current = { _id: 'w3', date: '2026-01-20', athleteBodyweightKg: 83 }
+    const all = [
+      { _id: 'w3', date: '2026-01-20', athleteBodyweightKg: 83 },
+      { _id: 'w2', date: '2026-01-10', athleteBodyweightKg: 81 },
+      { _id: 'w1', date: '2026-01-01', athleteBodyweightKg: 79 }
+    ]
+    const result = resolveBodyweightCorrelation(current, all, [])
+    assert.equal(result.previous_bodyweight_kg, 81)
+    assert.equal(result.period_days, 10)
+  })
+})
+
+describe('structureAnalysisForAI: bodyweight_correlation', () => {
+  const exerciseAnalyses = [{
+    exercise: 'Bankdrücken',
+    current: { weight: 100, reps: 24, sets: 3, volume: 2400 },
+    previous: null,
+    changes: { weight_change: 0, rep_change: 0, sets_change: 0, volume_change: 0, volume_change_percent: 0 },
+    progression: 'first_session',
+    period_days: 0
+  }]
+
+  test('Feld fehlt komplett, wenn keine bodyweightCorrelation übergeben wird', () => {
+    const result = structureAnalysisForAI(exerciseAnalyses)
+    assert.equal('bodyweight_correlation' in result, false)
+  })
+
+  test('Feld wird 1:1 durchgereicht, wenn vorhanden', () => {
+    const bodyweightCorrelation = {
+      current_bodyweight_kg: 82,
+      previous_bodyweight_kg: 80,
+      bodyweight_change_kg: 2,
+      period_days: 14,
+      strength_context: { exercises_compared: 1, exercises_with_weight_increase: 1, exercises_with_weight_decrease: 0, exercises_stable: 0 }
+    }
+    const result = structureAnalysisForAI(exerciseAnalyses, { bodyweightCorrelation })
+    assert.deepEqual(result.bodyweight_correlation, bodyweightCorrelation)
   })
 })

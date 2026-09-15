@@ -127,6 +127,22 @@ export function collectAllowedNumbers(structuredAnalysis) {
   add(structuredAnalysis.total_exercises_analyzed);
   add(structuredAnalysis.athlete_bodyweight_kg);
 
+  // Körpergewicht-Kraft-Gegenüberstellung (siehe resolveBodyweightCorrelation/Regel 18) -
+  // eigene, deterministisch berechnete Zahlen, die im Feedback-Text vorkommen dürfen.
+  if (structuredAnalysis.bodyweight_correlation) {
+    const bc = structuredAnalysis.bodyweight_correlation;
+    add(bc.current_bodyweight_kg);
+    add(bc.previous_bodyweight_kg);
+    add(bc.bodyweight_change_kg);
+    add(bc.period_days);
+    if (bc.strength_context) {
+      add(bc.strength_context.exercises_compared);
+      add(bc.strength_context.exercises_with_weight_increase);
+      add(bc.strength_context.exercises_with_weight_decrease);
+      add(bc.strength_context.exercises_stable);
+    }
+  }
+
   for (const ex of structuredAnalysis.exercises || []) {
     add(ex.current_weight);
     add(ex.current_reps);

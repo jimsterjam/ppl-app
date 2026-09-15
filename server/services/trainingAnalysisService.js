@@ -462,6 +462,87 @@ export function buildVolumeHistory(exerciseName, currentWorkout, allWorkouts, ma
 }
 
 /**
+ * Körpergewicht-Kraft-Korrelation (rein deterministisch, KEINE AI-Berechnung).
+ *
+ * Hintergrund (User-Wunsch): langfristig sehen, wie sich Körpergewicht und Kraftentwicklung
+ * zueinander verhalten - z.B. "2kg zugenommen, gleichzeitig beim Bankdrücken von 95kg auf
+ * 105kg Max-Rep gesteigert". Bewusst NUR eine deterministische Gegenüberstellung zweier
+ * Fakten (Gewichtsänderung seit der letzten Session MIT erfasstem Körpergewicht, plus eine
+ * knappe Zusammenfassung der Kraftveränderungen dieser Session) - KEINE Kausalaussage, KEINE
+ * Korrelationsberechnung (Pearson o.ä.), KEINE Bewertung. Die eigentliche Einordnung
+ * ("könnte zusammenhängen, muss aber nicht") bleibt bewusst der AI überlassen (siehe Regel 18
+ * in OpenAIProvider.js) - dieses Modul liefert nur die Zahlen, niemals die Interpretation
+ * (Regel 1 "Datenwahrheit": die AI darf keine eigenen Zahlen berechnen).
+ *
+ * Plateau-Erkennung (Körpergewicht als Signal für Trainingsstagnation über einen längeren
+ * Zeitraum) ist bewusst NICHT Teil dieser Funktion - erst als möglicher späterer Ausbau, wenn
+ * genug echte Nutzungsdaten (mehrere Wochen/Monate erfasstes Gewicht) vorliegen.
+ *
+ * @param {Object} currentWorkout - aktuelles Workout (benötigt: _id, date, createdAt,
+ *   athleteBodyweightKg)
+ * @param {Array} allWorkouts - alle Workouts des Users (DESC nach date/createdAt sortiert)
+ * @param {Array} exerciseAnalyses - Ergebnis von analyzeWorkoutProgression()/dem Fallback in
+ *   routes/workouts.js, für die Kraft-Zusammenfassung dieser Session
+ * @returns {Object|null} null, wenn für diese Session kein Körpergewicht erfasst wurde ODER
+ *   keine vorherige Session mit erfasstem Körpergewicht existiert (Null-Annahmen-Prinzip: ohne
+ *   zwei echte Messpunkte gibt es keine Veränderung zu berichten).
+ */
+export function resolveBodyweightCorrelation(currentWorkout, allWorkouts, exerciseAnalyses) {
+  const currentBodyweightKg = typeof currentWorkout?.athleteBodyweightKg === 'number' && Number.isFinite(currentWorkout.athleteBodyweightKg)
+    ? currentWorkout.athleteBodyweightKg
+    : null;
+  if (currentBodyweightKg == null) return null;
+
+  const currentDateMs = new Date(currentWorkout.date).getTime();
+  const currentCreatedMs = currentWorkout.createdAt ? new Date(currentWorkout.createdAt).getTime() : 0;
+  const currentIdStr = currentWorkout._id?.toString?.() ?? String(currentWorkout._id);
+
+  // Gleiche chronologische Vorher-Logik wie analyzeWorkoutProgression()/buildVolumeHistory()
+  // oben - siehe dortige Kommentare zur Begründung (date, bei Gleichstand createdAt als
+  // Tiebreaker; allWorkouts ist DESC sortiert).
+  const isStrictlyBeforeCurrent = (w) => {
+    const wDateMs = new Date(w.date).getTime();
+    if (wDateMs !== currentDateMs) return wDateMs < currentDateMs;
+    const wCreatedMs = w.createdAt ? new Date(w.createdAt).getTime() : 0;
+    return wCreatedMs < currentCreatedMs;
+  };
+
+  const previousWithBodyweight = (allWorkouts || [])
+    .filter(w => (w._id?.toString?.() ?? String(w._id)) !== currentIdStr)
+    .filter(isStrictlyBeforeCurrent)
+    .find(w => typeof w.athleteBodyweightKg === 'number' && Number.isFinite(w.athleteBodyweightKg));
+
+  if (!previousWithBodyweight) return null;
+
+  const round1 = (n) => Math.round(Number(n) * 10) / 10;
+  const bodyweightChangeKg = round1(currentBodyweightKg - previousWithBodyweight.athleteBodyweightKg);
+  const periodDays = Math.max(0, Math.floor(
+    (currentDateMs - new Date(previousWithBodyweight.date).getTime()) / (1000 * 60 * 60 * 24)
+  ));
+
+  // Kraft-Kontext dieser Session: rein deskriptive Zählung, keine Gewichtung/Bewertung -
+  // basiert auf denselben changes.weight_change-Werten, die auch sonst an die AI gehen
+  // (siehe structureAnalysisForAI). Nur Übungen mit echtem Vorher-Vergleich zählen.
+  const comparable = (Array.isArray(exerciseAnalyses) ? exerciseAnalyses : [])
+    .filter(e => e && e.previous && e.changes && typeof e.changes.weight_change === 'number');
+
+  const strengthContext = {
+    exercises_compared: comparable.length,
+    exercises_with_weight_increase: comparable.filter(e => e.changes.weight_change > 0).length,
+    exercises_with_weight_decrease: comparable.filter(e => e.changes.weight_change < 0).length,
+    exercises_stable: comparable.filter(e => e.changes.weight_change === 0).length
+  };
+
+  return {
+    current_bodyweight_kg: currentBodyweightKg,
+    previous_bodyweight_kg: previousWithBodyweight.athleteBodyweightKg,
+    bodyweight_change_kg: bodyweightChangeKg,
+    period_days: periodDays,
+    strength_context: strengthContext
+  };
+}
+
+/**
  * Strukturiere Trainingsanalysen für AI-Eingabe
  * Dies ist der "Mini-Datensatz" den das LLM erhält
  *
@@ -470,6 +551,9 @@ export function buildVolumeHistory(exerciseName, currentWorkout, allWorkouts, ma
  * @param {number|null} [options.athleteBodyweightKg] - Kap. 24: nur ausgeben, wenn tatsächlich
  *   erfasst (Null-Annahmen-Prinzip) - fehlt der Wert, wird das Feld schlicht weggelassen statt
  *   mit einem Platzhalter gefüllt, damit die AI keine Annahme über das Körpergewicht trifft.
+ * @param {Object|null} [options.bodyweightCorrelation] - Ergebnis von
+ *   resolveBodyweightCorrelation() (siehe dort) - nur ausgeben, wenn vorhanden (Null-Annahmen-
+ *   Prinzip: ohne zwei echte Körpergewicht-Messpunkte gibt es nichts zu berichten).
  * @returns {Object} Strukturierte Daten für AI
  */
 export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
@@ -477,7 +561,7 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
     return null;
   }
 
-  const { athleteBodyweightKg = null } = options || {};
+  const { athleteBodyweightKg = null, bodyweightCorrelation = null } = options || {};
 
   // Statistiken über alle Übungen
   const positiveExercises = exerciseAnalyses.filter(e => e.progression === 'positive');
@@ -503,6 +587,12 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
     // Nur ausgegeben, wenn tatsächlich für diese Session erfasst (Null-Annahmen-Prinzip,
     // Kap. 24) - kein Fallback/Platzhalter.
     ...(athleteBodyweightKg != null ? { athlete_bodyweight_kg: athleteBodyweightKg } : {}),
+
+    // Deterministische Gegenüberstellung Körpergewicht/Kraftentwicklung (siehe
+    // resolveBodyweightCorrelation) - nur ausgegeben, wenn tatsächlich zwei Messpunkte
+    // vorliegen. Bewusst getrennt von athlete_bodyweight_kg oben (das ist nur der reine
+    // Session-Wert für die einmalige Erwähnung, siehe Regel 2).
+    ...(bodyweightCorrelation ? { bodyweight_correlation: bodyweightCorrelation } : {}),
 
     // Zusammenfassung Progressionen
     progression_summary: {
@@ -634,7 +724,8 @@ export default {
   structureAnalysisForAI,
   createSimpleExerciseFeedback,
   buildVolumeHistory,
-  findWorkoutsAffectedByDeletion
+  findWorkoutsAffectedByDeletion,
+  resolveBodyweightCorrelation
 };
 
 // Hinweis: determineTrend() (rein gewicht-/volumenbasiert) bleibt unverändert exportiert und

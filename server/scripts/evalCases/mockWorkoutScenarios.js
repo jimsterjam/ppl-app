@@ -237,6 +237,72 @@ export const mockWorkoutScenarios = [
   },
 
   {
+    name: 'Körpergewicht gestiegen + mehrere Übungen stärker (Regel 18 Risiko: Kausalaussage)',
+    // Klassischer Fall für eine halluzinierte Ursache (Regel 3/18): Körpergewicht UND Kraft sind
+    // im selben Zeitraum gestiegen - ein sauberes Feedback darf daraus NICHT "weil du
+    // zugenommen hast, bist du stärker geworden" o.ä. ableiten, sondern beide Fakten nur
+    // nebeneinanderstellen (siehe resolveBodyweightCorrelation in trainingAnalysisService.js).
+    structuredAnalysis: {
+      total_exercises_analyzed: 2,
+      athlete_bodyweight_kg: 82,
+      bodyweight_correlation: {
+        current_bodyweight_kg: 82,
+        previous_bodyweight_kg: 80,
+        bodyweight_change_kg: 2,
+        period_days: 21,
+        strength_context: {
+          exercises_compared: 2,
+          exercises_with_weight_increase: 2,
+          exercises_with_weight_decrease: 0,
+          exercises_stable: 0
+        }
+      },
+      exercises: [{
+        exercise: 'Bankdrücken',
+        current_weight: 105,
+        current_reps: 15,
+        current_sets: 3,
+        current_volume: 1575,
+        previous_weight: 95,
+        previous_reps: 15,
+        previous_sets: 3,
+        previous_volume: 1425,
+        period_days: 21,
+        period_description: '3 Wochen',
+        changes: { weight_change_kg: 10, reps_change: 0, sets_change: 0, volume_change_kg: 150, volume_change_percent: 10.5 },
+        sets_comparison: [
+          { set_number: 1, current_weight: 105, current_reps: 5, previous_weight: 95, previous_reps: 5, weight_change_kg: 10, reps_change: 0 },
+          { set_number: 2, current_weight: 105, current_reps: 5, previous_weight: 95, previous_reps: 5, weight_change_kg: 10, reps_change: 0 },
+          { set_number: 3, current_weight: 105, current_reps: 5, previous_weight: 95, previous_reps: 5, weight_change_kg: 10, reps_change: 0 }
+        ]
+      }, {
+        exercise: 'Kniebeugen',
+        current_weight: 130,
+        current_reps: 15,
+        current_sets: 3,
+        current_volume: 1950,
+        previous_weight: 122.5,
+        previous_reps: 15,
+        previous_sets: 3,
+        previous_volume: 1837.5,
+        period_days: 21,
+        period_description: '3 Wochen',
+        changes: { weight_change_kg: 7.5, reps_change: 0, sets_change: 0, volume_change_kg: 112.5, volume_change_percent: 6.1 },
+        sets_comparison: [
+          { set_number: 1, current_weight: 130, current_reps: 5, previous_weight: 122.5, previous_reps: 5, weight_change_kg: 7.5, reps_change: 0 },
+          { set_number: 2, current_weight: 130, current_reps: 5, previous_weight: 122.5, previous_reps: 5, weight_change_kg: 7.5, reps_change: 0 },
+          { set_number: 3, current_weight: 130, current_reps: 5, previous_weight: 122.5, previous_reps: 5, weight_change_kg: 7.5, reps_change: 0 }
+        ]
+      }],
+      top_improvements: [
+        { exercise: 'Bankdrücken', volume_change_percent: 10.5, weight_change_kg: 10 },
+        { exercise: 'Kniebeugen', volume_change_percent: 6.1, weight_change_kg: 7.5 }
+      ],
+      top_declines: []
+    }
+  },
+
+  {
     name: 'Stagnation mit erklärender Notiz (Deload - Regel 12)',
     structuredAnalysis: {
       total_exercises_analyzed: 1,
