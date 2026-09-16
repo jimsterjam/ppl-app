@@ -61,6 +61,15 @@ onAuthStateChanged((user) => {
 
 <style scoped>
 .header-bar {
+  /* Überschreibt bewusst das globale .glass (siehe style.css: overflow:hidden, für den
+     abgerundeten Rahmen/::after-Highlight anderer Panels gedacht) - hier zusätzlich als
+     .header-bar[data-v-xxx] gescopt, also spezifischer als .glass und gewinnt automatisch ohne
+     !important. Ohne das war das SessionStopwatch-Overlay (Start/Pause/Reset, öffnet sich
+     UNTERHALB des Headers, siehe SessionStopwatch.vue) unsichtbar abgeschnitten - der Klick auf
+     den Timer im Header hat zwar funktioniert (overlayOpen wurde true), das Popup war aber
+     durch overflow:hidden auf dem Header selbst nicht zu sehen ("Timer lässt sich nicht
+     anklicken"). */
+  overflow: visible;
   background: color-mix(in srgb, var(--surface) 40%, transparent);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
