@@ -5255,10 +5255,10 @@
     }
   },
   {
-    "_id": "ex_0043",
-    "id": "0043",
-    "name": "Volle Langhantel-Kniebeuge",
-    "name_en": "barbell full squat",
+    "_id": "ex_1462",
+    "id": "1462",
+    "name": "Full Squat",
+    "name_en": "full squat",
     "category": "Legs",
     "category_raw": "strength",
     "muscleGroup": "Quadrizeps",
@@ -5267,8 +5267,8 @@
     "equipment_en": "barbell",
     "description": "Die Langhantel-Kniebeuge ist eine zusammengesetzte Unterkörperübung, die auf die Gesäßmuskulatur abzielt und auch den Quadrizeps, die hintere Oberschenkelmuskulatur, die Waden und den Rumpf trainiert. Dabei geht es darum, mit einer Langhantel über dem oberen Rücken in die Hocke zu gehen, was Kraft, Gleichgewicht und die richtige Technik erfordert.",
     "description_en": "The barbell full squat is a compound lower body exercise that targets the glutes and also works the quadriceps, hamstrings, calves, and core. It involves squatting down with a barbell placed across the upper back, requiring strength, balance, and proper technique.",
-    "imageUrl": "/exercises/360/0043.gif",
-    "thumbnailUrl": "/exercises/180/0043.gif",
+    "imageUrl": "/exercises/360/1462.gif",
+    "thumbnailUrl": "/exercises/180/1462.gif",
     "bodyPart": "upper legs",
     "target": "glutes",
     "secondaryMuscles": [
@@ -5294,116 +5294,6 @@
       "Engage your core and keep your chest up as you begin to lower your body down.",
       "Bend at the knees and hips, pushing your hips back and down as if sitting into a chair.",
       "Lower yourself until your thighs are parallel to the ground or slightly below.",
-      "Keep your knees in line with your toes and your weight in your heels.",
-      "Drive through your heels to stand back up, extending your hips and knees.",
-      "Repeat for the desired number of repetitions."
-    ],
-    "aiMetadata": {
-      "exerciseType": "compound",
-      "primaryPhase": "main",
-      "minDifficulty": "intermediate",
-      "disallowedGoals": [],
-      "allowedEquipmentModes": [
-        "gym_only",
-        "gym_plus_bodyweight"
-      ]
-    }
-  },
-  {
-    "_id": "ex_1461",
-    "id": "1461",
-    "name": "Volle Langhantel-Kniebeuge (Rücken-POV)",
-    "name_en": "barbell full squat (back pov)",
-    "category": "Legs",
-    "category_raw": "strength",
-    "muscleGroup": "Quadrizeps",
-    "muscleGroup_en": "glutes",
-    "equipment": "Langhantel",
-    "equipment_en": "barbell",
-    "description": "Die Langhantel-Kniebeuge (Rücken-POV) ist eine zusammengesetzte Unterkörperübung, die auf die Gesäßmuskulatur, den Quadrizeps, die hintere Oberschenkelmuskulatur, die Waden und den Rumpf zielt. Dabei wird eine Langhantel über den oberen Rücken gehalten und eine tiefe Kniebeuge ausgeführt, was Kraft, Gleichgewicht und die richtige Technik erfordert.",
-    "description_en": "The barbell full squat (back POV) is a compound lower body exercise that targets the glutes, quadriceps, hamstrings, calves, and core. It involves holding a barbell across the upper back and performing a deep squat, requiring strength, balance, and proper technique.",
-    "imageUrl": "/exercises/360/1461.gif",
-    "thumbnailUrl": "/exercises/180/1461.gif",
-    "bodyPart": "upper legs",
-    "target": "glutes",
-    "secondaryMuscles": [
-      "quadriceps",
-      "hamstrings",
-      "calves",
-      "core"
-    ],
-    "instructions": [
-      "Stehen Sie mit schulterbreit auseinander stehenden Füßen und leicht nach außen gerichteten Zehen.",
-      "Halten Sie die Hantel über Ihren oberen Rücken und legen Sie sie auf Ihre Trapez- oder hinteren Schultermuskeln.",
-      "Spannen Sie Ihren Rumpf an und halten Sie Ihre Brust hoch, während Sie beginnen, Ihren Körper nach unten zu senken.",
-      "Beugen Sie Knie und Hüfte und drücken Sie Ihre Hüften nach hinten und unten, als würden Sie auf einem Stuhl sitzen.",
-      "Senken Sie Ihren Körper, bis Ihre Oberschenkel parallel zum Boden oder leicht darunter sind.",
-      "Halten Sie Ihre Knie auf einer Linie mit Ihren Zehen und verlagern Sie Ihr Gewicht auf Ihre Fersen.",
-      "Fahren Sie durch Ihre Fersen, um wieder aufzustehen, und strecken Sie dabei Ihre Hüften und Knie.",
-      "Wiederholen Sie dies für die gewünschte Anzahl an Wiederholungen."
-    ],
-    "difficulty": "intermediate",
-    "instructions_en": [
-      "Stand with your feet shoulder-width apart, toes slightly turned out.",
-      "Hold the barbell across your upper back, resting it on your traps or rear delts.",
-      "Engage your core and keep your chest up as you begin to lower your body down.",
-      "Bend at the knees and hips, pushing your hips back and down as if sitting into a chair.",
-      "Lower your body until your thighs are parallel to the ground or slightly below.",
-      "Keep your knees in line with your toes and your weight in your heels.",
-      "Drive through your heels to stand back up, extending your hips and knees.",
-      "Repeat for the desired number of repetitions."
-    ],
-    "aiMetadata": {
-      "exerciseType": "compound",
-      "primaryPhase": "main",
-      "minDifficulty": "intermediate",
-      "disallowedGoals": [],
-      "allowedEquipmentModes": [
-        "gym_only",
-        "gym_plus_bodyweight"
-      ]
-    }
-  },
-  {
-    "_id": "ex_1462",
-    "id": "1462",
-    "name": "Volle Langhantel-Kniebeuge (Seitenperspektive)",
-    "name_en": "barbell full squat (side pov)",
-    "category": "Legs",
-    "category_raw": "strength",
-    "muscleGroup": "Quadrizeps",
-    "muscleGroup_en": "glutes",
-    "equipment": "Langhantel",
-    "equipment_en": "barbell",
-    "description": "Die Langhantel-Kniebeuge (Seitenperspektive) ist eine zusammengesetzte Unterkörperübung, die auf die Gesäßmuskulatur, den Quadrizeps und die hintere Oberschenkelmuskulatur abzielt und gleichzeitig die Waden und den Rumpf beansprucht, um für Stabilität zu sorgen. Dabei wird der Körper mit einer Hantel über den oberen Rücken abgesenkt und dann wieder in den Stand gebracht.",
-    "description_en": "The barbell full squat (side POV) is a compound lower body exercise that targets the glutes, quadriceps, and hamstrings, while also engaging the calves and core for stability. It involves lowering the body with a barbell across the upper back and then driving back up to a standing position.",
-    "imageUrl": "/exercises/360/1462.gif",
-    "thumbnailUrl": "/exercises/180/1462.gif",
-    "bodyPart": "upper legs",
-    "target": "glutes",
-    "secondaryMuscles": [
-      "quadriceps",
-      "hamstrings",
-      "calves",
-      "core"
-    ],
-    "instructions": [
-      "Stehen Sie mit schulterbreit auseinander stehenden Füßen und leicht nach außen gerichteten Zehen.",
-      "Halten Sie die Hantel über Ihren oberen Rücken und legen Sie sie auf Ihre Trapez- oder hinteren Schultermuskeln.",
-      "Spannen Sie Ihren Rumpf an und halten Sie Ihre Brust hoch, während Sie beginnen, Ihren Körper nach unten zu senken.",
-      "Beugen Sie Knie und Hüfte und drücken Sie Ihre Hüften nach hinten und unten, als würden Sie auf einem Stuhl sitzen.",
-      "Senken Sie Ihren Körper, bis Ihre Oberschenkel parallel zum Boden oder leicht darunter sind.",
-      "Halten Sie Ihre Knie auf einer Linie mit Ihren Zehen und verlagern Sie Ihr Gewicht auf Ihre Fersen.",
-      "Fahren Sie durch Ihre Fersen, um wieder aufzustehen, und strecken Sie dabei Ihre Hüften und Knie.",
-      "Wiederholen Sie dies für die gewünschte Anzahl an Wiederholungen."
-    ],
-    "difficulty": "intermediate",
-    "instructions_en": [
-      "Stand with your feet shoulder-width apart, toes slightly turned out.",
-      "Hold the barbell across your upper back, resting it on your traps or rear delts.",
-      "Engage your core and keep your chest up as you begin to lower your body down.",
-      "Bend at the knees and hips, pushing your hips back and down as if sitting into a chair.",
-      "Lower your body until your thighs are parallel to the ground or slightly below.",
       "Keep your knees in line with your toes and your weight in your heels.",
       "Drive through your heels to stand back up, extending your hips and knees.",
       "Repeat for the desired number of repetitions."
@@ -61057,6 +60947,163 @@
       "allowedEquipmentModes": [
         "gym_plus_bodyweight",
         "bodyweight_only"
+      ]
+    }
+  },
+  {
+    "_id": "ex_9009",
+    "id": "9009",
+    "name": "Clean",
+    "name_en": "clean",
+    "category": "Legs",
+    "category_raw": "strength",
+    "muscleGroup": "Quadrizeps",
+    "muscleGroup_en": "hamstrings",
+    "equipment": "Langhantel",
+    "equipment_en": "barbell",
+    "description": "Der Clean ist eine olympische Gewichtheberübung, bei der die Langhantel in einer explosiven Zugbewegung vom Boden auf die Schultern gebracht wird - der Athlet fängt die Hantel in einer vollen Frontkniebeuge auf und steht anschließend vollständig auf. Im Unterschied zum Power Clean (Fangen in einer flachen/Viertel-Kniebeuge) endet der Clean in der tiefen Fangposition und erfordert dadurch zusätzlich Beweglichkeit und Kniebeugenkraft.",
+    "description_en": "The clean is an Olympic weightlifting movement in which the barbell is pulled explosively from the floor to the shoulders - the athlete catches the bar in a full front squat and then stands up to full extension. Unlike the power clean (caught in a partial/quarter squat), the clean is received in the deep squat position, requiring additional mobility and squat strength.",
+    "imageUrl": "",
+    "thumbnailUrl": "",
+    "bodyPart": "upper legs",
+    "target": "hamstrings",
+    "secondaryMuscles": [
+      "glutes",
+      "quadriceps",
+      "calves",
+      "shoulders",
+      "back",
+      "core"
+    ],
+    "instructions": [
+      "Stehen Sie mit schulterbreit auseinander stehenden Füßen, die Hantel auf dem Boden vor Ihnen.",
+      "Greifen Sie die Hantel im Obergriff etwas weiter als schulterbreit und heben Sie sie mit geradem Rücken vom Boden ab (erster Zug).",
+      "Wenn die Hantel Kniehöhe erreicht, strecken Sie Hüfte, Knie und Knöchel explosiv durch (zweiter Zug) und ziehen die Hantel eng am Körper nach oben.",
+      "Ziehen Sie sich aktiv unter die Hantel und fangen Sie sie auf den vorderen Schultern in einer vollen Frontkniebeuge auf, Ellbogen nach vorne oben.",
+      "Stehen Sie aus der Frontkniebeuge vollständig auf, um die Wiederholung abzuschließen.",
+      "Senken Sie die Hantel kontrolliert zurück auf den Boden und wiederholen Sie die Bewegung."
+    ],
+    "difficulty": "advanced",
+    "instructions_en": [
+      "Stand with feet shoulder-width apart, the barbell on the floor in front of you.",
+      "Grip the bar overhand slightly wider than shoulder-width and lift it off the floor with a flat back (first pull).",
+      "As the bar passes the knees, explosively extend hips, knees, and ankles (second pull), pulling the bar close to the body.",
+      "Pull yourself under the bar and catch it on the front of your shoulders in a full front squat, elbows driven up and forward.",
+      "Stand up fully out of the front squat to complete the repetition.",
+      "Lower the bar back to the floor under control and repeat."
+    ],
+    "aiMetadata": {
+      "exerciseType": "compound",
+      "primaryPhase": "main",
+      "minDifficulty": "advanced",
+      "disallowedGoals": [],
+      "allowedEquipmentModes": [
+        "gym_only"
+      ]
+    }
+  },
+  {
+    "_id": "ex_9010",
+    "id": "9010",
+    "name": "Snatch",
+    "name_en": "snatch",
+    "category": "Legs",
+    "category_raw": "strength",
+    "muscleGroup": "Quadrizeps",
+    "muscleGroup_en": "shoulders",
+    "equipment": "Langhantel",
+    "equipment_en": "barbell",
+    "description": "Der Snatch (Reißen) ist eine olympische Gewichtheberübung, bei der die Langhantel in einer einzigen durchgehenden Bewegung vom Boden direkt über den Kopf gebracht wird - ohne Zwischenstopp auf den Schultern wie beim Clean. Der Athlet fängt die Hantel mit gestreckten Armen in einer tiefen Überkopf-Kniebeuge auf und steht anschließend vollständig auf. Diese Übung erfordert außergewöhnliche Technik, Schulterstabilität, Beweglichkeit und Explosivkraft.",
+    "description_en": "The snatch is an Olympic weightlifting movement in which the barbell travels from the floor to directly overhead in one continuous motion - with no intermediate rack position on the shoulders as in the clean. The athlete catches the bar with locked-out arms in a deep overhead squat and then stands up to full extension. This lift demands exceptional technique, shoulder stability, mobility, and explosive power.",
+    "imageUrl": "",
+    "thumbnailUrl": "",
+    "bodyPart": "shoulders",
+    "target": "shoulders",
+    "secondaryMuscles": [
+      "glutes",
+      "hamstrings",
+      "quadriceps",
+      "back",
+      "core",
+      "calves"
+    ],
+    "instructions": [
+      "Stehen Sie mit schulterbreit auseinander stehenden Füßen, die Hantel auf dem Boden, Griffbreite deutlich weiter als schulterbreit.",
+      "Heben Sie die Hantel mit geradem Rücken vom Boden ab (erster Zug), bis sie Kniehöhe erreicht.",
+      "Strecken Sie Hüfte, Knie und Knöchel explosiv durch (zweiter Zug) und ziehen Sie die Hantel eng am Körper hoch bis über Brusthöhe.",
+      "Ziehen Sie sich aktiv unter die Hantel und fangen Sie sie mit vollständig gestreckten Armen über dem Kopf auf, in einer tiefen Überkopf-Kniebeuge.",
+      "Stehen Sie aus der Überkopf-Kniebeuge vollständig auf, Hantel bleibt dabei über dem Kopf fixiert.",
+      "Senken Sie die Hantel kontrolliert zurück auf den Boden und wiederholen Sie die Bewegung."
+    ],
+    "difficulty": "advanced",
+    "instructions_en": [
+      "Stand with feet shoulder-width apart, the barbell on the floor, grip significantly wider than shoulder-width.",
+      "Lift the bar off the floor with a flat back (first pull) until it reaches knee height.",
+      "Explosively extend hips, knees, and ankles (second pull), pulling the bar close to the body up past chest height.",
+      "Pull yourself under the bar and catch it overhead with fully locked-out arms in a deep overhead squat.",
+      "Stand up fully out of the overhead squat, keeping the bar locked out overhead.",
+      "Lower the bar back to the floor under control and repeat."
+    ],
+    "aiMetadata": {
+      "exerciseType": "compound",
+      "primaryPhase": "main",
+      "minDifficulty": "advanced",
+      "disallowedGoals": [],
+      "allowedEquipmentModes": [
+        "gym_only"
+      ]
+    }
+  },
+  {
+    "_id": "ex_9011",
+    "id": "9011",
+    "name": "Clean and Jerk",
+    "name_en": "clean and jerk",
+    "category": "Legs",
+    "category_raw": "strength",
+    "muscleGroup": "Quadrizeps",
+    "muscleGroup_en": "shoulders",
+    "equipment": "Langhantel",
+    "equipment_en": "barbell",
+    "description": "Der Clean and Jerk (Umsetzen und Stoßen) ist die zweite der beiden olympischen Wettkampfübungen und besteht aus zwei Teilen: zunächst wird die Hantel per Clean vom Boden auf die Schultern gebracht und der Athlet steht auf, danach wird die Hantel per Jerk (Dip-Treiben mit Fußsprung in einen Ausfallschritt oder Squat-Jerk) explosiv über den Kopf gestoßen und dort fixiert. Höchste Anforderungen an Ganzkörperkraft, Explosivkraft, Beweglichkeit und Technik.",
+    "description_en": "The clean and jerk is the second of the two Olympic competition lifts and consists of two parts: first the barbell is brought from the floor to the shoulders via a clean and the athlete stands up, then the barbell is explosively driven overhead via a jerk (dip and drive with a foot split or squat jerk) and locked out overhead. It demands the highest levels of total-body strength, explosive power, mobility, and technique.",
+    "imageUrl": "",
+    "thumbnailUrl": "",
+    "bodyPart": "shoulders",
+    "target": "shoulders",
+    "secondaryMuscles": [
+      "glutes",
+      "hamstrings",
+      "quadriceps",
+      "back",
+      "core",
+      "calves",
+      "triceps"
+    ],
+    "instructions": [
+      "Führen Sie zunächst einen vollständigen Clean aus: Hantel vom Boden explosiv auf die Schultern ziehen, in der Frontkniebeuge auffangen und vollständig aufstehen.",
+      "Positionieren Sie die Hantel stabil auf den vorderen Schultern, Ellbogen leicht angehoben, als Ausgangsposition für den Jerk.",
+      "Führen Sie eine kurze, kontrollierte Dip-Bewegung in den Beinen aus (leichtes Beugen von Knien und Hüfte).",
+      "Treiben Sie explosiv durch die Beine nach oben und drücken Sie die Hantel gleichzeitig über den Kopf, während Sie in einen Ausfallschritt (Split Jerk) oder eine flache Kniebeuge (Squat Jerk) springen.",
+      "Fixieren Sie die Hantel mit gestreckten Armen über dem Kopf und bringen Sie die Füße wieder parallel zusammen.",
+      "Senken Sie die Hantel kontrolliert zurück auf den Boden und wiederholen Sie die Bewegung."
+    ],
+    "difficulty": "advanced",
+    "instructions_en": [
+      "First perform a full clean: pull the bar explosively from the floor to the shoulders, catch it in a front squat, and stand up fully.",
+      "Position the bar securely on the front of the shoulders, elbows slightly raised, as the starting position for the jerk.",
+      "Perform a short, controlled dip with the legs (slight bend of the knees and hips).",
+      "Drive explosively upward through the legs while simultaneously pressing the bar overhead, splitting one foot forward and one back (split jerk) or dropping into a shallow squat (squat jerk).",
+      "Lock the bar out overhead with straight arms and bring your feet back together in line.",
+      "Lower the bar back to the floor under control and repeat."
+    ],
+    "aiMetadata": {
+      "exerciseType": "compound",
+      "primaryPhase": "main",
+      "minDifficulty": "advanced",
+      "disallowedGoals": [],
+      "allowedEquipmentModes": [
+        "gym_only"
       ]
     }
   }

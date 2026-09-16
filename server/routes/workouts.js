@@ -1384,22 +1384,72 @@ router.get("/exercise-notes/one-rep-max", firebaseAuthMiddleware, async (req, re
     }
     const exerciseNames = [...new Set(namesRaw.split(',').map((n) => n.trim()).filter(Boolean))].slice(0, 50);
 
+    // Zusätzlich zu Notizen mit bereits gesetztem Wert auch solche mit aktiviertem
+    // "Maximalkraft verfolgen"-Opt-in (overrides.trackOneRepMax=true, siehe
+    // POST /exercise-notes/track-one-rep-max) mitladen - sonst würde der Client nach einem
+    // Reload den zuvor gesetzten Toggle für eine Custom-Übung vergessen, obwohl noch kein
+    // konkreter Wert eingetragen wurde.
     const docs = await UserExerciseNote.find({
       userId,
       exerciseName: { $in: exerciseNames },
-      estimatedOneRepMaxKg: { $ne: null }
-    }).select('exerciseName estimatedOneRepMaxKg oneRepMaxUpdatedAt').lean();
+      $or: [
+        { estimatedOneRepMaxKg: { $ne: null } },
+        { 'overrides.trackOneRepMax': true }
+      ]
+    }).select('exerciseName estimatedOneRepMaxKg oneRepMaxUpdatedAt overrides.trackOneRepMax').lean();
 
     res.json({
       success: true,
       oneRepMaxByExercise: docs.reduce((acc, d) => {
-        acc[d.exerciseName] = { estimatedOneRepMaxKg: d.estimatedOneRepMaxKg, oneRepMaxUpdatedAt: d.oneRepMaxUpdatedAt || null };
+        acc[d.exerciseName] = {
+          estimatedOneRepMaxKg: d.estimatedOneRepMaxKg ?? null,
+          oneRepMaxUpdatedAt: d.oneRepMaxUpdatedAt || null,
+          trackOneRepMax: d.overrides?.trackOneRepMax === true
+        };
         return acc;
       }, {})
     });
   } catch (err) {
     logger.error('❌ 1RM laden fehlgeschlagen', { message: err.message });
     res.status(500).json({ error: '1RM konnte nicht geladen werden', message: err.message });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Opt-in "Maximalkraft für diese Übung verfolgen" für eigene/unbekannte Übungen (siehe
+// UserExerciseNote.overrides.trackOneRepMax) - der Client zeigt das 1RM-Feld für Übungen
+// außerhalb der festen Whitelist (siehe client/src/utils/oneRepMaxExercises.js) nur, wenn
+// dieses Flag aktiv gesetzt ist. Eigener Endpoint statt Wiederverwendung von
+// /exercise-notes/one-rep-max, weil dort noch kein Zahlenwert vorliegen muss, wenn der Nutzer
+// den Toggle aktiviert.
+// ---------------------------------------------------------------------------
+router.post("/exercise-notes/track-one-rep-max", firebaseAuthMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.auth;
+    const exerciseName = String(req.body?.exerciseName || '').trim();
+    if (!exerciseName) {
+      return res.status(400).json({ error: 'exerciseName ist erforderlich' });
+    }
+    const trackOneRepMax = req.body?.trackOneRepMax === true;
+
+    const update = trackOneRepMax
+      ? { $set: { userId, exerciseName, 'overrides.trackOneRepMax': true } }
+      : { $set: { userId, exerciseName }, $unset: { 'overrides.trackOneRepMax': '' } };
+
+    const saved = await UserExerciseNote.findOneAndUpdate(
+      { userId, exerciseName },
+      update,
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    ).lean();
+
+    res.json({
+      success: true,
+      exerciseName: saved.exerciseName,
+      trackOneRepMax: saved.overrides?.trackOneRepMax === true
+    });
+  } catch (err) {
+    logger.error('❌ 1RM-Tracking-Flag speichern fehlgeschlagen', { message: err.message });
+    res.status(500).json({ error: 'Einstellung konnte nicht gespeichert werden', message: err.message });
   }
 });
 

@@ -172,11 +172,25 @@
                     <textarea :value="getNote(i)" @input="setNote(i, $event.target.value)" rows="2" style="width:100%;resize:vertical" placeholder="Notiz zu dieser Übung..."></textarea>
                   </div>
 
-                  <!-- 1RM (geschätztes Maximalgewicht für 1 Wiederholung) - nur bei Übungen mit
-                       tatsächlicher externer Last sinnvoll (siehe isOneRepMaxRelevant()). Eigener
-                       Speicherpfad (nicht Teil des Workout-Speicherns), da 1RM übungsgebunden und
-                       nutzerweit gilt, nicht pro Workout-Session (siehe Regel 19 in OpenAIProvider.js). -->
-                  <div v-if="isOneRepMaxRelevant(ex)" style="margin-top: 6px;">
+                  <!-- 1RM (geschätztes Maximalgewicht für 1 Wiederholung) - nur bei Übungen aus der
+                       festen Whitelist (Back/Front Squat, Bench, Deadlift, Overhead Press,
+                       gewichtete Klimmzüge/Dips, Olympische Hebungen) sinnvoll, siehe
+                       oneRepMaxExercises.js. Bei eigenen/unbekannten Übungen erst nach explizitem
+                       Opt-in über den Toggle unten (isCustomExercise()). Eigener Speicherpfad
+                       (nicht Teil des Workout-Speicherns), da 1RM übungsgebunden und nutzerweit
+                       gilt, nicht pro Workout-Session (siehe Regel 19 in OpenAIProvider.js). -->
+                  <div v-if="isCustomExercise(ex)" style="margin-top: 6px;">
+                    <label class="one-rep-max-toggle">
+                      <input
+                        type="checkbox"
+                        :checked="getIsCustomOneRepMaxTrackingEnabled(i)"
+                        @change="toggleTrackOneRepMax(i)"
+                      />
+                      Maximalkraft für diese Übung verfolgen
+                    </label>
+                  </div>
+
+                  <div v-if="isOneRepMaxRelevant(ex, i)" style="margin-top: 6px;">
                     <button class="link" @click="toggleOneRepMax(i)">
                       <Dumbbell class="btn-icon btn-icon--inline" aria-hidden="true" />
                       {{ getOneRepMaxDisplay(i) != null
@@ -186,7 +200,11 @@
                   </div>
 
                   <div v-if="showOneRepMax && showOneRepMax[i]" class="one-rep-max-field" style="margin-top: 4px;">
-                    <label :for="`one-rep-max-${i}`">Geschätztes 1RM (Maximalgewicht für 1 Wiederholung)</label>
+                    <label :for="`one-rep-max-${i}`">
+                      {{ isOneRepMaxAddedWeightExercise(ex)
+                        ? 'Geschätztes 1RM - Zusatzgewicht zum Körpergewicht'
+                        : 'Geschätztes 1RM (Maximalgewicht für 1 Wiederholung)' }}
+                    </label>
                     <div class="one-rep-max-input-row">
                       <input
                         :id="`one-rep-max-${i}`"
@@ -204,7 +222,8 @@
                       />
                       <span class="unit">kg</span>
                     </div>
-                    <small class="one-rep-max-hint">Hilft der KI bei Übungen mit hohem Kraftanteil (z.B. Speed Squats) passendere Empfehlungen zu geben. Optional, jederzeit änderbar - leer lassen und speichern entfernt den Wert wieder.</small>
+                    <small v-if="isOneRepMaxAddedWeightExercise(ex)" class="one-rep-max-hint">Nur das Zusatzgewicht eintragen, nicht Körpergewicht + Zusatzgewicht zusammen. Optional, jederzeit änderbar - leer lassen und speichern entfernt den Wert wieder.</small>
+                    <small v-else class="one-rep-max-hint">Hilft der KI, bei dieser Übung passendere Empfehlungen zu geben. Optional, jederzeit änderbar - leer lassen und speichern entfernt den Wert wieder.</small>
                   </div>
 
                   <div v-if="mediaExercise" class="media-overlay" @click.self="closeExerciseMedia">
@@ -760,7 +779,8 @@ import { resolveExerciseMedia, buildExerciseMediaUrl } from '@/utils/assetResolv
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { getWorkoutOffline, getExerciseOffline, getAllExercisesOffline, getAllWorkoutsOffline, saveWorkoutOffline, db, deleteMetadata } from '@/utils/offlineStorage'
-import { fetchWorkout, deleteWorkout as deleteWorkoutApi, fetchOneRepMaxForExercises, saveOneRepMax as saveOneRepMaxApi } from '@/api/workouts'
+import { fetchWorkout, deleteWorkout as deleteWorkoutApi, fetchOneRepMaxForExercises, saveOneRepMax as saveOneRepMaxApi, saveTrackOneRepMax as saveTrackOneRepMaxApi } from '@/api/workouts'
+import { isDefaultExerciseOneRepMaxEligible, isAddedWeightOneRepMaxExercise } from '@/utils/oneRepMaxExercises'
 // import { fetchExercise, fetchExercises } from '@/api/exercises'
 import { useUserStore } from '@/stores/userStore'
 import { useAuthStore } from '@/stores/authStore'
@@ -1505,23 +1525,68 @@ function oneRepMaxKeyFor(idx) {
   return String(workout.value?.exercises?.[idx]?.name || '').trim().toLowerCase()
 }
 
-// Nur wo sinnvoll anzeigen (Klärung mit dem Nutzer: "Nur wo sinnvoll, z.B.
-// externalLoadRelevant=true"). Der Client hat aktuell kein gecachtes Exercise.metricProfile
-// (das lebt nur serverseitig, siehe exerciseAnalysisRules.js) - als pragmatischer
-// Näherungswert wird stattdessen das ohnehin schon geladene equipment-Feld aus den
-// Default-Übungsdaten genutzt (defaultExerciseByName, siehe getExerciseImage() etc.):
-// "Körpergewicht"/"body weight" gilt als nicht external-load-relevant, alles andere
-// (Langhantel, Kurzhantel, Maschine, Kabelzug ...) als relevant. Eigene/unbekannte Übungen
-// (kein Treffer in den Default-Daten) werden im Zweifel angezeigt, damit der Nutzer selbst
-// entscheiden kann (Null-Annahmen-Prinzip: lieber die Möglichkeit anbieten als sie zu Unrecht
-// vorzuenthalten).
-function isOneRepMaxRelevant(ex) {
+// Nur wo fachlich sinnvoll anzeigen (Absprache mit dem Nutzer nach Live-Test: die ursprüngliche
+// equipment-basierte Heuristik ("equipment != Körpergewicht") war zu ungenau - z.B. Bizeps-Curls
+// oder Seitheben mit Kurzhantel hätten das Feld gezeigt). Jetzt zwei Fälle:
+// 1) Übung ist in den Default-Übungsdaten bekannt -> exakte ID-Whitelist entscheidet
+//    (siehe oneRepMaxExercises.js: Back/Front Squat, Bench, Deadlift, Overhead Press,
+//    gewichtete Klimmzüge/Dips, Power Clean/Clean/Snatch/Clean and Jerk).
+// 2) Übung ist eigen/unbekannt (kein Treffer in den Default-Daten) -> standardmäßig AUS, nur
+//    wenn der Nutzer explizit "Maximalkraft für diese Übung verfolgen" aktiviert hat
+//    (UserExerciseNote.overrides.trackOneRepMax) - bewusstes Opt-in statt "im Zweifel
+//    anzeigen", siehe getIsCustomOneRepMaxTrackingEnabled().
+function isOneRepMaxRelevant(ex, idx) {
   const nameKey = String(ex?.name || '').trim().toLowerCase()
   const mapped = nameKey ? defaultExerciseByName.value.get(nameKey) : null
-  if (!mapped) return true
-  const equip = String(mapped.equipment_en || mapped.equipment || '').trim().toLowerCase()
-  if (!equip) return true
-  return !['body weight', 'bodyweight', 'körpergewicht'].includes(equip)
+  if (mapped) {
+    return isDefaultExerciseOneRepMaxEligible(mapped.id || mapped._id)
+  }
+  return getIsCustomOneRepMaxTrackingEnabled(idx)
+}
+
+// Zeigt bei gewichteten Klimmzügen/Dips einen klärenden Hinweis, dass der Wert das
+// Zusatzgewicht (nicht das Gesamtgewicht inkl. Körpergewicht) meint (Absprache mit dem
+// Nutzer: "bei dips ist das gewicht immer als zusatzgewicht gemeint zu körpergewicht").
+function isOneRepMaxAddedWeightExercise(ex) {
+  const nameKey = String(ex?.name || '').trim().toLowerCase()
+  const mapped = nameKey ? defaultExerciseByName.value.get(nameKey) : null
+  return mapped ? isAddedWeightOneRepMaxExercise(mapped.id || mapped._id) : false
+}
+
+function isCustomExercise(ex) {
+  const nameKey = String(ex?.name || '').trim().toLowerCase()
+  return !(nameKey && defaultExerciseByName.value.get(nameKey))
+}
+
+function getIsCustomOneRepMaxTrackingEnabled(idx) {
+  const key = oneRepMaxKeyFor(idx)
+  const stored = key ? oneRepMaxByExerciseName.value[key] : null
+  return stored?.trackOneRepMax === true
+}
+
+// Toggle im UI für Custom-/unbekannte Übungen ("Maximalkraft für diese Übung verfolgen") -
+// speichert sofort (analog zu saveOneRepMaxForExercise()), unabhängig vom Workout-Speicherfluss.
+async function toggleTrackOneRepMax(idx) {
+  const exerciseName = String(workout.value?.exercises?.[idx]?.name || '').trim()
+  if (!exerciseName) return
+  const next = !getIsCustomOneRepMaxTrackingEnabled(idx)
+  try {
+    const token = await getIdToken().catch(() => null)
+    await saveTrackOneRepMaxApi(exerciseName, next, token)
+    const key = exerciseName.toLowerCase()
+    const existing = oneRepMaxByExerciseName.value[key] || {}
+    oneRepMaxByExerciseName.value = {
+      ...oneRepMaxByExerciseName.value,
+      [key]: { ...existing, trackOneRepMax: next }
+    }
+    if (!next) {
+      // Ausschalten klappt auch das Eingabefeld direkt wieder zu, statt es leer offen zu lassen.
+      showOneRepMax.value[idx] = false
+    }
+  } catch (e) {
+    logger.warn('⚠️ 1RM-Tracking-Einstellung konnte nicht gespeichert werden', e?.message)
+    toast.show('Einstellung konnte nicht gespeichert werden', { type: 'error', duration: 2500 })
+  }
 }
 
 function toggleOneRepMax(idx) {
@@ -1581,10 +1646,17 @@ async function saveOneRepMaxForExercise(idx) {
     const result = await saveOneRepMaxApi(exerciseName, num, token)
     const key = exerciseName.toLowerCase()
     const next = { ...oneRepMaxByExerciseName.value }
-    if (clearing) {
+    // trackOneRepMax (Custom-Übungs-Toggle) bleibt erhalten, unabhängig davon, ob gerade ein
+    // Wert gesetzt oder gelöscht wird - beides sind unabhängige Felder auf derselben Notiz.
+    const existingTrackFlag = next[key]?.trackOneRepMax
+    if (clearing && !existingTrackFlag) {
       delete next[key]
     } else {
-      next[key] = { estimatedOneRepMaxKg: result.estimatedOneRepMaxKg, oneRepMaxUpdatedAt: result.oneRepMaxUpdatedAt }
+      next[key] = {
+        estimatedOneRepMaxKg: result.estimatedOneRepMaxKg,
+        oneRepMaxUpdatedAt: result.oneRepMaxUpdatedAt,
+        ...(existingTrackFlag ? { trackOneRepMax: true } : {})
+      }
     }
     oneRepMaxByExerciseName.value = next
     oneRepMaxInputs.value[idx] = clearing ? '' : String(result.estimatedOneRepMaxKg)
@@ -3545,6 +3617,19 @@ onBeforeUnmount(() => {
   color: var(--muted);
   font-size: 0.75rem;
   line-height: 1.3;
+}
+.one-rep-max-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+.one-rep-max-toggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
 }
 .actions { margin: 6px; display: flex; gap: 8px; }
 .primary {

@@ -58,7 +58,13 @@ const userExerciseNoteSchema = new mongoose.Schema({
     targetRepRange: {
       min: { type: Number, default: null },
       max: { type: Number, default: null }
-    }
+    },
+    // Opt-in für eigene/unbekannte Übungen (nicht in der festen 1RM-Whitelist des Clients,
+    // siehe oneRepMaxExercises.js): "Maximalkraft für diese Übung verfolgen" - ohne dieses Flag
+    // bietet der Client für Custom-Übungen KEIN 1RM-Feld an (Absprache mit dem Nutzer: Default
+    // ist "aus", explizites Opt-in statt "im Zweifel anzeigen"). Für Whitelist-Übungen aus der
+    // Default-Datenbank irrelevant - dort entscheidet allein die Whitelist.
+    trackOneRepMax: { type: Boolean, default: null }
   },
   // Woher die Notiz stammt (für spätere Nachvollziehbarkeit/Debugging)
   source: {

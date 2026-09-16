@@ -630,6 +630,23 @@ export async function saveOneRepMax(exerciseName, oneRepMaxKg, token = null) {
   }
 }
 
+// Opt-in "Maximalkraft für diese Übung verfolgen" für eigene/unbekannte Übungen außerhalb der
+// festen 1RM-Whitelist (siehe utils/oneRepMaxExercises.js) - schaltet das 1RM-Eingabefeld für
+// diese eine Übung frei/aus.
+export async function saveTrackOneRepMax(exerciseName, trackOneRepMax, token = null) {
+  try {
+    const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+    const res = await api.post('/exercise-notes/track-one-rep-max', {
+      exerciseName: String(exerciseName || '').trim(),
+      trackOneRepMax: trackOneRepMax === true
+    }, config)
+    return res.data
+  } catch (error) {
+    logger.warn('⚠️ Workouts API - saveTrackOneRepMax failed:', error?.message)
+    throw handleAPIError(error, '1RM-Tracking-Einstellung speichern', { showToast: false })
+  }
+}
+
 // Alle Workouts löschen
 export async function deleteAllWorkouts(token = null) {
   try {
