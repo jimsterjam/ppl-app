@@ -171,6 +171,42 @@
                     />
                     <textarea :value="getNote(i)" @input="setNote(i, $event.target.value)" rows="2" style="width:100%;resize:vertical" placeholder="Notiz zu dieser Übung..."></textarea>
                   </div>
+
+                  <!-- 1RM (geschätztes Maximalgewicht für 1 Wiederholung) - nur bei Übungen mit
+                       tatsächlicher externer Last sinnvoll (siehe isOneRepMaxRelevant()). Eigener
+                       Speicherpfad (nicht Teil des Workout-Speicherns), da 1RM übungsgebunden und
+                       nutzerweit gilt, nicht pro Workout-Session (siehe Regel 19 in OpenAIProvider.js). -->
+                  <div v-if="isOneRepMaxRelevant(ex)" style="margin-top: 6px;">
+                    <button class="link" @click="toggleOneRepMax(i)">
+                      <Dumbbell class="btn-icon btn-icon--inline" aria-hidden="true" />
+                      {{ getOneRepMaxDisplay(i) != null
+                        ? (showOneRepMax[i] ? 'ändern' : `1RM: ${getOneRepMaxDisplay(i)}kg`)
+                        : '1RM hinterlegen' }}
+                    </button>
+                  </div>
+
+                  <div v-if="showOneRepMax && showOneRepMax[i]" class="one-rep-max-field" style="margin-top: 4px;">
+                    <label :for="`one-rep-max-${i}`">Geschätztes 1RM (Maximalgewicht für 1 Wiederholung)</label>
+                    <div class="one-rep-max-input-row">
+                      <input
+                        :id="`one-rep-max-${i}`"
+                        type="number"
+                        min="0"
+                        max="500"
+                        step="0.5"
+                        inputmode="decimal"
+                        placeholder="z.B. 100"
+                        :value="getOneRepMaxInput(i)"
+                        :disabled="oneRepMaxSaving[i]"
+                        @input="setOneRepMaxInput(i, $event.target.value)"
+                        @blur="saveOneRepMaxForExercise(i)"
+                        @keydown.enter="$event.target.blur()"
+                      />
+                      <span class="unit">kg</span>
+                    </div>
+                    <small class="one-rep-max-hint">Hilft der KI bei Übungen mit hohem Kraftanteil (z.B. Speed Squats) passendere Empfehlungen zu geben. Optional, jederzeit änderbar - leer lassen und speichern entfernt den Wert wieder.</small>
+                  </div>
+
                   <div v-if="mediaExercise" class="media-overlay" @click.self="closeExerciseMedia">
                     <div class="media-content">
                       <video
@@ -708,6 +744,11 @@ function onAddExerciseConfirm() {
   selectedExerciseToAdd.value = null
   ensureSetDetailsStructure()
   try { triggerAutoSave() } catch {}
+  // Lädt ein evtl. bereits für diese Übung hinterlegtes 1RM nach (z.B. wenn dieselbe Übung
+  // schon früher in einem anderen Workout trainiert und dort ein 1RM eingetragen wurde) -
+  // die neue Übung selbst wird durch den watch(workout, ...) oben nicht automatisch erfasst,
+  // da hier direkt ins bestehende Array gepusht wird (keine Neuzuweisung von workout.value).
+  loadOneRepMaxData()
   toast.show('Übung hinzugefügt', { type: 'success', duration: 1500 })
 }
 import { ref, onMounted, onBeforeUnmount, watch, nextTick, computed } from 'vue'
@@ -719,7 +760,7 @@ import { resolveExerciseMedia, buildExerciseMediaUrl } from '@/utils/assetResolv
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { getWorkoutOffline, getExerciseOffline, getAllExercisesOffline, getAllWorkoutsOffline, saveWorkoutOffline, db, deleteMetadata } from '@/utils/offlineStorage'
-import { fetchWorkout, deleteWorkout as deleteWorkoutApi } from '@/api/workouts'
+import { fetchWorkout, deleteWorkout as deleteWorkoutApi, fetchOneRepMaxForExercises, saveOneRepMax as saveOneRepMaxApi } from '@/api/workouts'
 // import { fetchExercise, fetchExercises } from '@/api/exercises'
 import { useUserStore } from '@/stores/userStore'
 import { useAuthStore } from '@/stores/authStore'
@@ -732,7 +773,7 @@ import WorkoutTimerConfig from '@/components/timer/WorkoutTimerConfig.vue'
 import SessionStopwatch from '@/components/SessionStopwatch.vue'
 // Einheitliches Icon-Set statt Emoji/ASCII-Mix (🗑️/📝/⋮⋮/▲▼/＋/−) - wie im Rest der App
 // (siehe z.B. BottomNav.vue, AiFeedbackRatingWidget.vue) bereits lucide-vue-next genutzt.
-import { Clock, Trash2, StickyNote, GripVertical, Plus, Minus } from 'lucide-vue-next'
+import { Clock, Trash2, StickyNote, GripVertical, Plus, Minus, Dumbbell } from 'lucide-vue-next'
 import { useToastStore } from '@/stores/toastStore'
 import { useTimerStore } from '@/stores/timerStore'
 import { useI18n } from 'vue-i18n'
@@ -915,6 +956,20 @@ const sessionStopwatchStore = useSessionStopwatchStore()
 // Notiz-Logik
 const showNote = ref([])
 const exerciseNotes = ref([])
+
+// 1RM (geschätztes Maximalgewicht für 1 Wiederholung) pro Übung - siehe
+// UserExerciseNote.estimatedOneRepMaxKg im Backend, Regel 19 in OpenAIProvider.js. Bewusst
+// getrennt vom Notiz-State oben: 1RM ist übungsgebunden UND nutzerweit (nicht pro Workout-
+// Session), wird also nicht über den normalen Workout-Speicherfluss, sondern direkt bei
+// Änderung per eigenem API-Call persistiert (siehe saveOneRepMaxForExercise()).
+const showOneRepMax = ref([])
+// lowercased exerciseName -> { estimatedOneRepMaxKg, oneRepMaxUpdatedAt } (nur vorhanden, wenn
+// tatsächlich ein Wert hinterlegt ist - Null-Annahmen-Prinzip)
+const oneRepMaxByExerciseName = ref({})
+// Rohwert des Eingabefelds pro Übungsindex, während der Nutzer tippt (String, damit z.B. "82,5"
+// beim Tippen nicht sofort zu einer geparsten Zahl gezwungen wird)
+const oneRepMaxInputs = ref([])
+const oneRepMaxSaving = ref([])
 
 // Bestätigungsgate vor dem finalen Speichern: warnt, wenn zu Übungen mit geloggten Sätzen
 // keine (oder nur leere) Notiz existiert - Notizen sind wichtiger Kontext für die spätere
@@ -1419,6 +1474,9 @@ watch(workout, (w) => {
   if (w && Array.isArray(w.exercises)) {
     showNote.value = w.exercises.map(ex => !!ex.note)
     exerciseNotes.value = w.exercises.map(ex => typeof ex.note === 'string' ? ex.note : '')
+    showOneRepMax.value = w.exercises.map(() => false)
+    oneRepMaxInputs.value = w.exercises.map(() => undefined)
+    loadOneRepMaxData()
   }
 })
 
@@ -1439,6 +1497,104 @@ function deleteNote(idx) {
   if (exerciseNotes.value) exerciseNotes.value[idx] = ''
   if (showNote.value) showNote.value[idx] = false
   try { triggerAutoSave() } catch {}
+}
+
+// --- 1RM (geschätztes Maximalgewicht für 1 Wiederholung) pro Übung -----------------------
+
+function oneRepMaxKeyFor(idx) {
+  return String(workout.value?.exercises?.[idx]?.name || '').trim().toLowerCase()
+}
+
+// Nur wo sinnvoll anzeigen (Klärung mit dem Nutzer: "Nur wo sinnvoll, z.B.
+// externalLoadRelevant=true"). Der Client hat aktuell kein gecachtes Exercise.metricProfile
+// (das lebt nur serverseitig, siehe exerciseAnalysisRules.js) - als pragmatischer
+// Näherungswert wird stattdessen das ohnehin schon geladene equipment-Feld aus den
+// Default-Übungsdaten genutzt (defaultExerciseByName, siehe getExerciseImage() etc.):
+// "Körpergewicht"/"body weight" gilt als nicht external-load-relevant, alles andere
+// (Langhantel, Kurzhantel, Maschine, Kabelzug ...) als relevant. Eigene/unbekannte Übungen
+// (kein Treffer in den Default-Daten) werden im Zweifel angezeigt, damit der Nutzer selbst
+// entscheiden kann (Null-Annahmen-Prinzip: lieber die Möglichkeit anbieten als sie zu Unrecht
+// vorzuenthalten).
+function isOneRepMaxRelevant(ex) {
+  const nameKey = String(ex?.name || '').trim().toLowerCase()
+  const mapped = nameKey ? defaultExerciseByName.value.get(nameKey) : null
+  if (!mapped) return true
+  const equip = String(mapped.equipment_en || mapped.equipment || '').trim().toLowerCase()
+  if (!equip) return true
+  return !['body weight', 'bodyweight', 'körpergewicht'].includes(equip)
+}
+
+function toggleOneRepMax(idx) {
+  showOneRepMax.value[idx] = !showOneRepMax.value[idx]
+}
+
+function getOneRepMaxDisplay(idx) {
+  const key = oneRepMaxKeyFor(idx)
+  const stored = key ? oneRepMaxByExerciseName.value[key] : null
+  return (typeof stored?.estimatedOneRepMaxKg === 'number') ? stored.estimatedOneRepMaxKg : null
+}
+
+function getOneRepMaxInput(idx) {
+  if (typeof oneRepMaxInputs.value[idx] !== 'undefined') return oneRepMaxInputs.value[idx]
+  const stored = getOneRepMaxDisplay(idx)
+  return stored != null ? String(stored) : ''
+}
+
+function setOneRepMaxInput(idx, val) {
+  oneRepMaxInputs.value[idx] = val
+}
+
+// Lädt die hinterlegten 1RM-Werte für alle Übungen des aktuell geöffneten Workouts auf einmal -
+// aufgerufen, sobald das Workout (oder eine neu hinzugefügte Übung) vorliegt.
+async function loadOneRepMaxData() {
+  const names = (workout.value?.exercises || []).map(ex => String(ex?.name || '').trim()).filter(Boolean)
+  if (!names.length) return
+  try {
+    const token = await getIdToken().catch(() => null)
+    const result = await fetchOneRepMaxForExercises(names, token)
+    const byName = {}
+    for (const [name, data] of Object.entries(result?.oneRepMaxByExercise || {})) {
+      byName[String(name || '').trim().toLowerCase()] = data
+    }
+    oneRepMaxByExerciseName.value = byName
+  } catch (e) {
+    logger.warn('⚠️ 1RM-Daten konnten nicht geladen werden', e?.message)
+  }
+}
+
+// Speichert das 1RM sofort bei Verlassen des Eingabefelds (nicht Teil von triggerAutoSave() -
+// siehe Kommentar am State oben, eigener, übungsgebundener/nutzerweiter Datensatz).
+async function saveOneRepMaxForExercise(idx) {
+  const exerciseName = String(workout.value?.exercises?.[idx]?.name || '').trim()
+  if (!exerciseName) return
+  const raw = getOneRepMaxInput(idx)
+  const trimmed = String(raw ?? '').trim()
+  const clearing = trimmed === ''
+  const num = clearing ? null : Number(trimmed.replace(',', '.'))
+  if (!clearing && (!Number.isFinite(num) || num <= 0 || num > 500)) {
+    toast.show('Bitte ein gültiges 1RM zwischen 0 und 500kg eingeben', { type: 'warning', duration: 2500 })
+    return
+  }
+  oneRepMaxSaving.value[idx] = true
+  try {
+    const token = await getIdToken().catch(() => null)
+    const result = await saveOneRepMaxApi(exerciseName, num, token)
+    const key = exerciseName.toLowerCase()
+    const next = { ...oneRepMaxByExerciseName.value }
+    if (clearing) {
+      delete next[key]
+    } else {
+      next[key] = { estimatedOneRepMaxKg: result.estimatedOneRepMaxKg, oneRepMaxUpdatedAt: result.oneRepMaxUpdatedAt }
+    }
+    oneRepMaxByExerciseName.value = next
+    oneRepMaxInputs.value[idx] = clearing ? '' : String(result.estimatedOneRepMaxKg)
+    toast.show(clearing ? '1RM entfernt' : '1RM gespeichert', { type: 'success', duration: 1500 })
+  } catch (e) {
+    logger.warn('⚠️ 1RM speichern fehlgeschlagen', e?.message)
+    toast.show('1RM konnte nicht gespeichert werden', { type: 'error', duration: 2500 })
+  } finally {
+    oneRepMaxSaving.value[idx] = false
+  }
 }
 
 // Liefert die Namen aller Übungen, zu denen mindestens ein Satz geloggt wurde, aber deren
@@ -2038,6 +2194,9 @@ function removeExercise(exIndex) {
   workout.value.exercises.splice(exIndex, 1)
   if (Array.isArray(showNote.value)) showNote.value.splice(exIndex, 1)
   if (Array.isArray(exerciseNotes.value)) exerciseNotes.value.splice(exIndex, 1)
+  if (Array.isArray(showOneRepMax.value)) showOneRepMax.value.splice(exIndex, 1)
+  if (Array.isArray(oneRepMaxInputs.value)) oneRepMaxInputs.value.splice(exIndex, 1)
+  if (Array.isArray(oneRepMaxSaving.value)) oneRepMaxSaving.value.splice(exIndex, 1)
 
   try { triggerAutoSave() } catch {}
   toast.show('Übung entfernt', { type: 'success', duration: 1500 })
@@ -3347,6 +3506,45 @@ onBeforeUnmount(() => {
   color: var(--muted);
   font-size: 0.8rem;
   line-height: 1.35;
+}
+/* 1RM-Feld pro Übung (aufklappbar, siehe toggleOneRepMax()) - bewusst kompakter als das
+   Körpergewicht-Feld oben, da es innerhalb der bereits verschachtelten Übungskarte sitzt. */
+.one-rep-max-field {
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line-soft);
+  background: var(--bg-elevated, transparent);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.one-rep-max-field label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--fg);
+}
+.one-rep-max-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.one-rep-max-input-row input {
+  width: 90px;
+  padding: 6px 9px;
+  border-radius: 10px;
+  border: 1px solid var(--line-soft);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 0.95rem;
+}
+.one-rep-max-input-row .unit {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+.one-rep-max-hint {
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.3;
 }
 .actions { margin: 6px; display: flex; gap: 8px; }
 .primary {

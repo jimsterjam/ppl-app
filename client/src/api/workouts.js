@@ -586,6 +586,50 @@ export async function fetchWorkoutProgressStats(token = null, params = {}) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// 1RM (geschätztes Maximalgewicht für 1 Wiederholung) pro Übung - siehe
+// UserExerciseNote.estimatedOneRepMaxKg im Backend und Regel 19 in OpenAIProvider.js.
+// Bewusst NICHT Teil des normalen Workout-Speicherflusses: die Werte gelten übungsgebunden und
+// nutzerweit (nicht pro Workout), werden also direkt bei Änderung persistiert statt über
+// updateWorkout()/createWorkout() mitgeschickt zu werden. Kein Offline-Fallback nötig - das
+// Feld ist rein additiv/optional, ein fehlgeschlagener Save verliert nur diese eine
+// Aktualisierung, nicht das Workout selbst.
+// ---------------------------------------------------------------------------
+
+// Lädt die hinterlegten 1RM-Werte für mehrere Übungen auf einmal (z.B. alle Übungen des
+// aktuell geöffneten Workouts) - liefert nur Einträge zurück, zu denen tatsächlich ein Wert
+// gespeichert ist (Null-Annahmen-Prinzip).
+export async function fetchOneRepMaxForExercises(exerciseNames = [], token = null) {
+  const names = Array.from(new Set((exerciseNames || []).map(n => String(n || '').trim()).filter(Boolean)))
+  if (!names.length) return { oneRepMaxByExercise: {} }
+  try {
+    const config = {
+      params: { exerciseNames: names.join(',') },
+      ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {})
+    }
+    const res = await api.get('/exercise-notes/one-rep-max', config)
+    return res.data || { oneRepMaxByExercise: {} }
+  } catch (error) {
+    logger.warn('⚠️ Workouts API - fetchOneRepMaxForExercises failed:', error?.message)
+    return { oneRepMaxByExercise: {} }
+  }
+}
+
+// Speichert (oder löscht, bei oneRepMaxKg=null) das 1RM für eine einzelne Übung.
+export async function saveOneRepMax(exerciseName, oneRepMaxKg, token = null) {
+  try {
+    const config = token ? { headers: { Authorization: `Bearer ${token}` } } : {}
+    const res = await api.post('/exercise-notes/one-rep-max', {
+      exerciseName: String(exerciseName || '').trim(),
+      oneRepMaxKg: oneRepMaxKg == null ? null : Number(oneRepMaxKg)
+    }, config)
+    return res.data
+  } catch (error) {
+    logger.warn('⚠️ Workouts API - saveOneRepMax failed:', error?.message)
+    throw handleAPIError(error, '1RM speichern', { showToast: false })
+  }
+}
+
 // Alle Workouts löschen
 export async function deleteAllWorkouts(token = null) {
   try {
