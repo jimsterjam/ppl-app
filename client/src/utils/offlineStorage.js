@@ -633,22 +633,43 @@ export async function cacheCustomExercises(exercises) {
   }
 }
 
+// Seed-Version der Standard-Übungen (siehe initializeDefaultExercises()) - MUSS bei jeder
+// inhaltlichen Änderung an client/src/data/default-exercises.json (Übungen zusammengeführt,
+// hinzugefügt oder entfernt) hochgezählt werden. Ohne diese Versionierung würde eine bereits
+// installierte App ihre einmal in IndexedDB geseedeten Default-Übungen NIE wieder aktualisieren
+// (siehe Bug-Report: die drei "Full Squat"-Dubletten blieben nach der Bereinigung in
+// default-exercises.json auf bereits installierten Geräten trotzdem in der Übungssuche stehen,
+// weil getMergedSortedExercises() die frischen JSON-Daten mit dieser IndexedDB-Kopie mischt).
+// v2: Full-Squat-Dubletten (ids 0043/1461) zu einer Übung (id 1462, "Full Squat") zusammengeführt,
+//     Snatch/Clean/Clean and Jerk (ids 9009-9011) ergänzt.
+const DEFAULT_EXERCISES_SEED_VERSION = 2
+const DEFAULT_EXERCISES_SEED_VERSION_KEY = 'default_exercises_seed_version'
+
 /**
- * Initialisiert die Datenbank mit Standard-Übungen (falls leer)
- * Wird beim ersten App-Start aufgerufen
- * @returns {Promise<boolean>} True wenn Übungen geladen wurden
+ * Initialisiert bzw. aktualisiert die Datenbank mit Standard-Übungen.
+ * Wird bei jedem App-Start aufgerufen (siehe App.vue) - lädt beim allerersten Start komplett,
+ * danach nur noch, wenn sich DEFAULT_EXERCISES_SEED_VERSION geändert hat (neue
+ * default-exercises.json seit dem letzten Start). Ersetzt/ergänzt dabei gezielt nur die zuvor
+ * selbst geseedeten Default-Einträge (_isDefault:true) per _id - eigene Übungen des Nutzers
+ * (separate Tabelle db.customExercises) und über die Remote-API gecachte Übungen (eigener
+ * _id-Namensraum, kein _isDefault-Flag) bleiben unberührt. Entfernte Default-Übungen (z.B.
+ * zusammengeführte Dubletten) werden aus der lokalen Tabelle gelöscht, statt als Karteileichen
+ * stehen zu bleiben.
+ * @returns {Promise<boolean>} True wenn Übungen (neu) geladen/aktualisiert wurden
  */
 export async function initializeDefaultExercises() {
   try {
-    // Prüfe ob schon Übungen vorhanden sind
     const count = await db.exercises.count()
-    if (count > 0) {
-      logger.debug('✅ Exercises bereits vorhanden:', count)
+    const storedVersion = await getMetadata(DEFAULT_EXERCISES_SEED_VERSION_KEY)
+    if (count > 0 && storedVersion === DEFAULT_EXERCISES_SEED_VERSION) {
+      logger.debug('✅ Exercises bereits vorhanden und aktuell:', count, 'seed v' + storedVersion)
       return false
     }
-    
-    logger.info('📥 Lade Standard-Übungen...')
-    
+
+    logger.info(count > 0
+      ? `📥 Standard-Übungen veraltet (Seed v${storedVersion ?? 'unbekannt'} -> v${DEFAULT_EXERCISES_SEED_VERSION}), aktualisiere...`
+      : '📥 Lade Standard-Übungen...')
+
     // Lade Standard-Übungen (bundled import primary, fetch fallback)
     let exercises = []
     try {
@@ -662,7 +683,7 @@ export async function initializeDefaultExercises() {
     if (!Array.isArray(exercises) || exercises.length === 0) {
       throw new Error('Keine Übungen geladen')
     }
-    
+
     // Generiere IDs für die Übungen
     const exercisesWithIds = exercises.map((ex, idx) => ({
       _id: ex._id || (ex.id ? `ex_${ex.id}` : `default_${idx + 1}`),
@@ -670,11 +691,28 @@ export async function initializeDefaultExercises() {
       _isDefault: true,
       _syncedAt: Date.now()
     }))
-    
-    // Speichere in IndexedDB
-    await db.exercises.bulkAdd(exercisesWithIds)
-    
-    logger.info(`✅ ${exercisesWithIds.length} Standard-Übungen geladen!`)
+
+    // Vorher bereits vorhandene Default-Einträge ermitteln, um entfernte/zusammengeführte
+    // Übungen (z.B. die alten Full-Squat-Dubletten) gezielt löschen zu können - nur Zeilen mit
+    // _isDefault===true kommen dafür in Frage, alles andere in der Tabelle bleibt unangetastet.
+    const existingDefaultIds = count > 0
+      ? await db.exercises.filter(ex => ex?._isDefault === true).primaryKeys()
+      : []
+    const freshIds = new Set(exercisesWithIds.map(ex => ex._id))
+    const staleIds = existingDefaultIds.filter(id => !freshIds.has(id))
+
+    // bulkPut statt bulkAdd: überschreibt bestehende Einträge mit gleicher _id (aktualisiert
+    // Inhalte wie Namen/Beschreibungen), legt neue an - im Gegensatz zu bulkAdd kein Fehler bei
+    // bereits vorhandener _id, was hier beim erneuten Durchlauf (Versionswechsel) genau richtig ist.
+    await db.exercises.bulkPut(exercisesWithIds)
+    if (staleIds.length > 0) {
+      await db.exercises.bulkDelete(staleIds)
+      logger.info(`🗑️ ${staleIds.length} veraltete Standard-Übung(en) entfernt`, staleIds)
+    }
+
+    await setMetadata(DEFAULT_EXERCISES_SEED_VERSION_KEY, DEFAULT_EXERCISES_SEED_VERSION)
+
+    logger.info(`✅ ${exercisesWithIds.length} Standard-Übungen geladen/aktualisiert!`)
     return true
   } catch (error) {
     logger.error('❌ Fehler beim Laden der Standard-Übungen:', error)
