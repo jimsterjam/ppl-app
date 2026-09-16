@@ -8,6 +8,14 @@
           <p v-if="subtitle" class="header-subtitle">{{ subtitle }}</p>
         </div>
       </div>
+      <!-- Mittlere Spalte (optional, z.B. Gesamtzeit in WorkoutDetailView.vue) - eigene Grid-
+           Spalte statt nur zwischen header-left/header-actions eingefügt, damit der Inhalt
+           WIRKLICH mittig im Header sitzt (unabhängig davon, wie breit Titel oder
+           Abmelden-Button gerade sind), nicht nur "irgendwo dazwischen". Bleibt leer und ohne
+           Breite, wenn keine Ansicht diesen Slot nutzt (siehe .header-center unten). -->
+      <div class="header-center">
+        <slot name="center"></slot>
+      </div>
       <div class="header-actions">
         <slot name="actions"></slot>
         <div class="auth-section">
@@ -67,8 +75,14 @@ onAuthStateChanged((user) => {
 }
 
 .header-content {
-  display: flex;
-  justify-content: space-between;
+  /* Grid statt flex+space-between: eine echte, unabhängige Mittelspalte für .header-center
+     (siehe Template-Kommentar oben) - mit flex+space-between gäbe es nur zwei Enden, kein
+     "echtes" Zentrum. gap bewusst 0, damit sich für Ansichten ohne #center-Slot (Dashboard,
+     Settings, ...) rein optisch NICHTS ändert - die leere mittlere Spalte hat dann Breite 0
+     und header-left/header-actions liegen exakt wie vorher an den beiden Rändern. */
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 0;
   align-items: center;
   max-width: 1200px;
   margin: 0 auto;
@@ -78,6 +92,14 @@ onAuthStateChanged((user) => {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
+  justify-self: start;
+}
+
+.header-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   min-width: 0;
 }
 
@@ -92,6 +114,7 @@ onAuthStateChanged((user) => {
   display: flex;
   align-items: center;
   gap: 12px;
+  justify-self: end;
 }
 
 .auth-section {

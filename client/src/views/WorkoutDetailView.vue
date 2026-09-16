@@ -3,9 +3,11 @@
       <HeaderBar title="Workout">
         <!-- Gesamtzeit (SessionStopwatch) hier statt weiter unten in der Übungsliste (siehe
              ex-list-header) platziert - Header ist sticky (siehe HeaderBar.vue), bleibt also
-             beim Scrollen durch eine lange Übungsliste immer im Sichtfeld. Nur sichtbar, wenn
-             ein Workout tatsächlich geladen ist (kein Timer während Lade-/Fehlerzustand). -->
-        <template #actions>
+             beim Scrollen durch eine lange Übungsliste immer im Sichtfeld. Eigener #center-Slot
+             (statt #actions), damit sie wirklich mittig zwischen Titel und "Abmelden"-Button
+             sitzt. Nur sichtbar, wenn ein Workout tatsächlich geladen ist (kein Timer während
+             Lade-/Fehlerzustand). -->
+        <template #center>
           <SessionStopwatch v-if="workout" compact @session-time="onSessionTime" />
         </template>
       </HeaderBar>

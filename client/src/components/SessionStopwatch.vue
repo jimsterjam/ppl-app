@@ -137,15 +137,23 @@ onBeforeUnmount(() => {
 
 .session-stopwatch--compact .sw-trigger {
   width: auto;
-  padding: 7px 12px;
+  min-height: 40px;
+  /* Kompakte Breite, aber min-height 40px als ausreichend großes Tap-Ziel (Apple HIG empfiehlt
+     min. 44px, 40px ist im engen Header ein vertretbarer Kompromiss) - sonst wirkt der Timer im
+     Header zwar sichtbar, aber schwer präzise antippbar ("nicht mehr steuerbar wie vorher"). */
+  padding: 7px 14px;
   font-size: 0.85rem;
   border-radius: 10px;
   white-space: nowrap;
 }
 
+/* Zentriert im Header (siehe .header-center in HeaderBar.vue) - das Overlay öffnet sich
+   deshalb mittig UNTER dem Trigger statt links/rechts ausgerichtet, sonst würde es je nach
+   Bildschirmbreite einseitig über den Rand hinausragen. */
 .session-stopwatch--compact .sw-overlay {
-  left: auto;
-  right: 0;
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
 }
 
 /* Trigger */
