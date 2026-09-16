@@ -1320,6 +1320,89 @@ router.post("/exercise-notes/confirm", firebaseAuthMiddleware, async (req, res) 
   }
 });
 
+// ---------------------------------------------------------------------------
+// Geschätztes 1RM (Maximalgewicht für 1 Wiederholung) pro Nutzer + Übung - additiv zur
+// bestehenden UserExerciseNote (siehe Modell-Kommentar dort). Nutzer trägt es freiwillig ein
+// und kann es jederzeit aktualisieren (WorkoutDetailView.vue, aufklappbares Feld pro Übung).
+// Eigener Endpoint statt Wiederverwendung von /exercise-notes/confirm, da dort noteText
+// PFLICHT ist (siehe oben) - 1RM soll unabhängig davon gesetzt werden können, auch wenn (noch)
+// keine Notiz zu dieser Übung existiert.
+// ---------------------------------------------------------------------------
+router.post("/exercise-notes/one-rep-max", firebaseAuthMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.auth;
+    const exerciseName = String(req.body?.exerciseName || '').trim();
+    if (!exerciseName) {
+      return res.status(400).json({ error: 'exerciseName ist erforderlich' });
+    }
+
+    // null/leer = Nutzer löscht den Wert wieder (z.B. falsch eingegeben) - explizit erlaubt,
+    // nicht nur ein Update auf einen neuen Zahlenwert.
+    const rawValue = req.body?.oneRepMaxKg;
+    const clearing = rawValue === null || rawValue === undefined || rawValue === '';
+
+    let oneRepMaxKg = null;
+    if (!clearing) {
+      const num = Number(rawValue);
+      if (!Number.isFinite(num) || num <= 0 || num > 500) {
+        return res.status(400).json({ error: 'oneRepMaxKg muss eine Zahl zwischen 0 und 500 sein' });
+      }
+      oneRepMaxKg = Math.round(num * 10) / 10;
+    }
+
+    const update = clearing
+      ? { $set: { userId, exerciseName }, $unset: { estimatedOneRepMaxKg: '', oneRepMaxUpdatedAt: '' } }
+      : { $set: { userId, exerciseName, estimatedOneRepMaxKg: oneRepMaxKg, oneRepMaxUpdatedAt: new Date() } };
+
+    const saved = await UserExerciseNote.findOneAndUpdate(
+      { userId, exerciseName },
+      update,
+      { upsert: true, new: true, setDefaultsOnInsert: true }
+    ).lean();
+
+    res.json({
+      success: true,
+      exerciseName: saved.exerciseName,
+      estimatedOneRepMaxKg: saved.estimatedOneRepMaxKg ?? null,
+      oneRepMaxUpdatedAt: saved.oneRepMaxUpdatedAt || null
+    });
+  } catch (err) {
+    logger.error('❌ 1RM speichern fehlgeschlagen', { message: err.message });
+    res.status(500).json({ error: '1RM konnte nicht gespeichert werden', message: err.message });
+  }
+});
+
+// Geschätztes 1RM für eine oder mehrere Übungen abrufen (z.B. beim Öffnen von
+// WorkoutDetailView, um das aufklappbare Feld vorab korrekt zu befüllen statt leer zu zeigen,
+// bis die nächste KI-Analyse läuft).
+router.get("/exercise-notes/one-rep-max", firebaseAuthMiddleware, async (req, res) => {
+  try {
+    const { userId } = req.auth;
+    const namesRaw = String(req.query?.exerciseNames || '').trim();
+    if (!namesRaw) {
+      return res.status(400).json({ error: 'exerciseNames ist erforderlich (kommagetrennt)' });
+    }
+    const exerciseNames = [...new Set(namesRaw.split(',').map((n) => n.trim()).filter(Boolean))].slice(0, 50);
+
+    const docs = await UserExerciseNote.find({
+      userId,
+      exerciseName: { $in: exerciseNames },
+      estimatedOneRepMaxKg: { $ne: null }
+    }).select('exerciseName estimatedOneRepMaxKg oneRepMaxUpdatedAt').lean();
+
+    res.json({
+      success: true,
+      oneRepMaxByExercise: docs.reduce((acc, d) => {
+        acc[d.exerciseName] = { estimatedOneRepMaxKg: d.estimatedOneRepMaxKg, oneRepMaxUpdatedAt: d.oneRepMaxUpdatedAt || null };
+        return acc;
+      }, {})
+    });
+  } catch (err) {
+    logger.error('❌ 1RM laden fehlgeschlagen', { message: err.message });
+    res.status(500).json({ error: '1RM konnte nicht geladen werden', message: err.message });
+  }
+});
+
 // Einzelnes Workout anhand ID holen
 router.get("/:id", firebaseAuthMiddleware, async (req, res) => {
   try {
@@ -2012,7 +2095,16 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
             higherRepsAreProgress: effectiveProfile.higherRepsAreProgress !== false,
             trainingVolumeRelevant: effectiveProfile.trainingVolumeRelevant !== false,
             targetRepRange: effectiveProfile.targetRepRange || null
-          } : null
+          } : null,
+          // Gleicher 1RM-Hinweis wie im Vergleichs-Pfad (analyzeExercise()), auch beim ersten
+          // Training zu dieser Übung - siehe Regel 19 in OpenAIProvider.js.
+          oneRepMax: (typeof userNote?.estimatedOneRepMaxKg === 'number'
+            && Number.isFinite(userNote.estimatedOneRepMaxKg) && userNote.estimatedOneRepMaxKg > 0)
+            ? {
+              estimatedOneRepMaxKg: userNote.estimatedOneRepMaxKg,
+              currentWeightPercentOf1RM: Math.round(((Number(ex.weight) || 0) / userNote.estimatedOneRepMaxKg) * 100)
+            }
+            : null
         };
       })
     }

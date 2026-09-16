@@ -455,3 +455,64 @@ describe('structureAnalysisForAI: bodyweight_correlation', () => {
     assert.deepEqual(result.bodyweight_correlation, bodyweightCorrelation)
   })
 })
+
+// Regel 19 (OpenAIProvider.js) / Task "1RM deterministisch in Prompt einbauen": das Backend
+// berechnet den %1RM-Wert deterministisch (Regel 1 "Datenwahrheit") aus dem vom Nutzer selbst
+// hinterlegten UserExerciseNote.estimatedOneRepMaxKg - die KI bekommt nur das fertige Ergebnis.
+describe('analyzeExercise: geschätztes 1RM (Regel 19)', () => {
+  test('kein estimatedOneRepMaxKg in userNote -> oneRepMax ist null (Null-Annahmen-Prinzip)', () => {
+    const currentEx = { setDetails: [{ weight: 80, reps: 8, isWarmup: false }] }
+    const analysis = analyzeExercise('Bankdrücken', currentEx, null, 0, { userNote: null })
+    assert.equal(analysis.oneRepMax, null)
+  })
+
+  test('vorhandenes estimatedOneRepMaxKg -> oneRepMax mit korrekt berechnetem %1RM', () => {
+    const currentEx = { setDetails: [{ weight: 80, reps: 8, isWarmup: false }] }
+    const analysis = analyzeExercise('Bankdrücken', currentEx, null, 0, {
+      userNote: { estimatedOneRepMaxKg: 100 }
+    })
+    assert.deepEqual(analysis.oneRepMax, {
+      estimatedOneRepMaxKg: 100,
+      currentWeightPercentOf1RM: 80
+    })
+  })
+
+  test('ungültiger estimatedOneRepMaxKg-Wert (0, negativ, NaN) -> oneRepMax bleibt null', () => {
+    const currentEx = { setDetails: [{ weight: 80, reps: 8, isWarmup: false }] }
+    assert.equal(analyzeExercise('X', currentEx, null, 0, { userNote: { estimatedOneRepMaxKg: 0 } }).oneRepMax, null)
+    assert.equal(analyzeExercise('X', currentEx, null, 0, { userNote: { estimatedOneRepMaxKg: -50 } }).oneRepMax, null)
+    assert.equal(analyzeExercise('X', currentEx, null, 0, { userNote: { estimatedOneRepMaxKg: 'x' } }).oneRepMax, null)
+  })
+})
+
+describe('structureAnalysisForAI: 1RM-Felder (Regel 19)', () => {
+  test('estimated_1rm_kg/current_weight_percent_of_1rm fehlen, wenn kein oneRepMax vorliegt', () => {
+    const exerciseAnalyses = [{
+      exercise: 'Bankdrücken',
+      current: { weight: 80, reps: 8, sets: 1, volume: 640 },
+      previous: null,
+      changes: { weight_change: 0, rep_change: 0, sets_change: 0, volume_change: 0, volume_change_percent: 0 },
+      progression: 'first_session',
+      period_days: 0,
+      oneRepMax: null
+    }]
+    const result = structureAnalysisForAI(exerciseAnalyses)
+    assert.equal('estimated_1rm_kg' in result.exercises[0], false)
+    assert.equal('current_weight_percent_of_1rm' in result.exercises[0], false)
+  })
+
+  test('estimated_1rm_kg/current_weight_percent_of_1rm werden 1:1 durchgereicht, wenn oneRepMax vorliegt', () => {
+    const exerciseAnalyses = [{
+      exercise: 'Speed Squats',
+      current: { weight: 80, reps: 6, sets: 3, volume: 1440 },
+      previous: null,
+      changes: { weight_change: 0, rep_change: 0, sets_change: 0, volume_change: 0, volume_change_percent: 0 },
+      progression: 'first_session',
+      period_days: 0,
+      oneRepMax: { estimatedOneRepMaxKg: 100, currentWeightPercentOf1RM: 80 }
+    }]
+    const result = structureAnalysisForAI(exerciseAnalyses)
+    assert.equal(result.exercises[0].estimated_1rm_kg, 100)
+    assert.equal(result.exercises[0].current_weight_percent_of_1rm, 80)
+  })
+})

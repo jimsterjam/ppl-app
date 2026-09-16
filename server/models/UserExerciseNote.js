@@ -65,7 +65,14 @@ const userExerciseNoteSchema = new mongoose.Schema({
     type: String,
     enum: ['user_input', 'ai_suggested', 'imported'],
     default: 'user_input'
-  }
+  },
+  // Geschätztes 1RM (Maximalgewicht für 1 Wiederholung) des Nutzers für diese Übung - additiv,
+  // komplett unabhängig von noteText/overrides. Vom Nutzer selbst eingegeben (siehe
+  // WorkoutDetailView.vue, aufklappbares Feld pro Übung) und jederzeit aktualisierbar, KEINE
+  // KI-Schätzung (Null-Annahmen-Prinzip: ohne diesen Wert darf die KI nie selbst eins annehmen,
+  // siehe Regel 19 in OpenAIProvider.js). null = nicht erfasst.
+  estimatedOneRepMaxKg: { type: Number, default: null },
+  oneRepMaxUpdatedAt: { type: Date, default: null }
 }, {
   timestamps: true
 });

@@ -122,6 +122,26 @@ describe('collectAllowedNumbers', () => {
     assert.ok(allowed.has(12))
   })
 
+  // Regel 19: 1RM/%1RM sind deterministisch aus einer Nutzereingabe berechnete Zahlen (siehe
+  // analyzeExercise()/structureAnalysisForAI() in trainingAnalysisService.js) - müssen daher
+  // in der erlaubten Zahlenmenge landen, sonst würde der Verifier ein legitimes Zitat dieser
+  // Werte fälschlich als erfundene Zahl (Regel 1) markieren.
+  test('estimated_1rm_kg/current_weight_percent_of_1rm gelten als erlaubt', () => {
+    const allowed = collectAllowedNumbers({
+      exercises: [{
+        estimated_1rm_kg: 100,
+        current_weight_percent_of_1rm: 80
+      }]
+    })
+    assert.ok(allowed.has(100))
+    assert.ok(allowed.has(80))
+  })
+
+  test('fehlende 1RM-Felder crashen nicht und fügen keine Zahlen hinzu', () => {
+    const allowed = collectAllowedNumbers({ exercises: [{ current_weight: 80 }] })
+    assert.equal(allowed.has(100), false)
+  })
+
 })
 
 describe('checkNumberConsistency', () => {
@@ -364,8 +384,8 @@ describe('getRuleLabel', () => {
     assert.match(label, /keine Beschreibung/)
   })
 
-  test('alle 18 Regeln aus dem System-Prompt sind hinterlegt', () => {
-    for (let rule = 1; rule <= 18; rule++) {
+  test('alle 19 Regeln aus dem System-Prompt sind hinterlegt', () => {
+    for (let rule = 1; rule <= 19; rule++) {
       assert.ok(RULE_LABELS[rule], `Regel ${rule} fehlt in RULE_LABELS`)
     }
   })
@@ -382,5 +402,14 @@ describe('getVerifierChecklistText: Regel 10 und 18 (Nachtrag, waren zuvor nicht
     const text = getVerifierChecklistText()
     assert.match(text, /\n18\. /)
     assert.match(text, /bodyweight_correlation/)
+  })
+})
+
+describe('getVerifierChecklistText: Regel 19 (1RM/%1RM)', () => {
+  test('Checkliste erwähnt Regel 19 (estimated_1rm_kg/%1RM) explizit', () => {
+    const text = getVerifierChecklistText()
+    assert.match(text, /\n19\. /)
+    assert.match(text, /estimated_1rm_kg/)
+    assert.match(text, /current_weight_percent_of_1rm/)
   })
 })

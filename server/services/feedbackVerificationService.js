@@ -158,6 +158,12 @@ export function collectAllowedNumbers(structuredAnalysis) {
     // Fließtext wiederholen.
     if (ex.period_days != null) add(Math.floor(Number(ex.period_days) / 7));
 
+    // Geschätztes 1RM des Nutzers + daraus abgeleiteter %1RM-Wert (siehe analyzeExercise() /
+    // structureAnalysisForAI() in trainingAnalysisService.js, Regel 19) - deterministisch
+    // berechnete Zahlen, die im Feedback-Text legitim vorkommen dürfen.
+    add(ex.estimated_1rm_kg);
+    add(ex.current_weight_percent_of_1rm);
+
     add(ex.changes?.weight_change_kg);
     add(ex.changes?.reps_change);
     add(ex.changes?.sets_change);
@@ -346,6 +352,16 @@ Entwurfstext. Du generierst KEIN neues Feedback, du prüfst nur.
     Körpergewicht als Variable). Kein Werturteil über die Gewichtsveränderung selbst ("gut, dass
     du zugenommen hast", "du solltest abnehmen"). Ist period_days sehr klein (wenige Tage), darf
     das nicht mit derselben Sicherheit wie ein über Wochen etablierter Trend präsentiert werden.
+19. 1RM/%1RM (estimated_1rm_kg, current_weight_percent_of_1rm, falls im Datensatz vorhanden):
+    diese Werte sind rein informativ und ausschließlich Nutzereingaben - die KI darf NIEMALS ein
+    eigenes 1RM schätzen oder einen %1RM-Wert nennen, der nicht exakt so in den Daten steht
+    (Null-Annahmen-Prinzip, siehe auch Regel 1). Bei Speed-/Power-/Technik-Übungen (siehe
+    profile_hint bzw. Regel 14/15, z.B. higherRepsAreProgress=false) UND einem hohen
+    current_weight_percent_of_1rm (grob ab 80%) darf NICHT pauschal "erhöhe das Gewicht"
+    empfohlen werden - stattdessen liegt der Fokus auf Ausführungsqualität/Geschwindigkeit
+    (Regel 15). Eine leichte Gewichtssteigerung ist dort erst sinnvoll, wenn die
+    Ausführungsqualität bereits ausgereizt ist, und wird dann nur vorsichtig als eine von
+    mehreren Optionen genannt, nie als alleinige Empfehlung.
 
 Antworte AUSSCHLIESSLICH als valides JSON-Objekt, keine Erklärung davor/danach:
 {
@@ -665,7 +681,8 @@ export const RULE_LABELS = {
   15: 'Speed-/Power-Übung anhand von Volumen/Wiederholungen bewertet',
   16: 'Rohzahlen einer Übung stumpf wiederholt (Dopplung zur UI-Übersicht)',
   17: 'Ton/Format: liest sich wie ein Report statt einer kurzen Chat-Nachricht',
-  18: 'Körpergewicht-Kraft-Gegenüberstellung: Kausalaussage oder Werturteil statt neutraler Fakten-Nebenstellung'
+  18: 'Körpergewicht-Kraft-Gegenüberstellung: Kausalaussage oder Werturteil statt neutraler Fakten-Nebenstellung',
+  19: '1RM/%1RM: eigene Schätzung statt Nutzereingabe, oder pauschale Gewichtssteigerung bei Speed-/Power-Übung trotz hohem %1RM'
 };
 
 export function getRuleLabel(ruleNumber) {

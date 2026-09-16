@@ -263,6 +263,21 @@ KRITISCHE REGELN:
       entsprechend vorsichtig/beiläufig einordnen, nicht mit gleicher Sicherheit wie einen
       etablierten Trend über Wochen präsentieren.
 
+19. 1RM/%1RM (estimated_1rm_kg, current_weight_percent_of_1rm, falls vorhanden) - rein deterministisch
+    berechnete Werte aus einem vom NUTZER selbst hinterlegten Maximalgewicht (1RM). Diese Werte sind
+    eine reine Nutzereingabe, KEINE KI-Schätzung (Null-Annahmen-Prinzip, siehe Regel 2) - schätze
+    niemals selbst ein 1RM oder einen %1RM-Wert, der nicht exakt so in den Daten steht, und triff
+    keine Aussage dazu, wenn diese Felder fehlen (kein "dein 1RM wurde nicht erfasst"-Hinweis).
+    - Bei Speed-/Power-/Technik-Übungen (siehe profile_hint bzw. Regel 14/15, z.B.
+      higherRepsAreProgress=false) UND einem hohen current_weight_percent_of_1rm (grob ab 80%):
+      NICHT pauschal "erhöhe das Gewicht" empfehlen, nur weil das Gewicht seit mehreren Einheiten
+      gleich geblieben ist. Bei diesen Übungen liegt das Ziel primär in der Ausführungsqualität/
+      Geschwindigkeit (z.B. explosiv aus der Hocke), nicht im Steigern der Last. Erst wenn die
+      Ausführungsqualität bereits ausgereizt scheint, darf eine leichte Gewichtssteigerung als EINE
+      von mehreren möglichen Optionen genannt werden - nie als alleinige oder pauschale Empfehlung.
+    - Bei niedrigem/mittlerem %1RM oder Übungen ohne dieses spezielle Profil gilt die normale
+      Gewichts-/Volumenbewertung unverändert (Regeln 1-16).
+
 OUTPUT-FORMAT (Variante "kurze Chat-Nachricht" - das ist jetzt der Standard-Ton):
 Ungefähr 80-150 Wörter, deutlich kürzer als ein klassischer Report. KEINE sichtbaren
 Überschriften, kein Markdown-Fettdruck für Struktur - einfache Zeilen und Bindestriche/
@@ -529,6 +544,14 @@ ${ex.sets_comparison.map(s => {
 **Übungsprofil:** Typ "${p.exerciseType}"${p.targetRepRange?.min != null || p.targetRepRange?.max != null
         ? `, Ziel-Wiederholungsbereich ${p.targetRepRange?.min ?? '?'}-${p.targetRepRange?.max ?? '?'}`
         : ''}. Relevante Metriken für diese Übung: ${relevantMetrics.length > 0 ? relevantMetrics.join(', ') : 'keine der üblichen (Gewicht/Volumen/Reps) - siehe Übungsprofil-Regel'}.`;
+    }
+
+    // Vom Nutzer selbst hinterlegtes 1RM + daraus deterministisch berechneter %1RM-Wert (siehe
+    // Regel 19) - nur ausgeben, wenn tatsächlich vorhanden (Null-Annahmen-Prinzip).
+    if (ex.estimated_1rm_kg != null) {
+      exPrompt += `
+
+**1RM (vom Nutzer hinterlegt):** ${ex.estimated_1rm_kg}kg. Aktuelles Arbeitsgewicht entspricht ca. ${ex.current_weight_percent_of_1rm}% des 1RM (siehe Regel 19).`;
     }
 
     // Kap. 25: persistente Notiz (Rang 1/2) und Session-Notiz getrennt ausgeben, damit die AI

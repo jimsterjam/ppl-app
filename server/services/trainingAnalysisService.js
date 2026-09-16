@@ -257,6 +257,22 @@ export function analyzeExercise(exerciseName, currentEx, previousEx = null, days
   // additiv neben dem bisherigen "note"-Feld, ersetzt es nicht (Rückwärtskompatibilität).
   const noteContext = buildNoteContext({ sessionNote: note, userNote });
 
+  // Geschätztes 1RM des Nutzers für diese Übung (siehe UserExerciseNote.estimatedOneRepMaxKg) -
+  // rein additiv/optional (Null-Annahmen-Prinzip: ohne hinterlegten Wert kein Prozentwert, die
+  // KI darf niemals selbst eins schätzen, siehe Regel 19 in OpenAIProvider.js). Rein
+  // deterministisch berechnet (Regel 1 "Datenwahrheit") - die KI bekommt nur das fertige
+  // Ergebnis, nicht die Rohwerte zum Selbstausrechnen.
+  const estimatedOneRepMaxKg = (typeof userNote?.estimatedOneRepMaxKg === 'number'
+    && Number.isFinite(userNote.estimatedOneRepMaxKg) && userNote.estimatedOneRepMaxKg > 0)
+    ? userNote.estimatedOneRepMaxKg
+    : null;
+  const oneRepMax = estimatedOneRepMaxKg != null
+    ? {
+      estimatedOneRepMaxKg,
+      currentWeightPercentOf1RM: Math.round((currentStats.weight / estimatedOneRepMaxKg) * 100)
+    }
+    : null;
+
   let analysis = {
     exercise: exerciseName,
     current: currentStats,
@@ -272,6 +288,7 @@ export function analyzeExercise(exerciseName, currentEx, previousEx = null, days
     period_days: daysDiff,
     note: note || null,
     noteContext,
+    oneRepMax,
     // Kap. 26: schlanker Hinweis fürs Prompt (Phase 4), damit die AI z.B. bei einer reinen
     // Technikübung nicht trotzdem eine Gewichtssteigerung empfiehlt. Nur gesetzt, wenn ein
     // Profil (global oder per User-Override) tatsächlich vorliegt - sonst weiterhin keine
@@ -646,7 +663,13 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
       ...(ex.noteContext ? { note_context: ex.noteContext } : {}),
 
       // Kap. 26: schlanker Übungsprofil-Hinweis (nur wenn vorhanden) - siehe analyzeExercise().
-      ...(ex.profileHint ? { profile_hint: ex.profileHint } : {})
+      ...(ex.profileHint ? { profile_hint: ex.profileHint } : {}),
+
+      // Geschätztes 1RM (nur wenn vom Nutzer hinterlegt, siehe analyzeExercise()) - Regel 19.
+      ...(ex.oneRepMax ? {
+        estimated_1rm_kg: ex.oneRepMax.estimatedOneRepMaxKg,
+        current_weight_percent_of_1rm: ex.oneRepMax.currentWeightPercentOf1RM
+      } : {})
     })),
 
     // Top-Übungen für AI-Schwerpunkt. weight_change_kg bewusst mit ausgegeben (additiv,
