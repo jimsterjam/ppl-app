@@ -326,6 +326,11 @@ Entwurfstext. Du generierst KEIN neues Feedback, du prüfst nur.
 7. Keine endgültigen Urteile/Anweisungen bei mehrdeutiger Datenlage - nur bedingte Hinweise.
 8. Keine automatische Wertung von Gewichts-/Volumenveränderung als per se positiv/negativ.
 9. Keine Überinterpretation einer einzelnen Trainingseinheit als langfristige Entwicklung.
+10. Trend über mehrere Einheiten: einzelne Abweichungen NICHT als Trend verallgemeinern. Nur ein
+    tatsächlich belegter, wiederkehrender Verlauf (z.B. durch eine bestätigte persistente Notiz,
+    die eine mehrwöchige Entwicklung beschreibt) darf als Trend bezeichnet werden - ein einzelner
+    Vorher/Jetzt-Vergleich ohne einen solchen Beleg ist KEIN Trend (siehe auch Regel 9). Bei
+    widersprüchlichen Daten keine eindeutige Entwicklung behaupten.
 11. Keine erfundene/generische Empfehlung ohne konkreten Datenbezug; maximal 3 Hinweise.
 12. Notizen des Nutzers korrekt berücksichtigt (z.B. Stagnation nicht negativ bewertet, wenn
     eine Notiz das erklärt).
@@ -334,6 +339,13 @@ Entwurfstext. Du generierst KEIN neues Feedback, du prüfst nur.
 14/15. Technikfokus-/Speed-Übungen nicht anhand von Gewicht/Volumen bewertet.
 16. Keine stumpfe Auflistung ALLER Rohzahlen je Übung (Dopplung zur separaten UI-Übersicht).
 17. Ton/Format: warme, kurze Chat-Nachricht (~80-150 Wörter), keine Überschriften/Report-Stil.
+18. Körpergewicht-Kraft-Gegenüberstellung (bodyweight_correlation, falls im Datensatz vorhanden):
+    die Körpergewichtsänderung und die Kraft-Zusammenfassung dürfen NUR nebeneinander genannt
+    werden, NIEMALS als Ursache-Wirkung verknüpft (z.B. "weil du zugenommen hast, bist du stärker
+    geworden" verstößt gegen Regel 18 - das ist derselbe Fehlertyp wie Regel 3, nur mit
+    Körpergewicht als Variable). Kein Werturteil über die Gewichtsveränderung selbst ("gut, dass
+    du zugenommen hast", "du solltest abnehmen"). Ist period_days sehr klein (wenige Tage), darf
+    das nicht mit derselben Sicherheit wie ein über Wochen etablierter Trend präsentiert werden.
 
 Antworte AUSSCHLIESSLICH als valides JSON-Objekt, keine Erklärung davor/danach:
 {
@@ -508,8 +520,22 @@ export async function verifyFeedbackWithAI(structuredAnalysis, feedbackText, opt
  * @returns {string}
  */
 export function buildRevisionUserPrompt(structuredAnalysis, feedbackText, violations = []) {
+  // Bug-Fix (Quality-Loop-Analyse, Regel-18-Testszenarien): der deterministische Zahlen-Check
+  // (checkNumberConsistency) liefert nie ein `quote` (er kennt nur die Position im Text nicht,
+  // nur die abweichende Zahl selbst über `value`) - bisher fiel dieses `value` beim Aufbau der
+  // Liste hier komplett unter den Tisch. Der Korrektur-Call bekam dadurch nur "Regel 1: Im
+  // Entwurf genannte Zahl kommt in den Trainingsdaten nicht vor" OHNE zu wissen, WELCHE Zahl
+  // gemeint ist - bei mehreren Zahlen im Text musste er raten und hat dabei nachweislich (siehe
+  // qualityLoopRunner-Auswertung) auch schon mal eine andere, korrekte Zahl umformuliert statt
+  // die tatsächlich erfundene zu entfernen. Jetzt wird `value` als Fallback angezeigt, wenn kein
+  // `quote` vorhanden ist.
   const violationList = violations
-    .map((v) => `- Regel ${v.rule}${v.quote ? ` (betroffene Stelle: "${v.quote}")` : ''}: ${v.issue}`)
+    .map((v) => {
+      const location = v.quote
+        ? ` (betroffene Stelle: "${v.quote}")`
+        : (v.value !== undefined && v.value !== null ? ` (betroffene Zahl: ${v.value})` : '');
+      return `- Regel ${v.rule}${location}: ${v.issue}`;
+    })
     .join('\n');
 
   // Bug-Fix (Quality-Loop-Analyse, scripts/qualityLoopRunner.js): bei Regel-4-/11-Verstößen
@@ -638,7 +664,8 @@ export const RULE_LABELS = {
   14: 'Technikfokus-Übung anhand von Gewicht/Volumen bewertet',
   15: 'Speed-/Power-Übung anhand von Volumen/Wiederholungen bewertet',
   16: 'Rohzahlen einer Übung stumpf wiederholt (Dopplung zur UI-Übersicht)',
-  17: 'Ton/Format: liest sich wie ein Report statt einer kurzen Chat-Nachricht'
+  17: 'Ton/Format: liest sich wie ein Report statt einer kurzen Chat-Nachricht',
+  18: 'Körpergewicht-Kraft-Gegenüberstellung: Kausalaussage oder Werturteil statt neutraler Fakten-Nebenstellung'
 };
 
 export function getRuleLabel(ruleNumber) {

@@ -301,6 +301,30 @@ describe('buildRevisionUserPrompt', () => {
     const prompt = buildRevisionUserPrompt({}, 'Text', [{ rule: 1, issue: 'Falsche Zahl' }])
     assert.ok(!prompt.includes('WICHTIG bei Regel 4/11'))
   })
+
+  test('Bug-Fix: deterministischer Regel-1-Fund ohne quote zeigt die betroffene Zahl (value) an', () => {
+    // checkNumberConsistency() liefert nie ein quote, nur { rule: 1, issue, value } - vorher
+    // fiel value beim Aufbau der Liste komplett weg, der Korrektur-Call wusste dadurch bei
+    // mehreren Zahlen im Text nicht, welche gemeint war (siehe qualityLoopRunner-Analyse).
+    const prompt = buildRevisionUserPrompt({}, 'Text mit 6 Wiederholungen.', [
+      { rule: 1, issue: 'Im Entwurf genannte Zahl kommt in den Trainingsdaten nicht vor', value: 6 }
+    ])
+    assert.match(prompt, /betroffene Zahl: 6/)
+  })
+
+  test('quote hat Vorrang vor value, wenn beides vorhanden ist', () => {
+    const prompt = buildRevisionUserPrompt({}, 'Text', [
+      { rule: 1, issue: 'x', quote: '6 Wiederholungen', value: 6 }
+    ])
+    assert.match(prompt, /betroffene Stelle: "6 Wiederholungen"/)
+    assert.ok(!prompt.includes('betroffene Zahl:'))
+  })
+
+  test('weder quote noch value vorhanden: keine "betroffene..."-Angabe, aber issue bleibt erhalten', () => {
+    const prompt = buildRevisionUserPrompt({}, 'Text', [{ rule: 17, issue: 'Wortanzahl außerhalb des Rahmens' }])
+    assert.ok(!prompt.includes('betroffene'))
+    assert.ok(prompt.includes('Regel 17: Wortanzahl außerhalb des Rahmens'))
+  })
 })
 
 describe('getVerifierMode', () => {
@@ -340,9 +364,23 @@ describe('getRuleLabel', () => {
     assert.match(label, /keine Beschreibung/)
   })
 
-  test('alle 17 Regeln aus dem System-Prompt sind hinterlegt', () => {
-    for (let rule = 1; rule <= 17; rule++) {
+  test('alle 18 Regeln aus dem System-Prompt sind hinterlegt', () => {
+    for (let rule = 1; rule <= 18; rule++) {
       assert.ok(RULE_LABELS[rule], `Regel ${rule} fehlt in RULE_LABELS`)
     }
+  })
+})
+
+describe('getVerifierChecklistText: Regel 10 und 18 (Nachtrag, waren zuvor nicht in der Checkliste)', () => {
+  test('Checkliste erwähnt Regel 10 explizit (Nummerierung sprang zuvor von 9. auf 11.)', () => {
+    const text = getVerifierChecklistText()
+    assert.match(text, /\n10\. /)
+    assert.match(text, /Trend über mehrere Einheiten/)
+  })
+
+  test('Checkliste erwähnt Regel 18 (bodyweight_correlation) explizit', () => {
+    const text = getVerifierChecklistText()
+    assert.match(text, /\n18\. /)
+    assert.match(text, /bodyweight_correlation/)
   })
 })
