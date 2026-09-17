@@ -48,6 +48,42 @@
           :text="t('onboarding.hintFirstWorkoutText')"
         />
 
+        <!-- Körpergewicht (optional) - bewusst ganz oben, direkt sichtbar beim Öffnen des
+             Workouts statt erst nach dem Durchscrollen der gesamten Übungsliste (User-Feedback).
+             Infotext hinter einem Info-Button versteckt (toggle statt IMMER sichtbar), damit das
+             Feld hier oben möglichst wenig Platz einnimmt. -->
+        <div
+          v-if="!isReordering && !isFavoriteAdjustMode"
+          class="bodyweight-field"
+        >
+          <div class="bodyweight-label-row">
+            <label for="athlete-bodyweight-input">{{ t('workoutDetail.bodyweightLabel') }}</label>
+            <button
+              type="button"
+              class="bodyweight-info-btn"
+              :aria-pressed="showBodyweightHint"
+              :aria-label="t('workoutDetail.bodyweightHint')"
+              @click="showBodyweightHint = !showBodyweightHint"
+            >
+              <Info class="btn-icon btn-icon--inline" aria-hidden="true" />
+            </button>
+          </div>
+          <div class="bodyweight-input-row">
+            <input
+              id="athlete-bodyweight-input"
+              type="number"
+              min="0"
+              max="400"
+              step="0.1"
+              inputmode="decimal"
+              :placeholder="t('workoutDetail.bodyweightPlaceholder')"
+              v-model="athleteBodyweightKg"
+            />
+            <span class="unit">kg</span>
+          </div>
+          <small v-if="showBodyweightHint" class="bodyweight-hint">{{ t('workoutDetail.bodyweightHint') }}</small>
+        </div>
+
           <div id="exercises" ref="exListRef" class="ex-list glass" :class="{ reordering: isReordering }">
 
           <div class="ex-list-header">
@@ -497,27 +533,6 @@
             </div>
           </div>
 
-          <div
-            v-if="!isReordering && !isFavoriteAdjustMode"
-            class="bodyweight-field"
-          >
-            <label for="athlete-bodyweight-input">{{ t('workoutDetail.bodyweightLabel') }}</label>
-            <div class="bodyweight-input-row">
-              <input
-                id="athlete-bodyweight-input"
-                type="number"
-                min="0"
-                max="400"
-                step="0.1"
-                inputmode="decimal"
-                :placeholder="t('workoutDetail.bodyweightPlaceholder')"
-                v-model="athleteBodyweightKg"
-              />
-              <span class="unit">kg</span>
-            </div>
-            <small class="bodyweight-hint">{{ t('workoutDetail.bodyweightHint') }}</small>
-          </div>
-
           <div class="actions">
             <button
               v-if="isReordering"
@@ -793,7 +808,7 @@ import WorkoutTimerConfig from '@/components/timer/WorkoutTimerConfig.vue'
 import SessionStopwatch from '@/components/SessionStopwatch.vue'
 // Einheitliches Icon-Set statt Emoji/ASCII-Mix (🗑️/📝/⋮⋮/▲▼/＋/−) - wie im Rest der App
 // (siehe z.B. BottomNav.vue, AiFeedbackRatingWidget.vue) bereits lucide-vue-next genutzt.
-import { Clock, Trash2, StickyNote, GripVertical, Plus, Minus, Dumbbell } from 'lucide-vue-next'
+import { Clock, Trash2, StickyNote, GripVertical, Plus, Minus, Dumbbell, Info } from 'lucide-vue-next'
 import { useToastStore } from '@/stores/toastStore'
 import { useTimerStore } from '@/stores/timerStore'
 import { useI18n } from 'vue-i18n'
@@ -941,6 +956,10 @@ const athleteBodyweightKg = computed({
 // Epoch) für den Hinweisbanner im Template. null = kein abgeschlossenes Workout bzw. kein
 // bekanntes Fenster (z.B. sehr alte Workouts ohne completedAt).
 const editWindowDeadline = ref(null)
+// Steuert, ob der Infotext zum Körpergewichtsfeld sichtbar ist (siehe .bodyweight-field im
+// Template) - standardmäßig eingeklappt, damit das Feld oben in der Ansicht weniger Platz
+// einnimmt (User-Feedback: Feld soll ganz oben stehen, Infotext hinter einem Info-Button).
+const showBodyweightHint = ref(false)
 const saving = ref(false)
 const saveMsg = ref('')
 const saveError = ref(false)
@@ -3542,7 +3561,10 @@ onBeforeUnmount(() => {
 .spin-btn.down { transform-origin: center; }
 .spin-btn:active { transform: scale(0.98); }
 .bodyweight-field {
-  margin: 6px;
+  /* Jetzt oberhalb der Übungsliste (siehe Template-Kommentar) statt am Ende von .ex-list -
+     etwas mehr Abstand nach unten als vorher (war margin:6px rundum), damit klar erkennbar
+     vom #exercises-Block getrennt. */
+  margin: 6px 6px 14px 6px;
   padding: 12px 14px;
   border-radius: var(--panel-radius, 16px);
   border: 1px solid var(--line-soft);
@@ -3555,6 +3577,29 @@ onBeforeUnmount(() => {
   font-size: 0.92rem;
   font-weight: 600;
   color: var(--fg);
+}
+.bodyweight-label-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.bodyweight-info-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 50%;
+}
+.bodyweight-info-btn:hover,
+.bodyweight-info-btn[aria-pressed="true"] {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 .bodyweight-input-row {
   display: flex;

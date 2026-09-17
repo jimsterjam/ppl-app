@@ -141,8 +141,12 @@ onBeforeUnmount(() => {
   /* Kompakte Breite, aber min-height 40px als ausreichend großes Tap-Ziel (Apple HIG empfiehlt
      min. 44px, 40px ist im engen Header ein vertretbarer Kompromiss) - sonst wirkt der Timer im
      Header zwar sichtbar, aber schwer präzise antippbar ("nicht mehr steuerbar wie vorher"). */
-  padding: 7px 14px;
-  font-size: 0.85rem;
+  /* Etwas breiter/größer (war 7px 14px / 0.85rem) - User-Feedback: Zeitanzeige im Header war
+     "sehr klein". .header-center ist eine auto-Grid-Spalte (siehe HeaderBar.vue), wächst also
+     mit, ohne header-left/header-actions zu verdrängen (die liegen in flexiblen 1fr-Spalten). */
+  padding: 9px 22px;
+  min-width: 108px;
+  font-size: 1.05rem;
   border-radius: 10px;
   white-space: nowrap;
 }
