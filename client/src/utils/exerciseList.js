@@ -9,7 +9,9 @@ export async function getMergedSortedExercises({ category = '', equipment = '', 
   console.log('[DEBUG-CUSTOM] getMergedSortedExercises aufgerufen mit userId:', userId || 'LEER')
   // Build quick lookup by both DE and EN names from defaults
   const normalize = (s) => (s || '').trim().toLowerCase()
-  const isGermanLocale = String(locale || '').toLowerCase().startsWith('de')
+  // locale wird bewusst nicht mehr zur Sprachauswahl des Anzeigenamens verwendet (siehe
+  // pickDisplayName() unten - Übungsnamen sind jetzt immer Englisch) - Parameter bleibt aus
+  // Kompatibilität zu bestehenden Aufrufern erhalten.
   let defaults = []
   try {
     defaults = await loadDefaultExercises()
@@ -26,13 +28,18 @@ export async function getMergedSortedExercises({ category = '', equipment = '', 
     if (en) nameIndex.set(en, d)
   }
 
+  // Produktentscheidung (User-Feedback): Übungsnamen werden IMMER auf Englisch angezeigt, auch
+  // wenn die App auf Deutsch gestellt ist - viele deutsche Übungsnamen in der Datenbank klingen
+  // wörtlich übersetzt und merkwürdig (z.B. "Hebel-Wadenpresse" für "lever calf press"). Bisher
+  // gab es hier einen isGermanLocale-Zweig, der bei deutscher Locale den deutschen Namen
+  // bevorzugte - das war der eigentliche Bug (siehe auch getEnglishExerciseName() in
+  // exerciseTranslation.js, die dieselbe Entscheidung beim Hinzufügen einer Übung zum Workout
+  // umsetzt). isGermanLocale bleibt als Parameter bestehen (Aufrufer übergeben ihn weiterhin),
+  // wird hier aber nicht mehr zur Sprachauswahl verwendet.
   const pickDisplayName = (exercise = {}) => {
     const rawName = exercise?.name || ''
     const d = nameIndex.get(normalize(rawName)) || nameIndex.get(normalize(exercise?.name_en))
-    if (isGermanLocale) {
-      return d?.name || exercise?.names?.de || exercise?.name_de || rawName || exercise?.name_en || ''
-    }
-    return d?.name_en || d?.name || exercise?.name_en || rawName || ''
+    return d?.name_en || exercise?.name_en || d?.name || rawName || ''
   }
   const canonNameKey = (rawName) => {
     const d = nameIndex.get(normalize(rawName))
@@ -110,15 +117,16 @@ export async function getMergedSortedExercises({ category = '', equipment = '', 
     list = list.filter(ex => ex._isCustom || (ex.equipment || '').toLowerCase() === eq)
   }
 
-  // Deduplicate by canonical name + canonical equipment (keep first: defaults preferred)
+  // Deduplicate by canonical name + canonical equipment (keep first: defaults preferred).
+  // War zuvor bei deutscher Locale ein anderer (displayName-basierter) Key - seit
+  // pickDisplayName() immer Englisch liefert, gibt es keinen Grund mehr für einen separaten
+  // Zweig hier, der __canonKey (ebenfalls englisch-kanonisch) ignoriert hätte.
   const seen = new Set()
   const unique = []
   for (const ex of list) {
     const key = ex._isCustom
       ? ex.__canonKey
-      : (isGermanLocale
-          ? normalize(ex.displayName || ex.name || ex.name_en)
-          : (ex.__canonKey || `${normalize(ex.name)}__${normalize(ex.equipment || 'bodyweight')}`))
+      : (ex.__canonKey || `${normalize(ex.name)}__${normalize(ex.equipment || 'bodyweight')}`)
     if (!seen.has(key)) { seen.add(key); unique.push(ex) }
   }
 

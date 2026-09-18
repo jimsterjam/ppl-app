@@ -176,7 +176,14 @@ onMounted(() => {
 function findCatalogMatch(catalog, name) {
   const normalized = String(name || '').trim().toLowerCase()
   if (!normalized) return null
-  return catalog.find((entry) => String(entry?.name || '').trim().toLowerCase() === normalized) || null
+  // Matcht sowohl gegen den deutschen als auch den englischen Katalog-Namen - die KI-Antwort
+  // (ex.name) kann je nach Prompt-Sprache beides liefern. Vorher wurde nur gegen entry.name
+  // (Deutsch) geprüft, ein englisch formulierter KI-Vorschlag hätte also nie gematcht.
+  return catalog.find((entry) => {
+    const de = String(entry?.name || '').trim().toLowerCase()
+    const en = String(entry?.name_en || '').trim().toLowerCase()
+    return de === normalized || en === normalized
+  }) || null
 }
 
 async function generate() {

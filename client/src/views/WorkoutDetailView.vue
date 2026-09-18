@@ -766,7 +766,10 @@ function onAddExerciseConfirm() {
   }
   workout.value.exercises.push({
     exerciseId: selectedId,
-    name: selectedExerciseToAdd.value.name,
+    // Immer den englischen Namen speichern, auch bei deutscher App-Sprache (User-Feedback:
+    // deutsche Namen klingen z.T. sehr merkwürdig, z.B. "Hebel-Wadenpresse"). Siehe
+    // getEnglishExerciseName() in exerciseTranslation.js.
+    name: getEnglishExerciseName(selectedExerciseToAdd.value),
     muscleGroup: selectedExerciseToAdd.value.muscleGroup,
     imageUrl: selectedExerciseToAdd.value.imageUrl || '',
     thumbnailUrl: selectedExerciseToAdd.value.thumbnailUrl || '',
@@ -788,7 +791,7 @@ function onAddExerciseConfirm() {
 import { ref, onMounted, onBeforeUnmount, watch, nextTick, computed } from 'vue'
 import { getCurrentInstance } from 'vue'
 import NumberPicker from '@/components/NumberPicker.vue'
-import { useExerciseTranslation } from '@/utils/exerciseTranslation'
+import { useExerciseTranslation, getEnglishExerciseName } from '@/utils/exerciseTranslation'
 import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
 import { resolveExerciseMedia, buildExerciseMediaUrl } from '@/utils/assetResolver'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
@@ -2946,7 +2949,7 @@ function buildFavoriteSourceWorkout() {
     name: source.name,
     type: source.type,
     notes: buildWorkoutNotesSummary(source.exercises || []),
-    exercises: (source.exercises || []).map((exercise) => ({
+    exercises: (source.exercises || []).map((exercise, idx) => ({
       _id: exercise._id || exercise.exerciseId || null,
       exerciseId: exercise.exerciseId || exercise._id || null,
       name: exercise.name,
@@ -2961,7 +2964,14 @@ function buildFavoriteSourceWorkout() {
         : [{
             reps: Number(exercise.reps) || 10,
             weight: Number(exercise.weight) || 0
-          }]
+          }],
+      // User-Feedback: Notizen sollen im Favoriten mitgespeichert werden, damit beim nächsten
+      // Start dieses Favoriten wieder sichtbar ist, was man sich letztes Mal notiert hat. Aus
+      // exerciseNotes.value lesen (Live-Stand der Notiz-Eingabefelder), nicht nur aus
+      // exercise.note (das wäre der Stand vom letzten Auto-Save, siehe getNote()/setNote()).
+      note: (Array.isArray(exerciseNotes.value) && typeof exerciseNotes.value[idx] !== 'undefined')
+        ? exerciseNotes.value[idx]
+        : (typeof exercise.note === 'string' ? exercise.note : '')
     }))
   }
 }

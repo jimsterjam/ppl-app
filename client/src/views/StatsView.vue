@@ -163,7 +163,7 @@
                 :key="ex._id || ex.name"
                 class="day-overlay-exercise"
               >
-                <span class="day-overlay-ex-name">{{ ex.name }}</span>
+                <span class="day-overlay-ex-name">{{ getTranslatedExerciseName(ex.name) }}</span>
                 <div v-if="getWorkingSetsStat(ex).length" class="day-overlay-sets">
                   <span
                     v-for="(set, si) in getWorkingSetsStat(ex)"
@@ -209,8 +209,12 @@ import { resolveWorkoutNotes } from '@/utils/workoutNotes'
 import { deleteWorkout as deleteWorkoutApi } from '@/api/workouts'
 import { deleteWorkoutFromStats, getWorkoutIdentifier } from '@/utils/workoutDeletion'
 import { dedupeWorkoutsForStats } from '@/utils/workoutMerge'
+import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 
 const { t, locale } = useI18n()
+// Sicherheitsnetz für Übungsnamen, die vor der "immer Englisch"-Umstellung noch mit
+// deutschem Namen gespeichert wurden (siehe getEnglishExerciseName() in exerciseTranslation.js).
+const { getTranslatedExerciseName } = useExerciseTranslation()
 const route = useRoute()
 const store = useUserStore()
 const settings = useSettingsStore()

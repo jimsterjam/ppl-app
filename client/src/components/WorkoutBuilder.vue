@@ -18,7 +18,7 @@ import { getMergedSortedExercises } from '@/utils/exerciseList';
 import { searchAndRankExercises } from '@/utils/exerciseSearch'
 import { consumeWorkoutBuilderPrefill, normalizeBuilderWorkoutType, readWorkoutBuilderRouteState, getDetailDraftKey } from '@/utils/workoutBuilderFlow'
 import { logger } from '@/utils/logger'
-import { useExerciseTranslation } from '@/utils/exerciseTranslation'
+import { useExerciseTranslation, getEnglishExerciseName } from '@/utils/exerciseTranslation'
 import { getActiveDraft, setActiveDraft } from '@/utils/activeWorkoutDraft'
 
 
@@ -363,7 +363,9 @@ async function createWorkout() {
 			userId: userIdComputed.value,
 			exercises: selectedExercises.value.map(ex => ({
 				exerciseId: ex.exerciseId || ex._id || ex.id || null,
-				name: ex.name,
+				// Immer den englischen Namen speichern, auch bei deutscher App-Sprache
+				// (User-Feedback: deutsche Namen klingen z.T. sehr merkwürdig).
+				name: getEnglishExerciseName(ex),
 				sets: (ex.setDetails || []).filter(s => !s.isWarmup).length || ex.setDetails?.length || 3,
 				reps: (ex.setDetails || []).find(s => !s.isWarmup)?.reps ?? ex.reps ?? 10,
 				weight: (ex.setDetails || []).find(s => !s.isWarmup)?.weight ?? ex.weight ?? 0,

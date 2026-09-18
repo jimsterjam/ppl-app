@@ -185,3 +185,23 @@ export function useExerciseTranslation() {
  * @returns {string} Übersetzter Name
  */
 // Nicht mehr benötigt, da alles über die JSON läuft
+
+/**
+ * Liefert den kanonischen (englischen) Namen für einen Katalog-Übungseintrag - zum Aufruf beim
+ * HINZUFÜGEN einer Übung zu einem Workout (WorkoutDetailView.vue onAddExerciseConfirm,
+ * WorkoutBuilder.vue toggleExercise/createWorkout, QuickWorkoutGeneratorView.vue), damit ab dem
+ * Zeitpunkt der Speicherung immer Englisch persistiert wird - unabhängig von der App-Sprache
+ * (User-Feedback: deutsche Übungsnamen klingen bei vielen Einträgen wörtlich übersetzt und
+ * merkwürdig, z.B. "Hebel-Wadenpresse" für "lever calf press"). Damit muss nicht mehr jede
+ * Anzeigestelle (Workout-Card, AI-Feedback-Text, Stats, Favoriten, ...) den Namen selbst
+ * übersetzen - getTranslatedExerciseName() bleibt zusätzlich als Sicherheitsnetz für bereits
+ * VOR dieser Änderung mit deutschem Namen gespeicherte Übungen bestehen.
+ * Für eigene/Custom-Übungen (kein name_en im Katalog vorhanden) bleibt der vom Nutzer selbst
+ * vergebene Name unverändert - dort gibt es nichts zu übersetzen.
+ * @param {Object} exercise - Katalogeintrag (z.B. aus getMergedSortedExercises())
+ * @returns {string}
+ */
+export function getEnglishExerciseName(exercise) {
+  if (!exercise) return ''
+  return exercise.name_en || exercise.displayName || exercise.name || ''
+}
