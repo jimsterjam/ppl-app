@@ -152,7 +152,11 @@ function buildFavoriteWorkoutPayload(workout, type) {
         : [{
             reps: Number(exercise?.reps) || 10,
             weight: Number(exercise?.weight) || 0
-          }]
+          }],
+      // User-Feedback: Notizen sollen mit dem Favoriten gespeichert werden, damit beim nächsten
+      // Start dieses Favoriten sichtbar ist, was beim letzten Mal notiert wurde - vorher wurde
+      // exercise.note hier stillschweigend nicht übernommen (Feld fehlte in diesem Mapping).
+      note: String(exercise?.note || '').trim()
     })).filter((exercise) => exercise.name)
   }
 }
