@@ -365,10 +365,12 @@ Entwurfstext. Du generierst KEIN neues Feedback, du prüfst nur.
 20. Ein einzelner geschaffter Satz mit einer Wiederholung weniger als geplant (v.a. der letzte
     Satz einer Übung) darf NICHT als Rückschritt/Leistungsabfall formuliert werden - das ist
     Ermüdung/Trainieren nah an der Leistungsgrenze, neutral bis positiv einzuordnen.
-21. Gewicht rauf, Wiederholungen runter bei derselben Übung: nur als negativ/Rückschritt
-    werten, wenn das Gesamtvolumen (Gewicht × Wiederholungen × Sätze) laut den Daten
-    tatsächlich gesunken ist. Ist das Gesamtvolumen gestiegen, ist "positiv" die korrekte
-    Einordnung, kein Verstoß.
+21. Gewicht rauf, Wiederholungen runter bei derselben Übung: NIEMALS anhand des Gesamtvolumens
+    (Gewicht × Wiederholungen × Sätze) bewerten oder das Volumen in diesem Zusammenhang
+    erwähnen - das ist ein Verstoß. Bewertungsgrundlage ist die Zielerreichung: bis zu ca. 20%
+    weniger Wiederholungen als geplant gilt als starker Satz (positiv), mehr als ca. 20% weniger
+    darf höchstens als vorsichtiger VERDACHT formuliert werden, dass das Gewicht evtl. etwas zu
+    hoch war - niemals als Rückschritt/Fehler.
 22. Identische Gewichts-/Wiederholungszahlen wie in der letzten Session dürfen NICHT als
     Stagnation/Ausbleiben von Fortschritt bewertet werden (das ist Konsolidierung). Ein
     Plateau-Hinweis ist nur zulässig, wenn die Daten mindestens drei Sessions ohne jede
@@ -698,7 +700,7 @@ export const RULE_LABELS = {
   18: 'Körpergewicht-Kraft-Gegenüberstellung: Kausalaussage oder Werturteil statt neutraler Fakten-Nebenstellung',
   19: '1RM/%1RM: eigene Schätzung statt Nutzereingabe, oder pauschale Gewichtssteigerung bei Speed-/Power-Übung trotz hohem %1RM',
   20: 'Geschaffte Wiederholung weniger als geplant (v.a. letzter Satz) fälschlich als Rückschritt statt als Ermüdung/Leistungsgrenze gewertet',
-  21: 'Mehr Gewicht/weniger Wiederholungen als negativ gewertet, obwohl das Gesamtvolumen laut Daten gestiegen ist',
+  21: 'Mehr Gewicht/weniger Wiederholungen anhand des Gesamtvolumens statt der Zielerreichung bewertet, oder eine deutlich verfehlte Wiederholungszahl als Rückschritt statt als vorsichtigen Verdacht (Gewicht evtl. zu hoch) formuliert',
   22: 'Identische Zahlen wie letzte Session fälschlich als Stagnation statt Konsolidierung gewertet, oder Plateau-Hinweis ohne 3+ unveränderte Sessions',
   23: 'Vorsichtig/warnend klingende Formulierung genutzt ("achte darauf", "behalte im Blick", "passe an", "sei vorsichtig") statt handlungsorientierter Sprache'
 };

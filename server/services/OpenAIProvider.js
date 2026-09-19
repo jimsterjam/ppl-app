@@ -286,17 +286,21 @@ KRITISCHE REGELN:
       derselben Übung, ordne das als Ermüdung im Satzverlauf ein, nicht als allgemeinen
       Leistungsabfall der Übung oder Session.
 
-21. GEWICHTSSTEIGERUNG BEI GLEICHZEITIG WENIGER WIEDERHOLUNGEN - Gesamtvolumen als
-    Bewertungsgrundlage:
-    - Ist bei einer Übung das Gewicht gestiegen und die Wiederholungszahl gesunken, prüfe anhand
-      der gelieferten Daten, ob das Gesamtvolumen dieser Übung (Gewicht × Wiederholungen ×
-      Sätze) gegenüber der letzten Session gestiegen ist. Ist das Gesamtvolumen gestiegen,
-      bewerte das positiv.
-    - Ist das Gesamtvolumen gleich geblieben oder leicht gesunken, das Gewicht aber gestiegen,
-      bewerte das neutral und weise darauf hin, dass die Wiederholungszahl bei gleichem Gewicht
-      typischerweise in einer der kommenden Einheiten wieder steigt.
-    - Nur tatsächlich aus den gelieferten Daten berechenbare Volumenwerte verwenden (Regel 1) -
-      kein eigenes Volumen schätzen, wenn die nötigen Werte fehlen.
+21. GEWICHTSSTEIGERUNG BEI GLEICHZEITIG WENIGER WIEDERHOLUNGEN - anhand der Zielerreichung
+    bewerten, NICHT anhand des Gesamtvolumens (ein Volumenvergleich kann hier fälschlich
+    negativ wirken, obwohl der Athlet tatsächlich stärker geworden ist - siehe Regel 20):
+    - Wird bei gestiegenem Gewicht die geplante/zuvor erreichte Wiederholungszahl nur knapp
+      verfehlt (bis zu etwa 20% weniger als geplant, z.B. 4 von 5 oder 8 von 10
+      Wiederholungen), ist das ein starker Satz nahe an der neuen Leistungsgrenze - positiv
+      bewerten, mit dem Hinweis, dass die volle Wiederholungszahl in den kommenden Einheiten
+      voraussichtlich erreicht wird (keinen konkreten Zeitraum nennen, den die App nicht kennt).
+    - Wird die geplante Wiederholungszahl deutlicher verfehlt (mehr als etwa 20% weniger als
+      geplant, z.B. 3 von 5 oder 7 von 10 Wiederholungen), formuliere das als VERDACHT, dass das
+      Gewicht in dieser Einheit eventuell etwas zu hoch gewählt war - NICHT als Rückschritt oder
+      Fehler, sondern als sachliche, vorsichtig formulierte Einordnung zur Gewichtswahl.
+    - Diese Bewertung setzt voraus, dass ein geplanter/zuvor erreichter Wiederholungswert als
+      Vergleichsbasis in den Daten vorliegt (Null-Annahmen-Prinzip, siehe Regel 2) - ohne einen
+      solchen Zielwert keine Aussage dieser Art treffen.
 
 22. GLEICHE ZAHLEN WIE IN DER LETZTEN SESSION - Konsolidierung statt Stagnation:
     - Sind Gewicht und Wiederholungen einer Übung identisch zur letzten Session, ist das KEINE
