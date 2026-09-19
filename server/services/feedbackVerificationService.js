@@ -285,7 +285,7 @@ export function runDeterministicChecks(feedbackText, structuredAnalysis) {
 // ---------------------------------------------------------------------------------------------
 
 /**
- * Knappe, für den zweiten KI-Call optimierte Fassung der 17 Regeln aus getCoachSystemPromptText()
+ * Knappe, für den zweiten KI-Call optimierte Fassung der 23 Regeln aus getCoachSystemPromptText()
  * (OpenAIProvider.js) - bewusst KEIN vollständiger Nachdruck des Systemprompts (das würde den
  * Prüfaufruf unnötig teuer machen), sondern eine Stichpunkt-Checkliste mit den Regel-Nummern,
  * damit die Admin-Auswertung (VerifierAudit.triggeredRules) auf dieselben Nummern wie der
@@ -362,6 +362,20 @@ Entwurfstext. Du generierst KEIN neues Feedback, du prüfst nur.
     (Regel 15). Eine leichte Gewichtssteigerung ist dort erst sinnvoll, wenn die
     Ausführungsqualität bereits ausgereizt ist, und wird dann nur vorsichtig als eine von
     mehreren Optionen genannt, nie als alleinige Empfehlung.
+20. Ein einzelner geschaffter Satz mit einer Wiederholung weniger als geplant (v.a. der letzte
+    Satz einer Übung) darf NICHT als Rückschritt/Leistungsabfall formuliert werden - das ist
+    Ermüdung/Trainieren nah an der Leistungsgrenze, neutral bis positiv einzuordnen.
+21. Gewicht rauf, Wiederholungen runter bei derselben Übung: nur als negativ/Rückschritt
+    werten, wenn das Gesamtvolumen (Gewicht × Wiederholungen × Sätze) laut den Daten
+    tatsächlich gesunken ist. Ist das Gesamtvolumen gestiegen, ist "positiv" die korrekte
+    Einordnung, kein Verstoß.
+22. Identische Gewichts-/Wiederholungszahlen wie in der letzten Session dürfen NICHT als
+    Stagnation/Ausbleiben von Fortschritt bewertet werden (das ist Konsolidierung). Ein
+    Plateau-Hinweis ist nur zulässig, wenn die Daten mindestens drei Sessions ohne jede
+    Veränderung bei dieser Übung belegen.
+23. Vermeidung bestimmter vorsichtig/warnend klingender Formulierungen: "achte darauf",
+    "behalte im Blick", "passe an", "sei vorsichtig" gelten als Verstoß, wenn sie im Entwurf
+    wörtlich oder sinngemäß vorkommen.
 
 Antworte AUSSCHLIESSLICH als valides JSON-Objekt, keine Erklärung davor/danach:
 {
@@ -682,7 +696,11 @@ export const RULE_LABELS = {
   16: 'Rohzahlen einer Übung stumpf wiederholt (Dopplung zur UI-Übersicht)',
   17: 'Ton/Format: liest sich wie ein Report statt einer kurzen Chat-Nachricht',
   18: 'Körpergewicht-Kraft-Gegenüberstellung: Kausalaussage oder Werturteil statt neutraler Fakten-Nebenstellung',
-  19: '1RM/%1RM: eigene Schätzung statt Nutzereingabe, oder pauschale Gewichtssteigerung bei Speed-/Power-Übung trotz hohem %1RM'
+  19: '1RM/%1RM: eigene Schätzung statt Nutzereingabe, oder pauschale Gewichtssteigerung bei Speed-/Power-Übung trotz hohem %1RM',
+  20: 'Geschaffte Wiederholung weniger als geplant (v.a. letzter Satz) fälschlich als Rückschritt statt als Ermüdung/Leistungsgrenze gewertet',
+  21: 'Mehr Gewicht/weniger Wiederholungen als negativ gewertet, obwohl das Gesamtvolumen laut Daten gestiegen ist',
+  22: 'Identische Zahlen wie letzte Session fälschlich als Stagnation statt Konsolidierung gewertet, oder Plateau-Hinweis ohne 3+ unveränderte Sessions',
+  23: 'Vorsichtig/warnend klingende Formulierung genutzt ("achte darauf", "behalte im Blick", "passe an", "sei vorsichtig") statt handlungsorientierter Sprache'
 };
 
 export function getRuleLabel(ruleNumber) {
