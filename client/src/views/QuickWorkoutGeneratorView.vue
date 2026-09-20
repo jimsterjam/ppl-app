@@ -86,6 +86,7 @@
           <textarea
             v-model="form.restrictions"
             rows="2"
+            maxlength="200"
             :placeholder="t('quickGenerator.restrictionsPlaceholder') || 'z.B. keine Kniebeugen wegen Knieproblemen'"
           />
         </div>
