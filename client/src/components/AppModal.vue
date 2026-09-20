@@ -34,6 +34,7 @@
 <script setup>
 import { onBeforeUnmount, nextTick, watch, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useScrollLock } from '@/composables/useScrollLock'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -76,17 +77,24 @@ function onKey(e) {
   if (e.key === 'Escape' && !props.persistent) { onCancel() }
 }
 
+const { lock: lockBodyScroll, unlock: unlockBodyScroll } = useScrollLock()
+
 watch(() => props.modelValue, async (open) => {
   if (open) {
+    lockBodyScroll()
     await nextTick()
     confirmBtn.value?.focus?.()
     window.addEventListener('keydown', onKey)
   } else {
+    unlockBodyScroll()
     window.removeEventListener('keydown', onKey)
   }
 })
 
-onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onKey)
+  unlockBodyScroll()
+})
 </script>
 
 <style scoped>

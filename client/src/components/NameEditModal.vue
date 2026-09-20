@@ -1,4 +1,5 @@
 <template>
+  <Teleport to="body">
   <Transition name="modal" appear>
     <div v-if="modelValue" class="modal-overlay" @click.self="close">
       <div class="modal-content" @click.stop>
@@ -30,18 +31,20 @@
       </div>
     </div>
   </Transition>
+  </Teleport>
 </template>
 
 <script setup>
 // Kleines, eigenständiges Modal zum Bearbeiten des Anzeigenamens - direkt aus dem Dashboard
 // aufrufbar (User-Feedback: Name soll nicht mehr über einen Umweg über die Settings-Seite
 // geändert werden). Übernimmt die Speicherlogik 1:1 aus SettingsView.vue (saveUsername()).
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, nextTick, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useToastStore } from '@/stores/toastStore'
 import { initFirebaseAuth, useFirebaseAuth } from '@/utils/firebaseAuth'
 import { logger } from '@/utils/logger'
+import { useScrollLock } from '@/composables/useScrollLock'
 
 const { t: $t } = useI18n()
 const settings = useSettingsStore()
@@ -60,13 +63,18 @@ const saving = ref(false)
 const inputRef = ref(null)
 
 // Beim Öffnen den aktuellen Namen als Ausgangswert übernehmen und das Feld fokussieren.
+const { lock: lockBodyScroll, unlock: unlockBodyScroll } = useScrollLock()
 watch(() => props.modelValue, async (open) => {
   if (open) {
     nameDraft.value = settings.username || ''
+    lockBodyScroll()
     await nextTick()
     inputRef.value?.focus()
+  } else {
+    unlockBodyScroll()
   }
 })
+onBeforeUnmount(unlockBodyScroll)
 
 function close() {
   emit('update:modelValue', false)

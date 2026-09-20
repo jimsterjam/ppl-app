@@ -1,4 +1,5 @@
 <template>
+  <Teleport to="body">
   <div class="modal-overlay" @click.self="!submitting && $emit('close')">
     <div class="modal-content feedback-modal">
       <div class="modal-header">
@@ -57,10 +58,11 @@
       </div>
     </div>
   </div>
+  </Teleport>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { Capacitor } from '@capacitor/core'
@@ -68,6 +70,7 @@ import { App as CapacitorApp } from '@capacitor/app'
 import { submitAppFeedback } from '@/api/feedback'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { logger } from '@/utils/logger'
+import { useScrollLock } from '@/composables/useScrollLock'
 
 // Allgemeiner Feedback-Dialog (Fehler/Idee/Unklarheit) - siehe server/routes/feedback.js,
 // server/models/AppFeedback.js. KOMPLETT GETRENNT von der Bewertung einzelner KI-Feedbacks
@@ -91,6 +94,13 @@ const consentGiven = ref(false)
 const submitting = ref(false)
 const success = ref(false)
 const errorMessage = ref('')
+
+// Diese Komponente wird komplett gemounted/entmountet (v-if am Aufrufer, z.B.
+// SettingsView.vue/PostWorkoutSummary.vue), nicht intern ein-/ausgeblendet -
+// daher Sperre direkt an den Lifecycle koppeln statt an ein Prop/watch.
+const { lock: lockBodyScroll, unlock: unlockBodyScroll } = useScrollLock()
+onMounted(lockBodyScroll)
+onBeforeUnmount(unlockBodyScroll)
 
 async function getIdTokenSafe() {
   try {
@@ -165,6 +175,126 @@ async function submit() {
 </script>
 
 <style scoped>
+/* Eigenständige Modal-Chrome-Styles (Overlay/Content/Header/Actions/Buttons) statt wie zuvor
+   implizit von Klassen des Aufrufers (SettingsView.vue) mitzuerben: über Vue's Scoped-CSS-
+   Vererbung auf Root-Elemente von Kindkomponenten wirkte das dort zufällig, war aber beim
+   zweiten Aufrufer (PostWorkoutSummary.vue, definiert dort kein .modal-overlay) komplett
+   ungestylt - das Dialogfenster hätte dort ohne echtes Overlay/Fixed-Positioning gerendert. */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
+.modal-content {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  max-width: 500px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  max-height: calc(100vh - 40px);
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 24px 0;
+  margin-bottom: 16px;
+}
+
+.modal-header h3 {
+  color: var(--fg);
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.close-btn:hover {
+  background: var(--surface);
+  color: var(--fg);
+}
+
+.modal-body {
+  padding: 0 24px 24px;
+  overflow: auto;
+}
+
+.warning-text {
+  color: var(--muted);
+  margin-bottom: 20px;
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  padding: 0 24px 24px;
+}
+
+.cancel-btn {
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  color: var(--fg);
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cancel-btn:hover {
+  background: color-mix(in srgb, var(--fg) 10%, var(--surface));
+}
+
+.confirm-danger-btn {
+  background: var(--danger);
+  border: none;
+  color: white;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.confirm-danger-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 85%, black);
+  transform: translateY(-1px);
+}
+
+.confirm-danger-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .feedback-categories {
   display: flex;
   flex-direction: column;

@@ -1,4 +1,5 @@
 <template>
+  <Teleport to="body">
   <div v-if="visible" class="picker-overlay" @click.self="onCancel">
     <div class="picker-sheet" role="dialog" aria-modal="true">
       <header class="picker-header">
@@ -69,11 +70,13 @@
       </div>
     </div>
   </div>
+  </Teleport>
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted, onBeforeUnmount } from 'vue'
 import { logger } from '@/utils/logger'
+import { useScrollLock } from '@/composables/useScrollLock'
 
 const props = defineProps({
   visible: { type: Boolean, default: false },
@@ -113,9 +116,16 @@ watch(() => props.value, (v) => {
   }
 })
 
+const { lock: lockBodyScroll, unlock: unlockBodyScroll } = useScrollLock()
+onBeforeUnmount(unlockBodyScroll)
+
 // When the picker becomes visible, measure and initialize scrolling
 watch(() => props.visible, async (v) => {
-  if (!v) return
+  if (!v) {
+    unlockBodyScroll()
+    return
+  }
+  lockBodyScroll()
   await nextTick()
   syncSplitFromValue(internalValue.value)
   try {

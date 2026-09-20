@@ -46,6 +46,7 @@
       <button class="done-btn" @click="$emit('done')">{{ doneLabel }}</button>
     </div>
 
+    <Teleport to="body">
     <div v-if="mediaExercise" class="media-overlay" @click.self="closeMedia">
       <div class="media-content">
         <video
@@ -66,13 +67,15 @@
         <button class="close-btn" @click="closeMedia">OK</button>
       </div>
     </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch, onBeforeUnmount } from 'vue'
 import { resolveExerciseMedia, getExerciseThumb, buildExerciseMediaUrl } from '@/utils/assetResolver'
 import { searchAndRankExercises } from '@/utils/exerciseSearch'
+import { useScrollLock } from '@/composables/useScrollLock'
 
 const props = defineProps({
   exercises: { type: Array, default: () => [] },
@@ -98,6 +101,10 @@ const brokenImageIds = ref(new Set())
 const mediaExercise = ref(null)
 const mediaUrl = ref('')
 const mediaRequestId = ref(0)
+
+const { lock: lockBodyScroll, unlock: unlockBodyScroll } = useScrollLock()
+watch(mediaExercise, (ex) => (ex ? lockBodyScroll() : unlockBodyScroll()))
+onBeforeUnmount(unlockBodyScroll)
 const isVideoUrl = (url) => typeof url === 'string' && /\.mp4($|[?#])/i.test(url)
 
 const filtered = computed(() => {

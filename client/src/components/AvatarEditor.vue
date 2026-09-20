@@ -26,6 +26,11 @@
     />
 
     <!-- Avatar Crop/Compress -->
+    <!-- Teleport auf document.body: .header-bar (Elternkomponente HeaderBar) hat
+         backdrop-filter gesetzt, das erzeugt einen neuen Containing Block für
+         position:fixed-Nachfahren. Ohne Teleport würde dieses Modal relativ zur
+         kleinen Header-Box statt zum Viewport positioniert (zu weit oben, abgeschnitten). -->
+    <Teleport to="body">
     <Transition name="modal" appear>
       <div v-if="showAvatarCropModal" class="modal-overlay" @click.self="!cropProcessing && cancelAvatarCrop()">
         <div class="modal-content" @click.stop>
@@ -65,6 +70,7 @@
         </div>
       </div>
     </Transition>
+    </Teleport>
   </div>
 </template>
 
@@ -84,6 +90,7 @@ import { Capacitor } from '@capacitor/core'
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera'
 import { logger } from '@/utils/logger'
 import { uploadProfileAvatar } from '@/api/account'
+import { useScrollLock } from '@/composables/useScrollLock'
 
 const { t: $t } = useI18n()
 const settings = useSettingsStore()
@@ -152,6 +159,11 @@ const isNativePlatform = computed(() => {
 
 // Crop/Compress modal state
 const showAvatarCropModal = ref(false)
+
+// Hintergrund-Scroll sperren, solange das Crop-Modal offen ist
+const { lock: lockBodyScroll, unlock: unlockBodyScroll } = useScrollLock()
+watch(showAvatarCropModal, (open) => (open ? lockBodyScroll() : unlockBodyScroll()))
+onBeforeUnmount(unlockBodyScroll)
 const avatarSourceFile = ref(null)
 const avatarCropUrl = ref('')
 const cropBoxRef = ref(null)

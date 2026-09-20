@@ -1,4 +1,5 @@
 <template>
+  <Teleport to="body">
   <div v-if="show" class="upgrade-modal-overlay" @click.self="$emit('close')">
     <div class="upgrade-modal glass">
       <div class="modal-header">
@@ -105,19 +106,25 @@
       </div>
     </div>
   </div>
+  </Teleport>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useToastStore } from '@/stores/toastStore'
 import { logger } from '@/utils/logger'
+import { useScrollLock } from '@/composables/useScrollLock'
 
 const props = defineProps({
   show: Boolean,
   limitType: String // 'workouts', 'exercises', 'general'
 })
+
+const { lock: lockBodyScroll, unlock: unlockBodyScroll } = useScrollLock()
+watch(() => props.show, (open) => (open ? lockBodyScroll() : unlockBodyScroll()))
+onBeforeUnmount(unlockBodyScroll)
 
 const emit = defineEmits(['close', 'continue-free', 'upgraded'])
 
