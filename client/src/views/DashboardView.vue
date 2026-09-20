@@ -2,27 +2,17 @@
   <div class="dashboard">
     <!-- Header -->
     <HeaderBar
-      :title="userSubtitle || $t('dashboard.title')"
+      :title="userSubtitle || $t('dashboard.yourNamePlaceholder')"
       :show-user-name="false"
+      title-clickable
+      @title-click="showNameModal = true"
     >
       <template #leading>
-        <button
-          class="dashboard-avatar"
-          type="button"
-          :aria-label="$t('settings.title')"
-          @click="router.push({ name: 'settings' })"
-        >
-          <img
-            v-if="avatarSrc && !avatarLoadError"
-            class="dashboard-avatar__img"
-            :src="avatarSrc"
-            alt=""
-            @error="onAvatarImgError"
-          />
-          <span v-else class="dashboard-avatar__fallback">{{ avatarInitials }}</span>
-        </button>
+        <AvatarEditor :initials="avatarInitials" />
       </template>
     </HeaderBar>
+
+    <NameEditModal v-model="showNameModal" />
 
     <main class="dashboard-content" :class="{ 'has-draft': hasDraft }">
       <section class="hero">
@@ -256,6 +246,8 @@ import WorkoutTimerConfig from '@/components/timer/WorkoutTimerConfig.vue'
 import OneTimeHint from '@/components/OneTimeHint.vue'
 import { logger } from '@/utils/logger'
 import SessionStopwatch from '@/components/SessionStopwatch.vue'
+import AvatarEditor from '@/components/AvatarEditor.vue'
+import NameEditModal from '@/components/NameEditModal.vue'
 
 
 const store = useUserStore()
@@ -277,6 +269,9 @@ const showTimerConfig = ref(false)
 const detailDraft = ref(null)
 const showInfoModal = ref(false)
 const infoMessage = ref('')
+// Name-Bearbeiten direkt im Dashboard (Klick auf den Titel/Namen im Header) statt Umleitung zu
+// den Settings - siehe HeaderBar.vue titleClickable/@title-click und NameEditModal.vue.
+const showNameModal = ref(false)
 const draftSourceLogged = ref(false)
 const pendingWorkoutType = ref('push')
 const startFlowStep = ref('idle')
@@ -408,16 +403,9 @@ const userSubtitle = computed(() => {
   return displayName || ''
 })
 
-const avatarLoadError = ref(false)
-// avatarData (DataURL-Cache, localStorage) hat Vorrang vor der Server-URL,
-// da letztere auf iOS via img-Tag durch ATS blockiert werden kann.
-const avatarSrc = computed(() => {
-  const data = String(settings.avatarData || '').trim()
-  if (data) return data
-  return String(settings.avatarUrl || '').trim()
-})
-const avatarFallbackSrc = computed(() => String(settings.avatarUrl || '').trim())
-
+// Zeigt Bild/Upload/Crop nun direkt AvatarEditor.vue (siehe #leading-Slot oben) - Initialen für
+// dessen Fallback werden weiterhin hier berechnet, da diese Komponente den angezeigten Namen
+// nicht selbst kennt.
 const avatarInitials = computed(() => {
   const name = String(userSubtitle.value || '').trim()
   if (!name) return 'U'
@@ -595,16 +583,6 @@ async function readDetailDraft() {
     detailDraft.value = null
     logDraftSourceOnce()
   }
-}
-
-function onAvatarImgError(e) {
-  // Falls DataURL-Anzeige fehlschlägt (sollte nicht passieren), Server-URL probieren
-  const fallback = avatarFallbackSrc.value
-  if (fallback && e?.target && e.target.src !== fallback) {
-    e.target.src = fallback
-    return
-  }
-  avatarLoadError.value = true
 }
 
 const onOnlineStatus = () => { isOffline.value = false }
@@ -1031,51 +1009,6 @@ onActivated(async () => {
   gap: 8px;
   padding-top: 10px;
   padding-bottom: calc(78px + env(safe-area-inset-bottom, 0px));
-}
-
-.dashboard-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 999px;
-  border: 1px solid var(--line-soft);
-  background: var(--card-bg);
-  padding: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  cursor: pointer;
-  box-shadow: var(--shadow-soft);
-  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
-}
-
-.dashboard-avatar:hover {
-  transform: translateY(-1px);
-  border-color: var(--line-strong);
-  background: var(--bg-panel);
-}
-
-.dashboard-avatar:active {
-  transform: translateY(0);
-}
-
-.dashboard-avatar__img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.dashboard-avatar__fallback {
-  width: 100%;
-  height: 100%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  color: var(--fg);
-  background: var(--card-bg);
 }
 
 .hero {

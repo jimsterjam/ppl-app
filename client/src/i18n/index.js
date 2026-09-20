@@ -68,6 +68,9 @@ export const messages = {
     },
   dashboard: {
       title: 'Startbereich',
+      // Platzhalter im Header, solange kein Anzeigename gesetzt ist - klickbar (siehe
+      // HeaderBar.vue titleClickable), führt direkt zum Namens-Bearbeiten-Modal im Dashboard.
+      yourNamePlaceholder: 'Dein Name',
       greetingMorning: 'Guten Morgen',
       greetingDay: 'Guten Tag',
       greetingEvening: 'Guten Abend',
@@ -998,6 +1001,7 @@ export const messages = {
     },
   dashboard: {
       title: 'Launchpad',
+      yourNamePlaceholder: 'Your Name',
       greetingMorning: 'Good morning',
       greetingDay: 'Good day',
       greetingEvening: 'Good evening',

@@ -4,7 +4,10 @@
       <div class="header-left">
         <slot name="leading"></slot>
         <div class="header-titles">
-          <h1>{{ title }}</h1>
+          <h1
+            :class="{ 'header-title--clickable': titleClickable }"
+            @click="titleClickable && $emit('title-click')"
+          >{{ title }}</h1>
           <p v-if="subtitle" class="header-subtitle">{{ subtitle }}</p>
         </div>
       </div>
@@ -46,8 +49,18 @@ defineProps({
   showUserName: {
     type: Boolean,
     default: false
+  },
+  // Optional: macht den Titel (h1) klickbar - z.B. für DashboardView.vue, wo ein Klick auf den
+  // (Anzeige-)Namen direkt das Namens-Bearbeiten öffnen soll, statt über die Settings-Seite
+  // umzuleiten. Standardmäßig aus, damit sich bestehende Verwender von HeaderBar (die meisten
+  // Views zeigen hier nur den statischen Seitentitel) nicht ändern.
+  titleClickable: {
+    type: Boolean,
+    default: false
   }
 })
+
+defineEmits(['title-click'])
 
 const { signInWithGoogle, signOut, onAuthStateChanged, getCurrentUser } = useFirebaseAuth()
 const signedIn = ref(false)
@@ -137,6 +150,14 @@ onAuthStateChanged((user) => {
   font-weight: 700;
   color: var(--fg);
   letter-spacing: -0.01em;
+}
+
+.header-bar h1.header-title--clickable {
+  cursor: pointer;
+}
+
+.header-bar h1.header-title--clickable:active {
+  opacity: 0.7;
 }
 
 .header-subtitle {
