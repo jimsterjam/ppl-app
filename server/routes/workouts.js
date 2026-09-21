@@ -2087,6 +2087,12 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
 
     const profileByExerciseName = new Map();
     const userNoteByExerciseName = new Map();
+    // Bug-Fix (User-Report): Das KI-Feedback zeigte für Katalog-Übungen immer den deutschen
+    // Anzeigenamen (exercise.name), nie die englische Bezeichnung, obwohl Exercise.names.en
+    // laut Schema-Kommentar explizit "für AI-Mapping" gedacht ist - dieses Feld wurde bisher an
+    // dieser Stelle nie gelesen. Lookup nur über die Übungsnamen DIESES Workouts (wie oben bei
+    // profileByExerciseName/userNoteByExerciseName).
+    const enNameByExerciseName = new Map();
 
     if (exerciseNamesInWorkout.length > 0) {
       const [exerciseDocs, userNoteDocs] = await Promise.all([
@@ -2095,6 +2101,7 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
       ]);
       for (const doc of exerciseDocs) {
         if (doc.metricProfile) profileByExerciseName.set((doc.name || '').toLowerCase(), doc.metricProfile);
+        if (doc.names?.en) enNameByExerciseName.set((doc.name || '').toLowerCase(), doc.names.en);
       }
       for (const doc of userNoteDocs) {
         userNoteByExerciseName.set((doc.exerciseName || '').toLowerCase(), doc);
@@ -2104,7 +2111,8 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
     // 3. Backend-Berechnung: Analysiere Fortschritte
     let exerciseAnalyses = analyzeWorkoutProgression(currentWorkout, allWorkouts, {
       profileByExerciseName,
-      userNoteByExerciseName
+      userNoteByExerciseName,
+      enNameByExerciseName
     });
 
     // Fallback: Wenn keine Vorwerte existieren, nutze aktuelle Übungen als Basis-Analyse
@@ -2117,6 +2125,10 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
         const sessionNote = (typeof ex.note === 'string' ? ex.note.trim() : '') || '';
         return {
           exercise: ex.name || 'Unknown',
+          // Gleicher Fix wie in analyzeWorkoutProgression() (trainingAnalysisService.js): nur
+          // dieses separate Feld (von structureAnalysisForAI() gelesen) wechselt auf Englisch,
+          // "exercise" bleibt Deutsch für Frontend-Snapshot/buildVolumeHistory-Lookups.
+          exerciseNameForAI: enNameByExerciseName.get(lookupKey) || ex.name || 'Unknown',
           current: {
             weight: Number(ex.weight) || 0,
             reps: Number(ex.reps) || 0,

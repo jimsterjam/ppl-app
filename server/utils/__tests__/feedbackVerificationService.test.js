@@ -169,6 +169,33 @@ describe('checkNumberConsistency', () => {
     assert.equal(result.violations[0].rule, 1)
     assert.equal(result.violations[0].value, 999)
   })
+
+  test('Regression (User-Report): interpolierter Zwischenwert (27.5kg) statt echter satzgenauer Werte wird erkannt', () => {
+    // Realer Fall: "Klimmzug mit Gewicht", Sätze 1-6 unverändert bei 30kg, nur Satz 7 änderte
+    // sich von 15kg auf 20kg (+5kg, +1 Wdh.). Der KI-Fließtext behauptete fälschlich "Gewicht in
+    // den ersten drei Sätzen auf 27.5kg erhöht" - dieser Wert kommt in den satzgenauen Rohdaten
+    // nirgends vor (kein Satz hatte je 27.5kg) und muss als erfundene Zahl markiert werden.
+    const weightedPullUpAnalysis = {
+      total_exercises_analyzed: 1,
+      exercises: [{
+        current_weight: 30,
+        current_reps: 6,
+        current_sets: 7,
+        current_volume: 1275,
+        changes: { weight_change_kg: 0, reps_change: 1, sets_change: 0, volume_change_kg: 5, volume_change_percent: 0.4 },
+        sets_comparison: [
+          { set_number: 1, current_weight: 30, current_reps: 5, previous_weight: 30, previous_reps: 5, weight_change_kg: 0, reps_change: 0 },
+          { set_number: 2, current_weight: 30, current_reps: 5, previous_weight: 30, previous_reps: 5, weight_change_kg: 0, reps_change: 0 },
+          { set_number: 3, current_weight: 30, current_reps: 5, previous_weight: 30, previous_reps: 5, weight_change_kg: 0, reps_change: 0 },
+          { set_number: 7, current_weight: 20, current_reps: 6, previous_weight: 15, previous_reps: 5, weight_change_kg: 5, reps_change: 1 }
+        ]
+      }]
+    }
+    const feedbackText = 'Klimmzug mit Gewicht: Gewicht in den ersten drei Sätzen auf 27.5kg erhöht und eine Wiederholung mehr im letzten Satz.'
+    const result = checkNumberConsistency(feedbackText, weightedPullUpAnalysis)
+    assert.equal(result.ok, false)
+    assert.ok(result.violations.some((v) => v.rule === 1 && v.value === 27.5))
+  })
 })
 
 describe('checkWordBudget', () => {

@@ -365,11 +365,23 @@ export function analyzeExercise(exerciseName, currentEx, previousEx = null, days
  */
 export function analyzeWorkoutProgression(currentWorkout, allWorkouts, profileMaps = {}) {
   const analysisResults = [];
-  const { profileByExerciseName = new Map(), userNoteByExerciseName = new Map() } = profileMaps || {};
+  const {
+    profileByExerciseName = new Map(),
+    userNoteByExerciseName = new Map(),
+    // Bug-Fix (User-Report): Das KI-Feedback nannte Katalog-Übungen immer auf Deutsch
+    // (exercise.name), obwohl das im KI-Kontext genutzte Label Englisch sein soll. Rein additiv/
+    // optional (Null-Annahmen-Prinzip) - ohne Eintrag (z.B. bei selbst angelegten Übungen ohne
+    // Katalog-Match) bleibt es beim bisherigen deutschen Namen.
+    enNameByExerciseName = new Map()
+  } = profileMaps || {};
 
   for (const exercise of currentWorkout.exercises || []) {
     const exerciseName = exercise.name || 'Unknown';
     const lookupKey = exerciseName.toLowerCase();
+    // Nur das an die KI gereichte Label wechselt auf Englisch - alle internen Vergleiche/Lookups
+    // (vorheriges Workout, Notizen, Profile) bleiben unverändert über den deutschen Namen, da so
+    // in der DB gespeichert wird.
+    const exerciseNameForAI = enNameByExerciseName.get(lookupKey) || exerciseName;
 
     try {
       // Finde letzte Session der gleichen Übung
@@ -417,6 +429,12 @@ export function analyzeWorkoutProgression(currentWorkout, allWorkouts, profileMa
         globalProfile: profileByExerciseName.get(lookupKey) || null,
         userNote: userNoteByExerciseName.get(lookupKey) || null
       });
+      // Separates Feld statt exercise direkt zu überschreiben: ex.exercise wird auch für die
+      // Frontend-Snapshot-Anzeige (Deutsch) und für buildVolumeHistory()-Lookups gegen die
+      // (deutsch gespeicherten) Workout-Übungsnamen verwendet - eine Umstellung auf Englisch
+      // an dieser Stelle hätte beides kaputt gemacht. Nur structureAnalysisForAI() (baut die
+      // KI-Eingabe) liest exerciseNameForAI.
+      if (analysis) analysis.exerciseNameForAI = exerciseNameForAI;
 
       if (analysis) {
         analysisResults.push(analysis);
@@ -620,7 +638,10 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
 
     // Detaillierte Übungs-Analysen (für AI)
     exercises: exerciseAnalyses.map(ex => ({
-      exercise: ex.exercise,
+      // Bug-Fix (User-Report): KI-Feedback nannte Katalog-Übungen immer auf Deutsch statt
+      // Englisch - siehe exerciseNameForAI in analyzeWorkoutProgression()/dem Fallback in
+      // routes/workouts.js. Fällt ohne Katalog-Match (z.B. eigene Übung) auf ex.exercise zurück.
+      exercise: ex.exerciseNameForAI || ex.exercise,
       current_weight: ex.current?.weight || 0,
       current_reps: ex.current?.reps || 0,
       current_sets: ex.current?.sets || 0,
@@ -678,13 +699,13 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
     // selben Zeitraum z.B. das Gewicht gestiegen ist (bewusster Tausch Volumen<->Intensität,
     // siehe "Keine automatische Bewertung von Gewichts-/Volumenveränderungen" im System-Prompt).
     top_improvements: topProgress.map(ex => ({
-      exercise: ex.exercise,
+      exercise: ex.exerciseNameForAI || ex.exercise,
       volume_change_percent: ex.changes.volume_change_percent,
       weight_change_kg: ex.changes.weight_change
     })),
 
     top_declines: topDeclines.map(ex => ({
-      exercise: ex.exercise,
+      exercise: ex.exerciseNameForAI || ex.exercise,
       volume_change_percent: ex.changes.volume_change_percent,
       weight_change_kg: ex.changes.weight_change
     }))
