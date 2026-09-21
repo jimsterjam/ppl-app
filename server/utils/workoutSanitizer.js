@@ -69,7 +69,11 @@ export function sanitizeQuickGeneratorRequest(body) {
     },
     injuries: typeof body.injuries === 'string' ? body.injuries.trim() : '',
     restrictions: typeof body.restrictions === 'string' ? body.restrictions.trim() : '',
-    requireCompleteInput: body.requireCompleteInput === true
+    requireCompleteInput: body.requireCompleteInput === true,
+    // User-Wunsch (mehr Kontrolle): optionale manuelle Übersteuerung der automatisch berechneten
+    // Übungsanzahl (siehe getMaxExerciseCount() in routes/workouts.js) - null/undefined lässt die
+    // automatische Ziel-/Dauer-basierte Obergrenze unverändert greifen.
+    exerciseCountOverride: normalizeOptionalNumber(body.exerciseCountOverride)
   };
 }
 

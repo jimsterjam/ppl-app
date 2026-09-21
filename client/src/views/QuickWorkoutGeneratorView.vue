@@ -3,7 +3,7 @@
     <HeaderBar :title="t('quickGenerator.title') || 'KI-Workout generieren'" />
 
     <main class="content">
-      <div v-if="!loading && !error" class="form glass">
+      <div v-if="!loading && !error && !preview" class="form glass">
         <p class="intro">
           {{ t('quickGenerator.intro') || 'Beantworte ein paar kurze Fragen, dann erstellen wir ein passendes Workout für dich.' }}
         </p>
@@ -82,6 +82,32 @@
         </div>
 
         <div class="field">
+          <label>{{ t('quickGenerator.exerciseCountLabel') || 'Übungsanzahl' }}</label>
+          <div class="chip-row">
+            <button
+              type="button"
+              class="chip"
+              :class="{ active: form.exerciseCountOverride === null }"
+              @click="form.exerciseCountOverride = null"
+            >{{ t('quickGenerator.exerciseCountAuto') || 'Automatisch' }}</button>
+            <button
+              type="button"
+              class="chip"
+              :class="{ active: form.exerciseCountOverride !== null }"
+              @click="form.exerciseCountOverride = form.exerciseCountOverride ?? manualExerciseCountSeed"
+            >{{ t('quickGenerator.exerciseCountManual') || 'Manuell' }}</button>
+          </div>
+          <div v-if="form.exerciseCountOverride !== null" class="exercise-count-stepper">
+            <button type="button" class="stepper-btn" :disabled="form.exerciseCountOverride <= 2" @click="form.exerciseCountOverride--">−</button>
+            <span class="stepper-value">{{ form.exerciseCountOverride }}</span>
+            <button type="button" class="stepper-btn" :disabled="form.exerciseCountOverride >= 8" @click="form.exerciseCountOverride++">+</button>
+          </div>
+          <p v-else class="hint">
+            {{ t('quickGenerator.exerciseCountAutoHint') || 'Wird automatisch anhand von Ziel und Trainingsdauer bestimmt.' }}
+          </p>
+        </div>
+
+        <div class="field">
           <label>{{ t('quickGenerator.restrictionsLabel') || 'Einschränkungen (optional)' }}</label>
           <textarea
             v-model="form.restrictions"
@@ -101,6 +127,33 @@
         <p>{{ t('quickGenerator.generating') || 'Erstelle dein Workout...' }}</p>
       </div>
 
+      <!-- Bug-Fix (User-Report): Trainingsdauer/Übungsanzahl/Warm-up wurden bisher nirgends
+           angezeigt - der Nutzer landete direkt im Builder, ohne zu sehen, dass z.B. "60 min"
+           NUR die reine Trainingszeit ist und das Warm-up zusätzlich obendrauf kommt. -->
+      <div v-if="preview && !loading && !error" class="form glass preview-panel">
+        <h2 class="preview-title">{{ preview.workoutName }}</h2>
+        <div class="preview-stats">
+          <div class="preview-stat">
+            <span class="preview-stat-value">{{ preview.estimatedDuration }} min</span>
+            <span class="preview-stat-label">{{ t('quickGenerator.previewDuration') || 'Trainingszeit (ohne Warm-up)' }}</span>
+          </div>
+          <div class="preview-stat">
+            <span class="preview-stat-value">{{ preview.exerciseCount }}</span>
+            <span class="preview-stat-label">{{ t('quickGenerator.previewExerciseCount') || 'Übungen' }}</span>
+          </div>
+        </div>
+        <p class="hint preview-warmup">{{ preview.warmup }}</p>
+
+        <div class="preview-actions">
+          <button class="secondary" type="button" @click="preview = null">
+            {{ t('quickGenerator.previewBack') || 'Zurück' }}
+          </button>
+          <button class="primary generate-btn" type="button" @click="confirmPreview">
+            {{ t('quickGenerator.previewConfirm') || 'Ins Workout übernehmen' }}
+          </button>
+        </div>
+      </div>
+
       <div v-if="error" class="state-message error">
         <p>{{ error }}</p>
         <button class="secondary" type="button" @click="error = null">
@@ -112,7 +165,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter, useRoute } from 'vue-router'
 import HeaderBar from '@/components/HeaderBar.vue'
@@ -129,6 +182,10 @@ const { getIdToken } = useFirebaseAuth()
 
 const loading = ref(false)
 const error = ref(null)
+const preview = ref(null)
+// Zwischenspeicher für die gemappten Builder-Übungen, während der Nutzer die Vorschau sieht -
+// erst bei "Ins Workout übernehmen" tatsächlich in den Prefill-Speicher schreiben/navigieren.
+let pendingBuilderPrefill = null
 
 const form = reactive({
   goal: 'hypertrophy',
@@ -136,7 +193,21 @@ const form = reactive({
   requestedType: normalizeBuilderWorkoutType(route.query?.type || 'fullbody'),
   equipmentMode: 'gym_plus_bodyweight',
   durationMinutes: 45,
-  restrictions: ''
+  restrictions: '',
+  // User-Wunsch (mehr Kontrolle): null = automatische Obergrenze (siehe getMaxExerciseCount()
+  // server-seitig, abhängig von Ziel+Dauer), sonst manuell 2-8.
+  exerciseCountOverride: null
+})
+
+// Nur als sinnvoller Startwert für den Stepper beim Umschalten auf "Manuell" - spiegelt grob
+// dieselbe Ziel-/Dauer-Tabelle wie getTimeAdjustedExerciseTarget() im Server, damit der Stepper
+// nicht bei 2 oder 8 (den Rändern) startet, sondern in der Nähe des automatischen Werts.
+const manualExerciseCountSeed = computed(() => {
+  const duration = Number(form.durationMinutes) || 45
+  const isStrength = form.goal === 'strength'
+  if (duration <= 30) return isStrength ? 3 : 4
+  if (duration <= 45) return isStrength ? 4 : 5
+  return isStrength ? 4 : 6
 })
 
 const goalOptions = [
@@ -199,7 +270,8 @@ async function generate() {
       requestedType: form.requestedType,
       equipmentMode: form.equipmentMode,
       durationMinutes: form.durationMinutes,
-      restrictions: form.restrictions || undefined
+      restrictions: form.restrictions || undefined,
+      exerciseCountOverride: form.exerciseCountOverride ?? undefined
     }, token)
 
     const rawExercises = Array.isArray(response?.exercises) ? response.exercises : []
@@ -241,21 +313,35 @@ async function generate() {
       }
     })
 
-    saveWorkoutBuilderPrefill({
+    pendingBuilderPrefill = {
       workoutName: response.workoutName || 'KI-Workout',
       type: form.requestedType,
       notes: response.notes || '',
       exercises,
       favoriteSource: false
-    })
+    }
 
-    router.push(buildWorkoutBuilderRoute(form.requestedType, { quick: true }))
+    // Vorschau statt direktem Sprung in den Builder (User-Report: Trainingsdauer/Übungsanzahl/
+    // Warm-up wurden dem Nutzer bisher nie gezeigt - "60 min" ist nur die reine Trainingszeit,
+    // das Warm-up kommt separat obendrauf).
+    preview.value = {
+      workoutName: pendingBuilderPrefill.workoutName,
+      estimatedDuration: response.estimatedDuration ?? form.durationMinutes,
+      exerciseCount: exercises.length,
+      warmup: response.warmup || ''
+    }
   } catch (err) {
     logger.error('[QuickWorkoutGenerator] generate failed', err?.message)
     error.value = t('quickGenerator.error') || 'Workout konnte nicht generiert werden. Versuch es noch einmal.'
   } finally {
     loading.value = false
   }
+}
+
+function confirmPreview() {
+  if (!pendingBuilderPrefill) return
+  saveWorkoutBuilderPrefill(pendingBuilderPrefill)
+  router.push(buildWorkoutBuilderRoute(form.requestedType, { quick: true }))
 }
 </script>
 
@@ -390,5 +476,84 @@ textarea {
   background: transparent;
   color: var(--fg);
   cursor: pointer;
+}
+
+.exercise-count-stepper {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.stepper-btn {
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  border: 1px solid var(--card-border);
+  background: transparent;
+  color: var(--fg);
+  font-size: 1.1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.stepper-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.stepper-value {
+  min-width: 1.5rem;
+  text-align: center;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.preview-panel {
+  align-items: stretch;
+}
+
+.preview-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.preview-stats {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.preview-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.preview-stat-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.preview-stat-label {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.preview-warmup {
+  margin: 0;
+}
+
+.preview-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.preview-actions .secondary {
+  flex: 1;
+}
+
+.preview-actions .generate-btn {
+  flex: 2;
 }
 </style>

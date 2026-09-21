@@ -102,6 +102,19 @@ describe('sanitizeQuickGeneratorRequest', () => {
     assert.equal(result.performance.bench1RM, null)
     assert.equal(result.performance.squat1RM, null)
   })
+
+  test('exerciseCountOverride: ohne Angabe null (automatische Obergrenze greift)', () => {
+    assert.equal(sanitizeQuickGeneratorRequest(validBody).exerciseCountOverride, null)
+  })
+
+  test('exerciseCountOverride: gültiger Wert wird übernommen', () => {
+    assert.equal(sanitizeQuickGeneratorRequest({ ...validBody, exerciseCountOverride: 6 }).exerciseCountOverride, 6)
+  })
+
+  test('exerciseCountOverride: ungültiger Wert (negativ/NaN) wird zu null', () => {
+    assert.equal(sanitizeQuickGeneratorRequest({ ...validBody, exerciseCountOverride: -3 }).exerciseCountOverride, null)
+    assert.equal(sanitizeQuickGeneratorRequest({ ...validBody, exerciseCountOverride: 'abc' }).exerciseCountOverride, null)
+  })
 })
 
 // ------------------------------------

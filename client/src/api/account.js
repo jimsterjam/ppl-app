@@ -26,30 +26,38 @@ function normalizeProfileData(data) {
   return out
 }
 
+// Bug-Fix (User-Report: Einführungsguide startet manchmal ungefragt neu): war bisher nur 1
+// Retry nach 1s - ein etwas länger anhaltender Netzwerkaussetzer beim App-Start (z.B. Wechsel
+// WLAN/Mobilfunk) reichte, um in den {}-Fallback zu fallen. onboardingStore.syncFromServer()
+// wertete das bisher fälschlich als "Onboarding nicht abgeschlossen" für Nutzer, die es längst
+// abgeschlossen hatten. Zwei Retries mit steigendem Abstand (1s, 2s) statt nur einem senken die
+// Wahrscheinlichkeit, dass ein rein transienter Aussetzer überhaupt bis zum Fallback durchschlägt.
+const PROFILE_RETRY_DELAYS_MS = [PROFILE_RETRY_DELAY_MS, PROFILE_RETRY_DELAY_MS * 2]
+
 export async function fetchAccountProfile(token) {
-  try {
-    const res = await api.get('/profile', authConfig(token))
-    return normalizeProfileData(res.data)
-  } catch (error) {
-    if (isLikelyTransportError(error)) {
-      try {
-        await sleep(PROFILE_RETRY_DELAY_MS)
-        const retryRes = await api.get('/profile', authConfig(token))
-        return normalizeProfileData(retryRes.data)
-      } catch (retryError) {
-        if (isLikelyTransportError(retryError)) {
-          logger.warn('📡 Account API - Profil Netzwerk/Transportproblem, nutze lokalen Fallback', {
-            code: retryError?.code || null,
-            status: retryError?.response?.status || null
-          })
-          return {}
-        }
-        throw handleAPIError(retryError, 'Profil laden')
+  let lastError = null
+  for (let attempt = 0; attempt <= PROFILE_RETRY_DELAYS_MS.length; attempt += 1) {
+    try {
+      const res = await api.get('/profile', authConfig(token))
+      return normalizeProfileData(res.data)
+    } catch (error) {
+      lastError = error
+      if (!isLikelyTransportError(error)) {
+        throw handleAPIError(error, 'Profil laden')
+      }
+      const delay = PROFILE_RETRY_DELAYS_MS[attempt]
+      if (delay !== undefined) {
+        await sleep(delay)
       }
     }
-
-    throw handleAPIError(error, 'Profil laden')
   }
+
+  logger.warn('📡 Account API - Profil Netzwerk/Transportproblem, nutze lokalen Fallback', {
+    code: lastError?.code || null,
+    status: lastError?.response?.status || null,
+    attempts: PROFILE_RETRY_DELAYS_MS.length + 1
+  })
+  return {}
 }
 
 export async function updateAccountProfile(token, payload) {

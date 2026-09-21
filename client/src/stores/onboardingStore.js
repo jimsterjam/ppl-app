@@ -100,23 +100,27 @@ export const useOnboardingStore = defineStore('onboarding', {
         if (profile?.onboarding) {
           this._applyServerOnboarding(profile.onboarding)
         } else if (!this.statusReady) {
-          // Kein onboarding-Feld in der Antwort (z.B. Netzwerk-Fallback von fetchAccountProfile
-          // liefert {}) und noch kein lokaler Cache vorhanden - als "noch nicht abgeschlossen"
-          // behandeln (neuer Nutzer), aber als bereit markieren, damit der Flow angezeigt werden kann.
+          // Kein onboarding-Feld in der Antwort - i.d.R. der {}-Fallback von fetchAccountProfile
+          // nach einem Netzwerk-/Transportfehler (siehe dort), NICHT zwangsläufig eine echte
+          // Server-Antwort ohne das Feld. Bug-Fix (User-Report: Einführungsguide startet manchmal
+          // ungefragt neu): frühere Version setzte hier "completed = false", weil man das als
+          // neuen Nutzer interpretierte - traf aber genauso einen BESTEHENDEN, längst
+          // onboarding-abgeschlossenen Nutzer, dessen Sync nur wegen eines kurzen
+          // Netzwerkaussetzers scheiterte (siehe fetchAccountProfile: nach 2 Retries wird der
+          // Fehler als leeres Objekt statt als Exception durchgereicht, nicht unterscheidbar von
+          // "Server hat wirklich kein onboarding-Feld geliefert"). Jetzt: im Zweifel NICHT auf
+          // "nicht abgeschlossen" zurückfallen, sondern den aktuellen (Default-)Stand
+          // unangetastet lassen - lieber den Guide einmal fälschlich NICHT zeigen (manuell über
+          // Einstellungen nachholbar) als ihn einem bestehenden Nutzer ungefragt aufzudrängen.
           this.statusReady = true
         }
       } catch (error) {
         logger.warn('[onboardingStore] syncFromServer fehlgeschlagen:', error?.message || error)
         if (!this.statusReady) {
-          // Ohne jegliche Information (kein lokaler Cache, kein Server erreichbar): als "noch
-          // nicht abgeschlossen" behandeln, damit ein wirklich neuer Nutzer den Flow trotz
-          // Netzwerkproblem sieht statt ihn nie zu bekommen - bewusst NICHT in den lokalen Cache
-          // geschrieben (kein this._persistCache() hier), damit diese Annahme nicht dauerhaft
-          // "einfriert": der nächste erfolgreiche Sync korrigiert sie ggf. auf "bereits erledigt".
-          // Schlimmstenfalls sieht ein bestehender Nutzer den Flow einmalig erneut - unkritisch,
-          // im Gegensatz zu einem Nutzer, der ihn nie zu sehen bekommt.
+          // Gleiche Abwägung wie oben - siehe ausführlichen Kommentar dort. Bewusst NICHT
+          // "completed = false" erzwingen, nur als bereit markieren, damit der aktuelle
+          // (Default-)Stand nicht länger blockiert wird.
           this.statusReady = true
-          this.completed = false
         }
       }
     },

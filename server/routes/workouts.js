@@ -3494,7 +3494,28 @@ function getTimeAdjustedExerciseTarget(durationMinutes = 45, goal = 'hypertrophy
   const duration = Number(durationMinutes) || 45;
   if (duration <= 30) return goal === 'strength' ? 3 : 4;
   if (duration <= 45) return goal === 'strength' ? 4 : 5;
-  return goal === 'strength' ? 5 : 6;
+  return goal === 'strength' ? 4 : 6;
+}
+
+// Bug-Fix (User-Report): generierte Workouts waren teils zu lang - bei 60 min und Ziel "Kraft"
+// passten laut reinem Zeitmodell (selectExercisesWithinTimeBudget) manchmal noch 5 Übungen ins
+// Budget (z.B. wenn eine Isolationsübung mit kürzerer Pause dabei war), obwohl bei den langen
+// Kraft-Pausen (DEFAULT_REST_SECONDS.strength) 4 Hauptübungen bereits ein voller 60-min-Block
+// sind. Zusätzlich zum Zeitmodell jetzt eine harte Obergrenze pro Ziel/Dauer - das Zeitmodell
+// darf weiterhin FRÜHER abbrechen (wenn's zeitlich knapp wird), aber nie mehr Übungen zulassen
+// als hier vorgegeben. Deckt sich bewusst mit getTimeAdjustedExerciseTarget() (gleiche Tabelle),
+// gilt hier aber immer, nicht nur als Fallback.
+//
+// User-Wunsch (mehr Kontrolle): der Nutzer kann diese automatische Obergrenze über
+// context.exerciseCountOverride bewusst überschreiben (z.B. explizit 6 Übungen bei Kraft/60min
+// wählen, wenn er das möchte) - Grenzen 2-8 bleiben trotzdem bestehen, um offensichtlich
+// unsinnige Werte (0 oder 20 Übungen) abzufangen.
+function getMaxExerciseCount(durationMinutes, goal, override) {
+  const overrideNumber = Number(override);
+  if (Number.isFinite(overrideNumber) && overrideNumber > 0) {
+    return Math.max(2, Math.min(8, Math.round(overrideNumber)));
+  }
+  return getTimeAdjustedExerciseTarget(durationMinutes, goal);
 }
 
 // ── Zeitmodell (Konzept-Papier Abschnitt 17.3/17.4) ─────────────────────────
@@ -3621,7 +3642,7 @@ function estimateWorkoutDurationSeconds(exercises = [], goal = 'hypertrophy') {
  * entfernen — hier realisiert durch schrittweises Hinzufügen in Prioritätsreihenfolge,
  * Abbruch sobald das Budget überschritten würde).
  */
-function selectExercisesWithinTimeBudget(orderedExercises = [], durationMinutes = 45, goal = 'hypertrophy', durationMode = 'training_only') {
+function selectExercisesWithinTimeBudget(orderedExercises = [], durationMinutes = 45, goal = 'hypertrophy', durationMode = 'training_only', maxExerciseCount = Infinity) {
   const rawMinutes = Math.max(20, Number(durationMinutes) || 45);
   // training_only (Default, Papier 18.1): die User-Minuten sind reine Trainingszeit, das
   // Warm-up kommt obendrauf. total_session: das Warm-up wird von den User-Minuten abgezogen.
@@ -3629,9 +3650,15 @@ function selectExercisesWithinTimeBudget(orderedExercises = [], durationMinutes 
     ? Math.max(0, rawMinutes * 60 - GENERAL_WARMUP_SECONDS)
     : rawMinutes * 60;
   const minCount = Math.min(2, orderedExercises.length);
+  const hardCap = Number.isFinite(maxExerciseCount) && maxExerciseCount > 0
+    ? Math.floor(maxExerciseCount)
+    : Infinity;
   const selected = [];
 
   for (let i = 0; i < orderedExercises.length; i += 1) {
+    // Harte Obergrenze (siehe getMaxExerciseCount) hat Vorrang vor dem Zeitmodell - auch wenn
+    // zeitlich noch eine weitere Übung reinpassen würde, wird hier abgebrochen.
+    if (selected.length >= hardCap) break;
     const candidate = [...selected, orderedExercises[i]];
     const estimated = estimateTrainingSeconds(candidate, goal);
     if (estimated <= budgetSeconds || candidate.length <= minCount) {
@@ -4026,7 +4053,8 @@ function enforceWorkoutProgrammingRules(payload, context = {}, options = {}) {
   // dass Hauptübungen vorne stehen und niedriger priorisierte Ergänzungen/Isolationen zuerst
   // wegfallen, wenn gekürzt werden muss (Kürzungsregel 1-3 aus Abschnitt 17.7).
   const durationMode = context.durationMode === 'total_session' ? 'total_session' : 'training_only';
-  const timeSelection = selectExercisesWithinTimeBudget(goalRangedCandidates, durationMinutes, goal, durationMode);
+  const maxExerciseCount = getMaxExerciseCount(durationMinutes, goal, context.exerciseCountOverride);
+  const timeSelection = selectExercisesWithinTimeBudget(goalRangedCandidates, durationMinutes, goal, durationMode, maxExerciseCount);
 
   const goalAdjusted = timeSelection.exercises.map((exercise, index) => ({
     name: exercise.name,
