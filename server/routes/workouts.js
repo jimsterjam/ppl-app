@@ -4073,16 +4073,25 @@ function enforceWorkoutProgrammingRules(payload, context = {}, options = {}) {
   }));
 
   const fallbackName = requestedType === 'fullbody' ? 'Full Body Session' : `${requestedType.toUpperCase()} Session`;
-  const warmupHint = durationMinutes >= 30
-    ? `Warm-up: 5-8 min ${requestedType === 'legs' ? 'Mobilität + Ramp-Up Sets' : 'leichtes Cardio + Aktivierung'}.`
-    : 'Warm-up: 2-4 min Gelenkaktivierung + 1 leichter Ramp-up Satz.';
+  // Laienverständlicher Warm-up-Hinweis (User-Report: "Ramp-Up Sets" ist Fitness-Fachjargon,
+  // nicht jeder Nutzer kennt den Begriff) - erklärt kurz, was gemeint ist, statt ihn
+  // vorauszusetzen. Zeitangabe jetzt fix "ca. 5 Minuten", passend zu GENERAL_WARMUP_SECONDS
+  // (vorher stand hier "5-8 min", was nie mit der tatsächlichen Berechnung übereinstimmte).
+  const warmupHint = 'Warm-up: ca. 5 Minuten leichtes Aufwärmen und ansteigende Gewichte vor der ersten Übung (Ramp-Up Sets).';
 
   return {
     workoutName: typeof payload?.workoutName === 'string' && payload.workoutName.trim()
       ? payload.workoutName.trim()
       : fallbackName,
     exercises: goalAdjusted,
+    // Bug-Fix (User-Report): estimatedDuration enthielt bereits das Warm-up, wurde im Client
+    // aber unter dem Label "Trainingszeit (ohne Warm-up)" angezeigt - widersprach sich selbst.
+    // Jetzt beide Werte getrennt liefern: estimatedDuration = Gesamtzeit inkl. Warm-up (das,
+    // was der Nutzer real einplanen muss), estimatedTrainingDuration = reine Trainingszeit ohne
+    // Warm-up, estimatedWarmupDuration = die Warm-up-Minuten selbst.
     estimatedDuration: Math.round(timeSelection.estimatedDurationSeconds / 60),
+    estimatedTrainingDuration: Math.round(timeSelection.trainingSeconds / 60),
+    estimatedWarmupDuration: Math.round(timeSelection.warmupSeconds / 60),
     difficulty: payload?.difficulty === 'advanced' ? 'advanced' : 'beginner',
     warmup: warmupHint,
     notes: [

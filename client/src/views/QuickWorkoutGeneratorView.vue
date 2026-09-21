@@ -75,10 +75,27 @@
               :key="opt.value"
               type="button"
               class="chip"
-              :class="{ active: form.durationMinutes === opt.value }"
-              @click="form.durationMinutes = opt.value"
+              :class="{ active: !durationManual && form.durationMinutes === opt.value }"
+              @click="selectDurationPreset(opt.value)"
             >{{ opt.label }}</button>
+            <button
+              type="button"
+              class="chip"
+              :class="{ active: durationManual }"
+              @click="enableManualDuration"
+            >{{ t('quickGenerator.exerciseCountManual') || 'Manuell' }}</button>
           </div>
+          <!-- User-Report: bisher nur 3 feste Zeit-Presets wählbar, keine Möglichkeit zur
+               Feinabstimmung (analog zur Übungsanzahl-Kontrolle oben). Stepper in 5-Min-Schritten,
+               20-120 min, wie im Zeitmodell serverseitig (selectExercisesWithinTimeBudget) erlaubt. -->
+          <div v-if="durationManual" class="exercise-count-stepper">
+            <button type="button" class="stepper-btn" :disabled="form.durationMinutes <= 20" @click="form.durationMinutes -= 5">−</button>
+            <span class="stepper-value">{{ form.durationMinutes }} min</span>
+            <button type="button" class="stepper-btn" :disabled="form.durationMinutes >= 120" @click="form.durationMinutes += 5">+</button>
+          </div>
+          <p v-if="durationManual" class="hint">
+            {{ t('quickGenerator.durationManualHint') || 'Frei wählbar in 5-Minuten-Schritten.' }}
+          </p>
         </div>
 
         <div class="field">
@@ -129,19 +146,25 @@
 
       <!-- Bug-Fix (User-Report): Trainingsdauer/Übungsanzahl/Warm-up wurden bisher nirgends
            angezeigt - der Nutzer landete direkt im Builder, ohne zu sehen, dass z.B. "60 min"
-           NUR die reine Trainingszeit ist und das Warm-up zusätzlich obendrauf kommt. -->
+           NUR die reine Trainingszeit ist und das Warm-up zusätzlich obendrauf kommt. Zweiter
+           Bug-Fix (Folgereport): die angezeigte Zahl war vorher unter dem Label "ohne Warm-up"
+           zu sehen, enthielt serverseitig aber bereits das Warm-up - jetzt zeigen wir konsistent
+           die Gesamtzeit inkl. Warm-up, dazu die reine Trainingszeit als Zusatzangabe. -->
       <div v-if="preview && !loading && !error" class="form glass preview-panel">
         <h2 class="preview-title">{{ preview.workoutName }}</h2>
         <div class="preview-stats">
           <div class="preview-stat">
             <span class="preview-stat-value">{{ preview.estimatedDuration }} min</span>
-            <span class="preview-stat-label">{{ t('quickGenerator.previewDuration') || 'Trainingszeit (ohne Warm-up)' }}</span>
+            <span class="preview-stat-label">{{ t('quickGenerator.previewDuration') || 'Gesamtzeit inkl. Warm-up' }}</span>
           </div>
           <div class="preview-stat">
             <span class="preview-stat-value">{{ preview.exerciseCount }}</span>
             <span class="preview-stat-label">{{ t('quickGenerator.previewExerciseCount') || 'Übungen' }}</span>
           </div>
         </div>
+        <p class="hint preview-training-time">
+          {{ t('quickGenerator.previewTrainingTime', { minutes: preview.trainingDuration }) || `Davon ${preview.trainingDuration} min reines Training` }}
+        </p>
         <p class="hint preview-warmup">{{ preview.warmup }}</p>
 
         <div class="preview-actions">
@@ -240,6 +263,20 @@ const durationOptions = [
   { value: 60, label: '60 min' }
 ]
 
+// User-Report: die Trainingsdauer war bisher nur über die 3 festen Presets wählbar, keine
+// Feinabstimmung möglich - analog zur Übungsanzahl-Kontrolle jetzt ein manueller Stepper
+// (5-Min-Schritte, 20-120 min) zusätzlich zu den Presets.
+const durationManual = ref(!durationOptions.some((opt) => opt.value === form.durationMinutes))
+
+function selectDurationPreset(value) {
+  durationManual.value = false
+  form.durationMinutes = value
+}
+
+function enableManualDuration() {
+  durationManual.value = true
+}
+
 let catalogPromise = null
 onMounted(() => {
   catalogPromise = loadDefaultExercises()
@@ -326,7 +363,11 @@ async function generate() {
     // das Warm-up kommt separat obendrauf).
     preview.value = {
       workoutName: pendingBuilderPrefill.workoutName,
+      // estimatedDuration ist die Gesamtzeit inkl. Warm-up (siehe server/routes/workouts.js,
+      // enforceWorkoutProgrammingRules) - trainingDuration die reine Trainingszeit separat, damit
+      // beide Werte konsistent zueinander angezeigt werden können.
       estimatedDuration: response.estimatedDuration ?? form.durationMinutes,
+      trainingDuration: response.estimatedTrainingDuration ?? form.durationMinutes,
       exerciseCount: exercises.length,
       warmup: response.warmup || ''
     }
