@@ -1,42 +1,62 @@
 <template>
   <div class="onboarding-overlay">
-    <div class="onboarding-topbar">
-      <div class="onboarding-dots" role="progressbar" :aria-valuenow="step + 1" :aria-valuemin="1" :aria-valuemax="totalSteps">
-        <span
-          v-for="i in totalSteps"
-          :key="i"
-          class="onboarding-dot"
-          :class="{ 'onboarding-dot--active': i - 1 === step }"
-        />
-      </div>
-      <button type="button" class="onboarding-skip" @click="handleSkip">
-        {{ t('onboarding.skip') }}
-      </button>
-    </div>
-
-    <div class="onboarding-content">
-      <Transition name="onboarding-fade" mode="out-in">
-        <div :key="step" class="onboarding-step">
-          <h1 class="onboarding-title">{{ t(`onboarding.step${step + 1}Title`) }}</h1>
-          <p class="onboarding-text">{{ t(`onboarding.step${step + 1}Text`) }}</p>
-          <ul v-if="isRulesStep" class="onboarding-rules-list">
-            <li v-for="n in 5" :key="n">{{ t(`onboarding.rulesItem${n}`) }}</li>
-          </ul>
+    <!-- Sprachauswahl VOR dem eigentlichen Guide - bewusst nicht Teil von totalSteps/der
+         Punkte-Anzeige, da sie nur beim allerersten Start erscheint (siehe showLanguagePicker),
+         nicht bei einem manuellen "Einführungsguide erneut starten" aus den Einstellungen, wenn
+         schon eine Sprache gewählt wurde. Beschriftungen bewusst NICHT übersetzt ("Deutsch"/
+         "English" statt $t(...)) - die Sprache des Nutzers ist an dieser Stelle ja noch unbekannt. -->
+    <template v-if="showLanguagePicker">
+      <div class="onboarding-content onboarding-content--centered">
+        <div class="onboarding-step">
+          <h1 class="onboarding-title">Sprache wählen<br />Choose your language</h1>
+          <div class="onboarding-lang-options">
+            <button type="button" class="onboarding-lang-btn" @click="chooseLanguage('de')">Deutsch</button>
+            <button type="button" class="onboarding-lang-btn" @click="chooseLanguage('en')">English</button>
+          </div>
         </div>
-      </Transition>
-    </div>
+      </div>
+    </template>
 
-    <div class="onboarding-footer">
-      <button type="button" class="onboarding-primary-btn" @click="handleNext">
-        {{ isLastStep ? t('onboarding.finish') : t('onboarding.next') }}
-      </button>
-    </div>
+    <template v-else>
+      <div class="onboarding-topbar">
+        <div class="onboarding-dots" role="progressbar" :aria-valuenow="step + 1" :aria-valuemin="1" :aria-valuemax="totalSteps">
+          <span
+            v-for="i in totalSteps"
+            :key="i"
+            class="onboarding-dot"
+            :class="{ 'onboarding-dot--active': i - 1 === step }"
+          />
+        </div>
+        <button type="button" class="onboarding-skip" @click="handleSkip">
+          {{ t('onboarding.skip') }}
+        </button>
+      </div>
+
+      <div class="onboarding-content">
+        <Transition name="onboarding-fade" mode="out-in">
+          <div :key="step" class="onboarding-step">
+            <h1 class="onboarding-title">{{ t(`onboarding.step${step + 1}Title`) }}</h1>
+            <p class="onboarding-text">{{ t(`onboarding.step${step + 1}Text`) }}</p>
+            <ul v-if="isRulesStep" class="onboarding-rules-list">
+              <li v-for="n in 5" :key="n">{{ t(`onboarding.rulesItem${n}`) }}</li>
+            </ul>
+          </div>
+        </Transition>
+      </div>
+
+      <div class="onboarding-footer">
+        <button type="button" class="onboarding-primary-btn" @click="handleNext">
+          {{ isLastStep ? t('onboarding.finish') : t('onboarding.next') }}
+        </button>
+      </div>
+    </template>
   </div>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useSettingsStore } from '@/stores/settingsStore'
 
 // Vollbild-Overlay statt eigener Router-Route (siehe Begründung in onboardingStore.js/main.js):
 // eine eigene Route hätte sich mit dem bestehenden, bereits fragilen Zusammenspiel aus
@@ -50,7 +70,20 @@ const RULES_STEP_INDEX = 1
 
 const emit = defineEmits(['complete', 'skip'])
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
+const settingsStore = useSettingsStore()
+
+// Nur beim allerersten Start fragen (settingsStore.language ist null, solange nie explizit
+// gewählt/gespeichert - siehe app-lang-Handling in settingsStore.js/i18n/index.js). Ein späteres
+// manuelles "Einführungsguide erneut starten" (SettingsView.vue) hat dann bereits eine Sprache
+// gesetzt und überspringt diesen Screen.
+const showLanguagePicker = ref(!settingsStore.language)
+
+function chooseLanguage(lang) {
+  locale.value = lang
+  settingsStore.setLanguage(lang)
+  showLanguagePicker.value = false
+}
 
 const step = ref(0)
 const isLastStep = computed(() => step.value === totalSteps - 1)
@@ -143,6 +176,34 @@ function handleSkip() {
 
 .onboarding-step {
   width: 100%;
+}
+
+.onboarding-content--centered {
+  align-items: center;
+  text-align: center;
+}
+
+.onboarding-lang-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.onboarding-lang-btn {
+  width: 100%;
+  min-height: 54px;
+  border-radius: var(--panel-radius, 28px);
+  border: 1px solid var(--line-soft);
+  background: var(--surface);
+  color: var(--fg);
+  font-size: 1.05rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.onboarding-lang-btn:active {
+  opacity: 0.85;
 }
 
 .onboarding-title {
