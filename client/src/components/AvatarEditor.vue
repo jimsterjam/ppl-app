@@ -25,6 +25,34 @@
       @change="onAvatarFileChange"
     />
 
+    <!-- Auswahl-Modal (User-Report): Klick auf den Avatar sprang bisher IMMER direkt in die
+         Fotogalerie. Besser: bei bereits vorhandenem Profilfoto erst fragen, ob das aktuelle
+         Foto nochmal bearbeitet oder komplett ausgetauscht werden soll - die Galerie öffnet sich
+         dann erst, wenn der User "Austauschen" wählt. Ohne vorhandenes Foto (nur Initialen)
+         bleibt der Klick weiterhin direkt der Foto-Picker, eine Auswahl wäre dort sinnlos. -->
+    <Teleport to="body">
+    <Transition name="modal" appear>
+      <div v-if="showChoiceModal" class="modal-overlay" @click.self="closeChoiceModal">
+        <div class="modal-content" @click.stop>
+          <div class="modal-header">
+            <h3>{{ $t('settings.profilePictureChoiceTitle') }}</h3>
+            <button class="close-btn" @click="closeChoiceModal" aria-label="Schließen">×</button>
+          </div>
+          <div class="modal-body">
+            <div class="avatar-choice-actions">
+              <button class="choice-btn" type="button" @click="onChooseEditCurrent">
+                {{ $t('settings.profilePictureChoiceEdit') }}
+              </button>
+              <button class="choice-btn" type="button" @click="onChooseReplace">
+                {{ $t('settings.profilePictureChoiceReplace') }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Transition>
+    </Teleport>
+
     <!-- Avatar Crop/Compress -->
     <!-- Teleport auf document.body: .header-bar (Elternkomponente HeaderBar) hat
          backdrop-filter gesetzt, das erzeugt einen neuen Containing Block für
@@ -159,10 +187,14 @@ const isNativePlatform = computed(() => {
 
 // Crop/Compress modal state
 const showAvatarCropModal = ref(false)
+// Auswahl-Modal "Bearbeiten/Austauschen" (siehe onTriggerClick weiter unten) - hier bereits
+// deklariert, damit der Scroll-Lock-Watch direkt darunter darauf zugreifen kann.
+const showChoiceModal = ref(false)
 
-// Hintergrund-Scroll sperren, solange das Crop-Modal offen ist
+// Hintergrund-Scroll sperren, solange eines der beiden Modals offen ist
 const { lock: lockBodyScroll, unlock: unlockBodyScroll } = useScrollLock()
 watch(showAvatarCropModal, (open) => (open ? lockBodyScroll() : unlockBodyScroll()))
+watch(showChoiceModal, (open) => (open ? lockBodyScroll() : unlockBodyScroll()))
 onBeforeUnmount(unlockBodyScroll)
 const avatarSourceFile = ref(null)
 const avatarCropUrl = ref('')
@@ -296,11 +328,51 @@ async function pickAvatarFromPhotos() {
   }
 }
 
+// User-Report: Klick auf den Avatar öffnete bisher immer sofort die Fotogalerie, auch wenn der
+// User eigentlich nur den bestehenden Ausschnitt/Zoom des aktuellen Fotos nachjustieren wollte.
+// Jetzt: bei vorhandenem Foto erst die Wahl zwischen "Bearbeiten" und "Austauschen" anbieten.
+// (showChoiceModal selbst ist weiter oben deklariert, siehe Scroll-Lock-Watch.)
 function onTriggerClick() {
+  const hasExistingAvatar = Boolean(avatarSrc.value && !avatarLoadError.value)
+  if (hasExistingAvatar) {
+    showChoiceModal.value = true
+  } else {
+    openReplacePicker()
+  }
+}
+
+function closeChoiceModal() {
+  showChoiceModal.value = false
+}
+
+function openReplacePicker() {
   if (isNativePlatform.value) {
     void pickAvatarFromPhotos()
   } else {
     avatarFileInput.value?.click()
+  }
+}
+
+function onChooseReplace() {
+  showChoiceModal.value = false
+  openReplacePicker()
+}
+
+// Einfache Variante (siehe Absprache): wir speichern nur die bereits auf 512x512 zugeschnittene
+// Version, nicht das Originalfoto vor dem ersten Zuschnitt. "Bearbeiten" justiert also Ausschnitt/
+// Zoom auf Basis dieser gespeicherten Version neu, nicht verlustfrei auf dem Originalbild.
+async function onChooseEditCurrent() {
+  showChoiceModal.value = false
+  const src = avatarSrc.value
+  if (!src) return
+  try {
+    const resp = await fetch(src)
+    const blob = await resp.blob()
+    const file = new File([blob], 'avatar.jpg', { type: blob.type || 'image/jpeg' })
+    await openAvatarCrop(file)
+  } catch (e) {
+    logger.warn('[AvatarEditor] onChooseEditCurrent failed:', e?.message || e)
+    toast.show($t('settings.profilePictureEditLoadFailed'), { type: 'error', duration: 2400 })
   }
 }
 
@@ -652,6 +724,28 @@ async function uploadAvatar() {
 .hint {
   color: var(--muted);
   font-size: 0.85rem;
+}
+
+.avatar-choice-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.choice-btn {
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--card-border);
+  background: transparent;
+  color: var(--fg);
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.choice-btn:hover {
+  background: var(--bg-panel);
 }
 
 /* 1:1 aus der bisherigen Crop-Modal-Optik in SettingsView.vue übernommen. */
