@@ -149,33 +149,44 @@
            NUR die reine Trainingszeit ist und das Warm-up zusätzlich obendrauf kommt. Zweiter
            Bug-Fix (Folgereport): die angezeigte Zahl war vorher unter dem Label "ohne Warm-up"
            zu sehen, enthielt serverseitig aber bereits das Warm-up - jetzt zeigen wir konsistent
-           die Gesamtzeit inkl. Warm-up, dazu die reine Trainingszeit als Zusatzangabe. -->
-      <div v-if="preview && !loading && !error" class="form glass preview-panel">
-        <h2 class="preview-title">{{ preview.workoutName }}</h2>
-        <div class="preview-stats">
-          <div class="preview-stat">
-            <span class="preview-stat-value">{{ preview.estimatedDuration }} min</span>
-            <span class="preview-stat-label">{{ t('quickGenerator.previewDuration') || 'Gesamtzeit inkl. Warm-up' }}</span>
-          </div>
-          <div class="preview-stat">
-            <span class="preview-stat-value">{{ preview.exerciseCount }}</span>
-            <span class="preview-stat-label">{{ t('quickGenerator.previewExerciseCount') || 'Übungen' }}</span>
-          </div>
-        </div>
-        <p class="hint preview-training-time">
-          {{ t('quickGenerator.previewTrainingTime', { minutes: preview.trainingDuration }) || `Davon ${preview.trainingDuration} min reines Training` }}
-        </p>
-        <p class="hint preview-warmup">{{ preview.warmup }}</p>
+           die Gesamtzeit inkl. Warm-up, dazu die reine Trainingszeit als Zusatzangabe. Dritter
+           Bug-Fix (Folgereport): die Vorschau erschien bisher als normaler Seiteninhalt an der
+           Scrollposition des Formulars, statt als zentriertes Popup - wenn der User beim Klick
+           auf "Workout generieren" weiter unten im Formular gescrollt war, blieb die Vorschau
+           dadurch außerhalb des Sichtfelds. Jetzt: echtes zentriertes Modal wie im Rest der App
+           (Teleport + Overlay + Scroll-Lock), analog zu AvatarEditor.vue/AppModal.vue. -->
+      <Teleport to="body">
+      <Transition name="modal" appear>
+        <div v-if="preview && !loading && !error" class="modal-overlay" @click.self="preview = null">
+          <div class="modal-content preview-panel">
+            <h2 class="preview-title">{{ preview.workoutName }}</h2>
+            <div class="preview-stats">
+              <div class="preview-stat">
+                <span class="preview-stat-value">{{ preview.estimatedDuration }} min</span>
+                <span class="preview-stat-label">{{ t('quickGenerator.previewDuration') || 'Gesamtzeit inkl. Warm-up' }}</span>
+              </div>
+              <div class="preview-stat">
+                <span class="preview-stat-value">{{ preview.exerciseCount }}</span>
+                <span class="preview-stat-label">{{ t('quickGenerator.previewExerciseCount') || 'Übungen' }}</span>
+              </div>
+            </div>
+            <p class="hint preview-training-time">
+              {{ t('quickGenerator.previewTrainingTime', { minutes: preview.trainingDuration }) || `Davon ${preview.trainingDuration} min reines Training` }}
+            </p>
+            <p class="hint preview-warmup">{{ preview.warmup }}</p>
 
-        <div class="preview-actions">
-          <button class="secondary" type="button" @click="preview = null">
-            {{ t('quickGenerator.previewBack') || 'Zurück' }}
-          </button>
-          <button class="primary generate-btn" type="button" @click="confirmPreview">
-            {{ t('quickGenerator.previewConfirm') || 'Ins Workout übernehmen' }}
-          </button>
+            <div class="preview-actions">
+              <button class="secondary" type="button" @click="preview = null">
+                {{ t('quickGenerator.previewBack') || 'Zurück' }}
+              </button>
+              <button class="primary generate-btn" type="button" @click="confirmPreview">
+                {{ t('quickGenerator.previewConfirm') || 'Ins Workout übernehmen' }}
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+      </Transition>
+      </Teleport>
 
       <div v-if="error" class="state-message error">
         <p>{{ error }}</p>
@@ -188,7 +199,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter, useRoute } from 'vue-router'
 import HeaderBar from '@/components/HeaderBar.vue'
@@ -197,6 +208,7 @@ import { quickGenerateWorkout } from '@/api/workouts'
 import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
 import { saveWorkoutBuilderPrefill, buildWorkoutBuilderRoute, normalizeBuilderWorkoutType } from '@/utils/workoutBuilderFlow'
 import { logger } from '@/utils/logger'
+import { useScrollLock } from '@/composables/useScrollLock'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -206,6 +218,11 @@ const { getIdToken } = useFirebaseAuth()
 const loading = ref(false)
 const error = ref(null)
 const preview = ref(null)
+
+// Hintergrund-Scroll sperren, solange die Vorschau als zentriertes Modal offen ist.
+const { lock: lockBodyScroll, unlock: unlockBodyScroll } = useScrollLock()
+watch(preview, (value) => (value ? lockBodyScroll() : unlockBodyScroll()))
+onBeforeUnmount(unlockBodyScroll)
 // Zwischenspeicher für die gemappten Builder-Übungen, während der Nutzer die Vorschau sieht -
 // erst bei "Ins Workout übernehmen" tatsächlich in den Prefill-Speicher schreiben/navigieren.
 let pendingBuilderPrefill = null
@@ -547,6 +564,47 @@ textarea {
   text-align: center;
   font-size: 1.1rem;
   font-weight: 700;
+}
+
+/* Zentriertes Modal für die Vorschau (siehe Bug-Fix oben) - Overlay/Content-Stil analog zu
+   AvatarEditor.vue/AppModal.vue, damit sich das Popup konsistent zum Rest der App verhält. */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: color-mix(in oklab, #000000 40%, transparent);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: var(--surface);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  max-width: 480px;
+  width: 100%;
+  max-height: 85vh;
+  overflow-y: auto;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.modal-enter-active,
+.modal-leave-active {
+  transition: all 0.25s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
 }
 
 .preview-panel {

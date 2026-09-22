@@ -10,52 +10,63 @@
       type="button"
       @click="toggleOverlay"
     >
-      <span v-if="!isRunning && elapsedMs === 0">{{ props.compact ? '⏱ 00:00' : '⏱ Gesamtzeit' }}</span>
+      <span v-if="!isRunning && elapsedMs === 0">{{ props.compact ? '⏱ 00:00' : '⏱ Stoppuhr' }}</span>
       <span v-else>{{ formattedTime }}</span>
     </button>
 
-    <!-- Overlay -->
-    <div v-if="overlayOpen" class="sw-overlay" @click.self="closeOverlay">
-      <div class="sw-panel">
-        <div class="sw-time" :class="{ 'sw-time--running': isRunning, 'sw-time--paused': !isRunning && elapsedMs > 0 }">
-          {{ elapsedMs === 0 ? '00:00' : formattedTime }}
-        </div>
+    <!-- Overlay (User-Report): hing bisher als kleines Dropdown direkt unter dem Trigger-Button
+         (position:absolute), statt wie andere Popups in der App zentriert aufzupoppen. Jetzt
+         zentriertes Modal (Teleport + Overlay), analog zu AvatarEditor.vue/AppModal.vue.
+         Schließen (Klick daneben, Close-Button) stoppt/resettet den Timer NICHT - closeOverlay()
+         setzt nur overlayOpen=false, der Store läuft unverändert im Hintergrund weiter. -->
+    <Teleport to="body">
+    <Transition name="modal" appear>
+      <div v-if="overlayOpen" ref="overlayRef" class="sw-overlay" @click.self="closeOverlay">
+        <div class="sw-panel">
+          <div class="sw-time" :class="{ 'sw-time--running': isRunning, 'sw-time--paused': !isRunning && elapsedMs > 0 }">
+            {{ elapsedMs === 0 ? '00:00' : formattedTime }}
+          </div>
 
-        <div class="sw-controls">
-          <!-- Nicht gestartet -->
-          <button v-if="!startedAt" class="sw-btn sw-btn--primary" type="button" @click="start">
-            ▶ Start
-          </button>
+          <div class="sw-controls">
+            <!-- Nicht gestartet -->
+            <button v-if="!startedAt" class="sw-btn sw-btn--primary" type="button" @click="start">
+              ▶ Start
+            </button>
 
-          <!-- Läuft -->
-          <template v-else-if="isRunning">
-            <button class="sw-btn sw-btn--secondary" type="button" @click="stop">
-              ⏸ Pause
-            </button>
-            <button class="sw-btn sw-btn--ghost" type="button" @click="handleReset">
-              ↺ Reset
-            </button>
-          </template>
+            <!-- Läuft -->
+            <template v-else-if="isRunning">
+              <button class="sw-btn sw-btn--secondary" type="button" @click="stop">
+                ⏸ Pause
+              </button>
+              <button class="sw-btn sw-btn--ghost" type="button" @click="handleReset">
+                ↺ Reset
+              </button>
+            </template>
 
-          <!-- Pausiert -->
-          <template v-else>
-            <button class="sw-btn sw-btn--primary" type="button" @click="resume">
-              ▶ Weiter
-            </button>
-            <button class="sw-btn sw-btn--ghost" type="button" @click="handleReset">
-              ↺ Reset
-            </button>
-          </template>
+            <!-- Pausiert -->
+            <template v-else>
+              <button class="sw-btn sw-btn--primary" type="button" @click="resume">
+                ▶ Weiter
+              </button>
+              <button class="sw-btn sw-btn--ghost" type="button" @click="handleReset">
+                ↺ Reset
+              </button>
+            </template>
+          </div>
+
+          <button class="sw-close" type="button" @click="closeOverlay" aria-label="Schließen">×</button>
         </div>
       </div>
-    </div>
+    </Transition>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useSessionStopwatch } from '@/composables/useSessionStopwatch'
 import { releaseKeepAwake } from '@/utils/keepAwakeGuard'
+import { useScrollLock } from '@/composables/useScrollLock'
 
 // compact: schlanke Darstellung für die Platzierung im sticky Header (siehe WorkoutDetailView.vue -
 // dort soll die Gesamtzeit immer im Sichtfeld bleiben, statt beim Scrollen durch die Übungsliste
@@ -80,6 +91,16 @@ const {
 
 const overlayOpen = ref(false)
 const rootRef = ref(null)
+// Bug-Fix (durch Teleport nötig geworden): das Overlay hängt jetzt an document.body statt im
+// rootRef-Teilbaum. Der reine rootRef.contains()-Check unten würde dadurch jeden Klick INNERHALB
+// des teleportierten Panels fälschlich als "außerhalb" werten und das Overlay sofort wieder
+// schließen. Zusätzlicher Ref auf das teleportierte Overlay-Element, der beim Containment-Check
+// mitberücksichtigt wird.
+const overlayRef = ref(null)
+
+// Hintergrund-Scroll sperren, solange das Overlay als zentriertes Modal offen ist.
+const { lock: lockBodyScroll, unlock: unlockBodyScroll } = useScrollLock()
+watch(overlayOpen, (open) => (open ? lockBodyScroll() : unlockBodyScroll()))
 
 function toggleOverlay() {
   overlayOpen.value = !overlayOpen.value
@@ -101,7 +122,9 @@ function handleReset() {
 
 function onOutsideClick(e) {
   if (!overlayOpen.value) return
-  if (rootRef.value && !rootRef.value.contains(e.target)) {
+  const insideRoot = rootRef.value && rootRef.value.contains(e.target)
+  const insideOverlay = overlayRef.value && overlayRef.value.contains(e.target)
+  if (!insideRoot && !insideOverlay) {
     closeOverlay()
   }
 }
@@ -117,6 +140,9 @@ onBeforeUnmount(() => {
   // einschlafen dürfen - der Store selbst gibt den Tag zwar bei stop()/reset()
   // frei, aber nicht automatisch beim Unmount der Anzeige.
   releaseKeepAwake('session-stopwatch')
+  // Sicherheitsnetz analog: Scroll-Lock nicht offen lassen, falls die Komponente bei
+  // geöffnetem Overlay verschwindet.
+  unlockBodyScroll()
 })
 </script>
 
@@ -149,15 +175,6 @@ onBeforeUnmount(() => {
   font-size: 1.05rem;
   border-radius: 10px;
   white-space: nowrap;
-}
-
-/* Zentriert im Header (siehe .header-center in HeaderBar.vue) - das Overlay öffnet sich
-   deshalb mittig UNTER dem Trigger statt links/rechts ausgerichtet, sonst würde es je nach
-   Bildschirmbreite einseitig über den Rand hinausragen. */
-.session-stopwatch--compact .sw-overlay {
-  left: 50%;
-  right: auto;
-  transform: translateX(-50%);
 }
 
 /* Trigger */
@@ -201,25 +218,59 @@ onBeforeUnmount(() => {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
-/* Overlay */
+/* Overlay (User-Report): jetzt zentriertes Modal statt Dropdown unter dem Trigger - siehe
+   Teleport im Template. Optik an .modal-overlay/.modal-content aus AvatarEditor.vue angelehnt. */
 .sw-overlay {
-  position: absolute;
-  top: calc(100% + 8px);
+  position: fixed;
+  top: 0;
   left: 0;
-  z-index: 500;
+  right: 0;
+  bottom: 0;
+  background: color-mix(in oklab, #000000 40%, transparent);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 1000;
 }
 
 .sw-panel {
-  background: color-mix(in srgb, var(--bg-panel) 97%, transparent);
+  position: relative;
+  background: var(--surface, var(--bg-panel));
   border: 1px solid var(--card-border);
   border-radius: 16px;
   box-shadow: 0 12px 36px rgba(0, 0, 0, 0.35);
-  padding: 20px 22px;
+  padding: 28px 26px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 16px;
-  min-width: 180px;
+  min-width: 220px;
+}
+
+.sw-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  background: transparent;
+  border: none;
+  font-size: 22px;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+  line-height: 1;
+}
+
+.modal-enter-active,
+.modal-leave-active {
+  transition: all 0.25s ease;
+}
+
+.modal-enter-from,
+.modal-leave-to {
+  opacity: 0;
 }
 
 /* Zeit-Anzeige */
