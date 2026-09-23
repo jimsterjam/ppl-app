@@ -8,7 +8,7 @@
     <template v-if="showLanguagePicker">
       <div class="onboarding-content onboarding-content--centered">
         <div class="onboarding-step">
-          <h1 class="onboarding-title">Sprache wählen<br />Choose your language</h1>
+          <h1 class="onboarding-title" data-i18n-ignore>Sprache wählen<br />Choose your language</h1>
           <div class="onboarding-lang-options">
             <button type="button" class="onboarding-lang-btn" @click="chooseLanguage('de')">Deutsch</button>
             <button type="button" class="onboarding-lang-btn" @click="chooseLanguage('en')">English</button>

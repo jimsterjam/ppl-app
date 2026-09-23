@@ -3,7 +3,7 @@
     <HeaderBar :title="$t('faqs.title')" />
 
     <div class="content">
-      <section class="faq-list glass" aria-label="FAQs">
+      <section class="faq-list glass" :aria-label="$t('nav.faqs')">
         <h3>{{ $t('faqs.title') }}</h3>
         <div
           v-for="(item, idx) in items"
@@ -27,7 +27,7 @@
           <div class="modal-content" @click.stop>
             <div class="modal-header">
               <h4>{{ $t(`faqs.${selectedFaqKey}`) }}</h4>
-              <button class="close-btn" @click="closeFaq" aria-label="Schließen">
+              <button class="close-btn" @click="closeFaq" :aria-label="$t('common.close')">
                 <span>×</span>
               </button>
             </div>

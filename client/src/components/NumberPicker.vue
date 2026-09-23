@@ -3,7 +3,7 @@
   <div v-if="visible" class="picker-overlay" @click.self="onCancel">
     <div class="picker-sheet" role="dialog" aria-modal="true">
       <header class="picker-header">
-        <button class="btn text" @click="onCancel">{{ cancelText }}</button>
+        <button class="btn text" @click="onCancel">{{ cancelText || $t('common.cancel') }}</button>
         <strong class="title">{{ title }}</strong>
         <button class="btn primary" @click="onConfirm">{{ confirmText }}</button>
       </header>
@@ -88,7 +88,8 @@ const props = defineProps({
   decimalOptions: { type: Array, default: () => [0, 0.25, 0.5, 0.75] },
   title: { type: String, default: '' },
   confirmText: { type: String, default: 'OK' },
-  cancelText: { type: String, default: 'Abbrechen' },
+  // Leer = übersetztes "Abbrechen" aus common.cancel (vorher fest Deutsch)
+  cancelText: { type: String, default: '' },
   visibleRange: { type: Number, default: 50 } // number of steps each side
 })
 

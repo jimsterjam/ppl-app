@@ -3,7 +3,7 @@
     <!-- Splash/Loader bis Firebase bereit ist -->
     <div v-if="!firebaseReady" class="auth-splash">
       <div class="spinner spin-indicator" />
-      <p>Initialisiere...</p>
+      <p>{{ $t('auth.initializing') }}</p>
     </div>
 
     <!-- Eingeloggt: Kindrouten rendern -->
@@ -12,7 +12,7 @@
     <!-- Ausgeloggt: Einmalig zu Welcome umleiten -->
     <div v-else class="auth-splash">
       <div class="spinner spin-indicator" />
-      <p>Weiterleitung...</p>
+      <p>{{ $t('auth.redirecting') }}</p>
     </div>
 
     <!-- BottomNav nur anzeigen, wenn eingeloggt -->

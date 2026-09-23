@@ -1,15 +1,15 @@
 <template>
   <div class="quick-generator-view">
-    <HeaderBar :title="t('quickGenerator.title') || 'KI-Workout generieren'" />
+    <HeaderBar :title="t('quickGenerator.title')" />
 
     <main class="content">
       <div v-if="!loading && !error && !preview" class="form glass">
         <p class="intro">
-          {{ t('quickGenerator.intro') || 'Beantworte ein paar kurze Fragen, dann erstellen wir ein passendes Workout für dich.' }}
+          {{ t('quickGenerator.intro') }}
         </p>
 
         <div class="field">
-          <label>{{ t('quickGenerator.goalLabel') || 'Ziel' }}</label>
+          <label>{{ t('quickGenerator.goalLabel') }}</label>
           <div class="chip-row">
             <button
               v-for="opt in goalOptions"
@@ -23,7 +23,7 @@
         </div>
 
         <div class="field">
-          <label>{{ t('quickGenerator.levelLabel') || 'Erfahrung' }}</label>
+          <label>{{ t('quickGenerator.levelLabel') }}</label>
           <div class="chip-row">
             <button
               v-for="opt in levelOptions"
@@ -37,7 +37,7 @@
         </div>
 
         <div class="field">
-          <label>{{ t('quickGenerator.typeLabel') || 'Workout-Typ' }}</label>
+          <label>{{ t('quickGenerator.typeLabel') }}</label>
           <div class="chip-row">
             <button
               v-for="opt in typeOptions"
@@ -51,7 +51,7 @@
         </div>
 
         <div class="field">
-          <label>{{ t('quickGenerator.equipmentLabel') || 'Equipment' }}</label>
+          <label>{{ t('quickGenerator.equipmentLabel') }}</label>
           <div class="chip-row">
             <button
               v-for="opt in equipmentOptions"
@@ -63,12 +63,12 @@
             >{{ opt.label }}</button>
           </div>
           <p v-if="form.equipmentMode === 'bodyweight_only'" class="hint">
-            {{ t('quickGenerator.bodyweightHint') || 'Bei reinem Bodyweight-Training kann die Übungsauswahl noch ungenauer sein — wir verbessern das laufend.' }}
+            {{ t('quickGenerator.bodyweightHint') }}
           </p>
         </div>
 
         <div class="field">
-          <label>{{ t('quickGenerator.durationLabel') || 'Zeit pro Einheit' }}</label>
+          <label>{{ t('quickGenerator.durationLabel') }}</label>
           <div class="chip-row">
             <button
               v-for="opt in durationOptions"
@@ -83,7 +83,7 @@
               class="chip"
               :class="{ active: durationManual }"
               @click="enableManualDuration"
-            >{{ t('quickGenerator.exerciseCountManual') || 'Manuell' }}</button>
+            >{{ t('quickGenerator.exerciseCountManual') }}</button>
           </div>
           <!-- User-Report: bisher nur 3 feste Zeit-Presets wählbar, keine Möglichkeit zur
                Feinabstimmung (analog zur Übungsanzahl-Kontrolle oben). Stepper in 5-Min-Schritten,
@@ -94,25 +94,25 @@
             <button type="button" class="stepper-btn" :disabled="form.durationMinutes >= 120" @click="form.durationMinutes += 5">+</button>
           </div>
           <p v-if="durationManual" class="hint">
-            {{ t('quickGenerator.durationManualHint') || 'Frei wählbar in 5-Minuten-Schritten.' }}
+            {{ t('quickGenerator.durationManualHint') }}
           </p>
         </div>
 
         <div class="field">
-          <label>{{ t('quickGenerator.exerciseCountLabel') || 'Übungsanzahl' }}</label>
+          <label>{{ t('quickGenerator.exerciseCountLabel') }}</label>
           <div class="chip-row">
             <button
               type="button"
               class="chip"
               :class="{ active: form.exerciseCountOverride === null }"
               @click="form.exerciseCountOverride = null"
-            >{{ t('quickGenerator.exerciseCountAuto') || 'Automatisch' }}</button>
+            >{{ t('quickGenerator.exerciseCountAuto') }}</button>
             <button
               type="button"
               class="chip"
               :class="{ active: form.exerciseCountOverride !== null }"
               @click="form.exerciseCountOverride = form.exerciseCountOverride ?? manualExerciseCountSeed"
-            >{{ t('quickGenerator.exerciseCountManual') || 'Manuell' }}</button>
+            >{{ t('quickGenerator.exerciseCountManual') }}</button>
           </div>
           <div v-if="form.exerciseCountOverride !== null" class="exercise-count-stepper">
             <button type="button" class="stepper-btn" :disabled="form.exerciseCountOverride <= 2" @click="form.exerciseCountOverride--">−</button>
@@ -120,28 +120,28 @@
             <button type="button" class="stepper-btn" :disabled="form.exerciseCountOverride >= 8" @click="form.exerciseCountOverride++">+</button>
           </div>
           <p v-else class="hint">
-            {{ t('quickGenerator.exerciseCountAutoHint') || 'Wird automatisch anhand von Ziel und Trainingsdauer bestimmt.' }}
+            {{ t('quickGenerator.exerciseCountAutoHint') }}
           </p>
         </div>
 
         <div class="field">
-          <label>{{ t('quickGenerator.restrictionsLabel') || 'Einschränkungen (optional)' }}</label>
+          <label>{{ t('quickGenerator.restrictionsLabel') }}</label>
           <textarea
             v-model="form.restrictions"
             rows="2"
             maxlength="200"
-            :placeholder="t('quickGenerator.restrictionsPlaceholder') || 'z.B. keine Kniebeugen wegen Knieproblemen'"
+            :placeholder="t('quickGenerator.restrictionsPlaceholder')"
           />
         </div>
 
         <button class="primary generate-btn" type="button" :disabled="loading" @click="generate">
-          {{ t('quickGenerator.generate') || 'Workout generieren' }}
+          {{ t('quickGenerator.generate') }}
         </button>
       </div>
 
       <div v-if="loading" class="state-message">
         <div class="spinner spin-indicator"></div>
-        <p>{{ t('quickGenerator.generating') || 'Erstelle dein Workout...' }}</p>
+        <p>{{ t('quickGenerator.generating') }}</p>
       </div>
 
       <!-- Bug-Fix (User-Report): Trainingsdauer/Übungsanzahl/Warm-up wurden bisher nirgends
@@ -163,24 +163,24 @@
             <div class="preview-stats">
               <div class="preview-stat">
                 <span class="preview-stat-value">{{ preview.estimatedDuration }} min</span>
-                <span class="preview-stat-label">{{ t('quickGenerator.previewDuration') || 'Gesamtzeit inkl. Warm-up' }}</span>
+                <span class="preview-stat-label">{{ t('quickGenerator.previewDuration') }}</span>
               </div>
               <div class="preview-stat">
                 <span class="preview-stat-value">{{ preview.exerciseCount }}</span>
-                <span class="preview-stat-label">{{ t('quickGenerator.previewExerciseCount') || 'Übungen' }}</span>
+                <span class="preview-stat-label">{{ t('quickGenerator.previewExerciseCount') }}</span>
               </div>
             </div>
             <p class="hint preview-training-time">
-              {{ t('quickGenerator.previewTrainingTime', { minutes: preview.trainingDuration }) || `Davon ${preview.trainingDuration} min reines Training` }}
+              {{ t('quickGenerator.previewTrainingTime', { minutes: preview.trainingDuration }) }}
             </p>
             <p class="hint preview-warmup">{{ preview.warmup }}</p>
 
             <div class="preview-actions">
               <button class="secondary" type="button" @click="preview = null">
-                {{ t('quickGenerator.previewBack') || 'Zurück' }}
+                {{ t('quickGenerator.previewBack') }}
               </button>
               <button class="primary generate-btn" type="button" @click="confirmPreview">
-                {{ t('quickGenerator.previewConfirm') || 'Ins Workout übernehmen' }}
+                {{ t('quickGenerator.previewConfirm') }}
               </button>
             </div>
           </div>
@@ -191,7 +191,7 @@
       <div v-if="error" class="state-message error">
         <p>{{ error }}</p>
         <button class="secondary" type="button" @click="error = null">
-          {{ t('common.retry') || 'Erneut versuchen' }}
+          {{ t('common.retry') }}
         </button>
       </div>
     </main>
@@ -251,14 +251,14 @@ const manualExerciseCountSeed = computed(() => {
 })
 
 const goalOptions = [
-  { value: 'hypertrophy', label: t('quickGenerator.goalHypertrophy') || 'Muskelaufbau' },
-  { value: 'strength', label: t('quickGenerator.goalStrength') || 'Kraft' }
+  { value: 'hypertrophy', label: t('quickGenerator.goalHypertrophy') },
+  { value: 'strength', label: t('quickGenerator.goalStrength') }
 ]
 
 const levelOptions = [
-  { value: 'beginner', label: t('quickGenerator.levelBeginner') || 'Anfänger' },
-  { value: 'intermediate', label: t('quickGenerator.levelIntermediate') || 'Fortgeschritten' },
-  { value: 'advanced', label: t('quickGenerator.levelAdvanced') || 'Erfahren' }
+  { value: 'beginner', label: t('quickGenerator.levelBeginner') },
+  { value: 'intermediate', label: t('quickGenerator.levelIntermediate') },
+  { value: 'advanced', label: t('quickGenerator.levelAdvanced') }
 ]
 
 const typeOptions = [
@@ -269,9 +269,9 @@ const typeOptions = [
 ]
 
 const equipmentOptions = [
-  { value: 'gym_only', label: t('quickGenerator.equipmentGym') || 'Nur Gym' },
-  { value: 'gym_plus_bodyweight', label: t('quickGenerator.equipmentMixed') || 'Gym + Bodyweight' },
-  { value: 'bodyweight_only', label: t('quickGenerator.equipmentBodyweight') || 'Nur Körpergewicht' }
+  { value: 'gym_only', label: t('quickGenerator.equipmentGym') },
+  { value: 'gym_plus_bodyweight', label: t('quickGenerator.equipmentMixed') },
+  { value: 'bodyweight_only', label: t('quickGenerator.equipmentBodyweight') }
 ]
 
 const durationOptions = [
@@ -330,7 +330,7 @@ async function generate() {
 
     const rawExercises = Array.isArray(response?.exercises) ? response.exercises : []
     if (rawExercises.length === 0) {
-      error.value = t('quickGenerator.error') || 'Workout konnte nicht generiert werden. Versuch es noch einmal.'
+      error.value = t('quickGenerator.error')
       loading.value = false
       return
     }
@@ -390,7 +390,7 @@ async function generate() {
     }
   } catch (err) {
     logger.error('[QuickWorkoutGenerator] generate failed', err?.message)
-    error.value = t('quickGenerator.error') || 'Workout konnte nicht generiert werden. Versuch es noch einmal.'
+    error.value = t('quickGenerator.error')
   } finally {
     loading.value = false
   }

@@ -10,19 +10,19 @@
 
         <!-- Modus -->
         <div class="section">
-          <div class="mode-switch" role="tablist" aria-label="Timer-Modus">
+          <div class="mode-switch" role="tablist" :aria-label="$t('timer.modeLabel')">
             <button
               class="mode-btn"
               :class="{ active: mode === 'interval' }"
               type="button"
               @click="mode = 'interval'"
-            >{{ t('timer.modeInterval') || 'Intervall' }}</button>
+            >{{ t('timer.modeInterval') }}</button>
             <button
               class="mode-btn"
               :class="{ active: mode === 'stopwatch' }"
               type="button"
               @click="mode = 'stopwatch'"
-            >{{ t('timer.modeStopwatch') || 'Stoppuhr' }}</button>
+            >{{ t('timer.modeStopwatch') }}</button>
           </div>
         </div>
 
@@ -54,19 +54,19 @@
 
         <!-- Richtung -->
         <div class="section">
-          <div class="mode-switch" role="tablist" aria-label="Zeitrichtung">
+          <div class="mode-switch" role="tablist" :aria-label="$t('timer.directionLabel')">
             <button
               class="mode-btn"
               :class="{ active: countDirection === 'down' }"
               type="button"
               @click="countDirection = 'down'"
-            >{{ t('timer.directionDown') || 'Runter' }}</button>
+            >{{ t('timer.directionDown') }}</button>
             <button
               class="mode-btn"
               :class="{ active: countDirection === 'up' }"
               type="button"
               @click="countDirection = 'up'"
-            >{{ t('timer.directionUp') || 'Hoch' }}</button>
+            >{{ t('timer.directionUp') }}</button>
           </div>
         </div>
 
@@ -174,13 +174,13 @@ const isMobile = ref(typeof window !== 'undefined' && ('ontouchstart' in window 
 const pickerVisible = ref(false)
 const pickerValue = ref(0)
 const pickerTarget = ref('')
-const pickerConfig = reactive({ min: 0, max: 60, step: 1, title: '', confirmText: 'OK', cancelText: 'Abbrechen' })
+const pickerConfig = reactive({ min: 0, max: 60, step: 1, title: '', confirmText: 'OK', cancelText: '' })
 
 const soundOptions = computed(() => [
-  { value: 'none',         icon: '🔇', label: t('timer.soundNone')        || 'Aus' },
-  { value: 'box-gong',     icon: '🥊', label: t('timer.soundBoxGong')     || 'Box Gong' },
-  { value: 'chinese-gong', icon: '🪘', label: t('timer.soundChineseGong') || 'China Gong' },
-  { value: 'bell',         icon: '🔔', label: t('timer.soundBell')        || 'Glocke' }
+  { value: 'none',         icon: '🔇', label: t('timer.soundNone') },
+  { value: 'box-gong',     icon: '🥊', label: t('timer.soundBoxGong') },
+  { value: 'chinese-gong', icon: '🪘', label: t('timer.soundChineseGong') },
+  { value: 'bell',         icon: '🔔', label: t('timer.soundBell') }
 ])
 
 function selectSound(value) {
@@ -221,8 +221,8 @@ function openPicker(key) {
   pickerConfig.max = limit.max
   pickerConfig.step = limit.step
   pickerConfig.title = limit.label()
-  pickerConfig.confirmText = t('common.done') || 'OK'
-  pickerConfig.cancelText = t('common.cancel') || 'Abbrechen'
+  pickerConfig.confirmText = t('common.done')
+  pickerConfig.cancelText = t('common.cancel')
   pickerVisible.value = true
 }
 

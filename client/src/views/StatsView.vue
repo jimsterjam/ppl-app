@@ -21,11 +21,11 @@
 
       <section v-if="!isPro" class="pro-banner">
         <div>
-          <p class="eyebrow">Pro Test</p>
-          <h2 class="banner-title">14 Tage kostenlos testen</h2>
-          <p class="banner-sub">Schalte Langzeit-Analysen frei und verfolge echte Fortschritte.</p>
+          <p class="eyebrow">{{ t('stats.proBanner.eyebrow') }}</p>
+          <h2 class="banner-title">{{ t('stats.proBanner.title') }}</h2>
+          <p class="banner-sub">{{ t('stats.proBanner.text') }}</p>
         </div>
-        <button class="cta-ghost" type="button" @click="openUpgrade('general')">Pro freischalten</button>
+        <button class="cta-ghost" type="button" @click="openUpgrade('general')">{{ t('stats.proBanner.cta') }}</button>
       </section>
 
 
@@ -52,27 +52,27 @@
 
         <section v-if="showMilestoneUpgrade" class="panel milestone">
           <div>
-            <h3>Starker Lauf!</h3>
-            <p>Du hast bereits {{ totalSessions }} Trainings im Blick. Schalte Pro frei, um Langzeit-Analysen zu sehen.</p>
+            <h3>{{ t('stats.milestone.title') }}</h3>
+            <p>{{ t('stats.milestone.text', { count: totalSessions }) }}</p>
           </div>
-          <button class="cta-inline" type="button" @click="openUpgrade('general')">Pro freischalten</button>
+          <button class="cta-inline" type="button" @click="openUpgrade('general')">{{ t('stats.proBanner.cta') }}</button>
         </section>
         <section class="section">
           <div class="section-head">
-            <h3>Basis-Statistiken</h3>
-            <span class="section-sub">Letzte 30 Tage im Fokus</span>
+            <h3>{{ t('stats.base.title') }}</h3>
+            <span class="section-sub">{{ t('stats.base.subtitle') }}</span>
           </div>
 
           <div class="base-grid">
             <div class="panel chart-card">
               <div class="card-head">
-                <h4>Aktivitätstage</h4>
+                <h4>{{ t('stats.base.activityDays') }}</h4>
                 <div class="calendar-head-right">
-                  <span class="badge">Basis</span>
-                  <div class="calendar-month-nav" aria-label="Monatsnavigation">
-                    <button type="button" class="calendar-month-btn" aria-label="Vorheriger Monat" @click="goToPreviousMonth">‹</button>
+                  <span class="badge">{{ t('stats.base.badge') }}</span>
+                  <div class="calendar-month-nav" :aria-label="t('stats.base.monthNav')">
+                    <button type="button" class="calendar-month-btn" :aria-label="t('stats.base.prevMonth')" @click="goToPreviousMonth">‹</button>
                     <span class="calendar-month-label">{{ calendarMonthLabel }}</span>
-                    <button type="button" class="calendar-month-btn" aria-label="Nächster Monat" @click="goToNextMonth">›</button>
+                    <button type="button" class="calendar-month-btn" :aria-label="t('stats.base.nextMonth')" @click="goToNextMonth">›</button>
                   </div>
                 </div>
               </div>
@@ -149,7 +149,7 @@
         <div class="day-overlay-panel glass">
           <div class="day-overlay-header">
             <h4 class="day-overlay-title">{{ formatDayOverlayDate(calendarDayOverlay.key) }}</h4>
-            <button class="day-overlay-close" type="button" @click="closeDayOverlay" aria-label="Schließen">&times;</button>
+            <button class="day-overlay-close" type="button" @click="closeDayOverlay" :aria-label="$t('common.close')">&times;</button>
           </div>
           <div class="day-overlay-body">
             <div
@@ -172,10 +172,10 @@
                   >{{ si + 1 }}. <span v-if="set.weight">{{ set.weight }}kg</span><span v-if="set.reps"> &times; {{ set.reps }}</span></span>
                 </div>
                 <div v-else-if="ex.sets || ex.reps || ex.weight" class="day-overlay-sets">
-                  <span class="day-overlay-set">{{ ex.sets ? ex.sets + ' Sätze' : '' }}{{ ex.reps ? ' · ' + ex.reps + ' Wdh' : '' }}{{ ex.weight ? ' · ' + ex.weight + 'kg' : '' }}</span>
+                  <span class="day-overlay-set">{{ ex.sets ? ex.sets + ' ' + t('common.sets') : '' }}{{ ex.reps ? ' · ' + ex.reps + ' ' + t('common.reps') : '' }}{{ ex.weight ? ' · ' + ex.weight + 'kg' : '' }}</span>
                 </div>
               </div>
-              <p v-if="(workout.exercises || []).length > 8" class="day-overlay-more">+{{ workout.exercises.length - 8 }} weitere Übungen</p>
+              <p v-if="(workout.exercises || []).length > 8" class="day-overlay-more">{{ t('stats.dayOverlay.moreExercises', { count: workout.exercises.length - 8 }) }}</p>
             </div>
           </div>
         </div>
@@ -290,7 +290,7 @@ const deleteModalMessage = computed(() => {
 const dataStatusMessage = computed(() => {
   if (loading.value) return ''
   const uid = resolveActiveUid(authToken.value)
-  if (!uid && !authStore.isOfflineSessionValid) return 'Anmeldung erforderlich — bitte einloggen, um deine Workouts zu sehen.'
+  if (!uid && !authStore.isOfflineSessionValid) return t('stats.loginRequired')
   return ''
 })
 
@@ -492,34 +492,6 @@ function formatDayOverlayDate(key) {
   return new Date(key + 'T00:00:00').toLocaleDateString(isDe.value ? 'de-DE' : 'en-US', { weekday: 'long', day: 'numeric', month: 'long' })
 }
 
-const advancedCards = computed(() => ([
-  { title: 'Langzeit-Fortschritt', subtitle: '3, 6, 12 Monate im Vergleich' },
-  { title: 'Muskelgruppen-Balance', subtitle: 'Push/Pull/Legs im Gleichgewicht' },
-  { title: 'Trainingskonsistenz Score', subtitle: 'Streaks, Trends, Wochenziele' },
-  { title: 'Leistung pro Übung', subtitle: 'PRs und Kurven pro Exercise' },
-  { title: 'Plateau-Erkennung', subtitle: 'Warnung bei stagnierendem Fortschritt' },
-  { title: 'Volumen-Trend-Analyse', subtitle: 'Intensität und Regeneration' }
-]))
-
-const baseInsights = computed(() => {
-  const sessionsPerWeek = Number(avgSessionsDisplay.value) || 0
-  const volumeChange = avgVolumePrev.value ? ((avgVolumeRecent.value - avgVolumePrev.value) / avgVolumePrev.value) * 100 : 0
-  const consistency = activeStats.value?.kpis?.consistencyScore ?? 0
-  return [
-    `Du trainierst aktuell ${sessionsPerWeek.toFixed(1)} Tage pro Woche.`,
-    volumeChange >= 0
-      ? `Dein Trainingsvolumen ist um ${volumeChange.toFixed(0)} % gestiegen.`
-      : `Dein Trainingsvolumen ist um ${Math.abs(volumeChange).toFixed(0)} % gesunken.`,
-    `Deine Konsistenz liegt bei ${Math.round(consistency)} %.`
-  ]
-})
-
-const proInsights = computed(() => ([
-  'Langzeit-Analyse: Dein Volumen steigt in 3-Monats-Wellen.',
-  'Muskelgruppen-Balance: Pull liegt leicht hinter Push.'
-]))
-
-const visibleInsights = computed(() => ([...baseInsights.value, ...proInsights.value]))
 
 const sortedWeeks = computed(() => {
   if (!hasStatsWindow.value) return []
@@ -917,7 +889,7 @@ function buildPushPullMetric() {
   const ratio = push / pull
   const status = ratio >= 0.85 && ratio <= 1.2 ? 'good' : ratio >= 0.7 && ratio <= 1.4 ? 'caution' : 'risk'
   const severity = severityScore[status]
-  const valueText = `${formatNumber(ratio, 2)} ${isDe.value ? 'Verhältnis Push/Pull' : 'push/pull ratio'}`
+  const valueText = `${formatNumber(ratio, 2)} ${isDe.value ? 'Verhältnis Push/Pull' : 'push/pull ratio'}` // i18n-ignore (isDe-Muster, bereits zweisprachig)
   const interpretation = status === 'good'
     ? (isDe.value ? 'Balance stimmt' : 'balance on point')
     : (isDe.value

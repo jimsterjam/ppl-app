@@ -38,7 +38,7 @@
           <polyline points="3 4 3 10 9 10" />
         </svg>
       </button>
-      <button class="timer-icon expand" type="button" aria-label="Expand timer" @click="isExpanded = !isExpanded">
+      <button class="timer-icon expand" type="button" :aria-label="$t('common.expand')" @click="isExpanded = !isExpanded">
         <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="8 10 12 6 16 10" />
           <polyline points="8 14 12 18 16 14" />
@@ -107,11 +107,11 @@ const isPrepPhase = computed(() => prepRemainingMs.value > 0)
 
 // Labels
 const statusLabel = computed(() => {
-  if (isPrepPhase.value) return t('timer.prepTime') || 'Prep Time'
-  if (timerStore.isCompleted) return t('timer.statusCompleted') || 'Fertig'
-  if (timerStore.isArmed) return t('timer.statusArmed') || 'Bereit'
+  if (isPrepPhase.value) return t('timer.prepTime')
+  if (timerStore.isCompleted) return t('timer.statusCompleted')
+  if (timerStore.isArmed) return t('timer.statusArmed')
   if (timerStore.isStopwatchMode) {
-    return timerStore.isPaused ? t('timer.statusPaused') : (t('timer.modeStopwatch') || 'Stoppuhr')
+    return timerStore.isPaused ? t('timer.statusPaused') : (t('timer.modeStopwatch'))
   }
   if (timerStore.isPaused) return t('timer.statusPaused')
   if (isRest.value) return t('timer.statusRest')

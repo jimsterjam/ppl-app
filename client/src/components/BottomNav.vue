@@ -59,7 +59,7 @@
               :class="{ active: $route.path.startsWith('/workouts') }"
               :aria-current="$route.path.startsWith('/workouts') ? 'page' : undefined"
               @click="onNavClick(WORKOUT_KEY, `/workouts/${activeWorkout._id}`)"
-              title="Zum laufenden Workout"
+              :title="$t('nav.goToActiveWorkout')"
             >
               <span class="icon workout-icon" aria-hidden="true">
                 <Timer class="icon-svg" />

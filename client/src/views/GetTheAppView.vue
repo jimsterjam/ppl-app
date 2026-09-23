@@ -1,10 +1,10 @@
 <template>
   <div class="funnel">
     <div class="content">
-      <h1>Lade die App herunter</h1>
-      <p>Diese App ist nur als mobile Anwendung verfügbar.</p>
+      <h1>{{ $t('getTheApp.title') }}</h1>
+      <p>{{ $t('getTheApp.text') }}</p>
       <div class="stores">
-        <a class="store-btn ios" :href="appStoreUrl" target="_blank" rel="noopener">Zum App Store</a>
+        <a class="store-btn ios" :href="appStoreUrl" target="_blank" rel="noopener">{{ $t('getTheApp.appStore') }}</a>
       </div>
     </div>
   </div>

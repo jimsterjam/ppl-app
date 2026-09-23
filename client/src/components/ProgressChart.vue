@@ -14,9 +14,9 @@
       </div>
       <div class="time-range-selector">
         <select v-model="selectedTimeRange" @change="updateChart">
-          <option value="4weeks">{{ t('charts.last4Weeks') || 'Letzte 4 Wochen' }}</option>
-          <option value="3months">{{ t('charts.last3Months') || 'Letzte 3 Monate' }}</option>
-          <option value="all">{{ t('charts.allTime') || 'Gesamtverlauf' }}</option>
+          <option value="4weeks">{{ t('charts.last4Weeks') }}</option>
+          <option value="3months">{{ t('charts.last3Months') }}</option>
+          <option value="all">{{ t('charts.allTime') }}</option>
         </select>
       </div>
     </div>
@@ -120,11 +120,11 @@
       <!-- Extended Stats -->
       <div class="stat-row">
         <div class="stat-item">
-          <span class="stat-label">{{ t('charts.totalVolume') || 'Gesamtvolumen' }}</span>
+          <span class="stat-label">{{ t('charts.totalVolume') }}</span>
           <span class="stat-value">{{ progressStats.totalVolume }}kg</span>
         </div>
         <div class="stat-item">
-          <span class="stat-label">{{ t('charts.avgVolume') || 'Ø Volume' }}</span>
+          <span class="stat-label">{{ t('charts.avgVolume') }}</span>
           <span class="stat-value">{{ progressStats.avgVolume }}kg</span>
         </div>
       </div>

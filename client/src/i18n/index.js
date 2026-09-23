@@ -14,6 +14,8 @@ function detectLocale() {
 export const messages = {
   de: {
     common: {
+      expand: 'Vergrößern',
+      resume: 'Fortsetzen',
       updated: 'Aktualisiert',
       copy: 'Kopieren',
       confirm: 'Bestätigen',
@@ -45,6 +47,35 @@ export const messages = {
       select: 'Auswählen'
     },
     auth: {
+      warnContinueUrlRejected: 'Weiterleitungsziel wurde von Firebase ignoriert.',
+      warnRateLimited: 'Firebase hat weitere Anfragen vorübergehend blockiert.',
+      warningPrefix: 'Hinweis:',
+      passwordTooShort: 'Passwort muss mindestens {min} Zeichen lang sein.',
+      passwordNeedsLetterAndNumber: 'Passwort muss mindestens einen Buchstaben und eine Zahl enthalten.',
+      accountCreated: 'Konto erstellt. Bestätigungs‑E‑Mail wurde gesendet – bitte bestätige deine E‑Mail, bevor du dich anmeldest.',
+      authFailed: 'Anmeldung fehlgeschlagen.',
+      verificationLinkSent: 'Verifizierungslink wurde gesendet. Bitte prüfe dein Postfach und bestätige die E‑Mail.',
+      verificationLinkFailed: 'Fehler beim Anfordern des Verifizierungslinks.',
+      enterEmailFirst: 'Bitte gib zuerst deine E‑Mail-Adresse oben ein.',
+      passwordResetSent: 'Passwort-Reset-E‑Mail wurde an {email} gesendet. Bitte prüfe dein Postfach (auch den Spam-Ordner).',
+      passwordResetFailed: 'Passwort-Reset fehlgeschlagen.',
+      confirmationResent: 'Bestätigungs‑E‑Mail wurde erneut gesendet.',
+      verificationLinkResent: 'Verifizierungslink wurde erneut gesendet. Bitte prüfe dein Postfach.',
+      noSignedInUser: 'Kein eingeloggter Nutzer vorhanden.',
+      resendFailed: 'Fehler beim erneuten Senden der E‑Mail.',
+      googleFailed: 'Google-Anmeldung fehlgeschlagen.',
+      appleFailed: 'Apple-Anmeldung fehlgeschlagen.',
+      modeSignUp: 'Neues Konto registrieren',
+      modeSignIn: 'Anmeldung',
+      signUpPrompt: 'Erstelle ein neues Konto mit E‑Mail und Passwort.',
+      offlineExpired: 'Deine Offline‑Sitzung ist abgelaufen. Bitte einmal online anmelden.',
+      confirmationSentBanner: 'Bestätigungs‑E‑Mail wurde gesendet. Bitte öffne deine E‑Mail und klicke den Bestätigungslink.',
+      resendEmail: 'E‑Mail erneut senden',
+      emailVerified: 'E‑Mail erfolgreich bestätigt. Du kannst dich jetzt anmelden.',
+      passwordHint: 'Mindestens 8 Zeichen, mit Buchstaben und Zahl.',
+      requestVerification: 'Verifizierungs‑E‑Mail erneut anfordern',
+      initializing: 'Initialisiere…',
+      redirecting: 'Weiterleitung…',
       signIn: 'Anmelden',
       signOut: 'Abmelden',
       email: 'E-Mail',
@@ -57,6 +88,7 @@ export const messages = {
       forgotPassword: 'Passwort vergessen?'
     },
     nav: {
+      goToActiveWorkout: 'Zum laufenden Workout',
       home: 'Home',
       stats: 'Stats',
       exercises: 'Übungen',
@@ -67,6 +99,7 @@ export const messages = {
       ariaMain: 'Hauptnavigation'
     },
   dashboard: {
+      heroTitle: 'Bereit für dein Training?',
       title: 'Startbereich',
       // Platzhalter im Header, solange kein Anzeigename gesetzt ist - klickbar (siehe
       // HeaderBar.vue titleClickable), führt direkt zum Namens-Bearbeiten-Modal im Dashboard.
@@ -181,6 +214,7 @@ export const messages = {
   ,quickGenFallbackUsed: 'AI aktuell nicht erreichbar – wir haben ein lokales Workout für dich erstellt.'
     },
     settings: {
+      dangerZoneAccountTitle: 'Gefahrenzone – Account',
       title: 'Einstellungen',
       profileSection: 'Profil',
       accountInfoTitle: 'Angemeldet als',
@@ -266,6 +300,8 @@ export const messages = {
       deleteAccountWarning4: 'Der Account kann nicht wiederhergestellt werden'
     },
     timer: {
+      modeLabel: 'Timer-Modus',
+      directionLabel: 'Zeitrichtung',
       title: 'Timer',
       open: 'Timer',
       modeInterval: 'Intervall',
@@ -463,6 +499,42 @@ export const messages = {
       }
     },
     workoutDetail: {
+      noteEdit: 'ändern',
+      noteShow: 'anzeigen',
+      noteAdd: 'Notiz hinzufügen',
+      noteDelete: 'löschen',
+      notePlaceholder: 'Notiz zu dieser Übung…',
+      trackOneRepMax: 'Maximalkraft für diese Übung verfolgen',
+      oneRepMaxEdit: 'ändern',
+      oneRepMaxValue: '1RM: {value}kg',
+      oneRepMaxAdd: '1RM hinterlegen',
+      oneRepMaxLabelAddedWeight: 'Geschätztes 1RM – Zusatzgewicht zum Körpergewicht',
+      oneRepMaxLabel: 'Geschätztes 1RM (Maximalgewicht für 1 Wiederholung)',
+      oneRepMaxPlaceholder: 'z.B. 100',
+      oneRepMaxHintAddedWeight: 'Nur das Zusatzgewicht eintragen, nicht Körpergewicht + Zusatzgewicht zusammen. Optional, jederzeit änderbar – leer lassen und speichern entfernt den Wert wieder.',
+      oneRepMaxHint: 'Hilft der KI, bei dieser Übung passendere Empfehlungen zu geben. Optional, jederzeit änderbar – leer lassen und speichern entfernt den Wert wieder.',
+      oneRepMaxInvalid: 'Bitte ein gültiges 1RM zwischen 0 und 500 kg eingeben.',
+      oneRepMaxSaveFailed: '1RM konnte nicht gespeichert werden.',
+      settingSaveFailed: 'Einstellung konnte nicht gespeichert werden.',
+      mediaDisclaimer: 'Visualisierung dient nur zur Orientierung. Keine Garantie für technisch korrekte Ausführung.',
+      incrementReps: 'Wiederholungen erhöhen',
+      decrementReps: 'Wiederholungen verringern',
+      incrementWeight: 'Gewicht erhöhen',
+      decrementWeight: 'Gewicht verringern',
+      timerActiveTitle: 'Aktiver Timer',
+      timerKeepRunning: 'Weiterlaufen',
+      timerPause: 'Pausieren',
+      timerActiveQuestion: 'Der Timer ist noch aktiv. Wie soll fortgefahren werden?',
+      timerStop: 'Timer stoppen',
+      exerciseAlreadyAdded: 'Übung bereits hinzugefügt',
+      exerciseAdded: 'Übung hinzugefügt',
+      exerciseRemoved: 'Übung entfernt',
+      favoriteUpdateFailed: 'Fehler beim Aktualisieren des Favoriten.',
+      favoriteUpdateFailedCode: 'Favorit konnte nicht aktualisiert werden ({code}).',
+      favoriteMissingId: 'Favorit konnte nicht gespeichert werden: fehlende ID.',
+      savedLocallyAuth: 'Lokal gespeichert. Sync startet nach erneuter Anmeldung.',
+      savedLocallyRetry: 'Lokal gespeichert. Sync wird erneut versucht.',
+      unknownError: 'Unbekannter Fehler',
       loading: 'Lade Workout...',
       loadError: 'Fehler beim Laden des Workouts.',
       notFound: 'Kein Workout gefunden.',
@@ -538,6 +610,7 @@ export const messages = {
       uploadFailed: 'Upload fehlgeschlagen.'
     },
     builder: {
+      noExercisesInCategory: '😅 Keine Übungen für diese Kategorie verfügbar',
       backToDashboard: '← Zurück',
       backToDashboardTitle: 'Zurück zum Dashboard',
       filterEquipment: 'Equipment filtern',
@@ -588,6 +661,46 @@ export const messages = {
       avgVolume: 'Ø Volume'
     },
     stats: {
+      proBanner: {
+        eyebrow: 'Pro Test',
+        title: '14 Tage kostenlos testen',
+        text: 'Schalte Langzeit-Analysen frei und verfolge echte Fortschritte.',
+        cta: 'Pro freischalten'
+      },
+      milestone: {
+        title: 'Starker Lauf!',
+        text: 'Du hast bereits {count} Trainings im Blick. Schalte Pro frei, um Langzeit-Analysen zu sehen.'
+      },
+      base: {
+        title: 'Basis-Statistiken',
+        subtitle: 'Letzte 30 Tage im Fokus',
+        activityDays: 'Aktivitätstage',
+        badge: 'Basis',
+        monthNav: 'Monatsnavigation',
+        prevMonth: 'Vorheriger Monat',
+        nextMonth: 'Nächster Monat'
+      },
+      dayOverlay: {
+        moreExercises: '+{count} weitere Übungen'
+      },
+      loginRequired: 'Anmeldung erforderlich – bitte einloggen, um deine Workouts zu sehen.',
+      progress3m: {
+        title: 'Mein Fortschritt',
+        subtitle: 'Letzte 3 Monate (90 Tage)',
+        empty: 'Keine ausreichenden Workout-Daten für die letzten 90 Tage.',
+        totalWorkouts: 'Workouts gesamt',
+        workoutsPerWeek: 'Ø Workouts / Woche',
+        totalVolume: 'Gesamtvolumen',
+        avgDuration: 'Ø Trainingsdauer'
+      },
+      comparison: {
+        title: 'Workout-Vergleich',
+        oneRmHintTitle: 'Was bedeutet „Geschätztes 1RM“?',
+        oneRmHintText: '1RM = das Gewicht, das du für eine einzige Wiederholung maximal schaffen würdest. Die App schätzt diesen Wert aus Gewicht und Wiederholungen deiner Sätze. Der Pfeil (↑/↓) zeigt, ob sich der geschätzte Wert seit der letzten vergleichbaren Einheit verbessert oder verschlechtert hat.',
+        weight: 'Gewicht:',
+        reps: 'Wiederholungen:',
+        estimatedOneRm: 'Geschätztes 1RM:'
+      },
       loading: 'Lade Statistiken...',
       exercises: 'Übungen',
       workouts: 'Workouts',
@@ -863,6 +976,7 @@ export const messages = {
       version: 'Version'
     },
     upgrade: {
+      title: '🚀 Upgrade auf Pro',
       workoutLimitReached: 'Workout-Limit erreicht',
       workoutLimitMsg: 'Du hast dein Limit von {limit} Workouts pro Woche erreicht.',
       exerciseLimitReached: 'Übungs-Limit erreicht',
@@ -980,9 +1094,16 @@ export const messages = {
       error: 'Feedback konnte nicht gesendet werden. Bitte versuche es erneut.',
       categoryRequired: 'Bitte wähle eine Kategorie aus.'
     },
+    getTheApp: {
+      title: 'Lade die App herunter',
+      text: 'Diese App ist nur als mobile Anwendung verfügbar.',
+      appStore: 'Zum App Store'
+    },
   },
   en: {
     common: {
+      expand: 'Expand',
+      resume: 'Resume',
       updated: 'Updated',
       copy: 'Copy',
       confirm: 'Confirm',
@@ -1014,6 +1135,35 @@ export const messages = {
       select: 'Select'
     },
     auth: {
+      warnContinueUrlRejected: 'The redirect target was ignored by Firebase.',
+      warnRateLimited: 'Firebase has temporarily blocked further requests.',
+      warningPrefix: 'Note:',
+      passwordTooShort: 'Password must be at least {min} characters long.',
+      passwordNeedsLetterAndNumber: 'Password must contain at least one letter and one number.',
+      accountCreated: 'Account created. A confirmation email has been sent – please confirm your email before signing in.',
+      authFailed: 'Sign-in failed.',
+      verificationLinkSent: 'Verification link sent. Please check your inbox and confirm your email.',
+      verificationLinkFailed: 'Could not request the verification link.',
+      enterEmailFirst: 'Please enter your email address above first.',
+      passwordResetSent: 'Password reset email sent to {email}. Please check your inbox (including the spam folder).',
+      passwordResetFailed: 'Password reset failed.',
+      confirmationResent: 'Confirmation email sent again.',
+      verificationLinkResent: 'Verification link sent again. Please check your inbox.',
+      noSignedInUser: 'No signed-in user.',
+      resendFailed: 'Could not resend the email.',
+      googleFailed: 'Google sign-in failed.',
+      appleFailed: 'Apple sign-in failed.',
+      modeSignUp: 'Create new account',
+      modeSignIn: 'Sign in',
+      signUpPrompt: 'Create a new account with email and password.',
+      offlineExpired: 'Your offline session has expired. Please sign in online once.',
+      confirmationSentBanner: 'Confirmation email sent. Please open your email and click the confirmation link.',
+      resendEmail: 'Resend email',
+      emailVerified: 'Email verified successfully. You can sign in now.',
+      passwordHint: 'At least 8 characters, with a letter and a number.',
+      requestVerification: 'Request verification email again',
+      initializing: 'Initializing…',
+      redirecting: 'Redirecting…',
       signIn: 'Sign in',
       signOut: 'Sign out',
       email: 'Email',
@@ -1026,6 +1176,7 @@ export const messages = {
       forgotPassword: 'Forgot password?'
     },
     nav: {
+      goToActiveWorkout: 'Go to active workout',
       home: 'Home',
       stats: 'Stats',
       exercises: 'Exercises',
@@ -1036,6 +1187,7 @@ export const messages = {
       ariaMain: 'Main navigation'
     },
   dashboard: {
+      heroTitle: 'Ready for your workout?',
       title: 'Launchpad',
       yourNamePlaceholder: 'Your Name',
       greetingMorning: 'Good morning',
@@ -1148,6 +1300,7 @@ export const messages = {
   ,quickGenFallbackUsed: 'AI is currently unavailable — we created a local workout for you.'
     },
     settings: {
+      dangerZoneAccountTitle: 'Danger Zone – Account',
       title: 'Settings',
       profileSection: 'Profile',
       accountInfoTitle: 'Signed in as',
@@ -1233,6 +1386,8 @@ export const messages = {
       deleteAccountWarning4: 'The account cannot be restored'
     },
     timer: {
+      modeLabel: 'Timer mode',
+      directionLabel: 'Time direction',
       title: 'Timer',
       open: 'Timer',
       modeInterval: 'Interval',
@@ -1423,6 +1578,42 @@ export const messages = {
       }
     },
     workoutDetail: {
+      noteEdit: 'edit',
+      noteShow: 'show',
+      noteAdd: 'Add note',
+      noteDelete: 'delete',
+      notePlaceholder: 'Note for this exercise…',
+      trackOneRepMax: 'Track max strength for this exercise',
+      oneRepMaxEdit: 'edit',
+      oneRepMaxValue: '1RM: {value}kg',
+      oneRepMaxAdd: 'Add 1RM',
+      oneRepMaxLabelAddedWeight: 'Estimated 1RM – added weight on top of bodyweight',
+      oneRepMaxLabel: 'Estimated 1RM (maximum weight for 1 rep)',
+      oneRepMaxPlaceholder: 'e.g. 100',
+      oneRepMaxHintAddedWeight: 'Enter only the added weight, not bodyweight + added weight combined. Optional, can be changed anytime – leave empty and save to remove the value.',
+      oneRepMaxHint: 'Helps the AI give better recommendations for this exercise. Optional, can be changed anytime – leave empty and save to remove the value.',
+      oneRepMaxInvalid: 'Please enter a valid 1RM between 0 and 500 kg.',
+      oneRepMaxSaveFailed: 'Could not save 1RM.',
+      settingSaveFailed: 'Could not save the setting.',
+      mediaDisclaimer: 'The visualization is for orientation only. No guarantee of technically correct execution.',
+      incrementReps: 'Increase reps',
+      decrementReps: 'Decrease reps',
+      incrementWeight: 'Increase weight',
+      decrementWeight: 'Decrease weight',
+      timerActiveTitle: 'Timer active',
+      timerKeepRunning: 'Keep running',
+      timerPause: 'Pause',
+      timerActiveQuestion: 'The timer is still running. How do you want to continue?',
+      timerStop: 'Stop timer',
+      exerciseAlreadyAdded: 'Exercise already added',
+      exerciseAdded: 'Exercise added',
+      exerciseRemoved: 'Exercise removed',
+      favoriteUpdateFailed: 'Could not update the favorite.',
+      favoriteUpdateFailedCode: 'Could not update the favorite ({code}).',
+      favoriteMissingId: 'Could not save the favorite: missing ID.',
+      savedLocallyAuth: 'Saved locally. Sync starts after you sign in again.',
+      savedLocallyRetry: 'Saved locally. Sync will be retried.',
+      unknownError: 'Unknown error',
       loading: 'Loading workout...',
       loadError: 'Failed to load workout.',
       notFound: 'No workout found.',
@@ -1498,6 +1689,7 @@ export const messages = {
       addExercise: 'Add Exercise'
     },
     builder: {
+      noExercisesInCategory: '😅 No exercises available for this category',
       backToDashboard: '← Back',
       backToDashboardTitle: 'Back to dashboard',
       filterEquipment: 'Filter equipment',
@@ -1548,6 +1740,46 @@ export const messages = {
       avgVolume: 'Avg volume'
     },
     stats: {
+      proBanner: {
+        eyebrow: 'Pro trial',
+        title: 'Try it free for 14 days',
+        text: 'Unlock long-term analyses and track real progress.',
+        cta: 'Unlock Pro'
+      },
+      milestone: {
+        title: 'Great streak!',
+        text: 'You already have {count} sessions tracked. Unlock Pro to see long-term analyses.'
+      },
+      base: {
+        title: 'Basic statistics',
+        subtitle: 'Focus on the last 30 days',
+        activityDays: 'Activity days',
+        badge: 'Basic',
+        monthNav: 'Month navigation',
+        prevMonth: 'Previous month',
+        nextMonth: 'Next month'
+      },
+      dayOverlay: {
+        moreExercises: '+{count} more exercises'
+      },
+      loginRequired: 'Sign-in required – please sign in to see your workouts.',
+      progress3m: {
+        title: 'My progress',
+        subtitle: 'Last 3 months (90 days)',
+        empty: 'Not enough workout data for the last 90 days.',
+        totalWorkouts: 'Total workouts',
+        workoutsPerWeek: 'Ø workouts / week',
+        totalVolume: 'Total volume',
+        avgDuration: 'Ø workout duration'
+      },
+      comparison: {
+        title: 'Workout comparison',
+        oneRmHintTitle: 'What does “Estimated 1RM” mean?',
+        oneRmHintText: '1RM = the maximum weight you could lift for a single repetition. The app estimates this value from the weight and reps of your sets. The arrow (↑/↓) shows whether the estimate has improved or declined since the last comparable session.',
+        weight: 'Weight:',
+        reps: 'Reps:',
+        estimatedOneRm: 'Estimated 1RM:'
+      },
       loading: 'Loading statistics...',
       exercises: 'Exercises',
       workouts: 'Workouts',
@@ -1813,6 +2045,7 @@ export const messages = {
       version: 'Version'
     },
     upgrade: {
+      title: '🚀 Upgrade to Pro',
       workoutLimitReached: 'Workout Limit Reached',
       workoutLimitMsg: 'You\'ve reached your limit of {limit} workouts per week.',
       exerciseLimitReached: 'Exercise Limit Reached',
@@ -1929,6 +2162,11 @@ export const messages = {
       success: 'Thanks for your feedback!',
       error: 'Feedback could not be sent. Please try again.',
       categoryRequired: 'Please choose a category.'
+    },
+    getTheApp: {
+      title: 'Download the app',
+      text: 'This app is only available as a mobile app.',
+      appStore: 'Go to the App Store'
     },
   }
 }

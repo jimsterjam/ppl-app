@@ -1,32 +1,32 @@
 <template>
   <section class="progress-3m-section panel">
     <div class="section-head">
-      <h3>Mein Fortschritt</h3>
-      <span class="section-sub">Letzte 3 Monate (90 Tage)</span>
+      <h3>{{ $t('stats.progress3m.title') }}</h3>
+      <span class="section-sub">{{ $t('stats.progress3m.subtitle') }}</span>
     </div>
 
     <div v-if="!hasData" class="empty-hint">
-      Keine ausreichenden Workout-Daten für die letzten 90 Tage.
+      {{ $t('stats.progress3m.empty') }}
     </div>
 
     <div v-else class="cards-grid">
       <article class="metric-card">
-        <p class="metric-label">Workouts gesamt</p>
+        <p class="metric-label">{{ $t('stats.progress3m.totalWorkouts') }}</p>
         <p class="metric-value">{{ totalWorkouts }}</p>
       </article>
 
       <article class="metric-card">
-        <p class="metric-label">Ø Workouts / Woche</p>
+        <p class="metric-label">{{ $t('stats.progress3m.workoutsPerWeek') }}</p>
         <p class="metric-value">{{ workoutsPerWeekLabel }}</p>
       </article>
 
       <article class="metric-card">
-        <p class="metric-label">Gesamtvolumen</p>
+        <p class="metric-label">{{ $t('stats.progress3m.totalVolume') }}</p>
         <p class="metric-value">{{ totalVolumeLabel }}</p>
       </article>
 
       <article class="metric-card">
-        <p class="metric-label">Ø Trainingsdauer</p>
+        <p class="metric-label">{{ $t('stats.progress3m.avgDuration') }}</p>
         <p class="metric-value">{{ avgDurationLabel }}</p>
       </article>
     </div>

@@ -29,8 +29,29 @@ export const CLIENT_ROOT = path.resolve(__dirname, '..')
 const SRC_DIR = path.join(CLIENT_ROOT, 'src')
 export const BASELINE_PATH = path.join(__dirname, 'i18n-baseline.json')
 
+// Bewusste Ausnahmen (mit Paul abgestimmt): nur intern erreichbare Seiten, keine Endnutzer-UI.
+// Teilbereiche einer Datei stattdessen im Template mit dem Attribut `data-i18n-ignore`
+// markieren (gilt für das Element und alles darunter), Script-Zeilen mit `// i18n-ignore`.
+const IGNORED_FILES = new Map([
+  ['src/components/AdminFeedbackPanel.vue', 'Admin-Panel, per Admin-Schlüssel geschützt'],
+  ['src/components/AiInsightsPanel.vue', 'Admin-Panel, per Admin-Schlüssel geschützt'],
+  ['src/components/VerifierAuditPanel.vue', 'Admin-Panel, per Admin-Schlüssel geschützt'],
+  ['src/views/AdminFeedbackView.vue', 'Admin-Seite, nicht in der App-Navigation'],
+  ['src/views/FeaturesTestView.vue', 'Entwickler-Testseite'],
+  ['src/views/InfoView.vue', 'ungenutzt: /info leitet auf /faqs um (Löschen steht aus)'],
+  ['src/components/AIDisclaimerModal.vue', 'ungenutzt: nirgends importiert (Löschen steht aus)'],
+  ['src/components/ProgressChart.vue', 'ungenutzt: nirgends importiert (Löschen steht aus)'],
+  ['src/components/WorkoutTypeChart.vue', 'ungenutzt: nirgends importiert (Löschen steht aus)'],
+  ['src/components/ExercisePicker.vue', 'ungenutzt: nirgends importiert (Löschen steht aus)'],
+  ['src/components/OfflineIndicator.vue', 'ungenutzt: nirgends importiert (Löschen steht aus)'],
+  ['src/components/QuickOverview.vue', 'ungenutzt: nirgends importiert (Löschen steht aus)'],
+  ['src/components/StatsWidget.vue', 'ungenutzt: nirgends importiert (Löschen steht aus)'],
+  ['src/components/WorkoutFrequencyChart.vue', 'ungenutzt: nirgends importiert (Löschen steht aus)'],
+  ['src/views/MotivationView.vue', 'ungenutzt: nicht im Router (Löschen steht aus)']
+])
+
 // Attribute, deren statischer Wert für den Nutzer sichtbar bzw. vorgelesen wird.
-const VISIBLE_ATTRS = new Set(['placeholder', 'title', 'aria-label', 'alt', 'label'])
+const VISIBLE_ATTRS = new Set(['placeholder', 'title', 'aria-label', 'alt', 'label', 'text', 'message', 'subtitle', 'description', 'confirm-text', 'cancel-text', 'hint'])
 
 // Texte, die in beiden Sprachen identisch sind und deshalb keine Übersetzung brauchen.
 // Bewusst klein halten - im Zweifel lieber übersetzen.
@@ -38,7 +59,8 @@ const LANGUAGE_NEUTRAL = new Set([
   'push', 'pull', 'legs', 'fullbody', 'full body', 'ppl', 'ppl fundamentals', 'ok', 'kg', 'lbs',
   'min', 'sek', 'sec', 'rpe', 'rir', '1rm', 'ki', 'ai', 'id', 'email', 'e-mail', 'apple', 'google',
   'deutsch', 'english', 'timer', 'reset', 'start', 'pause', 'status', 'workout', 'workouts',
-  'feedback', 'dashboard', 'x', 'max', 'set', 'sets', 'reps', 'bodyweight', 'gym', 'pro', 'premium'
+  'feedback', 'dashboard', 'x', 'max', 'set', 'sets', 'reps', 'bodyweight', 'gym', 'pro', 'premium',
+  'elite', 'day', 'faqs', 'vs', 'coach'
 ])
 
 const GERMAN_WORDS = /\b(und|oder|nicht|kein|keine|bitte|wird|werden|ist|sind|mit|für|fur|der|die|das|dein|deine|dich|dir|noch|jetzt|speichern|abbrechen|löschen|loeschen|fehler|zurück|zurueck|weiter|schließen|schliessen|übung|übungen|satz|sätze|gewicht|wiederholungen|einstellungen|erfolgreich|hinzufügen|bearbeiten|wählen|auswählen|laden|lädt|konnte|kann|neu|alle|heute|gestern)\b/i
@@ -86,9 +108,48 @@ function isTranslatableText(raw) {
   return true
 }
 
+// Deutsche String-Literale in JS-Ausdrücken (Template-Interpolationen, :bindings, Script-Blöcke
+// von .vue-Dateien), z.B. {{ isSignUp ? 'Neues Konto' : 'Anmeldung' }} oder
+// authError.value = err.message || 'Fehlgeschlagen.' - die fallen durch die übrigen Prüfungen.
+// Nur .vue-Dateien: in reinen .js-Utilities stehen deutsche Strings meist als Daten
+// (Übungsnamen, Mappings), nicht als UI-Text.
+const STRING_LITERAL = /(['"`])((?:(?!\1)[^\\\n]|\\.){3,}?)\1/g
+
+function collectGermanLiterals(code, offset, file, source, findings, { skipTranslated = true } = {}) {
+  const cleaned = stripComments(code)
+  let m
+  STRING_LITERAL.lastIndex = 0
+  while ((m = STRING_LITERAL.exec(cleaned))) {
+    const text = m[2].trim()
+    if (!/\s/.test(text) && !GERMAN_CHARS.test(text)) continue
+    if (!looksGerman(text)) continue
+    const lineStart = cleaned.lastIndexOf('\n', m.index) + 1
+    const lineEnd = cleaned.indexOf('\n', m.index)
+    const line = code.slice(lineStart, lineEnd === -1 ? undefined : lineEnd)
+    if (line.includes('i18n-ignore')) continue
+    if (/\b(logger|console)\.\w+\(/.test(line)) continue
+    if (/^\s*import\b/.test(line)) continue
+    // Bestehendes Muster `isDe.value ? 'Deutsch' : 'English'` ist bereits zweisprachig -
+    // nicht ideal (sollte t() nutzen), aber für Nutzer korrekt; nicht als Fehler werten.
+    if (/\bisDe\b/.test(cleaned.slice(Math.max(0, m.index - 250), m.index))) continue
+    // `t('key') || 'Fallback'` ist Gruppe 3 (wirkungslose Fallbacks) - separat behandelt.
+    if (skipTranslated && /\$?t\([^)]*\)\s*\|\|\s*$/.test(cleaned.slice(lineStart, m.index))) continue
+    findings.push({
+      check: 'germanLiteral',
+      file: rel(file),
+      line: lineOf(source, offset + m.index),
+      text,
+      german: true
+    })
+  }
+}
+
 function collectTemplateFindings(node, file, source, templateOffset, findings) {
   if (!node) return
-  // NodeTypes: 1 = ELEMENT, 2 = TEXT, 6 = ATTRIBUTE
+  // NodeTypes: 1 = ELEMENT, 2 = TEXT, 5 = INTERPOLATION, 6 = ATTRIBUTE, 7 = DIRECTIVE
+  if (node.type === 5 && node.content?.content) {
+    collectGermanLiterals(node.content.content, node.content.loc.start.offset, file, source, findings)
+  }
   if (node.type === 2) {
     const text = node.content.replace(/\s+/g, ' ').trim()
     if (isTranslatableText(text)) {
@@ -102,7 +163,11 @@ function collectTemplateFindings(node, file, source, templateOffset, findings) {
     }
   }
   if (node.type === 1) {
+    if ((node.props || []).some((prop) => prop.type === 6 && prop.name === 'data-i18n-ignore')) return
     for (const prop of node.props || []) {
+      if (prop.type === 7 && prop.exp?.content) {
+        collectGermanLiterals(prop.exp.content, prop.exp.loc.start.offset, file, source, findings)
+      }
       if (prop.type === 6 && VISIBLE_ATTRS.has(prop.name) && prop.value) {
         const text = prop.value.content.trim()
         if (isTranslatableText(text)) {
@@ -139,6 +204,9 @@ function collectScriptFindings(code, offset, file, source, findings) {
   while ((m = SCRIPT_SINK.exec(cleaned))) {
     const text = (m[3] ?? m[6] ?? '').trim()
     if (!text || !looksGerman(text)) continue
+    const lineStart = code.lastIndexOf('\n', m.index) + 1
+    const lineEnd = code.indexOf('\n', m.index)
+    if (code.slice(lineStart, lineEnd === -1 ? undefined : lineEnd).includes('i18n-ignore')) continue
     findings.push({
       check: 'hardcodedScriptText',
       file: rel(file),
@@ -183,6 +251,7 @@ export async function runI18nCheck() {
   const files = walkFiles(SRC_DIR, ['.vue', '.js'])
   for (const file of files) {
     if (file.endsWith(path.join('i18n', 'index.js'))) continue
+    if (IGNORED_FILES.has(rel(file))) continue
     const source = fs.readFileSync(file, 'utf8')
     if (file.endsWith('.vue')) {
       const { descriptor } = parseSfc(source, { filename: file })
@@ -193,6 +262,7 @@ export async function runI18nCheck() {
       for (const block of [descriptor.script, descriptor.scriptSetup]) {
         if (!block) continue
         collectScriptFindings(block.content, block.loc.start.offset, file, source, findings)
+        collectGermanLiterals(block.content, block.loc.start.offset, file, source, findings)
         collectUsedKeys(block.content, block.loc.start.offset, file, source, used)
       }
     } else {

@@ -3,7 +3,7 @@
   <div v-if="show" class="upgrade-modal-overlay" @click.self="$emit('close')">
     <div class="upgrade-modal glass">
       <div class="modal-header">
-        <h2>🚀 Upgrade to Pro</h2>
+        <h2>{{ $t('upgrade.title') }}</h2>
         <button class="close-btn" @click="$emit('close')">×</button>
       </div>
       

@@ -9,7 +9,7 @@
           {{ t('exercises.filters.type') }}
         </label>
         <select id="type-filter-select" v-model="selectedCategory" @change="setCategory($event.target.value)" class="equipment-filter-select">
-          <option :value="''">{{ t('exercises.filters.all') || 'Alle' }}</option>
+          <option :value="''">{{ t('exercises.filters.all') }}</option>
           <option v-for="cat in quickCategories" :key="cat.value" :value="cat.value">{{ cat.label }}</option>
         </select>
       </div>
@@ -19,7 +19,7 @@
           {{ t('builder.filterEquipment') }}
         </label>
         <select id="equipment-filter-select" v-model="selectedEquipment" @change="setEquipment($event.target.value)" class="equipment-filter-select">
-          <option :value="''">{{ t('exercises.filters.all') || 'Alle' }}</option>
+          <option :value="''">{{ t('exercises.filters.all') }}</option>
           <option v-for="equip in allEquipmentTypes" :key="equip" :value="equip">{{ getTranslatedEquipment(equip) }}</option>
         </select>
       </div>
@@ -54,7 +54,7 @@
           v-model="searchDraft"
           class="equipment-filter-select search-input"
           type="search"
-          :placeholder="t('exercises.searchPlaceholder') || 'Suchen…'"
+          :placeholder="t('exercises.searchPlaceholder')"
           @input="onSearchInput"
         />
         <p v-if="searchError" class="search-error">{{ searchError }}</p>
@@ -66,7 +66,7 @@
         @click="editingCustomExercise = null; showAddCustomModal = true"
         >
         <span class="add-custom-exercise-icon" aria-hidden="true">+</span>
-        {{ t('exercises.addCustom') || 'Eigene Übung' }}
+        {{ t('exercises.addCustom') }}
       </button>
     </div>
 
@@ -110,7 +110,7 @@
               <button
                 class="custom-action-btn"
                 type="button"
-                :title="t('exercises.editCustomTitle') || 'Bearbeiten'"
+                :title="t('exercises.editCustomTitle')"
                 @click.stop="openEditCustom(ex)"
               >
                 ✏️
@@ -118,7 +118,7 @@
               <button
                 class="custom-action-btn danger"
                 type="button"
-                :title="t('exercises.deleteCustomTitle') || 'Löschen'"
+                :title="t('exercises.deleteCustomTitle')"
                 @click.stop="askDeleteCustom(ex)"
               >
                 🗑️
@@ -171,9 +171,9 @@
   />
   <AppModal
     v-model="showDeleteCustomModal"
-    :title="t('exercises.deleteCustomConfirmTitle') || 'Übung löschen'"
-    :message="t('exercises.deleteCustomConfirmMsg') || 'Diese eigene Übung wirklich löschen?'"
-    :confirm-text="t('common.delete') || 'Löschen'"
+    :title="t('exercises.deleteCustomConfirmTitle')"
+    :message="t('exercises.deleteCustomConfirmMsg')"
+    :confirm-text="t('common.delete')"
     :cancel-text="t('common.cancel')"
     type="warning"
     @confirm="confirmDeleteCustom"
@@ -316,7 +316,7 @@ const muscleGroups = [
   'Schultern',
   'Trizeps',
   'Bizeps',
-  'Rücken',
+  'Rücken', // i18n-ignore (Filterwert aus den Übungsdaten, Anzeige über getTranslatedMuscleGroup)
   'Quadrizeps',
   'Waden'
 ];

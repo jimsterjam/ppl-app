@@ -11,7 +11,7 @@
     {{ t('timer.open') }}
   </button>
 
-  <div v-if="showDevDebug" class="timer-debug-indicator" aria-live="polite">
+  <div v-if="showDevDebug" class="timer-debug-indicator" aria-live="polite" data-i18n-ignore>
     <div>restore: {{ restoreStatus }}</div>
     <div>from: {{ timerStore.debugRestoreSource || 'n/a' }}</div>
     <div>persist: {{ timerStore.debugPersistSource || 'n/a' }}</div>

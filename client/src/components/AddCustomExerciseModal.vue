@@ -1,7 +1,7 @@
 <template>
   <AppModal
     v-model="internalOpen"
-    :title="isEditMode ? (t('exercises.editCustomTitle') || 'Übung bearbeiten') : (t('exercises.addCustomTitle') || 'Eigene Übung hinzufügen')"
+    :title="isEditMode ? (t('exercises.editCustomTitle')) : (t('exercises.addCustomTitle'))"
     :show-cancel="true"
     :confirm-text="saving ? t('common.loading') : (isEditMode ? t('common.save') : t('common.add'))"
     :cancel-text="t('common.cancel')"
@@ -13,58 +13,58 @@
   >
     <div class="custom-exercise-form">
       <label class="field image-field">
-        <span>{{ t('exercises.imageLabel') || 'Bild (optional)' }}</span>
+        <span>{{ t('exercises.imageLabel') }}</span>
         <div class="image-picker" @click="pickImage">
           <img v-if="imagePreviewUrl" :src="imagePreviewUrl" class="image-preview" alt="" />
-          <span v-else class="image-placeholder">+ {{ t('exercises.imageAdd') || 'Bild wählen' }}</span>
+          <span v-else class="image-placeholder">+ {{ t('exercises.imageAdd') }}</span>
         </div>
         <small v-if="isEditMode && !canUploadImage" class="image-hint">
-          {{ t('exercises.imageSyncHint') || 'Bild kann erst nach der ersten Synchronisierung hinzugefügt werden.' }}
+          {{ t('exercises.imageSyncHint') }}
         </small>
       </label>
 
       <label class="field">
-        <span>{{ t('exercises.nameLabel') || 'Name der Übung' }}</span>
+        <span>{{ t('exercises.nameLabel') }}</span>
         <input
           v-model="name"
           type="text"
           maxlength="60"
-          :placeholder="t('exercises.nameLabel') || 'z.B. Bulgarian Split Squat'"
+          :placeholder="t('exercises.nameLabel')"
           @keydown.enter.prevent="onConfirm"
         />
       </label>
 
       <label class="field">
-        <span>{{ t('exercises.muscleGroupLabel') || 'Muskelgruppe' }}</span>
+        <span>{{ t('exercises.muscleGroupLabel') }}</span>
         <select v-model="muscleGroup">
-          <option value="">{{ t('exercises.muscleGroupPlaceholder') || 'Bitte wählen' }}</option>
-          <option value="chest">{{ t('muscleGroups.chest') || 'Brust' }}</option>
-          <option value="back">{{ t('muscleGroups.back') || 'Rücken' }}</option>
-          <option value="shoulders">{{ t('muscleGroups.shoulders') || 'Schultern' }}</option>
-          <option value="biceps">{{ t('muscleGroups.biceps') || 'Bizeps' }}</option>
-          <option value="triceps">{{ t('muscleGroups.triceps') || 'Trizeps' }}</option>
-          <option value="legs">{{ t('muscleGroups.legs') || 'Beine' }}</option>
-          <option value="glutes">{{ t('muscleGroups.glutes') || 'Gesäß' }}</option>
-          <option value="abs">{{ t('muscleGroups.abs') || 'Bauch' }}</option>
-          <option value="other">{{ t('muscleGroups.other') || 'Sonstiges' }}</option>
+          <option value="">{{ t('exercises.muscleGroupPlaceholder') }}</option>
+          <option value="chest">{{ t('muscleGroups.chest') }}</option>
+          <option value="back">{{ t('muscleGroups.back') }}</option>
+          <option value="shoulders">{{ t('muscleGroups.shoulders') }}</option>
+          <option value="biceps">{{ t('muscleGroups.biceps') }}</option>
+          <option value="triceps">{{ t('muscleGroups.triceps') }}</option>
+          <option value="legs">{{ t('muscleGroups.legs') }}</option>
+          <option value="glutes">{{ t('muscleGroups.glutes') }}</option>
+          <option value="abs">{{ t('muscleGroups.abs') }}</option>
+          <option value="other">{{ t('muscleGroups.other') }}</option>
         </select>
       </label>
       <label class="field">
-      <span>{{ t('exercises.descriptionLabel') || 'Beschreibung (optional)' }}</span>
+      <span>{{ t('exercises.descriptionLabel') }}</span>
         <textarea
           v-model="description"
           rows="3"
           maxlength="500"
-          :placeholder="t('exercises.descriptionPlaceholder') || 'Kurze Beschreibung oder Ausführungshinweise'"
+          :placeholder="t('exercises.descriptionPlaceholder')"
         ></textarea>
       </label>
       <label class="field">
-        <span>{{ t('exercises.notesLabel') || 'Notiz (optional)' }}</span>
+        <span>{{ t('exercises.notesLabel') }}</span>
         <textarea
           v-model="notes"
           rows="2"
           maxlength="200"
-          :placeholder="t('exercises.notesPlaceholder') || 'z.B. Ersatz für Nordic Curls, näher an meiner tatsächlichen Übung'"
+          :placeholder="t('exercises.notesPlaceholder')"
         ></textarea>
       </label>
 
@@ -141,9 +141,9 @@ async function pickImage() {
       quality: 90,
       resultType: CameraResultType.Uri,
       source: CameraSource.Prompt,
-      promptLabelHeader: t('exercises.imagePickTitle') || 'Bild auswählen',
-      promptLabelPhoto: t('exercises.imagePickGallery') || 'Aus Galerie wählen',
-      promptLabelPicture: t('exercises.imagePickCamera') || 'Foto aufnehmen'
+      promptLabelHeader: t('exercises.imagePickTitle'),
+      promptLabelPhoto: t('exercises.imagePickGallery'),
+      promptLabelPicture: t('exercises.imagePickCamera')
     })
 
     const response = await fetch(photo.webPath)
@@ -156,7 +156,7 @@ async function pickImage() {
   } catch (err) {
     if (err?.message === 'User cancelled photos app') return
     logger.warn('[AddCustomExerciseModal] Bildauswahl fehlgeschlagen', err?.message)
-    errorMsg.value = t('exercises.imageError') || 'Bild konnte nicht verarbeitet werden.'
+    errorMsg.value = t('exercises.imageError')
   }
 }
 
@@ -164,11 +164,11 @@ async function onConfirm() {
   if (saving.value) return
   const trimmedName = name.value.trim()
   if (!trimmedName) {
-    errorMsg.value = t('exercises.nameRequired') || 'Bitte einen Namen eingeben.'
+    errorMsg.value = t('exercises.nameRequired')
     return
   }
   if (!props.userId) {
-    errorMsg.value = t('common.error') || 'Fehler: Kein User erkannt.'
+    errorMsg.value = t('common.error')
     return
   }
 
@@ -193,7 +193,7 @@ async function onConfirm() {
           logger.warn('[AddCustomExerciseModal] Bild-Upload fehlgeschlagen', imgErr?.message)
           // Textänderungen sind bereits gespeichert — Bildfehler nicht als Gesamtfehler werten,
           // aber informieren.
-          errorMsg.value = t('exercises.imageUploadFailed') || 'Übung gespeichert, Bild-Upload fehlgeschlagen.'
+          errorMsg.value = t('exercises.imageUploadFailed')
         }
       }
 
@@ -220,7 +220,7 @@ async function onConfirm() {
 
     if (!errorMsg.value) internalOpen.value = false
   } catch (err) {
-    errorMsg.value = t('common.error') || 'Speichern fehlgeschlagen. Bitte erneut versuchen.'
+    errorMsg.value = t('common.error')
   } finally {
     saving.value = false
   }

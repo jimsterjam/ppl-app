@@ -38,7 +38,7 @@
             <button
               class="action-btn favorite"
               :class="{ active: isFavorited(workout) }"
-              :title="isFavorited(workout) ? t('recent.favorited') || 'Als Favorit gespeichert' : t('recent.favoriteTitle') || 'Als Favorit speichern'"
+              :title="isFavorited(workout) ? t('recent.favorited') : t('recent.favoriteTitle')"
               :disabled="favoriteSavingId === workout._id"
               @click.stop="openFavoriteStar(workout)"
             >
@@ -195,7 +195,7 @@
     <!-- Favoriten-Namens-Modal -->
     <AppModal
       v-model="showFavoriteModal"
-      :title="t('recent.favoriteNameTitle') || 'Als Favorit speichern'"
+      :title="t('recent.favoriteNameTitle')"
       :confirm-text="favoriteSavingId ? t('common.loading') : t('common.save')"
       :cancel-text="t('common.cancel')"
       :close-on-confirm="false"
@@ -203,12 +203,12 @@
       @confirm="confirmSaveFavorite"
     >
       <label class="favorite-modal-field">
-        <span>{{ t('recent.favoriteNamePlaceholder') || 'Name des Favoriten' }}</span>
+        <span>{{ t('recent.favoriteNamePlaceholder') }}</span>
         <input
           v-model="favoriteNameInput"
           type="text"
           maxlength="40"
-          :placeholder="t('recent.favoriteNamePlaceholder') || 'Name des Favoriten'"
+          :placeholder="t('recent.favoriteNamePlaceholder')"
           @keydown.enter.prevent="confirmSaveFavorite"
         />
       </label>
@@ -284,7 +284,7 @@ function confirmSaveFavorite() {
   if (!workout) return
   const trimmedName = favoriteNameInput.value.trim()
   if (!trimmedName) {
-    favoriteErrorMsg.value = t('recent.favoriteNameRequired') || 'Bitte einen Namen eingeben.'
+    favoriteErrorMsg.value = t('recent.favoriteNameRequired')
     return
   }
 
@@ -301,7 +301,7 @@ function confirmSaveFavorite() {
   favoriteSavingId.value = null
 
   if (!result.success) {
-    favoriteErrorMsg.value = result.message || t('common.error') || 'Speichern fehlgeschlagen.'
+    favoriteErrorMsg.value = result.message || t('common.error')
     return
   }
 

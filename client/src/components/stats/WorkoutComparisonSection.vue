@@ -1,13 +1,13 @@
 <template>
   <section v-if="comparisonEntries.length" class="workout-compare panel">
     <div class="section-head">
-      <h3>Workout-Vergleich</h3>
+      <h3>{{ $t('stats.comparison.title') }}</h3>
     </div>
 
     <OneTimeHint
       hint-id="estimated-1rm-explainer"
-      title="Was bedeutet „Geschätztes 1RM“?"
-      text="1RM = das Gewicht, das du für eine einzige Wiederholung maximal schaffen würdest. Die App schätzt diesen Wert aus Gewicht und Wiederholungen deiner Sätze. Der Pfeil (↑/↓) zeigt, ob sich der geschätzte Wert seit der letzten vergleichbaren Einheit verbessert oder verschlechtert hat."
+      :title="$t('stats.comparison.oneRmHintTitle')"
+      :text="$t('stats.comparison.oneRmHintText')"
     />
 
     <div class="type-grid">
@@ -32,15 +32,15 @@
           >
             <h5>{{ getTranslatedExerciseName(exercise.name) }}</h5>
             <p class="line">
-              <span class="label">Gewicht:</span>
+              <span class="label">{{ $t('stats.comparison.weight') }}</span>
               <span class="value">{{ formatKg(exercise.previous.bestWeight) }} → {{ formatKg(exercise.current.bestWeight) }}</span>
             </p>
             <p class="line">
-              <span class="label">Wiederholungen:</span>
+              <span class="label">{{ $t('stats.comparison.reps') }}</span>
               <span class="value">{{ formatCount(exercise.previous.totalReps) }} → {{ formatCount(exercise.current.totalReps) }}</span>
             </p>
             <p class="line">
-              <span class="label">Geschätztes 1RM:</span>
+              <span class="label">{{ $t('stats.comparison.estimatedOneRm') }}</span>
               <span class="value">{{ formatOneRepMax(exercise.previous.estimated1RM) }} → {{ formatOneRepMax(exercise.current.estimated1RM) }} {{ directionArrow(exercise.direction) }}</span>
             </p>
           </article>

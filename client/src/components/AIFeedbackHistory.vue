@@ -1,7 +1,7 @@
 <template>
   <div class="ai-feedback-history glass">
     <div class="header">
-      <h3>{{ t('feedbackHistory.title') || 'KI-Feedback Verlauf' }}</h3>
+      <h3>{{ t('feedbackHistory.title') }}</h3>
     </div>
 
     <div v-if="loading && items.length === 0" class="state-message">
@@ -11,13 +11,13 @@
     <div v-else-if="error" class="state-message error">
       <p>{{ error }}</p>
       <button class="retry-btn" type="button" @click="load(1)">
-        {{ t('common.retry') || 'Erneut versuchen' }}
+        {{ t('common.retry') }}
       </button>
     </div>
 
     <div v-else-if="items.length === 0" class="empty-state">
       <div class="empty-icon">🤖</div>
-      <p>{{ t('feedbackHistory.empty') || 'Noch kein KI-Feedback vorhanden. Schließe ein Workout ab, um dein erstes Feedback zu erhalten.' }}</p>
+      <p>{{ t('feedbackHistory.empty') }}</p>
     </div>
 
     <div v-else class="feedback-list">
@@ -35,7 +35,7 @@
             <span class="feedback-date">
               {{ formatDate(item.ai_generated_at || item.date) }}
               <span v-if="item.ai_feedback_status === 'deferred'" class="pending-badge">
-                {{ t('feedbackHistory.pendingBadge') || 'Ausstehend' }}
+                {{ t('feedbackHistory.pendingBadge') }}
               </span>
             </span>
           </div>
@@ -47,8 +47,8 @@
              models/Workout.js) - eigener Zustand mit "Jetzt generieren"-Button statt des
              normalen Feedback-Texts, der hier ja noch gar nicht existiert. -->
         <div v-if="expandedId === item.workoutId && item.ai_feedback_status === 'deferred'" class="feedback-text pending" @click.stop>
-          <p class="pending-hint">{{ t('feedbackHistory.pendingHint') || 'Für dieses Workout wurde noch kein KI-Feedback angefordert. Falls du inzwischen Notizen ergänzt hast, kannst du es jetzt generieren.' }}</p>
-          <p v-if="generateError === item.workoutId" class="generate-error">{{ t('feedbackHistory.generateError') || 'Feedback konnte gerade nicht generiert werden. Bitte später erneut versuchen.' }}</p>
+          <p class="pending-hint">{{ t('feedbackHistory.pendingHint') }}</p>
+          <p v-if="generateError === item.workoutId" class="generate-error">{{ t('feedbackHistory.generateError') }}</p>
           <button
             class="generate-now-btn"
             type="button"
@@ -56,7 +56,7 @@
             @click.stop="generateNow(item)"
           >
             <span v-if="generatingId === item.workoutId" class="generate-spinner spin-indicator" aria-hidden="true"></span>
-            {{ generatingId === item.workoutId ? (t('feedbackHistory.generating') || 'Generiere…') : (t('feedbackHistory.generateNow') || 'Jetzt generieren') }}
+            {{ generatingId === item.workoutId ? (t('feedbackHistory.generating')) : (t('feedbackHistory.generateNow')) }}
           </button>
         </div>
 
@@ -76,11 +76,11 @@
           <button
             class="share-btn"
             type="button"
-            :aria-label="t('feedbackHistory.share') || 'Analyse teilen'"
+            :aria-label="t('feedbackHistory.share')"
             @click.stop="shareFeedback(item)"
           >
             <Share2 class="share-icon" aria-hidden="true" />
-            <span>{{ t('feedbackHistory.share') || 'Teilen' }}</span>
+            <span>{{ t('feedbackHistory.share') }}</span>
           </button>
         </div>
       </div>
@@ -92,7 +92,7 @@
         :disabled="loading"
         @click.stop="loadMore"
       >
-        {{ loading ? (t('common.loading') || 'Lädt…') : (t('feedbackHistory.loadMore') || 'Mehr laden') }}
+        {{ loading ? (t('common.loading')) : (t('feedbackHistory.loadMore')) }}
       </button>
     </div>
   </div>
@@ -189,7 +189,7 @@ async function generateNow(item) {
       // Bleibt "ausstehend" (kein Fehler) - nur noch nicht genug Trainingshistorie für eine
       // wertende Analyse. Gleicher Hinweistext wie in PostWorkoutSummary.vue.
       toast.show(
-        t('postWorkout.insufficientHistoryExplainer') || 'Eine wertende Analyse ist erst nach mindestens 4 Wochen bzw. 8 identischen Workouts aussagekräftig.',
+        t('postWorkout.insufficientHistoryExplainer'),
         { type: 'info', duration: 4000 }
       )
       logDiagnostic('feedback-history-generate-now', { workoutId: item.workoutId, outcome: 'insufficient_history' })
@@ -242,7 +242,7 @@ async function shareFeedback(item) {
   // schlägt die Erzeugung fehl, bleibt es beim bisherigen Text-Only-Share, kein Fehler sichtbar.
   const imageUri = await generateFeedbackShareImage(item, {
     dateLabel,
-    footerText: t('feedbackHistory.shareFooter') || 'Erstellt mit der ppl App'
+    footerText: t('feedbackHistory.shareFooter')
   }).catch((err) => {
     logger.debug('[AIFeedbackHistory] Share-Bild-Erzeugung fehlgeschlagen', err?.message)
     return null
@@ -250,10 +250,10 @@ async function shareFeedback(item) {
 
   try {
     await Share.share({
-      title: t('feedbackHistory.shareTitle') || 'KI-Feedback',
+      title: t('feedbackHistory.shareTitle'),
       text,
       ...(imageUri ? { files: [imageUri] } : {}),
-      dialogTitle: t('feedbackHistory.shareTitle') || 'KI-Feedback teilen'
+      dialogTitle: t('feedbackHistory.shareTitle')
     })
   } catch (err) {
     // Nutzer hat den Share-Sheet einfach abgebrochen - das ist kein Fehler, kein Toast.
@@ -271,10 +271,10 @@ async function copyFeedbackToClipboard(text) {
   try {
     if (!navigator?.clipboard?.writeText) throw new Error('clipboard-unavailable')
     await navigator.clipboard.writeText(text)
-    toast.success(t('feedbackHistory.copiedToClipboard') || 'In die Zwischenablage kopiert')
+    toast.success(t('feedbackHistory.copiedToClipboard'))
   } catch (err) {
     logger.warn('[AIFeedbackHistory] clipboard fallback failed', err?.message)
-    toast.error(t('feedbackHistory.shareError') || 'Teilen ist gerade nicht möglich')
+    toast.error(t('feedbackHistory.shareError'))
   }
 }
 
@@ -357,7 +357,7 @@ async function load(targetPage = 1, { silent = false } = {}) {
     // statt ihn durch eine Fehlermeldung zu ersetzen - der Nutzer hat ja etwas Nützliches vor
     // sich, auch wenn der aktuelle Netzwerk-Versuch fehlschlägt.
     if (!silent) {
-      error.value = t('feedbackHistory.error') || 'Feedback-Verlauf konnte nicht geladen werden'
+      error.value = t('feedbackHistory.error')
     }
   } finally {
     if (!silent) {

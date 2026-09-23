@@ -93,15 +93,15 @@
       <h2 class="section-title">{{ $t('settings.profileSection') }}</h2>
 
       <section v-if="accountEmail || accountProviderLabel" class="card card--profile account-info-card">
-        <h3>{{ $t('settings.accountInfoTitle') || 'Angemeldet als' }}</h3>
+        <h3>{{ $t('settings.accountInfoTitle') }}</h3>
         <p class="account-email">{{ accountEmail || '—' }}</p>
-        <p v-if="accountProviderLabel" class="hint">{{ $t('settings.accountInfoProvider', { provider: accountProviderLabel }) || `Login über ${accountProviderLabel}` }}</p>
+        <p v-if="accountProviderLabel" class="hint">{{ $t('settings.accountInfoProvider', { provider: accountProviderLabel }) }}</p>
         <p class="hint account-info-note">
-          {{ $t('settings.accountInfoNote') || 'Hinweis: E-Mail/Passwort-, Google- und Apple-Login sind eigenständige Konten. Meldest du dich über einen anderen Anbieter an, siehst du nicht automatisch dieselben Workouts.' }}
+          {{ $t('settings.accountInfoNote') }}
         </p>
         <div v-if="accountUid" class="account-uid-row">
           <code class="account-uid">{{ accountUid }}</code>
-          <button type="button" class="uid-copy-btn" @click="copyAccountUid">{{ $t('common.copy') || 'Kopieren' }}</button>
+          <button type="button" class="uid-copy-btn" @click="copyAccountUid">{{ $t('common.copy') }}</button>
         </div>
       </section>
 
@@ -116,8 +116,9 @@
            Fünffach-Tap-Unlock, der über localStorage auch in Produktions-Builds funktionierte -
            damit konnte jeder TestFlight-Tester die QA-Tools freischalten. Jetzt komplett aus dem
            Build-Output entfernt statt nur "versteckt". -->
+      <!-- data-i18n-ignore: Entwickler-Werkzeuge, nur in Dev-Builds enthalten (nicht TestFlight/App Store) -->
       <template v-if="isDevBuild">
-        <section v-if="isDevelopment" class="card dev-tools">
+        <section v-if="isDevelopment" class="card dev-tools" data-i18n-ignore>
           <h3>🧪 Developer Tools</h3>
           <p class="hint">Features testing and debugging tools</p>
           <button class="dev-btn" @click="goToFeatureTest">
@@ -168,7 +169,7 @@
             <p class="hint tiny">Local-only override. Clear storage to reset.</p>
           </div>
         </section>
-        <section v-else class="card dev-unlock">
+        <section v-else class="card dev-unlock" data-i18n-ignore>
           <h3>🔒 Developer Tools</h3>
           <p class="hint">Tap the badge below five times to unlock QA controls on this device.</p>
           <button class="dev-unlock-badge" @click="handleDevUnlockTap">
@@ -220,7 +221,7 @@
       </section>
 
       <section class="card danger-zone account-danger">
-        <h3>{{ $t('settings.dangerZone') }} - Account</h3>
+        <h3>{{ $t('settings.dangerZoneAccountTitle') }}</h3>
         <p class="hint">{{ $t('settings.dangerZoneHint') }}</p>
         <button class="danger-btn account-delete-btn" @click="showDeleteAccountConfirm = true" :disabled="isDeletingAccount">
           <span v-if="isDeletingAccount" class="spinner spin-indicator" aria-hidden="true"></span>
@@ -393,7 +394,7 @@ const accountProviderLabel = computed(() => {
   const providerId = authStore.user?.providerId || ''
   if (providerId === 'apple.com') return 'Apple'
   if (providerId === 'google.com') return 'Google'
-  if (providerId === 'password') return $t('settings.accountProviderPassword') || 'E-Mail/Passwort'
+  if (providerId === 'password') return $t('settings.accountProviderPassword')
   return ''
 })
 
@@ -426,7 +427,7 @@ async function copyAccountUid() {
   if (!accountUid.value) return
   try {
     await navigator.clipboard.writeText(accountUid.value)
-    toast.show($t('settings.accountUidCopied') || 'UID kopiert', { type: 'success', duration: 2000 })
+    toast.show($t('settings.accountUidCopied'), { type: 'success', duration: 2000 })
   } catch (err) {
     logger.warn('[Settings] UID konnte nicht kopiert werden', err?.message)
   }
@@ -585,10 +586,10 @@ async function copyDraftDebugLog() {
       toast.show(`Debug-Log kopiert (${diagnostics.length} Events)`, { type: 'success', duration: 1800 })
     } else {
       logger.debug('[SettingsView] Draft-Debug-Log:', text)
-      toast.show('Clipboard nicht verfügbar, siehe Konsole', { type: 'info', duration: 1800 })
+      toast.show('Clipboard nicht verfügbar, siehe Konsole', { type: 'info', duration: 1800 }) // i18n-ignore (Dev-Tool)
     }
   } catch (e) {
-    toast.show('Debug-Log konnte nicht erstellt werden', { type: 'error', duration: 1600 })
+    toast.show('Debug-Log konnte nicht erstellt werden', { type: 'error', duration: 1600 }) // i18n-ignore (Dev-Tool)
   }
 }
 
@@ -601,7 +602,7 @@ function clearDraftDebugLog() {
     localStorage.removeItem('bro_split_load_diagnostics_v1')
     toast.show('Debug-Log geleert', { type: 'success', duration: 1400 })
   } catch (e) {
-    toast.show('Log konnte nicht geleert werden', { type: 'error', duration: 1600 })
+    toast.show('Log konnte nicht geleert werden', { type: 'error', duration: 1600 }) // i18n-ignore (Dev-Tool)
   }
 }
 
@@ -609,17 +610,17 @@ async function copyIdToken() {
   try {
     const token = await getIdTokenSafe()
     if (!token) {
-      toast.show('Kein Token (nicht eingeloggt)', { type: 'info', duration: 1600 })
+      toast.show('Kein Token (nicht eingeloggt)', { type: 'info', duration: 1600 }) // i18n-ignore (Dev-Tool)
       return
     }
     if (!navigator?.clipboard?.writeText) {
-      toast.show('Clipboard nicht verfügbar', { type: 'info', duration: 1600 })
+      toast.show('Clipboard nicht verfügbar', { type: 'info', duration: 1600 }) // i18n-ignore (Dev-Tool)
       return
     }
     await navigator.clipboard.writeText(token)
-    toast.show('Token kopiert', { type: 'success', duration: 1400 })
+    toast.show('Token kopiert', { type: 'success', duration: 1400 }) // i18n-ignore (Dev-Tool)
   } catch (e) {
-    toast.show('Kopieren fehlgeschlagen', { type: 'error', duration: 1600 })
+    toast.show('Kopieren fehlgeschlagen', { type: 'error', duration: 1600 }) // i18n-ignore (Dev-Tool)
   }
 }
 

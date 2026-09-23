@@ -1,8 +1,8 @@
 <template>
   <div v-if="showSummary" class="post-workout-summary glass">
     <div class="summary-header">
-      <h2>{{ t('postWorkout.title') || 'Workout abgeschlossen!' }}</h2>
-      <button class="close-btn" type="button" @click="dismissSummary" aria-label="Schließen">×</button>
+      <h2>{{ t('postWorkout.title') }}</h2>
+      <button class="close-btn" type="button" @click="dismissSummary" :aria-label="$t('common.close')">×</button>
     </div>
 
     <!-- Einmalige Feedback-Einladung nach dem ersten erfolgreich gespeicherten Workout (siehe
@@ -25,14 +25,14 @@
          WorkoutDetailView.vue). Kein Lade-Spinner, da hier gar nichts lädt/läuft - das würde
          etwas vortäuschen, das nicht passiert. -->
     <div v-if="deferredConfirmation" class="summary-content fallback">
-      <p>{{ t('postWorkout.deferredSaved') || 'Workout gespeichert - ohne KI-Feedback.' }}</p>
-      <p class="deferred-hint">{{ t('postWorkout.deferredHint') || 'Sobald du Notizen ergänzt hast, kannst du das Feedback im Feedback-Verlauf nachträglich anfordern.' }}</p>
+      <p>{{ t('postWorkout.deferredSaved') }}</p>
+      <p class="deferred-hint">{{ t('postWorkout.deferredHint') }}</p>
       <div class="summary-actions">
         <button class="primary" type="button" @click="dismissSummary">
-          {{ t('common.continue') || 'Weiter' }}
+          {{ t('common.continue') }}
         </button>
         <button class="secondary" type="button" @click="goToAnalytics">
-          {{ t('postWorkout.goToFeedbackHistory') || 'Zum Feedback-Verlauf' }}
+          {{ t('postWorkout.goToFeedbackHistory') }}
         </button>
       </div>
     </div>
@@ -40,19 +40,19 @@
     <!-- Loading State -->
     <div v-else-if="loading" class="summary-content loading">
       <div class="spinner spin-indicator"></div>
-      <p>{{ t('postWorkout.analyzing') || 'Analysiere deinen Trainingsfortschritt...' }}</p>
+      <p>{{ t('postWorkout.analyzing') }}</p>
     </div>
 
     <!-- Error State -->
     <div v-else-if="error" class="summary-content error">
       <p class="error-message">{{ error }}</p>
-      <button class="secondary" type="button" @click="dismissSummary">{{ t('common.close') || 'Schließen' }}</button>
+      <button class="secondary" type="button" @click="dismissSummary">{{ t('common.close') }}</button>
     </div>
 
     <!-- Success State -->
     <div v-else-if="feedback" class="summary-content success">
       <div class="feedback-section">
-        <h3>{{ t('postWorkout.feedback') || 'Dein Feedback' }}</h3>
+        <h3>{{ t('postWorkout.feedback') }}</h3>
         <AiFeedbackDeltaSummary v-if="analysisSnapshot.length > 0" :snapshot="analysisSnapshot" />
         <div class="feedback-text">{{ feedback }}</div>
         <!-- Erklärt NUR, wofür die Bewertung da ist - rührt AiFeedbackRatingWidget selbst nicht
@@ -72,10 +72,10 @@
 
       <div class="summary-actions">
         <button class="primary" type="button" @click="dismissSummary">
-          {{ t('postWorkout.gotIt') || 'Verstanden' }}
+          {{ t('postWorkout.gotIt') }}
         </button>
         <button class="secondary" type="button" @click="goToAnalytics">
-          {{ t('postWorkout.seeDetails') || 'Details anschauen' }}
+          {{ t('postWorkout.seeDetails') }}
         </button>
       </div>
     </div>
@@ -85,49 +85,49 @@
          AI_FEEDBACK_MIN_REPETITIONS / AI_FEEDBACK_MIN_HISTORY_DAYS serverseitig). -->
     <div v-else-if="insufficientHistory" class="summary-content fallback">
       <p>
-        {{ t('postWorkout.insufficientHistoryExplainer') || 'Eine wertende Analyse ist erst nach mindestens 4 Wochen bzw. 8 identischen Workouts aussagekräftig.' }}
+        {{ t('postWorkout.insufficientHistoryExplainer') }}
       </p>
       <p v-if="remainingCount > 0 || remainingDays > 0">
         {{ remainingCount === 1
-          ? (t('postWorkout.insufficientHistorySingle') || 'Noch 1 gleiches Workout, dann bekommst du dein erstes Feedback.')
-          : (t('postWorkout.insufficientHistoryMulti', { count: remainingCount }) || `Noch ${remainingCount} gleiche Workouts, dann bekommst du dein erstes Feedback.`)
+          ? (t('postWorkout.insufficientHistorySingle'))
+          : (t('postWorkout.insufficientHistoryMulti', { count: remainingCount }))
         }}
         <template v-if="remainingDays > 0">
-          {{ t('postWorkout.insufficientHistoryOr') || '(oder' }}
+          {{ t('postWorkout.insufficientHistoryOr') }}
           {{ remainingDays === 1
-            ? (t('postWorkout.insufficientHistoryDaySingle') || 'noch 1 Tag)')
-            : (t('postWorkout.insufficientHistoryDaysMulti', { days: remainingDays }) || `noch ${remainingDays} Tage)`)
+            ? (t('postWorkout.insufficientHistoryDaySingle'))
+            : (t('postWorkout.insufficientHistoryDaysMulti', { days: remainingDays }))
           }}
         </template>
       </p>
       <button class="primary" type="button" @click="dismissSummary">
-        {{ t('common.continue') || 'Weiter' }}
+        {{ t('common.continue') }}
       </button>
     </div>
 
     <!-- KI-Provider kurz nicht erreichbar (z.B. Ollama im Heimnetz nicht im selben WLAN, oder
          ein Cold-Start beim OpenAI-Relay) - Workout ist trotzdem gespeichert. -->
     <div v-else-if="networkUnavailable" class="summary-content fallback">
-      <p>{{ t('postWorkout.networkUnavailable') || 'Dein Workout ist gespeichert. Die KI-Analyse ist gerade kurz nicht erreichbar — du findest sie in Kürze automatisch in den Stats.' }}</p>
+      <p>{{ t('postWorkout.networkUnavailable') }}</p>
       <button class="primary" type="button" @click="dismissSummary">
-        {{ t('common.continue') || 'Weiter' }}
+        {{ t('common.continue') }}
       </button>
     </div>
 
     <!-- Workout wurde noch nicht mit dem Server synchronisiert (z.B. langsames Netz beim
          Speichern) - die echte ID lag beim Laden dieser Ansicht noch nicht vor. -->
     <div v-else-if="syncPending" class="summary-content fallback">
-      <p>{{ t('postWorkout.syncPending') || 'Dein Workout wird gerade noch synchronisiert. Das Feedback kannst du in Kürze in den Stats abrufen.' }}</p>
+      <p>{{ t('postWorkout.syncPending') }}</p>
       <button class="primary" type="button" @click="dismissSummary">
-        {{ t('common.continue') || 'Weiter' }}
+        {{ t('common.continue') }}
       </button>
     </div>
 
     <!-- Fallback: No Feedback (AI unavailable but workout saved) -->
     <div v-else class="summary-content fallback">
-      <p>{{ t('postWorkout.saved') || 'Dein Workout wurde gespeichert!' }}</p>
+      <p>{{ t('postWorkout.saved') }}</p>
       <button class="primary" type="button" @click="dismissSummary">
-        {{ t('common.continue') || 'Weiter' }}
+        {{ t('common.continue') }}
       </button>
     </div>
 
@@ -373,8 +373,7 @@ async function loadAIFeedback() {
     // Nicht tödlich - Workout wurde trotzdem gespeichert
     error.value = err.response?.data?.message ||
                   err.message ||
-                  t('postWorkout.error') ||
-                  'Feedback konnte nicht geladen werden'
+                  t('postWorkout.error')
     logDiagnostic('ai-feedback-result', {
       workoutId: props.workoutId,
       outcome: 'error',

@@ -28,9 +28,13 @@ const offlineExpired = computed(() => route.query?.reason === 'offline-expired')
 // jetzt ausschließlich direkt bei einer Sende-Aktion (Signup/Resend) gesetzt und beim
 // Moduswechsel/erfolgreichem Login/erfolgreicher Verifizierung wieder zurückgesetzt (siehe
 // toggleAuthMode/Watcher unten) - kein Wiederaufleben aus einer vorherigen Sitzung mehr.
-const WARNING_LABELS = {
-    'continue-url-rejected': 'Weiterleitungsziel wurde von Firebase ignoriert.',
-    'firebase-rate-limited': 'Firebase hat weitere Anfragen vorübergehend blockiert.'
+const WARNING_LABEL_KEYS = {
+    'continue-url-rejected': 'auth.warnContinueUrlRejected',
+    'firebase-rate-limited': 'auth.warnRateLimited'
+}
+function formatWarnings(warnings) {
+    const readable = warnings.map((w) => (WARNING_LABEL_KEYS[w] ? t(WARNING_LABEL_KEYS[w]) : w))
+    return ` ${t('auth.warningPrefix')} ${readable.join(' ')}`
 }
 
 // Auth Form
@@ -90,10 +94,10 @@ onMounted(() => {
 const MIN_PASSWORD_LENGTH = 8
 function validatePasswordStrength(pw) {
     if (String(pw || '').length < MIN_PASSWORD_LENGTH) {
-        return `Passwort muss mindestens ${MIN_PASSWORD_LENGTH} Zeichen lang sein.`
+        return t('auth.passwordTooShort', { min: MIN_PASSWORD_LENGTH })
     }
     if (!/[a-zA-Z]/.test(pw) || !/[0-9]/.test(pw)) {
-        return 'Passwort muss mindestens einen Buchstaben und eine Zahl enthalten.'
+        return t('auth.passwordNeedsLetterAndNumber')
     }
     return null
 }
@@ -113,7 +117,7 @@ async function handleEmailAuth() {
             const res = await signUpWithEmail(email.value, password.value)
             if (res && res.pendingEmailVerification) {
                 verificationSent.value = true
-                statusMessage.value = 'Konto erstellt. Bestätigungs‑E‑Mail wurde gesendet - bitte bestätige deine E‑Mail, bevor du dich anmeldest.'
+                statusMessage.value = t('auth.accountCreated')
                 // switch back to sign-in view
                 isSignUp.value = false
                 // suppress watcher navigation for a short grace period to avoid brief auto-login redirect
@@ -127,7 +131,7 @@ async function handleEmailAuth() {
         }
         // Erfolg: Auth State wird automatisch aktualisiert
     } catch (err) {
-        authError.value = err.message || 'Authentifizierung fehlgeschlagen'
+        authError.value = err.message || t('auth.authFailed')
         // If email already in use during signup, show option to request verification link
         if (isSignUp.value && /E[-–\s]?Mail/i.test(email.value) || /E‑Mail/i.test(err.message) || /verwende/i.test(err.message) || /already in use/i.test(err.message)) {
             showResendForExisting.value = true
@@ -145,13 +149,12 @@ async function handleRequestVerification() {
     try {
         const resp = await requestVerificationLink(attemptedEmail.value, { forceNewLink: true })
         verificationSent.value = true
-        verificationMessage.value = 'Verifizierungslink wurde gesendet. Bitte prüfe dein Postfach und bestätige die E‑Mail.'
+        verificationMessage.value = t('auth.verificationLinkSent')
         if (resp?.warnings?.length) {
-            const readable = resp.warnings.map((w) => WARNING_LABELS[w] || w)
-            verificationMessage.value += ' Hinweis: ' + readable.join(' ')
+            verificationMessage.value += formatWarnings(resp.warnings)
         }
     } catch (e) {
-        authError.value = e?.message || 'Fehler beim Anfordern des Verifizierungslinks.'
+        authError.value = e?.message || t('auth.verificationLinkFailed')
     } finally {
         authLoading.value = false
     }
@@ -159,7 +162,7 @@ async function handleRequestVerification() {
 
 async function handlePasswordReset() {
     if (!email.value) {
-        authError.value = 'Bitte gib zuerst deine E-Mail-Adresse oben ein.'
+        authError.value = t('auth.enterEmailFirst')
         return
     }
     authError.value = ''
@@ -167,9 +170,9 @@ async function handlePasswordReset() {
     authLoading.value = true
     try {
         await resetPassword(email.value)
-        statusMessage.value = `Passwort-Reset-E-Mail wurde an ${email.value} gesendet. Bitte prüfe dein Postfach (auch den Spam-Ordner).`
+        statusMessage.value = t('auth.passwordResetSent', { email: email.value })
     } catch (err) {
-        authError.value = err.message || 'Passwort-Reset fehlgeschlagen.'
+        authError.value = err.message || t('auth.passwordResetFailed')
     } finally {
         authLoading.value = false
     }
@@ -184,20 +187,19 @@ async function handleResendVerification() {
         const user = getCurrentUser()
         if (user) {
             await resendVerification()
-            verificationMessage.value = 'Bestätigungs‑E‑Mail wurde erneut gesendet.'
+            verificationMessage.value = t('auth.confirmationResent')
         } else if (attemptedEmail.value) {
             // Fallback: Admin-Endpoint anfragen, falls kein eingeloggter Nutzer vorhanden
             const resp = await requestVerificationLink(attemptedEmail.value, { forceNewLink: true })
-            verificationMessage.value = 'Verifizierungslink wurde erneut gesendet. Bitte prüfe dein Postfach.'
+            verificationMessage.value = t('auth.verificationLinkResent')
             if (resp?.warnings?.length) {
-                const readable = resp.warnings.map((w) => WARNING_LABELS[w] || w)
-                verificationMessage.value += ' Hinweis: ' + readable.join(' ')
+                verificationMessage.value += formatWarnings(resp.warnings)
             }
         } else {
-            throw new Error('Kein eingeloggter Nutzer vorhanden')
+            throw new Error(t('auth.noSignedInUser'))
         }
     } catch (err) {
-        authError.value = err.message || 'Fehler beim erneuten Senden der E‑Mail.'
+        authError.value = err.message || t('auth.resendFailed')
     } finally {
         authLoading.value = false
     }
@@ -233,7 +235,7 @@ async function handleGoogleLogin() {
         }
     } catch (err) {
         logger.error('[WelcomePage] Google login failed:', err?.message || err, err)
-        authError.value = err.message || 'Google Login fehlgeschlagen'
+        authError.value = err.message || t('auth.googleFailed')
     } finally {
         logger.debug('[WelcomePage] Google login finished, resetting loading state')
         authLoading.value = false
@@ -265,7 +267,7 @@ async function handleAppleLogin() {
         }
     } catch (err) {
         logger.error('[WelcomePage] Apple login failed:', err?.message || err, err)
-        authError.value = err.message || 'Apple Login fehlgeschlagen'
+        authError.value = err.message || t('auth.appleFailed')
     } finally {
         logger.debug('[WelcomePage] Apple login finished, resetting loading state')
         authLoading.value = false
@@ -326,24 +328,24 @@ watch(() => route.query?.emailVerified, (val) => {
         <!-- Nicht eingeloggt: Sign-In -->
         <div v-if="!isSignedIn" class="sign-in-container">
             <div v-if="offlineExpired" class="info-banner">
-                <p>Deine Offline‑Sitzung ist abgelaufen. Bitte einmal online anmelden.</p>
+                <p>{{ t('auth.offlineExpired') }}</p>
             </div>
             <h2>{{ t('welcome.title') }}</h2>
             <div class="mode-badge" :class="isSignUp ? 'mode-signup' : 'mode-signin'">
-                {{ isSignUp ? 'Neues Konto registrieren' : 'Anmeldung' }}
+                {{ isSignUp ? t('auth.modeSignUp') : t('auth.modeSignIn') }}
             </div>
-            <p>{{ isSignUp ? 'Erstelle ein neues Konto mit E‑Mail und Passwort.' : t('welcome.signInPrompt') }}</p>
+            <p>{{ isSignUp ? t('auth.signUpPrompt') : t('welcome.signInPrompt') }}</p>
 
             <!-- Email/Passwort Form -->
             <div v-if="verificationSent" class="info-banner">
-                <p>Bestätigungs‑E‑Mail wurde gesendet. Bitte öffne deine E‑Mail und klicke den Bestätigungslink.</p>
+                <p>{{ t('auth.confirmationSentBanner') }}</p>
                 <div class="resend-row">
-                    <button class="resend-btn" @click="handleResendVerification" :disabled="authLoading">E‑Mail erneut senden</button>
+                    <button class="resend-btn" @click="handleResendVerification" :disabled="authLoading">{{ t('auth.resendEmail') }}</button>
                     <span class="small-info" v-if="verificationMessage">{{ verificationMessage }}</span>
                 </div>
             </div>
             <div v-else-if="route.query?.emailVerified" class="success-banner">
-                <p>E‑Mail erfolgreich bestätigt. Du kannst dich jetzt anmelden.</p>
+                <p>{{ t('auth.emailVerified') }}</p>
             </div>
             <div v-if="statusMessage" class="success-banner">
                 <p>{{ statusMessage }}</p>
@@ -365,7 +367,7 @@ watch(() => route.query?.emailVerified, (val) => {
                     :autocomplete="isSignUp ? 'new-password' : 'current-password'"
                     class="auth-input"
                 >
-                <p v-if="isSignUp" class="password-hint">Mindestens 8 Zeichen, mit Buchstaben und Zahl.</p>
+                <p v-if="isSignUp" class="password-hint">{{ t('auth.passwordHint') }}</p>
                 <button
                     type="submit" 
                     :disabled="authLoading" 
@@ -383,7 +385,7 @@ watch(() => route.query?.emailVerified, (val) => {
                         {{ t('auth.forgotPassword') }}
                     </button>
                     <button v-if="showResendForExisting" type="button" @click="handleRequestVerification" class="resend-existing" :disabled="authLoading">
-                        Verifizierungs‑E‑Mail erneut anfordern
+                        {{ t('auth.requestVerification') }}
                     </button>
                 </div>
                 <p v-if="authError" class="error">{{ authError }}</p>

@@ -82,7 +82,7 @@ const allEquipmentTypes = computed(() => {
 const equipmentTranslation = (equip) => {
 	// Standardisierte Keys für i18n
 	const keyMap = {
-		'Körpergewicht': 'bodyweight',
+		'Körpergewicht': 'bodyweight', // i18n-ignore (Daten-Mapping, kein UI-Text)
 		'Langhantel': 'barbell',
 		'Hanteln': 'dumbbell',
 		'Maschine': 'machine',
@@ -205,9 +205,7 @@ const workoutTypes = computed(() => [
 	},
 	{
 		value: 'fullbody',
-		label: t('builder.fullBodyDay') !== 'builder.fullBodyDay'
-			? t('builder.fullBodyDay')
-			: 'Ganzkörper'
+		label: t('builder.fullBodyDay')
   }
 ])
 const currentTypeLabel = computed(() => {
@@ -425,7 +423,7 @@ async function createWorkout() {
 	} catch (e) {
 		let hint = '';
 		if (e && typeof e.message === 'string' && /Cannot access 'te' before initialization/.test(e.message)) {
-			hint = '\nHinweis: Im Template wird vermutlich eine Variable (z.B. v-for="t in ...") verwendet, die die Übersetzungsfunktion t() überschattet. Bitte prüfe die v-for-Schleifen und benenne die Variable um.';
+			hint = '\nHinweis: Im Template wird vermutlich eine Variable (z.B. v-for="t in ...") verwendet, die die Übersetzungsfunktion t() überschattet. Bitte prüfe die v-for-Schleifen und benenne die Variable um.'; // i18n-ignore (Entwickler-Diagnose)
 		}
 		errorMsg.value = t('builder.createFailed') + (e?.message ? ': ' + e.message : (e?.toString() ? ': ' + e.toString() : '')) + hint;
 	} finally {
@@ -523,7 +521,7 @@ watch(() => `${route.query.quick || ''}:${route.query.favoriteStart || ''}`, () 
 					<div v-for="n in 6" :key="n" class="exercise-item sk"></div>
 				</div>
 				<div v-else-if="!loading && filteredExercises.length === 0 && initialReady" class="empty-state">
-					<p>😅 Keine Übungen für diese Kategorie verfügbar</p>
+					<p>{{ t('builder.noExercisesInCategory') }}</p>
 				</div>
 				<ExerciseList
 					v-else
@@ -549,7 +547,7 @@ watch(() => `${route.query.quick || ''}:${route.query.favoriteStart || ''}`, () 
 							{{ t('builder.filterEquipment') !== 'builder.filterEquipment' ? t('builder.filterEquipment') : 'Equipment filtern' }}
 						</label>
 						<select id="equipment-filter-select" v-model="selectedEquipment" @change="setEquipment($event.target.value)" style="padding:7px 12px; border-radius:8px; border:1px solid #e5e7eb; min-width:140px;">
-							<option :value="''">{{ t('exercises.filters.all') || 'Alle' }}</option>
+							<option :value="''">{{ t('exercises.filters.all') }}</option>
 							<option v-for="equipmentOption in allEquipmentTypes" :key="equipmentOption" :value="equipmentOption">{{ equipmentTranslation(equipmentOption) }}</option>
 						 </select>
 					 </div>
@@ -582,7 +580,7 @@ watch(() => `${route.query.quick || ''}:${route.query.favoriteStart || ''}`, () 
 				<ul class="selected-exercise-list">
 					<li v-for="(exercise, index) in selectedExercises" :key="exercise._id" class="selected-exercise-item" draggable="true" @dragstart="onDragStart(index)" @dragover.prevent="onDrop(index)">
 						<span class="exercise-name">{{ getTranslatedExerciseName(exercise.displayName || exercise.name) }}</span>
-						<button class="remove-btn" @click="removeExercise(index)" aria-label="remove exercise">×</button>
+						<button class="remove-btn" @click="removeExercise(index)" :aria-label="t('builder.removeExercise')">×</button>
 					</li>
 				</ul>
 				<p v-if="errorMsg" class="error-hint">{{ errorMsg }}</p>

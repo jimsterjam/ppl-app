@@ -17,7 +17,7 @@
     <main class="dashboard-content" :class="{ 'has-draft': hasDraft }">
       <section class="hero">
         <div>
-          <h4 class="hero-title">Bereit für dein Training?</h4>
+          <h4 class="hero-title">{{ $t('dashboard.heroTitle') }}</h4>
           <p class="hero-sub">{{ weeklyProgressLabel }}</p>
         </div>
       </section>
@@ -165,7 +165,7 @@
         <div v-if="hasDraft" class="draft-note">
           <span>{{ $t('dashboard.draftAvailable') }}</span>
           <div class="draft-actions">
-            <button class="cta-inline" type="button" @click="startWorkout(draftId)">Fortsetzen</button>
+            <button class="cta-inline" type="button" @click="startWorkout(draftId)">{{ $t('common.resume') }}</button>
             <button class="cta-inline danger" type="button" @click="showDiscardDraftConfirm = true">{{ $t('dashboard.deleteDraft') }}</button>
           </div>
         </div>

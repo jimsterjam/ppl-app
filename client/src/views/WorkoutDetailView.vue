@@ -39,7 +39,7 @@
              diesen Hinweis wäre für den Nutzer nicht ersichtlich, dass Änderungen hier nur
              noch begrenzte Zeit möglich sind. -->
         <div v-if="editWindowDeadline" class="banner warning">
-          <span>{{ t('workoutDetail.editWindowHint', { time: editWindowDeadlineLabel }) || `Du kannst dieses bereits abgeschlossene Workout noch bis ${editWindowDeadlineLabel} bearbeiten.` }}</span>
+          <span>{{ t('workoutDetail.editWindowHint', { time: editWindowDeadlineLabel }) }}</span>
         </div>
 
         <OneTimeHint
@@ -185,8 +185,8 @@
                     <button class="link" @click="toggleNote(i)">
                       <StickyNote class="btn-icon btn-icon--inline" aria-hidden="true" />
                       {{ getNote(i)
-                        ? (showNote[i] ? 'ändern' : 'anzeigen')
-                        : 'Notiz hinzufügen' }}
+                        ? (showNote[i] ? t('workoutDetail.noteEdit') : t('workoutDetail.noteShow'))
+                        : t('workoutDetail.noteAdd') }}
                     </button>
 
                     <button
@@ -195,7 +195,7 @@
                       @click="askDeleteNote(i)"
                       style="margin-left:8px;"
                     >
-                      <Trash2 class="btn-icon btn-icon--inline" aria-hidden="true" /> löschen
+                      <Trash2 class="btn-icon btn-icon--inline" aria-hidden="true" /> {{ t('workoutDetail.noteDelete') }}
                     </button>
                   </div>
 
@@ -205,7 +205,7 @@
                       :title="t('onboarding.hintFirstNoteTitle')"
                       :text="t('onboarding.hintFirstNoteText')"
                     />
-                    <textarea :value="getNote(i)" @input="setNote(i, $event.target.value)" rows="2" style="width:100%;resize:vertical" placeholder="Notiz zu dieser Übung..."></textarea>
+                    <textarea :value="getNote(i)" @input="setNote(i, $event.target.value)" rows="2" style="width:100%;resize:vertical" :placeholder="t('workoutDetail.notePlaceholder')"></textarea>
                   </div>
 
                   <!-- 1RM (geschätztes Maximalgewicht für 1 Wiederholung) - nur bei Übungen aus der
@@ -222,7 +222,7 @@
                         :checked="getIsCustomOneRepMaxTrackingEnabled(i)"
                         @change="toggleTrackOneRepMax(i)"
                       />
-                      Maximalkraft für diese Übung verfolgen
+                      {{ t('workoutDetail.trackOneRepMax') }}
                     </label>
                   </div>
 
@@ -230,16 +230,16 @@
                     <button class="link" @click="toggleOneRepMax(i)">
                       <Dumbbell class="btn-icon btn-icon--inline" aria-hidden="true" />
                       {{ getOneRepMaxDisplay(i) != null
-                        ? (showOneRepMax[i] ? 'ändern' : `1RM: ${getOneRepMaxDisplay(i)}kg`)
-                        : '1RM hinterlegen' }}
+                        ? (showOneRepMax[i] ? t('workoutDetail.oneRepMaxEdit') : t('workoutDetail.oneRepMaxValue', { value: getOneRepMaxDisplay(i) }))
+                        : t('workoutDetail.oneRepMaxAdd') }}
                     </button>
                   </div>
 
                   <div v-if="showOneRepMax && showOneRepMax[i]" class="one-rep-max-field" style="margin-top: 4px;">
                     <label :for="`one-rep-max-${i}`">
                       {{ isOneRepMaxAddedWeightExercise(ex)
-                        ? 'Geschätztes 1RM - Zusatzgewicht zum Körpergewicht'
-                        : 'Geschätztes 1RM (Maximalgewicht für 1 Wiederholung)' }}
+                        ? t('workoutDetail.oneRepMaxLabelAddedWeight')
+                        : t('workoutDetail.oneRepMaxLabel') }}
                     </label>
                     <div class="one-rep-max-input-row">
                       <input
@@ -249,7 +249,7 @@
                         max="500"
                         step="0.5"
                         inputmode="decimal"
-                        placeholder="z.B. 100"
+                        :placeholder="t('workoutDetail.oneRepMaxPlaceholder')"
                         :value="getOneRepMaxInput(i)"
                         :disabled="oneRepMaxSaving[i]"
                         @input="setOneRepMaxInput(i, $event.target.value)"
@@ -258,8 +258,8 @@
                       />
                       <span class="unit">kg</span>
                     </div>
-                    <small v-if="isOneRepMaxAddedWeightExercise(ex)" class="one-rep-max-hint">Nur das Zusatzgewicht eintragen, nicht Körpergewicht + Zusatzgewicht zusammen. Optional, jederzeit änderbar - leer lassen und speichern entfernt den Wert wieder.</small>
-                    <small v-else class="one-rep-max-hint">Hilft der KI, bei dieser Übung passendere Empfehlungen zu geben. Optional, jederzeit änderbar - leer lassen und speichern entfernt den Wert wieder.</small>
+                    <small v-if="isOneRepMaxAddedWeightExercise(ex)" class="one-rep-max-hint">{{ t('workoutDetail.oneRepMaxHintAddedWeight') }}</small>
+                    <small v-else class="one-rep-max-hint">{{ t('workoutDetail.oneRepMaxHint') }}</small>
                   </div>
 
                   <div v-if="mediaExercise" class="media-overlay" @click.self="closeExerciseMedia">
@@ -279,7 +279,7 @@
                         :alt="mediaExercise.name"
                         class="media-image"
                       />
-                      <p class="media-disclaimer">Visualisierung dient nur zur Orientierung. Keine Garantie für technisch korrekte Ausführung.</p>
+                      <p class="media-disclaimer">{{ t('workoutDetail.mediaDisclaimer') }}</p>
                       <button class="close-btn" @click="closeExerciseMedia">OK</button>
                     </div>
                   </div>
@@ -329,7 +329,7 @@
                         <button
                           type="button"
                           class="spin-btn up"
-                          aria-label="increment reps"
+                          :aria-label="t('workoutDetail.incrementReps')"
                           @click="adjustRowField(row, 'reps', 1, 1, 1, 500)"
                           @mousedown="startSpin(row, 'reps', 1, 1, 1, 500)"
                           @mouseup="stopSpin(row, 'reps')"
@@ -341,7 +341,7 @@
                         <button
                           type="button"
                           class="spin-btn down"
-                          aria-label="decrement reps"
+                          :aria-label="t('workoutDetail.decrementReps')"
                           @click="adjustRowField(row, 'reps', -1, 1, 1, 500)"
                           @mousedown="startSpin(row, 'reps', -1, 1, 1, 500)"
                           @mouseup="stopSpin(row, 'reps')"
@@ -377,7 +377,7 @@
                           <button
                             type="button"
                             class="spin-btn up"
-                            aria-label="increment weight"
+                            :aria-label="t('workoutDetail.incrementWeight')"
                             @click="adjustRowField(row, 'weight', 1, 0.25, 0, 1000)"
                             @mousedown="startSpin(row, 'weight', 1, 0.25, 0, 1000)"
                             @mouseup="stopSpin(row, 'weight')"
@@ -389,7 +389,7 @@
                           <button
                             type="button"
                             class="spin-btn down"
-                            aria-label="decrement weight"
+                            :aria-label="t('workoutDetail.decrementWeight')"
                             @click="adjustRowField(row, 'weight', -1, 0.25, 0, 1000)"
                             @mousedown="startSpin(row, 'weight', -1, 0.25, 0, 1000)"
                             @mouseup="stopSpin(row, 'weight')"
@@ -447,7 +447,7 @@
                         <button
                           type="button"
                           class="spin-btn up"
-                          aria-label="increment reps"
+                          :aria-label="t('workoutDetail.incrementReps')"
                           @click="adjustRowField(row, 'reps', 1, 1, 0, 500)"
                           @mousedown="startSpin(row, 'reps', 1, 1, 0, 500)"
                           @mouseup="stopSpin(row, 'reps')"
@@ -459,7 +459,7 @@
                         <button
                           type="button"
                           class="spin-btn down"
-                          aria-label="decrement reps"
+                          :aria-label="t('workoutDetail.decrementReps')"
                           @click="adjustRowField(row, 'reps', -1, 1, 0, 500)"
                           @mousedown="startSpin(row, 'reps', -1, 1, 0, 500)"
                           @mouseup="stopSpin(row, 'reps')"
@@ -495,7 +495,7 @@
                           <button
                             type="button"
                             class="spin-btn up"
-                            aria-label="increment weight"
+                            :aria-label="t('workoutDetail.incrementWeight')"
                             @click="adjustRowField(row, 'weight', 1, 0.25, 0, 1000)"
                             @mousedown="startSpin(row, 'weight', 1, 0.25, 0, 1000)"
                             @mouseup="stopSpin(row, 'weight')"
@@ -507,7 +507,7 @@
                           <button
                             type="button"
                             class="spin-btn down"
-                            aria-label="decrement weight"
+                            :aria-label="t('workoutDetail.decrementWeight')"
                             @click="adjustRowField(row, 'weight', -1, 0.25, 0, 1000)"
                             @mousedown="startSpin(row, 'weight', -1, 0.25, 0, 1000)"
                             @mouseup="stopSpin(row, 'weight')"
@@ -629,38 +629,38 @@
          speichern. -->
     <AppModal
       v-model="showMissingNotesModal"
-      :title="t('workoutDetail.missingNotesTitle') || 'Notizen unvollständig'"
-      :confirm-text="t('workoutDetail.missingNotesConfirm') || 'Trotzdem speichern'"
-      :cancel-text="t('workoutDetail.missingNotesCancel') || 'Notizen prüfen'"
-      :extra-text="t('workoutDetail.missingNotesDefer') || 'Später bewerten'"
+      :title="t('workoutDetail.missingNotesTitle')"
+      :confirm-text="t('workoutDetail.missingNotesConfirm')"
+      :cancel-text="t('workoutDetail.missingNotesCancel')"
+      :extra-text="t('workoutDetail.missingNotesDefer')"
       type="warning"
       @confirm="confirmSaveDespiteMissingNotes"
       @extra="confirmDeferFeedback"
     >
-      <p>{{ t('workoutDetail.missingNotesMessage') || 'Zu folgenden Übungen fehlt noch eine Notiz. Notizen helfen der AI-Analyse, dein Training besser einzuschätzen.' }}</p>
+      <p>{{ t('workoutDetail.missingNotesMessage') }}</p>
       <ul class="missing-notes-list">
         <li v-for="name in missingNotesExerciseNames" :key="name">{{ name }}</li>
       </ul>
       <!-- Erklärt sofort die Konsequenz der Zurückstellen-Option (Moment 1) - ohne diesen Satz
            weiß der Nutzer in genau diesem Moment nicht, dass/wo er das Feedback nachholen kann. -->
       <p class="missing-notes-defer-hint">
-        {{ t('workoutDetail.missingNotesDeferHint') || 'Workout wird ohne KI-Feedback gespeichert. Sobald du Notizen ergänzt hast, kannst du das Feedback im Feedback-Verlauf nachträglich anfordern.' }}
+        {{ t('workoutDetail.missingNotesDeferHint') }}
       </p>
     </AppModal>
 
     <AppModal
       v-model="showTimerActionModal"
-      title="Aktiver Timer"
-      confirm-text="Weiterlaufen"
-      cancel-text="Pausieren"
+      :title="t('workoutDetail.timerActiveTitle')"
+      :confirm-text="t('workoutDetail.timerKeepRunning')"
+      :cancel-text="t('workoutDetail.timerPause')"
       type="warning"
       @confirm="onTimerDecision('continue')"
       @cancel="onTimerDecision('pause')"
     >
       <div class="timer-decision-body">
-        <p>Der Timer ist noch aktiv. Wie soll fortgefahren werden?</p>
+        <p>{{ t('workoutDetail.timerActiveQuestion') }}</p>
         <button class="timer-stop-btn" type="button" @click="onTimerDecision('stop')">
-          Timer stoppen
+          {{ t('workoutDetail.timerStop') }}
         </button>
       </div>
     </AppModal>
@@ -759,7 +759,7 @@ function onAddExerciseConfirm() {
   if (!workout.value.exercises) workout.value.exercises = []
   // Verhindere Duplikate (optional)
   if (workout.value.exercises.some(e => String(e.exerciseId || e._id || e.id || '') === selectedId)) {
-    toast.show('Übung bereits hinzugefügt', { type: 'warning', duration: 2000 })
+    toast.show(t('workoutDetail.exerciseAlreadyAdded'), { type: 'warning', duration: 2000 })
     showAddExerciseModal.value = false
     selectedExerciseToAdd.value = null
     return
@@ -786,7 +786,7 @@ function onAddExerciseConfirm() {
   // die neue Übung selbst wird durch den watch(workout, ...) oben nicht automatisch erfasst,
   // da hier direkt ins bestehende Array gepusht wird (keine Neuzuweisung von workout.value).
   loadOneRepMaxData()
-  toast.show('Übung hinzugefügt', { type: 'success', duration: 1500 })
+  toast.show(t('workoutDetail.exerciseAdded'), { type: 'success', duration: 1500 })
 }
 import { ref, onMounted, onBeforeUnmount, watch, nextTick, computed } from 'vue'
 import { getCurrentInstance } from 'vue'
@@ -1607,7 +1607,7 @@ async function toggleTrackOneRepMax(idx) {
     }
   } catch (e) {
     logger.warn('⚠️ 1RM-Tracking-Einstellung konnte nicht gespeichert werden', e?.message)
-    toast.show('Einstellung konnte nicht gespeichert werden', { type: 'error', duration: 2500 })
+    toast.show(t('workoutDetail.settingSaveFailed'), { type: 'error', duration: 2500 })
   }
 }
 
@@ -1659,7 +1659,7 @@ async function saveOneRepMaxForExercise(idx) {
   const clearing = trimmed === ''
   const num = clearing ? null : Number(trimmed.replace(',', '.'))
   if (!clearing && (!Number.isFinite(num) || num <= 0 || num > 500)) {
-    toast.show('Bitte ein gültiges 1RM zwischen 0 und 500kg eingeben', { type: 'warning', duration: 2500 })
+    toast.show(t('workoutDetail.oneRepMaxInvalid'), { type: 'warning', duration: 2500 })
     return
   }
   oneRepMaxSaving.value[idx] = true
@@ -1685,7 +1685,7 @@ async function saveOneRepMaxForExercise(idx) {
     toast.show(clearing ? '1RM entfernt' : '1RM gespeichert', { type: 'success', duration: 1500 })
   } catch (e) {
     logger.warn('⚠️ 1RM speichern fehlgeschlagen', e?.message)
-    toast.show('1RM konnte nicht gespeichert werden', { type: 'error', duration: 2500 })
+    toast.show(t('workoutDetail.oneRepMaxSaveFailed'), { type: 'error', duration: 2500 })
   } finally {
     oneRepMaxSaving.value[idx] = false
   }
@@ -2040,8 +2040,7 @@ async function loadWorkout() {
         if (deadlineMs && Date.now() > deadlineMs) {
           logger.warn('[WorkoutDetail] Zugriff außerhalb des Bearbeitungsfensters blockiert', { requestedId })
           toast.show(
-            t('workoutDetail.editWindowExpired', { hours: WORKOUT_EDIT_WINDOW_HOURS_CLIENT })
-              || `Das Bearbeitungsfenster von ${WORKOUT_EDIT_WINDOW_HOURS_CLIENT} Stunden nach Abschluss dieses Workouts ist abgelaufen.`,
+            t('workoutDetail.editWindowExpired', { hours: WORKOUT_EDIT_WINDOW_HOURS_CLIENT }),
             { type: 'info', duration: 5000 }
           )
           router.replace('/stats')
@@ -2074,7 +2073,7 @@ async function loadWorkout() {
     }
   } catch (e) {
     logger.error('Workout laden fehlgeschlagen:', e)
-    error.value = (e && e.message) || 'Unbekannter Fehler'
+    error.value = (e && e.message) || t('workoutDetail.unknownError')
   } finally {
     loading.value = false
   }
@@ -2293,7 +2292,7 @@ function removeExercise(exIndex) {
   if (Array.isArray(oneRepMaxSaving.value)) oneRepMaxSaving.value.splice(exIndex, 1)
 
   try { triggerAutoSave() } catch {}
-  toast.show('Übung entfernt', { type: 'success', duration: 1500 })
+  toast.show(t('workoutDetail.exerciseRemoved'), { type: 'success', duration: 1500 })
 }
 
 function ensureSetDetailsStructure() {
@@ -2670,7 +2669,7 @@ async function performSaveWorkout(updateFavorite = false, { deferAiFeedback = fa
           })
         } catch (updateErr) {
           logger.warn('[WorkoutDetail] Favorit-Anpassen: updateFavoriteWorkout Ausnahme', updateErr)
-          toast.show('Fehler beim Aktualisieren des Favoriten', { type: 'error', duration: 4000 })
+          toast.show(t('workoutDetail.favoriteUpdateFailed'), { type: 'error', duration: 4000 })
           saving.value = false
           suppressDraftPersistence.value = false
           releaseSaveKeepAwake()
@@ -2679,21 +2678,21 @@ async function performSaveWorkout(updateFavorite = false, { deferAiFeedback = fa
         if (!updateResult?.success) {
           logger.warn('[WorkoutDetail] Favorit-Anpassen: Update fehlgeschlagen', updateResult?.code, updateResult?.message)
           if (updateResult?.code === 'NOT_FOUND') {
-            toast.show(t('workoutDetail.favoriteNotFound') || 'Favorit wurde nicht gefunden – wurde er gelöscht?', { type: 'error', duration: 4000 })
+            toast.show(t('workoutDetail.favoriteNotFound'), { type: 'error', duration: 4000 })
             saving.value = false
             suppressDraftPersistence.value = false
             releaseSaveKeepAwake()
             return
           }
           if (updateResult?.code === 'INVALID_NAME') {
-            toast.show(t('workoutDetail.favoriteNameInvalid') || 'Ungültiger Favoritenname', { type: 'error', duration: 4000 })
+            toast.show(t('workoutDetail.favoriteNameInvalid'), { type: 'error', duration: 4000 })
             saving.value = false
             suppressDraftPersistence.value = false
             releaseSaveKeepAwake()
             return
           }
           // Unbekannter Fehlercode: Nutzer informieren, nicht still verlieren
-          toast.show(`Favorit konnte nicht aktualisiert werden (${updateResult?.code || 'unbekannt'})`, { type: 'error', duration: 4000 })
+          toast.show(t('workoutDetail.favoriteUpdateFailedCode', { code: updateResult?.code || t('common.unknown') }), { type: 'error', duration: 4000 })
           saving.value = false
           suppressDraftPersistence.value = false
           releaseSaveKeepAwake()
@@ -2707,7 +2706,7 @@ async function performSaveWorkout(updateFavorite = false, { deferAiFeedback = fa
         }
       } else {
         logger.warn('[WorkoutDetail] Favorit-Anpassen: Keine favoriteId in Route – Update übersprungen')
-        toast.show('Favorit konnte nicht gespeichert werden: fehlende ID', { type: 'error', duration: 4000 })
+        toast.show(t('workoutDetail.favoriteMissingId'), { type: 'error', duration: 4000 })
         saving.value = false
         suppressDraftPersistence.value = false
         releaseSaveKeepAwake()
@@ -2742,7 +2741,7 @@ async function performSaveWorkout(updateFavorite = false, { deferAiFeedback = fa
         const tk = await getIdToken().catch(() => null)
         deleteWorkoutApi(adjustId, tk).catch(() => null)
       }
-      toast.show(t('workoutDetail.adjustSaved') || 'Favorit aktualisiert', { type: 'success', duration: 2000 })
+      toast.show(t('workoutDetail.adjustSaved'), { type: 'success', duration: 2000 })
       bypassTimerLeaveGuard.value = true
       releaseSaveKeepAwake()
       router.push('/dashboard')
@@ -2822,8 +2821,8 @@ async function performSaveWorkout(updateFavorite = false, { deferAiFeedback = fa
           }, token).catch(() => null)
           if (!savedWorkout) throw createError
           saveMsg.value = status === 401 || status === 403
-            ? 'Lokal gespeichert. Sync startet nach erneuter Anmeldung.'
-            : 'Lokal gespeichert. Sync wird erneut versucht.'
+            ? t('workoutDetail.savedLocallyAuth')
+            : t('workoutDetail.savedLocallyRetry')
           saveError.value = false
         }
       }
@@ -2875,8 +2874,8 @@ async function performSaveWorkout(updateFavorite = false, { deferAiFeedback = fa
       workout.value = { ...workout.value, completed: false, _isDraft: true, isDraft: true }
     }
     suppressDraftPersistence.value = false
-    error.value = e?.message || 'Speichern fehlgeschlagen'
-    saveMsg.value = 'Speichern fehlgeschlagen.'
+    error.value = e?.message || t('workoutDetail.saveFailed')
+    saveMsg.value = t('workoutDetail.saveFailed')
     saveError.value = true
     releaseSaveKeepAwake()
     logDiagnostic('save-error', { id: String(route.params.id || ''), message: e?.message || String(e) })

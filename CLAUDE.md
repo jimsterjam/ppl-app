@@ -62,6 +62,8 @@ bei jeder neuen Sitzung neu gelernt werden müssen. Bei Widerspruch gilt die jü
 
 - Kein Zugriff auf beliebige externe Hosts (MongoDB Atlas, Firebase Console) – Produktionsdaten
   kopiert Paul bei Bedarf in den Chat.
+- Im Repo angelegte Dateien kann die Sandbox nicht wieder löschen. Hilfsskripte (z.B. für die
+  SFC-Kompilierung) nur unter `/tmp` ablegen, nie im Projektordner.
 - `vitest` hängt in der Sandbox (Rollup-Native-Modul, ARM-Architektur) – läuft aber in CI und
   auf Render. Ersatz lokal: `npm run i18n:check` direkt per Node und SFC-Kompilierung.
 - Web-Version (`ppl-app-client.onrender.com`) hat bewusst keine Firebase-Web-Config; die App wird
