@@ -8,6 +8,8 @@
 //                     Attribute wie placeholder/title/aria-label/label), der nicht über t() läuft
 //   4. hardcodedScriptText: deutsche String-Literale, die direkt an toast.show()/alert()/
 //                     confirm() gehen oder einer error-/message-Variable zugewiesen werden
+//   5. germanLiteral: deutsche String-Literale in JS-Ausdrücken von .vue-Dateien (Template-
+//                     Interpolationen, :bindings, <script>)
 //
 // Aufruf:  node scripts/i18n-check.mjs            -> Bericht, Exit-Code 1 bei NEUEN Funden
 //          node scripts/i18n-check.mjs --all      -> alle Funde inkl. Baseline anzeigen
@@ -37,17 +39,7 @@ const IGNORED_FILES = new Map([
   ['src/components/AiInsightsPanel.vue', 'Admin-Panel, per Admin-Schlüssel geschützt'],
   ['src/components/VerifierAuditPanel.vue', 'Admin-Panel, per Admin-Schlüssel geschützt'],
   ['src/views/AdminFeedbackView.vue', 'Admin-Seite, nicht in der App-Navigation'],
-  ['src/views/FeaturesTestView.vue', 'Entwickler-Testseite'],
-  ['src/views/InfoView.vue', 'ungenutzt: /info leitet auf /faqs um (Löschen steht aus)'],
-  ['src/components/AIDisclaimerModal.vue', 'ungenutzt: nirgends importiert (Löschen steht aus)'],
-  ['src/components/ProgressChart.vue', 'ungenutzt: nirgends importiert (Löschen steht aus)'],
-  ['src/components/WorkoutTypeChart.vue', 'ungenutzt: nirgends importiert (Löschen steht aus)'],
-  ['src/components/ExercisePicker.vue', 'ungenutzt: nirgends importiert (Löschen steht aus)'],
-  ['src/components/OfflineIndicator.vue', 'ungenutzt: nirgends importiert (Löschen steht aus)'],
-  ['src/components/QuickOverview.vue', 'ungenutzt: nirgends importiert (Löschen steht aus)'],
-  ['src/components/StatsWidget.vue', 'ungenutzt: nirgends importiert (Löschen steht aus)'],
-  ['src/components/WorkoutFrequencyChart.vue', 'ungenutzt: nirgends importiert (Löschen steht aus)'],
-  ['src/views/MotivationView.vue', 'ungenutzt: nicht im Router (Löschen steht aus)']
+  ['src/views/FeaturesTestView.vue', 'Entwickler-Testseite']
 ])
 
 // Attribute, deren statischer Wert für den Nutzer sichtbar bzw. vorgelesen wird.
