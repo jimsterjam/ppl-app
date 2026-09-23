@@ -308,6 +308,17 @@ export const messages = {
       resetConfirmTitle: 'Timer zurücksetzen?',
       resetConfirmMsg: 'Zeit und Fortschritt werden zurückgesetzt.'
     },
+    // SessionStopwatch.vue (Dashboard/WorkoutDetailView) - eigener Namespace, bewusst getrennt
+    // von "timer" oben: das ist der separate Intervall-/Satzpausen-Timer, konzeptionell ein
+    // anderes Feature als diese durchgehende Stoppuhr für die Gesamt-Gym-Zeit.
+    sessionStopwatch: {
+      triggerLabel: 'Stoppuhr',
+      start: 'Start',
+      pause: 'Pause',
+      resume: 'Weiter',
+      reset: 'Reset',
+      close: 'Schließen'
+    },
     // Für das Muskelgruppen-Dropdown beim Anlegen einer eigenen Übung (AddCustomExerciseModal.vue)
     muscleGroups: {
       chest: 'Brust',
@@ -1252,6 +1263,14 @@ export const messages = {
       closeConfirmMsg: 'The current timer will be reset.',
       resetConfirmTitle: 'Reset timer?',
       resetConfirmMsg: 'Time and progress will be reset.'
+    },
+    sessionStopwatch: {
+      triggerLabel: 'Stopwatch',
+      start: 'Start',
+      pause: 'Pause',
+      resume: 'Resume',
+      reset: 'Reset',
+      close: 'Close'
     },
     muscleGroups: {
       chest: 'Chest',

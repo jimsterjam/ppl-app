@@ -47,6 +47,7 @@ import {
   getQuickGeneratorMissingInputs
 } from '../utils/workoutSanitizer.js';
 import { decideExerciseMatch } from '../utils/exerciseMatching.js';
+import { getMaxExerciseCount } from '../utils/exerciseCountTarget.js';
 import { createOpenAIClient, describeAiClientMode, ensureRelayAwake, markRelayContact } from '../utils/aiClientFactory.js';
 import {
   classifyAiError,
@@ -2907,7 +2908,8 @@ Schema, Format und die Regeln unten.
       - requestedType strikt einhalten (push|pull|legs|fullbody), kein Mix außerhalb des Splits.
       - Reihenfolge strikt: Main Compound -> Secondary Compound -> Accessory -> optional Core/Finisher.
       - Keine doppelte Hauptbewegung direkt hintereinander.
-      - 5-6 Übungen insgesamt, maximal 1 Core-Übung und nicht an Position 1.
+      - Genau targetExerciseCount Übungen insgesamt (Wert steht in den Parametern), maximal 1 Core-Übung und nicht an Position 1.
+      - durationMinutes ist die reine Trainingszeit ohne Aufwärmen - Satzzahl und Pausen so wählen, dass das Workout hineinpasst.
       - Für strength: Hauptübungen 3-6 Reps, längere Pausen; für hypertrophy: 6-12 Reps, moderate Pausen.
       - equipmentMode strikt beachten (gym_only, gym_plus_bodyweight, bodyweight_only).
 Schema exakt:
@@ -2950,8 +2952,13 @@ function wrapQuickGeneratorFreeText(text, tagName, maxLength = 200) {
 }
 
 function createQuickGeneratorPrompt(context) {
+  // Dieselbe Zielanzahl, die enforceWorkoutProgrammingRules() später als harte Obergrenze
+  // durchsetzt - vorher stand im System-Prompt fest "5-6 Übungen", und die Nachbearbeitung hat
+  // die überzähligen Übungen danach wieder abgeschnitten.
+  const targetExerciseCount = getMaxExerciseCount(context.durationMinutes, context.goal, context.exerciseCountOverride);
   return [
     `durationMinutes=${context.durationMinutes}`,
+    `targetExerciseCount=${targetExerciseCount}`,
     `goal=${context.goal}`,
     `gender=${context.gender}`,
     `bodyweightKg=${context.bodyweightKg}`,
@@ -3488,35 +3495,11 @@ function normalizeExercise(exercise, fallbackType) {
   };
 }
 
-// Fallback-Ziel, falls das Zeitmodell (siehe unten) aus irgendeinem Grund nicht greift
-// (z.B. bodyweight_only ohne kuratierte Blueprint-Daten). Bleibt als grobe Untergrenze bestehen.
-function getTimeAdjustedExerciseTarget(durationMinutes = 45, goal = 'hypertrophy') {
-  const duration = Number(durationMinutes) || 45;
-  if (duration <= 30) return goal === 'strength' ? 3 : 4;
-  if (duration <= 45) return goal === 'strength' ? 4 : 5;
-  return goal === 'strength' ? 4 : 6;
-}
-
-// Bug-Fix (User-Report): generierte Workouts waren teils zu lang - bei 60 min und Ziel "Kraft"
-// passten laut reinem Zeitmodell (selectExercisesWithinTimeBudget) manchmal noch 5 Übungen ins
-// Budget (z.B. wenn eine Isolationsübung mit kürzerer Pause dabei war), obwohl bei den langen
-// Kraft-Pausen (DEFAULT_REST_SECONDS.strength) 4 Hauptübungen bereits ein voller 60-min-Block
-// sind. Zusätzlich zum Zeitmodell jetzt eine harte Obergrenze pro Ziel/Dauer - das Zeitmodell
-// darf weiterhin FRÜHER abbrechen (wenn's zeitlich knapp wird), aber nie mehr Übungen zulassen
-// als hier vorgegeben. Deckt sich bewusst mit getTimeAdjustedExerciseTarget() (gleiche Tabelle),
-// gilt hier aber immer, nicht nur als Fallback.
-//
-// User-Wunsch (mehr Kontrolle): der Nutzer kann diese automatische Obergrenze über
-// context.exerciseCountOverride bewusst überschreiben (z.B. explizit 6 Übungen bei Kraft/60min
-// wählen, wenn er das möchte) - Grenzen 2-8 bleiben trotzdem bestehen, um offensichtlich
-// unsinnige Werte (0 oder 20 Übungen) abzufangen.
-function getMaxExerciseCount(durationMinutes, goal, override) {
-  const overrideNumber = Number(override);
-  if (Number.isFinite(overrideNumber) && overrideNumber > 0) {
-    return Math.max(2, Math.min(8, Math.round(overrideNumber)));
-  }
-  return getTimeAdjustedExerciseTarget(durationMinutes, goal);
-}
+// getTimeAdjustedExerciseTarget()/getMaxExerciseCount() liegen jetzt in
+// utils/exerciseCountTarget.js (testbar, und vom Prompt UND der harten Obergrenze gemeinsam
+// genutzt). Hintergrund der Obergrenze (User-Report "Workouts zu lang"): das Zeitmodell
+// (selectExercisesWithinTimeBudget) darf weiterhin FRÜHER abbrechen, aber nie mehr Übungen
+// zulassen als die Ziel/Dauer-Tabelle bzw. der manuelle Override (2-8) vorgibt.
 
 // ── Zeitmodell (Konzept-Papier Abschnitt 17.3/17.4) ─────────────────────────
 // Ersetzt die reine "Minuten → feste Übungszahl"-Tabelle oben durch eine echte
@@ -4266,7 +4249,12 @@ function generateQuickGeneratorDemo(context) {
 }
 
 function normalizeQuickGeneratorResponse(payload, context) {
-  const safePayload = payload && Array.isArray(payload.exercises) && payload.exercises.length >= 3
+  // Mindestanzahl an die Zielanzahl koppeln: seit der Prompt eine konkrete Anzahl vorgibt, liefert
+  // die KI bei manuellem Override von 2 Übungen korrekt nur 2 - ein festes ">= 3" hätte diese
+  // gültige Antwort verworfen und stattdessen das Demo-Workout ausgeliefert.
+  const targetExerciseCount = getMaxExerciseCount(context?.durationMinutes, context?.goal, context?.exerciseCountOverride);
+  const minExercises = Math.min(3, targetExerciseCount);
+  const safePayload = payload && Array.isArray(payload.exercises) && payload.exercises.length >= minExercises
     ? payload
     : generateQuickGeneratorDemo(context);
   return enforceWorkoutProgrammingRules(safePayload, context, { source: 'quick-generator' });

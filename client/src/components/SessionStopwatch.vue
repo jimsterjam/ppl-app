@@ -10,7 +10,7 @@
       type="button"
       @click="toggleOverlay"
     >
-      <span v-if="!isRunning && elapsedMs === 0">{{ props.compact ? '⏱ 00:00' : '⏱ Stoppuhr' }}</span>
+      <span v-if="!isRunning && elapsedMs === 0">{{ props.compact ? '⏱ 00:00' : `⏱ ${t('sessionStopwatch.triggerLabel')}` }}</span>
       <span v-else>{{ formattedTime }}</span>
     </button>
 
@@ -30,31 +30,31 @@
           <div class="sw-controls">
             <!-- Nicht gestartet -->
             <button v-if="!startedAt" class="sw-btn sw-btn--primary" type="button" @click="start">
-              ▶ Start
+              ▶ {{ t('sessionStopwatch.start') }}
             </button>
 
             <!-- Läuft -->
             <template v-else-if="isRunning">
               <button class="sw-btn sw-btn--secondary" type="button" @click="stop">
-                ⏸ Pause
+                ⏸ {{ t('sessionStopwatch.pause') }}
               </button>
               <button class="sw-btn sw-btn--ghost" type="button" @click="handleReset">
-                ↺ Reset
+                ↺ {{ t('sessionStopwatch.reset') }}
               </button>
             </template>
 
             <!-- Pausiert -->
             <template v-else>
               <button class="sw-btn sw-btn--primary" type="button" @click="resume">
-                ▶ Weiter
+                ▶ {{ t('sessionStopwatch.resume') }}
               </button>
               <button class="sw-btn sw-btn--ghost" type="button" @click="handleReset">
-                ↺ Reset
+                ↺ {{ t('sessionStopwatch.reset') }}
               </button>
             </template>
           </div>
 
-          <button class="sw-close" type="button" @click="closeOverlay" aria-label="Schließen">×</button>
+          <button class="sw-close" type="button" @click="closeOverlay" :aria-label="t('sessionStopwatch.close')">×</button>
         </div>
       </div>
     </Transition>
@@ -64,9 +64,15 @@
 
 <script setup>
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useSessionStopwatch } from '@/composables/useSessionStopwatch'
 import { releaseKeepAwake } from '@/utils/keepAwakeGuard'
 import { useScrollLock } from '@/composables/useScrollLock'
+
+// User-Report: alle Texte in der App sollen DE+EN verfügbar sein - diese Komponente war bisher
+// komplett hartcodiert Deutsch (Stoppuhr/Start/Pause/Weiter/Reset/Schließen), siehe neuer
+// Namespace sessionStopwatch.* in i18n/index.js.
+const { t } = useI18n()
 
 // compact: schlanke Darstellung für die Platzierung im sticky Header (siehe WorkoutDetailView.vue -
 // dort soll die Gesamtzeit immer im Sichtfeld bleiben, statt beim Scrollen durch die Übungsliste
