@@ -56,6 +56,10 @@ bei jeder neuen Sitzung neu gelernt werden müssen. Bei Widerspruch gilt die jü
   `ppl-app-ai-relay` (`srv-daj65flg1s2s739i5elg`). Deploy startet automatisch nach Push auf `main`.
 - Render-Env-Vars über das Render-MCP ändern löst einen Redeploy aus. `replace: true` mit leerer
   Liste löscht **alle** Dashboard-Variablen des Service.
+- Admin-Zugriff: `ADMIN_API_KEY` (Header `x-admin-key`) für alle Admin-Routen; das
+  Verifier-Protokoll verlangt zusätzlich ein Login mit einer UID aus `ADMIN_UIDS` (Render, 
+  `ppl-app-server`). Die sichtbare Liste im Client steht in `client/src/config/admin.js` –
+  beide synchron halten.
 - iOS: Client-Änderungen erst nach `npm run build` + `npx cap sync ios` + Xcode-Build sichtbar.
 
 ## Bekannte Einschränkungen der Sandbox (Cowork)

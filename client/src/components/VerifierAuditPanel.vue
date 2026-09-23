@@ -68,6 +68,7 @@
 <script setup>
 import { ref } from 'vue'
 import { listVerifierAuditEntries, getVerifierAuditSummary } from '@/api/verifierAudit'
+import { initFirebaseAuth, useFirebaseAuth } from '@/utils/firebaseAuth'
 
 // Admin-only Auswertung des Feedback-Qualitäts-Loops (Phase 1: Shadow-Modus, siehe
 // server/services/feedbackVerificationService.js + models/VerifierAudit.js). Zeigt bewusst
@@ -106,19 +107,32 @@ function formatDateTime(d) {
   }
 }
 
+// Der Server verlangt zusätzlich zum Admin-Schlüssel das Login des Admin-Accounts.
+async function getIdTokenSafe() {
+  try {
+    await initFirebaseAuth()
+    const { getIdToken } = useFirebaseAuth()
+    return await getIdToken().catch(() => null)
+  } catch {
+    return null
+  }
+}
+
 async function load() {
   if (!adminKey.value || loading.value) return
   loading.value = true
   error.value = ''
   try {
     localStorage.setItem(STORAGE_KEY, adminKey.value)
+    const idToken = await getIdTokenSafe()
     const [entriesResult, summaryResult] = await Promise.all([
       listVerifierAuditEntries(adminKey.value, {
         mode: modeFilter.value,
         onlyViolations: onlyViolations.value,
-        limit: 50
+        limit: 50,
+        idToken
       }),
-      getVerifierAuditSummary(adminKey.value, { days: 30 })
+      getVerifierAuditSummary(adminKey.value, { days: 30, idToken })
     ])
     entries.value = entriesResult
     summary.value = summaryResult

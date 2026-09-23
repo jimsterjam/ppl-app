@@ -37,7 +37,7 @@ export const BASELINE_PATH = path.join(__dirname, 'i18n-baseline.json')
 const IGNORED_FILES = new Map([
   ['src/components/AdminFeedbackPanel.vue', 'Admin-Panel, per Admin-Schlüssel geschützt'],
   ['src/components/AiInsightsPanel.vue', 'Admin-Panel, per Admin-Schlüssel geschützt'],
-  ['src/components/VerifierAuditPanel.vue', 'Admin-Panel, per Admin-Schlüssel geschützt'],
+  ['src/components/VerifierAuditPanel.vue', 'Admin-Panel, nur für ADMIN_UIDS sichtbar (SettingsView) und serverseitig geschützt'],
   ['src/views/AdminFeedbackView.vue', 'Admin-Seite, nicht in der App-Navigation'],
   ['src/views/FeaturesTestView.vue', 'Entwickler-Testseite']
 ])

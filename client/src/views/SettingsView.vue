@@ -229,7 +229,15 @@
           {{ isDeletingAccount ? $t('settings.deletingAccount') : $t('settings.deleteAccount') }}
         </button>
       </section>
-      
+
+      <!-- Nur für den Admin-Testaccount (client/src/config/admin.js). Nur Sichtbarkeit - die
+           Daten gibt der Server ausschließlich mit Admin-Schlüssel + passender UID heraus.
+           Bewusst nicht übersetzt (data-i18n-ignore), da nur Paul diesen Bereich sieht. -->
+      <section v-if="showVerifierAudit" class="card" data-i18n-ignore>
+        <h3>Verifier-Protokoll (Admin)</h3>
+        <p class="hint">Ergebnisse der automatischen Prüfung des KI-Feedbacks (Zahlen und Regeln), letzte 30 Tage.</p>
+        <VerifierAuditPanel />
+      </section>
     </div>
 
     <!-- Bestätigungs-Dialog -->
@@ -371,6 +379,8 @@ import { logger } from '@/utils/logger'
 import { deleteAllWorkouts } from '@/api/workouts'
 import { isOnline, db } from '@/utils/offlineStorage'
 import { exportAccountData } from '@/api/account'
+import { isAdminUid } from '@/config/admin'
+import VerifierAuditPanel from '../components/VerifierAuditPanel.vue'
 
 const themeStore = useThemeStore()
 const { theme, colorMode } = storeToRefs(themeStore)
@@ -390,6 +400,7 @@ const colorModeOptions = computed(() => ([
 const authStore = useAuthStore()
 const accountEmail = computed(() => authStore.user?.email || '')
 const accountUid = computed(() => authStore.user?.uid || '')
+const showVerifierAudit = computed(() => isAdminUid(accountUid.value))
 const accountProviderLabel = computed(() => {
   const providerId = authStore.user?.providerId || ''
   if (providerId === 'apple.com') return 'Apple'

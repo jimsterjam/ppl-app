@@ -1,6 +1,7 @@
 import express from 'express';
 import VerifierAudit from '../models/VerifierAudit.js';
-import { requireAdminKey } from '../middleware/adminAuth.js';
+import { requireAdminKey, requireAdminUid } from '../middleware/adminAuth.js';
+import { firebaseAuthMiddleware } from '../middleware/firebaseAuth.js';
 import { getRuleLabel } from '../services/feedbackVerificationService.js';
 import { logger } from '../utils/logger.js';
 
@@ -9,7 +10,10 @@ import { logger } from '../utils/logger.js';
 // feedbackVerificationService.js). Liest ausschließlich das anonyme, aggregierbare
 // VerifierAudit-Protokoll (kein User-/Workout-Bezug, siehe Modell-Kommentar dort) - analog zu
 // den bestehenden Admin-Routen (routes/feedback.js, routes/adminFeedbackInsights.js), gleicher
-// Schutz per requireAdminKey.
+// Schutz per requireAdminKey - und zusätzlich (Wunsch Paul) nur für eingeloggte Accounts, deren
+// UID in ADMIN_UIDS steht (firebaseAuthMiddleware + requireAdminUid). Das Panel dazu ist in der
+// App nur für diesen Account sichtbar (SettingsView.vue); die Server-Prüfung ist der eigentliche
+// Schutz, falls der Admin-Schlüssel einmal durchsickert.
 //
 // Baut die Klartext-Erklärung (Regel-Nummer -> Beschreibung) bereits hier serverseitig, statt
 // dem Client nur die rohen Regel-Nummern zu liefern - der Admin soll im Panel direkt lesen
@@ -51,7 +55,7 @@ function summarizeEntry(entry) {
   };
 }
 
-router.get('/', requireAdminKey, async (req, res) => {
+router.get('/', requireAdminKey, firebaseAuthMiddleware, requireAdminUid, async (req, res) => {
   try {
     const filter = {};
     const ALLOWED_MODES = new Set(['shadow', 'active']);
@@ -83,7 +87,7 @@ router.get('/', requireAdminKey, async (req, res) => {
 // genau der Anwendungsfall aus dem ursprünglichen Plan (Priorisierung, welche Regeln überhaupt
 // relevant sind). Zählt nur KI-Prüfschritt-Verstöße (triggeredRules), nicht den reinen
 // Zahlen-Check separat, da der Admin hier primär an inhaltlichen Mustern interessiert ist.
-router.get('/summary', requireAdminKey, async (req, res) => {
+router.get('/summary', requireAdminKey, firebaseAuthMiddleware, requireAdminUid, async (req, res) => {
   try {
     const days = Math.max(1, Math.min(90, Number.parseInt(req.query?.days || '30', 10) || 30));
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);

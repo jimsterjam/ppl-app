@@ -18,3 +18,31 @@ export function requireAdminKey(req, res, next) {
 
   next();
 }
+
+// Liest ADMIN_UIDS (kommagetrennte Firebase-UIDs, z.B. in Render unter Environment).
+export function parseAdminUids(value) {
+  return new Set(
+    String(value || '')
+      .split(',')
+      .map((uid) => uid.trim())
+      .filter(Boolean)
+  );
+}
+
+// Zusätzlicher Schutz für besonders interne Admin-Daten (aktuell: Verifier-Protokoll), der den
+// statischen Admin-Schlüssel ergänzt: der Aufruf muss zusätzlich von einem eingeloggten Account
+// kommen, dessen UID in ADMIN_UIDS steht. Muss NACH firebaseAuthMiddleware laufen (braucht
+// req.auth.userId). Wie bei requireAdminKey gilt: nicht konfiguriert = gesperrt (503), nie offen.
+export function requireAdminUid(req, res, next) {
+  const allowed = parseAdminUids(process.env.ADMIN_UIDS);
+  if (allowed.size === 0) {
+    return res.status(503).json({ error: 'Admin access not configured' });
+  }
+
+  const uid = req.auth?.userId;
+  if (!uid || !allowed.has(uid)) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+
+  next();
+}
