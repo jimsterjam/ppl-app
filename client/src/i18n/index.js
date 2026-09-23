@@ -348,7 +348,11 @@ export const messages = {
     // von "timer" oben: das ist der separate Intervall-/Satzpausen-Timer, konzeptionell ein
     // anderes Feature als diese durchgehende Stoppuhr für die Gesamt-Gym-Zeit.
     sessionStopwatch: {
-      triggerLabel: 'Stoppuhr',
+      cardTitle: 'Gym-Zeit',
+      paused: 'Pausiert',
+      hintIdle: 'Starte, sobald du loslegst',
+      runningSince: 'seit {time} Uhr',
+      resetConfirm: 'Zeit zurücksetzen?',
       start: 'Start',
       pause: 'Pause',
       resume: 'Weiter',
@@ -1431,7 +1435,11 @@ export const messages = {
       resetConfirmMsg: 'Time and progress will be reset.'
     },
     sessionStopwatch: {
-      triggerLabel: 'Stopwatch',
+      cardTitle: 'Gym time',
+      paused: 'Paused',
+      hintIdle: 'Start as soon as you get going',
+      runningSince: 'since {time}',
+      resetConfirm: 'Reset time?',
       start: 'Start',
       pause: 'Pause',
       resume: 'Resume',

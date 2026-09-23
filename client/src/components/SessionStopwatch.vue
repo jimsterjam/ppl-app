@@ -1,7 +1,55 @@
 <template>
   <div class="session-stopwatch" :class="{ 'session-stopwatch--compact': props.compact }" ref="rootRef">
-    <!-- Trigger Button -->
+    <!-- Dashboard-Variante (Wunsch Paul: Stoppuhr war "zu klein und armselig"): eigene Karte mit
+         großer Zeitanzeige und Bedienung direkt auf der Karte, ohne Popup. Die kompakte
+         Header-Variante (WorkoutDetailView) behält Trigger + Popup, dort fehlt der Platz. -->
+    <section
+      v-if="!props.compact"
+      class="sw-card"
+      :class="{ 'sw-card--running': isRunning, 'sw-card--paused': isPaused }"
+    >
+      <div class="sw-card-info">
+        <p class="sw-card-label">
+          <span v-if="isRunning" class="sw-card-dot" aria-hidden="true"></span>
+          <span v-else class="sw-card-icon" aria-hidden="true">{{ isPaused ? '⏸' : '⏱' }}</span>
+          {{ isPaused ? t('sessionStopwatch.paused') : t('sessionStopwatch.cardTitle') }}
+        </p>
+        <p class="sw-card-time">{{ cardTime }}</p>
+        <p v-if="isRunning" class="sw-card-hint">{{ t('sessionStopwatch.runningSince', { time: startedAtLabel }) }}</p>
+        <button
+          v-else-if="isPaused && !resetConfirmOpen"
+          type="button"
+          class="sw-card-reset-link"
+          @click="resetConfirmOpen = true"
+        >↺ {{ t('sessionStopwatch.reset') }}</button>
+        <p v-else-if="!isPaused" class="sw-card-hint">{{ t('sessionStopwatch.hintIdle') }}</p>
+      </div>
+
+      <!-- Zurücksetzen nur im Pause-Zustand und nur nach Rückfrage direkt auf der Karte - vorher
+           setzte ein einziger Tipp auf "Reset" die Zeit sofort zurück. -->
+      <div v-if="resetConfirmOpen" class="sw-card-confirm">
+        <span class="sw-card-confirm-text">{{ t('sessionStopwatch.resetConfirm') }}</span>
+        <div class="sw-card-confirm-actions">
+          <button type="button" class="sw-card-confirm-btn" @click="resetConfirmOpen = false">{{ t('common.cancel') }}</button>
+          <button type="button" class="sw-card-confirm-btn sw-card-confirm-btn--danger" @click="confirmReset">{{ t('sessionStopwatch.reset') }}</button>
+        </div>
+      </div>
+      <button
+        v-else
+        type="button"
+        class="sw-card-main-btn"
+        :class="{ 'sw-card-main-btn--pause': isRunning }"
+        :aria-label="mainButtonLabel"
+        @click="onMainButton"
+      >
+        <svg v-if="isRunning" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/></svg>
+        <svg v-else viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor"/></svg>
+      </button>
+    </section>
+
+    <!-- Trigger Button (kompakte Header-Variante) -->
     <button
+      v-if="props.compact"
       class="sw-trigger"
       :class="{
         'sw-trigger--running': isRunning,
@@ -10,7 +58,7 @@
       type="button"
       @click="toggleOverlay"
     >
-      <span v-if="!isRunning && elapsedMs === 0">{{ props.compact ? '⏱ 00:00' : `⏱ ${t('sessionStopwatch.triggerLabel')}` }}</span>
+      <span v-if="!isRunning && elapsedMs === 0">⏱ 00:00</span>
       <span v-else>{{ formattedTime }}</span>
     </button>
 
@@ -63,7 +111,7 @@
 </template>
 
 <script setup>
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSessionStopwatch } from '@/composables/useSessionStopwatch'
 import { releaseKeepAwake } from '@/utils/keepAwakeGuard'
@@ -126,6 +174,59 @@ function handleReset() {
   reset()
 }
 
+// --- Dashboard-Karte -------------------------------------------------------
+const { locale } = useI18n()
+const isPaused = computed(() => !isRunning.value && elapsedMs.value > 0)
+const resetConfirmOpen = ref(false)
+
+// Ab einer Stunde h:mm:ss statt mm:ss (Store-Format bleibt unverändert, da die Header-Variante
+// und die Workout-Dauer es nutzen).
+const cardTime = computed(() => {
+  const totalSeconds = Math.floor(elapsedMs.value / 1000)
+  const hours = Math.floor(totalSeconds / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+  const mm = String(minutes).padStart(2, '0')
+  const ss = String(seconds).padStart(2, '0')
+  return hours > 0 ? `${hours}:${mm}:${ss}` : `${mm}:${ss}`
+})
+
+const startedAtLabel = computed(() => {
+  if (!startedAt.value) return ''
+  try {
+    return new Date(startedAt.value).toLocaleTimeString(locale.value === 'de' ? 'de-DE' : 'en-US', { hour: '2-digit', minute: '2-digit' })
+  } catch {
+    return ''
+  }
+})
+
+const mainButtonLabel = computed(() => {
+  if (isRunning.value) return t('sessionStopwatch.pause')
+  return isPaused.value ? t('sessionStopwatch.resume') : t('sessionStopwatch.start')
+})
+
+function onMainButton() {
+  if (isRunning.value) {
+    stop()
+    emit('session-time', { totalMs: elapsedMs.value, formattedTime: formattedTime.value })
+  } else if (isPaused.value) {
+    resume()
+  } else {
+    start()
+  }
+}
+
+function confirmReset() {
+  reset()
+  resetConfirmOpen.value = false
+}
+
+// Rückfrage schließen, sobald die Uhr nicht mehr pausiert ist (z.B. über die Header-Variante
+// in einem anderen View weitergestartet).
+watch(isPaused, (paused) => {
+  if (!paused) resetConfirmOpen.value = false
+})
+
 function onOutsideClick(e) {
   if (!overlayOpen.value) return
   const insideRoot = rootRef.value && rootRef.value.contains(e.target)
@@ -157,6 +258,185 @@ onBeforeUnmount(() => {
   position: relative;
   display: flex;
   width: 100%;
+}
+
+/* Dashboard-Karte - Optik wie .hero in DashboardView.vue (Panel-Hintergrund, Rahmen, Rundung),
+   die Akzentfarbe markiert nur den laufenden Zustand und den Hauptbutton. */
+.session-stopwatch:not(.session-stopwatch--compact) {
+  align-items: flex-start;
+}
+
+.sw-card {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px 12px 16px;
+  border-radius: calc(var(--panel-radius) - 12px);
+  border: 1px solid var(--line-strong);
+  background: var(--bg-panel);
+  box-shadow: var(--shadow-soft);
+  transition: border-color 0.2s ease;
+}
+
+.sw-card--running {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent), var(--shadow-soft);
+}
+
+.sw-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.sw-card-label {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sw-card--paused .sw-card-label {
+  color: var(--warning-text, var(--warning));
+}
+
+.sw-card-icon {
+  font-size: 0.85rem;
+}
+
+.sw-card-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: sw-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes sw-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.sw-card-time {
+  margin: 2px 0 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  color: color-mix(in srgb, var(--fg) 45%, transparent);
+}
+
+.sw-card--running .sw-card-time {
+  color: var(--fg-strong);
+}
+
+.sw-card--paused .sw-card-time {
+  color: color-mix(in srgb, var(--fg) 70%, transparent);
+}
+
+.sw-card-hint {
+  margin: 2px 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.sw-card-reset-link {
+  margin-top: 4px;
+  padding: 2px 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.sw-card-main-btn {
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: var(--accent-contrast, #060606);
+  cursor: pointer;
+  transition: transform 0.12s ease, opacity 0.12s ease;
+}
+
+.sw-card-main-btn:active {
+  transform: scale(0.94);
+}
+
+.sw-card-main-btn--pause {
+  background: transparent;
+  border: 2px solid var(--accent);
+  color: var(--fg-strong);
+}
+
+.sw-card-confirm {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.sw-card-confirm-text {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.sw-card-confirm-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.sw-card-confirm-btn {
+  min-height: 36px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sw-card-confirm-btn--danger {
+  border-color: var(--danger);
+  color: var(--danger-text, var(--danger));
+}
+
+/* Kleine iPhones: Dashboard soll ohne Scrollen passen - Hinweiszeile ausblenden, Zeit etwas kleiner. */
+@media (max-height: 700px) {
+  .sw-card-hint {
+    display: none;
+  }
+
+  .sw-card-time {
+    font-size: 1.7rem;
+  }
+
+  .sw-card-main-btn {
+    width: 48px;
+    height: 48px;
+  }
 }
 
 /* Kompakte Variante für die Platzierung im sticky Header (siehe compact-Prop oben) - dort ist
