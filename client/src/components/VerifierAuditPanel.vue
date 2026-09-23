@@ -45,8 +45,10 @@
 
     <p v-if="loaded && !loading && !entries.length" class="muted">Keine Einträge gefunden.</p>
 
+    <!-- Standardmäßig nur die neuesten Prüfungen (Wunsch Paul: Bereich wird sonst immer länger),
+         der Rest per Button aufklappbar. Server liefert bereits neueste zuerst. -->
     <div v-if="entries.length" class="entry-list">
-      <article v-for="entry in entries" :key="entry.id" class="entry">
+      <article v-for="entry in visibleEntries" :key="entry.id" class="entry">
         <div class="entry-top">
           <span class="badge" :class="entryBadgeClass(entry)">{{ entryBadgeLabel(entry) }}</span>
           <span class="badge badge-mode">{{ entry.mode === 'shadow' ? 'Shadow' : 'Aktiv' }}</span>
@@ -61,12 +63,20 @@
           </li>
         </ul>
       </article>
+      <button
+        v-if="entries.length > COLLAPSED_COUNT"
+        type="button"
+        class="outline-btn expand-btn"
+        @click="expanded = !expanded"
+      >
+        {{ expanded ? 'Weniger anzeigen' : `Alle ${entries.length} anzeigen` }}
+      </button>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { listVerifierAuditEntries, getVerifierAuditSummary } from '@/api/verifierAudit'
 import { initFirebaseAuth, useFirebaseAuth } from '@/utils/firebaseAuth'
 
@@ -85,6 +95,10 @@ const summary = ref(null)
 const loading = ref(false)
 const loaded = ref(false)
 const error = ref('')
+
+const COLLAPSED_COUNT = 2
+const expanded = ref(false)
+const visibleEntries = computed(() => (expanded.value ? entries.value : entries.value.slice(0, COLLAPSED_COUNT)))
 
 function entryBadgeLabel(entry) {
   if (entry.aiCheckFailed) return 'KI-Prüfung fehlgeschlagen'
@@ -135,6 +149,7 @@ async function load() {
       getVerifierAuditSummary(adminKey.value, { days: 30, idToken })
     ])
     entries.value = entriesResult
+    expanded.value = false
     summary.value = summaryResult
     loaded.value = true
   } catch (e) {
@@ -205,6 +220,10 @@ if (adminKey.value) {
   gap: 6px;
   font-size: 0.88rem;
   color: var(--fg);
+}
+
+.expand-btn {
+  justify-self: start;
 }
 
 .outline-btn {

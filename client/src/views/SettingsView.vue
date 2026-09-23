@@ -240,12 +240,14 @@
       </section>
     </div>
 
-    <!-- Bestätigungs-Dialog -->
+    <!-- Bestätigungs-Dialog. Teleport + Scroll-Lock (Modal-Muster der App, siehe CLAUDE.md):
+         vorher hing das Overlay im Seiten-DOM, der Hintergrund blieb scrollbar. -->
+    <Teleport to="body">
     <div v-if="showDeleteConfirm" class="modal-overlay" @click.self="!isDeleting && (showDeleteConfirm = false)">
       <div class="modal-content danger-modal">
         <div class="modal-header">
           <h3>⚠️ {{ $t('settings.confirmDelete') }}</h3>
-          <button v-if="!isDeleting" class="close-btn" @click="showDeleteConfirm = false">×</button>
+          <button v-if="!isDeleting" class="close-btn" :aria-label="$t('common.close')" @click="showDeleteConfirm = false">×</button>
         </div>
         
         <div class="modal-body">
@@ -295,13 +297,15 @@
         </div>
       </div>
     </div>
+    </Teleport>
 
-    <!-- Account-Lösch-Dialog -->
+    <!-- Account-Lösch-Dialog (Teleport + Scroll-Lock wie oben) -->
+    <Teleport to="body">
     <div v-if="showDeleteAccountConfirm" class="modal-overlay" @click.self="!isDeletingAccount && (showDeleteAccountConfirm = false)">
       <div class="modal-content danger-modal">
         <div class="modal-header">
           <h3>⚠️ {{ $t('settings.confirmDeleteAccount') }}</h3>
-          <button v-if="!isDeletingAccount" class="close-btn" @click="showDeleteAccountConfirm = false">×</button>
+          <button v-if="!isDeletingAccount" class="close-btn" :aria-label="$t('common.close')" @click="showDeleteAccountConfirm = false">×</button>
         </div>
         
         <div class="modal-body">
@@ -355,6 +359,7 @@
         </div>
       </div>
     </div>
+    </Teleport>
 
     <AppFeedbackDialog v-if="showFeedbackDialog" @close="showFeedbackDialog = false" />
   </div>
@@ -372,7 +377,8 @@ import { useOnboardingStore } from '@/stores/onboardingStore'
 import { useToastStore } from '@/stores/toastStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useI18n } from 'vue-i18n'
-import { computed, ref, onBeforeUnmount } from 'vue'
+import { computed, ref, watch, onBeforeUnmount } from 'vue'
+import { useScrollLock } from '@/composables/useScrollLock'
 import { useRouter } from 'vue-router'
 import { initFirebaseAuth, useFirebaseAuth } from '@/utils/firebaseAuth'
 import { logger } from '@/utils/logger'
@@ -646,6 +652,12 @@ const clearDevPlan = () => {
 }
 
 const showDeleteAccountConfirm = ref(false)
+
+// Hintergrund-Scroll sperren, solange einer der beiden Lösch-Dialoge offen ist.
+const { lock: lockBodyScroll, unlock: unlockBodyScroll } = useScrollLock()
+const anyDeleteDialogOpen = computed(() => showDeleteConfirm.value || showDeleteAccountConfirm.value)
+watch(anyDeleteDialogOpen, (open) => (open ? lockBodyScroll() : unlockBodyScroll()))
+onBeforeUnmount(unlockBodyScroll)
 const confirmAccountText = ref('')
 const isDeletingAccount = ref(false)
 
