@@ -25,13 +25,16 @@
       </div>
 
       <div v-else class="workout">
+        <!-- Kompakte Titelzeile (Wunsch Paul: Name, Typ und Datum standen doppelt da - der Name
+             enthielt schon das Datum, darunter nochmal Typ-Plakette + Datum mit Uhrzeit). Jetzt:
+             Name ohne angehängtes Datum, rechts "Heute" bzw. das Datum ohne Uhrzeit. Der
+             gespeicherte Name bleibt unverändert (nur Anzeige, siehe displayWorkoutName). -->
         <div class="workout-header">
-        <h2>{{ workout.name }}</h2>
-        <div class="meta">
-            <span class="badge">{{ workout.type?.toUpperCase() }}</span>
-            <span>{{ formatDate(workout.date) }}</span>
-            <span v-if="workout.completed" class="completed">✓</span>
-          </div>
+          <h2>{{ displayWorkoutName }}</h2>
+          <span class="workout-header-date">
+            <span v-if="workout.completed" class="completed" aria-hidden="true">✓</span>
+            {{ workoutDateLabel }}
+          </span>
         </div>
 
         <!-- Hinweis für den Sonderfall "abgeschlossenes Workout innerhalb des nachträglichen
@@ -52,12 +55,18 @@
              Workouts statt erst nach dem Durchscrollen der gesamten Übungsliste (User-Feedback).
              Infotext hinter einem Info-Button versteckt (toggle statt IMMER sichtbar), damit das
              Feld hier oben möglichst wenig Platz einnimmt. -->
+        <!-- Einzeilig (Wunsch Paul: Feld war zu groß): Symbol, Label, "(optional)", Info-Button,
+             Eingabe, kg. Der Infotext klappt bei Bedarf darunter auf. Platzhalter = zuletzt
+             eingetragenes Körpergewicht aus einem früheren Workout - nur als Anzeige, gespeichert
+             wird ausschließlich, was der Nutzer selbst einträgt (keine geschätzten Werte). -->
         <div
           v-if="!isReordering && !isFavoriteAdjustMode"
           class="bodyweight-field"
         >
-          <div class="bodyweight-label-row">
-            <label for="athlete-bodyweight-input">{{ t('workoutDetail.bodyweightLabel') }}</label>
+          <div class="bodyweight-row">
+            <Weight class="bodyweight-icon" aria-hidden="true" />
+            <label for="athlete-bodyweight-input" class="bodyweight-label">{{ t('workoutDetail.bodyweightShort') }}</label>
+            <span class="bodyweight-optional">{{ t('workoutDetail.optionalHint') }}</span>
             <button
               type="button"
               class="bodyweight-info-btn"
@@ -67,8 +76,7 @@
             >
               <Info class="btn-icon btn-icon--inline" aria-hidden="true" />
             </button>
-          </div>
-          <div class="bodyweight-input-row">
+            <span class="bodyweight-spacer"></span>
             <input
               id="athlete-bodyweight-input"
               type="number"
@@ -76,7 +84,8 @@
               max="400"
               step="0.1"
               inputmode="decimal"
-              :placeholder="t('workoutDetail.bodyweightPlaceholder')"
+              :placeholder="bodyweightPlaceholder"
+              :aria-label="t('workoutDetail.bodyweightLabel')"
               v-model="athleteBodyweightKg"
             />
             <span class="unit">kg</span>
@@ -811,7 +820,7 @@ import WorkoutTimerConfig from '@/components/timer/WorkoutTimerConfig.vue'
 import SessionStopwatch from '@/components/SessionStopwatch.vue'
 // Einheitliches Icon-Set statt Emoji/ASCII-Mix (🗑️/📝/⋮⋮/▲▼/＋/−) - wie im Rest der App
 // (siehe z.B. BottomNav.vue, AiFeedbackRatingWidget.vue) bereits lucide-vue-next genutzt.
-import { Clock, Trash2, StickyNote, GripVertical, Plus, Minus, Dumbbell, Info } from 'lucide-vue-next'
+import { Clock, Trash2, StickyNote, GripVertical, Plus, Minus, Dumbbell, Info, Weight } from 'lucide-vue-next'
 import { useToastStore } from '@/stores/toastStore'
 import { useTimerStore } from '@/stores/timerStore'
 import { useI18n } from 'vue-i18n'
@@ -1697,6 +1706,41 @@ async function saveOneRepMaxForExercise(idx) {
 function getExercisesMissingNotesForCurrentWorkout() {
   return getExercisesMissingNotes(workout.value?.exercises || [], getNote)
 }
+
+// --- Kompakte Titelzeile ------------------------------------------------------
+// Neue Workouts heißen z.B. "Leg Day - 23.9.2026" (siehe WorkoutBuilder.vue). Das Datum steht
+// rechts separat, deshalb hier nur für die Anzeige abschneiden (de- und en-Datumsformat).
+const displayWorkoutName = computed(() => {
+  const name = String(workout.value?.name || '').trim()
+  const stripped = name.replace(/\s*[-–]\s*\d{1,2}[./]\d{1,2}[./]\d{2,4}$/, '').trim()
+  return stripped || name
+})
+
+const workoutDateLabel = computed(() => {
+  const raw = workout.value?.date
+  if (!raw) return ''
+  const d = new Date(raw)
+  if (Number.isNaN(d.getTime())) return ''
+  const now = new Date()
+  if (d.toDateString() === now.toDateString()) return t('common.today')
+  const loc = (locale?.value || 'en').toLowerCase().startsWith('de') ? 'de-DE' : 'en-US'
+  const opts = { weekday: 'short', day: '2-digit', month: '2-digit' }
+  if (d.getFullYear() !== now.getFullYear()) opts.year = 'numeric'
+  return d.toLocaleDateString(loc, opts)
+})
+
+// Zuletzt eingetragenes Körpergewicht aus einem anderen (früheren) Workout - nur Platzhalter.
+const bodyweightPlaceholder = computed(() => {
+  const currentId = String(workout.value?._id || workout.value?.id || '')
+  const candidates = (userStore.workouts || [])
+    .filter((w) => w && String(w._id || w.id || '') !== currentId)
+    .filter((w) => typeof w.athleteBodyweightKg === 'number' && Number.isFinite(w.athleteBodyweightKg) && w.athleteBodyweightKg > 0)
+    .sort((a, b) => new Date(b.date || b.updatedAt || 0) - new Date(a.date || a.updatedAt || 0))
+  const last = candidates[0]?.athleteBodyweightKg
+  if (!last) return '—'
+  const loc = (locale?.value || 'en').toLowerCase().startsWith('de') ? 'de-DE' : 'en-US'
+  return new Intl.NumberFormat(loc, { maximumFractionDigits: 1 }).format(last)
+})
 
 function formatDate(dateStr) {
   if (!dateStr) return ''
@@ -3421,10 +3465,29 @@ onBeforeUnmount(() => {
 }
 
 .loading, .empty, .error { text-align: center; color: var(--muted); padding: 40px 0; }
-.workout-header { margin-bottom: 16px; }
-.workout-header h2 { margin: 0 0 8px 0; font-size: 1.5rem; }
-.meta { display: flex; gap: 8px; color: var(--muted); align-items: center; font-size: 0.9rem; }
-.badge { background: var(--surface); padding: 3px 8px; border-radius: 6px; font-size: 0.7rem; border: 1px solid var(--card-border); }
+.workout-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 6px 10px;
+}
+.workout-header h2 {
+  margin: 0;
+  font-size: 1.35rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.workout-header-date {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
 .completed { color: var(--success); }
 .ex-list { background: transparent; border: 1px solid transparent; border-radius: 12px; padding: 12px; }
 .ex-list input,
@@ -3570,27 +3633,51 @@ onBeforeUnmount(() => {
 .spin-btn.down { transform-origin: center; }
 .spin-btn:active { transform: scale(0.98); }
 .bodyweight-field {
-  /* Jetzt oberhalb der Übungsliste (siehe Template-Kommentar) statt am Ende von .ex-list -
-     etwas mehr Abstand nach unten als vorher (war margin:6px rundum), damit klar erkennbar
-     vom #exercises-Block getrennt. */
-  margin: 6px 6px 14px 6px;
-  padding: 12px 14px;
-  border-radius: var(--panel-radius, 16px);
+  /* Einzeilig (siehe Template-Kommentar) - vorher eigener Kasten mit Überschrift und
+     Eingabefeld darunter. */
+  margin: 0 6px 12px;
+  padding: 6px 10px;
+  border-radius: 12px;
   border: 1px solid var(--line-soft);
   background: var(--bg-elevated, transparent);
+}
+.bodyweight-row {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  flex-wrap: wrap;
   gap: 6px;
 }
-.bodyweight-field label {
-  font-size: 0.92rem;
+.bodyweight-icon {
+  width: 16px;
+  height: 16px;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.bodyweight-label {
+  font-size: 0.88rem;
   font-weight: 600;
   color: var(--fg);
 }
-.bodyweight-label-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.bodyweight-optional {
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+.bodyweight-spacer {
+  flex: 1 1 0;
+}
+.bodyweight-row input {
+  width: 64px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--line-soft);
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 16px; /* < 16px würde iOS beim Fokussieren reinzoomen */
+  text-align: right;
+}
+.bodyweight-row .unit {
+  color: var(--muted);
+  font-size: 0.85rem;
 }
 .bodyweight-info-btn {
   display: inline-flex;
@@ -3610,25 +3697,9 @@ onBeforeUnmount(() => {
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
-.bodyweight-input-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.bodyweight-input-row input {
-  width: 100px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px solid var(--line-soft);
-  background: var(--bg);
-  color: var(--fg);
-  font-size: 1rem;
-}
-.bodyweight-input-row .unit {
-  color: var(--muted);
-  font-size: 0.9rem;
-}
 .bodyweight-hint {
+  display: block;
+  margin-top: 6px;
   color: var(--muted);
   font-size: 0.8rem;
   line-height: 1.35;
