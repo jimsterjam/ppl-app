@@ -992,30 +992,31 @@ onActivated(async () => {
 }
 
 .dashboard-content {
+  /* Wunsch Paul: Dashboard soll NICHT scrollen, auch mit der größeren Stoppuhr-Karte.
+     Vorher: min-height + Workout-Kacheln mit fester aspect-ratio (Höhe hing an der Breite) - kam
+     mehr Inhalt dazu, wurde die Seite länger als der Bildschirm. Jetzt (wie bisher schon im
+     Entwurfs-Modus): feste Höhe = Platz zwischen Header und Bottom-Nav, Hero und Stoppuhr in
+     ihrer natürlichen Höhe, der Kachel-Bereich teilt sich den Rest (siehe .quick-grid). Scrollen
+     nur noch als Notlösung innerhalb des Bereichs (overflow-y), z.B. bei langen Favoritenlisten. */
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 14px clamp(12px, 3vw, 32px);
-  padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px));
-  min-height: calc(100dvh - var(--header-height) - var(--safe-top) - 64px - var(--safe-bottom, 0px));
+  gap: 10px;
+  padding: 12px clamp(12px, 3vw, 32px);
+  padding-bottom: calc(78px + env(safe-area-inset-bottom, 0px));
+  height: calc(100dvh - var(--header-height) - var(--safe-top) - 64px - var(--safe-bottom, 0px));
+  overflow-y: auto;
   font-family: "Sora", "Space Grotesk", "SF Pro Display", sans-serif;
 }
 
 .dashboard-content.has-draft {
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  height: calc(100dvh - var(--header-height) - var(--safe-top) - 64px - var(--safe-bottom, 0px));
-  overflow-y: auto;
   gap: 8px;
   padding-top: 10px;
-  padding-bottom: calc(78px + env(safe-area-inset-bottom, 0px));
 }
 
 .hero {
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  flex-shrink: 1;
+  flex-shrink: 0;
   gap: 10px;
   padding: 10px 12px;
   border-radius: calc(var(--panel-radius) - 12px);
@@ -1049,8 +1050,8 @@ onActivated(async () => {
 .quick-start {
   display: flex;
   flex-direction: column;
+  flex: 1 1 0;
   min-height: 0;
-  flex-shrink: 1;
   gap: 10px;
 }
 
@@ -1058,20 +1059,16 @@ onActivated(async () => {
 .quick-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* Zwei Kachel-Reihen teilen sich den verfügbaren Platz (mind. 64px, höchstens 170px, etwa so
+     groß wie die bisherigen Kacheln auf dem iPhone), darunter die Reihe Favoriten/Timer. */
+  grid-template-rows: repeat(2, minmax(64px, 170px)) auto;
+  align-content: start;
   gap: 8px;
+  flex: 1 1 0;
   min-height: 0;
 }
 
 .quick-grid :deep(.workout-card) {
-  aspect-ratio: 1.15 / 1;
-}
-
-.dashboard-content.has-draft .quick-grid {
-  grid-template-rows: repeat(2, minmax(0, 1fr));
-  min-height: 0;
-}
-
-.dashboard-content.has-draft .quick-grid :deep(.workout-card) {
   aspect-ratio: unset;
   height: 100%;
   min-height: 0;
@@ -1086,7 +1083,7 @@ onActivated(async () => {
   font-weight: 700;
   font-size: 1.1rem;
   letter-spacing: 0.05em;
-  padding: 20px 14px;
+  padding: 14px 12px;
   cursor: pointer;
   text-align: center;
   transition: background 120ms ease, border-color 120ms ease;
@@ -1110,7 +1107,7 @@ onActivated(async () => {
   font-weight: 700;
   font-size: 1.1rem;
   letter-spacing: 0.05em;
-  padding: 20px 14px;
+  padding: 14px 12px;
   cursor: pointer;
   text-align: center;
   transition: background 120ms ease, border-color 120ms ease;
