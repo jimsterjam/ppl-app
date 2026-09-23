@@ -606,7 +606,9 @@ export const messages = {
         },
         metrics: {
           frequency: 'Trainingsfrequenz',
+          muscleVolume: 'Muskelvolumen',
           pushPull: 'Push/Pull Verhältnis',
+          progression: 'Steigerung',
           recovery: 'Recovery-Stress'
         }
       },
@@ -686,7 +688,12 @@ export const messages = {
       detailsTitle: 'Details anzeigen',
       deleteConfirm: 'Workout "{name}" wirklich löschen?',
       deleteFailed: 'Workout konnte nicht gelöscht werden.',
-      unknownDuration: '?'
+      unknownDuration: '?',
+      favorited: 'Als Favorit gespeichert',
+      favoriteTitle: 'Als Favorit speichern',
+      favoriteNameTitle: 'Als Favorit speichern',
+      favoriteNamePlaceholder: 'Name des Favoriten',
+      favoriteNameRequired: 'Bitte einen Namen eingeben.'
     },
     postWorkout: {
       title: 'Workout abgeschlossen!',
@@ -705,7 +712,8 @@ export const messages = {
       insufficientHistoryOr: '(oder',
       insufficientHistoryDaySingle: 'noch 1 Tag)',
       insufficientHistoryDaysMulti: 'noch {days} Tage)',
-      networkUnavailable: 'Workout gespeichert. Die KI-Analyse ist gerade kurz nicht erreichbar — du findest sie in Kürze automatisch in den Stats.'
+      networkUnavailable: 'Workout gespeichert. Die KI-Analyse ist gerade kurz nicht erreichbar — du findest sie in Kürze automatisch in den Stats.',
+      syncPending: 'Dein Workout wird gerade noch synchronisiert. Das Feedback kannst du in Kürze in den Stats abrufen.'
     },
     feedbackHistory: {
       title: 'KI-Feedback Verlauf',
@@ -879,7 +887,9 @@ export const messages = {
         workoutSharing: 'Workout-Sharing',
         customTemplates: 'Eigene Vorlagen',
         up50Friends: 'Bis zu 50 Freunde',
+        everythingPro: 'Alles aus Pro',
         unlimitedFriends: 'Unbegrenzt Freunde',
+        personalCoaching: 'Persönliches Coaching',
         prioritySupport: 'Priority Support',
         earlyAccess: 'Early Access',
         exportData: 'Daten exportieren'
@@ -998,6 +1008,7 @@ export const messages = {
       reps: 'Reps',
       duration: 'Duration',
       today: 'Today',
+      continue: 'Continue',
       unknownDuration: 'Unknown duration',
       more: 'more',
       select: 'Select'
@@ -1431,6 +1442,14 @@ export const messages = {
       set: 'Set',
       reps: 'Reps',
       actions: 'Actions',
+      chatTitle: 'Feedback / Chat',
+      chatEmpty: 'No messages yet',
+      chatPlaceholder: 'Write feedback or questions…',
+      chatUnavailableDraft: 'Feedback is available once the workout is saved and synced online.',
+      chatOfflineHint: 'Offline: chat is only available online.',
+      chatSenderYou: 'You',
+      chatSenderCoach: 'Coach',
+      chatSend: 'Send',
       editOrder: 'Edit order',
       done: 'Done',
       reorderHint: 'Drag and drop to change the order.',
@@ -1629,7 +1648,12 @@ export const messages = {
       detailsTitle: 'Show details',
       deleteConfirm: 'Do you really want to delete "{name}"?',
       deleteFailed: 'Workout could not be deleted.',
-      unknownDuration: 'Unknown duration'
+      unknownDuration: 'Unknown duration',
+      favorited: 'Saved as favorite',
+      favoriteTitle: 'Save as favorite',
+      favoriteNameTitle: 'Save as favorite',
+      favoriteNamePlaceholder: 'Favorite name',
+      favoriteNameRequired: 'Please enter a name.'
     },
     postWorkout: {
       title: 'Workout complete!',
@@ -1648,7 +1672,8 @@ export const messages = {
       insufficientHistoryOr: '(or',
       insufficientHistoryDaySingle: '1 more day)',
       insufficientHistoryDaysMulti: '{days} more days)',
-      networkUnavailable: 'Workout saved. AI analysis is briefly unavailable — you\'ll find it in Stats shortly, automatically.'
+      networkUnavailable: 'Workout saved. AI analysis is briefly unavailable — you\'ll find it in Stats shortly, automatically.',
+      syncPending: 'Your workout is still syncing. You\'ll find the feedback in Stats shortly.'
     },
     feedbackHistory: {
       title: 'AI Feedback History',
