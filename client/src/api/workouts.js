@@ -12,6 +12,7 @@ import {
   clearWorkoutTombstones
 } from "@/utils/offlineStorage";
 import { logger } from "@/utils/logger";
+import { getAppLanguage } from "@/i18n";
 
 // API Basis-URL
 const WORKOUTS_TIMEOUT_MS = Number.parseInt(import.meta.env.VITE_WORKOUTS_TIMEOUT_MS || '', 10) || 25000
@@ -261,7 +262,7 @@ export async function requestAiAnalysis(workoutId, token = null, { timeoutMs } =
       ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
       ...(Number.isFinite(timeoutMs) && timeoutMs > 0 ? { timeout: timeoutMs } : {})
     }
-    const res = await api.post(`/${workoutId}/ai-analysis`, {}, config)
+    const res = await api.post(`/${workoutId}/ai-analysis`, { language: getAppLanguage() }, config)
     return res.data
   } catch (error) {
     logger.warn('⚠️ Workouts API - requestAiAnalysis failed:', error?.message)

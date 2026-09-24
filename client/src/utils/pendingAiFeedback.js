@@ -22,6 +22,7 @@ import { apiUrl } from '@/api/http'
 import { resolveRealIdFromDraftId, isValidObjectId } from './workoutHelpers'
 import { useFirebaseAuth } from './firebaseAuth'
 import { logger } from './logger'
+import { getAppLanguage } from '@/i18n'
 
 const STORAGE_KEY = 'bro_split_pending_ai_feedback_v1'
 // Defensive Obergrenze: falls eine temporäre ID nie aufgelöst wird (z.B. Workout wurde nie
@@ -127,7 +128,7 @@ export async function processPendingAiFeedback() {
         const token = await getIdToken().catch(() => null)
         await axios.post(
           `${apiUrl('workouts')}/${realId}/ai-analysis`,
-          {},
+          { language: getAppLanguage() },
           {
             headers: token ? { Authorization: `Bearer ${token}` } : {},
             timeout: 60000

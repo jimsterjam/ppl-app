@@ -2199,6 +2199,11 @@ export function setLocale(i18n, locale) {
   try { localStorage.setItem(STORAGE_KEY, locale) } catch {}
 }
 
+// Sprache für serverseitig erzeugte Texte (z.B. KI-Feedback): nur 'de' oder 'en'.
+export function getAppLanguage() {
+  return String(getStoredLocale() || '').toLowerCase().startsWith('en') ? 'en' : 'de'
+}
+
 export function getStoredLocale() {
   try { return localStorage.getItem(STORAGE_KEY) || detectLocale() } catch { return detectLocale() }
 }

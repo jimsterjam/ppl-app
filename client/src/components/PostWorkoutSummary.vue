@@ -138,6 +138,7 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { getAppLanguage } from '@/i18n'
 import { useRouter } from 'vue-router'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { logger } from '@/utils/logger'
@@ -313,7 +314,8 @@ async function loadAIFeedback() {
 
     const response = await axios.post(
       url,
-      {},
+      // Sprache des KI-Feedback-Texts = App-Sprache (Server: resolveFeedbackLanguage)
+      { language: getAppLanguage() },
       {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         // Server macht jetzt einen schnellen Erreichbarkeits-Check (max. 3s) vor dem

@@ -31,7 +31,7 @@
       >
         <div class="feedback-summary">
           <div class="feedback-info">
-            <span class="feedback-name">{{ item.name || 'Workout' }}</span>
+            <span class="feedback-name">{{ stripWorkoutNameDate(item.name) || 'Workout' }}</span>
             <span class="feedback-date">
               {{ formatDate(item.ai_generated_at || item.date) }}
               <span v-if="item.ai_feedback_status === 'deferred'" class="pending-badge">
@@ -101,6 +101,7 @@
 <script setup>
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { stripWorkoutNameDate } from '@/utils/workoutName'
 import { Share2 } from 'lucide-vue-next'
 import { Share } from '@capacitor/share'
 import { generateFeedbackShareImage } from '@/utils/feedbackShareImage'
@@ -218,7 +219,7 @@ async function generateNow(item) {
 // nur einen "geht nicht"-Fehler zu zeigen.
 async function shareFeedback(item) {
   const dateLabel = formatDate(item?.ai_generated_at || item?.date)
-  const text = [item?.name || 'Workout', dateLabel, '', item?.ai_feedback || '']
+  const text = [stripWorkoutNameDate(item?.name) || 'Workout', dateLabel, '', item?.ai_feedback || '']
     .filter(Boolean)
     .join('\n')
 

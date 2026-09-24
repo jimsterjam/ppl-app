@@ -10,6 +10,7 @@ import { logger } from '../utils/logger.js';
 import AIProvider from './AIProvider.js';
 import { createOpenAIClient, describeAiClientMode, ensureRelayAwake, markRelayContact } from '../utils/aiClientFactory.js';
 import { withAiRetry } from '../utils/aiUtils.js';
+import { languageDirective, EXERCISE_ORDER_DIRECTIVE, reorderBulletLinesByExerciseOrder } from '../utils/feedbackLocalization.js';
 
 // WICHTIG: Lazy-Load von ENV-Variablen (nicht beim Import)
 // Sonst sind sie noch undefined wenn dotenv.config() nicht aufgerufen wurde
@@ -390,6 +391,8 @@ export class OpenAIProvider extends AIProvider {
    */
   async generateTrainingAnalysis(trainingAnalysis, options = {}) {
     const { requestId = 'unknown', temperature = 0.7, systemPrompt } = options;
+    // App-Sprache des Nutzers (siehe resolveFeedbackLanguage in routes/workouts.js) - 'de' = bisher.
+    const language = trainingAnalysis?.response_language === 'en' ? 'en' : 'de';
 
     if (!this.client) {
       throw new Error('OpenAI client not initialized. Check OPENAI_API_KEY.');
@@ -430,7 +433,7 @@ export class OpenAIProvider extends AIProvider {
         messages: [
           {
             role: 'system',
-            content: systemPrompt || this.getSystemPrompt()
+            content: (systemPrompt || this.getSystemPrompt()) + EXERCISE_ORDER_DIRECTIVE + languageDirective(language)
           },
           {
             role: 'user',
@@ -445,7 +448,12 @@ export class OpenAIProvider extends AIProvider {
 
       markRelayContact();
 
-      const feedback = response.choices?.[0]?.message?.content?.trim();
+      // Aufzählungszeilen in Workout-Reihenfolge bringen (User-Report: Zusammenfassung begann mit
+      // der letzten Übung) - siehe reorderBulletLinesByExerciseOrder.
+      const feedback = reorderBulletLinesByExerciseOrder(
+        response.choices?.[0]?.message?.content?.trim(),
+        (trainingAnalysis.exercises || []).map((ex) => ex.exercise)
+      );
 
       if (!feedback) {
         throw new Error('OpenAI returned empty response');
@@ -548,7 +556,7 @@ ${trainingAnalysis.bodyweight_correlation ? `
 - Trainingsgewicht in dieser Session (nur Übungen mit Vorher-Vergleich, ${trainingAnalysis.bodyweight_correlation.strength_context.exercises_compared} insgesamt): ${trainingAnalysis.bodyweight_correlation.strength_context.exercises_with_weight_increase} gestiegen, ${trainingAnalysis.bodyweight_correlation.strength_context.exercises_with_weight_decrease} gesunken, ${trainingAnalysis.bodyweight_correlation.strength_context.exercises_stable} stabil
 ` : ''}
 
-## Größte Volumenveränderungen nach oben
+## Größte Volumenveränderungen nach oben (nur zur Einordnung - NICHT als Reihenfolge verwenden)
 ${topImprovements.length > 0
   ? topImprovements.map(e => `- ${this.wrapExerciseName(e.exercise)}: Volumen +${e.volume_change_percent}%, Gewicht ${e.weight_change_kg > 0 ? '+' : ''}${e.weight_change_kg}kg`).join('\n')
   : '- Keine nennenswerten Veränderungen'}
@@ -558,9 +566,9 @@ ${topDeclines.length > 0
   ? topDeclines.map(e => `- ${this.wrapExerciseName(e.exercise)}: Volumen ${e.volume_change_percent}%, Gewicht ${e.weight_change_kg > 0 ? '+' : ''}${e.weight_change_kg}kg`).join('\n')
   : '- Keine nennenswerten Veränderungen'}
 
-## Detaillierte Übungsdaten
+## Detaillierte Übungsdaten (in Workout-Reihenfolge)
 ${exercises
-  .map(ex => {
+  .map((ex, exerciseIndex) => {
     // Bug-Fix (User-Report): buildPrompt() zeigte bisher IMMER zusätzlich Durchschnitts-/Summen-
     // Werte über alle Sätze hinweg (Gewicht als Ø, Wiederholungen als Summe) - das sind für den
     // Nutzer keine handlungsrelevanten Zahlen (er trainiert Satz für Satz) und können einen
@@ -568,7 +576,7 @@ ${exercises
     // Grundlage für Gewichts-/Wiederholungsangaben ist die satzgenaue Sätze-Liste unten (siehe
     // Regel 3) - Gesamtvolumen bleibt als reine Tendenz-Kennzahl bestehen (das ist eine legitime
     // Summe, keine irreführende Durchschnittsbildung von Gewicht/Wiederholungen).
-    let exPrompt = `### ${this.wrapExerciseName(ex.exercise)}
+    let exPrompt = `### ${exerciseIndex + 1}. ${this.wrapExerciseName(ex.exercise)}
 - Zeitraum: ${ex.period_description} (${ex.period_days} Tage)
 - Gesamtvolumen (Gewicht × Wiederholungen, Summe über alle Sätze) aktuell: ${ex.current_volume}kg`;
 

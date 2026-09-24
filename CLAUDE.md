@@ -24,8 +24,11 @@ bei jeder neuen Sitzung neu gelernt werden müssen. Bei Widerspruch gilt die jü
   (z.B. die Stoppuhr) nicht beenden.
 - **Nutzer sind keine Fitness-Experten:** Fachbegriffe (z.B. „Ramp-Up Sets") kurz erklären statt
   voraussetzen; der Begriff darf in Klammern stehen bleiben.
-- **KI-Feedback:** Übungsnamen im KI-Text in der App-Sprache (`exerciseNameForAI`), Zahlen im Text
-  müssen aus den echten Trainingsdaten stammen (Verifier, `AI_VERIFIER_MODE=active` auf Render).
+- **Übungsnamen sind in der ganzen App immer englisch** (Anzeige über `getTranslatedExerciseName`,
+  im KI-Text über `exerciseNameForAI` / `server/utils/feedbackLocalization.js` mit Katalog-Fallback).
+- **KI-Feedback:** Text in der App-Sprache (Client schickt `language`, Server
+  `resolveFeedbackLanguage`), Aufzählung in Workout-Reihenfolge (`reorderBulletLinesByExerciseOrder`),
+  Zahlen im Text müssen aus den echten Trainingsdaten stammen (Verifier, `AI_VERIFIER_MODE=active`).
 - Antworten an Paul auf Deutsch, knapp, Ergebnis zuerst.
 
 ## Definition of Done (vor jedem Commit-Befehl prüfen)

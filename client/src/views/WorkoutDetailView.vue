@@ -824,6 +824,7 @@ import { Clock, Trash2, StickyNote, GripVertical, Plus, Minus, Dumbbell, Info, W
 import { useToastStore } from '@/stores/toastStore'
 import { useTimerStore } from '@/stores/timerStore'
 import { useI18n } from 'vue-i18n'
+import { stripWorkoutNameDate } from '@/utils/workoutName'
 import { logger } from '@/utils/logger'
 import { buildWorkoutNotesSummary } from '@/utils/workoutNotes'
 import { resolveRealIdFromDraftId as _resolveRealIdFromDraftId, snapshotCore } from '@/utils/workoutHelpers'
@@ -1710,11 +1711,7 @@ function getExercisesMissingNotesForCurrentWorkout() {
 // --- Kompakte Titelzeile ------------------------------------------------------
 // Neue Workouts heißen z.B. "Leg Day - 23.9.2026" (siehe WorkoutBuilder.vue). Das Datum steht
 // rechts separat, deshalb hier nur für die Anzeige abschneiden (de- und en-Datumsformat).
-const displayWorkoutName = computed(() => {
-  const name = String(workout.value?.name || '').trim()
-  const stripped = name.replace(/\s*[-–]\s*\d{1,2}[./]\d{1,2}[./]\d{2,4}$/, '').trim()
-  return stripped || name
-})
+const displayWorkoutName = computed(() => stripWorkoutNameDate(workout.value?.name))
 
 const workoutDateLabel = computed(() => {
   const raw = workout.value?.date

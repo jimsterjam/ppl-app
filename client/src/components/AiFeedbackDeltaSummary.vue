@@ -10,6 +10,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 
 // Zusammenhängender, natürlichsprachlicher Vergleichssatz je Übung (Sätze/Wiederholungen/
 // Gewicht vs. letzte Session) statt der früheren drei isolierten Chips + SVG-Sparkline. Die
@@ -33,6 +34,7 @@ const props = defineProps({
 })
 
 const { t, locale } = useI18n()
+const { getTranslatedExerciseName } = useExerciseTranslation()
 
 function formatNumber(value) {
   const isDe = String(locale.value || 'de').toLowerCase().startsWith('de')
@@ -138,7 +140,9 @@ const rows = computed(() => {
       const weightScope = item.weight_change_scope || 'unknown'
       const weightSetNumbers = Array.isArray(item.weight_change_set_numbers) ? item.weight_change_set_numbers : []
       return {
-        exercise: item.exercise,
+        // User-Report: hier standen die deutschen Katalognamen, obwohl Übungsnamen in der App
+        // immer englisch sind (siehe exerciseTranslation.js) - jetzt wie überall übersetzt.
+        exercise: getTranslatedExerciseName(item.exercise),
         isFirstSession: !!item.is_first_session,
         sentence: buildSentence({ setsChange, repsChange, weightChangeKg, weightScope, weightSetNumbers })
       }
@@ -162,6 +166,8 @@ const rows = computed(() => {
 
 .delta-exercise {
   font-weight: 600;
+  /* Katalognamen sind klein geschrieben ("calf press lever") - wie im KI-Text groß. */
+  text-transform: capitalize;
   margin-right: 0.25rem;
 }
 </style>

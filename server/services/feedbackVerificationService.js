@@ -31,6 +31,7 @@ import { withAiRetry, parseJsonSafely } from '../utils/aiUtils.js';
 import { createOpenAIClient, ensureRelayAwake, markRelayContact } from '../utils/aiClientFactory.js';
 import { getCoachSystemPromptText } from './OpenAIProvider.js';
 import VerifierAudit from '../models/VerifierAudit.js';
+import { languageDirective, EXERCISE_ORDER_DIRECTIVE, reorderBulletLinesByExerciseOrder } from '../utils/feedbackLocalization.js';
 
 const MIN_EXPECTED_WORDS = 40;
 const MAX_EXPECTED_WORDS = 220;
@@ -456,7 +457,7 @@ export async function verifyFeedbackWithAI(structuredAnalysis, feedbackText, opt
     return client.chat.completions.create({
       model,
       messages: [
-        { role: 'system', content: getVerifierChecklistText() },
+        { role: 'system', content: getVerifierChecklistText() + languageDirective(structuredAnalysis?.response_language, 'verifier') },
         { role: 'user', content: userPrompt }
       ],
       temperature: 0.1,
@@ -651,7 +652,7 @@ export async function reviseFeedback(structuredAnalysis, feedbackText, violation
   const response = await withAiRetry(async () => client.chat.completions.create({
     model,
     messages: [
-      { role: 'system', content: getCoachSystemPromptText() },
+      { role: 'system', content: getCoachSystemPromptText() + EXERCISE_ORDER_DIRECTIVE + languageDirective(structuredAnalysis?.response_language) },
       { role: 'user', content: userPrompt }
     ],
     temperature: 0.3,
@@ -666,7 +667,8 @@ export async function reviseFeedback(structuredAnalysis, feedbackText, violation
     err.code = 'AI_EMPTY_REVISION';
     throw err;
   }
-  return revised;
+  // Gleiche Reihenfolge-Sortierung wie beim Erst-Entwurf (OpenAIProvider.generateTrainingAnalysis).
+  return reorderBulletLinesByExerciseOrder(revised, (structuredAnalysis?.exercises || []).map((ex) => ex.exercise));
 }
 
 // ---------------------------------------------------------------------------------------------

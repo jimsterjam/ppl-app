@@ -48,6 +48,7 @@ import {
 } from '../utils/workoutSanitizer.js';
 import { decideExerciseMatch } from '../utils/exerciseMatching.js';
 import { getMaxExerciseCount } from '../utils/exerciseCountTarget.js';
+import { resolveEnglishExerciseName, resolveFeedbackLanguage } from '../utils/feedbackLocalization.js';
 import { createOpenAIClient, describeAiClientMode, ensureRelayAwake, markRelayContact } from '../utils/aiClientFactory.js';
 import {
   classifyAiError,
@@ -2102,10 +2103,21 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
       ]);
       for (const doc of exerciseDocs) {
         if (doc.metricProfile) profileByExerciseName.set((doc.name || '').toLowerCase(), doc.metricProfile);
-        if (doc.names?.en) enNameByExerciseName.set((doc.name || '').toLowerCase(), doc.names.en);
+        if (doc.names?.en) enNameByExerciseName.set((doc.name || '').toLowerCase(), resolveEnglishExerciseName(doc.name, doc.names.en));
       }
       for (const doc of userNoteDocs) {
         userNoteByExerciseName.set((doc.exerciseName || '').toLowerCase(), doc);
+      }
+    }
+
+    // User-Report: KI-Feedback nannte Übungen trotzdem deutsch, wenn in der Exercise-Collection
+    // kein names.en gepflegt ist. Fallback auf den Übungskatalog (name_en); eigene Übungen ohne
+    // Katalog-Eintrag behalten ihren Namen.
+    for (const name of exerciseNamesInWorkout) {
+      const key = name.toLowerCase();
+      if (!enNameByExerciseName.has(key)) {
+        const english = resolveEnglishExerciseName(name);
+        if (english !== name) enNameByExerciseName.set(key, english);
       }
     }
 
@@ -2185,6 +2197,12 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
       athleteBodyweightKg: currentWorkout.athleteBodyweightKg ?? null,
       bodyweightCorrelation
     });
+
+    // Sprache des Feedback-Texts = App-Sprache des Nutzers (Body `language`, Header
+    // `x-app-language` oder Accept-Language). Wird vom Coach-, Prüf- und Korrektur-Prompt gelesen.
+    if (structuredAnalysis) {
+      structuredAnalysis.response_language = resolveFeedbackLanguage(req);
+    }
 
     // 5. Rufe AI-Service auf (OpenAI oder Ollama, abhängig von Konfiguration)
     const aiService = getAIService();
