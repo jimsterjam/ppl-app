@@ -72,13 +72,13 @@
             </div>
             <div v-for="favorite in allFavoriteWorkouts" :key="favorite.id" class="favorite-item favorite-item--compact">
               <!-- Aufgeräumt (Wunsch Paul: zu viele Buttons): nur "Starten" sichtbar, Anpassen/
-                   Namen ändern/Löschen im "⋯"-Menü (favoriteMenu-Modal). -->
+                   Namen ändern/Löschen im "⋮"-Menü (favoriteMenu-Modal). -->
               <div class="favorite-main">
                 <div class="favorite-name">{{ favorite.name }}<span class="fav-type-badge">{{ favorite.type }}</span></div>
                 <div class="favorite-meta">{{ favoriteMetaLine(favorite) }}</div>
               </div>
               <button class="favorite-start-btn" type="button" @click="startFavoriteWorkout(favorite)">{{ $t('dashboard.favoriteStart') }}</button>
-              <button class="favorite-more-btn" type="button" :aria-label="$t('dashboard.favoriteMore')" @click="openFavoriteMenu(favorite)">⋯</button>
+              <button class="favorite-more-btn" type="button" :aria-label="$t('dashboard.favoriteMore')" @click="openFavoriteMenu(favorite)">⋮</button>
             </div>
           </div>
         </div>
@@ -120,13 +120,13 @@
 
             <div v-for="favorite in favoriteWorkouts" :key="favorite.id" class="favorite-item favorite-item--compact">
               <!-- Aufgeräumt (Wunsch Paul: zu viele Buttons): nur "Starten" sichtbar, Anpassen/
-                   Namen ändern/Löschen im "⋯"-Menü (favoriteMenu-Modal). -->
+                   Namen ändern/Löschen im "⋮"-Menü (favoriteMenu-Modal). -->
               <div class="favorite-main">
                 <div class="favorite-name">{{ favorite.name }}</div>
                 <div class="favorite-meta">{{ favoriteMetaLine(favorite) }}</div>
               </div>
               <button class="favorite-start-btn" type="button" @click="startFavoriteWorkout(favorite)">{{ $t('dashboard.favoriteStart') }}</button>
-              <button class="favorite-more-btn" type="button" :aria-label="$t('dashboard.favoriteMore')" @click="openFavoriteMenu(favorite)">⋯</button>
+              <button class="favorite-more-btn" type="button" :aria-label="$t('dashboard.favoriteMore')" @click="openFavoriteMenu(favorite)">⋮</button>
             </div>
           </div>
         </div>
@@ -1311,10 +1311,11 @@ onActivated(async () => {
 
 .favorite-start-btn {
   flex-shrink: 0;
-  min-height: 40px;
-  padding: 0 14px;
+  min-height: 34px;
+  padding: 0 12px;
   border: none;
-  border-radius: 10px;
+  border-radius: 9px;
+  font-size: 0.85rem;
   background: var(--accent);
   color: var(--accent-contrast, #060606);
   font: inherit;
@@ -1323,14 +1324,17 @@ onActivated(async () => {
 }
 
 .favorite-more-btn {
+  /* Schmal und hochkant (Wunsch Paul) - Tippfläche bleibt über die Höhe groß genug. */
   flex-shrink: 0;
-  width: 40px;
-  min-height: 40px;
+  width: 24px;
+  min-height: 34px;
+  margin-right: -4px;
+  padding: 0;
   border: none;
-  border-radius: 10px;
   background: transparent;
   color: var(--muted);
-  font-size: 1.3rem;
+  font-size: 1.2rem;
+  font-weight: 700;
   line-height: 1;
   cursor: pointer;
 }

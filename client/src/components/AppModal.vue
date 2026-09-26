@@ -105,7 +105,10 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  /* Über der Bottom-Nav (z-index 1200, style.css) - vorher lag das Fenster teils dahinter und
+     wirkte am unteren Rand abgeschnitten. Safe-Area oben/unten freihalten (Notch, Home-Balken). */
+  z-index: 1300;
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) 12px calc(env(safe-area-inset-bottom, 0px) + 12px);
 }
 .modal {
   width: min(520px, calc(100% - 32px));
@@ -177,7 +180,9 @@ onBeforeUnmount(() => {
   color: var(--fg);
 }
 /* .btn.primary.warning { background: color-mix(in oklab, var(--warning) 60%, var(--accent-color)); color: #fff; } */
-.btn.primary.info { background: color-mix(in oklab, #3b82f6 60%, var(--accent-color)); color: #fff; }
+/* Info-Fenster nutzen dieselbe Akzentfarbe wie der Rest der App (vorher ein sonst nirgends
+   verwendetes Blau). */
+.btn.primary.info { background: var(--accent); color: var(--accent-contrast); }
 .btn:hover { filter: brightness(1.02); }
 .btn:active { transform: translateY(1px); }
 
@@ -202,16 +207,10 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 640px) {
-  .modal-overlay {
-    align-items: flex-end;
-  }
-
+  /* Auch auf dem iPhone zentriert (Modal-Muster der App) statt am unteren Rand angedockt. */
   .modal {
-    width: calc(100% - 16px);
-    max-height: min(92vh, 860px);
-    border-bottom-left-radius: 10px;
-    border-bottom-right-radius: 10px;
-    margin-bottom: 8px;
+    width: 100%;
+    max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 24px);
   }
 }
 </style>

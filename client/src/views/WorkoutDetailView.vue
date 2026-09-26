@@ -556,9 +556,19 @@
               </template>
 
               <p v-if="showProgressionHints && repTargetsByIndex[i]" class="progression-hint-line">
-                {{ suggestionsByIndex[i]
+                <span>{{ suggestionsByIndex[i]
                   ? t('workoutDetail.weightSuggestionReason', { reps: suggestionsByIndex[i].targetReps })
-                  : t('workoutDetail.repTargetExplain', { reps: repTargetsByIndex[i].target }) }}
+                  : t('workoutDetail.repTargetExplain', { reps: repTargetsByIndex[i].target }) }}</span>
+                <!-- Erklärung (FAQ-Text) als Fenster direkt im Workout: kein Seitenwechsel, laufende
+                     Stoppuhr/Timer bleiben unberührt. -->
+                <button
+                  type="button"
+                  class="progression-info-btn"
+                  :aria-label="t('workoutDetail.weightSuggestionInfo')"
+                  @click="showWeightSuggestionInfo = true"
+                >
+                  <Info class="btn-icon btn-icon--inline" aria-hidden="true" />
+                </button>
               </p>
               <div class="row-actions">
                 <button class="add-row-btn" :title="t('workoutDetail.addSet')" @click="addSetRow(i, $event)"><Plus class="btn-icon btn-icon--inline" aria-hidden="true" /> {{ t('workoutDetail.addSet') }}</button>
@@ -696,6 +706,20 @@
           {{ t('workoutDetail.timerStop') }}
         </button>
       </div>
+    </AppModal>
+
+    <AppModal
+      v-model="showWeightSuggestionInfo"
+      :title="t('faqs.weightSuggestion')"
+      :confirm-text="t('common.close')"
+      :show-cancel="false"
+      type="info"
+    >
+      <p
+        v-for="(paragraph, pi) in t('faqs.weightSuggestionText').split('\n\n')"
+        :key="pi"
+        class="weight-suggestion-info-text"
+      >{{ paragraph }}</p>
     </AppModal>
 
     <AppModal
@@ -1859,6 +1883,9 @@ const repTargetsByIndex = computed(() =>
     isNoLoadExercise(info) ? null : getRepTarget(info, progressionGoal.value)
   )
 )
+
+// Erklärfenster zum Gewichtsvorschlag (ⓘ neben der Hinweiszeile, Text = FAQ-Eintrag).
+const showWeightSuggestionInfo = ref(false)
 
 const suggestionsByIndex = computed(() => {
   const candidates = progressionHistory.value
@@ -3794,7 +3821,31 @@ onBeforeUnmount(() => {
   font-size: 0.78rem;
   line-height: 1.4;
   color: var(--muted);
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
 }
+.progression-info-btn {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin: -6px -4px -6px auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  border-radius: 50%;
+}
+.progression-info-btn:active {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.weight-suggestion-info-text { margin: 0 0 10px; line-height: 1.45; }
+.weight-suggestion-info-text:last-child { margin-bottom: 0; }
 .row-actions { padding: 4px 0; }
 .add-row-btn {
   background: transparent;

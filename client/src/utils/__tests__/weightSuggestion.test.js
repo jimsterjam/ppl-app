@@ -82,6 +82,19 @@ describe('getWeightSuggestion', () => {
     expect(getWeightSuggestion(crunch, session([{ reps: 20, weight: 10 }]), 'hypertrophy')).toBeNull()
   })
 
+  it('5x5-Beispiele: nur alle fünf Sätze mit 5 Wdh. führen zum Vorschlag', () => {
+    const at100 = (reps) => session(reps.map((r) => ({ reps: r, weight: 100 })))
+    expect(getWeightSuggestion(squat, at100([5, 5, 5, 5, 5]), 'strength')?.suggestedWeights[0]).toBe(102.5)
+    expect(getWeightSuggestion(squat, at100([5, 5, 5, 5, 4]), 'strength')).toBeNull()
+    expect(getWeightSuggestion(squat, at100([5, 5, 5, 4, 4]), 'strength')).toBeNull()
+    expect(getWeightSuggestion(squat, at100([5, 5, 4, 4, 3]), 'strength')).toBeNull()
+  })
+
+  it('Satzanzahl spielt keine Rolle: 3x5 nach 5x5 -> trotzdem Vorschlag', () => {
+    const three = session([{ reps: 5, weight: 100 }, { reps: 5, weight: 100 }, { reps: 5, weight: 100 }])
+    expect(getWeightSuggestion(squat, three, 'strength')?.suggestedWeights).toEqual([102.5, 102.5, 102.5])
+  })
+
   it('getSuggestionForSet: mehr Sätze als letztes Mal -> letzter Wert', () => {
     const suggestion = { suggestedWeights: [62.5, 65] }
     expect(getSuggestionForSet(suggestion, 0)).toBe(62.5)

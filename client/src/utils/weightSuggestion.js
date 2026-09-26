@@ -116,6 +116,9 @@ export function getWeightSuggestion(info = {}, lastSessionExercise = null, goal 
   if (working.some((set) => set.weight <= 0)) return null
   // Nur wenn ALLE Arbeitssätze das Ziel erreicht haben - sonst gleiches Gewicht, kein Hinweis.
   if (!working.every((set) => set.reps >= target.target)) return null
+  // Bewusst KEIN Vergleich der Satzanzahl mit früheren Sessions: Favoriten werden mit den Sätzen
+  // der letzten Session vorausgefüllt, nicht gemachte Sätze bleiben meist stehen - der Vergleich
+  // hätte kaum gegriffen, aber bewusste Umstellungen (z.B. 5 -> 3 Sätze) bestraft.
 
   const increment = incrementFor(info)
   return {
