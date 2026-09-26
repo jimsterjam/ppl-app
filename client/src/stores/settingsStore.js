@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { fetchAccountProfile, updateAccountProfile } from '@/api/account'
 import { logger } from '@/utils/logger'
+import { sanitizeWorkoutGoal } from '@/utils/workoutGoal'
 
 const PROFILE_REQUEST_COOLDOWN_MS = 15000
 let profileLoadPromise = null
@@ -48,6 +49,10 @@ export const useSettingsStore = defineStore('settings', {
     username: '',
     avatarUrl: '',
     avatarData: '',
+    // Zuletzt gewähltes Workout-Ziel (Muskelaufbau/Kraft) - nur zur Vorauswahl der Ziel-Abfrage
+    // beim Erstellen eines Workouts (WorkoutGoalPicker.vue). '' = noch nie gewählt. Das Ziel
+    // selbst gehört ans Workout (Feld `goal`), nicht in die Einstellungen.
+    lastWorkoutGoal: '',
   }),
   actions: {
     // Muss aus main.js nach jedem Firebase-onAuthStateChanged aufgerufen werden.
@@ -63,6 +68,7 @@ export const useSettingsStore = defineStore('settings', {
         this.username = ''
         this.avatarUrl = ''
         this.avatarData = ''
+        this.lastWorkoutGoal = ''
         profileCooldownUntil = 0
         profileLoadPromise = null
         profileLoadPromiseToken = ''
@@ -86,6 +92,7 @@ export const useSettingsStore = defineStore('settings', {
       this.username = lsGet(newUid, 'app-username')
       this.avatarUrl = lsGet(newUid, 'app-avatar-url')
       this.avatarData = lsGet(newUid, 'app-avatar-data')
+      this.lastWorkoutGoal = sanitizeWorkoutGoal(lsGet(newUid, 'app-last-workout-goal')) || ''
 
       // Cooldown zurücksetzen für neuen Account
       profileCooldownUntil = 0
@@ -188,6 +195,12 @@ export const useSettingsStore = defineStore('settings', {
     setLanguage(locale) {
       this.language = locale
       try { localStorage.setItem('app-lang', locale) } catch {}
+    },
+    setLastWorkoutGoal(goal) {
+      const valid = sanitizeWorkoutGoal(goal)
+      if (!valid) return
+      this.lastWorkoutGoal = valid
+      lsSet(this._uid, 'app-last-workout-goal', valid)
     },
     setWeeklyGoal(val) {
       const v = Number.parseInt(val, 10)

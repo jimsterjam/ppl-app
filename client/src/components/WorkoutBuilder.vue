@@ -372,7 +372,9 @@ async function createWorkout() {
 				setDetails: ex.setDetails || []
 			})),
 			date: new Date().toISOString(),
-			completed: false
+			completed: false,
+			// Ziel des Workouts (im Dashboard abgefragt, siehe utils/workoutGoal.js) - danach fest.
+			goal: readWorkoutBuilderRouteState(route.query).goal
 		};
 		const tempId = getDraftId();
 		const tempWorkout = {

@@ -45,6 +45,15 @@
           <span>{{ t('workoutDetail.editWindowHint', { time: editWindowDeadlineLabel }) }}</span>
         </div>
 
+        <!-- Favorit anpassen: hier lässt sich das Ziel des Favoriten ändern (wird mit dem
+             Favoriten gespeichert, siehe buildFavoriteSourceWorkout). In einem laufenden
+             Workout ist das Ziel dagegen fest. -->
+        <WorkoutGoalPicker
+          v-if="isFavoriteAdjustMode && !isReordering"
+          v-model="favoriteAdjustGoal"
+          class="adjust-goal-picker"
+        />
+
         <OneTimeHint
           hint-id="first-workout-open"
           :title="t('onboarding.hintFirstWorkoutTitle')"
@@ -423,7 +432,9 @@
 
               <!-- Arbeitssätze -->
               <div class="sets-section-divider" v-if="hasWarmupSets(ex)"></div>
-              <div class="sets-section-label working-label">{{ t('workoutDetail.workingSetsLabel') }}</div>
+              <div class="sets-section-label working-label">
+                {{ t('workoutDetail.workingSetsLabel') }}<template v-if="showProgressionHints && repTargetsByIndex[i]"> · {{ t('workoutDetail.repTargetShort', { reps: repTargetsByIndex[i].target }) }}</template>
+              </div>
               <template
                 v-for="(row, rIdx) in (ex.setDetails || [])"
                 :key="`${ex.exerciseId || i}-working-row-${rIdx}`"
@@ -431,7 +442,6 @@
                 <div v-if="!row.isWarmup" class="set-row" :class="{ 'set-row-empty': isRowEmpty(row) }" :data-set-index="rIdx">
                   <span class="col set">
                     {{ getSetLabel(ex.setDetails, rIdx) }}
-                    <span v-if="Number(row.reps) >= 6" class="weight-progress-hint" :title="t('workoutDetail.progressionHint')">&#8593;</span>
                   </span>
                   <span class="col reps">
                     <div class="number-with-spinner">
@@ -481,7 +491,7 @@
                     </div>
                   </span>
                   <span class="col weight">
-                    <div class="weight-input">
+                    <div class="weight-input" :class="{ 'has-suggestion': showProgressionHints && weightSuggestionFor(i, rIdx) != null }">
                       <div class="number-with-spinner">
                         <input
                           v-model.number="row.weight"
@@ -528,6 +538,15 @@
                         </div>
                       </div>
                       <span class="unit">kg</span>
+                      <!-- Gewichtsvorschlag (utils/weightSuggestion.js): reiner Hinweis, trägt nichts ein.
+                           pointer-events:none im CSS - ein Tipp landet wie bisher im Gewichtsfeld und
+                           öffnet die Zahlenauswahl, der Chip selbst reagiert nicht. -->
+                      <span
+                        v-if="showProgressionHints && weightSuggestionFor(i, rIdx) != null"
+                        class="weight-suggestion-chip"
+                        :class="{ reached: Number(row.weight) >= weightSuggestionFor(i, rIdx) }"
+                        :aria-label="t('workoutDetail.weightSuggestionAria', { weight: formatKg(weightSuggestionFor(i, rIdx)) })"
+                      >{{ Number(row.weight) >= weightSuggestionFor(i, rIdx) ? '✓' : `↑ ${formatKg(weightSuggestionFor(i, rIdx))}` }}</span>
                     </div>
                   </span>
                   <span class="col actions">
@@ -536,6 +555,11 @@
                 </div>
               </template>
 
+              <p v-if="showProgressionHints && repTargetsByIndex[i]" class="progression-hint-line">
+                {{ suggestionsByIndex[i]
+                  ? t('workoutDetail.weightSuggestionReason', { reps: suggestionsByIndex[i].targetReps })
+                  : t('workoutDetail.repTargetExplain', { reps: repTargetsByIndex[i].target }) }}
+              </p>
               <div class="row-actions">
                 <button class="add-row-btn" :title="t('workoutDetail.addSet')" @click="addSetRow(i, $event)"><Plus class="btn-icon btn-icon--inline" aria-hidden="true" /> {{ t('workoutDetail.addSet') }}</button>
               </div>
@@ -802,6 +826,11 @@ import { getCurrentInstance } from 'vue'
 import NumberPicker from '@/components/NumberPicker.vue'
 import { useExerciseTranslation, getEnglishExerciseName } from '@/utils/exerciseTranslation'
 import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
+import { getRepTarget, getWeightSuggestion, getSuggestionForSet, isNoLoadExercise } from '@/utils/weightSuggestion'
+import { prepareHistoryCandidates, findLastSessionExercise } from '@/utils/lastSessionLookup'
+import { sanitizeWorkoutGoal } from '@/utils/workoutGoal'
+import WorkoutGoalPicker from '@/components/WorkoutGoalPicker.vue'
+import { useSettingsStore } from '@/stores/settingsStore'
 import { resolveExerciseMedia, buildExerciseMediaUrl } from '@/utils/assetResolver'
 import { useRoute, useRouter, onBeforeRouteLeave } from 'vue-router'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
@@ -1738,6 +1767,126 @@ const bodyweightPlaceholder = computed(() => {
   const loc = (locale?.value || 'en').toLowerCase().startsWith('de') ? 'de-DE' : 'en-US'
   return new Intl.NumberFormat(loc, { maximumFractionDigits: 1 }).format(last)
 })
+
+// --- Gewichtsvorschlag (doppelte Progression, siehe utils/weightSuggestion.js) -------------
+// Nur während eines laufenden Workouts: nicht beim nachträglichen Bearbeiten abgeschlossener
+// Workouts und nicht im Favoriten-Anpassen-Modus. Reiner Hinweis - es wird nichts eingetragen,
+// kein Auto-Save ausgelöst und der bestehende Eingabe-Flow bleibt unverändert.
+const progressionSettings = useSettingsStore()
+const progressionHistory = ref([])
+const progressionCatalog = ref([])
+
+// Ziel des laufenden Workouts (beim Erstellen abgefragt, danach fest). Workouts von vor dieser
+// Änderung haben kein Ziel -> zuletzt gewähltes Ziel, sonst Muskelaufbau.
+const progressionGoal = computed(() =>
+  sanitizeWorkoutGoal(workout.value?.goal) || progressionSettings.lastWorkoutGoal || 'hypertrophy'
+)
+
+// Nur im Favoriten-Anpassen-Modus änderbar (siehe Template).
+const favoriteAdjustGoal = computed({
+  get: () => sanitizeWorkoutGoal(workout.value?.goal) || '',
+  set: (value) => {
+    const goal = sanitizeWorkoutGoal(value)
+    if (!workout.value || !goal || !isFavoriteAdjustMode.value) return
+    workout.value = { ...workout.value, goal }
+  }
+})
+
+const showProgressionHints = computed(() =>
+  !!workout.value && workout.value.completed !== true && !isFavoriteAdjustMode.value
+)
+
+async function loadProgressionData() {
+  const currentId = String(workout.value?._id || workout.value?.id || '')
+  try {
+    const userId = resolveActiveWorkoutUserId()
+    const history = userId ? await getAllWorkoutsOffline({ userId }).catch(() => []) : []
+    progressionHistory.value = prepareHistoryCandidates(history, currentId)
+  } catch (e) {
+    logger.debug('[WorkoutDetail] Historie für Gewichtsvorschlag nicht verfügbar', e?.message)
+    progressionHistory.value = []
+  }
+  try {
+    progressionCatalog.value = await loadDefaultExercises()
+  } catch {
+    progressionCatalog.value = []
+  }
+}
+
+// Einmal pro geöffnetem Workout laden (nicht bei jeder Eingabe).
+watch(
+  () => (showProgressionHints.value ? String(workout.value?._id || workout.value?.id || '') : ''),
+  (id) => { if (id) loadProgressionData() },
+  { immediate: true }
+)
+
+function progressionLower(value) {
+  return String(value || '').trim().toLowerCase()
+}
+
+function findCatalogEntryForProgression(ex) {
+  const list = Array.isArray(progressionCatalog.value) ? progressionCatalog.value : []
+  if (!list.length) return null
+  const id = String(ex?.exerciseId || ex?._id || '').trim()
+  const name = progressionLower(ex?.name)
+  return (id && list.find((e) => String(e?._id || '') === id || String(e?.id || '') === id))
+    || (name && list.find((e) => progressionLower(e?.name) === name || progressionLower(e?.name_en) === name))
+    || null
+}
+
+function progressionInfo(ex) {
+  const cat = findCatalogEntryForProgression(ex) || {}
+  return {
+    name: ex?.name,
+    name_en: cat.name_en,
+    category: cat.category_raw || cat.category || ex?.category,
+    equipment: cat.equipment || ex?.equipment,
+    equipment_en: cat.equipment_en || ex?.equipment_en,
+    aiMetadata: cat.aiMetadata || ex?.aiMetadata
+  }
+}
+
+// Hängt nur von Identität der Übungen (Name/ID/Muskelgruppe) ab, nicht von eingetippten Werten.
+const progressionInfoByIndex = computed(() =>
+  (workout.value?.exercises || []).map((ex) => progressionInfo({
+    name: ex?.name, exerciseId: ex?.exerciseId, _id: ex?._id, category: ex?.category,
+    equipment: ex?.equipment, equipment_en: ex?.equipment_en, aiMetadata: ex?.aiMetadata
+  }))
+)
+
+const repTargetsByIndex = computed(() =>
+  progressionInfoByIndex.value.map((info) =>
+    isNoLoadExercise(info) ? null : getRepTarget(info, progressionGoal.value)
+  )
+)
+
+const suggestionsByIndex = computed(() => {
+  const candidates = progressionHistory.value
+  return (workout.value?.exercises || []).map((ex, index) => {
+    const last = findLastSessionExercise(
+      { name: ex?.name, exerciseId: ex?.exerciseId, _id: ex?._id, muscleGroup: ex?.muscleGroup },
+      candidates
+    )
+    return getWeightSuggestion(progressionInfoByIndex.value[index], last, progressionGoal.value)
+  })
+})
+
+function weightSuggestionFor(exerciseIndex, rowIndex) {
+  const suggestion = suggestionsByIndex.value[exerciseIndex]
+  if (!suggestion) return null
+  const sets = workout.value?.exercises?.[exerciseIndex]?.setDetails || []
+  if (sets[rowIndex]?.isWarmup) return null
+  let workingIndex = -1
+  for (let k = 0; k <= rowIndex; k++) {
+    if (!sets[k]?.isWarmup) workingIndex++
+  }
+  return getSuggestionForSet(suggestion, workingIndex)
+}
+
+function formatKg(value) {
+  const loc = (locale?.value || 'en').toLowerCase().startsWith('de') ? 'de-DE' : 'en-US'
+  return new Intl.NumberFormat(loc, { maximumFractionDigits: 2 }).format(value)
+}
 
 function formatDate(dateStr) {
   if (!dateStr) return ''
@@ -2988,6 +3137,7 @@ function buildFavoriteSourceWorkout() {
   return {
     name: source.name,
     type: source.type,
+    goal: source.goal,
     notes: buildWorkoutNotesSummary(source.exercises || []),
     exercises: (source.exercises || []).map((exercise, idx) => ({
       _id: exercise._id || exercise.exerciseId || null,
@@ -3462,6 +3612,9 @@ onBeforeUnmount(() => {
 }
 
 .loading, .empty, .error { text-align: center; color: var(--muted); padding: 40px 0; }
+.adjust-goal-picker {
+  margin: 0 6px 12px;
+}
 .workout-header {
   display: flex;
   align-items: baseline;
@@ -3601,11 +3754,47 @@ onBeforeUnmount(() => {
   border: 1px solid var(--card-border);
   border-radius: 10px;
 }
-.set-row { display: grid; grid-template-columns: 50px 1fr 1fr 60px; gap: 8px; align-items: center; padding: 4px 0; }
+.set-row {
+  /* Gewichtsspalte breiter (1.35fr), Satznummer und Minus-Button schmaler - Platz für den
+     Gewichtsvorschlag-Chip im Gewichtsfeld (siehe .weight-suggestion-chip). */
+  display: grid;
+  grid-template-columns: 34px 1fr 1.35fr 36px;
+  gap: 8px;
+  align-items: center;
+  padding: 4px 0;
+}
 .set-row.header { color: var(--muted); font-size: 0.75rem; padding-top: 0; }
 .set-row .col input { width: 100%; padding: 5px 6px; border-radius: 6px; border: 1px solid var(--card-border); background: var(--surface); color: var(--fg); text-align: center; font-size: 1rem; }
 .weight-input { position: relative; }
 .weight-input .unit { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 0.75rem; pointer-events: none; }
+/* Mit Vorschlag: Wert links, "kg" in der Mitte, Chip rechts im selben Feld. */
+.weight-input.has-suggestion input { text-align: left; padding-left: 8px; padding-right: 72px; }
+.weight-input.has-suggestion .unit { right: 58px; }
+.weight-suggestion-chip {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none; /* reiner Hinweis - Tipps gehen ans Gewichtsfeld (Zahlenauswahl) */
+  padding: 2px 5px;
+  border-radius: 5px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: nowrap;
+  color: var(--accent-contrast, #060606);
+  background: color-mix(in srgb, var(--accent) 85%, transparent);
+}
+.weight-suggestion-chip.reached {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+}
+.progression-hint-line {
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
 .row-actions { padding: 4px 0; }
 .add-row-btn {
   background: transparent;
@@ -3830,24 +4019,6 @@ onBeforeUnmount(() => {
   margin: 6px 0 0;
   color: var(--fg-soft, #9fb0c2);
   font-size: 0.78rem;
-}
-.weight-progress-hint {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  margin-left: 4px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: #22c55e;
-  background: rgba(34, 197, 94, 0.15);
-  border: 1px solid rgba(34, 197, 94, 0.35);
-  border-radius: 50%;
-  flex-shrink: 0;
-  user-select: none;
-  cursor: default;
-  vertical-align: middle;
 }
 .col.set {
   display: flex;

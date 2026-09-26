@@ -1,6 +1,7 @@
 import { useFirebaseAuth } from './firebaseAuth'
 import { fetchFavoriteWorkoutsRemote, pushFavoriteWorkoutRemote, deleteFavoriteWorkoutRemote } from '@/api/favoriteWorkouts'
 import { logger } from './logger'
+import { sanitizeWorkoutGoal } from './workoutGoal'
 
 // Favoriten wurden bisher AUSSCHLIESSLICH in localStorage gehalten - bei Geräteverlust,
 // Neuinstallation oder einem Identitätswechsel (z.B. Login über einen anderen Firebase-
@@ -133,6 +134,8 @@ function buildFavoriteWorkoutPayload(workout, type) {
     type: normalizeWorkoutType(source.type || type),
     workoutName: String(source.name || source.workoutName || '').trim(),
     notes: typeof source.notes === 'string' ? source.notes : '',
+    // Ziel des Workouts, aus dem der Favorit entstanden ist (siehe utils/workoutGoal.js).
+    goal: sanitizeWorkoutGoal(source.goal),
     exercises: exercises.map((exercise, index) => ({
       _id: exercise?._id || `fav_ex_${index}`,
       exerciseId: exercise?.exerciseId || exercise?._id || null,

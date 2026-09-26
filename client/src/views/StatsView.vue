@@ -204,7 +204,7 @@ import ProgressThreeMonthsSection from '@/components/stats/ProgressThreeMonthsSe
 import WorkoutComparisonSection from '@/components/stats/WorkoutComparisonSection.vue'
 import PostWorkoutSummary from '@/components/PostWorkoutSummary.vue'
 import { logger } from '@/utils/logger'
-import { isOnline, getAllWorkoutsOffline, deleteWorkoutOffline, saveWorkoutOffline, OFFLINE_WORKOUTS_UPDATED_EVENT } from '@/utils/offlineStorage'
+import { isOnline, getAllWorkoutsOffline, deleteWorkoutOffline, saveWorkoutOffline, OFFLINE_WORKOUTS_UPDATED_EVENT, WORKOUT_DELETED_EVENT, AI_FEEDBACK_UPDATED_EVENT } from '@/utils/offlineStorage'
 import { resolveWorkoutNotes } from '@/utils/workoutNotes'
 import { deleteWorkout as deleteWorkoutApi } from '@/api/workouts'
 import { deleteWorkoutFromStats, getWorkoutIdentifier } from '@/utils/workoutDeletion'
@@ -690,6 +690,10 @@ async function confirmDeleteRecentWorkout() {
   store.invalidateStatsCache()
   showDeleteModal.value = false
   pendingDeleteWorkout.value = null
+  // Feedback-Verlauf sofort mitziehen (User-Report: KI-Feedback blieb nach dem Löschen sichtbar).
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(WORKOUT_DELETED_EVENT, { detail: { workoutId } }))
+  }
 
   // Hintergrund: IndexedDB + Server-Sync (fire-and-forget)
   deleteWorkoutFromStats({
@@ -709,6 +713,10 @@ async function confirmDeleteRecentWorkout() {
     .catch(err => logger.warn('[Stats] Background delete sync failed', err))
     .finally(() => {
       deletingRecentWorkout.value = false
+      // Nach dem Server-Löschen den Feedback-Verlauf still mit dem Server abgleichen.
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent(AI_FEEDBACK_UPDATED_EVENT, { detail: { workoutId } }))
+      }
     })
 }
 

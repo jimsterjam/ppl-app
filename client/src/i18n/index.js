@@ -503,6 +503,10 @@ export const messages = {
       }
     },
     workoutDetail: {
+      repTargetShort: 'Ziel {reps} Wdh.',
+      repTargetExplain: 'Ziel: {reps} Wiederholungen pro Satz. Schaffst du sie in allen Sätzen, schlägt die App beim nächsten Mal mehr Gewicht vor.',
+      weightSuggestionReason: '↑ Empfehlung: letztes Mal alle Sätze mit {reps} Wdh. geschafft',
+      weightSuggestionAria: 'Empfohlenes Gewicht: {weight} kg',
       noteEdit: 'ändern',
       noteShow: 'anzeigen',
       noteAdd: 'Notiz hinzufügen',
@@ -604,7 +608,6 @@ export const messages = {
       removeExerciseConfirmMsg: 'Alle Sätze dieser Übung werden unwiderruflich gelöscht.',
       deleteNoteConfirmTitle: 'Notiz löschen?',
       deleteNoteConfirmMsg: 'Die Notiz zu dieser Übung wird gelöscht.',
-      progressionHint: '↑ +2.5–5 kg',
       removePhotoTitle: 'Foto entfernen?',
       removePhotoMsg: 'Möchtest du das Foto wirklich entfernen?',
       removeFailedNoId: 'Bild konnte nicht entfernt werden (fehlende Übungs-ID).',
@@ -1104,6 +1107,12 @@ export const messages = {
       text: 'Diese App ist nur als mobile Anwendung verfügbar.',
       appStore: 'Zum App Store'
     },
+    workoutGoal: {
+      question: 'Dein Ziel für dieses Workout',
+      required: 'Bitte zuerst ein Ziel wählen.',
+      rangeHypertrophy: 'meist 6–12 Wdh.',
+      rangeStrength: 'meist 3–5 Wdh.'
+    },
   },
   en: {
     common: {
@@ -1587,6 +1596,10 @@ export const messages = {
       }
     },
     workoutDetail: {
+      repTargetShort: 'Target {reps} reps',
+      repTargetExplain: 'Target: {reps} reps per set. Hit them in every set and the app suggests more weight next time.',
+      weightSuggestionReason: '↑ Suggestion: you hit all sets with {reps} reps last time',
+      weightSuggestionAria: 'Suggested weight: {weight} kg',
       noteEdit: 'edit',
       noteShow: 'show',
       noteAdd: 'Add note',
@@ -1687,7 +1700,6 @@ export const messages = {
       removeExerciseConfirmMsg: 'All sets of this exercise will be permanently deleted.',
       deleteNoteConfirmTitle: 'Delete note?',
       deleteNoteConfirmMsg: 'The note for this exercise will be deleted.',
-      progressionHint: '↑ +2.5–5 kg',
       removePhotoTitle: 'Remove photo?',
       removePhotoMsg: 'Do you really want to remove the photo?',
       removeFailedNoId: 'Could not remove image (missing exercise id).',
@@ -2177,6 +2189,12 @@ export const messages = {
       title: 'Download the app',
       text: 'This app is only available as a mobile app.',
       appStore: 'Go to the App Store'
+    },
+    workoutGoal: {
+      question: 'Your goal for this workout',
+      required: 'Choose a goal first.',
+      rangeHypertrophy: 'mostly 6–12 reps',
+      rangeStrength: 'mostly 3–5 reps'
     },
   }
 }

@@ -1,3 +1,4 @@
+import { sanitizeWorkoutGoal } from './workoutGoal'
 import { buildWorkoutNotesSummary } from './workoutNotes'
 
 export function getExercisesMissingNotes(exercises = [], getNote) {
@@ -52,7 +53,10 @@ export function normalizeWorkoutForSave({ workout, exerciseNotes, sessionStopwat
     // null - niemals geschätzt oder aus anderen Feldern abgeleitet.
     athleteBodyweightKg: (typeof w.athleteBodyweightKg === 'number' && Number.isFinite(w.athleteBodyweightKg))
       ? w.athleteBodyweightKg
-      : null
+      : null,
+    // Ziel des Workouts (beim Erstellen abgefragt, siehe utils/workoutGoal.js) - null bei alten
+    // Workouts ohne Ziel.
+    goal: sanitizeWorkoutGoal(w.goal)
   }
 
   normalized.notes = buildWorkoutNotesSummary(normalized.exercises)

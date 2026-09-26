@@ -48,6 +48,7 @@ import {
 } from '../utils/workoutSanitizer.js';
 import { decideExerciseMatch } from '../utils/exerciseMatching.js';
 import { getMaxExerciseCount } from '../utils/exerciseCountTarget.js';
+import { getRepRange } from '../utils/repTargets.js';
 import { resolveEnglishExerciseName, resolveFeedbackLanguage } from '../utils/feedbackLocalization.js';
 import { createOpenAIClient, describeAiClientMode, ensureRelayAwake, markRelayContact } from '../utils/aiClientFactory.js';
 import {
@@ -2928,7 +2929,7 @@ Schema, Format und die Regeln unten.
       - Keine doppelte Hauptbewegung direkt hintereinander.
       - Genau targetExerciseCount Übungen insgesamt (Wert steht in den Parametern), maximal 1 Core-Übung und nicht an Position 1.
       - durationMinutes ist die reine Trainingszeit ohne Aufwärmen - Satzzahl und Pausen so wählen, dass das Workout hineinpasst.
-      - Für strength: Hauptübungen 3-6 Reps, längere Pausen; für hypertrophy: 6-12 Reps, moderate Pausen.
+      - Für strength: Grundübungen 3-5 Reps, Isolationsübungen 8-10 Reps, längere Pausen; für hypertrophy: Grundübungen 6-10 Reps, Isolationsübungen 10-12 Reps, moderate Pausen.
       - equipmentMode strikt beachten (gym_only, gym_plus_bodyweight, bodyweight_only).
 Schema exakt:
 {"workoutName":"string","exercises":[{"name":"string","sets":3,"reps":10,"weight":0,"rest":90}],"estimatedDuration":45,"difficulty":"beginner|advanced","notes":"string"}
@@ -3796,8 +3797,11 @@ function applyGoalRanges(exercises, goal) {
     const primary = index < 2 && !exercise.isIsolation;
     const accessory = exercise.isIsolation || exercise.demandTier === 'low';
 
+    // Wiederholungen: gleiche Bereiche wie der Gewichtsvorschlag im Workout (utils/repTargets.js),
+    // abhängig von Grundübung/Isolation - Sätze und Pausen unverändert.
+    const repsRange = getRepRange(goal, !!exercise.isIsolation);
+
     if (goal === 'strength') {
-      const repsRange = primary ? [3, 6] : accessory ? [6, 12] : [3, 8];
       const setsRange = primary ? [4, 5] : accessory ? [2, 3] : [3, 4];
       const restRange = primary ? [120, 240] : accessory ? [60, 120] : [90, 180];
       return {
@@ -3808,7 +3812,6 @@ function applyGoalRanges(exercises, goal) {
       };
     }
 
-    const repsRange = primary ? [6, 12] : [8, 15];
     const setsRange = [3, 4];
     const restRange = primary ? [60, 120] : [45, 90];
     return {

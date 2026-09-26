@@ -107,6 +107,16 @@ const workoutSchema = new mongoose.Schema({
   // Additiv/optional, null = nicht erfasst -> KI darf dann keine Aussage über Bodyweight treffen.
   athleteBodyweightKg: { type: Number, default: null },
 
+  // Ziel dieses Workouts (Muskelaufbau/Kraft) - wird beim Erstellen im Client immer abgefragt
+  // und ist danach fest. Bestimmt das Wiederholungsziel des Gewichtsvorschlags. Optional:
+  // ältere Workouts haben kein Ziel (null). Setter statt enum, damit ungültige Werte zu null
+  // werden, statt das Speichern des ganzen Workouts scheitern zu lassen.
+  goal: {
+    type: String,
+    default: null,
+    set: (v) => (v === 'hypertrophy' || v === 'strength' ? v : null)
+  },
+
   // KI-generiertes Trainings-Feedback (einmal generiert, danach wiederverwendet)
   ai_feedback: { type: String },
   ai_generated_at: { type: Date },

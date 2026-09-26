@@ -8,19 +8,11 @@
           {{ t('quickGenerator.intro') }}
         </p>
 
-        <div class="field">
-          <label>{{ t('quickGenerator.goalLabel') }}</label>
-          <div class="chip-row">
-            <button
-              v-for="opt in goalOptions"
-              :key="opt.value"
-              type="button"
-              class="chip"
-              :class="{ active: form.goal === opt.value }"
-              @click="form.goal = opt.value"
-            >{{ opt.label }}</button>
-          </div>
-        </div>
+        <!-- Ziel wird einheitlich vorher im Dashboard abgefragt (WorkoutGoalPicker.vue) und hier
+             nur angezeigt - keine zweite Abfrage. -->
+        <p class="hint goal-fixed">
+          {{ t('quickGenerator.goalLabel') }}: <strong>{{ form.goal === 'strength' ? t('quickGenerator.goalStrength') : t('quickGenerator.goalHypertrophy') }}</strong>
+        </p>
 
         <div class="field">
           <label>{{ t('quickGenerator.levelLabel') }}</label>
@@ -209,6 +201,8 @@ import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
 import { saveWorkoutBuilderPrefill, buildWorkoutBuilderRoute, normalizeBuilderWorkoutType } from '@/utils/workoutBuilderFlow'
 import { logger } from '@/utils/logger'
 import { useScrollLock } from '@/composables/useScrollLock'
+import { useSettingsStore } from '@/stores/settingsStore'
+import { sanitizeWorkoutGoal } from '@/utils/workoutGoal'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -227,8 +221,11 @@ onBeforeUnmount(unlockBodyScroll)
 // erst bei "Ins Workout übernehmen" tatsächlich in den Prefill-Speicher schreiben/navigieren.
 let pendingBuilderPrefill = null
 
+// Ziel kommt aus der Abfrage im Dashboard (Route-Query `goal`), Fallback: zuletzt gewähltes Ziel.
+const settingsStore = useSettingsStore()
+
 const form = reactive({
-  goal: 'hypertrophy',
+  goal: sanitizeWorkoutGoal(route.query?.goal) || settingsStore.lastWorkoutGoal || 'hypertrophy',
   level: 'beginner',
   requestedType: normalizeBuilderWorkoutType(route.query?.type || 'fullbody'),
   equipmentMode: 'gym_plus_bodyweight',
@@ -249,11 +246,6 @@ const manualExerciseCountSeed = computed(() => {
   if (duration <= 45) return isStrength ? 4 : 5
   return isStrength ? 4 : 6
 })
-
-const goalOptions = [
-  { value: 'hypertrophy', label: t('quickGenerator.goalHypertrophy') },
-  { value: 'strength', label: t('quickGenerator.goalStrength') }
-]
 
 const levelOptions = [
   { value: 'beginner', label: t('quickGenerator.levelBeginner') },
@@ -399,7 +391,7 @@ async function generate() {
 function confirmPreview() {
   if (!pendingBuilderPrefill) return
   saveWorkoutBuilderPrefill(pendingBuilderPrefill)
-  router.push(buildWorkoutBuilderRoute(form.requestedType, { quick: true }))
+  router.push(buildWorkoutBuilderRoute(form.requestedType, { quick: true, goal: form.goal }))
 }
 </script>
 

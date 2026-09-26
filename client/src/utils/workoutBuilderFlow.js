@@ -1,3 +1,5 @@
+import { sanitizeWorkoutGoal } from './workoutGoal'
+
 const VALID_WORKOUT_TYPES = new Set(['push', 'pull', 'legs', 'fullbody'])
 
 export const QUICK_PREFILL_KEY = 'quick_workout_prefill'
@@ -32,6 +34,11 @@ export function buildWorkoutBuilderRoute(type, options = {}) {
   if (options.favoriteAdjust === true) {
     query.favoriteAdjust = '1'
   }
+  // Ziel des neuen Workouts (im Dashboard abgefragt) bis zur Erstellung im Builder durchreichen.
+  const goal = sanitizeWorkoutGoal(options.goal)
+  if (goal) {
+    query.goal = goal
+  }
 
   return {
     name: 'workout-builder',
@@ -65,6 +72,7 @@ export function readWorkoutBuilderRouteState(routeQuery = {}) {
     type: normalizeBuilderWorkoutType(routeQuery?.type),
     quick: String(routeQuery?.quick || '') === '1',
     favoriteStart: String(routeQuery?.favoriteStart || '') === '1',
-    favoriteAdjust: String(routeQuery?.favoriteAdjust || '') === '1'
+    favoriteAdjust: String(routeQuery?.favoriteAdjust || '') === '1',
+    goal: sanitizeWorkoutGoal(routeQuery?.goal)
   }
 }

@@ -20,6 +20,9 @@ export const OFFLINE_WORKOUTS_UPDATED_EVENT = 'offline-workouts-updated'
 // die kein onMounted-Refresh mehr durchläuft) automatisch aktualisiert - siehe User-Report
 // "Feedback-Verlauf aktualisiert sich nicht automatisch".
 export const AI_FEEDBACK_UPDATED_EVENT = 'ai-feedback-updated'
+// Ein Workout wurde gelöscht (z.B. in den Stats) - detail: { workoutId }. Der Feedback-Verlauf
+// entfernt den zugehörigen Eintrag daraufhin sofort (AIFeedbackHistory.vue).
+export const WORKOUT_DELETED_EVENT = 'workout-deleted'
 const MAX_OFFLINE_WORKOUTS = 400
 const DELETED_WORKOUT_TOMBSTONES_KEY = 'deleted_workout_ids_v1'
 

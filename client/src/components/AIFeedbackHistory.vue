@@ -111,7 +111,7 @@ import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { fetchWorkoutFeedbacks, requestAiAnalysis } from '@/api/workouts'
 import { isValidObjectId } from '@/utils/workoutHelpers'
 import { logger } from '@/utils/logger'
-import { getMetadata, setMetadata, AI_FEEDBACK_UPDATED_EVENT } from '@/utils/offlineStorage'
+import { getMetadata, setMetadata, AI_FEEDBACK_UPDATED_EVENT, WORKOUT_DELETED_EVENT } from '@/utils/offlineStorage'
 import { useToastStore } from '@/stores/toastStore'
 import { logDiagnostic } from '@/utils/diagnosticsLog'
 
@@ -147,6 +147,16 @@ const error = ref(null)
 const page = ref(1)
 const hasMore = ref(false)
 const expandedId = ref(null)
+
+// User-Report: nach dem Löschen eines Workouts in den Stats blieb dessen KI-Feedback hier stehen.
+// Gelöschte Workouts werden sofort ausgeblendet und auch aus später eintreffenden Server-/Cache-
+// Ständen herausgefiltert (ein bereits laufender Refresh könnte sie sonst kurz zurückbringen).
+const deletedWorkoutIds = new Set()
+
+function withoutDeleted(list) {
+  if (!deletedWorkoutIds.size) return list
+  return list.filter((item) => !deletedWorkoutIds.has(String(item?.workoutId || '')))
+}
 // Feature "Feedback später bewerten": Zustand für den manuellen "Jetzt generieren"-Button.
 const generatingId = ref(null)
 const generateError = ref(null)
@@ -304,7 +314,7 @@ async function loadFromCache() {
   try {
     const cached = await getMetadata(cacheKey)
     if (!cached || !Array.isArray(cached.items) || cached.items.length === 0) return false
-    items.value = cached.items
+    items.value = withoutDeleted(cached.items)
     hasMore.value = Boolean(cached.hasMore)
     page.value = 1
     return true
@@ -339,7 +349,7 @@ async function load(targetPage = 1, { silent = false } = {}) {
       limit: FEEDBACK_PAGE_SIZE,
       timeoutMs: FEEDBACK_TIMEOUT_MS
     })
-    const newItems = Array.isArray(res?.items) ? res.items : []
+    const newItems = withoutDeleted(Array.isArray(res?.items) ? res.items : [])
     items.value = targetPage === 1 ? newItems : [...items.value, ...newItems]
     hasMore.value = Boolean(res?.hasMore)
     page.value = targetPage
@@ -398,9 +408,22 @@ function handleAiFeedbackUpdated() {
   load(1, { silent: true })
 }
 
+function handleWorkoutDeleted(event) {
+  const workoutId = String(event?.detail?.workoutId || '').trim()
+  if (!workoutId) return
+  deletedWorkoutIds.add(workoutId)
+  const before = items.value.length
+  items.value = withoutDeleted(items.value)
+  if (expandedId.value === workoutId) expandedId.value = null
+  if (items.value.length !== before) {
+    cacheFirstPage(items.value.slice(0, FEEDBACK_PAGE_SIZE), hasMore.value)
+  }
+}
+
 onMounted(() => {
   if (typeof window !== 'undefined') {
     window.addEventListener(AI_FEEDBACK_UPDATED_EVENT, handleAiFeedbackUpdated)
+    window.addEventListener(WORKOUT_DELETED_EVENT, handleWorkoutDeleted)
   }
   // Cache-Lesen (schnelles IndexedDB) und Netzwerk-Refresh bewusst NICHT nacheinander
   // (await ... dann erst starten), sondern parallel anstoßen - der Netzwerk-Request ist der
@@ -424,6 +447,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   if (typeof window !== 'undefined') {
     window.removeEventListener(AI_FEEDBACK_UPDATED_EVENT, handleAiFeedbackUpdated)
+    window.removeEventListener(WORKOUT_DELETED_EVENT, handleWorkoutDeleted)
   }
 })
 </script>

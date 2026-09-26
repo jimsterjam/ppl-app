@@ -26,6 +26,12 @@ bei jeder neuen Sitzung neu gelernt werden müssen. Bei Widerspruch gilt die jü
   voraussetzen; der Begriff darf in Klammern stehen bleiben.
 - **Übungsnamen sind in der ganzen App immer englisch** (Anzeige über `getTranslatedExerciseName`,
   im KI-Text über `exerciseNameForAI` / `server/utils/feedbackLocalization.js` mit Katalog-Fallback).
+- **Workout-Ziel** (Muskelaufbau/Kraft) wird bei jedem neuen Workout (Manuell/Generator) im
+  Dashboard abgefragt – erst NACH der Wahl des Weges (`WorkoutGoalPicker.vue`), als `workout.goal` gespeichert und ist im
+  laufenden Workout fest. Favoriten tragen ihr Ziel (`favorite.workout.goal`) und starten ohne
+  Abfrage; alte Favoriten ohne Ziel fragen einmal und speichern es. Ändern nur über „Anpassen".
+  Keine Einstellung dafür. Wdh.-Ziele: `REP_TARGETS`
+  (Client `utils/weightSuggestion.js` = Server `utils/repTargets.js`, per Test abgeglichen).
 - **KI-Feedback:** Text in der App-Sprache (Client schickt `language`, Server
   `resolveFeedbackLanguage`), Aufzählung in Workout-Reihenfolge (`reorderBulletLinesByExerciseOrder`),
   Zahlen im Text müssen aus den echten Trainingsdaten stammen (Verifier, `AI_VERIFIER_MODE=active`).
