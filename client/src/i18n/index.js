@@ -99,6 +99,7 @@ export const messages = {
       ariaMain: 'Hauptnavigation'
     },
   dashboard: {
+      favoriteMore: 'Weitere Aktionen',
       heroTitle: 'Bereit für dein Training?',
       title: 'Startbereich',
       // Platzhalter im Header, solange kein Anzeigename gesetzt ist - klickbar (siehe
@@ -1201,6 +1202,7 @@ export const messages = {
       ariaMain: 'Main navigation'
     },
   dashboard: {
+      favoriteMore: 'More actions',
       heroTitle: 'Ready for your workout?',
       title: 'Launchpad',
       yourNamePlaceholder: 'Your Name',

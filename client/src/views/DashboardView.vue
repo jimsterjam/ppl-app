@@ -70,41 +70,15 @@
             <div v-if="!allFavoriteWorkouts.length" class="favorite-empty">
               {{ $t('dashboard.allFavoritesEmpty') }}
             </div>
-            <div v-for="favorite in allFavoriteWorkouts" :key="favorite.id" class="favorite-item">
-              <div class="favorite-top">
-                <div class="favorite-name">
-                  {{ favorite.name }}
-                  <span class="fav-type-badge">{{ favorite.type }}</span>
-                  <span v-if="favoriteGoalLabel(favorite)" class="fav-goal-badge">{{ favoriteGoalLabel(favorite) }}</span>
-                </div>
-                <div class="favorite-date">{{ formatFavoriteDate(favorite.updatedAt || favorite.createdAt) }}</div>
+            <div v-for="favorite in allFavoriteWorkouts" :key="favorite.id" class="favorite-item favorite-item--compact">
+              <!-- Aufgeräumt (Wunsch Paul: zu viele Buttons): nur "Starten" sichtbar, Anpassen/
+                   Namen ändern/Löschen im "⋯"-Menü (favoriteMenu-Modal). -->
+              <div class="favorite-main">
+                <div class="favorite-name">{{ favorite.name }}<span class="fav-type-badge">{{ favorite.type }}</span></div>
+                <div class="favorite-meta">{{ favoriteMetaLine(favorite) }}</div>
               </div>
-              <div v-if="renamingFavoriteId === favorite.id" class="favorite-rename-row">
-                <input
-                  v-model="favoriteRenameInput"
-                  class="favorite-rename-input"
-                  type="text"
-                  maxlength="40"
-                  :placeholder="$t('dashboard.favoriteNamePlaceholder')"
-                />
-                <button class="cta-inline" type="button" @click="confirmRenameFavorite(favorite)">{{ $t('common.save') }}</button>
-                <button class="cta-inline" type="button" @click="cancelRenameFavorite">{{ $t('common.cancel') }}</button>
-              </div>
-              <div v-else class="favorite-actions">
-                <button class="cta-inline" type="button" @click="startFavoriteWorkout(favorite)">{{ $t('dashboard.favoriteStart') }}</button>
-                <button class="cta-inline" type="button" @click="adjustFavoriteWorkout(favorite)">{{ $t('dashboard.favoriteAdjust') }}</button>
-                <button class="cta-inline" type="button" @click="beginRenameFavorite(favorite)">{{ $t('dashboard.favoriteRename') }}</button>
-                <button class="cta-inline danger" type="button" @click="askRemoveFavorite(favorite)">{{ $t('dashboard.favoriteDelete') }}</button>
-              </div>
-              <!-- Favorit ohne gespeichertes Ziel (vor Einführung der Ziel-Abfrage gespeichert):
-                   einmal fragen, Ziel im Favoriten speichern, danach nie wieder. -->
-              <div v-if="pendingGoalFavoriteId === favorite.id" class="favorite-goal-prompt">
-                <WorkoutGoalPicker v-model="favoriteGoalChoice" :show-error="favoriteGoalError" />
-                <div class="favorite-actions">
-                  <button class="cta-inline" type="button" @click="confirmFavoriteGoalStart(favorite)">{{ $t('dashboard.favoriteStart') }}</button>
-                  <button class="cta-inline" type="button" @click="cancelFavoriteGoalPrompt">{{ $t('common.cancel') }}</button>
-                </div>
-              </div>
+              <button class="favorite-start-btn" type="button" @click="startFavoriteWorkout(favorite)">{{ $t('dashboard.favoriteStart') }}</button>
+              <button class="favorite-more-btn" type="button" :aria-label="$t('dashboard.favoriteMore')" @click="openFavoriteMenu(favorite)">⋯</button>
             </div>
           </div>
         </div>
@@ -131,15 +105,6 @@
             </button>
           </template>
 
-          <!-- Ziel-Abfrage erst NACH der Wahl des Weges (Wunsch Paul) - nur für neue Workouts
-               (Manuell/Generieren). Favoriten tragen ihr Ziel selbst (siehe startFavoriteWorkout). -->
-          <template v-else-if="startFlowStep === 'goal'">
-            <WorkoutGoalPicker class="goal-step-picker" v-model="selectedWorkoutGoal" :show-error="goalError" />
-            <button class="quick-mode-btn quick-mode-btn--primary" type="button" @click="confirmStartPath">
-              {{ $t('common.continue') }}
-            </button>
-            <button class="cta-inline" type="button" @click="backToStartModes">{{ $t('common.back') }}</button>
-          </template>
 
           <p v-if="favoriteInfoText" class="quick-mode-info">{{ favoriteInfoText }}</p>
 
@@ -153,42 +118,15 @@
               {{ $t('dashboard.favoritesEmpty') }}
             </div>
 
-            <div v-for="favorite in favoriteWorkouts" :key="favorite.id" class="favorite-item">
-              <div class="favorite-top">
-                <div class="favorite-name">
-                  {{ favorite.name }}
-                  <span v-if="favoriteGoalLabel(favorite)" class="fav-goal-badge">{{ favoriteGoalLabel(favorite) }}</span>
-                </div>
-                <div class="favorite-date">{{ formatFavoriteDate(favorite.updatedAt || favorite.createdAt) }}</div>
+            <div v-for="favorite in favoriteWorkouts" :key="favorite.id" class="favorite-item favorite-item--compact">
+              <!-- Aufgeräumt (Wunsch Paul: zu viele Buttons): nur "Starten" sichtbar, Anpassen/
+                   Namen ändern/Löschen im "⋯"-Menü (favoriteMenu-Modal). -->
+              <div class="favorite-main">
+                <div class="favorite-name">{{ favorite.name }}</div>
+                <div class="favorite-meta">{{ favoriteMetaLine(favorite) }}</div>
               </div>
-
-              <div v-if="renamingFavoriteId === favorite.id" class="favorite-rename-row">
-                <input
-                  v-model="favoriteRenameInput"
-                  class="favorite-rename-input"
-                  type="text"
-                  maxlength="40"
-                  :placeholder="$t('dashboard.favoriteNamePlaceholder')"
-                />
-                <button class="cta-inline" type="button" @click="confirmRenameFavorite(favorite)">{{ $t('common.save') }}</button>
-                <button class="cta-inline" type="button" @click="cancelRenameFavorite">{{ $t('common.cancel') }}</button>
-              </div>
-
-              <div v-else class="favorite-actions">
-                <button class="cta-inline" type="button" @click="startFavoriteWorkout(favorite)">{{ $t('dashboard.favoriteStart') }}</button>
-                <button class="cta-inline" type="button" @click="adjustFavoriteWorkout(favorite)">{{ $t('dashboard.favoriteAdjust') }}</button>
-                <button class="cta-inline" type="button" @click="beginRenameFavorite(favorite)">{{ $t('dashboard.favoriteRename') }}</button>
-                <button class="cta-inline danger" type="button" @click="askRemoveFavorite(favorite)">{{ $t('dashboard.favoriteDelete') }}</button>
-              </div>
-              <!-- Favorit ohne gespeichertes Ziel (vor Einführung der Ziel-Abfrage gespeichert):
-                   einmal fragen, Ziel im Favoriten speichern, danach nie wieder. -->
-              <div v-if="pendingGoalFavoriteId === favorite.id" class="favorite-goal-prompt">
-                <WorkoutGoalPicker v-model="favoriteGoalChoice" :show-error="favoriteGoalError" />
-                <div class="favorite-actions">
-                  <button class="cta-inline" type="button" @click="confirmFavoriteGoalStart(favorite)">{{ $t('dashboard.favoriteStart') }}</button>
-                  <button class="cta-inline" type="button" @click="cancelFavoriteGoalPrompt">{{ $t('common.cancel') }}</button>
-                </div>
-              </div>
+              <button class="favorite-start-btn" type="button" @click="startFavoriteWorkout(favorite)">{{ $t('dashboard.favoriteStart') }}</button>
+              <button class="favorite-more-btn" type="button" :aria-label="$t('dashboard.favoriteMore')" @click="openFavoriteMenu(favorite)">⋯</button>
             </div>
           </div>
         </div>
@@ -210,6 +148,50 @@
       </div>
 
     </main>
+
+    <!-- Ziel-Abfrage als eigenes Fenster (Wunsch Paul: rest tritt in den Hintergrund, kein
+         Scrollen). Für Manuell, Generieren und Favoriten ohne gespeichertes Ziel. -->
+    <AppModal
+      v-model="showGoalModal"
+      :title="$t('workoutGoal.question')"
+      :confirm-text="$t('dashboard.favoriteStart')"
+      :cancel-text="$t('common.cancel')"
+      :close-on-confirm="false"
+      type="info"
+      @confirm="confirmGoalModal"
+      @cancel="closeGoalModal"
+    >
+      <WorkoutGoalPicker v-model="goalModalChoice" :show-error="goalModalError" hide-question />
+    </AppModal>
+
+    <!-- "⋯"-Menü eines Favoriten: Anpassen, Namen ändern (im Fenster), Löschen. -->
+    <AppModal
+      v-model="showFavoriteMenu"
+      :title="favoriteMenuTarget?.name || ''"
+      :confirm-text="favoriteMenuRenaming ? $t('common.save') : $t('common.close')"
+      :cancel-text="$t('common.cancel')"
+      :show-cancel="favoriteMenuRenaming"
+      :close-on-confirm="false"
+      type="info"
+      @confirm="onFavoriteMenuConfirm"
+      @cancel="closeFavoriteMenu"
+    >
+      <div v-if="!favoriteMenuRenaming" class="favorite-menu-actions">
+        <button class="favorite-menu-btn" type="button" @click="favoriteMenuAdjust">{{ $t('dashboard.favoriteAdjust') }}</button>
+        <button class="favorite-menu-btn" type="button" @click="favoriteMenuBeginRename">{{ $t('dashboard.favoriteRename') }}</button>
+        <button class="favorite-menu-btn favorite-menu-btn--danger" type="button" @click="favoriteMenuDelete">{{ $t('dashboard.favoriteDelete') }}</button>
+      </div>
+      <div v-else class="favorite-menu-rename">
+        <input
+          v-model="favoriteRenameInput"
+          class="favorite-rename-input"
+          type="text"
+          maxlength="40"
+          :placeholder="$t('dashboard.favoriteNamePlaceholder')"
+        />
+        <p v-if="favoriteMenuError" class="favorite-menu-error">{{ favoriteMenuError }}</p>
+      </div>
+    </AppModal>
 
     <AppModal
       v-model="showInfoModal"
@@ -685,25 +667,6 @@ function startQuick(type, goal) {
   router.push(buildWorkoutBuilderRoute(normalizeBuilderWorkoutType(type), { goal }))
 }
 
-// --- Ziel-Abfrage (WorkoutGoalPicker) -------------------------------------------------------
-// Jedes neue Workout bekommt ein Ziel - ohne Auswahl geht es nicht weiter. Vorauswahl ist das
-// zuletzt gewählte Ziel (settingsStore.lastWorkoutGoal), damit man meist nur bestätigt.
-const selectedWorkoutGoal = ref(sanitizeWorkoutGoal(settings.lastWorkoutGoal) || '')
-const goalError = ref(false)
-
-watch(selectedWorkoutGoal, (goal) => {
-  if (goal) goalError.value = false
-})
-
-function requireWorkoutGoal() {
-  const goal = sanitizeWorkoutGoal(selectedWorkoutGoal.value)
-  if (!goal) {
-    goalError.value = true
-    return null
-  }
-  settings.setLastWorkoutGoal(goal)
-  return goal
-}
 
 function openStartMode(type) {
   pendingWorkoutType.value = normalizeBuilderWorkoutType(type)
@@ -715,52 +678,54 @@ function openStartMode(type) {
 
 function closeStartModePanel() {
   startFlowStep.value = 'idle'
-  goalError.value = false
-  pendingGoalFavoriteId.value = null
-  pendingStartPath.value = null
   favoriteInfoText.value = ''
   renamingFavoriteId.value = null
   favoriteRenameInput.value = ''
 }
 
-// Ablauf neues Workout: Weg wählen (Manuell/Generieren) -> Ziel wählen -> Weiter.
-const pendingStartPath = ref(null)
+// Ablauf neues Workout: Weg wählen (Manuell/Generieren) -> Ziel-Fenster -> Starten.
+// Favoriten ohne gespeichertes Ziel nutzen dasselbe Fenster (goalModalContext.kind === 'favorite').
+const showGoalModal = ref(false)
+const goalModalChoice = ref('')
+const goalModalError = ref(false)
+const goalModalContext = ref(null)
 
-// User-Report: die Ziel-Abfrage erschien teils unterhalb des sichtbaren Bereichs und man musste
-// erst scrollen. Nach dem Einblenden daher direkt in den sichtbaren Bereich holen (mittig, damit
-// weder Header noch Bottom-Nav sie verdecken).
-function revealGoalPrompt(selector) {
-  nextTick(() => {
-    const el = typeof document !== 'undefined' ? document.querySelector(selector) : null
-    if (!el || typeof el.scrollIntoView !== 'function') return
-    try {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    } catch {
-      el.scrollIntoView()
-    }
-  })
+watch(goalModalChoice, (goal) => {
+  if (goal) goalModalError.value = false
+})
+
+function openGoalModal(context) {
+  goalModalContext.value = context
+  goalModalChoice.value = sanitizeWorkoutGoal(settings.lastWorkoutGoal) || ''
+  goalModalError.value = false
+  showGoalModal.value = true
+}
+
+function closeGoalModal() {
+  showGoalModal.value = false
+  goalModalContext.value = null
 }
 
 function chooseStartPath(path) {
-  pendingStartPath.value = path
-  goalError.value = false
-  startFlowStep.value = 'goal'
-  revealGoalPrompt('.goal-step-picker')
+  openGoalModal({ kind: 'path', path })
 }
 
-function backToStartModes() {
-  pendingStartPath.value = null
-  goalError.value = false
-  startFlowStep.value = 'mode'
-}
-
-function confirmStartPath() {
-  const goal = requireWorkoutGoal()
-  if (!goal) return
+function confirmGoalModal() {
+  const goal = sanitizeWorkoutGoal(goalModalChoice.value)
+  if (!goal) {
+    goalModalError.value = true
+    return
+  }
+  settings.setLastWorkoutGoal(goal)
+  const context = goalModalContext.value
+  closeGoalModal()
+  if (context?.kind === 'favorite') {
+    startFavoriteWithNewGoal(context.favorite, goal)
+    return
+  }
   const type = pendingWorkoutType.value
-  const path = pendingStartPath.value
   closeStartModePanel()
-  if (path === 'generate') {
+  if (context?.path === 'generate') {
     router.push({ name: 'quick-workout-generator', query: { type, goal } })
   } else {
     startQuick(type, goal)
@@ -793,9 +758,6 @@ function openAllFavorites() {
 
 function closeAllFavoritesPanel() {
   startFlowStep.value = 'idle'
-  goalError.value = false
-  pendingGoalFavoriteId.value = null
-  pendingStartPath.value = null
   favoriteInfoText.value = ''
   renamingFavoriteId.value = null
   favoriteRenameInput.value = ''
@@ -846,16 +808,8 @@ async function openFavoriteAdjustInDetail(favorite) {
 }
 
 // --- Ziel bei Favoriten ------------------------------------------------------------------
-// Favorit mit gespeichertem Ziel startet direkt damit. Ohne Ziel (alte Favoriten) wird einmal
-// gefragt und das Ziel sofort im Favoriten gespeichert.
-const pendingGoalFavoriteId = ref(null)
-const favoriteGoalChoice = ref('')
-const favoriteGoalError = ref(false)
-
-watch(favoriteGoalChoice, (goal) => {
-  if (goal) favoriteGoalError.value = false
-})
-
+// Favorit mit gespeichertem Ziel startet direkt damit. Ohne Ziel (alte Favoriten) erscheint das
+// Ziel-Fenster einmal; das Ziel wird sofort im Favoriten gespeichert.
 function favoriteGoalOf(favorite) {
   return sanitizeWorkoutGoal(favorite?.workout?.goal)
 }
@@ -866,17 +820,13 @@ function favoriteGoalLabel(favorite) {
   return goal === 'strength' ? $t('quickGenerator.goalStrength') : $t('quickGenerator.goalHypertrophy')
 }
 
-function cancelFavoriteGoalPrompt() {
-  pendingGoalFavoriteId.value = null
-  favoriteGoalError.value = false
+function favoriteMetaLine(favorite) {
+  return [favoriteGoalLabel(favorite), formatFavoriteDate(favorite?.updatedAt || favorite?.createdAt)]
+    .filter(Boolean)
+    .join(' · ')
 }
 
-function confirmFavoriteGoalStart(favorite) {
-  const goal = sanitizeWorkoutGoal(favoriteGoalChoice.value)
-  if (!goal) {
-    favoriteGoalError.value = true
-    return
-  }
+function startFavoriteWithNewGoal(favorite, goal) {
   const result = updateFavoriteWorkout({
     userId: getCurrentFavoritesUserId(),
     type: favorite?.type,
@@ -887,8 +837,6 @@ function confirmFavoriteGoalStart(favorite) {
   if (!result?.success) {
     logger.warn('[Dashboard] Ziel konnte nicht im Favoriten gespeichert werden', result?.code)
   }
-  settings.setLastWorkoutGoal(goal)
-  cancelFavoriteGoalPrompt()
   const updated = result?.success && result.favorite ? result.favorite : { ...favorite, workout: { ...(favorite?.workout || {}), goal } }
   try {
     openFavoriteInBuilder(updated, { autoStart: true, goal })
@@ -897,13 +845,62 @@ function confirmFavoriteGoalStart(favorite) {
   }
 }
 
+// --- "⋯"-Menü eines Favoriten -------------------------------------------------------------
+const showFavoriteMenu = ref(false)
+const favoriteMenuTarget = ref(null)
+const favoriteMenuRenaming = ref(false)
+const favoriteMenuError = ref('')
+
+function openFavoriteMenu(favorite) {
+  favoriteMenuTarget.value = favorite
+  favoriteMenuRenaming.value = false
+  favoriteMenuError.value = ''
+  showFavoriteMenu.value = true
+}
+
+function closeFavoriteMenu() {
+  showFavoriteMenu.value = false
+  favoriteMenuRenaming.value = false
+  favoriteMenuError.value = ''
+  renamingFavoriteId.value = null
+  favoriteRenameInput.value = ''
+}
+
+function favoriteMenuAdjust() {
+  const favorite = favoriteMenuTarget.value
+  closeFavoriteMenu()
+  if (favorite) adjustFavoriteWorkout(favorite)
+}
+
+function favoriteMenuBeginRename() {
+  beginRenameFavorite(favoriteMenuTarget.value)
+  favoriteMenuRenaming.value = true
+}
+
+function favoriteMenuDelete() {
+  const favorite = favoriteMenuTarget.value
+  closeFavoriteMenu()
+  if (favorite) askRemoveFavorite(favorite)
+}
+
+function onFavoriteMenuConfirm() {
+  if (!favoriteMenuRenaming.value) {
+    closeFavoriteMenu()
+    return
+  }
+  const validationError = getFavoriteNameValidationError(favoriteRenameInput.value)
+  if (validationError) {
+    favoriteMenuError.value = validationError
+    return
+  }
+  confirmRenameFavorite(favoriteMenuTarget.value)
+  closeFavoriteMenu()
+}
+
 function startFavoriteWorkout(favorite) {
   const goal = favoriteGoalOf(favorite)
   if (!goal) {
-    pendingGoalFavoriteId.value = favorite?.id || null
-    favoriteGoalChoice.value = sanitizeWorkoutGoal(settings.lastWorkoutGoal) || ''
-    favoriteGoalError.value = false
-    revealGoalPrompt('.favorite-goal-prompt')
+    openGoalModal({ kind: 'favorite', favorite })
     return
   }
   try {
@@ -1289,22 +1286,86 @@ onActivated(async () => {
   box-shadow: var(--shadow-soft);
 }
 
-.favorite-goal-prompt {
+.favorite-item--compact {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.favorite-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.favorite-main .favorite-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.favorite-meta {
+  margin-top: 2px;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.favorite-start-btn {
+  flex-shrink: 0;
+  min-height: 40px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 10px;
+  background: var(--accent);
+  color: var(--accent-contrast, #060606);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.favorite-more-btn {
+  flex-shrink: 0;
+  width: 40px;
+  min-height: 40px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.favorite-menu-actions {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-top: 8px;
 }
 
-.fav-goal-badge {
-  margin-left: 6px;
-  padding: 1px 7px;
-  border-radius: 999px;
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: var(--accent);
-  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
-  white-space: nowrap;
+.favorite-menu-btn {
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.favorite-menu-btn--danger {
+  border-color: var(--danger);
+  color: var(--danger-text, var(--danger));
+}
+
+.favorite-menu-rename .favorite-rename-input {
+  width: 100%;
+}
+
+.favorite-menu-error {
+  margin: 6px 0 0;
+  font-size: 0.8rem;
+  color: var(--danger-text, var(--danger));
 }
 
 .quick-mode-head {

@@ -3,7 +3,7 @@
        Generator, siehe DashboardView.vue). Das gewählte Ziel wird am Workout gespeichert und ist
        im laufenden Workout fest (utils/workoutGoal.js). -->
   <div class="goal-picker">
-    <p class="goal-picker-question">{{ t('workoutGoal.question') }}</p>
+    <p v-if="!hideQuestion" class="goal-picker-question">{{ t('workoutGoal.question') }}</p>
     <div class="goal-picker-options" role="radiogroup" :aria-label="t('workoutGoal.question')">
       <button
         v-for="opt in options"
@@ -29,7 +29,9 @@ import { useI18n } from 'vue-i18n'
 
 defineProps({
   modelValue: { type: String, default: '' },
-  showError: { type: Boolean, default: false }
+  showError: { type: Boolean, default: false },
+  // Im Fenster steht die Frage bereits als Titel.
+  hideQuestion: { type: Boolean, default: false }
 })
 defineEmits(['update:modelValue'])
 
