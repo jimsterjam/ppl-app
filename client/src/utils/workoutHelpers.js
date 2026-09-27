@@ -245,7 +245,8 @@ export function snapshotCore(w) {
         exerciseId: ex.exerciseId,
         name: ex.name,
         muscleGroup: ex.muscleGroup,
-        setDetails: (ex.setDetails || []).map(s => ({ reps: s.reps, weight: s.weight }))
+        // done nur, wenn abgehakt - so bleiben Snapshots alter Daten (ohne Feld) unverändert.
+        setDetails: (ex.setDetails || []).map(s => ({ reps: s.reps, weight: s.weight, ...(s.done === true ? { done: true } : {}) }))
       }))
     }
     return JSON.stringify(core)

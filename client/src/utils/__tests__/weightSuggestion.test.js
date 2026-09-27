@@ -4,6 +4,7 @@ import {
   getRepTarget,
   getWeightSuggestion,
   getSuggestionForSet,
+  getProgressionStatus,
   normalizeTrainingGoal
 } from '../weightSuggestion.js'
 
@@ -107,10 +108,44 @@ describe('getWeightSuggestion', () => {
     expect(getWeightSuggestion(squat, three, 'strength')?.suggestedWeights).toEqual([102.5, 102.5, 102.5])
   })
 
+  it('nicht abgehakte Sätze (done: false) zählen nicht', () => {
+    const last = session([{ reps: 5, weight: 100 }, { reps: 5, weight: 100 }, { reps: 2, weight: 100, done: false }])
+    expect(getWeightSuggestion(squat, last, 'strength')?.suggestedWeights).toEqual([102.5, 102.5])
+  })
+
   it('getSuggestionForSet: mehr Sätze als letztes Mal -> letzter Wert', () => {
     const suggestion = { suggestedWeights: [62.5, 65] }
     expect(getSuggestionForSet(suggestion, 0)).toBe(62.5)
     expect(getSuggestionForSet(suggestion, 3)).toBe(65)
     expect(getSuggestionForSet(null, 0)).toBeNull()
+  })
+})
+
+describe('getProgressionStatus', () => {
+  const at100 = (reps) => session(reps.map((r) => ({ reps: r, weight: 100 })))
+
+  it('5/5/5/5/5 -> Steigern mit Vorschlag', () => {
+    const s = getProgressionStatus(squat, at100([5, 5, 5, 5, 5]), 'strength')
+    expect(s).toMatchObject({ state: 'increase', weight: 100, targetReps: 5, sets: 5 })
+    expect(s.suggestion.suggestedWeights[0]).toBe(102.5)
+  })
+
+  it('5/5/5/5/4 -> Knapp dran', () => {
+    expect(getProgressionStatus(squat, at100([5, 5, 5, 5, 4]), 'strength')).toMatchObject({ state: 'close', missingReps: 1, suggestion: null })
+  })
+
+  it('5/5/4/4/3 -> Halten mit 21 von 25', () => {
+    expect(getProgressionStatus(squat, at100([5, 5, 4, 4, 3]), 'strength')).toMatchObject({ state: 'hold', totalReps: 21, targetTotal: 25 })
+  })
+
+  it('zwei Sätze je 1 Wdh. zu wenig -> Halten, nicht Knapp dran', () => {
+    expect(getProgressionStatus(squat, at100([5, 5, 5, 4, 4]), 'strength')?.state).toBe('hold')
+  })
+
+  it('unterschiedliche Gewichte / keine Historie / Körpergewicht -> null', () => {
+    const mixed = session([100, 100, 95].map((weight) => ({ reps: 5, weight })))
+    expect(getProgressionStatus(squat, mixed, 'strength')).toBeNull()
+    expect(getProgressionStatus(squat, null, 'strength')).toBeNull()
+    expect(getProgressionStatus({ ...squat, equipment: 'Körpergewicht' }, at100([5, 5]), 'strength')).toBeNull()
   })
 })

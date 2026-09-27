@@ -23,7 +23,7 @@ function matchKeys(exercise = {}) {
 
 function hasWorkingSets(exercise = {}) {
   const sets = Array.isArray(exercise?.setDetails) ? exercise.setDetails : []
-  return sets.some((set) => set && !set.isWarmup && (Number(set.reps) || 0) > 0)
+  return sets.some((set) => set && !set.isWarmup && set.done !== false && (Number(set.reps) || 0) > 0)
 }
 
 /** Vorbereitete Liste der Kandidaten-Workouts (einmal pro geöffnetem Workout berechnen). */

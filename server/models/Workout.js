@@ -71,7 +71,11 @@ const workoutSchema = new mongoose.Schema({
       weight: Number,
       restTime: Number, // in Sekunden
       notes: String,
-      isWarmup: { type: Boolean, default: false }
+      isWarmup: { type: Boolean, default: false },
+      // Im laufenden Workout abgehakt (Client: Satznummer antippen). Bewusst OHNE Default: fehlt
+      // das Feld (alle Workouts vor dieser Änderung), gilt der Satz als gemacht. Beim finalen
+      // Speichern bleiben nur abgehakte Sätze übrig (Client "Kurz prüfen").
+      done: { type: Boolean }
     }]
   }],
   date: {

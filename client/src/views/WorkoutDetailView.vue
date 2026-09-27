@@ -322,8 +322,19 @@
                 v-for="(row, rIdx) in (ex.setDetails || [])"
                 :key="`${ex.exerciseId || i}-row-${rIdx}`"
               >
-                <div v-if="row.isWarmup" class="set-row warmup-row" :data-set-index="rIdx">
-                  <span class="col set">{{ getSetLabel(ex.setDetails, rIdx) }}</span>
+                <div v-if="row.isWarmup" class="set-row warmup-row" :class="{ 'set-row--open': !isRowDone(row) }" :data-set-index="rIdx">
+                  <span class="col set">
+                    <button
+                      v-if="setTrackingActive"
+                      type="button"
+                      class="set-done-btn"
+                      :class="{ done: isRowDone(row) }"
+                      :aria-pressed="isRowDone(row)"
+                      :aria-label="t(isRowDone(row) ? 'workoutDetail.setUndoneAria' : 'workoutDetail.setDoneAria', { set: getSetLabel(ex.setDetails, rIdx) })"
+                      @click="toggleRowDone(row)"
+                    >{{ isRowDone(row) ? '✓' : getSetLabel(ex.setDetails, rIdx) }}</button>
+                    <template v-else>{{ getSetLabel(ex.setDetails, rIdx) }}</template>
+                  </span>
                   <span class="col reps">
                     <div class="number-with-spinner">
                         <input
@@ -439,9 +450,20 @@
                 v-for="(row, rIdx) in (ex.setDetails || [])"
                 :key="`${ex.exerciseId || i}-working-row-${rIdx}`"
               >
-                <div v-if="!row.isWarmup" class="set-row" :class="{ 'set-row-empty': isRowEmpty(row) }" :data-set-index="rIdx">
+                <div v-if="!row.isWarmup" class="set-row" :class="{ 'set-row-empty': isRowEmpty(row), 'set-row--open': !isRowDone(row) }" :data-set-index="rIdx">
                   <span class="col set">
-                    {{ getSetLabel(ex.setDetails, rIdx) }}
+                    <!-- Abhaken (laufendes Workout): Nummer antippen = Satz gemacht, nochmal = zurück.
+                         Nicht abgehakte Sätze erscheinen grau (übernommene Werte vom letzten Mal). -->
+                    <button
+                      v-if="setTrackingActive"
+                      type="button"
+                      class="set-done-btn"
+                      :class="{ done: isRowDone(row) }"
+                      :aria-pressed="isRowDone(row)"
+                      :aria-label="t(isRowDone(row) ? 'workoutDetail.setUndoneAria' : 'workoutDetail.setDoneAria', { set: getSetLabel(ex.setDetails, rIdx) })"
+                      @click="toggleRowDone(row)"
+                    >{{ isRowDone(row) ? '✓' : getSetLabel(ex.setDetails, rIdx) }}</button>
+                    <template v-else>{{ getSetLabel(ex.setDetails, rIdx) }}</template>
                   </span>
                   <span class="col reps">
                     <div class="number-with-spinner">
@@ -556,9 +578,7 @@
               </template>
 
               <p v-if="showProgressionHints && repTargetsByIndex[i]" class="progression-hint-line">
-                <span>{{ suggestionsByIndex[i]
-                  ? t('workoutDetail.weightSuggestionReason', { reps: suggestionsByIndex[i].targetReps })
-                  : t('workoutDetail.repTargetExplain', { reps: repTargetsByIndex[i].target }) }}</span>
+                <span>{{ progressionHintText(i) }}</span>
                 <!-- Erklärung (FAQ-Text) als Fenster direkt im Workout: kein Seitenwechsel, laufende
                      Stoppuhr/Timer bleiben unberührt. -->
                 <button
@@ -667,28 +687,54 @@
       </label>
     </AppModal> -->
 
-    <!-- Bestätigungsmodal: Notizen zu einer oder mehreren Übungen fehlen - Notizen sind
-         wichtiger Kontext für die AI-Analyse, deshalb hier nochmal nachfragen statt still zu
-         speichern. -->
+    <!-- "Kurz prüfen" vor dem finalen Speichern (utils/saveReview.js): vergessene Sätze,
+         auffällige Werte, fehlendes Feedback in EINEM Fenster. Blockiert nie. Tipp auf einen
+         Eintrag schließt das Fenster und springt zur Übung (nichts wird gespeichert). -->
     <AppModal
-      v-model="showMissingNotesModal"
-      :title="t('workoutDetail.missingNotesTitle')"
-      :confirm-text="t('workoutDetail.missingNotesConfirm')"
-      :cancel-text="t('workoutDetail.missingNotesCancel')"
-      :extra-text="t('workoutDetail.missingNotesDefer')"
+      v-model="showSaveReviewModal"
+      :title="t('workoutDetail.reviewTitle')"
+      :confirm-text="saveReview.hasOpenSets ? t('workoutDetail.reviewRemoveOpen') : t('workoutDetail.reviewSaveAnyway')"
+      :cancel-text="t('workoutDetail.reviewBack')"
+      :extra-text="saveReview.hasOpenSets ? t('workoutDetail.reviewMarkAllDone') : ''"
       type="warning"
-      @confirm="confirmSaveDespiteMissingNotes"
-      @extra="confirmDeferFeedback"
+      @confirm="onReviewConfirm"
+      @extra="onReviewMarkAllDone"
     >
-      <p>{{ t('workoutDetail.missingNotesMessage') }}</p>
-      <ul class="missing-notes-list">
-        <li v-for="name in missingNotesExerciseNames" :key="name">{{ name }}</li>
-      </ul>
-      <!-- Erklärt sofort die Konsequenz der Zurückstellen-Option (Moment 1) - ohne diesen Satz
-           weiß der Nutzer in genau diesem Moment nicht, dass/wo er das Feedback nachholen kann. -->
-      <p class="missing-notes-defer-hint">
-        {{ t('workoutDetail.missingNotesDeferHint') }}
-      </p>
+      <div v-if="saveReview.forgotten.length" class="review-group">
+        <div class="review-group-title">{{ t('workoutDetail.reviewForgotten') }}</div>
+        <button
+          v-for="(item, k) in saveReview.forgotten"
+          :key="`f-${k}`"
+          type="button"
+          class="review-item"
+          @click="jumpToExerciseFromReview(item.exIndex)"
+        >
+          <span>{{ reviewItemText(item) }}</span>
+          <span class="review-item-chevron" aria-hidden="true">›</span>
+        </button>
+      </div>
+      <div v-if="saveReview.check.length" class="review-group">
+        <div class="review-group-title">{{ t('workoutDetail.reviewCheck') }}</div>
+        <button
+          v-for="(item, k) in saveReview.check"
+          :key="`c-${k}`"
+          type="button"
+          class="review-item"
+          @click="jumpToExerciseFromReview(item.exIndex)"
+        >
+          <span>{{ reviewItemText(item) }}</span>
+          <span class="review-item-chevron" aria-hidden="true">›</span>
+        </button>
+      </div>
+      <!-- Früher eigener Button "Später bewerten" im Feedback-Fenster - jetzt als Häkchen,
+           damit alles in einem Fenster bleibt. Nur sichtbar, wenn Feedback fehlt. -->
+      <label v-if="saveReview.check.some((c) => c.kind === 'missingFeedback')" class="review-defer">
+        <input v-model="reviewDeferAi" type="checkbox" />
+        <span>
+          {{ t('workoutDetail.reviewDeferAi') }}
+          <small>{{ t('workoutDetail.missingNotesDeferHint') }}</small>
+        </span>
+      </label>
     </AppModal>
 
     <AppModal
@@ -850,7 +896,7 @@ import { getCurrentInstance } from 'vue'
 import NumberPicker from '@/components/NumberPicker.vue'
 import { useExerciseTranslation, getEnglishExerciseName } from '@/utils/exerciseTranslation'
 import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
-import { getRepTarget, getWeightSuggestion, getSuggestionForSet, isNoLoadExercise } from '@/utils/weightSuggestion'
+import { getRepTarget, getProgressionStatus, getSuggestionForSet, isNoLoadExercise } from '@/utils/weightSuggestion'
 import { prepareHistoryCandidates, findLastSessionExercise } from '@/utils/lastSessionLookup'
 import { sanitizeWorkoutGoal } from '@/utils/workoutGoal'
 import WorkoutGoalPicker from '@/components/WorkoutGoalPicker.vue'
@@ -903,10 +949,8 @@ import {
   readDetailViewState as readDetailViewStateUtil,
   writeDetailViewState as writeDetailViewStateUtil
 } from '@/utils/workoutDetailPersistState'
-import {
-  getExercisesMissingNotes,
-  normalizeWorkoutForSave
-} from '@/utils/workoutDetailSaveFlow'
+import { normalizeWorkoutForSave } from '@/utils/workoutDetailSaveFlow'
+import { buildSaveReview, removeOpenSets, markAllSetsDone } from '@/utils/saveReview'
 import {
   shouldKeepAsDraft as shouldKeepAsDraftUtil,
   clearActiveDraftForCurrentUser as clearActiveDraftForCurrentUserUtil,
@@ -1076,15 +1120,15 @@ const oneRepMaxByExerciseName = ref({})
 const oneRepMaxInputs = ref([])
 const oneRepMaxSaving = ref([])
 
-// Bestätigungsgate vor dem finalen Speichern: warnt, wenn zu Übungen mit geloggten Sätzen
-// keine (oder nur leere) Notiz existiert - Notizen sind wichtiger Kontext für die spätere
-// AI-Analyse, sollen also nicht versehentlich leer gespeichert werden. Der User kann
-// entweder abbrechen (zurück zu den Notizen) oder trotzdem speichern.
-const showMissingNotesModal = ref(false)
-const missingNotesExerciseNames = ref([])
+// "Kurz prüfen" vor dem finalen Speichern (utils/saveReview.js, ersetzt das frühere reine
+// Notizen-Fenster): vergessene Sätze, auffällige Werte, fehlendes Feedback. Der User kann
+// zurück zur Übung springen oder trotzdem speichern.
+const showSaveReviewModal = ref(false)
+const saveReview = ref({ forgotten: [], check: [], hasOpenSets: false, isEmpty: true })
+const reviewDeferAi = ref(false)
 let notesCheckAcknowledged = false
 // Merkt sich die gewählte Speicher-Option ("nur speichern" vs. "speichern + Favorit
-// aktualisieren"), während der Notizen-Check/Timer-Guard-Dialog dazwischenkommt, damit die
+// aktualisieren"), während der Prüf-/Timer-Guard-Dialog dazwischenkommt, damit die
 // ursprüngliche Nutzerwahl beim tatsächlichen Speichern (performSaveWorkout) erhalten bleibt.
 let pendingUpdateFavoriteOnSave = false
 // Mobile detection (treat app as mobile-only if touch available or narrow)
@@ -1754,11 +1798,67 @@ async function saveOneRepMaxForExercise(idx) {
   }
 }
 
-// Liefert die Namen aller Übungen, zu denen mindestens ein Satz geloggt wurde, aber deren
-// Notiz leer/nur Whitespace ist. Grundlage für das Bestätigungsmodal vor dem finalen
-// Speichern (showMissingNotesModal) - siehe saveWorkout().
-function getExercisesMissingNotesForCurrentWorkout() {
-  return getExercisesMissingNotes(workout.value?.exercises || [], getNote)
+// --- "Kurz prüfen" vor dem Speichern (utils/saveReview.js) -------------------------------
+function computeSaveReview() {
+  return buildSaveReview({
+    exercises: workout.value?.exercises || [],
+    trackingActive: setTrackingActive.value,
+    getNote,
+    lastSessions: lastSessionByIndex.value,
+    repTargets: repTargetsByIndex.value,
+    noLoad: progressionInfoByIndex.value.map((info) => isNoLoadExercise(info))
+  })
+}
+
+function reviewItemText(item) {
+  const params = {
+    name: getTranslatedExerciseName(item.name),
+    sets: item.sets,
+    set: item.set,
+    weight: formatKg(item.weight),
+    lastWeight: formatKg(item.lastWeight),
+    reps: item.reps,
+    target: item.target
+  }
+  const keys = {
+    openSets: item.count === 1 ? 'reviewOpenSet' : 'reviewOpenSets',
+    noSets: 'reviewNoSets',
+    weightOutlier: 'reviewWeightOutlier',
+    zeroWeight: 'reviewZeroWeight',
+    zeroReps: 'reviewZeroReps',
+    repsOutlier: 'reviewRepsOutlier',
+    missingFeedback: 'reviewMissingFeedback'
+  }
+  return t(`workoutDetail.${keys[item.kind] || 'reviewMissingFeedback'}`, params)
+}
+
+function proceedAfterReview() {
+  notesCheckAcknowledged = true
+  saveWorkout(pendingUpdateFavoriteOnSave, { deferAiFeedback: reviewDeferAi.value })
+}
+
+// Hervorgehobener Button: mit offenen Sätzen "Nicht abgehakte entfernen", sonst "Trotzdem speichern".
+function onReviewConfirm() {
+  if (saveReview.value.hasOpenSets && workout.value) {
+    workout.value.exercises = removeOpenSets(workout.value.exercises)
+  }
+  proceedAfterReview()
+}
+
+function onReviewMarkAllDone() {
+  if (workout.value) workout.value.exercises = markAllSetsDone(workout.value.exercises)
+  proceedAfterReview()
+}
+
+// Tipp auf einen Eintrag: Fenster zu, zur Übung scrollen - es wird nichts gespeichert, Stoppuhr
+// und Timer laufen weiter.
+function jumpToExerciseFromReview(exIndex) {
+  showSaveReviewModal.value = false
+  nextTick(() => {
+    try {
+      document.querySelector(`[data-ex-index="${exIndex}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    } catch {}
+  })
 }
 
 // --- Kompakte Titelzeile ------------------------------------------------------
@@ -1819,6 +1919,23 @@ const favoriteAdjustGoal = computed({
 const showProgressionHints = computed(() =>
   !!workout.value && workout.value.completed !== true && !isFavoriteAdjustMode.value
 )
+
+// --- Sätze abhaken ------------------------------------------------------------------------
+// Nur im laufenden Workout (gleiche Bedingung wie die Progressions-Hinweise). Beim Bearbeiten
+// abgeschlossener Workouts und im Favoriten-Anpassen-Modus gelten alle Sätze als gemacht.
+// Im laufenden Workout zählt nur done === true (vorausgefüllte Sätze haben kein done-Feld).
+const setTrackingActive = showProgressionHints
+
+function isRowDone(row) {
+  if (!setTrackingActive.value) return true
+  return row?.done === true
+}
+
+function toggleRowDone(row) {
+  if (!row || !setTrackingActive.value) return
+  row.done = !isRowDone(row)
+  try { triggerAutoSave() } catch {}
+}
 
 async function loadProgressionData() {
   const currentId = String(workout.value?._id || workout.value?.id || '')
@@ -1887,16 +2004,37 @@ const repTargetsByIndex = computed(() =>
 // Erklärfenster zum Gewichtsvorschlag (ⓘ neben der Hinweiszeile, Text = FAQ-Eintrag).
 const showWeightSuggestionInfo = ref(false)
 
-const suggestionsByIndex = computed(() => {
+// Dieselbe Übung aus der letzten abgeschlossenen Session (Basis für Hinweiszeile, Chip und die
+// Speicher-Prüfung "Gewicht auffällig").
+const lastSessionByIndex = computed(() => {
   const candidates = progressionHistory.value
-  return (workout.value?.exercises || []).map((ex, index) => {
-    const last = findLastSessionExercise(
-      { name: ex?.name, exerciseId: ex?.exerciseId, _id: ex?._id, muscleGroup: ex?.muscleGroup },
-      candidates
-    )
-    return getWeightSuggestion(progressionInfoByIndex.value[index], last, progressionGoal.value)
-  })
+  return (workout.value?.exercises || []).map((ex) => findLastSessionExercise(
+    { name: ex?.name, exerciseId: ex?.exerciseId, _id: ex?._id, muscleGroup: ex?.muscleGroup },
+    candidates
+  ))
 })
+
+// Steigern / Knapp dran / Halten (utils/weightSuggestion.js getProgressionStatus), null = nur Ziel.
+const progressionStatusByIndex = computed(() =>
+  lastSessionByIndex.value.map((last, index) =>
+    getProgressionStatus(progressionInfoByIndex.value[index], last, progressionGoal.value)
+  )
+)
+
+const suggestionsByIndex = computed(() =>
+  progressionStatusByIndex.value.map((status) => status?.suggestion || null)
+)
+
+function progressionHintText(index) {
+  const status = progressionStatusByIndex.value[index]
+  const params = status
+    ? { weight: formatKg(status.weight), reps: status.targetReps, sets: status.sets, done: status.totalReps, total: status.targetTotal, missing: status.missingReps }
+    : null
+  if (status?.state === 'increase') return t('workoutDetail.weightSuggestionReason', params)
+  if (status?.state === 'close') return t('workoutDetail.progressionClose', params)
+  if (status?.state === 'hold') return t('workoutDetail.progressionHold', params)
+  return t('workoutDetail.repTargetExplain', { reps: repTargetsByIndex.value[index]?.target })
+}
 
 function weightSuggestionFor(exerciseIndex, rowIndex) {
   const suggestion = suggestionsByIndex.value[exerciseIndex]
@@ -3108,16 +3246,17 @@ async function performSaveWorkout(updateFavorite = false, { deferAiFeedback = fa
 // verknüpfte Favoriten-Template unangetastet, auch wenn diese Session ursprünglich aus einem
 // Favoriten gestartet wurde.
 async function saveWorkout(updateFavorite = false, { deferAiFeedback = false } = {}) {
-  // Notizen-Check zuerst: läuft VOR dem Timer-Guard, damit er auch beim direkten Klick auf
+  // "Kurz prüfen" zuerst: läuft VOR dem Timer-Guard, damit es auch beim direkten Klick auf
   // "Speichern" greift (der Timer-Guard deferred den eigentlichen Save ohnehin über
-  // pendingTimerAction -> performSaveWorkout(), würde diesen Check also umgehen, wenn er
+  // pendingTimerAction -> performSaveWorkout(), würde die Prüfung also umgehen, wenn sie
   // erst danach käme). Im Favorit-Anpassen-Modus nicht relevant (kein echtes Workout-Save).
   if (!isFavoriteAdjustMode.value && !notesCheckAcknowledged) {
-    const missing = getExercisesMissingNotesForCurrentWorkout()
-    if (missing.length > 0) {
-      missingNotesExerciseNames.value = missing
+    const review = computeSaveReview()
+    if (!review.isEmpty) {
+      saveReview.value = review
+      reviewDeferAi.value = false
       pendingUpdateFavoriteOnSave = updateFavorite
-      showMissingNotesModal.value = true
+      showSaveReviewModal.value = true
       return
     }
   }
@@ -3128,26 +3267,6 @@ async function saveWorkout(updateFavorite = false, { deferAiFeedback = false } =
     return
   }
   await performSaveWorkout(updateFavorite, { deferAiFeedback })
-}
-
-// Wird vom Bestätigungsmodal (showMissingNotesModal) aufgerufen, wenn der Nutzer trotz
-// fehlender Notizen speichern möchte. Merkt sich das für diesen Speicherversuch, damit
-// saveWorkout() den Check nicht erneut auslöst (z.B. wenn danach noch der Timer-Guard
-// dazwischenkommt), setzt es aber in performSaveWorkout() wieder zurück, damit der nächste
-// Speichervorgang (nächstes Workout) wieder frisch geprüft wird.
-function confirmSaveDespiteMissingNotes() {
-  notesCheckAcknowledged = true
-  saveWorkout(pendingUpdateFavoriteOnSave)
-}
-
-// Wird vom selben Bestätigungsmodal aufgerufen, wenn der Nutzer stattdessen "Später bewerten"
-// wählt (siehe extra-text/@extra an AppModal oben): Workout wird ganz normal gespeichert, aber
-// die automatische KI-Analyse wird für diesen Speichervorgang bewusst übersprungen (siehe
-// deferAiFeedback in performSaveWorkout()/goToPostWorkoutSummary()) - der Nutzer kann sie
-// später, nachdem er Notizen ergänzt hat, im Feedback-Verlauf manuell anstoßen.
-function confirmDeferFeedback() {
-  notesCheckAcknowledged = true
-  saveWorkout(pendingUpdateFavoriteOnSave, { deferAiFeedback: true })
 }
 
 function getFavoriteUserId() {
@@ -4100,6 +4219,71 @@ onBeforeUnmount(() => {
 }
 .set-row.set-row-empty {
   opacity: 0.35;
+}
+/* Abhaken: Satznummer als runder Button (34px Spalte, volle Zeilenhöhe als Tippfläche). */
+.set-done-btn {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1.5px solid var(--line-strong, var(--card-border));
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.set-done-btn.done {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-contrast, #060606);
+  font-size: 0.95rem;
+}
+/* "Kurz prüfen"-Fenster (Slot-Inhalt von AppModal). */
+.review-group + .review-group { margin-top: 14px; }
+.review-group-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.review-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  border-radius: 10px;
+  border: 1px solid var(--card-border);
+  background: var(--surface);
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.88rem;
+  text-align: left;
+  cursor: pointer;
+}
+.review-item-chevron { color: var(--muted); font-size: 1.1rem; }
+.review-defer {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+.review-defer input { margin-top: 3px; }
+.review-defer small { display: block; margin-top: 2px; color: var(--muted); font-size: 0.78rem; line-height: 1.35; }
+/* Nicht abgehakt: Werte grau = nur übernommen / noch nicht gemacht. */
+.set-row.set-row--open .col input {
+  color: var(--muted);
 }
 .set-row.set-row-empty .col input {
   border-color: var(--line-soft, rgba(255,255,255,0.1));

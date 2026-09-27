@@ -85,11 +85,12 @@ function roundKg(value) {
   return Math.round(value * 100) / 100
 }
 
-/** Arbeitssätze (ohne Aufwärmsätze) mit echten Wiederholungen. */
+/** Arbeitssätze (ohne Aufwärmsätze und ohne ausdrücklich nicht gemachte Sätze) mit echten Wiederholungen. */
 export function getWorkingSets(exercise = {}) {
   const sets = Array.isArray(exercise?.setDetails) ? exercise.setDetails : []
   return sets
-    .filter((set) => set && !set.isWarmup)
+    // done === false: im laufenden Workout nicht abgehakt. Fehlt das Feld (alte Daten), gilt der Satz als gemacht.
+    .filter((set) => set && !set.isWarmup && set.done !== false)
     .map((set) => ({ reps: Number(set.reps) || 0, weight: Number(set.weight) || 0 }))
     .filter((set) => set.reps > 0)
 }
@@ -132,6 +133,43 @@ export function getWeightSuggestion(info = {}, lastSessionExercise = null, goal 
     baseWeight: Math.max(...working.map((set) => set.weight)),
     suggestedWeights: working.map((set) => roundKg(set.weight + increment))
   }
+}
+
+/**
+ * Zustand für die Hinweiszeile unter der Übung (Einschätzung der letzten Session):
+ *   'increase' - alle Arbeitssätze am Ziel -> mehr Gewicht (zusätzlich Chip, siehe getWeightSuggestion)
+ *   'close'    - knapp dran: genau ein Satz, und der nur 1 Wdh. unter dem Ziel -> gleiches Gewicht
+ *   'hold'     - sonst -> gleiches Gewicht, bis alle Sätze das Ziel schaffen
+ * null = keine Einschätzung möglich (keine Historie, Körpergewicht, unterschiedliche Gewichte, ...),
+ * dann zeigt die App nur das Wiederholungsziel. Senkungen werden nie vorgeschlagen.
+ * @returns {null | { state, targetReps, weight, sets, totalReps, targetTotal, missingReps, suggestion }}
+ */
+export function getProgressionStatus(info = {}, lastSessionExercise = null, goal = DEFAULT_TRAINING_GOAL) {
+  if (!lastSessionExercise || isNoLoadExercise(info)) return null
+  const target = getRepTarget(info, goal)
+  if (!target) return null
+  const working = getWorkingSets(lastSessionExercise)
+  if (!working.length || working.some((set) => set.weight <= 0)) return null
+  const firstWeight = roundKg(working[0].weight)
+  if (working.some((set) => roundKg(set.weight) !== firstWeight)) return null
+
+  const totalReps = working.reduce((sum, set) => sum + set.reps, 0)
+  const targetTotal = working.length * target.target
+  const missingReps = working.reduce((sum, set) => sum + Math.max(0, target.target - set.reps), 0)
+  const below = working.filter((set) => set.reps < target.target)
+  const base = {
+    targetReps: target.target,
+    weight: firstWeight,
+    sets: working.length,
+    totalReps,
+    targetTotal,
+    missingReps
+  }
+  if (!below.length) {
+    return { ...base, state: 'increase', suggestion: getWeightSuggestion(info, lastSessionExercise, goal) }
+  }
+  const state = below.length === 1 && below[0].reps === target.target - 1 ? 'close' : 'hold'
+  return { ...base, state, suggestion: null }
 }
 
 /** Vorschlag für den k-ten Arbeitssatz der aktuellen Session (mehr Sätze als letztes Mal -> letzter Wert). */
