@@ -69,9 +69,21 @@ describe('getWeightSuggestion', () => {
     expect(getWeightSuggestion(squat, last, 'hypertrophy')).toBeNull()
   })
 
-  it('Kurzhanteln: +2 kg; unterschiedliche Satzgewichte je Satz', () => {
-    const last = { setDetails: [{ reps: 12, weight: 10 }, { reps: 12, weight: 12.5 }] }
-    expect(getWeightSuggestion(lateralRaise, last, 'hypertrophy')?.suggestedWeights).toEqual([12, 14.5])
+  it('Kurzhanteln: +2 kg', () => {
+    const last = { setDetails: [{ reps: 12, weight: 10 }, { reps: 12, weight: 10 }] }
+    expect(getWeightSuggestion(lateralRaise, last, 'hypertrophy')?.suggestedWeights).toEqual([12, 12])
+  })
+
+  it('unterschiedliche Gewichte in den Arbeitssätzen -> kein Vorschlag', () => {
+    const dropped = session([100, 100, 100, 95, 95].map((weight) => ({ reps: 5, weight })))
+    const ascending = session([90, 95, 100].map((weight) => ({ reps: 5, weight })))
+    expect(getWeightSuggestion(squat, dropped, 'strength')).toBeNull()
+    expect(getWeightSuggestion(squat, ascending, 'strength')).toBeNull()
+  })
+
+  it('Aufwärmsatz mit anderem Gewicht stört nicht', () => {
+    const last = session([{ reps: 5, weight: 60, isWarmup: true }, { reps: 5, weight: 100 }, { reps: 5, weight: 100 }])
+    expect(getWeightSuggestion(squat, last, 'strength')?.suggestedWeights).toEqual([102.5, 102.5])
   })
 
   it('Körpergewicht / 0 kg / Speed-Variante / keine Historie -> kein Vorschlag', () => {

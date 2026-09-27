@@ -1286,10 +1286,13 @@ onActivated(async () => {
   box-shadow: var(--shadow-soft);
 }
 
-.favorite-item--compact {
-  display: flex;
+/* Doppelte Klasse: muss die spätere Grundregel .favorite-item (flex-direction: column) schlagen -
+   Name links, "Starten" und "⋮" rechts in derselben Zeile. */
+.favorite-item.favorite-item--compact {
+  flex-direction: row;
   align-items: center;
   gap: 8px;
+  padding: 8px 6px 8px 10px;
 }
 
 .favorite-main {
@@ -1315,10 +1318,10 @@ onActivated(async () => {
   padding: 0 12px;
   border: none;
   border-radius: 9px;
-  font-size: 0.85rem;
   background: var(--accent);
   color: var(--accent-contrast, #060606);
-  font: inherit;
+  font-family: inherit;
+  font-size: 0.85rem;
   font-weight: 700;
   cursor: pointer;
 }

@@ -100,8 +100,8 @@ export function getWorkingSets(exercise = {}) {
  * @param {object|null} lastSessionExercise - dieselbe Übung aus der letzten abgeschlossenen Session
  * @param {string} goal - 'hypertrophy' | 'strength'
  * @returns {null | { targetReps, increment, baseWeight, suggestedWeights: number[] }}
- *   suggestedWeights[k] = Vorschlag für den k-ten Arbeitssatz (Gewicht dieses Satzes letztes Mal
- *   + Schrittweite), damit auch Pyramiden/unterschiedliche Satzgewichte stimmen.
+ *   suggestedWeights[k] = Vorschlag für den k-ten Arbeitssatz (Gewicht letztes Mal + Schrittweite;
+ *   da alle Arbeitssätze dasselbe Gewicht haben müssen, sind alle Werte gleich).
  */
 export function getWeightSuggestion(info = {}, lastSessionExercise = null, goal = DEFAULT_TRAINING_GOAL) {
   if (!lastSessionExercise) return null
@@ -114,6 +114,11 @@ export function getWeightSuggestion(info = {}, lastSessionExercise = null, goal 
   if (!working.length) return null
   // Satz ohne Gewicht = Körpergewicht-Satz -> kein Gewichtsvorschlag.
   if (working.some((set) => set.weight <= 0)) return null
+  // Das Gewicht gilt erst als geschafft, wenn ALLE Arbeitssätze mit demselben Gewicht liefen
+  // (z.B. 5x5 mit 100 kg). Wurde zwischendurch reduziert (100/100/100/95/95) oder gesteigert,
+  // kein Vorschlag - Aufwärm-/Ramp-Up-Sätze zählen nicht (isWarmup).
+  const firstWeight = roundKg(working[0].weight)
+  if (working.some((set) => roundKg(set.weight) !== firstWeight)) return null
   // Nur wenn ALLE Arbeitssätze das Ziel erreicht haben - sonst gleiches Gewicht, kein Hinweis.
   if (!working.every((set) => set.reps >= target.target)) return null
   // Bewusst KEIN Vergleich der Satzanzahl mit früheren Sessions: Favoriten werden mit den Sätzen
