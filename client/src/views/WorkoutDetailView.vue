@@ -322,19 +322,9 @@
                 v-for="(row, rIdx) in (ex.setDetails || [])"
                 :key="`${ex.exerciseId || i}-row-${rIdx}`"
               >
-                <div v-if="row.isWarmup" class="set-row warmup-row" :class="{ 'set-row--open': !isRowDone(row) }" :data-set-index="rIdx">
-                  <span class="col set">
-                    <button
-                      v-if="setTrackingActive"
-                      type="button"
-                      class="set-done-btn"
-                      :class="{ done: isRowDone(row) }"
-                      :aria-pressed="isRowDone(row)"
-                      :aria-label="t(isRowDone(row) ? 'workoutDetail.setUndoneAria' : 'workoutDetail.setDoneAria', { set: getSetLabel(ex.setDetails, rIdx) })"
-                      @click="toggleRowDone(row)"
-                    >{{ isRowDone(row) ? '✓' : getSetLabel(ex.setDetails, rIdx) }}</button>
-                    <template v-else>{{ getSetLabel(ex.setDetails, rIdx) }}</template>
-                  </span>
+                <!-- Aufwärmsätze werden nicht abgehakt (zählen nie für Vorschlag/Prüfung). -->
+                <div v-if="row.isWarmup" class="set-row warmup-row" :data-set-index="rIdx">
+                  <span class="col set">{{ getSetLabel(ex.setDetails, rIdx) }}</span>
                   <span class="col reps">
                     <div class="number-with-spinner">
                         <input
@@ -1927,7 +1917,7 @@ const showProgressionHints = computed(() =>
 const setTrackingActive = showProgressionHints
 
 function isRowDone(row) {
-  if (!setTrackingActive.value) return true
+  if (!setTrackingActive.value || row?.isWarmup) return true
   return row?.done === true
 }
 
@@ -3910,11 +3900,13 @@ onBeforeUnmount(() => {
   padding: 4px 0;
 }
 .set-row.header { color: var(--muted); font-size: 0.75rem; padding-top: 0; }
+/* Spaltentitel mittig über den (mittig ausgerichteten) Werten. */
+.set-row.header .col { text-align: center; }
 .set-row .col input { width: 100%; padding: 5px 6px; border-radius: 6px; border: 1px solid var(--card-border); background: var(--surface); color: var(--fg); text-align: center; font-size: 1rem; }
 .weight-input { position: relative; }
 .weight-input .unit { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 0.75rem; pointer-events: none; }
 /* Mit Vorschlag: Wert links, "kg" in der Mitte, Chip rechts im selben Feld. */
-.weight-input.has-suggestion input { text-align: left; padding-left: 8px; padding-right: 72px; }
+.weight-input.has-suggestion input { text-align: center; padding-left: 8px; padding-right: 72px; }
 .weight-input.has-suggestion .unit { right: 58px; }
 .weight-suggestion-chip {
   position: absolute;
@@ -3946,6 +3938,8 @@ onBeforeUnmount(() => {
 }
 .progression-info-btn {
   flex: 0 0 auto;
+  min-width: 0;
+  min-height: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3981,7 +3975,7 @@ onBeforeUnmount(() => {
    .remove-row-btn .btn-icon oben) ist als "Entfernen"-Aktion auch ohne farbige Fläche
    verständlich; die rote Farbe des Icons selbst signalisiert weiterhin "löschen". Breite/Höhe
    bleiben als Klick-/Touch-Zielgröße erhalten, nur ohne sichtbaren Kasten drumherum. */
-.remove-row-btn { background: transparent; color: var(--danger); border: none; width: 28px; height: 28px; cursor: pointer; font-size: 1rem; }
+.remove-row-btn { background: transparent; color: var(--danger); border: none; width: 28px; height: 28px; min-width: 0; min-height: 0; padding: 0; cursor: pointer; font-size: 1rem; }
 .number-with-spinner { display: flex; align-items: center; gap: 6px; }
 .spinner-vertical { display: flex; flex-direction: column; gap: 2px; }
 .spin-btn { background: transparent; border: 1px solid var(--card-border); padding: 2px 6px; border-radius: 6px; font-size: 0.7rem; line-height: 1; cursor: pointer; }
@@ -4041,6 +4035,8 @@ onBeforeUnmount(() => {
   justify-content: center;
   width: 24px;
   height: 24px;
+  min-width: 0;
+  min-height: 0;
   padding: 0;
   border: none;
   background: transparent;
@@ -4193,6 +4189,7 @@ onBeforeUnmount(() => {
 .col.set {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 3px;
 }
 .sets-section-label {
@@ -4222,12 +4219,16 @@ onBeforeUnmount(() => {
 }
 /* Abhaken: Satznummer als runder Button (34px Spalte, volle Zeilenhöhe als Tippfläche). */
 .set-done-btn {
-  width: 30px;
-  height: 30px;
+  /* min-width/min-height: globale Button-Regel (style.css, 48px) würde in die Wdh.-Spalte ragen. */
+  width: 28px;
+  height: 28px;
+  min-width: 0;
+  min-height: 0;
   padding: 0;
   border-radius: 50%;
-  border: 1.5px solid var(--line-strong, var(--card-border));
-  background: transparent;
+  border: none;
+  /* Ohne Rahmen, nur leicht hinterlegt - erkennbar antippbar, ragt nicht in die Nachbarspalte. */
+  background: color-mix(in srgb, var(--fg) 8%, transparent);
   color: var(--muted);
   font: inherit;
   font-size: 0.8rem;
@@ -4253,6 +4254,7 @@ onBeforeUnmount(() => {
   margin-bottom: 6px;
 }
 .review-item {
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;

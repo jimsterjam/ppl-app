@@ -1330,6 +1330,7 @@ onActivated(async () => {
   /* Schmal und hochkant (Wunsch Paul) - Tippfläche bleibt über die Höhe groß genug. */
   flex-shrink: 0;
   width: 24px;
+  min-width: 0; /* globale Button-Regel (style.css) setzt 48px */
   min-height: 34px;
   margin-right: -4px;
   padding: 0;
