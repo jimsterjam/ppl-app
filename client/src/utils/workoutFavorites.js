@@ -2,6 +2,7 @@ import { useFirebaseAuth } from './firebaseAuth'
 import { fetchFavoriteWorkoutsRemote, pushFavoriteWorkoutRemote, deleteFavoriteWorkoutRemote } from '@/api/favoriteWorkouts'
 import { logger } from './logger'
 import { sanitizeWorkoutGoal } from './workoutGoal'
+import { sanitizeExerciseTrainingType } from './weightSuggestion'
 
 // Favoriten wurden bisher AUSSCHLIESSLICH in localStorage gehalten - bei Geräteverlust,
 // Neuinstallation oder einem Identitätswechsel (z.B. Login über einen anderen Firebase-
@@ -159,7 +160,9 @@ function buildFavoriteWorkoutPayload(workout, type) {
       // User-Feedback: Notizen sollen mit dem Favoriten gespeichert werden, damit beim nächsten
       // Start dieses Favoriten sichtbar ist, was beim letzten Mal notiert wurde - vorher wurde
       // exercise.note hier stillschweigend nicht übernommen (Feld fehlte in diesem Mapping).
-      note: String(exercise?.note || '').trim()
+      note: String(exercise?.note || '').trim(),
+      // Eigene Trainingsart der Übung (z.B. Muskelaufbau im Kraft-Workout) - nur wenn gewählt.
+      ...(sanitizeExerciseTrainingType(exercise?.trainingType) ? { trainingType: exercise.trainingType } : {})
     })).filter((exercise) => exercise.name)
   }
 }

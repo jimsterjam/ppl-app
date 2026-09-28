@@ -434,7 +434,18 @@
               <!-- Arbeitssätze -->
               <div class="sets-section-divider" v-if="hasWarmupSets(ex)"></div>
               <div class="sets-section-label working-label">
-                {{ t('workoutDetail.workingSetsLabel') }}<template v-if="showProgressionHints && repTargetsByIndex[i]"> · {{ t('workoutDetail.repTargetShort', { reps: repTargetsByIndex[i].target }) }}</template>
+                {{ t('workoutDetail.workingSetsLabel') }}
+                <!-- Trainingsart der Übung (Kraft/Muskelaufbau/Explosiv): antippen öffnet die Auswahl.
+                     Voreinstellung = Workout-Ziel bzw. automatisch "Explosiv" (weightSuggestion.js). -->
+                <button
+                  v-if="showTrainingTypeControl"
+                  type="button"
+                  class="training-type-btn"
+                  :aria-label="t('workoutDetail.trainingTypeAria', { name: getTranslatedExerciseName(ex.name) })"
+                  @click="openTrainingTypeModal(i)"
+                >· {{ goalByIndex[i] === 'explosive'
+                    ? t('workoutDetail.trainingTypeExplosive')
+                    : (repTargetsByIndex[i] ? t('workoutDetail.repTargetShort', { reps: repTargetsByIndex[i].target }) : t(`workoutDetail.trainingType_${goalByIndex[i]}`)) }} ▾</button>
               </div>
               <template
                 v-for="(row, rIdx) in (ex.setDetails || [])"
@@ -567,7 +578,7 @@
                 </div>
               </template>
 
-              <p v-if="showProgressionHints && repTargetsByIndex[i]" class="progression-hint-line">
+              <p v-if="showProgressionHints && (repTargetsByIndex[i] || goalByIndex[i] === 'explosive')" class="progression-hint-line">
                 <span>{{ progressionHintText(i) }}</span>
                 <!-- Erklärung (FAQ-Text) als Fenster direkt im Workout: kein Seitenwechsel, laufende
                      Stoppuhr/Timer bleiben unberührt. -->
@@ -758,6 +769,34 @@
       >{{ paragraph }}</p>
     </AppModal>
 
+    <!-- Trainingsart einer Übung (Kraft / Muskelaufbau / Explosiv). -->
+    <AppModal
+      v-model="showTrainingTypeModal"
+      :title="t('workoutDetail.trainingTypeTitle')"
+      :confirm-text="t('workoutDetail.trainingTypeApply')"
+      :cancel-text="t('common.cancel')"
+      type="info"
+      @confirm="applyTrainingType"
+    >
+      <p class="training-type-exercise">{{ trainingTypeModalName }}</p>
+      <div class="training-type-options" role="radiogroup" :aria-label="t('workoutDetail.trainingTypeTitle')">
+        <button
+          v-for="opt in trainingTypeOptions"
+          :key="opt.value"
+          type="button"
+          role="radio"
+          class="training-type-option"
+          :class="{ active: trainingTypeChoice === opt.value }"
+          :aria-checked="trainingTypeChoice === opt.value"
+          @click="trainingTypeChoice = opt.value"
+        >
+          <strong>{{ opt.label }}</strong>
+          <span>{{ opt.description }}</span>
+        </button>
+      </div>
+      <p class="training-type-default">{{ t('workoutDetail.trainingTypeDefault', { type: t(`workoutDetail.trainingType_${trainingTypeModalDefault}`) }) }}</p>
+    </AppModal>
+
     <AppModal
       v-model="showRemoveExerciseModal"
       :title="t('workoutDetail.removeExerciseConfirmTitle')"
@@ -886,7 +925,7 @@ import { getCurrentInstance } from 'vue'
 import NumberPicker from '@/components/NumberPicker.vue'
 import { useExerciseTranslation, getEnglishExerciseName } from '@/utils/exerciseTranslation'
 import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
-import { getRepTarget, getProgressionStatus, getSuggestionForSet, isNoLoadExercise } from '@/utils/weightSuggestion'
+import { getRepTarget, getProgressionStatus, getSuggestionForSet, isNoLoadExercise, resolveExerciseGoal, sanitizeExerciseTrainingType } from '@/utils/weightSuggestion'
 import { prepareHistoryCandidates, findLastSessionExercise } from '@/utils/lastSessionLookup'
 import { sanitizeWorkoutGoal } from '@/utils/workoutGoal'
 import WorkoutGoalPicker from '@/components/WorkoutGoalPicker.vue'
@@ -1426,6 +1465,7 @@ async function syncStartedFavoriteFromWorkout(workoutLike = null) {
       reps: Number(exercise.reps) || Number(exercise.setDetails?.[0]?.reps) || 10,
       weight: Number(exercise.weight) || Number(exercise.setDetails?.[0]?.weight) || 0,
       rest: Number(exercise.rest) || 90,
+      ...(sanitizeExerciseTrainingType(exercise.trainingType) ? { trainingType: exercise.trainingType } : {}),
       setDetails: Array.isArray(exercise.setDetails) && exercise.setDetails.length
         ? exercise.setDetails
         : [{
@@ -1985,11 +2025,71 @@ const progressionInfoByIndex = computed(() =>
   }))
 )
 
-const repTargetsByIndex = computed(() =>
-  progressionInfoByIndex.value.map((info) =>
-    isNoLoadExercise(info) ? null : getRepTarget(info, progressionGoal.value)
+// --- Trainingsart pro Übung ---------------------------------------------------------------
+// Wirksame Trainingsart: eigene Wahl an der Übung > Wahl aus der letzten Session dieser Übung
+// (damit eine einmal getroffene Wahl auch ohne Favoriten-Update erhalten bleibt) > automatisch
+// "Explosiv" > Workout-Ziel. Siehe resolveExerciseGoal in utils/weightSuggestion.js.
+function trainingTypeOverride(index) {
+  const ex = workout.value?.exercises?.[index]
+  return sanitizeExerciseTrainingType(ex?.trainingType)
+    || sanitizeExerciseTrainingType(lastSessionByIndex.value[index]?.trainingType)
+    || null
+}
+
+const goalByIndex = computed(() =>
+  progressionInfoByIndex.value.map((info, index) =>
+    resolveExerciseGoal(info, progressionGoal.value, trainingTypeOverride(index))
   )
 )
+
+// Im laufenden Workout und beim Anpassen eines Favoriten (dort wird die Wahl im Favoriten gespeichert).
+const showTrainingTypeControl = computed(() => !!workout.value && workout.value.completed !== true)
+
+const repTargetsByIndex = computed(() =>
+  progressionInfoByIndex.value.map((info, index) =>
+    isNoLoadExercise(info) ? null : getRepTarget(info, goalByIndex.value[index])
+  )
+)
+
+const showTrainingTypeModal = ref(false)
+const trainingTypeModalIndex = ref(-1)
+const trainingTypeChoice = ref('')
+
+const trainingTypeModalName = computed(() =>
+  getTranslatedExerciseName(workout.value?.exercises?.[trainingTypeModalIndex.value]?.name || '')
+)
+
+// Voreinstellung ohne eigene Wahl (Workout-Ziel bzw. automatisch explosiv) - zur Info im Fenster.
+const trainingTypeModalDefault = computed(() => {
+  const info = progressionInfoByIndex.value[trainingTypeModalIndex.value] || {}
+  return resolveExerciseGoal(info, progressionGoal.value, null)
+})
+
+const trainingTypeOptions = computed(() => {
+  const info = progressionInfoByIndex.value[trainingTypeModalIndex.value] || {}
+  const target = (goal) => getRepTarget(info, goal)?.target
+  return [
+    { value: 'strength', label: t('workoutDetail.trainingType_strength'), description: t('workoutDetail.trainingTypeStrengthDesc', { reps: target('strength') }) },
+    { value: 'hypertrophy', label: t('workoutDetail.trainingType_hypertrophy'), description: t('workoutDetail.trainingTypeHypertrophyDesc', { reps: target('hypertrophy') }) },
+    { value: 'explosive', label: t('workoutDetail.trainingType_explosive'), description: t('workoutDetail.trainingTypeExplosiveDesc') }
+  ]
+})
+
+function openTrainingTypeModal(index) {
+  trainingTypeModalIndex.value = index
+  trainingTypeChoice.value = goalByIndex.value[index] || 'hypertrophy'
+  showTrainingTypeModal.value = true
+}
+
+function applyTrainingType() {
+  const ex = workout.value?.exercises?.[trainingTypeModalIndex.value]
+  const choice = sanitizeExerciseTrainingType(trainingTypeChoice.value)
+  if (!ex || !choice) return
+  ex.trainingType = choice
+  if (!isFavoriteAdjustMode.value) {
+    try { triggerAutoSave() } catch {}
+  }
+}
 
 // Erklärfenster zum Gewichtsvorschlag (ⓘ neben der Hinweiszeile, Text = FAQ-Eintrag).
 const showWeightSuggestionInfo = ref(false)
@@ -2007,7 +2107,7 @@ const lastSessionByIndex = computed(() => {
 // Steigern / Knapp dran / Halten (utils/weightSuggestion.js getProgressionStatus), null = nur Ziel.
 const progressionStatusByIndex = computed(() =>
   lastSessionByIndex.value.map((last, index) =>
-    getProgressionStatus(progressionInfoByIndex.value[index], last, progressionGoal.value)
+    getProgressionStatus(progressionInfoByIndex.value[index], last, goalByIndex.value[index])
   )
 )
 
@@ -2023,6 +2123,7 @@ function progressionHintText(index) {
   if (status?.state === 'increase') return t('workoutDetail.weightSuggestionReason', params)
   if (status?.state === 'close') return t('workoutDetail.progressionClose', params)
   if (status?.state === 'hold') return t('workoutDetail.progressionHold', params)
+  if (goalByIndex.value[index] === 'explosive') return t('workoutDetail.explosiveExplain')
   return t('workoutDetail.repTargetExplain', { reps: repTargetsByIndex.value[index]?.target })
 }
 
@@ -2974,7 +3075,9 @@ async function performSaveWorkout(updateFavorite = false, { deferAiFeedback = fa
     // über den extrahierten Save-Flow-Util statt einer eigenen Inline-Kopie - siehe
     // utils/workoutDetailSaveFlow.js.
     const normalized = normalizeWorkoutForSave({
-      workout: w,
+      // Eigene Trainingsart mitspeichern - auch wenn sie nur aus der letzten Session übernommen
+      // wurde, damit die Wahl von Session zu Session erhalten bleibt.
+      workout: { ...w, exercises: (w.exercises || []).map((ex, idx) => ({ ...ex, trainingType: trainingTypeOverride(idx) || undefined })) },
       exerciseNotes: exerciseNotes.value,
       sessionStopwatchStore,
       userId: resolvedUserId
@@ -3285,6 +3388,7 @@ function buildFavoriteSourceWorkout() {
       reps: Number(exercise.reps) || Number(exercise.setDetails?.[0]?.reps) || 10,
       weight: Number(exercise.weight) || Number(exercise.setDetails?.[0]?.weight) || 0,
       rest: Number(exercise.rest) || 90,
+      ...(sanitizeExerciseTrainingType(exercise.trainingType) ? { trainingType: exercise.trainingType } : {}),
       setDetails: Array.isArray(exercise.setDetails) && exercise.setDetails.length
         ? exercise.setDetails
         : [{
@@ -3897,12 +4001,13 @@ onBeforeUnmount(() => {
   grid-template-columns: 34px 1fr 1.35fr 36px;
   gap: 8px;
   align-items: center;
-  padding: 4px 0;
+  /* Etwas mehr Luft (Wunsch Paul: Zeilen wirkten zu eng). */
+  padding: 6px 0;
 }
 .set-row.header { color: var(--muted); font-size: 0.75rem; padding-top: 0; }
 /* Spaltentitel mittig über den (mittig ausgerichteten) Werten. */
 .set-row.header .col { text-align: center; }
-.set-row .col input { width: 100%; padding: 5px 6px; border-radius: 6px; border: 1px solid var(--card-border); background: var(--surface); color: var(--fg); text-align: center; font-size: 1rem; }
+.set-row .col input { width: 100%; min-height: 40px; padding: 8px 6px; border-radius: 6px; border: 1px solid var(--card-border); background: var(--surface); color: var(--fg); text-align: center; font-size: 1rem; }
 .weight-input { position: relative; }
 .weight-input .unit { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 0.75rem; pointer-events: none; }
 /* Mit Vorschlag: Wert links, "kg" in der Mitte, Chip rechts im selben Feld. */
@@ -4206,6 +4311,45 @@ onBeforeUnmount(() => {
 .working-label {
   padding-top: 2px;
 }
+/* Trainingsart-Auswahl im Arbeitssatz-Label (unauffällig, aber antippbar). */
+.training-type-btn {
+  min-width: 0;
+  min-height: 0;
+  padding: 2px 4px;
+  margin-left: 2px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  font-size: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.training-type-exercise { font-weight: 700; margin: 0 0 10px; }
+.training-type-options { display: flex; flex-direction: column; gap: 8px; }
+.training-type-option {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--card-border);
+  background: var(--surface);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.training-type-option span { font-size: 0.8rem; color: var(--muted); }
+.training-type-option.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+}
+.training-type-default { margin: 10px 0 0; font-size: 0.78rem; color: var(--muted); }
 .sets-section-divider {
   height: 1px;
   background: var(--line-soft, rgba(255,255,255,0.08));

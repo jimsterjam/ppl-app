@@ -84,3 +84,30 @@ describe('stripAiFocusLines / applyNextSessionFocus', () => {
     assert.equal(applyNextSessionFocus(ai, null), 'Guter Trainingstag 💪\n- Squat: Gewicht rauf - läuft.')
   })
 })
+
+describe('Trainingsart je Übung', () => {
+  test('Kraft-Workout: Hack Calf Raise auf Muskelaufbau -> Ziel 12; Trap Bar Jumps -> explosiv', () => {
+    const focus = buildNextSessionFocus({
+      workout: {
+        goal: 'strength',
+        exercises: [
+          { name: 'Hack Calf Raise', trainingType: 'hypertrophy', setDetails: sets([12, 12, 11], 120) }
+        ]
+      }
+    })
+    assert.equal(focus.kind, 'close')
+    assert.match(focus.text, /Ziel: 12 Wdh\./)
+
+    const jumps = buildNextSessionFocus({
+      workout: { goal: 'strength', exercises: [{ name: 'Trap Bar Jumps', setDetails: sets([3, 3, 3], 30) }] }
+    })
+    assert.equal(jumps.kind, 'speed')
+  })
+
+  test('eigene Wahl schlägt Automatik: Jumps bewusst auf Kraft gestellt', () => {
+    const focus = buildNextSessionFocus({
+      workout: { goal: 'strength', exercises: [{ name: 'Trap Bar Jumps', trainingType: 'strength', setDetails: sets([5, 5, 5], 30) }] }
+    })
+    assert.notEqual(focus?.kind, 'speed')
+  })
+})

@@ -327,6 +327,9 @@ export function analyzeExercise(exerciseName, currentEx, previousEx = null, days
     note: note || null,
     noteContext,
     oneRepMax,
+    // Vom Nutzer gewählte Trainingsart DIESER Übung (abweichend vom Workout-Ziel), siehe
+    // Workout.exercises[].trainingType - verbindlich für die Einordnung (Regel 26 im Prompt).
+    trainingType: ['strength', 'hypertrophy', 'explosive'].includes(currentEx?.trainingType) ? currentEx.trainingType : null,
     // Kap. 26: schlanker Hinweis fürs Prompt (Phase 4), damit die AI z.B. bei einer reinen
     // Technikübung nicht trotzdem eine Gewichtssteigerung empfiehlt. Nur gesetzt, wenn ein
     // Profil (global oder per User-Override) tatsächlich vorliegt - sonst weiterhin keine
@@ -726,6 +729,9 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
 
       // Nutzer-Notiz zu dieser Übung (nur wenn vorhanden) - siehe analyzeExercise()
       ...(ex.note ? { note: ex.note } : {}),
+
+      // Vom Nutzer gewählte Trainingsart dieser Übung (nur wenn gesetzt) - Regel 26.
+      ...(ex.trainingType ? { training_type: ex.trainingType } : {}),
 
       // Kap. 25: additiv, gemergte Notiz aus persistenter exerciseNote (Rang 1/2) und
       // sessionNote dieser Session, mit Kennzeichnung von Herkunft/Bestätigung, damit die

@@ -61,6 +61,10 @@ const workoutSchema = new mongoose.Schema({
     // "exerciseNote" in models/UserExerciseNote.js. Feldname bewusst NICHT umbenannt,
     // um bestehende Clients/Daten nicht zu brechen - nur semantisch hier dokumentiert).
     note: String,
+    // Trainingsart DIESER Übung, falls vom Nutzer abweichend vom Workout-Ziel gewählt
+    // ('strength'|'hypertrophy'|'explosive'); fehlt = Workout-Ziel bzw. automatische Erkennung
+    // (siehe client/src/utils/weightSuggestion.js resolveExerciseGoal).
+    trainingType: { type: String, enum: ['strength', 'hypertrophy', 'explosive'], default: undefined },
     // Tatsächlich bewegtes externes Gewicht für diese Übung in dieser Session (Kap. 24.2:
     // strikt getrennt von athleteBodyweightKg - z.B. Zusatzgewicht am Gürtel bei
     // Klimmzügen. Additiv/optional, null = nicht erfasst.)

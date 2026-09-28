@@ -1,5 +1,6 @@
 import { sanitizeWorkoutGoal } from './workoutGoal'
 import { buildWorkoutNotesSummary } from './workoutNotes'
+import { sanitizeExerciseTrainingType } from './weightSuggestion'
 
 export function getExercisesMissingNotes(exercises = [], getNote) {
   const missing = []
@@ -32,6 +33,8 @@ export function normalizeWorkoutForSave({ workout, exerciseNotes, sessionStopwat
       reps: firstWorkingSet?.reps ?? ex.reps ?? 10,
       weight: firstWorkingSet?.weight ?? ex.weight ?? 0,
       setDetails: ex.setDetails || [],
+      // Eigene Trainingsart der Übung (siehe weightSuggestion.js resolveExerciseGoal) - nur wenn gewählt.
+      ...(sanitizeExerciseTrainingType(ex.trainingType) ? { trainingType: ex.trainingType } : {}),
       note: Array.isArray(exerciseNotes) && typeof exerciseNotes[idx] !== 'undefined'
         ? exerciseNotes[idx]
         : (typeof ex.note === 'string' ? ex.note : '')

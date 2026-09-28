@@ -5,7 +5,9 @@ import {
   getWeightSuggestion,
   getSuggestionForSet,
   getProgressionStatus,
-  normalizeTrainingGoal
+  normalizeTrainingGoal,
+  isExplosiveExercise,
+  resolveExerciseGoal
 } from '../weightSuggestion.js'
 
 const squat = { name: 'Kniebeugen mit der Langhantel', name_en: 'barbell high bar squat', category: 'Legs', equipment: 'Langhantel', aiMetadata: { exerciseType: 'compound' } }
@@ -147,5 +149,36 @@ describe('getProgressionStatus', () => {
     expect(getProgressionStatus(squat, mixed, 'strength')).toBeNull()
     expect(getProgressionStatus(squat, null, 'strength')).toBeNull()
     expect(getProgressionStatus({ ...squat, equipment: 'Körpergewicht' }, at100([5, 5]), 'strength')).toBeNull()
+  })
+})
+
+describe('Trainingsart pro Übung', () => {
+  it('explosive Übungen werden am Namen erkannt, Fehltreffer nicht', () => {
+    expect(isExplosiveExercise({ name: 'Trap Bar Jumps' })).toBe(true)
+    expect(isExplosiveExercise({ name_en: 'power clean' })).toBe(true)
+    expect(isExplosiveExercise({ name: 'Kettlebell einarmiges Reißen' })).toBe(true)
+    expect(isExplosiveExercise({ name_en: 'front squat barbell clean-grip' })).toBe(false)
+    expect(isExplosiveExercise({ name_en: 'assisted hanging knee raise with throw down' })).toBe(false)
+    expect(isExplosiveExercise({ name_en: 'jump rope' })).toBe(false)
+    expect(isExplosiveExercise(squat)).toBe(false)
+  })
+
+  it('eigene Wahl > automatisch explosiv > Workout-Ziel', () => {
+    expect(resolveExerciseGoal(squat, 'strength')).toBe('strength')
+    expect(resolveExerciseGoal(lateralRaise, 'strength', 'hypertrophy')).toBe('hypertrophy')
+    expect(resolveExerciseGoal({ name: 'Trap Bar Jumps' }, 'strength')).toBe('explosive')
+    expect(resolveExerciseGoal({ name: 'Trap Bar Jumps' }, 'strength', 'strength')).toBe('strength')
+    expect(resolveExerciseGoal(squat, 'strength', 'unsinn')).toBe('strength')
+  })
+
+  it('explosiv: kein Wiederholungsziel, kein Vorschlag, kein Halten-Text', () => {
+    const last = session([{ reps: 3, weight: 30 }, { reps: 3, weight: 30 }])
+    expect(getRepTarget(squat, 'explosive')).toBeNull()
+    expect(getWeightSuggestion(squat, last, 'explosive')).toBeNull()
+    expect(getProgressionStatus(squat, last, 'explosive')).toBeNull()
+  })
+
+  it('Isolationsübung im Kraft-Workout auf Muskelaufbau gestellt -> Ziel 12', () => {
+    expect(getRepTarget(lateralRaise, resolveExerciseGoal(lateralRaise, 'strength', 'hypertrophy')).target).toBe(12)
   })
 })

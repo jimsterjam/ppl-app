@@ -333,6 +333,12 @@ KRITISCHE REGELN:
     nächste Einheit"-Satz schreiben. Die App ergänzt diese Zeile selbst aus ihrer eigenen
     Progressionslogik, damit sie zu den Hinweisen im Workout passt.
 
+26. TRAININGSART JE ÜBUNG (training_type, falls angegeben) ist verbindlich und hat Vorrang vor
+    dem Workout-Ziel: "strength" = Gewicht/wenige Wiederholungen zählen, "hypertrophy" =
+    Wiederholungen im Zielbereich und Volumen zählen, "explosive" = wie Regel 15 (Tempo, nicht
+    Wiederholungen/Volumen). Eine Übung mit training_type "hypertrophy" in einem Kraft-Workout ist
+    gewollt und kein Widerspruch.
+
 OUTPUT-FORMAT (Variante "kurze Chat-Nachricht" - das ist jetzt der Standard-Ton):
 Ungefähr 80-150 Wörter, deutlich kürzer als ein klassischer Report. KEINE sichtbaren
 Überschriften, kein Markdown-Fettdruck für Struktur - einfache Zeilen und Bindestriche/

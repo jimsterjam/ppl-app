@@ -37,6 +37,37 @@ export function normalizeTrainingGoal(goal) {
   return String(goal || '').toLowerCase().includes('strength') ? 'strength' : DEFAULT_TRAINING_GOAL
 }
 
+// --- Trainingsart pro Übung ---------------------------------------------------------------
+// Das Workout-Ziel (Kraft/Muskelaufbau) ist nur die Voreinstellung. Pro Übung kann der Nutzer
+// eine eigene Trainingsart wählen (exercise.trainingType), z.B. im Kraft-Workout Hack Calf Raise
+// auf Muskelaufbau. Explosive Übungen (Sprünge, Speed-Varianten, Umsetzen/Reißen) werden
+// automatisch erkannt: dort zählt das Tempo, es gibt kein Wiederholungsziel.
+export const EXERCISE_TRAINING_TYPES = Object.freeze(['strength', 'hypertrophy', 'explosive'])
+
+const EXPLOSIVE_NAME_PATTERN = /\bspeed\b|jump|sprung|explosiv|plyo|\bclean\b|snatch|reißen|power start|medicine ball.*throw|überkopfwurf|brustwurf/i
+// Treffer, die trotz Stichwort NICHT explosiv sind (Griffart, Bauchübung, Seilspringen).
+const EXPLOSIVE_EXCLUDE_PATTERN = /clean[- ]grip|throw down|abwerfen|abwurf|power point|jump rope|springseil/i
+
+export function isExplosiveExercise(info = {}) {
+  const names = `${info.name_en || ''} ${info.name || ''}`
+  return EXPLOSIVE_NAME_PATTERN.test(names) && !EXPLOSIVE_EXCLUDE_PATTERN.test(names)
+}
+
+export function sanitizeExerciseTrainingType(value) {
+  return EXERCISE_TRAINING_TYPES.includes(value) ? value : null
+}
+
+/**
+ * Wirksame Trainingsart einer Übung: eigene Wahl > automatisch explosiv > Workout-Ziel.
+ * @returns {'strength'|'hypertrophy'|'explosive'}
+ */
+export function resolveExerciseGoal(info = {}, workoutGoal = DEFAULT_TRAINING_GOAL, override = null) {
+  const own = sanitizeExerciseTrainingType(override)
+  if (own) return own
+  if (isExplosiveExercise(info)) return 'explosive'
+  return normalizeTrainingGoal(workoutGoal)
+}
+
 function lower(value) {
   return String(value || '').trim().toLowerCase()
 }
@@ -61,6 +92,7 @@ export function classifyExercise(info = {}) {
 
 /** Wiederholungsziel für eine Übung, oder null (keine Gewichtssteigerung sinnvoll). */
 export function getRepTarget(info = {}, goal = DEFAULT_TRAINING_GOAL) {
+  if (goal === 'explosive') return null // Tempo zählt, kein Wiederholungsziel
   const type = classifyExercise(info)
   if (type === 'core') return null
   const range = REP_TARGETS[normalizeTrainingGoal(goal)][type]

@@ -66,11 +66,14 @@ function exerciseInfo(ex = {}) {
   };
 }
 
-const SPEED_PATTERN = /\bspeed\b|jump|explosiv|explosive|sprung|power/i;
-
-function isSpeedExercise(info, profileHint) {
-  if (profileHint?.exerciseType === 'power') return true;
-  return SPEED_PATTERN.test(`${info.name_en || ''} ${info.name || ''}`);
+// Trainingsart je Übung wie im Workout: eigene Wahl > automatisch explosiv > Workout-Ziel
+// (resolveExerciseGoal in weightSuggestion.js). Ein Übungsprofil "power" zählt ebenfalls als explosiv.
+function exerciseGoal(info, ex, workoutGoal, profileHint) {
+  const goal = engine.resolveExerciseGoal
+    ? engine.resolveExerciseGoal(info, workoutGoal, ex?.trainingType)
+    : (workoutGoal || 'hypertrophy');
+  if (!ex?.trainingType && profileHint?.exerciseType === 'power') return 'explosive';
+  return goal;
 }
 
 function hasLoad(ex) {
@@ -121,10 +124,11 @@ export function buildNextSessionFocus({ workout, language = 'de', profileHintByN
     const hint = profileHintByName.get(String(ex?.name || '').trim().toLowerCase()) || null;
     let candidate = null;
 
-    if (isSpeedExercise(info, hint)) {
+    const exGoal = exerciseGoal(info, ex, goal, hint);
+    if (exGoal === 'explosive') {
       if (hasLoad(ex)) candidate = { kind: 'speed', params: {} };
     } else {
-      const status = engine.getProgressionStatus(info, ex, goal);
+      const status = engine.getProgressionStatus(info, ex, exGoal);
       if (status?.state === 'increase' && status.suggestion?.suggestedWeights?.length) {
         candidate = { kind: 'increase', params: { weight: formatKg(status.suggestion.suggestedWeights[0], lang) } };
       } else if (status?.state === 'close' || status?.state === 'hold') {
