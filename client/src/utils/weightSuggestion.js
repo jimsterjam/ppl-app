@@ -127,6 +127,27 @@ export function getWorkingSets(exercise = {}) {
     .filter((set) => set.reps > 0)
 }
 
+// Zusatzsätze (Back-off): leichtere Sätze NACH den Hauptsätzen, z.B. 5x5 mit 100 kg + 2x10 mit
+// 80 kg. Sie zählen für Vorschlag/Einschätzung nicht - aber nur, wenn sie deutlich leichter sind
+// (höchstens 85 % des Hauptgewichts). Kleine Reduzierungen (100 -> 95 kg) gelten als "Hauptsatz
+// nicht geschafft" und verhindern den Vorschlag (Absprache Paul, Variante b).
+export const BACKOFF_MAX_RATIO = 0.85
+
+/**
+ * Hauptsätze = die ersten Arbeitssätze mit demselben Gewicht; dieses Gewicht muss das schwerste
+ * sein (sonst Pyramide/Aufwärm-Rampe -> null). Alle Sätze danach müssen Zusatzsätze sein.
+ * @returns {null | { main: Array, backoff: Array, weight: number }}
+ */
+export function splitMainAndBackoffSets(working = []) {
+  if (!working.length) return null
+  const weight = roundKg(working[0].weight)
+  let k = 0
+  while (k < working.length && roundKg(working[k].weight) === weight) k++
+  const backoff = working.slice(k)
+  if (backoff.some((set) => roundKg(set.weight) > roundKg(weight * BACKOFF_MAX_RATIO))) return null
+  return { main: working.slice(0, k), backoff, weight }
+}
+
 /**
  * Gewichtsvorschlag für die aktuelle Session.
  * @param {object} info - Übungsinfos (name, name_en, category, equipment, aiMetadata)
@@ -147,13 +168,15 @@ export function getWeightSuggestion(info = {}, lastSessionExercise = null, goal 
   if (!working.length) return null
   // Satz ohne Gewicht = Körpergewicht-Satz -> kein Gewichtsvorschlag.
   if (working.some((set) => set.weight <= 0)) return null
-  // Das Gewicht gilt erst als geschafft, wenn ALLE Arbeitssätze mit demselben Gewicht liefen
-  // (z.B. 5x5 mit 100 kg). Wurde zwischendurch reduziert (100/100/100/95/95) oder gesteigert,
-  // kein Vorschlag - Aufwärm-/Ramp-Up-Sätze zählen nicht (isWarmup).
-  const firstWeight = roundKg(working[0].weight)
-  if (working.some((set) => roundKg(set.weight) !== firstWeight)) return null
-  // Nur wenn ALLE Arbeitssätze das Ziel erreicht haben - sonst gleiches Gewicht, kein Hinweis.
-  if (!working.every((set) => set.reps >= target.target)) return null
+  // Das Gewicht gilt erst als geschafft, wenn ALLE Hauptsätze mit demselben Gewicht liefen
+  // (z.B. 5x5 mit 100 kg). Deutlich leichtere Zusatzsätze danach zählen nicht; kleine
+  // Reduzierungen (100/100/100/95/95) oder Steigerungen innerhalb der Sätze -> kein Vorschlag.
+  // Aufwärm-/Ramp-Up-Sätze zählen ohnehin nicht (isWarmup).
+  const split = splitMainAndBackoffSets(working)
+  if (!split) return null
+  const main = split.main
+  // Nur wenn ALLE Hauptsätze das Ziel erreicht haben - sonst gleiches Gewicht, kein Hinweis.
+  if (!main.every((set) => set.reps >= target.target)) return null
   // Bewusst KEIN Vergleich der Satzanzahl mit früheren Sessions: Favoriten werden mit den Sätzen
   // der letzten Session vorausgefüllt, nicht gemachte Sätze bleiben meist stehen - der Vergleich
   // hätte kaum gegriffen, aber bewusste Umstellungen (z.B. 5 -> 3 Sätze) bestraft.
@@ -162,8 +185,10 @@ export function getWeightSuggestion(info = {}, lastSessionExercise = null, goal 
   return {
     targetReps: target.target,
     increment,
-    baseWeight: Math.max(...working.map((set) => set.weight)),
-    suggestedWeights: working.map((set) => roundKg(set.weight + increment))
+    baseWeight: split.weight,
+    suggestedWeights: main.map((set) => roundKg(set.weight + increment)),
+    // Anzahl Zusatzsätze letztes Mal - dort gibt es keinen Chip (siehe getSuggestionForSet).
+    backoffSets: split.backoff.length
   }
 }
 
@@ -180,10 +205,13 @@ export function getProgressionStatus(info = {}, lastSessionExercise = null, goal
   if (!lastSessionExercise || isNoLoadExercise(info)) return null
   const target = getRepTarget(info, goal)
   if (!target) return null
-  const working = getWorkingSets(lastSessionExercise)
-  if (!working.length || working.some((set) => set.weight <= 0)) return null
-  const firstWeight = roundKg(working[0].weight)
-  if (working.some((set) => roundKg(set.weight) !== firstWeight)) return null
+  const all = getWorkingSets(lastSessionExercise)
+  if (!all.length || all.some((set) => set.weight <= 0)) return null
+  // Nur Hauptsätze zählen (siehe splitMainAndBackoffSets) - Zusatzsätze bleiben außen vor.
+  const split = splitMainAndBackoffSets(all)
+  if (!split) return null
+  const working = split.main
+  const firstWeight = split.weight
 
   const totalReps = working.reduce((sum, set) => sum + set.reps, 0)
   const targetTotal = working.length * target.target
@@ -208,5 +236,7 @@ export function getProgressionStatus(info = {}, lastSessionExercise = null, goal
 export function getSuggestionForSet(suggestion, workingSetIndex) {
   const list = suggestion?.suggestedWeights
   if (!Array.isArray(list) || !list.length || workingSetIndex < 0) return null
+  // Letztes Mal gab es Zusatzsätze: Sätze nach den Hauptsätzen bekommen keinen Vorschlag.
+  if ((suggestion.backoffSets || 0) > 0 && workingSetIndex >= list.length) return null
   return list[Math.min(workingSetIndex, list.length - 1)]
 }

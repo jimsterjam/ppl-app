@@ -174,84 +174,30 @@
                 <strong class="ex-name-only">{{ getTranslatedExerciseName(ex.name) }}</strong>
               </template>
               <template v-else>
-                <img
-                  :src="getExerciseImage(ex)"
-                  :alt="getTranslatedExerciseName(ex.name)"
-                  class="ex-thumb"
-                  @error="onImgError"
-                  @click="openExerciseMedia(ex)"
-                />
+                <!-- Übungskopf (UI-Überarbeitung): Name, Trainingsart-Chip und "⋮"-Menü. Bild, 1RM
+                     und Entfernen liegen im Menü (openExerciseMenu), "Dein Feedback" unten neben
+                     "+ Satz" (wird meist nach der Übung ausgefüllt). -->
                 <div class="ex-text">
                   <div class="ex-title-row">
                     <strong>{{ getTranslatedExerciseName(ex.name) }}</strong>
-                    <button
-                      class="remove-exercise-btn"
-                      type="button"
-                      :title="t('common.remove')"
-                      @click="askRemoveExercise(i)"
-                    >
-                      <Trash2 class="btn-icon" aria-hidden="true" />
-                    </button>
+                    <div class="ex-title-actions">
+                      <button
+                        v-if="showTrainingTypeControl"
+                        type="button"
+                        class="training-type-chip"
+                        :aria-label="t('workoutDetail.trainingTypeAria', { name: getTranslatedExerciseName(ex.name) })"
+                        @click="openTrainingTypeModal(i)"
+                      >{{ trainingTypeChipText(i) }}</button>
+                      <button
+                        type="button"
+                        class="ex-more-btn"
+                        :aria-label="t('workoutDetail.exerciseMenuAria', { name: getTranslatedExerciseName(ex.name) })"
+                        @click="openExerciseMenu(i)"
+                      >⋮</button>
+                    </div>
                   </div>
                   <small>{{ getTranslatedMuscleGroup ? getTranslatedMuscleGroup(ex.muscleGroup) : ex.muscleGroup }}</small>
                   <p v-if="ex.description" class="ex-description">{{ ex.description }}</p>
-                  <!-- <p v-if="favoriteLastPerformanceByIndex[i]" class="last-performance-hint">
-                    Letztes Mal: {{ favoriteLastPerformanceByIndex[i].sets }} Sets · {{ favoriteLastPerformanceByIndex[i].reps }} Wdh · {{ favoriteLastPerformanceByIndex[i].weight }} kg
-                  </p> -->
-                  <!-- Notiz-Button und Feld -->
-                  <div style="margin-top: 6px;">
-                    <button class="link" @click="toggleNote(i)">
-                      <StickyNote class="btn-icon btn-icon--inline" aria-hidden="true" />
-                      {{ getNote(i)
-                        ? (showNote[i] ? t('workoutDetail.noteEdit') : t('workoutDetail.noteShow'))
-                        : t('workoutDetail.noteAdd') }}
-                    </button>
-
-                    <button
-                      class="link danger"
-                      v-if="getNote(i)"
-                      @click="askDeleteNote(i)"
-                      style="margin-left:8px;"
-                    >
-                      <Trash2 class="btn-icon btn-icon--inline" aria-hidden="true" /> {{ t('workoutDetail.noteDelete') }}
-                    </button>
-                  </div>
-
-                  <div v-if="showNote && showNote[i]" style="margin-top: 4px;">
-                    <OneTimeHint
-                      hint-id="first-exercise-note"
-                      :title="t('onboarding.hintFirstNoteTitle')"
-                      :text="t('onboarding.hintFirstNoteText')"
-                    />
-                    <textarea :value="getNote(i)" @input="setNote(i, $event.target.value)" rows="2" style="width:100%;resize:vertical" :placeholder="t('workoutDetail.notePlaceholder')"></textarea>
-                  </div>
-
-                  <!-- 1RM (geschätztes Maximalgewicht für 1 Wiederholung) - nur bei Übungen aus der
-                       festen Whitelist (Back/Front Squat, Bench, Deadlift, Overhead Press,
-                       gewichtete Klimmzüge/Dips, Olympische Hebungen) sinnvoll, siehe
-                       oneRepMaxExercises.js. Bei eigenen/unbekannten Übungen erst nach explizitem
-                       Opt-in über den Toggle unten (isCustomExercise()). Eigener Speicherpfad
-                       (nicht Teil des Workout-Speicherns), da 1RM übungsgebunden und nutzerweit
-                       gilt, nicht pro Workout-Session (siehe Regel 19 in OpenAIProvider.js). -->
-                  <div v-if="isCustomExercise(ex)" style="margin-top: 6px;">
-                    <label class="one-rep-max-toggle">
-                      <input
-                        type="checkbox"
-                        :checked="getIsCustomOneRepMaxTrackingEnabled(i)"
-                        @change="toggleTrackOneRepMax(i)"
-                      />
-                      {{ t('workoutDetail.trackOneRepMax') }}
-                    </label>
-                  </div>
-
-                  <div v-if="isOneRepMaxRelevant(ex, i)" style="margin-top: 6px;">
-                    <button class="link" @click="toggleOneRepMax(i)">
-                      <Dumbbell class="btn-icon btn-icon--inline" aria-hidden="true" />
-                      {{ getOneRepMaxDisplay(i) != null
-                        ? (showOneRepMax[i] ? t('workoutDetail.oneRepMaxEdit') : t('workoutDetail.oneRepMaxValue', { value: getOneRepMaxDisplay(i) }))
-                        : t('workoutDetail.oneRepMaxAdd') }}
-                    </button>
-                  </div>
 
                   <div v-if="showOneRepMax && showOneRepMax[i]" class="one-rep-max-field" style="margin-top: 4px;">
                     <label :for="`one-rep-max-${i}`">
@@ -307,23 +253,48 @@
 
             <div class="ex-sets" v-if="!isReordering">
 
-              <!-- Aufwärmsätze: Label + Tabellenkopf nur zeigen, wenn schon ein Aufwärmsatz
-                   existiert - sonst nur der kompakte "+"-Link weiter unten (siehe warmup-actions). -->
-              <template v-if="hasWarmupSets(ex)">
-                <div class="sets-section-label warmup-label">{{ t('workoutDetail.warmupSetsLabel') }}</div>
-                <div class="set-row header">
-                  <span class="col set">{{ t('workoutDetail.set') }}</span>
-                  <span class="col reps">{{ t('workoutDetail.reps') }}</span>
-                  <span class="col weight">{{ t('workoutDetail.weight') }}</span>
-                  <span class="col actions"></span>
-                </div>
-              </template>
+              <!-- Hinweis vor dem Eintragen (UI-Überarbeitung): Steigern / Knapp dran / Halten /
+                   Explosiv / Ziel als farbiger Kasten oben statt einer Zeile unter den Sätzen. -->
+              <div
+                v-if="showProgressionHints && (repTargetsByIndex[i] || goalByIndex[i] === 'explosive')"
+                class="progression-callout"
+                :class="`progression-callout--${progressionStateFor(i)}`"
+              >
+                <span>{{ progressionHintText(i) }}</span>
+                <!-- Erklärung (FAQ-Text) als Fenster direkt im Workout: kein Seitenwechsel, laufende
+                     Stoppuhr/Timer bleiben unberührt. -->
+                <button
+                  type="button"
+                  class="progression-info-btn"
+                  :aria-label="t('workoutDetail.weightSuggestionInfo')"
+                  @click="showWeightSuggestionInfo = true"
+                >
+                  <Info class="btn-icon btn-icon--inline" aria-hidden="true" />
+                </button>
+              </div>
+
+              <!-- Spaltenkopf immer sichtbar; "kg" steht nur hier, nicht mehr in jedem Feld. -->
+              <div v-if="(ex.setDetails || []).length" class="set-row header">
+                <span class="col set">{{ t('workoutDetail.set') }}</span>
+                <span class="col reps">{{ t('workoutDetail.reps') }}</span>
+                <span class="col weight">{{ t('workoutDetail.weightKgShort') }}</span>
+                <span class="col actions"></span>
+              </div>
+
+              <!-- Aufwärmsätze einklappbar: offen, bis der erste Arbeitssatz abgehakt ist. -->
+              <button
+                v-if="hasWarmupSets(ex)"
+                type="button"
+                class="warmup-toggle"
+                :aria-expanded="isWarmupOpen(i)"
+                @click="toggleWarmups(i)"
+              >{{ isWarmupOpen(i) ? '▾' : '▸' }} {{ t('workoutDetail.warmupSetsLabel') }} ({{ warmupCount(ex) }})</button>
               <template
                 v-for="(row, rIdx) in (ex.setDetails || [])"
                 :key="`${ex.exerciseId || i}-row-${rIdx}`"
               >
                 <!-- Aufwärmsätze werden nicht abgehakt (zählen nie für Vorschlag/Prüfung). -->
-                <div v-if="row.isWarmup" class="set-row warmup-row" :data-set-index="rIdx">
+                <div v-if="row.isWarmup && isWarmupOpen(i)" class="set-row warmup-row" :data-set-index="rIdx">
                   <span class="col set">{{ getSetLabel(ex.setDetails, rIdx) }}</span>
                   <span class="col reps">
                     <div class="number-with-spinner">
@@ -419,7 +390,6 @@
                           >▼</button>
                         </div>
                       </div>
-                      <span class="unit">kg</span>
                     </div>
                   </span>
                   <span class="col actions">
@@ -427,31 +397,18 @@
                   </span>
                 </div>
               </template>
-              <div class="row-actions warmup-actions" :class="{ 'warmup-actions--empty': !hasWarmupSets(ex) }">
+              <div v-if="!hasWarmupSets(ex) || isWarmupOpen(i)" class="row-actions warmup-actions" :class="{ 'warmup-actions--empty': !hasWarmupSets(ex) }">
                 <button class="add-warmup-btn" @click="addWarmupSetRow(i, $event)"><Plus class="btn-icon btn-icon--inline" aria-hidden="true" /> {{ t('workoutDetail.addWarmupSet') }}</button>
               </div>
 
               <!-- Arbeitssätze -->
               <div class="sets-section-divider" v-if="hasWarmupSets(ex)"></div>
-              <div class="sets-section-label working-label">
-                {{ t('workoutDetail.workingSetsLabel') }}
-                <!-- Trainingsart der Übung (Kraft/Muskelaufbau/Explosiv): antippen öffnet die Auswahl.
-                     Voreinstellung = Workout-Ziel bzw. automatisch "Explosiv" (weightSuggestion.js). -->
-                <button
-                  v-if="showTrainingTypeControl"
-                  type="button"
-                  class="training-type-btn"
-                  :aria-label="t('workoutDetail.trainingTypeAria', { name: getTranslatedExerciseName(ex.name) })"
-                  @click="openTrainingTypeModal(i)"
-                >· {{ goalByIndex[i] === 'explosive'
-                    ? t('workoutDetail.trainingTypeExplosive')
-                    : (repTargetsByIndex[i] ? t('workoutDetail.repTargetShort', { reps: repTargetsByIndex[i].target }) : t(`workoutDetail.trainingType_${goalByIndex[i]}`)) }} ▾</button>
-              </div>
+              <div class="sets-section-label working-label">{{ t('workoutDetail.workingSetsLabel') }}</div>
               <template
                 v-for="(row, rIdx) in (ex.setDetails || [])"
                 :key="`${ex.exerciseId || i}-working-row-${rIdx}`"
               >
-                <div v-if="!row.isWarmup" class="set-row" :class="{ 'set-row-empty': isRowEmpty(row), 'set-row--open': !isRowDone(row) }" :data-set-index="rIdx">
+                <div v-if="!row.isWarmup" class="set-row" :class="{ 'set-row-empty': isRowEmpty(row), 'set-row--open': !isRowDone(row), 'set-row--done': setTrackingActive && isRowDone(row) }" :data-set-index="rIdx">
                   <span class="col set">
                     <!-- Abhaken (laufendes Workout): Nummer antippen = Satz gemacht, nochmal = zurück.
                          Nicht abgehakte Sätze erscheinen grau (übernommene Werte vom letzten Mal). -->
@@ -514,7 +471,7 @@
                     </div>
                   </span>
                   <span class="col weight">
-                    <div class="weight-input" :class="{ 'has-suggestion': showProgressionHints && weightSuggestionFor(i, rIdx) != null }">
+                    <div class="weight-input">
                       <div class="number-with-spinner">
                         <input
                           v-model.number="row.weight"
@@ -560,16 +517,6 @@
                           >▼</button>
                         </div>
                       </div>
-                      <span class="unit">kg</span>
-                      <!-- Gewichtsvorschlag (utils/weightSuggestion.js): reiner Hinweis, trägt nichts ein.
-                           pointer-events:none im CSS - ein Tipp landet wie bisher im Gewichtsfeld und
-                           öffnet die Zahlenauswahl, der Chip selbst reagiert nicht. -->
-                      <span
-                        v-if="showProgressionHints && weightSuggestionFor(i, rIdx) != null"
-                        class="weight-suggestion-chip"
-                        :class="{ reached: Number(row.weight) >= weightSuggestionFor(i, rIdx) }"
-                        :aria-label="t('workoutDetail.weightSuggestionAria', { weight: formatKg(weightSuggestionFor(i, rIdx)) })"
-                      >{{ Number(row.weight) >= weightSuggestionFor(i, rIdx) ? '✓' : `↑ ${formatKg(weightSuggestionFor(i, rIdx))}` }}</span>
                     </div>
                   </span>
                   <span class="col actions">
@@ -578,21 +525,31 @@
                 </div>
               </template>
 
-              <p v-if="showProgressionHints && (repTargetsByIndex[i] || goalByIndex[i] === 'explosive')" class="progression-hint-line">
-                <span>{{ progressionHintText(i) }}</span>
-                <!-- Erklärung (FAQ-Text) als Fenster direkt im Workout: kein Seitenwechsel, laufende
-                     Stoppuhr/Timer bleiben unberührt. -->
-                <button
-                  type="button"
-                  class="progression-info-btn"
-                  :aria-label="t('workoutDetail.weightSuggestionInfo')"
-                  @click="showWeightSuggestionInfo = true"
-                >
-                  <Info class="btn-icon btn-icon--inline" aria-hidden="true" />
-                </button>
-              </p>
-              <div class="row-actions">
+              <!-- Unten: "+ Satz" und "Dein Feedback" (wird meist nach der Übung ausgefüllt). -->
+              <div class="row-actions ex-bottom-actions">
                 <button class="add-row-btn" :title="t('workoutDetail.addSet')" @click="addSetRow(i, $event)"><Plus class="btn-icon btn-icon--inline" aria-hidden="true" /> {{ t('workoutDetail.addSet') }}</button>
+                <span class="ex-note-actions">
+                  <button class="link" :class="{ 'has-note': !!getNote(i) }" :aria-expanded="!!(showNote && showNote[i])" @click="toggleNote(i)">
+                    <StickyNote class="btn-icon btn-icon--inline" aria-hidden="true" />
+                    {{ t('workoutDetail.noteAdd') }}<span v-if="getNote(i)" class="note-check" aria-hidden="true"> ✓</span>
+                  </button>
+                  <button
+                    v-if="getNote(i)"
+                    class="link danger"
+                    :aria-label="t('workoutDetail.deleteNoteConfirmTitle')"
+                    @click="askDeleteNote(i)"
+                  >
+                    <Trash2 class="btn-icon btn-icon--inline" aria-hidden="true" />
+                  </button>
+                </span>
+              </div>
+              <div v-if="showNote && showNote[i]" class="ex-note-field">
+                <OneTimeHint
+                  hint-id="first-exercise-note"
+                  :title="t('onboarding.hintFirstNoteTitle')"
+                  :text="t('onboarding.hintFirstNoteText')"
+                />
+                <textarea :value="getNote(i)" @input="setNote(i, $event.target.value)" rows="2" style="width:100%;resize:vertical" :placeholder="t('workoutDetail.notePlaceholder')"></textarea>
               </div>
             </div>
           </div>
@@ -769,6 +726,43 @@
       >{{ paragraph }}</p>
     </AppModal>
 
+    <!-- "⋮"-Menü einer Übung: Nebenaktionen (Bild/Video, 1RM, Übung entfernen). -->
+    <AppModal
+      v-model="showExerciseMenu"
+      :title="exerciseMenuName"
+      :confirm-text="t('common.close')"
+      :show-cancel="false"
+      type="info"
+    >
+      <div v-if="exerciseMenuExercise" class="exercise-menu-actions">
+        <button type="button" class="exercise-menu-btn" @click="exerciseMenuShowMedia">
+          {{ t('workoutDetail.exerciseMenuMedia') }}
+        </button>
+        <button
+          v-if="isOneRepMaxRelevant(exerciseMenuExercise, exerciseMenuIndex)"
+          type="button"
+          class="exercise-menu-btn"
+          @click="exerciseMenuOneRepMax"
+        >
+          {{ getOneRepMaxDisplay(exerciseMenuIndex) != null
+            ? t('workoutDetail.oneRepMaxValue', { value: getOneRepMaxDisplay(exerciseMenuIndex) })
+            : t('workoutDetail.oneRepMaxAdd') }}
+        </button>
+        <!-- Eigene Übungen: 1RM-Verfolgung per Opt-in (siehe oneRepMaxExercises.js). -->
+        <label v-if="isCustomExercise(exerciseMenuExercise)" class="exercise-menu-toggle">
+          <input
+            type="checkbox"
+            :checked="getIsCustomOneRepMaxTrackingEnabled(exerciseMenuIndex)"
+            @change="toggleTrackOneRepMax(exerciseMenuIndex)"
+          />
+          {{ t('workoutDetail.trackOneRepMax') }}
+        </label>
+        <button type="button" class="exercise-menu-btn danger" @click="exerciseMenuRemove">
+          {{ t('workoutDetail.exerciseMenuRemove') }}
+        </button>
+      </div>
+    </AppModal>
+
     <!-- Trainingsart einer Übung (Kraft / Muskelaufbau / Explosiv). -->
     <AppModal
       v-model="showTrainingTypeModal"
@@ -925,7 +919,7 @@ import { getCurrentInstance } from 'vue'
 import NumberPicker from '@/components/NumberPicker.vue'
 import { useExerciseTranslation, getEnglishExerciseName } from '@/utils/exerciseTranslation'
 import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
-import { getRepTarget, getProgressionStatus, getSuggestionForSet, isNoLoadExercise, resolveExerciseGoal, sanitizeExerciseTrainingType } from '@/utils/weightSuggestion'
+import { getRepTarget, getProgressionStatus, isNoLoadExercise, resolveExerciseGoal, sanitizeExerciseTrainingType } from '@/utils/weightSuggestion'
 import { prepareHistoryCandidates, findLastSessionExercise } from '@/utils/lastSessionLookup'
 import { sanitizeWorkoutGoal } from '@/utils/workoutGoal'
 import WorkoutGoalPicker from '@/components/WorkoutGoalPicker.vue'
@@ -948,7 +942,7 @@ import WorkoutTimerConfig from '@/components/timer/WorkoutTimerConfig.vue'
 import SessionStopwatch from '@/components/SessionStopwatch.vue'
 // Einheitliches Icon-Set statt Emoji/ASCII-Mix (🗑️/📝/⋮⋮/▲▼/＋/−) - wie im Rest der App
 // (siehe z.B. BottomNav.vue, AiFeedbackRatingWidget.vue) bereits lucide-vue-next genutzt.
-import { Clock, Trash2, StickyNote, GripVertical, Plus, Minus, Dumbbell, Info, Weight } from 'lucide-vue-next'
+import { Clock, Trash2, StickyNote, GripVertical, Plus, Minus, Info, Weight } from 'lucide-vue-next'
 import { useToastStore } from '@/stores/toastStore'
 import { useTimerStore } from '@/stores/timerStore'
 import { useI18n } from 'vue-i18n'
@@ -2081,6 +2075,70 @@ function openTrainingTypeModal(index) {
   showTrainingTypeModal.value = true
 }
 
+// Kurzform im Übungskopf: "Kraft · 5 Wdh." / "Explosiv".
+function trainingTypeChipText(index) {
+  const goal = goalByIndex.value[index]
+  const label = t(`workoutDetail.trainingType_${goal || 'hypertrophy'}`)
+  const target = repTargetsByIndex.value[index]?.target
+  return goal !== 'explosive' && target ? t('workoutDetail.trainingTypeChip', { type: label, reps: target }) : label
+}
+
+// Zustand für die Farbe des Hinweiskastens.
+function progressionStateFor(index) {
+  const state = progressionStatusByIndex.value[index]?.state
+  if (state) return state
+  return goalByIndex.value[index] === 'explosive' ? 'explosive' : 'target'
+}
+
+// --- Aufwärmsätze einklappbar -----------------------------------------------------------
+// Ohne eigene Wahl offen, bis der erste Arbeitssatz abgehakt ist (dann sind sie meist erledigt).
+const warmupOpenOverride = ref({})
+
+function warmupCount(ex) {
+  return (ex?.setDetails || []).filter((row) => row?.isWarmup).length
+}
+
+function isWarmupOpen(index) {
+  const own = warmupOpenOverride.value[index]
+  if (typeof own === 'boolean') return own
+  if (!setTrackingActive.value) return true
+  const sets = workout.value?.exercises?.[index]?.setDetails || []
+  return !sets.some((row) => row && !row.isWarmup && row.done === true)
+}
+
+function toggleWarmups(index) {
+  warmupOpenOverride.value = { ...warmupOpenOverride.value, [index]: !isWarmupOpen(index) }
+}
+
+// --- "⋮"-Menü einer Übung -----------------------------------------------------------------
+const showExerciseMenu = ref(false)
+const exerciseMenuIndex = ref(-1)
+const exerciseMenuExercise = computed(() => workout.value?.exercises?.[exerciseMenuIndex.value] || null)
+const exerciseMenuName = computed(() => getTranslatedExerciseName(exerciseMenuExercise.value?.name || ''))
+
+function openExerciseMenu(index) {
+  exerciseMenuIndex.value = index
+  showExerciseMenu.value = true
+}
+
+function exerciseMenuShowMedia() {
+  const ex = exerciseMenuExercise.value
+  showExerciseMenu.value = false
+  if (ex) nextTick(() => openExerciseMedia(ex))
+}
+
+function exerciseMenuOneRepMax() {
+  const index = exerciseMenuIndex.value
+  showExerciseMenu.value = false
+  if (!(showOneRepMax.value && showOneRepMax.value[index])) toggleOneRepMax(index)
+}
+
+function exerciseMenuRemove() {
+  const index = exerciseMenuIndex.value
+  showExerciseMenu.value = false
+  nextTick(() => askRemoveExercise(index))
+}
+
 function applyTrainingType() {
   const ex = workout.value?.exercises?.[trainingTypeModalIndex.value]
   const choice = sanitizeExerciseTrainingType(trainingTypeChoice.value)
@@ -2111,32 +2169,17 @@ const progressionStatusByIndex = computed(() =>
   )
 )
 
-const suggestionsByIndex = computed(() =>
-  progressionStatusByIndex.value.map((status) => status?.suggestion || null)
-)
 
 function progressionHintText(index) {
   const status = progressionStatusByIndex.value[index]
   const params = status
-    ? { weight: formatKg(status.weight), reps: status.targetReps, sets: status.sets, done: status.totalReps, total: status.targetTotal, missing: status.missingReps }
+    ? { next: formatKg(status.suggestion?.suggestedWeights?.[0] ?? status.weight), weight: formatKg(status.weight), reps: status.targetReps, sets: status.sets, done: status.totalReps, total: status.targetTotal, missing: status.missingReps }
     : null
   if (status?.state === 'increase') return t('workoutDetail.weightSuggestionReason', params)
   if (status?.state === 'close') return t('workoutDetail.progressionClose', params)
   if (status?.state === 'hold') return t('workoutDetail.progressionHold', params)
   if (goalByIndex.value[index] === 'explosive') return t('workoutDetail.explosiveExplain')
   return t('workoutDetail.repTargetExplain', { reps: repTargetsByIndex.value[index]?.target })
-}
-
-function weightSuggestionFor(exerciseIndex, rowIndex) {
-  const suggestion = suggestionsByIndex.value[exerciseIndex]
-  if (!suggestion) return null
-  const sets = workout.value?.exercises?.[exerciseIndex]?.setDetails || []
-  if (sets[rowIndex]?.isWarmup) return null
-  let workingIndex = -1
-  for (let k = 0; k <= rowIndex; k++) {
-    if (!sets[k]?.isWarmup) workingIndex++
-  }
-  return getSuggestionForSet(suggestion, workingIndex)
 }
 
 function formatKg(value) {
@@ -4007,39 +4050,28 @@ onBeforeUnmount(() => {
 .set-row.header { color: var(--muted); font-size: 0.75rem; padding-top: 0; }
 /* Spaltentitel mittig über den (mittig ausgerichteten) Werten. */
 .set-row.header .col { text-align: center; }
-.set-row .col input { width: 100%; min-height: 40px; padding: 8px 6px; border-radius: 6px; border: 1px solid var(--card-border); background: var(--surface); color: var(--fg); text-align: center; font-size: 1rem; }
+.set-row .col input { width: 100%; min-height: 40px; padding: 8px 6px; border-radius: 6px; border: 1px solid var(--card-border); background: var(--surface); color: var(--fg); text-align: center; font-size: 1.1rem; font-weight: 600; font-variant-numeric: tabular-nums; }
 .weight-input { position: relative; }
-.weight-input .unit { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 0.75rem; pointer-events: none; }
-/* Mit Vorschlag: Wert links, "kg" in der Mitte, Chip rechts im selben Feld. */
-.weight-input.has-suggestion input { text-align: center; padding-left: 8px; padding-right: 72px; }
-.weight-input.has-suggestion .unit { right: 58px; }
-.weight-suggestion-chip {
-  position: absolute;
-  right: 4px;
-  top: 50%;
-  transform: translateY(-50%);
-  pointer-events: none; /* reiner Hinweis - Tipps gehen ans Gewichtsfeld (Zahlenauswahl) */
-  padding: 2px 5px;
-  border-radius: 5px;
-  font-size: 0.7rem;
-  font-weight: 700;
-  line-height: 1.3;
-  white-space: nowrap;
-  color: var(--accent-contrast, #060606);
-  background: color-mix(in srgb, var(--accent) 85%, transparent);
-}
-.weight-suggestion-chip.reached {
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 15%, transparent);
-}
-.progression-hint-line {
-  margin: 4px 0 0;
-  font-size: 0.78rem;
-  line-height: 1.4;
-  color: var(--muted);
+/* UI-Überarbeitung: Hinweis als Kasten über den Sätzen. Steigern in Akzentfarbe, alles andere
+   neutral - so fällt nur die eine handlungsrelevante Empfehlung auf. */
+.progression-callout {
   display: flex;
   align-items: flex-start;
-  gap: 4px;
+  gap: 6px;
+  margin: 2px 0 10px;
+  padding: 9px 10px;
+  border-radius: 10px;
+  font-size: 0.84rem;
+  line-height: 1.4;
+  color: var(--fg);
+  background: color-mix(in srgb, var(--fg) 6%, transparent);
+  border: 1px solid color-mix(in srgb, var(--fg) 10%, transparent);
+}
+.progression-callout > span { flex: 1; }
+.progression-callout--increase {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  font-weight: 600;
 }
 .progression-info-btn {
   flex: 0 0 auto;
@@ -4312,20 +4344,70 @@ onBeforeUnmount(() => {
   padding-top: 2px;
 }
 /* Trainingsart-Auswahl im Arbeitssatz-Label (unauffällig, aber antippbar). */
-.training-type-btn {
+.training-type-chip {
   min-width: 0;
   min-height: 0;
-  padding: 2px 4px;
-  margin-left: 2px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--accent);
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--fg);
   font: inherit;
-  font-size: inherit;
+  font-size: 0.72rem;
   font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
 }
+.ex-title-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+.ex-more-btn {
+  min-width: 0;
+  min-height: 0;
+  width: 26px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.2rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+.warmup-toggle {
+  min-width: 0;
+  min-height: 0;
+  display: block;
+  padding: 4px 0;
+  margin: 2px 0;
+  border: none;
+  background: transparent;
+  color: color-mix(in srgb, #f59e0b 65%, var(--muted));
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+.ex-bottom-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.ex-note-actions { display: inline-flex; align-items: center; gap: 6px; }
+.ex-note-actions .has-note { color: var(--fg); }
+.note-check { color: var(--accent); }
+.ex-note-field { margin-top: 4px; }
+.exercise-menu-actions { display: flex; flex-direction: column; gap: 8px; }
+.exercise-menu-btn {
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--card-border);
+  background: var(--surface);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.exercise-menu-btn.danger { color: var(--danger); }
+.exercise-menu-toggle { display: flex; align-items: center; gap: 8px; padding: 6px 2px; font-size: 0.9rem; }
 .training-type-exercise { font-weight: 700; margin: 0 0 10px; }
 .training-type-options { display: flex; flex-direction: column; gap: 8px; }
 .training-type-option {
@@ -4428,6 +4510,13 @@ onBeforeUnmount(() => {
 .review-defer input { margin-top: 3px; }
 .review-defer small { display: block; margin-top: 2px; color: var(--muted); font-size: 0.78rem; line-height: 1.35; }
 /* Nicht abgehakt: Werte grau = nur übernommen / noch nicht gemacht. */
+/* Abgehakte Sätze ganz hinterlegen - Fortschritt auf einen Blick. */
+.set-row.set-row--done {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  /* Fläche etwas über die Zeile hinaus ziehen, ohne das Spaltenraster zu verschieben. */
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 10%, transparent);
+  border-radius: 6px;
+}
 .set-row.set-row--open .col input {
   color: var(--muted);
 }

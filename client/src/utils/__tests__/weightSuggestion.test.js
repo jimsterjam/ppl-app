@@ -48,7 +48,8 @@ describe('getWeightSuggestion', () => {
       targetReps: 5,
       increment: 2.5,
       baseWeight: 60,
-      suggestedWeights: [62.5, 62.5, 62.5]
+      suggestedWeights: [62.5, 62.5, 62.5],
+      backoffSets: 0
     })
   })
 
@@ -180,5 +181,37 @@ describe('Trainingsart pro Übung', () => {
 
   it('Isolationsübung im Kraft-Workout auf Muskelaufbau gestellt -> Ziel 12', () => {
     expect(getRepTarget(lateralRaise, resolveExerciseGoal(lateralRaise, 'strength', 'hypertrophy')).target).toBe(12)
+  })
+})
+
+describe('Zusatzsätze (Back-off) nach den Hauptsätzen', () => {
+  const sets = (list) => session(list.map(([reps, weight]) => ({ reps, weight })))
+
+  it('5x5 mit 100 kg + 2x10 mit 80 kg -> Vorschlag nur für die 5 Hauptsätze', () => {
+    const s = getWeightSuggestion(squat, sets([[5, 100], [5, 100], [5, 100], [5, 100], [5, 100], [10, 80], [10, 80]]), 'strength')
+    expect(s.suggestedWeights).toEqual([102.5, 102.5, 102.5, 102.5, 102.5])
+    expect(s.backoffSets).toBe(2)
+    expect(getSuggestionForSet(s, 4)).toBe(102.5)
+    expect(getSuggestionForSet(s, 5)).toBeNull()
+  })
+
+  it('Zusatzsätze egal für Knapp dran / Halten', () => {
+    const last = sets([[5, 100], [5, 100], [5, 100], [5, 100], [4, 100], [8, 80], [6, 80]])
+    expect(getProgressionStatus(squat, last, 'strength')).toMatchObject({ state: 'close', sets: 5, totalReps: 24 })
+  })
+
+  it('kleine Reduzierung (100 -> 95 kg, weniger als 15 %) verhindert den Vorschlag', () => {
+    expect(getWeightSuggestion(squat, sets([[5, 100], [5, 100], [5, 100], [5, 95], [5, 95]]), 'strength')).toBeNull()
+    expect(getWeightSuggestion(squat, sets([[5, 100], [5, 100], [5, 85]]), 'strength')).not.toBeNull()
+  })
+
+  it('ohne Zusatzsätze letztes Mal: mehr Sätze heute bekommen weiter den letzten Wert', () => {
+    const s = getWeightSuggestion(squat, sets([[5, 100], [5, 100]]), 'strength')
+    expect(s.backoffSets).toBe(0)
+    expect(getSuggestionForSet(s, 3)).toBe(102.5)
+  })
+
+  it('Pyramide (erster Satz nicht der schwerste) -> weiter kein Vorschlag', () => {
+    expect(getWeightSuggestion(squat, sets([[5, 90], [5, 100], [5, 80]]), 'strength')).toBeNull()
   })
 })

@@ -50,7 +50,9 @@ html {
   --divider: rgba(255, 255, 255, 0.1);
   --fg: #f4f6fb;
   --fg-strong: #ffffff;
-  --muted: #c7cde3;
+  /* Nebentexte deutlich dunkler als --fg (vorher #c7cde3, kaum Unterschied) - sonst fehlt die
+     Hierarchie zwischen Beschriftung und Werten. Kontrast auf --bg weiterhin > 7:1. */
+  --muted: #9aa3b8;
   --line-soft: rgba(255, 255, 255, 0.09);
   --line-strong: rgba(255, 255, 255, 0.2);
   --shadow-soft: 0 20px 45px rgba(0, 0, 0, 0.45);
