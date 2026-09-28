@@ -176,7 +176,15 @@
               <template v-else>
                 <!-- Übungskopf (UI-Überarbeitung): Name, Trainingsart-Chip und "⋮"-Menü. Bild, 1RM
                      und Entfernen liegen im Menü (openExerciseMenu), "Dein Feedback" unten neben
-                     "+ Satz" (wird meist nach der Übung ausgefüllt). -->
+                     "+ Satz" (wird meist nach der Übung ausgefüllt). Das Vorschaubild bleibt
+                     (Wunsch Paul: gerade für Einsteiger hilfreich), Tippen öffnet Bild/Video. -->
+                <img
+                  :src="getExerciseImage(ex)"
+                  :alt="getTranslatedExerciseName(ex.name)"
+                  class="ex-thumb"
+                  @error="onImgError"
+                  @click="openExerciseMedia(ex)"
+                />
                 <div class="ex-text">
                   <div class="ex-title-row">
                     <strong>{{ getTranslatedExerciseName(ex.name) }}</strong>
