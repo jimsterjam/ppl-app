@@ -49,6 +49,7 @@ import {
 import { decideExerciseMatch } from '../utils/exerciseMatching.js';
 import { getMaxExerciseCount } from '../utils/exerciseCountTarget.js';
 import { getRepRange } from '../utils/repTargets.js';
+import { buildNextSessionFocus, applyNextSessionFocus } from '../utils/nextSessionFocus.js';
 import { resolveEnglishExerciseName, resolveFeedbackLanguage } from '../utils/feedbackLocalization.js';
 import { createOpenAIClient, describeAiClientMode, ensureRelayAwake, markRelayContact } from '../utils/aiClientFactory.js';
 import {
@@ -2296,6 +2297,10 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
         weight_change_kg: weightChange.weightChangeKg,
         weight_change_scope: weightChange.scope,
         weight_change_set_numbers: weightChange.setNumbers,
+        // Spanne bei 'increased'/'decreased' (alle Sätze gleiche Richtung, unterschiedlich viel).
+        ...(typeof weightChange.minKg === 'number' ? { weight_change_min_kg: weightChange.minKg, weight_change_max_kg: weightChange.maxKg } : {}),
+        // Schwerster Satz - Maßstab bei gegenläufigen Sätzen ('mixed', z.B. Pyramide).
+        ...(typeof ex.changes?.top_weight_current === 'number' ? { top_weight_kg: ex.changes.top_weight_current, top_weight_change_kg: ex.changes.top_weight_change } : {}),
         volume_change_percent: ex.changes?.volume_change_percent ?? 0,
         is_first_session: ex.progression === 'first_session',
         is_notable: isNotable,
@@ -2333,6 +2338,27 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
         }
       }
 
+      // "Nächstes Mal"-Zeile: von der App bestimmt, nicht von der KI (siehe
+      // utils/nextSessionFocus.js). Erst NACH dem Verifier anhängen - dessen Zahlenprüfung kennt
+      // z.B. das vorgeschlagene Gewicht nicht. Der Shadow-Verifier unten prüft den KI-Entwurf.
+      const draftForVerifier = aiResult.feedback;
+      try {
+        const profileHintByName = new Map(
+          exerciseAnalyses
+            .filter((ex) => ex?.profileHint)
+            .map((ex) => [String(ex.exercise || '').trim().toLowerCase(), ex.profileHint])
+        );
+        const focus = buildNextSessionFocus({
+          workout: currentWorkout,
+          language: structuredAnalysis?.response_language,
+          profileHintByName,
+          englishNameByName: enNameByExerciseName
+        });
+        aiResult.feedback = applyNextSessionFocus(aiResult.feedback, focus);
+      } catch (e) {
+        logger.warn('⚠️ Fokus-Zeile konnte nicht gebaut werden', { requestId, error: e.message });
+      }
+
       // Kontingent erst bei tatsächlich erfolgreicher Generierung verbrauchen (nicht bei
       // Health-Check-Fehlschlag/network_unavailable oben oder einem AI-Fehler unten) - konsistent
       // mit /quick-generator und /ai-suggestion, die ebenfalls nur bei echtem Erfolg zählen.
@@ -2367,7 +2393,7 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
       if (verifierMode !== 'active') {
         runVerificationLoop({
           structuredAnalysis,
-          feedbackText: aiResult.feedback,
+          feedbackText: draftForVerifier,
           requestId
         }).catch((e) => {
           logger.warn('⚠️ Feedback-Verifier-Loop fehlgeschlagen', { requestId, error: e.message });

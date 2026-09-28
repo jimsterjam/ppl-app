@@ -323,6 +323,16 @@ KRITISCHE REGELN:
     - Diese Sprachregel ändert nichts an den inhaltlichen Grenzen der anderen Regeln (z.B. Regel
       4 zu Ausführung/Technik) - sie betrifft nur den Ton der ohnehin erlaubten Aussagen.
 
+24. GEGENLÄUFIGE SÄTZE (set_changes_opposite_directions: true, z.B. Pyramide mit anderem
+    Einstieg): Sätze NICHT einzeln gegeneinander aufrechnen ("Satz 4 weniger", "in den letzten
+    Sätzen weniger") - die Zuordnung Satz 1 zu Satz 1 ist hier irreführend. Einordnung
+    ausschließlich über den schwersten Satz (top_set_weight_kg / top_set_weight_change_kg) und
+    das insgesamt bewegte Gewicht (volume_change_percent).
+
+25. KEINE EMPFEHLUNG FÜR DIE NÄCHSTE EINHEIT: keinen Fokus-, "Nächstes Mal"- oder "Für die
+    nächste Einheit"-Satz schreiben. Die App ergänzt diese Zeile selbst aus ihrer eigenen
+    Progressionslogik, damit sie zu den Hinweisen im Workout passt.
+
 OUTPUT-FORMAT (Variante "kurze Chat-Nachricht" - das ist jetzt der Standard-Ton):
 Ungefähr 80-150 Wörter, deutlich kürzer als ein klassischer Report. KEINE sichtbaren
 Überschriften, kein Markdown-Fettdruck für Struktur - einfache Zeilen und Bindestriche/
@@ -339,12 +349,9 @@ Aufzählungspunkte reichen. Aufbau:
   Satz kombiniert (z.B. "- Bankdrücken: Gewicht rauf, Wiederholungen stabil - läuft."). Nur
   Übungen mit relevanter Veränderung, Notiz oder Auffälligkeit bekommen eine eigene Zeile
   (siehe Regel 16 - Rohzahlen nicht wiederholen, die stehen separat).
-- Zum Schluss EINE einzige, konkrete Fokus-Empfehlung für die nächste Einheit (nur wenn aus
-  den Daten ableitbar, siehe Regel 11) - ein Satz, keine Liste, keine Zusammenfassung der
-  bereits genannten Punkte.
+- KEINE Fokus-/"Nächstes Mal"-Zeile am Ende (Regel 25) - die App hängt sie selbst an.
 
-Kein separates "Fazit" oder "Zusammenfassung" am Ende - der Einstieg und die Fokus-Zeile
-reichen. Priorisiere statt alle Daten zu wiederholen.
+Kein separates "Fazit" oder "Zusammenfassung" am Ende - Einstieg und Übungs-Zeilen reichen. Priorisiere statt alle Daten zu wiederholen.
 Spreche den Nutzer direkt an (Du/Dein, nicht "Der Nutzer").
 Deutsch, warm, direkt, wie ein Coach im Chat - nicht wie ein Bericht.`;
 }

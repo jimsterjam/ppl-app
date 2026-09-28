@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const { calculateExerciseStats, analyzeExercise, buildSetsComparison, resolveSatzgenauWeightChange, resolveBodyweightCorrelation, structureAnalysisForAI } = await import(
+const { calculateExerciseStats, analyzeExercise, buildSetsComparison, resolveSatzgenauWeightChange, buildTopWeightChange, resolveBodyweightCorrelation, structureAnalysisForAI } = await import(
   join(__dirname, '../../services/trainingAnalysisService.js')
 )
 
@@ -514,5 +514,43 @@ describe('structureAnalysisForAI: 1RM-Felder (Regel 19)', () => {
     const result = structureAnalysisForAI(exerciseAnalyses)
     assert.equal(result.exercises[0].estimated_1rm_kg, 100)
     assert.equal(result.exercises[0].current_weight_percent_of_1rm, 80)
+  })
+})
+
+// User-Report: alle Sätze schwerer, aber unterschiedlich viel -> war "gemischt" und nie Steigerung;
+// verschobene Pyramide (Hack Calf Raise) -> Satz-für-Satz gegenläufig, Spitze gleich.
+describe('resolveSatzgenauWeightChange: gleiche Richtung vs. gegenläufig', () => {
+  test('alle Sätze schwerer, unterschiedlich viel -> "increased" mit Spanne', () => {
+    const result = resolveSatzgenauWeightChange([
+      { set_number: 1, weight_change_kg: 5, is_new_set: false },
+      { set_number: 2, weight_change_kg: 5, is_new_set: false },
+      { set_number: 3, weight_change_kg: 2.5, is_new_set: false }
+    ], 4.2)
+    assert.equal(result.scope, 'increased')
+    assert.equal(result.minKg, 2.5)
+    assert.equal(result.maxKg, 5)
+    assert.equal(result.weightChangeKg, 5)
+  })
+
+  test('alle Sätze leichter -> "decreased", min = kleinster Schritt', () => {
+    const result = resolveSatzgenauWeightChange([
+      { set_number: 1, weight_change_kg: -2.5, is_new_set: false },
+      { set_number: 2, weight_change_kg: -5, is_new_set: false }
+    ], 0)
+    assert.equal(result.scope, 'decreased')
+    assert.equal(result.minKg, -2.5)
+    assert.equal(result.maxKg, -5)
+  })
+
+  test('verschobene Pyramide -> "mixed"; schwerster Satz gleich', () => {
+    const sets = (weights) => ({ setDetails: weights.map((weight) => ({ reps: 12, weight })) })
+    const today = sets([128, 168, 198, 168, 148, 128])
+    const last = sets([88, 128, 168, 198, 168, 148])
+    const comparison = buildSetsComparison(today, last)
+    assert.equal(resolveSatzgenauWeightChange(comparison, 0).scope, 'mixed')
+    assert.deepEqual(buildTopWeightChange(today, last), { top_weight_current: 198, top_weight_previous: 198, top_weight_change: 0 })
+    const analysis = analyzeExercise('Hack Calf Raise', today, last, 3)
+    assert.equal(analysis.changes.volume_change_percent, 4.5)
+    assert.equal(analysis.changes.top_weight_change, 0)
   })
 })

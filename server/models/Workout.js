@@ -157,8 +157,14 @@ const workoutSchema = new mongoose.Schema({
     // Session-Ø-Differenz - diese beiden Felder geben dem Frontend (AiFeedbackDeltaSummary.vue)
     // den nötigen Kontext, um bei "partial" die betroffenen Sätze konkret zu benennen statt
     // eine pauschale Zahl zu behaupten.
-    weight_change_scope: { type: String, enum: ['none', 'uniform', 'partial', 'mixed', 'unknown'], default: 'unknown' },
+    weight_change_scope: { type: String, enum: ['none', 'uniform', 'partial', 'increased', 'decreased', 'mixed', 'unknown'], default: 'unknown' },
     weight_change_set_numbers: [{ type: Number }],
+    // 'increased'/'decreased': kleinste und größte Satz-Änderung (gleiche Richtung).
+    weight_change_min_kg: { type: Number },
+    weight_change_max_kg: { type: Number },
+    // Schwerster Arbeitssatz dieser Session und Änderung ggü. der letzten (Maßstab bei 'mixed').
+    top_weight_kg: { type: Number },
+    top_weight_change_kg: { type: Number },
     volume_change_percent: { type: Number, default: 0 },
     is_first_session: { type: Boolean, default: false },
     // Nur gesetzt, wenn die Übung eine tatsächlich auffällige Veränderung zeigt (siehe

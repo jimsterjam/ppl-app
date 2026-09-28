@@ -146,6 +146,24 @@ export function buildSetsComparison(currentEx, previousEx) {
 }
 
 /**
+ * Schwerster Arbeitssatz aktuell vs. vorher (kg). Maßstab, wenn sich die Sätze gegenläufig
+ * verändert haben (scope 'mixed', z.B. Pyramide mit anderem Einstieg).
+ */
+export function buildTopWeightChange(currentEx, previousEx) {
+  const top = (ex) => {
+    const weights = getWorkingSetsArray(ex).filter((s) => s.reps > 0).map((s) => s.weight);
+    return weights.length ? Math.max(...weights) : 0;
+  };
+  const current = top(currentEx);
+  const previous = top(previousEx);
+  return {
+    top_weight_current: current,
+    top_weight_previous: previous,
+    top_weight_change: Math.round((current - previous) * 10) / 10
+  };
+}
+
+/**
  * Löst die "wie viel Gewicht mehr/weniger" - Aussage satzgenau auf, statt (wie zuvor) einen
  * blanken Durchschnitt über alle Sätze zu bilden (Session-Ø-Gewicht aktuell minus Session-Ø-
  * Gewicht vorher, siehe calculateExerciseStats/analyzeExercise -> changes.weight_change).
@@ -165,15 +183,20 @@ export function buildSetsComparison(currentEx, previousEx) {
  * @param {number} fallbackWeightChangeKg - Session-Ø-Differenz (bisheriges Verhalten) - wird
  *   nur genutzt, wenn kein satzgenauer Vergleich möglich ist (fehlende Sätze-Daten) oder die
  *   Sätze wirklich gegenläufig verändert wurden (scope 'mixed', siehe unten).
- * @returns {{ weightChangeKg: number, scope: 'none'|'uniform'|'partial'|'mixed'|'unknown', setNumbers: number[] }}
+ * @returns {{ weightChangeKg: number, scope: 'none'|'uniform'|'partial'|'increased'|'decreased'|'mixed'|'unknown', setNumbers: number[], minKg?: number, maxKg?: number }}
  *   - 'none': keine Gewichtsveränderung.
  *   - 'uniform': ALLE vergleichbaren Sätze haben sich um denselben Betrag verändert - ein
  *     einzelner Satz-Vergleich fehlt hier extra zu nennen (setNumbers bleibt leer).
  *   - 'partial': NUR einzelne Sätze (setNumbers) haben sich verändert, der Rest blieb gleich -
  *     UI sollte die konkreten Satznummern nennen, statt den (irreführenden) Durchschnitt.
- *   - 'mixed': verschiedene Sätze haben sich UNTERSCHIEDLICH verändert (z.B. +2,5kg und -1kg) -
- *     keine einzelne Zahl kann das ehrlich zusammenfassen, UI sollte neutral/vorsichtig
- *     formulieren statt eine Zahl zu nennen.
+ *   - 'increased' / 'decreased': alle veränderten Sätze in DIESELBE Richtung, aber um
+ *     unterschiedlich viel (z.B. +2,5kg und +5kg) - UI nennt die Spanne (minKg bis maxKg).
+ *     User-Report: vorher landete das als 'mixed' ("unterschiedliche Gewichtsänderungen"), obwohl
+ *     jeder Satz schwerer war - und zählte damit nie als Steigerung.
+ *   - 'mixed': Sätze haben sich GEGENLÄUFIG verändert (z.B. +40kg und -30kg, typisch bei einer
+ *     verschobenen Pyramide) - ein Satz-für-Satz-Vergleich ist dann irreführend; UI/KI nutzen
+ *     stattdessen den schwersten Satz und das insgesamt bewegte Gewicht (top_weight_*,
+ *     volume_change_percent).
  *   - 'unknown': keine satzgenauen Vergleichsdaten vorhanden (z.B. Legacy-Struktur ohne
  *     setDetails) - Fallback auf die bisherige Session-Ø-Differenz.
  */
@@ -195,6 +218,21 @@ export function resolveSatzgenauWeightChange(setsComparison, fallbackWeightChang
 
   const distinctValues = [...new Set(changed.map((s) => round1(s.weight_change_kg)))];
   if (distinctValues.length > 1) {
+    const allUp = distinctValues.every((v) => v > 0);
+    const allDown = distinctValues.every((v) => v < 0);
+    if (allUp || allDown) {
+      // Gleiche Richtung, unterschiedlich viel: Spanne statt "gemischt". weightChangeKg = der
+      // betragsmäßig größte Schritt (Vorzeichen = Richtung) - nur für die Steigerungs-Wertung.
+      const minKg = Math.min(...distinctValues);
+      const maxKg = Math.max(...distinctValues);
+      return {
+        weightChangeKg: allUp ? maxKg : minKg,
+        scope: allUp ? 'increased' : 'decreased',
+        setNumbers: changed.map((s) => s.set_number),
+        minKg: allUp ? minKg : maxKg,
+        maxKg: allUp ? maxKg : minKg
+      };
+    }
     return { weightChangeKg: fallbackKg, scope: 'mixed', setNumbers: changed.map((s) => s.set_number) };
   }
 
@@ -325,7 +363,10 @@ export function analyzeExercise(exerciseName, currentEx, previousEx = null, days
         // bestehenden Trend-Berechnung.
         sets_change: currentStats.sets - prevStats.sets,
         volume_change: Math.round((currentStats.volume - prevStats.volume) * 10) / 10,
-        volume_change_percent: volumeChangePct
+        volume_change_percent: volumeChangePct,
+        // Schwerster Arbeitssatz (User-Report Pyramide: Satz-für-Satz-Vergleich ergab "gemischt",
+        // obwohl die Spitze gleich blieb und insgesamt mehr bewegt wurde).
+        ...buildTopWeightChange(currentEx, previousEx)
       };
 
       // Kap. 26: übungstypabhängige Trendbewertung, wenn ein Profil vorliegt (Rang 1-3);
@@ -666,8 +707,17 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
         reps_change: ex.changes.rep_change,
         sets_change: ex.changes.sets_change || 0,
         volume_change_kg: ex.changes.volume_change,
-        volume_change_percent: ex.changes.volume_change_percent
+        volume_change_percent: ex.changes.volume_change_percent,
+        ...(typeof ex.changes.top_weight_current === 'number' ? {
+          top_set_weight_kg: ex.changes.top_weight_current,
+          previous_top_set_weight_kg: ex.changes.top_weight_previous,
+          top_set_weight_change_kg: ex.changes.top_weight_change
+        } : {})
       },
+      // Sätze gegenläufig verändert (z.B. verschobene Pyramide) - siehe Regel 24 im Prompt.
+      ...(Array.isArray(ex.setsComparison) && resolveSatzgenauWeightChange(ex.setsComparison, 0).scope === 'mixed'
+        ? { set_changes_opposite_directions: true }
+        : {}),
 
       // Trend (von Backend berechnet)
       progression: ex.progression, // 'positive' | 'negative' | 'stable' | 'first_session'

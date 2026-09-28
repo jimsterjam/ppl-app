@@ -169,7 +169,9 @@ Erstelle das Feedback wie eine kurze Chat-Nachricht, KEINE Überschriften/Markdo
   Session gelaufen ist.
 - Pro Übung mit relevanter Veränderung oder Notiz eine kurze Zeile (Bindestrich), die
   Einschätzung und Hinweis kombiniert (z.B. "- Bankdrücken: Gewicht rauf, Wdh stabil - läuft.").
-- Zum Schluss EINE konkrete Fokus-Empfehlung für die nächste Einheit, ein Satz.
+- KEINE Fokus-/"Nächstes Mal"-Empfehlung am Ende - die App ergänzt sie selbst.
+- Bei gegenläufig veränderten Sätzen (z.B. Pyramide) keine Einzelsätze vergleichen, nur
+  schwerster Satz und insgesamt bewegtes Gewicht.
 
 Sprich den Nutzer direkt an (Du/Dein). Deutsch. Warm, direkt, wie ein Coach im Chat.`;
 
