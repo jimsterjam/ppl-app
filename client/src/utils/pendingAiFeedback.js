@@ -23,6 +23,8 @@ import { resolveRealIdFromDraftId, isValidObjectId } from './workoutHelpers'
 import { useFirebaseAuth } from './firebaseAuth'
 import { logger } from './logger'
 import { getAppLanguage } from '@/i18n'
+import { trackPendingFeedback } from './feedbackTracker'
+import { classifyFeedbackResponse, REQUEST_TIMEOUT_MS } from './feedbackRetryRules'
 
 const STORAGE_KEY = 'bro_split_pending_ai_feedback_v1'
 // Defensive Obergrenze: falls eine temporäre ID nie aufgelöst wird (z.B. Workout wurde nie
@@ -126,24 +128,29 @@ export async function processPendingAiFeedback() {
       try {
         const { getIdToken } = useFirebaseAuth()
         const token = await getIdToken().catch(() => null)
-        await axios.post(
+        const response = await axios.post(
           `${apiUrl('workouts')}/${realId}/ai-analysis`,
           { language: getAppLanguage() },
           {
             headers: token ? { Authorization: `Bearer ${token}` } : {},
-            timeout: 60000
+            timeout: REQUEST_TIMEOUT_MS
           }
         )
+        // Noch nicht fertig (z.B. KI-Relay im Kaltstart) -> an den Tracker übergeben, der
+        // automatisch nachlädt und meldet, sobald es da ist.
+        if (classifyFeedbackResponse(response?.data) === 'retry') trackPendingFeedback(realId)
         logger.debug('[pendingAiFeedback] Nachträgliche KI-Analyse ausgelöst', { tempId: entry.id, realId })
         // Angefragt (Ergebnis wird serverseitig auf dem Workout-Dokument gespeichert und
         // erscheint dadurch im Feedback-Verlauf, auch wenn die Zusammenfassung längst
         // geschlossen ist) - aus der Queue entfernen.
       } catch (err) {
-        logger.warn('[pendingAiFeedback] Nachträgliche KI-Analyse fehlgeschlagen, später erneut versuchen', {
+        // ID ist aufgelöst - das weitere Nachladen übernimmt der Tracker (kürzere Abstände,
+        // Meldung bei Erfolg), dieser Eintrag ist damit erledigt.
+        logger.warn('[pendingAiFeedback] Nachträgliche KI-Analyse fehlgeschlagen, Tracker übernimmt', {
           tempId: entry.id,
           error: err?.message
         })
-        stillPending.push({ ...entry, attempts: (entry.attempts || 0) + 1, lastAttemptAt: now })
+        trackPendingFeedback(realId)
       }
     }
 

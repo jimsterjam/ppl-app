@@ -140,11 +140,15 @@ const workoutSchema = new mongoose.Schema({
   // zu 'none' (Analyse wurde nie angefragt/ist nicht relevant, z.B. ältere Workouts von vor
   // diesem Feature) und 'generated' (ai_feedback wurde erfolgreich erzeugt, siehe
   // POST /:id/ai-analysis in routes/workouts.js).
+  // 'pending' = Analyse wurde angefragt, ist aber noch nicht fertig (z.B. KI-Relay im Kaltstart);
+  // der Client lädt automatisch nach (client/src/utils/feedbackTracker.js). Seit ai_pending_since
+  // länger als FEEDBACK_PENDING_FAILED_AFTER_MS offen -> in der Liste als "failed" ausgeliefert.
   ai_feedback_status: {
     type: String,
-    enum: ['none', 'deferred', 'generated'],
+    enum: ['none', 'deferred', 'pending', 'generated'],
     default: 'none'
   },
+  ai_pending_since: { type: Date },
   // Kompakte, strukturierte Delta-Zusammenfassung je Übung (Sätze/Wdh./Gewicht mehr bzw.
   // weniger als die vorherige Session) - wird zusammen mit ai_feedback einmalig berechnet und
   // gespeichert, damit die UI (PostWorkoutSummary/AIFeedbackHistory) eine übersichtliche,

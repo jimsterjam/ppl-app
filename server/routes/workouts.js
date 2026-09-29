@@ -50,6 +50,7 @@ import { decideExerciseMatch } from '../utils/exerciseMatching.js';
 import { getMaxExerciseCount } from '../utils/exerciseCountTarget.js';
 import { getRepRange } from '../utils/repTargets.js';
 import { buildNextSessionFocus, applyNextSessionFocus } from '../utils/nextSessionFocus.js';
+import { resolveListFeedbackStatus, FEEDBACK_PENDING_FAILED_AFTER_MS } from '../utils/feedbackStatus.js';
 import { resolveEnglishExerciseName, resolveFeedbackLanguage } from '../utils/feedbackLocalization.js';
 import { createOpenAIClient, describeAiClientMode, ensureRelayAwake, markRelayContact } from '../utils/aiClientFactory.js';
 import {
@@ -1061,6 +1062,15 @@ router.get("/exercise-stats", async (req, res) => {
   }
 });
 
+// 🔥 Aufwärmen während eines laufenden Workouts (Render Free-Plan: Server und KI-Relay schlafen
+// nach ~15 Min. ein; ein Kaltstart beider Dienste dauerte beim Speichern teils Minuten). Die App
+// ruft das beim Start des Workouts und danach alle 10 Min. auf - antwortet sofort, das Wecken
+// des Relays läuft im Hintergrund (kein OpenAI-Aufruf, keine Kosten).
+router.post("/ai-warmup", firebaseAuthMiddleware, (req, res) => {
+  ensureRelayAwake().catch(() => {});
+  res.status(202).json({ success: true });
+});
+
 // 📋 Liste aller Workouts mit gespeichertem AI-Feedback (chronologisch, neueste zuerst)
 router.get("/feedbacks", firebaseAuthMiddleware, async (req, res) => {
   try {
@@ -1079,7 +1089,7 @@ router.get("/feedbacks", firebaseAuthMiddleware, async (req, res) => {
       userId,
       $or: [
         { ai_feedback: { $exists: true, $ne: null } },
-        { ai_feedback_status: 'deferred' }
+        { ai_feedback_status: { $in: ['deferred', 'pending'] } }
       ]
     };
 
@@ -1089,14 +1099,14 @@ router.get("/feedbacks", firebaseAuthMiddleware, async (req, res) => {
         // Zurückgestellte Workouts oben anpinnen (sie haben kein ai_generated_at, würden bei
         // einer reinen Sortierung danach sonst je nach Sortierrichtung ganz oben oder unten
         // "verschwinden" statt als klar sichtbare, offene Aufgabe aufzufallen).
-        { $addFields: { _pendingFirst: { $cond: [{ $eq: ['$ai_feedback_status', 'deferred'] }, 0, 1] } } },
+        { $addFields: { _pendingFirst: { $cond: [{ $in: ['$ai_feedback_status', ['deferred', 'pending']] }, 0, 1] } } },
         { $sort: { _pendingFirst: 1, ai_generated_at: -1, date: -1 } },
         { $skip: skip },
         { $limit: limit },
         { $project: {
           name: 1, type: 1, date: 1, completed: 1,
           ai_feedback: 1, ai_generated_at: 1, ai_metadata: 1, ai_analysis_snapshot: 1,
-          ai_feedback_status: 1
+          ai_feedback_status: 1, ai_pending_since: 1
         } }
       ]),
       Workout.countDocuments(query)
@@ -1118,7 +1128,9 @@ router.get("/feedbacks", firebaseAuthMiddleware, async (req, res) => {
         ai_analysis_snapshot: w.ai_analysis_snapshot || [],
         // 'deferred' = noch kein Feedback, Nutzer hat es bewusst zurückgestellt (zeigt in der
         // UI ein "ausstehend"-Badge + "Jetzt generieren"-Button statt des Feedback-Texts).
-        ai_feedback_status: w.ai_feedback_status || (w.ai_feedback ? 'generated' : 'none')
+        // 'pending' = wird noch erstellt (Client lädt automatisch nach); nach
+        // FEEDBACK_PENDING_FAILED_AFTER_MS ohne Ergebnis als 'failed' ("Erneut versuchen").
+        ai_feedback_status: resolveListFeedbackStatus(w)
       })),
       page,
       limit,
@@ -2075,6 +2087,21 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
           aiAvailable: false
         }
       });
+    }
+
+    // 2b'. Ab hier wird wirklich generiert: als "wird erstellt" markieren, damit der
+    // Feedback-Verlauf das Workout auch dann zeigt, wenn diese Anfrage scheitert (z.B.
+    // KI-Relay im Kaltstart) - der Client lädt automatisch nach (feedbackTracker.js).
+    // ai_pending_since nur beim ersten Mal setzen (Basis für "failed" nach 30 Min.) - bzw. neu,
+    // wenn ein bereits als "failed" geltender Eintrag erneut angestoßen wird ("Erneut versuchen").
+    const pendingSinceMs = currentWorkout.ai_pending_since ? new Date(currentWorkout.ai_pending_since).getTime() : 0;
+    const pendingIsStale = currentWorkout.ai_feedback_status === 'pending'
+      && (!pendingSinceMs || Date.now() - pendingSinceMs > FEEDBACK_PENDING_FAILED_AFTER_MS);
+    if (!currentWorkout.ai_feedback && (currentWorkout.ai_feedback_status !== 'pending' || pendingIsStale)) {
+      await Workout.updateOne(
+        { _id: workoutId, userId },
+        { $set: { ai_feedback_status: 'pending', ai_pending_since: new Date() } }
+      ).catch((e) => logger.warn('⚠️ Konnte Feedback-Status "pending" nicht setzen', { requestId, error: e.message }));
     }
 
     // 2c. Korrektheits-Regel-Engine (Kap. 24-26, Phase 2/3): lade das fachlich geprüfte

@@ -981,6 +981,7 @@ import {
   writeDetailViewState as writeDetailViewStateUtil
 } from '@/utils/workoutDetailPersistState'
 import { normalizeWorkoutForSave } from '@/utils/workoutDetailSaveFlow'
+import { startAiWarmup } from '@/utils/aiWarmup'
 import { buildSaveReview, removeOpenSets, markAllSetsDone } from '@/utils/saveReview'
 import {
   shouldKeepAsDraft as shouldKeepAsDraftUtil,
@@ -1957,6 +1958,17 @@ const showProgressionHints = computed(() =>
 // abgeschlossener Workouts und im Favoriten-Anpassen-Modus gelten alle Sätze als gemacht.
 // Im laufenden Workout zählt nur done === true (vorausgefüllte Sätze haben kein done-Feld).
 const setTrackingActive = showProgressionHints
+
+// Laufendes Workout: Server + KI-Relay wach halten, damit das Feedback beim Speichern ohne
+// Kaltstart-Wartezeit kommt (utils/aiWarmup.js, Render Free-Plan).
+let stopAiWarmup = null
+watch(setTrackingActive, (active) => {
+  if (active && !stopAiWarmup) stopAiWarmup = startAiWarmup()
+  if (!active && stopAiWarmup) { stopAiWarmup(); stopAiWarmup = null }
+}, { immediate: true })
+onBeforeUnmount(() => {
+  if (stopAiWarmup) { stopAiWarmup(); stopAiWarmup = null }
+})
 
 function isRowDone(row) {
   if (!setTrackingActive.value || row?.isWarmup) return true

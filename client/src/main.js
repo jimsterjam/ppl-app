@@ -22,6 +22,9 @@ import { setupAutoSync, processSyncQueue } from '@/utils/syncManager'
 import { saveWorkoutService } from '@/utils/SaveWorkoutService'
 import { deleteWorkoutOffline, setMetadata, OFFLINE_WORKOUTS_UPDATED_EVENT } from '@/utils/offlineStorage'
 import { processPendingAiFeedback } from '@/utils/pendingAiFeedback'
+import { startFeedbackTracker, FEEDBACK_READY_EVENT } from '@/utils/feedbackTracker'
+import { useToastStore } from '@/stores/toastStore'
+import { stripWorkoutNameDate } from '@/utils/workoutName'
 // Bewusst NICHT statisch importiert (siehe warmupExercisesArea unten): defaultExercisesLoader.js
 // importiert die ~3,3MB große Übungsdatenbank (default-exercises.json) statisch - ein Top-Level-
 // Import hier würde sie fest in den Haupt-Bundle-Chunk backen, obwohl sie erst gebraucht wird,
@@ -185,6 +188,18 @@ app.use(i18n)
 const timerStore = useTimerStore(pinia)
 timerStore.restoreState('main-init')
 
+// KI-Feedback, das sich verzögert hat (z.B. Kaltstart auf Render), wird im Hintergrund
+// nachgeladen (utils/feedbackTracker.js). Sobald es da ist: kurze Meldung, egal wo der Nutzer
+// gerade ist. Kein Timeout-/Fehlertext in der Oberfläche.
+window.addEventListener(FEEDBACK_READY_EVENT, (event) => {
+  const name = stripWorkoutNameDate(event?.detail?.name || '')
+  const t = i18n.global.t
+  useToastStore(pinia).show(
+    name ? t('postWorkout.feedbackReadyToastNamed', { name }) : t('postWorkout.feedbackReadyToast'),
+    { type: 'success', duration: 6000 }
+  )
+})
+
 // Letzten Navigationszustand fortlaufend speichern, damit die App nach Background/Screen-Off
 // oder Process-Restart an derselben Stelle weiterlaufen kann.
 router.afterEach((to) => {
@@ -285,6 +300,9 @@ async function bootstrapAuth() {
           processPendingAiFeedback().catch((error) => {
             logger.warn('[main] processPendingAiFeedback (Start) fehlgeschlagen:', error)
           })
+
+          // Verzögerte KI-Feedbacks nachladen (läuft danach app-weit weiter, siehe feedbackTracker.js).
+          startFeedbackTracker()
 
           // Onboarding-Status mit dem Server abgleichen (geräteübergreifend konsistent, siehe
           // onboardingStore.js) - fire-and-forget, App.vue zeigt den Flow erst, sobald

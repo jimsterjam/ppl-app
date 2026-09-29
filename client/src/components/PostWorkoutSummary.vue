@@ -37,16 +37,22 @@
       </div>
     </div>
 
-    <!-- Loading State -->
+    <!-- Loading State. Dauert es länger (z.B. Kaltstart von Server/KI-Relay), erscheint nach
+         SLOW_NOTICE_MS ein ruhiger Hinweis - die App lädt das Feedback danach selbst nach
+         (utils/feedbackTracker.js) und meldet sich, sobald es da ist. Nie ein Timeout-Text. -->
     <div v-else-if="loading" class="summary-content loading">
       <div class="spinner spin-indicator"></div>
       <p>{{ t('postWorkout.analyzing') }}</p>
+      <template v-if="slowNotice">
+        <p class="pending-notice">{{ t('postWorkout.feedbackDelayed') }}</p>
+        <button class="primary" type="button" @click="dismissSummary">{{ t('postWorkout.gotIt') }}</button>
+      </template>
     </div>
 
-    <!-- Error State -->
-    <div v-else-if="error" class="summary-content error">
-      <p class="error-message">{{ error }}</p>
-      <button class="secondary" type="button" @click="dismissSummary">{{ t('common.close') }}</button>
+    <!-- Feedback kommt später (Anfrage gescheitert oder zu lange) - kein Fehlertext. -->
+    <div v-else-if="pendingLater" class="summary-content fallback">
+      <p>{{ t('postWorkout.feedbackDelayed') }}</p>
+      <button class="primary" type="button" @click="dismissSummary">{{ t('postWorkout.gotIt') }}</button>
     </div>
 
     <!-- Success State -->
@@ -108,7 +114,7 @@
     <!-- KI-Provider kurz nicht erreichbar (z.B. Ollama im Heimnetz nicht im selben WLAN, oder
          ein Cold-Start beim OpenAI-Relay) - Workout ist trotzdem gespeichert. -->
     <div v-else-if="networkUnavailable" class="summary-content fallback">
-      <p>{{ t('postWorkout.networkUnavailable') }}</p>
+      <p>{{ t('postWorkout.feedbackDelayed') }}</p>
       <button class="primary" type="button" @click="dismissSummary">
         {{ t('common.continue') }}
       </button>
@@ -149,6 +155,8 @@ import { resolveRealIdFromDraftId, isValidObjectId } from '@/utils/workoutHelper
 import { logDiagnostic } from '@/utils/diagnosticsLog'
 import { OFFLINE_WORKOUTS_UPDATED_EVENT, AI_FEEDBACK_UPDATED_EVENT } from '@/utils/offlineStorage'
 import { queuePendingAiFeedback, clearPendingAiFeedback } from '@/utils/pendingAiFeedback'
+import { trackPendingFeedback, untrackFeedback, FEEDBACK_READY_EVENT } from '@/utils/feedbackTracker'
+import { REQUEST_TIMEOUT_MS } from '@/utils/feedbackRetryRules'
 import AiFeedbackDeltaSummary from '@/components/AiFeedbackDeltaSummary.vue'
 import AiFeedbackRatingWidget from '@/components/AiFeedbackRatingWidget.vue'
 import OneTimeHint from '@/components/OneTimeHint.vue'
@@ -191,6 +199,12 @@ const remainingCount = ref(0)
 const remainingDays = ref(0)
 const networkUnavailable = ref(false)
 const syncPending = ref(false)
+// Feedback verzögert sich: ruhiger Hinweis statt Fehlermeldung (siehe feedbackTracker.js).
+const SLOW_NOTICE_MS = 15000
+const slowNotice = ref(false)
+const pendingLater = ref(false)
+let slowTimer = null
+let currentResolvedId = ''
 
 // Reagiert auf verzögerte Reconciliation (siehe resolveWorkoutIdForAnalysis oben): wartet
 // dort das 8s-Zeitfenster ohne Erfolg ab (z.B. weil die Netzwerkverbindung beim Speichern
@@ -288,6 +302,8 @@ async function loadAIFeedback() {
     remainingDays.value = 0
     networkUnavailable.value = false
     syncPending.value = false
+    pendingLater.value = false
+    slowNotice.value = false
 
     const resolvedWorkoutId = await resolveWorkoutIdForAnalysis(props.workoutId)
     if (!resolvedWorkoutId) {
@@ -304,6 +320,15 @@ async function loadAIFeedback() {
     // Warteschlangen-Eintrag für diese ID ist damit hinfällig.
     clearPendingAiFeedback(props.workoutId)
     resolvedWorkoutIdForRating.value = resolvedWorkoutId
+    currentResolvedId = resolvedWorkoutId
+
+    // Dauert es länger: Hinweis zeigen und das Nachladen schon vormerken - falls der Nutzer die
+    // Ansicht schließt, bevor diese Anfrage fertig ist, kümmert sich der Tracker darum.
+    clearTimeout(slowTimer)
+    slowTimer = setTimeout(() => {
+      slowNotice.value = true
+      trackPendingFeedback(resolvedWorkoutId, { firstDelayMs: 60000 })
+    }, SLOW_NOTICE_MS)
 
     const token = await getIdToken().catch(() => null)
 
@@ -322,11 +347,17 @@ async function loadAIFeedback() {
         // eigentlichen Generierungs-Aufruf und antwortet bei nicht erreichbarem Provider
         // sofort mit feedback_status: 'network_unavailable' statt lange zu hängen — der
         // Client muss also nicht mehr für den "unerreichbar"-Fall auf ein langes Timeout warten.
-        timeout: 60000
+        timeout: REQUEST_TIMEOUT_MS
       }
     )
 
     if (response.data?.ai_feedback) {
+      untrackFeedback(resolvedWorkoutId)
+      // Nutzer hat die Zusammenfassung schon geschlossen ("Verstanden" beim Hinweis) -> Meldung,
+      // dass das Feedback jetzt da ist (Toast in main.js).
+      if (!showSummary.value && typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent(FEEDBACK_READY_EVENT, { detail: { workoutId: resolvedWorkoutId } }))
+      }
       feedback.value = response.data.ai_feedback
       analysisSnapshot.value = Array.isArray(response.data?.ai_analysis_snapshot)
         ? response.data.ai_analysis_snapshot
@@ -344,11 +375,13 @@ async function loadAIFeedback() {
       }
     } else if (response.data?.feedback_status === 'network_unavailable') {
       networkUnavailable.value = true
+      trackPendingFeedback(resolvedWorkoutId)
       logger.debug('[PostWorkoutSummary] AI provider not reachable (network)', {
         workoutId: props.workoutId
       })
       logDiagnostic('ai-feedback-result', { workoutId: props.workoutId, outcome: 'network_unavailable' })
     } else if (response.data?.feedback_status === 'insufficient_history') {
+      untrackFeedback(resolvedWorkoutId)
       insufficientHistory.value = true
       remainingCount.value = Number(response.data?.remaining) || 0
       remainingDays.value = Number(response.data?.remaining_days) || 0
@@ -361,7 +394,9 @@ async function loadAIFeedback() {
       })
       logDiagnostic('ai-feedback-result', { workoutId: props.workoutId, outcome: 'insufficient_history', remaining: remainingCount.value, remainingDays: remainingDays.value })
     } else {
-      // Kein Feedback, aber kein Error
+      // Kein Feedback (z.B. KI-Aufruf auf dem Server gescheitert) - später automatisch nachladen.
+      pendingLater.value = true
+      trackPendingFeedback(resolvedWorkoutId)
       logger.debug('[PostWorkoutSummary] No feedback in response', { response: response.data })
       logDiagnostic('ai-feedback-result', { workoutId: props.workoutId, outcome: 'empty', response: response.data })
     }
@@ -372,10 +407,10 @@ async function loadAIFeedback() {
       error: err.message
     })
 
-    // Nicht tödlich - Workout wurde trotzdem gespeichert
-    error.value = err.response?.data?.message ||
-                  err.message ||
-                  t('postWorkout.error')
+    // Nicht tödlich - Workout wurde trotzdem gespeichert. Keine technische Meldung (z.B.
+    // "timeout of 60000ms exceeded") anzeigen: ruhiger Hinweis, Feedback wird nachgeladen.
+    pendingLater.value = true
+    if (currentResolvedId) trackPendingFeedback(currentResolvedId)
     logDiagnostic('ai-feedback-result', {
       workoutId: props.workoutId,
       outcome: 'error',
@@ -383,9 +418,19 @@ async function loadAIFeedback() {
       message: err?.message || String(err)
     })
   } finally {
+    clearTimeout(slowTimer)
+    slowTimer = null
     loading.value = false
     releaseKeepAwake('ai-feedback')
   }
+}
+
+// Der Tracker hat das Feedback nachgeladen, während diese Ansicht noch offen ist -> anzeigen
+// (der Server liefert es jetzt aus dem Cache, kein neuer KI-Aufruf).
+function handleFeedbackUpdated(event) {
+  const id = String(event?.detail?.workoutId || '')
+  if (!id || id !== currentResolvedId || feedback.value || loading.value || !showSummary.value) return
+  loadAIFeedback()
 }
 
 function dismissSummary() {
@@ -410,10 +455,13 @@ onMounted(() => {
   }
   loadAIFeedback()
   window.addEventListener(OFFLINE_WORKOUTS_UPDATED_EVENT, handleOfflineWorkoutsUpdated)
+  window.addEventListener(AI_FEEDBACK_UPDATED_EVENT, handleFeedbackUpdated)
 })
 
 onBeforeUnmount(() => {
+  clearTimeout(slowTimer)
   window.removeEventListener(OFFLINE_WORKOUTS_UPDATED_EVENT, handleOfflineWorkoutsUpdated)
+  window.removeEventListener(AI_FEEDBACK_UPDATED_EVENT, handleFeedbackUpdated)
 })
 </script>
 
@@ -525,6 +573,11 @@ onBeforeUnmount(() => {
   border-radius: 0.5rem;
 }
 
+.pending-notice {
+  margin: 12px 0 8px;
+  line-height: 1.45;
+  color: var(--fg);
+}
 .error-message {
   color: var(--danger-text, var(--danger, #ff5f5f));
   margin: 0 0 1rem 0;

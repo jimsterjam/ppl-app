@@ -37,6 +37,14 @@
               <span v-if="item.ai_feedback_status === 'deferred'" class="pending-badge">
                 {{ t('feedbackHistory.pendingBadge') }}
               </span>
+              <!-- Wird noch erstellt (App lädt automatisch nach, feedbackTracker.js) bzw. konnte
+                   nach 30 Min. nicht erstellt werden (dann "Erneut versuchen"). -->
+              <span v-else-if="item.ai_feedback_status === 'pending'" class="pending-badge">
+                {{ t('feedbackHistory.creatingBadge') }}
+              </span>
+              <span v-else-if="item.ai_feedback_status === 'failed'" class="pending-badge">
+                {{ t('feedbackHistory.failedBadge') }}
+              </span>
             </span>
           </div>
           <span class="chevron" :class="{ open: expandedId === item.workoutId }">›</span>
@@ -57,6 +65,23 @@
           >
             <span v-if="generatingId === item.workoutId" class="generate-spinner spin-indicator" aria-hidden="true"></span>
             {{ generatingId === item.workoutId ? (t('feedbackHistory.generating')) : (t('feedbackHistory.generateNow')) }}
+          </button>
+        </div>
+
+        <div v-else-if="expandedId === item.workoutId && item.ai_feedback_status === 'pending'" class="feedback-text pending" @click.stop>
+          <p class="pending-hint">{{ t('feedbackHistory.creatingHint') }}</p>
+        </div>
+
+        <div v-else-if="expandedId === item.workoutId && item.ai_feedback_status === 'failed'" class="feedback-text pending" @click.stop>
+          <p class="pending-hint">{{ t('feedbackHistory.failedHint') }}</p>
+          <button
+            class="generate-now-btn"
+            type="button"
+            :disabled="generatingId === item.workoutId"
+            @click.stop="generateNow(item)"
+          >
+            <span v-if="generatingId === item.workoutId" class="generate-spinner spin-indicator" aria-hidden="true"></span>
+            {{ generatingId === item.workoutId ? t('feedbackHistory.generating') : t('feedbackHistory.retryNow') }}
           </button>
         </div>
 
@@ -105,6 +130,8 @@ import { stripWorkoutNameDate } from '@/utils/workoutName'
 import { Share2 } from 'lucide-vue-next'
 import { Share } from '@capacitor/share'
 import { generateFeedbackShareImage } from '@/utils/feedbackShareImage'
+import { trackPendingFeedback } from '@/utils/feedbackTracker'
+import { REQUEST_TIMEOUT_MS } from '@/utils/feedbackRetryRules'
 import AiFeedbackDeltaSummary from '@/components/AiFeedbackDeltaSummary.vue'
 import AiFeedbackRatingWidget from '@/components/AiFeedbackRatingWidget.vue'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
@@ -168,6 +195,11 @@ function toggle(id) {
 // Stößt die KI-Analyse manuell für ein zuvor zurückgestelltes Workout an (siehe
 // ai_feedback_status === 'deferred') und aktualisiert den Eintrag in-place, sobald das
 // Ergebnis da ist - kein erneutes Laden der ganzen Liste nötig.
+function markCreating(item) {
+  item.ai_feedback_status = 'pending'
+  trackPendingFeedback(item.workoutId, { name: item.name })
+}
+
 async function generateNow(item) {
   if (generatingId.value) return
   // Sicherheitsnetz (siehe isValidObjectId-Kommentar in workoutHelpers.js): sollte item.workoutId
@@ -183,7 +215,7 @@ async function generateNow(item) {
   generateError.value = null
   try {
     const token = await getIdToken().catch(() => null)
-    const data = await requestAiAnalysis(String(item.workoutId), token, { timeoutMs: 60000 })
+    const data = await requestAiAnalysis(String(item.workoutId), token, { timeoutMs: REQUEST_TIMEOUT_MS })
     if (data?.ai_feedback) {
       item.ai_feedback = data.ai_feedback
       item.ai_generated_at = new Date().toISOString()
@@ -204,16 +236,15 @@ async function generateNow(item) {
         { type: 'info', duration: 4000 }
       )
       logDiagnostic('feedback-history-generate-now', { workoutId: item.workoutId, outcome: 'insufficient_history' })
-    } else if (data?.feedback_status === 'network_unavailable') {
-      generateError.value = item.workoutId
-      logDiagnostic('feedback-history-generate-now', { workoutId: item.workoutId, outcome: 'network_unavailable' })
     } else {
-      generateError.value = item.workoutId
-      logDiagnostic('feedback-history-generate-now', { workoutId: item.workoutId, outcome: 'empty' })
+      // Noch nicht fertig (z.B. Kaltstart) - kein Fehlertext: "wird erstellt", die App lädt
+      // automatisch nach und meldet sich (feedbackTracker.js).
+      markCreating(item)
+      logDiagnostic('feedback-history-generate-now', { workoutId: item.workoutId, outcome: data?.feedback_status || 'empty' })
     }
   } catch (err) {
     logger.warn('[AIFeedbackHistory] generateNow failed', err?.message)
-    generateError.value = item.workoutId
+    markCreating(item)
     logDiagnostic('feedback-history-generate-now', { workoutId: item.workoutId, outcome: 'error', message: err?.message })
   } finally {
     generatingId.value = null
@@ -350,6 +381,10 @@ async function load(targetPage = 1, { silent = false } = {}) {
       timeoutMs: FEEDBACK_TIMEOUT_MS
     })
     const newItems = withoutDeleted(Array.isArray(res?.items) ? res.items : [])
+    // "Wird erstellt"-Einträge (auch von einem anderen Gerät angestoßen) automatisch nachladen.
+    newItems
+      .filter((entry) => entry?.ai_feedback_status === 'pending')
+      .forEach((entry) => trackPendingFeedback(entry.workoutId, { name: entry.name }))
     items.value = targetPage === 1 ? newItems : [...items.value, ...newItems]
     hasMore.value = Boolean(res?.hasMore)
     page.value = targetPage
