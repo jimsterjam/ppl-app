@@ -9,7 +9,7 @@ bei jeder neuen Sitzung neu gelernt werden müssen. Bei Widerspruch gilt die jü
 
 ## Feste Absprachen
 
-- **Git führt Paul selbst aus.** Keine `git commit`/`git push` aus der Sandbox. Nach jeder fertigen
+- **Git führt Paul selbst aus** (nur lokale Cowork-Sandbox; Cloud-Sessions siehe unten). Keine `git commit`/`git push` aus der Sandbox. Nach jeder fertigen
   Änderung den exakten Befehl als Codeblock ausgeben (`git add <Dateien>` + `git commit -m "..."`
   + `git push origin main`). Grund: `.git/*.lock`-Dateien aus der Sandbox lassen sich auf dem
   Host-Mount nicht löschen und blockieren danach jedes Git-Kommando. Das gilt auch für scheinbar
@@ -71,7 +71,9 @@ bei jeder neuen Sitzung neu gelernt werden müssen. Bei Widerspruch gilt die jü
   beide synchron halten.
 - iOS: Client-Änderungen erst nach `npm run build` + `npx cap sync ios` + Xcode-Build sichtbar.
 
-## Bekannte Einschränkungen der Sandbox (Cowork)
+## Bekannte Einschränkungen der Sandbox (Cowork) – nur lokal
+
+Gilt nur für die lokale Cowork-Sandbox, **nicht** für Cloud-Sessions.
 
 - Kein Zugriff auf beliebige externe Hosts (MongoDB Atlas, Firebase Console) – Produktionsdaten
   kopiert Paul bei Bedarf in den Chat.
@@ -81,3 +83,22 @@ bei jeder neuen Sitzung neu gelernt werden müssen. Bei Widerspruch gilt die jü
   auf Render. Ersatz lokal: `npm run i18n:check` direkt per Node und SFC-Kompilierung.
 - Web-Version (`ppl-app-client.onrender.com`) hat bewusst keine Firebase-Web-Config; die App wird
   nur als iOS-App genutzt.
+
+## Cloud-Sessions (claude.ai/code)
+
+Die Git-Regel unter „Feste Absprachen" und „Bekannte Einschränkungen der Sandbox" gelten nur für
+die lokale Cowork-Sandbox. In Cloud-Sessions gilt stattdessen:
+
+- **Nie auf `main` pushen oder mergen.** Immer eigener Branch `claude/<kurzbeschreibung>` +
+  Pull Request gegen `main`. Paul prüft und mergt; erst der Merge löst den Render-Deploy aus.
+  Zusätzlich technisch gesperrt über `.claude/settings.json`.
+- **Vor dem PR:** `cd server && npm test`, `cd client && npm test` (inkl. i18n-Konsistenztest),
+  im Root `npm run lint`. Ergebnis in die PR-Beschreibung.
+- **PR-Beschreibung auf Deutsch:** Was/Warum, was verifiziert vs. nur per Code-Lektüre geprüft ist,
+  offene Punkte, und ob ein iOS-Build nötig ist (Client-Änderung → Paul macht `npm run build`
+  + `npx cap sync ios` + Xcode).
+- **Keine Produktionszugriffe:** keine Aufrufe an Render, MongoDB Atlas oder Firebase, keine
+  Secrets in Code, Logs oder PR-Text.
+- „Erst vorschlagen, dann umsetzen" gilt auch hier: bei Features, UI und Texten zuerst den
+  Vorschlag in der Session zeigen, umsetzen erst nach Freigabe.
+- Setup der Umgebung: `bash scripts/cloud-setup.sh` (installiert Root, `server`, `client`).
