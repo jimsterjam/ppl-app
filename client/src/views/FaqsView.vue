@@ -27,7 +27,7 @@
           <div class="modal-content" @click.stop>
             <div class="modal-header">
               <h4>{{ $t(`faqs.${selectedFaqKey}`) }}</h4>
-              <button class="close-btn" @click="closeFaq" :aria-label="$t('common.close')">
+              <button class="close-btn" :aria-label="$t('common.close')" @click="closeFaq">
                 <span>×</span>
               </button>
             </div>

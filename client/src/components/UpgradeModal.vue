@@ -40,7 +40,7 @@
               </div>
             </div>
             
-            <div class="most-popular" v-if="selectedPlan === 'pro'">{{ t('upgrade.mostPopular') }}</div>
+            <div v-if="selectedPlan === 'pro'" class="most-popular">{{ t('upgrade.mostPopular') }}</div>
           </div>
           
           <div class="plan-card elite-plan" :class="{ selected: selectedPlan === 'elite' }" @click="selectedPlan = 'elite'">
@@ -65,11 +65,11 @@
         <!-- Billing Cycle Toggle -->
         <div class="billing-toggle">
           <label class="toggle-option" :class="{ active: billingCycle === 'monthly' }">
-            <input type="radio" v-model="billingCycle" value="monthly" />
+            <input v-model="billingCycle" type="radio" value="monthly" />
             <span>{{ t('upgrade.monthly') }}</span>
           </label>
           <label class="toggle-option" :class="{ active: billingCycle === 'yearly' }">
-            <input type="radio" v-model="billingCycle" value="yearly" />
+            <input v-model="billingCycle" type="radio" value="yearly" />
             <span>{{ t('upgrade.yearly') }}</span>
             <span class="discount">-17%</span>
           </label>
@@ -77,7 +77,7 @@
         
         <!-- CTA Buttons -->
         <div class="modal-actions">
-          <button class="upgrade-btn" @click="handleUpgrade" :disabled="isProcessing">
+          <button class="upgrade-btn" :disabled="isProcessing" @click="handleUpgrade">
             <span v-if="isProcessing">🔄</span>
             <span v-else>💳</span>
             {{ isProcessing ? t('upgrade.processing') : t('upgrade.upgradeNow') }}
@@ -110,7 +110,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { ref, watch, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useToastStore } from '@/stores/toastStore'

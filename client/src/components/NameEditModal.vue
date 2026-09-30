@@ -5,16 +5,16 @@
       <div class="modal-content" @click.stop>
         <div class="modal-header">
           <h3>{{ $t('settings.username') }}</h3>
-          <button class="close-btn" @click="close" :aria-label="$t('common.close')">×</button>
+          <button class="close-btn" :aria-label="$t('common.close')" @click="close">×</button>
         </div>
         <div class="modal-body">
           <p class="hint" style="margin-top:0">{{ $t('settings.usernameHint') }}</p>
           <input
             ref="inputRef"
+            v-model="nameDraft"
             class="text-input"
             type="text"
             :placeholder="$t('settings.usernamePlaceholder')"
-            v-model="nameDraft"
             autocomplete="nickname"
             maxlength="24"
             @keyup.enter="save"

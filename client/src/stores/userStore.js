@@ -23,17 +23,12 @@ import {
 } from '@/api/workouts'
 import { parseUidFromToken } from '@/utils/authToken'
 import {
-  DRAFT_TOMBSTONES_KEY,
-  DRAFT_TOMBSTONE_TTL_MS,
   isDraftLike,
-  readDraftTombstones,
-  writeDraftTombstones,
   markDraftsDeleted,
   isDraftDeleted,
   filterOutDeletedDrafts
 } from '@/utils/draftTombstones'
 import {
-  normalizeWorkoutFingerprint,
   mergeWorkoutLists,
   dedupeWorkoutsForStats
 } from '@/utils/workoutMerge'

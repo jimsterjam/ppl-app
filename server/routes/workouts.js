@@ -3,7 +3,6 @@ import Workout from "../models/Workout.js";
 import { firebaseAuthMiddleware } from '../middleware/firebaseAuth.js';
 import { requireAdminKey } from '../middleware/adminAuth.js';
 // Clerk-Import entfernt
-import { OpenAI } from 'openai';
 import exercises from '../data/exercises.js';
 import Exercise from '../models/Exercise.js';
 import UserExerciseNote from '../models/UserExerciseNote.js';
@@ -15,7 +14,6 @@ import { isWorkoutEditWindowExpired } from '../utils/workoutEditWindow.js';
 import { getAIService } from '../services/aiService.js';
 import { runVerificationLoop, getVerifierMode } from '../services/feedbackVerificationService.js';
 import {
-  calculateExerciseStats,
   analyzeWorkoutProgression,
   structureAnalysisForAI,
   createSimpleExerciseFeedback,
@@ -28,7 +26,6 @@ import {
   buildFeedbackVersion,
   validateRatingPayload,
   nextRatingStatus,
-  isCountedStatus,
   buildQualitySignal,
   shouldWriteQualitySignal
 } from '../services/feedbackRatingService.js';
@@ -36,9 +33,6 @@ import { resolveEffectiveProfile } from '../services/exerciseAnalysisRules.js';
 import {
   startOfIsoWeek,
   startOfMonth,
-  normalizeCategory,
-  calculateExerciseVolume,
-  getExerciseBestWeight,
   computeWorkoutMetrics
 } from '../utils/workoutMetrics.js';
 import {
@@ -56,8 +50,6 @@ import { resolveEnglishExerciseName, resolveFeedbackLanguage } from '../utils/fe
 import { createOpenAIClient, describeAiClientMode, ensureRelayAwake, markRelayContact } from '../utils/aiClientFactory.js';
 import {
   classifyAiError,
-  isRetryableAiError,
-  sleep,
   withAiRetry,
   parseJsonSafely,
   validateAiSuggestionPayload,

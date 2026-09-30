@@ -228,7 +228,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onActivated, onUnmounted, nextTick, watch } from 'vue'
+import { ref, computed, onMounted, onActivated, onUnmounted, watch } from 'vue'
 import { startAiWarmup } from '@/utils/aiWarmup'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -236,14 +236,11 @@ import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { useUserStore } from "../stores/userStore";
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useAuthStore } from '@/stores/authStore'
-import { isOnline, deleteWorkoutOffline, getWorkoutOffline, saveWorkoutOffline } from '@/utils/offlineStorage'
+import { isOnline, getWorkoutOffline, saveWorkoutOffline } from '@/utils/offlineStorage'
 import { isDraftDeleted } from '@/utils/draftTombstones'
 import { deleteWorkout } from '@/api/workouts'
-import { http } from '@/api/http'
-import { loadDefaultExercises, getCachedDefaultExercises } from '@/utils/defaultExercisesLoader'
-import { buildWorkoutBuilderRoute, normalizeBuilderWorkoutType, QUICK_PREFILL_KEY, DETAIL_DRAFT_KEY, saveWorkoutBuilderPrefill, getDetailDraftKey as buildDetailDraftKey } from '@/utils/workoutBuilderFlow'
+import { buildWorkoutBuilderRoute, normalizeBuilderWorkoutType, saveWorkoutBuilderPrefill, getDetailDraftKey as buildDetailDraftKey } from '@/utils/workoutBuilderFlow'
 import { hasActiveDraft, getActiveDraft, clearActiveDraft } from '@/utils/activeWorkoutDraft'
-import { purgePendingCreateQueueForWorkoutId, markWorkoutDeleted } from '@/utils/offlineStorage'
 import {
   getFavoritesByType,
   renameFavoriteWorkout,

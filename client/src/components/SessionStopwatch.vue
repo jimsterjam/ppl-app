@@ -1,5 +1,5 @@
 <template>
-  <div class="session-stopwatch" :class="{ 'session-stopwatch--compact': props.compact }" ref="rootRef">
+  <div ref="rootRef" class="session-stopwatch" :class="{ 'session-stopwatch--compact': props.compact }">
     <!-- Dashboard-Variante (Wunsch Paul: Stoppuhr war "zu klein und armselig"): eigene Karte mit
          großer Zeitanzeige und Bedienung direkt auf der Karte, ohne Popup. Die kompakte
          Header-Variante (WorkoutDetailView) behält Trigger + Popup, dort fehlt der Platz. -->
@@ -102,7 +102,7 @@
             </template>
           </div>
 
-          <button class="sw-close" type="button" @click="closeOverlay" :aria-label="t('sessionStopwatch.close')">×</button>
+          <button class="sw-close" type="button" :aria-label="t('sessionStopwatch.close')" @click="closeOverlay">×</button>
         </div>
       </div>
     </Transition>

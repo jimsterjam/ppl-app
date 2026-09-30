@@ -21,7 +21,7 @@
     </svg>
 
     <div class="nav-surface">
-      <div class="nav-container" ref="navContainerRef">
+      <div ref="navContainerRef" class="nav-container">
         <div
           class="active-pill"
           :class="{ dragging: isDragging }"
@@ -33,8 +33,8 @@
           <li
             v-for="link in visibleLinks"
             :key="link.path"
-            class="nav-item"
             :ref="el => setNavItemRef(el, link.path)"
+            class="nav-item"
           >
             <button
               class="nav-btn"
@@ -51,15 +51,15 @@
           <li
             v-if="activeWorkout"
             key="workout"
-            class="nav-item workout-item"
             :ref="el => setNavItemRef(el, WORKOUT_KEY)"
+            class="nav-item workout-item"
           >
             <button
               class="nav-btn workout-btn"
               :class="{ active: $route.path.startsWith('/workouts') }"
               :aria-current="$route.path.startsWith('/workouts') ? 'page' : undefined"
-              @click="onNavClick(WORKOUT_KEY, `/workouts/${activeWorkout._id}`)"
               :title="$t('nav.goToActiveWorkout')"
+              @click="onNavClick(WORKOUT_KEY, `/workouts/${activeWorkout._id}`)"
             >
               <span class="icon workout-icon" aria-hidden="true">
                 <Timer class="icon-svg" />

@@ -2,7 +2,7 @@
   <div v-if="showSummary" class="post-workout-summary glass">
     <div class="summary-header">
       <h2>{{ t('postWorkout.title') }}</h2>
-      <button class="close-btn" type="button" @click="dismissSummary" :aria-label="$t('common.close')">×</button>
+      <button class="close-btn" type="button" :aria-label="$t('common.close')" @click="dismissSummary">×</button>
     </div>
 
     <!-- Einmalige Feedback-Einladung nach dem ersten erfolgreich gespeicherten Workout (siehe
@@ -142,7 +142,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getAppLanguage } from '@/i18n'
 import { useRouter } from 'vue-router'

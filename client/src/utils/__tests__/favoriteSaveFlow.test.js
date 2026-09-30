@@ -18,7 +18,6 @@ import {
   saveFavoriteWorkout,
   updateFavoriteWorkout,
   getFavoritesByType,
-  normalizeWorkoutType,
 } from '../workoutFavorites.js'
 import { dedupeWorkoutsForStats } from '../workoutMerge.js'
 
