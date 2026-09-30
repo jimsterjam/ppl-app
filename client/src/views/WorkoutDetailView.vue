@@ -3923,19 +3923,11 @@ onBeforeRouteLeave(async (to) => {
     return true
   }
 
-  // War auskommentiert (vermutlich zum Debuggen eines anderen Bugs) - dadurch konnte man
-  // während eines laufenden Session-Timers per Zurück-Geste/-Button die Seite verlassen,
-  // ohne gefragt zu werden, ob der Timer weiterlaufen/pausieren/stoppen soll (Datenverlust-
-  // Risiko: Nutzer verlässt versehentlich eine laufende Trainingssession). Infrastruktur
-  // (pendingTimerAction/showTimerActionModal/applyPendingTimerAction 'route-leave'-Zweig in
-  // workoutDetailNavigationFlow.js) war unverändert vorhanden und funktionsfähig, nur dieser
-  // Guard selbst war deaktiviert - deshalb reine Reaktivierung ohne weitere Änderungen nötig.
-  if (timerStore.isRunningLike) {
-    pendingTimerAction.value = { kind: 'route-leave', targetPath: to?.fullPath || '/dashboard' }
-    showTimerActionModal.value = true
-    return false
-  }
-
+  // Kein Timer-Fenster beim Verlassen (Absprache Paul, 30.09.): Wechselt der Nutzer aus einem
+  // laufenden Workout in einen anderen Tab, läuft der Timer einfach weiter - das Workout bleibt
+  // aktiv (Entwurf ist oben gesichert, Timer ist app-weit sichtbar). Gefragt wird nur noch beim
+  // Speichern (saveWorkout, pendingTimerAction 'save'). Beim Abbrechen setzt discardDraftAndLeave
+  // den Timer selbst zurück.
   return true
 })
 
