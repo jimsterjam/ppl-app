@@ -48,7 +48,7 @@ import {
 } from '../utils/workoutSanitizer.js';
 import { decideExerciseMatch } from '../utils/exerciseMatching.js';
 import { getMaxExerciseCount } from '../utils/exerciseCountTarget.js';
-import { getRepRange } from '../utils/repTargets.js';
+import { applyGeneratorRule } from '../utils/repTargets.js';
 import { buildNextSessionFocus, applyNextSessionFocus } from '../utils/nextSessionFocus.js';
 import { resolveListFeedbackStatus, FEEDBACK_PENDING_FAILED_AFTER_MS } from '../utils/feedbackStatus.js';
 import { findCatalogEntryForName, catalogReference } from '../utils/catalogMatch.js';
@@ -2998,7 +2998,7 @@ Schema, Format und die Regeln unten.
       - Keine doppelte Hauptbewegung direkt hintereinander.
       - Genau targetExerciseCount Übungen insgesamt (Wert steht in den Parametern), maximal 1 Core-Übung und nicht an Position 1.
       - durationMinutes ist die reine Trainingszeit ohne Aufwärmen - Satzzahl und Pausen so wählen, dass das Workout hineinpasst.
-      - Für strength: Grundübungen 3-5 Reps, Isolationsübungen 8-10 Reps, längere Pausen; für hypertrophy: Grundübungen 6-10 Reps, Isolationsübungen 10-12 Reps, moderate Pausen.
+      - Für strength: Grundübungen 3-5 Reps in 3-5 Sätzen (schwere Grundübungen zuerst, Pause ca. 3 Min.), Zubehör/Isolation 8-12 Reps in 2-4 Sätzen (ca. 2 Min.); für hypertrophy: alle Übungen 8-12 Reps in 2-4 Sätzen (meist 3), Pausen ca. 2 Min. bei Grundübungen und 1,5 Min. bei Isolation.
       - equipmentMode strikt beachten (gym_only, gym_plus_bodyweight, bodyweight_only).
 Schema exakt:
 {"workoutName":"string","exercises":[{"name":"string","sets":3,"reps":10,"weight":0,"rest":90}],"estimatedDuration":45,"difficulty":"beginner|advanced","notes":"string"}
@@ -3862,33 +3862,12 @@ function pickExercisesByPattern(pool, preferredPatterns = [], maxCount = 6) {
 }
 
 function applyGoalRanges(exercises, goal) {
-  return exercises.map((exercise, index) => {
-    const primary = index < 2 && !exercise.isIsolation;
-    const accessory = exercise.isIsolation || exercise.demandTier === 'low';
-
-    // Wiederholungen: gleiche Bereiche wie der Gewichtsvorschlag im Workout (utils/repTargets.js),
-    // abhängig von Grundübung/Isolation - Sätze und Pausen unverändert.
-    const repsRange = getRepRange(goal, !!exercise.isIsolation);
-
-    if (goal === 'strength') {
-      const setsRange = primary ? [4, 5] : accessory ? [2, 3] : [3, 4];
-      const restRange = primary ? [120, 240] : accessory ? [60, 120] : [90, 180];
-      return {
-        ...exercise,
-        reps: Math.min(repsRange[1], Math.max(repsRange[0], exercise.reps)),
-        sets: Math.min(setsRange[1], Math.max(setsRange[0], exercise.sets)),
-        rest: Math.min(restRange[1], Math.max(restRange[0], exercise.rest))
-      };
-    }
-
-    const setsRange = [3, 4];
-    const restRange = primary ? [60, 120] : [45, 90];
-    return {
-      ...exercise,
-      reps: Math.min(repsRange[1], Math.max(repsRange[0], exercise.reps)),
-      sets: Math.min(setsRange[1], Math.max(setsRange[0], exercise.sets)),
-      rest: Math.min(restRange[1], Math.max(restRange[0], exercise.rest))
-    };
+  // Vorgaben je Ziel und Rolle (utils/repTargets.js, Schritt A): Muskelaufbau 8-12 Wdh.;
+  // Kraft-Grundübungen 3-5 Wdh. in 3-5 Sätzen, Zubehör 8-12; Pausen wie der Pausentimer.
+  const strength = String(goal || '').toLowerCase().includes('strength');
+  return exercises.map((exercise) => {
+    const isAccessory = !!exercise.isIsolation || (strength && exercise.demandTier === 'low');
+    return applyGeneratorRule(exercise, goal, isAccessory);
   });
 }
 

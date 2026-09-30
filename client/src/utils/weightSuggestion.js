@@ -11,19 +11,8 @@
 export const TRAINING_GOALS = Object.freeze(['hypertrophy', 'strength'])
 export const DEFAULT_TRAINING_GOAL = 'hypertrophy'
 
-// Wiederholungsbereiche des Quick Generators (server/utils/repTargets.js, per Test abgeglichen).
-// Die Fortschrittslogik im Workout nutzt seit dem Schema-Umbau PROGRESSION_RANGES (unten) - der
-// Generator wird in einem eigenen Schritt angeglichen (Absprache Paul: "A noch nicht umsetzen").
-export const REP_TARGETS = Object.freeze({
-  strength: Object.freeze({
-    compound: Object.freeze({ min: 3, max: 5 }),
-    isolation: Object.freeze({ min: 8, max: 10 })
-  }),
-  hypertrophy: Object.freeze({
-    compound: Object.freeze({ min: 6, max: 10 }),
-    isolation: Object.freeze({ min: 10, max: 12 })
-  })
-})
+// Die Vorgaben des Workout-Generators stehen in server/utils/repTargets.js (GENERATOR_RULES) und
+// liegen innerhalb von PROGRESSION_RANGES (unten) - per Server-Test abgeglichen.
 
 // Katalog-Einordnung (aiMetadata.exerciseType) ist nicht fehlerfrei - z.B. Seitheben steht dort als
 // Grundübung. Diese typischen Isolationsbewegungen werden unabhängig vom Katalog als Isolation
