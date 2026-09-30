@@ -6,6 +6,15 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { loadDefaultExercises, getCachedDefaultExercises } from '@/utils/defaultExercisesLoader'
+import { buildCatalogIndex, findCatalogEntryByName } from '@/utils/exerciseMatch'
+
+// Ein Index je geladener Katalogliste (alle Komponenten teilen sich dieselbe Liste).
+const indexCache = new WeakMap()
+function catalogIndexFor(list) {
+  if (!Array.isArray(list)) return null
+  if (!indexCache.has(list)) indexCache.set(list, buildCatalogIndex(list))
+  return indexCache.get(list)
+}
 
 /**
  * Composable für Übungsübersetzungen
@@ -34,8 +43,8 @@ export function useExerciseTranslation() {
 
   const getTranslatedExerciseName = (exerciseName) => {
     if (!exerciseName || exercisesData.value.length === 0) return exerciseName
-    const normName = normalize(exerciseName)
-    const found = exercisesData.value.find(e => normalize(e.name) === normName || normalize(e.name_en) === normName)
+    // Auch frühere Namen und andere Wortreihenfolge ("Barbell Bench Press" -> "bench press barbell").
+    const found = findCatalogEntryByName(catalogIndexFor(exercisesData.value), exerciseName)
     if (!found) return exerciseName
     // Product decision: exercise names are always displayed in English.
     return found.name_en || found.name || exerciseName

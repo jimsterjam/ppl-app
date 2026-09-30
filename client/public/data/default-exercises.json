@@ -824,7 +824,7 @@
   {
     "_id": "ex_0015",
     "id": "0015",
-    "name": "Klimmzug mit engem Griff",
+    "name": "Klimmzug eng, unterstützt (Gerät)",
     "name_en": "pull-up assisted parallel close grip",
     "category": "Pull",
     "category_raw": "strength",
@@ -870,7 +870,10 @@
         "gym_only",
         "gym_plus_bodyweight"
       ]
-    }
+    },
+    "aliases": [
+      "Klimmzug mit engem Griff"
+    ]
   },
   {
     "_id": "ex_0016",
@@ -1023,7 +1026,7 @@
   {
     "_id": "ex_1431",
     "id": "1431",
-    "name": "Klimmzug unterstützt im Stehen",
+    "name": "Klimmzug im Untergriff, unterstützt im Stehen",
     "name_en": "assisted standing chin-up",
     "category": "Pull",
     "category_raw": "strength",
@@ -4189,8 +4192,8 @@
   {
     "_id": "ex_0024",
     "id": "0024",
-    "name": "Frontkniebeuge Langhantel",
-    "name_en": "front squat barbell bench",
+    "name": "Frontkniebeuge Langhantel auf die Bank",
+    "name_en": "barbell bench front squat",
     "category": "Legs",
     "category_raw": "strength",
     "muscleGroup": "Quadrizeps",
@@ -4283,7 +4286,10 @@
         "gym_only",
         "gym_plus_bodyweight"
       ]
-    }
+    },
+    "aliases": [
+      "bench press"
+    ]
   },
   {
     "_id": "ex_0026",
@@ -5252,7 +5258,10 @@
         "gym_only",
         "gym_plus_bodyweight"
       ]
-    }
+    },
+    "aliases": [
+      "Frontkniebeuge Langhantel"
+    ]
   },
   {
     "_id": "ex_1462",
@@ -7406,7 +7415,7 @@
   {
     "_id": "ex_0075",
     "id": "0075",
-    "name": "Hantel-Deltaheben hinten",
+    "name": "Langhantel-Deltaheben hinten",
     "name_en": "barbell rear delt raise",
     "category": "Push",
     "category_raw": "strength",
@@ -7448,7 +7457,10 @@
         "gym_only",
         "gym_plus_bodyweight"
       ]
-    }
+    },
+    "aliases": [
+      "Hantel-Deltaheben hinten"
+    ]
   },
   {
     "_id": "ex_0076",
@@ -8233,7 +8245,10 @@
         "gym_only",
         "gym_plus_bodyweight"
       ]
-    }
+    },
+    "aliases": [
+      "romanian deadlift"
+    ]
   },
   {
     "_id": "ex_0086",
@@ -8383,8 +8398,8 @@
   {
     "_id": "ex_1371",
     "id": "1371",
-    "name": "Wadenheben im Sitzen mit der Langhantel",
-    "name_en": "barbell seated calf raise",
+    "name": "Wadenheben im Sitzen mit Langhantel, Zehen erhöht",
+    "name_en": "barbell seated calf raise (toes elevated)",
     "category": "Legs",
     "category_raw": "strength",
     "muscleGroup": "Waden",
@@ -20216,7 +20231,7 @@
   {
     "_id": "ex_1326",
     "id": "1326",
-    "name": "Klimmzug",
+    "name": "Klimmzug im Untergriff (Chin-up)",
     "name_en": "chin-up",
     "category": "Pull",
     "category_raw": "strength",
@@ -20411,7 +20426,7 @@
   {
     "_id": "ex_1327",
     "id": "1327",
-    "name": "Klimmzug mit engem Griff",
+    "name": "Klimmzug im Untergriff, eng",
     "name_en": "close grip chin-up",
     "category": "Pull",
     "category_raw": "strength",
@@ -22045,7 +22060,7 @@
   {
     "_id": "ex_0291",
     "id": "0291",
-    "name": "Kniebeugen mit Kurzhanteln",
+    "name": "Kniebeuge mit Kurzhanteln auf die Bank",
     "name_en": "dumbbell bench squat",
     "category": "Legs",
     "category_raw": "strength",
@@ -22642,55 +22657,6 @@
     }
   },
   {
-    "_id": "ex_1731",
-    "id": "1731",
-    "name": "Kurzhanteldrücken mit engem Griff",
-    "name_en": "dumbbell close grip press",
-    "category": "Push",
-    "category_raw": "strength",
-    "muscleGroup": "Trizeps",
-    "muscleGroup_en": "triceps",
-    "equipment": "Kurzhanteln",
-    "equipment_en": "dumbbell",
-    "description": "Das Kurzhanteldrücken mit engem Griff ist eine Kraftübung, die auf den Trizeps abzielt, mit sekundärer Betonung auf Brust und Schultern. Dabei werden Hanteln mit festem Griff zusammengedrückt, wobei der Schwerpunkt auf dem Einsatz des Trizeps liegt.",
-    "description_en": "The dumbbell close grip press is a strength exercise targeting the triceps, with secondary emphasis on the chest and shoulders. It is performed by pressing dumbbells together with a close grip, focusing on triceps engagement.",
-    "imageUrl": "/exercises/360/1731.gif",
-    "thumbnailUrl": "/exercises/180/1731.gif",
-    "bodyPart": "upper arms",
-    "target": "triceps",
-    "secondaryMuscles": [
-      "chest",
-      "shoulders"
-    ],
-    "instructions": [
-      "Setzen Sie sich mit einer Hantel in jeder Hand auf eine flache Bank und stützen Sie sich dabei auf Ihren Oberschenkeln ab.",
-      "Heben Sie die Hanteln einzeln mit Ihren Oberschenkeln an, sodass Sie sie schulterbreit vor sich halten können.",
-      "Sobald Sie schulterbreit sind, drehen Sie Ihre Handgelenke nach vorne, sodass die Handflächen von Ihnen weg zeigen. Dies wird Ihre Ausgangsposition sein.",
-      "Senken Sie beim Einatmen die Hanteln langsam zur Seite, bis sie etwa auf Brusthöhe sind.",
-      "Heben Sie beim Ausatmen die Hanteln mit Ihrem Trizeps zurück in die Ausgangsposition. Stellen Sie sicher, dass Sie nur Ihren Trizeps verwenden und nicht Ihre Unterarme oder Ihren Bizeps, um beim Heben der Hanteln zu helfen.",
-      "Nach einer zweiten Pause in der kontrahierten Position wiederholen Sie die Bewegung für die vorgeschriebene Anzahl an Wiederholungen."
-    ],
-    "difficulty": "beginner",
-    "instructions_en": [
-      "Sit on a flat bench with a dumbbell in each hand, resting on your thighs.",
-      "Using your thighs to help raise the dumbbells, lift the dumbbells one at a time so that you can hold them in front of you at shoulder width.",
-      "Once at shoulder width, rotate your wrists forward so that the palms of your hands are facing away from you. This will be your starting position.",
-      "As you breathe in, slowly lower the dumbbells to your side until they are about level with your chest.",
-      "As you exhale, use your triceps to lift the dumbbells back to the starting position. Make sure to use only your triceps and do not use your forearms or biceps to help lift the dumbbells.",
-      "After a second pause at the contracted position, repeat the movement for the prescribed amount of repetitions."
-    ],
-    "aiMetadata": {
-      "exerciseType": "isolation",
-      "primaryPhase": "accessory",
-      "minDifficulty": "beginner",
-      "disallowedGoals": [],
-      "allowedEquipmentModes": [
-        "gym_only",
-        "gym_plus_bodyweight"
-      ]
-    }
-  },
-  {
     "_id": "ex_0296",
     "id": "0296",
     "name": "Kurzhanteldrücken mit engem Griff",
@@ -22737,7 +22703,14 @@
         "gym_only",
         "gym_plus_bodyweight"
       ]
-    }
+    },
+    "aliases": [
+      "dumbbell close grip press",
+      "Kurzhanteldrücken mit engem Griff"
+    ],
+    "aliasIds": [
+      "1731"
+    ]
   },
   {
     "_id": "ex_0297",
@@ -29943,7 +29916,7 @@
   {
     "_id": "ex_2292",
     "id": "2292",
-    "name": "Hantel-Deltaheben hinten",
+    "name": "Kurzhantel-Deltaheben hinten",
     "name_en": "dumbbell rear delt raise",
     "category": "Push",
     "category_raw": "strength",
@@ -34221,7 +34194,7 @@
   {
     "_id": "ex_2796",
     "id": "2796",
-    "name": "Ausfallschritt mit Kurzhanteln",
+    "name": "Step-up mit Ausfallschritt, Kurzhanteln",
     "name_en": "dumbbell step-up lunge",
     "category": "Legs",
     "category_raw": "strength",
@@ -36831,8 +36804,8 @@
   {
     "_id": "ex_0454",
     "id": "0454",
-    "name": "ez Langhantel-Spider-Curl",
-    "name_en": "ez barbell spider curl",
+    "name": "EZ-Spider-Curl an der Scottbank",
+    "name_en": "ez barbell spider curl (preacher bench)",
     "category": "Pull",
     "category_raw": "strength",
     "muscleGroup": "Bizeps",
@@ -36874,13 +36847,17 @@
         "gym_only",
         "gym_plus_bodyweight"
       ]
-    }
+    },
+    "aliases": [
+      "ez barbell spider curl",
+      "ez Langhantel-Spider-Curl"
+    ]
   },
   {
     "_id": "ex_1628",
     "id": "1628",
-    "name": "ez Langhantel-Spider-Curl",
-    "name_en": "ez barbell spider curl",
+    "name": "EZ-Spider-Curl auf der Schrägbank",
+    "name_en": "ez barbell spider curl (incline bench)",
     "category": "Pull",
     "category_raw": "strength",
     "muscleGroup": "Bizeps",
@@ -42481,7 +42458,7 @@
   {
     "_id": "ex_0558",
     "id": "0558",
-    "name": "Muskeln aufbauen",
+    "name": "Muscle-up mit Schwung (Kipping)",
     "name_en": "kipping muscle up",
     "category": "Pull",
     "category_raw": "strength",
@@ -42528,7 +42505,10 @@
         "gym_plus_bodyweight",
         "bodyweight_only"
       ]
-    }
+    },
+    "aliases": [
+      "Muskeln aufbauen"
+    ]
   },
   {
     "_id": "ex_3640",
@@ -43511,8 +43491,8 @@
   {
     "_id": "ex_0577",
     "id": "0577",
-    "name": "Hebel-Brustpresse",
-    "name_en": "lever chest press",
+    "name": "Brustpresse am Gerät (Steckgewicht)",
+    "name_en": "lever chest press (weight stack)",
     "category": "Push",
     "category_raw": "strength",
     "muscleGroup": "Brust",
@@ -43558,8 +43538,8 @@
   {
     "_id": "ex_0576",
     "id": "0576",
-    "name": "Hebel-Brustpresse",
-    "name_en": "lever chest press",
+    "name": "Brustpresse am Gerät (Scheiben)",
+    "name_en": "lever chest press (plate loaded)",
     "category": "Push",
     "category_raw": "strength",
     "muscleGroup": "Brust",
@@ -43600,7 +43580,11 @@
         "gym_only",
         "gym_plus_bodyweight"
       ]
-    }
+    },
+    "aliases": [
+      "lever chest press",
+      "Hebel-Brustpresse"
+    ]
   },
   {
     "_id": "ex_0578",
@@ -47753,7 +47737,7 @@
   {
     "_id": "ex_0631",
     "id": "0631",
-    "name": "Muskeln aufbauen",
+    "name": "Muscle-up",
     "name_en": "muscle up",
     "category": "Pull",
     "category_raw": "strength",
@@ -49536,8 +49520,8 @@
   {
     "_id": "ex_0655",
     "id": "0655",
-    "name": "Liegestütz (auf dem Stabilitätsball)",
-    "name_en": "push-up (on stability ball)",
+    "name": "Liegestütz, Hände auf dem Gymnastikball",
+    "name_en": "push-up (hands on stability ball)",
     "category": "Push",
     "category_raw": "strength",
     "muscleGroup": "Brust",
@@ -49580,13 +49564,17 @@
         "gym_plus_bodyweight",
         "bodyweight_only"
       ]
-    }
+    },
+    "aliases": [
+      "push-up (on stability ball)",
+      "Liegestütz (auf dem Stabilitätsball)"
+    ]
   },
   {
     "_id": "ex_0656",
     "id": "0656",
-    "name": "Liegestütz (auf dem Stabilitätsball)",
-    "name_en": "push-up (on stability ball)",
+    "name": "Liegestütz, Füße auf dem Gymnastikball",
+    "name_en": "push-up (feet on stability ball)",
     "category": "Push",
     "category_raw": "strength",
     "muscleGroup": "Brust",
@@ -51644,8 +51632,8 @@
   {
     "_id": "ex_0697",
     "id": "0697",
-    "name": "Selbstunterstützter umgekehrter Beinbeuger",
-    "name_en": "self assisted inverse leg curl",
+    "name": "Umgekehrter Beinbeuger, unterstützt (Gerät)",
+    "name_en": "self assisted inverse leg curl (machine)",
     "category": "Legs",
     "category_raw": "strength",
     "muscleGroup": "Quadrizeps",
@@ -51687,13 +51675,17 @@
         "gym_plus_bodyweight",
         "bodyweight_only"
       ]
-    }
+    },
+    "aliases": [
+      "self assisted inverse leg curl",
+      "Selbstunterstützter umgekehrter Beinbeuger"
+    ]
   },
   {
     "_id": "ex_1766",
     "id": "1766",
-    "name": "Selbstunterstützter umgekehrter Beinbeuger",
-    "name_en": "self assisted inverse leg curl",
+    "name": "Umgekehrter Beinbeuger, unterstützt (Bank)",
+    "name_en": "self assisted inverse leg curl (bench)",
     "category": "Legs",
     "category_raw": "strength",
     "muscleGroup": "Quadrizeps",
@@ -55064,8 +55056,8 @@
   {
     "_id": "ex_0763",
     "id": "0763",
-    "name": "Smith umgekehrtes Wadenheben",
-    "name_en": "smith reverse calf raises",
+    "name": "Smith-Wadenheben auf Erhöhung",
+    "name_en": "smith reverse calf raise (on step)",
     "category": "Legs",
     "category_raw": "strength",
     "muscleGroup": "Waden",
@@ -55109,13 +55101,17 @@
         "gym_only",
         "gym_plus_bodyweight"
       ]
-    }
+    },
+    "aliases": [
+      "smith reverse calf raises",
+      "Smith umgekehrtes Wadenheben"
+    ]
   },
   {
     "_id": "ex_1394",
     "id": "1394",
-    "name": "Smith umgekehrtes Wadenheben",
-    "name_en": "smith reverse calf raises",
+    "name": "Smith-Wadenheben ohne Erhöhung",
+    "name_en": "smith reverse calf raise (floor)",
     "category": "Legs",
     "category_raw": "strength",
     "muscleGroup": "Waden",
@@ -56075,7 +56071,7 @@
   {
     "_id": "ex_1309",
     "id": "1309",
-    "name": "Smith Bankdrücken mit breitem Griff",
+    "name": "Smith-Negativbankdrücken mit breitem Griff",
     "name_en": "smith wide grip decline bench press",
     "category": "Push",
     "category_raw": "strength",

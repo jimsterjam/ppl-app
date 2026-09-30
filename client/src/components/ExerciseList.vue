@@ -329,6 +329,9 @@ function normalizeSearchText(value) {
     .trim()
 }
 
+// Doppelte über die ID filtern (vorher über den deutschen Namen - dadurch verschwanden echte,
+// nur gleich benannte Übungen, z.B. der Pull-up hinter dem Chin-up "Klimmzug"). Einträge ohne ID
+// (eigene Übungen) weiterhin über den Namen.
 function dedupeExercises(list = []) {
   const normalizeKey = (value) => String(value || '').trim().toLowerCase()
   const seen = new Set()
@@ -336,10 +339,10 @@ function dedupeExercises(list = []) {
 
   for (const exercise of Array.isArray(list) ? list : []) {
     if (!exercise) continue
-    const canonicalName = normalizeKey(exercise.displayName || exercise.name || exercise.name_en)
-    if (!canonicalName) continue
-    if (seen.has(canonicalName)) continue
-    seen.add(canonicalName)
+    const id = String(exercise.id || exercise._id || '').replace(/^ex_/, '')
+    const key = id ? `id:${id}` : `name:${normalizeKey(exercise.displayName || exercise.name || exercise.name_en)}`
+    if (key === 'name:' || seen.has(key)) continue
+    seen.add(key)
     unique.push(exercise)
   }
 

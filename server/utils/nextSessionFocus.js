@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath, pathToFileURL } from 'url';
 import { resolveEnglishExerciseName, toTitleCase } from './feedbackLocalization.js';
+import { findCatalogEntryForName } from './catalogMatch.js';
 
 // ---------------------------------------------------------------------------
 // "Nächstes Mal"-Zeile unter dem KI-Feedback - deterministisch statt von der KI formuliert.
@@ -30,12 +31,14 @@ try {
 }
 
 let catalog = null;
+let catalogList = [];
 function loadCatalog() {
   if (catalog) return catalog;
   catalog = new Map();
   try {
     const parsed = JSON.parse(fs.readFileSync(CATALOG_PATH, 'utf8'));
-    for (const entry of Array.isArray(parsed) ? parsed : []) {
+    catalogList = Array.isArray(parsed) ? parsed : [];
+    for (const entry of catalogList) {
       if (entry?.name) catalog.set(String(entry.name).trim().toLowerCase(), entry);
       if (entry?.name_en) catalog.set(String(entry.name_en).trim().toLowerCase(), entry);
     }
@@ -48,6 +51,7 @@ function loadCatalog() {
 // Nur für Tests
 export function __setFocusCatalogForTests(entries) {
   catalog = new Map();
+  catalogList = Array.isArray(entries) ? entries : [];
   for (const entry of entries || []) {
     if (entry?.name) catalog.set(String(entry.name).trim().toLowerCase(), entry);
     if (entry?.name_en) catalog.set(String(entry.name_en).trim().toLowerCase(), entry);
@@ -55,7 +59,10 @@ export function __setFocusCatalogForTests(entries) {
 }
 
 function exerciseInfo(ex = {}) {
-  const cat = loadCatalog().get(String(ex?.name || '').trim().toLowerCase()) || {};
+  const catalogMap = loadCatalog();
+  const cat = catalogMap.get(String(ex?.name || '').trim().toLowerCase())
+    || findCatalogEntryForName(catalogList, ex?.name)
+    || {};
   return {
     name: ex?.name,
     name_en: cat.name_en,

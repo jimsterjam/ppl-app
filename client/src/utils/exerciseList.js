@@ -5,6 +5,8 @@ import { fetchExercises } from '@/api/exercises'
 // Merge offline exercises with JSON defaults, dedupe by name+equipment, optional equipment filter,
 // and sort alphabetically by first three letters, then full name.
 // userId: falls gesetzt, werden zusätzlich die eigenen (nur für diesen User sichtbaren) Übungen eingemischt.
+import { buildCatalogIndex, findCatalogEntryByName } from '@/utils/exerciseMatch'
+
 export async function getMergedSortedExercises({ category = '', equipment = '', locale = '', includeRemote = true, userId = '' } = {}) {
   console.log('[DEBUG-CUSTOM] getMergedSortedExercises aufgerufen mit userId:', userId || 'LEER')
   // Build quick lookup by both DE and EN names from defaults
@@ -20,12 +22,13 @@ export async function getMergedSortedExercises({ category = '', equipment = '', 
   }
   if (!Array.isArray(defaults)) defaults = []
   console.debug('[ExerciseList] defaults loaded:', defaults.length, '| category:', category || '(all)')
-  const nameIndex = new Map()
-  for (const d of defaults) {
-    const de = normalize(d.name)
-    const en = normalize(d.name_en)
-    if (de) nameIndex.set(de, d)
-    if (en) nameIndex.set(en, d)
+  // Katalog-Index (utils/exerciseMatch.js): findet auch frühere Namen und andere Wortreihenfolge.
+  // User-Report: "Barbell Bench Press" stand doppelt und ohne Video in der Liste - der Eintrag kam
+  // aus der Server-Datenbank (vom Generator angelegt) und wurde nicht als "bench press barbell"
+  // (Katalog 0025) erkannt, weil hier nur exakte Namen verglichen wurden.
+  const catalogIndex = buildCatalogIndex(defaults)
+  const nameIndex = {
+    get: (name) => findCatalogEntryByName(catalogIndex, name)
   }
 
   // Produktentscheidung (User-Feedback): Übungsnamen werden IMMER auf Englisch angezeigt, auch
@@ -38,16 +41,16 @@ export async function getMergedSortedExercises({ category = '', equipment = '', 
   // wird hier aber nicht mehr zur Sprachauswahl verwendet.
   const pickDisplayName = (exercise = {}) => {
     const rawName = exercise?.name || ''
-    const d = nameIndex.get(normalize(rawName)) || nameIndex.get(normalize(exercise?.name_en))
+    const d = nameIndex.get(rawName) || nameIndex.get(exercise?.name_en)
     return d?.name_en || exercise?.name_en || d?.name || rawName || ''
   }
   const canonNameKey = (rawName) => {
-    const d = nameIndex.get(normalize(rawName))
+    const d = nameIndex.get(rawName)
     // Use EN as canonical when available, else DE
     return normalize(d?.name_en || d?.name || rawName)
   }
   const canonEquipKey = (rawEquip, rawName) => {
-    const d = nameIndex.get(normalize(rawName))
+    const d = nameIndex.get(rawName)
     // Prefer default english equipment as canonical key when mapping exists
     return normalize(d?.equipment_en || rawEquip || 'bodyweight')
   }

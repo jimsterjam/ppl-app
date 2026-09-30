@@ -51,6 +51,7 @@ import { getMaxExerciseCount } from '../utils/exerciseCountTarget.js';
 import { getRepRange } from '../utils/repTargets.js';
 import { buildNextSessionFocus, applyNextSessionFocus } from '../utils/nextSessionFocus.js';
 import { resolveListFeedbackStatus, FEEDBACK_PENDING_FAILED_AFTER_MS } from '../utils/feedbackStatus.js';
+import { findCatalogEntryForName, catalogReference } from '../utils/catalogMatch.js';
 import { resolveEnglishExerciseName, resolveFeedbackLanguage } from '../utils/feedbackLocalization.js';
 import { createOpenAIClient, describeAiClientMode, ensureRelayAwake, markRelayContact } from '../utils/aiClientFactory.js';
 import {
@@ -591,7 +592,7 @@ function guessMuscleGroupsForCategory(category) {
  */
 async function resolveQuickGeneratorExercises(suggestedExercises, options = {}) {
   const { requestedType = null, equipmentMode = null, userId = null } = options;
-  const summary = { matchedExisting: 0, createdSimilar: 0, createdNew: 0 };
+  const summary = { matchedCatalog: 0, matchedExisting: 0, createdSimilar: 0, createdNew: 0 };
 
   if (!Array.isArray(suggestedExercises) || suggestedExercises.length === 0) {
     return { exercises: suggestedExercises || [], summary };
@@ -618,6 +619,17 @@ async function resolveQuickGeneratorExercises(suggestedExercises, options = {}) 
     const candidateName = exercise?.name;
     if (!candidateName) {
       resolved.push(exercise);
+      continue;
+    }
+
+    // Zuerst gegen den Übungskatalog (User-Report "Barbell Bench Press" doppelt und ohne Video):
+    // der Generator fragte Namen wie "Barbell Bench Press" an, im Katalog heißt die Übung
+    // "bench press barbell" (0025). Ohne Katalog-Treffer wurde eine neue DB-Übung ohne Video
+    // angelegt. Treffer -> Katalog-ID und Katalogname (Videos werden über die Katalog-ID gefunden).
+    const catalogRef = catalogReference(findCatalogEntryForName(exerciseCatalog, candidateName));
+    if (catalogRef) {
+      summary.matchedCatalog++;
+      resolved.push({ ...exercise, ...catalogRef });
       continue;
     }
 

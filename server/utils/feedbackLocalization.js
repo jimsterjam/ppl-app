@@ -1,6 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import exerciseList from '../data/exercises.js';
+import { findCatalogEntryForName } from './catalogMatch.js';
 
 // ---------------------------------------------------------------------------
 // Sprache und Übungsnamen für das KI-Feedback (User-Report: App auf Englisch, Feedback-Text
@@ -62,6 +64,9 @@ export function resolveEnglishExerciseName(name, dbEnglishName = null) {
   if (fromDb) return toTitleCase(fromDb);
   const fromCatalog = loadCatalogMap().get(raw.toLowerCase());
   if (fromCatalog) return toTitleCase(fromCatalog);
+  // Frühere Namen / andere Wortreihenfolge ("Barbell Bench Press" -> "bench press barbell").
+  const matched = findCatalogEntryForName(exerciseList, raw);
+  if (matched?.name_en) return toTitleCase(matched.name_en);
   return raw;
 }
 

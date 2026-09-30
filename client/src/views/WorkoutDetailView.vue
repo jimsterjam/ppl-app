@@ -984,6 +984,7 @@ import {
 } from '@/utils/workoutDetailPersistState'
 import { normalizeWorkoutForSave } from '@/utils/workoutDetailSaveFlow'
 import { startAiWarmup } from '@/utils/aiWarmup'
+import { buildCatalogIndex, findCatalogEntry } from '@/utils/exerciseMatch'
 import { useRestTimerStore } from '@/stores/restTimerStore'
 import { restSecondsFor, sanitizeCustomRest } from '@/utils/restTimerRules'
 import RestTimerBar from '@/components/timer/RestTimerBar.vue'
@@ -1041,21 +1042,20 @@ const { getIdToken, getCurrentUser } = useFirebaseAuth()
 
 const { t, locale } = useI18n()
 const { getTranslatedExerciseName } = useExerciseTranslation()
-const defaultExerciseByName = ref(new Map())
+// Katalog-Index (utils/exerciseMatch.js): Zuordnung über ID, Namen, frühere Namen (aliases) und
+// unabhängig von der Wortreihenfolge - z.B. "Barbell Bench Press" (vom Generator) findet
+// "bench press barbell" (Katalog 0025) samt Video. Vorher nur exakter Namensvergleich.
+const defaultExerciseIndex = ref(buildCatalogIndex([]))
 async function loadDefaultExerciseMap() {
   try {
-    const defaultExercisesNormalized = await loadDefaultExercises()
-    defaultExerciseByName.value = new Map(
-      defaultExercisesNormalized.flatMap(ex => {
-        const entries = []
-        if (ex.name) entries.push([String(ex.name).trim().toLowerCase(), ex])
-        if (ex.name_en) entries.push([String(ex.name_en).trim().toLowerCase(), ex])
-        return entries
-      })
-    )
+    defaultExerciseIndex.value = buildCatalogIndex(await loadDefaultExercises())
   } catch {
-    defaultExerciseByName.value = new Map()
+    defaultExerciseIndex.value = buildCatalogIndex([])
   }
+}
+
+function lookupDefaultExercise(ex) {
+  return ex ? findCatalogEntry(defaultExerciseIndex.value, ex) : null
 }
 // Optional: eigene Übersetzungsfunktion für Muskelgruppen
 const getTranslatedMuscleGroup = (mg) => mg
@@ -1704,8 +1704,7 @@ function oneRepMaxKeyFor(idx) {
 //    (UserExerciseNote.overrides.trackOneRepMax) - bewusstes Opt-in statt "im Zweifel
 //    anzeigen", siehe getIsCustomOneRepMaxTrackingEnabled().
 function isOneRepMaxRelevant(ex, idx) {
-  const nameKey = String(ex?.name || '').trim().toLowerCase()
-  const mapped = nameKey ? defaultExerciseByName.value.get(nameKey) : null
+  const mapped = lookupDefaultExercise(ex)
   if (mapped) {
     return isDefaultExerciseOneRepMaxEligible(mapped.id || mapped._id)
   }
@@ -1716,14 +1715,12 @@ function isOneRepMaxRelevant(ex, idx) {
 // Zusatzgewicht (nicht das Gesamtgewicht inkl. Körpergewicht) meint (Absprache mit dem
 // Nutzer: "bei dips ist das gewicht immer als zusatzgewicht gemeint zu körpergewicht").
 function isOneRepMaxAddedWeightExercise(ex) {
-  const nameKey = String(ex?.name || '').trim().toLowerCase()
-  const mapped = nameKey ? defaultExerciseByName.value.get(nameKey) : null
+  const mapped = lookupDefaultExercise(ex)
   return mapped ? isAddedWeightOneRepMaxExercise(mapped.id || mapped._id) : false
 }
 
 function isCustomExercise(ex) {
-  const nameKey = String(ex?.name || '').trim().toLowerCase()
-  return !(nameKey && defaultExerciseByName.value.get(nameKey))
+  return !lookupDefaultExercise(ex)
 }
 
 function getIsCustomOneRepMaxTrackingEnabled(idx) {
@@ -2073,18 +2070,10 @@ watch(
   { immediate: true }
 )
 
-function progressionLower(value) {
-  return String(value || '').trim().toLowerCase()
-}
+const progressionCatalogIndex = computed(() => buildCatalogIndex(progressionCatalog.value))
 
 function findCatalogEntryForProgression(ex) {
-  const list = Array.isArray(progressionCatalog.value) ? progressionCatalog.value : []
-  if (!list.length) return null
-  const id = String(ex?.exerciseId || ex?._id || '').trim()
-  const name = progressionLower(ex?.name)
-  return (id && list.find((e) => String(e?._id || '') === id || String(e?.id || '') === id))
-    || (name && list.find((e) => progressionLower(e?.name) === name || progressionLower(e?.name_en) === name))
-    || null
+  return findCatalogEntry(progressionCatalogIndex.value, ex || {})
 }
 
 function progressionInfo(ex) {
@@ -2705,8 +2694,7 @@ function getExerciseImage(ex) {
   const safeImage = /\.gif($|[?#])/i.test(imageUrl) ? '' : imageUrl
   const direct = ex?.thumbnailStaticUrl || ex?.thumbnailUrl || safeImage
   if (direct) return direct
-  const nameKey = String(ex?.name || '').trim().toLowerCase()
-  const mapped = nameKey ? defaultExerciseByName.value.get(nameKey) : null
+  const mapped = lookupDefaultExercise(ex)
   const mappedImage = typeof mapped?.imageUrl === 'string' && /\.gif($|[?#])/i.test(mapped.imageUrl) ? '' : mapped?.imageUrl
   return mapped?.thumbnailStaticUrl || mapped?.thumbnailUrl || mappedImage || '/exercises/play.svg'
 }
@@ -2716,8 +2704,7 @@ function getExerciseLargeImage(ex) {
   const safeImage = /\.gif($|[?#])/i.test(imageUrl) ? '': imageUrl
   const direct = safeImage || ex?.thumbnailUrl
   if (direct) return direct
-  const nameKey = String(ex?.name || '').trim().toLowerCase()
-  const mapped = nameKey ? defaultExerciseByName.value.get(nameKey) : null
+  const mapped = lookupDefaultExercise(ex)
   const mappedImage = typeof mapped?.imageUrl === 'string' && /\.gif($|[?#])/i.test(mapped.imageUrl) ? '' : mapped?.imageUrl
   return mappedImage || mapped?.thumbnailUrl || '/exercises/play.svg'
 }
@@ -2725,8 +2712,7 @@ function getExerciseLargeImage(ex) {
 function openExerciseMedia(exercise) {
   if (!exercise || isReordering.value) return
   const requestId = ++mediaRequestId.value
-  const nameKey = String(exercise?.name || '').trim().toLowerCase()
-  const mapped = nameKey ? defaultExerciseByName.value.get(nameKey) : null
+  const mapped = lookupDefaultExercise(exercise)
   const source = mapped ? Object.fromEntries(
     Object.entries({ ...mapped, ...exercise }).filter(([, value]) => value != null && value !== '')
   ) : exercise

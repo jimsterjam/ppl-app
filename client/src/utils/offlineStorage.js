@@ -645,7 +645,9 @@ export async function cacheCustomExercises(exercises) {
 // weil getMergedSortedExercises() die frischen JSON-Daten mit dieser IndexedDB-Kopie mischt).
 // v2: Full-Squat-Dubletten (ids 0043/1461) zu einer Übung (id 1462, "Full Squat") zusammengeführt,
 //     Snatch/Clean/Clean and Jerk (ids 9009-9011) ergänzt.
-const DEFAULT_EXERCISES_SEED_VERSION = 2
+// v3: Dubletten-Bereinigung (30.09.): 1731 in 0296 zusammengeführt, gleich benannte Varianten
+//     eindeutig benannt (z.B. Brustpresse Scheiben/Steckgewicht), alte Namen als "aliases".
+const DEFAULT_EXERCISES_SEED_VERSION = 3
 const DEFAULT_EXERCISES_SEED_VERSION_KEY = 'default_exercises_seed_version'
 
 /**
