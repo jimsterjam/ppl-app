@@ -15,11 +15,11 @@
       <div class="legal-content">
         <section class="legal-section">
           <p class="section-title">{{ $t('legal.section1Title') }}</p>
-          <p v-html="$t('legal.section1Address').replace(/\n/g, '<br>')"></p>
+          <p class="multiline">{{ $t('legal.section1Address') }}</p>
           <p>{{ $t('legal.section1Mail', { email: legalEmail }) }}</p>
           <p class="section-subtitle">
             {{ $t('legal.section1ResponsibleTitle') }}<br />
-            <span v-html="$t('legal.section1Responsible').replace(/\n/g, '<br>')"></span>
+            <span class="multiline">{{ $t('legal.section1Responsible') }}</span>
           </p>
         </section>
 
@@ -49,7 +49,7 @@
           <h2>{{ $t('legal.privacyTitle') }}</h2>
           <div class="privacy-block">
             <strong>{{ $t('legal.privacy1') }}</strong>
-            <p v-html="$t('legal.privacy1Text', { email: legalEmail }).replace(/\n/g, '<br>')"></p>
+            <p class="multiline">{{ $t('legal.privacy1Text', { email: legalEmail }) }}</p>
           </div>
           <div class="privacy-block">
             <strong>{{ $t('legal.privacy2') }}</strong>
@@ -222,5 +222,10 @@ function goBack() {
   .back-btn {
     width: fit-content;
   }
+}
+
+/* Zeilenumbrüche (\n) aus den Übersetzungen anzeigen, ohne v-html */
+.multiline {
+  white-space: pre-line;
 }
 </style>
