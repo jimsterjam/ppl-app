@@ -35,11 +35,11 @@ describe('Generator-Vorgaben (Schritt A)', () => {
     assert.deepEqual(server.applyGeneratorRule({ reps: 6, sets: 1 }, 'hypertrophy', true), { reps: 8, sets: 2, rest: 90 })
   })
 
-  test('Kraft: Grundübungen 3-5 Wdh. in 3-5 Sätzen, Zubehör 8-12', () => {
-    assert.deepEqual(server.applyGeneratorRule({ reps: 8, sets: 3 }, 'strength', false), { reps: 5, sets: 3, rest: 180 })
+  test('Kraft: Grundübungen 3-6 Wdh. in 3-5 Sätzen, Zubehör 8-12', () => {
+    assert.deepEqual(server.applyGeneratorRule({ reps: 8, sets: 3 }, 'strength', false), { reps: 6, sets: 3, rest: 180 })
     assert.deepEqual(server.applyGeneratorRule({ reps: 1, sets: 8 }, 'strength', false), { reps: 3, sets: 5, rest: 180 })
     assert.deepEqual(server.applyGeneratorRule({}, 'strength', false), { reps: 5, sets: 4, rest: 180 })
     assert.deepEqual(server.applyGeneratorRule({ reps: 15, sets: 3 }, 'strength', true), { reps: 12, sets: 3, rest: 120 })
-    assert.deepEqual(server.getRepRange('strength', false), [3, 5])
+    assert.deepEqual(server.getRepRange('strength', false), [3, 6])
   })
 })

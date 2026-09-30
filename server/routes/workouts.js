@@ -2998,7 +2998,7 @@ Schema, Format und die Regeln unten.
       - Keine doppelte Hauptbewegung direkt hintereinander.
       - Genau targetExerciseCount Übungen insgesamt (Wert steht in den Parametern), maximal 1 Core-Übung und nicht an Position 1.
       - durationMinutes ist die reine Trainingszeit ohne Aufwärmen - Satzzahl und Pausen so wählen, dass das Workout hineinpasst.
-      - Für strength: Grundübungen 3-5 Reps in 3-5 Sätzen (schwere Grundübungen zuerst, Pause ca. 3 Min.), Zubehör/Isolation 8-12 Reps in 2-4 Sätzen (ca. 2 Min.); für hypertrophy: alle Übungen 8-12 Reps in 2-4 Sätzen (meist 3), Pausen ca. 2 Min. bei Grundübungen und 1,5 Min. bei Isolation.
+      - Für strength: Grundübungen 3-6 Reps in 3-5 Sätzen (schwere Grundübungen zuerst, Pause ca. 3 Min.), Zubehör/Isolation 8-12 Reps in 2-4 Sätzen (ca. 2 Min.); für hypertrophy: alle Übungen 8-12 Reps in 2-4 Sätzen (meist 3), Pausen ca. 2 Min. bei Grundübungen und 1,5 Min. bei Isolation.
       - equipmentMode strikt beachten (gym_only, gym_plus_bodyweight, bodyweight_only).
 Schema exakt:
 {"workoutName":"string","exercises":[{"name":"string","sets":3,"reps":10,"weight":0,"rest":90}],"estimatedDuration":45,"difficulty":"beginner|advanced","notes":"string"}

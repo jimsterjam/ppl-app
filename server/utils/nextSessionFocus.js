@@ -101,7 +101,8 @@ const TEXTS = {
     hold: (n, p) => `Nächstes Mal – ${n}: gleiches Gewicht (${p.weight} kg). Ziel: ${p.reps} Wdh. in jedem Satz.`,
     climb: (n, p) => `Nächstes Mal – ${n}: ${p.nextReps} Wdh. pro Satz mit ${p.weight} kg versuchen. Bei ${p.max} in allen Sätzen gibt es mehr Gewicht.`,
     confirm: (n, p) => `Nächstes Mal – ${n}: ${p.sets}×${p.reps} mit ${p.weight} kg noch einmal bestätigen, dann mehr Gewicht.`,
-    plateau: (n, p) => `Hinweis – ${n}: seit ${p.sessions} Einheiten bei ${p.weight} kg. Ein kleinerer Steigerungsschritt oder etwas längere Pausen können helfen.`
+    plateau: (n, p) => `Hinweis – ${n}: seit ${p.sessions} Einheiten bei ${p.weight} kg. Ein kleinerer Steigerungsschritt oder etwas längere Pausen können helfen.`,
+    below: (n, p) => `Hinweis – ${n}: unter ${p.min} Wdh. ist ${p.weight} kg für Muskelaufbau eher zu schwer. Etwas weniger Gewicht kann besser passen.`
   },
   en: {
     increase: (n, p) => `Next time – ${n}: try ${p.weight} kg. If you don't hit all reps, stay there until you do.`,
@@ -110,14 +111,15 @@ const TEXTS = {
     hold: (n, p) => `Next time – ${n}: same weight (${p.weight} kg). Goal: ${p.reps} reps in every set.`,
     climb: (n, p) => `Next time – ${n}: try ${p.nextReps} reps per set at ${p.weight} kg. Once every set hits ${p.max}, add weight.`,
     confirm: (n, p) => `Next time – ${n}: confirm ${p.sets}×${p.reps} at ${p.weight} kg once more, then add weight.`,
-    plateau: (n, p) => `Note – ${n}: ${p.sessions} sessions at ${p.weight} kg. A smaller increase step or slightly longer rests can help.`
+    plateau: (n, p) => `Note – ${n}: ${p.sessions} sessions at ${p.weight} kg. A smaller increase step or slightly longer rests can help.`,
+    below: (n, p) => `Note – ${n}: below ${p.min} reps, ${p.weight} kg is rather heavy for muscle building. A little less weight may suit you better.`
   }
 };
 
 // Keine Senkung, nur ein Hinweis (Absprache Paul): nach PLATEAU_SESSIONS Einheiten mit demselben
 // Hauptgewicht ohne Steigerung.
 export const PLATEAU_SESSIONS = 3;
-const PRIORITY = { increase: 1, plateau: 2, speed: 3, confirm: 4, close: 5, climb: 6, hold: 7 };
+const PRIORITY = { increase: 1, plateau: 2, below: 2, speed: 3, confirm: 4, close: 5, climb: 6, hold: 7 };
 
 // Dieselbe Übung aus früheren Workouts (neueste zuerst), passend über den Namen.
 function previousSessionsOf(ex, history, limit) {
@@ -127,7 +129,8 @@ function previousSessionsOf(ex, history, limit) {
     if (found.length >= limit) break;
     const match = (w?.exercises || []).find((item) => String(item?.name || '').trim().toLowerCase() === name
       && engine.getWorkingSets(item).length > 0);
-    if (match) found.push(match);
+    // Workout-Ziel der Session mitgeben - verglichen werden nur Sessions derselben Trainingsart.
+    if (match) found.push(w?.goal ? { ...match, __workoutGoal: w.goal } : match);
   }
   return found;
 }
@@ -164,8 +167,9 @@ export function buildNextSessionFocus({ workout, language = 'de', profileHintByN
     if (exGoal === 'explosive') {
       if (hasLoad(ex)) candidate = { kind: 'speed', params: {} };
     } else {
-      const previousSessions = previousSessionsOf(ex, history, PLATEAU_SESSIONS - 1);
+      const previousSessions = previousSessionsOf(ex, history, PLATEAU_SESSIONS + 1);
       const status = engine.getProgressionStatus(info, ex, exGoal, { previousSessions });
+      const compatible = engine.compatibleSessions ? engine.compatibleSessions(info, previousSessions, exGoal) : previousSessions;
       const params = {
         weight: formatKg(status?.weight, lang),
         reps: status?.targetReps,
@@ -175,8 +179,11 @@ export function buildNextSessionFocus({ workout, language = 'de', profileHintByN
       };
       if (status?.state === 'increase' && status.suggestion?.suggestedWeights?.length) {
         candidate = { kind: 'increase', params: { weight: formatKg(status.suggestion.suggestedWeights[0], lang) } };
-      } else if (status && previousSessions.length >= PLATEAU_SESSIONS - 1
-        && previousSessions.every((prev) => mainWeightOf(prev) === status.weight)) {
+      } else if (status?.state === 'climb' && status.belowRange) {
+        // Muskelaufbau unter 8 Wdh.: nur Hinweis im Feedback, keine direkte Senkung (Absprache Paul).
+        candidate = { kind: 'below', params: { ...params, min: status.min } };
+      } else if (status && compatible.length >= PLATEAU_SESSIONS - 1
+        && compatible.slice(0, PLATEAU_SESSIONS - 1).every((prev) => mainWeightOf(prev) === status.weight)) {
         // Seit mehreren Einheiten dasselbe Gewicht ohne Steigerung -> nur ein Hinweis, keine Senkung.
         candidate = { kind: 'plateau', params: { ...params, sessions: PLATEAU_SESSIONS } };
       } else if (['confirm', 'close', 'climb', 'hold'].includes(status?.state)) {

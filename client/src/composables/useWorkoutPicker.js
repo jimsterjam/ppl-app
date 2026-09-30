@@ -75,7 +75,9 @@ export function useWorkoutPicker({ isMobile, onValueChanged } = {}) {
     return lastPickerCloseAt
   }
 
-  function openPicker(row, field, step = 1, min = 0, max = 1000, title = '') {
+  // startValue: Startwert der Auswahl, wenn das Feld noch leer ist (z.B. untere Grenze des
+  // Wiederholungsbereichs statt 0).
+  function openPicker(row, field, step = 1, min = 0, max = 1000, title = '', startValue = 0) {
     logDiagnostic('picker-open', { field, currentValue: row?.[field], suppressed: suppressNextPickerOpen })
     if (suppressNextPickerOpen) {
       suppressNextPickerOpen = false
@@ -90,7 +92,7 @@ export function useWorkoutPicker({ isMobile, onValueChanged } = {}) {
     pickerConfig.splitDecimals = field === 'weight'
     pickerConfig.decimalOptions = pickerConfig.splitDecimals ? [0, 0.25, 0.5, 0.75] : [0]
     pickerConfig.title = title || (field === 'weight' ? 'Gewicht (kg)' : 'Wiederholungen')
-    pickerValue.value = Number(row[field]) || 0
+    pickerValue.value = Number(row[field]) || Number(startValue) || 0
     pickerVisible.value = true
   }
 

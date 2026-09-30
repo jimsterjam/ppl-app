@@ -324,7 +324,7 @@ function toggleExercise(exercise) {
 			exerciseId: exercise.exerciseId || exercise._id || exercise.id || null,
 			setDetails: Array.isArray(exercise.setDetails) && exercise.setDetails.length > 0
 				? exercise.setDetails
-				: [{ reps: 10, weight: 0 }]
+				: [{ reps: null, weight: null }] // leer statt erfundener 10 / 0 kg (Platzhalter in der Workout-Ansicht)
 		}
 		selectedExercises.value.push(sanitized)
 	}

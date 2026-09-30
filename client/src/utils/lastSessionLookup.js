@@ -52,7 +52,9 @@ export function findRecentSessionExercises(currentExercise = {}, candidates = []
   for (const workout of candidates) {
     if (found.length >= limit) break
     const match = findLastSessionExercise(currentExercise, [workout])
-    if (match) found.push(match)
+    // Workout-Ziel der Session mitgeben: Hinweise vergleichen nur Sessions derselben Trainingsart
+    // (isSessionCompatible in weightSuggestion.js).
+    if (match) found.push(workout?.goal ? { ...match, __workoutGoal: workout.goal } : match)
   }
   return found
 }

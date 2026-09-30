@@ -95,6 +95,44 @@ export const DEFAULT_STRENGTH_REPS = 5
 // Bis zu dieser Wdh.-Zahl muss das Schema zweimal hintereinander geschafft werden.
 export const CONFIRM_REPS_MAX = 3
 
+// Übergangswert zwischen Kraft (1-6) und Muskelaufbau (8-12), Absprache Paul: schafft jemand bei
+// Kraft 7+ in allen Hauptsätzen, ist das Gewicht zu leicht; bei Muskelaufbau unter 8 eher zu schwer.
+export const TRANSITION_REPS = 7
+
+/** 'fixed' (Kraft-Grundübung, festes Schema) oder 'range' (8-12) - null = kein Wdh.-Ziel. */
+export function progressionModeFor(info = {}, goal = DEFAULT_TRAINING_GOAL) {
+  if (goal === 'explosive') return null
+  const type = classifyExercise(info)
+  if (type === 'core') return null
+  return normalizeTrainingGoal(goal) === 'strength' && type === 'compound' ? 'fixed' : 'range'
+}
+
+/**
+ * Passt eine frühere Session zur aktuellen Trainingsart? (User-Report: eine Kraft-Session mit
+ * 5x85 kg lieferte im Muskelaufbau-Workout "6 Wdh. mit 85 kg".)
+ * - Trainingsart der Session bekannt (Workout-Ziel __workoutGoal bzw. trainingType der Übung):
+ *   muss dieselbe sein.
+ * - Unbekannt (alte Workouts): Plausibilität über die Wiederholungen - für Muskelaufbau darf nicht
+ *   alles unter 7 liegen, für ein Kraft-Schema nicht alles über 7.
+ */
+export function isSessionCompatible(info = {}, sessionExercise = null, goal = DEFAULT_TRAINING_GOAL) {
+  if (!sessionExercise) return false
+  const known = sessionExercise.__workoutGoal || sessionExercise.trainingType
+  if (known) {
+    return resolveExerciseGoal(info, sessionExercise.__workoutGoal, sessionExercise.trainingType) === resolveExerciseGoal(info, goal)
+  }
+  const mode = progressionModeFor(info, goal)
+  const reps = getWorkingSets(sessionExercise).map((set) => set.reps)
+  if (!mode || !reps.length) return true
+  if (mode === 'range') return Math.max(...reps) >= TRANSITION_REPS
+  return Math.min(...reps) <= TRANSITION_REPS
+}
+
+/** Nur die Sessions, die zur aktuellen Trainingsart passen (Reihenfolge bleibt, neueste zuerst). */
+export function compatibleSessions(info = {}, sessions = [], goal = DEFAULT_TRAINING_GOAL) {
+  return (Array.isArray(sessions) ? sessions : []).filter((session) => isSessionCompatible(info, session, goal))
+}
+
 /**
  * Ziel-Wiederholungen eines festen Kraft-Schemas aus den letzten Sessions (neueste zuerst):
  * häufigste Wdh.-Zahl der Hauptsätze, bei Gleichstand die höhere, begrenzt auf 1-6.
@@ -128,7 +166,8 @@ export function getRepTarget(info = {}, goal = DEFAULT_TRAINING_GOAL, { sessions
   if (type === 'core') return null
   if (normalizeTrainingGoal(goal) === 'strength' && type === 'compound') {
     const { min, max } = PROGRESSION_RANGES.strength
-    return { type, mode: 'fixed', min, max, target: detectSchemeReps(sessions) }
+    // Schema nur aus Sessions derselben Trainingsart ablesen.
+    return { type, mode: 'fixed', min, max, target: detectSchemeReps(compatibleSessions(info, sessions, goal)) }
   }
   const { min, max } = PROGRESSION_RANGES.hypertrophy
   return { type, mode: 'range', min, max, target: max }
@@ -214,8 +253,11 @@ function schemeAchieved(sessionExercise, weight, reps) {
  * @param {Array} [options.previousSessions] - dieselbe Übung aus den Sessions VOR der letzten,
  *   neueste zuerst (für Schema-Erkennung und die Bestätigungs-Regel bei 1-3 Wdh.)
  */
-export function getProgressionStatus(info = {}, lastSessionExercise = null, goal = DEFAULT_TRAINING_GOAL, { previousSessions = [] } = {}) {
-  if (!lastSessionExercise || isNoLoadExercise(info)) return null
+export function getProgressionStatus(info = {}, lastSessionExerciseRaw = null, goal = DEFAULT_TRAINING_GOAL, { previousSessions: previousRaw = [] } = {}) {
+  if (!lastSessionExerciseRaw || isNoLoadExercise(info)) return null
+  // Nur Sessions derselben Trainingsart (siehe isSessionCompatible).
+  const [lastSessionExercise = null, ...previousSessions] = compatibleSessions(info, [lastSessionExerciseRaw, ...previousRaw], goal)
+  if (!lastSessionExercise) return null
   const target = getRepTarget(info, goal, { sessions: [lastSessionExercise, ...previousSessions] })
   if (!target) return null
   const all = getWorkingSets(lastSessionExercise)
@@ -251,10 +293,23 @@ export function getProgressionStatus(info = {}, lastSessionExercise = null, goal
       !schemeAchieved(previousSessions[0], split.weight, target.target)) {
       return { ...base, state: 'confirm', suggestion: null }
     }
-    return { ...base, state: 'increase', suggestion: buildSuggestion(info, split, target) }
+    return {
+      ...base,
+      state: 'increase',
+      // Kraft: 7+ in allen Hauptsätzen -> deutlich über dem Schema, Gewicht war zu leicht.
+      aboveScheme: target.mode === 'fixed' && minReps >= TRANSITION_REPS,
+      suggestion: buildSuggestion(info, split, target)
+    }
   }
   if (target.mode === 'range') {
-    return { ...base, state: 'climb', nextReps: Math.min(target.max, minReps + 1), suggestion: null }
+    return {
+      ...base,
+      state: 'climb',
+      nextReps: Math.min(target.max, minReps + 1),
+      // Muskelaufbau unter 8: unter dem Zielbereich (Gewicht eher zu schwer) - nur Hinweis, keine Senkung.
+      belowRange: minReps < target.min,
+      suggestion: null
+    }
   }
   const state = below.length === 1 && below[0].reps === target.target - 1 ? 'close' : 'hold'
   return { ...base, state, suggestion: null }

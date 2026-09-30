@@ -331,9 +331,12 @@ async function generate() {
     const exercises = rawExercises.map((ex, index) => {
       const match = findCatalogMatch(catalog, ex.name)
       const setsCount = Math.max(1, Math.min(6, Number(ex.sets) || 3))
+      // Sätze leer anlegen (User-Report: "10" und "0 kg" waren erfunden) - die Workout-Ansicht
+      // zeigt den Zielbereich als Platzhalter bzw. übernimmt Werte aus einer passenden früheren
+      // Session (WorkoutDetailView prefillEmptyExercisesFromHistory).
       const setDetails = Array.from({ length: setsCount }, () => ({
-        reps: Math.max(1, Number(ex.reps) || 10),
-        weight: Math.max(0, Number(ex.weight) || 0),
+        reps: null,
+        weight: null,
         restTime: Math.max(20, Number(ex.rest) || 90),
         isWarmup: false
       }))

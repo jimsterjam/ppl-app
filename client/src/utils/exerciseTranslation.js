@@ -8,6 +8,16 @@ import { useI18n } from 'vue-i18n'
 import { loadDefaultExercises, getCachedDefaultExercises } from '@/utils/defaultExercisesLoader'
 import { buildCatalogIndex, findCatalogEntryByName } from '@/utils/exerciseMatch'
 
+// Katalognamen sind klein geschrieben ("bench press barbell") - angezeigt wird "Bench Press Barbell"
+// (wie im KI-Feedback, server/utils/feedbackLocalization.js toTitleCase).
+export function toTitleCase(name) {
+  return String(name || '')
+    .split(/(\s+|-|\()/)
+    .map((part) => (/^[a-zäöü]/.test(part) ? part.charAt(0).toUpperCase() + part.slice(1) : part))
+    .join('')
+    .replace(/\bEz\b/g, 'EZ')
+}
+
 // Ein Index je geladener Katalogliste (alle Komponenten teilen sich dieselbe Liste).
 const indexCache = new WeakMap()
 function catalogIndexFor(list) {
@@ -46,8 +56,8 @@ export function useExerciseTranslation() {
     // Auch frühere Namen und andere Wortreihenfolge ("Barbell Bench Press" -> "bench press barbell").
     const found = findCatalogEntryByName(catalogIndexFor(exercisesData.value), exerciseName)
     if (!found) return exerciseName
-    // Product decision: exercise names are always displayed in English.
-    return found.name_en || found.name || exerciseName
+    // Product decision: exercise names are always displayed in English (mit großen Anfangsbuchstaben).
+    return toTitleCase(found.name_en || found.name || exerciseName)
   }
 
   function findByField(field, value) {

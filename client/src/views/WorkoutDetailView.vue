@@ -363,6 +363,7 @@
                           step="0.25"
                           inputmode="decimal"
                           :readonly="isMobile"
+                          :placeholder="t('workoutDetail.weightKgShort')"
                           @focus="trackFieldAnchor(i, rIdx, 'weight')"
                           @click="trackFieldAnchor(i, rIdx, 'weight')"
                           @input="() => { clampRowValue(row, 'weight', 0, 1000, 0.25); triggerAutoSave() }"
@@ -416,7 +417,7 @@
                 v-for="(row, rIdx) in (ex.setDetails || [])"
                 :key="`${ex.exerciseId || i}-working-row-${rIdx}`"
               >
-                <div v-if="!row.isWarmup" class="set-row" :class="{ 'set-row-empty': isRowEmpty(row), 'set-row--open': !isRowDone(row), 'set-row--done': setTrackingActive && isRowDone(row), 'set-row--next': nextSetHighlight.exIndex === i && nextSetHighlight.rowIndex === rIdx }" :data-set-index="rIdx">
+                <div v-if="!row.isWarmup" class="set-row" :class="{ 'set-row-empty': !setTrackingActive && isRowEmpty(row), 'set-row--open': !isRowDone(row), 'set-row--done': setTrackingActive && isRowDone(row), 'set-row--next': nextSetHighlight.exIndex === i && nextSetHighlight.rowIndex === rIdx }" :data-set-index="rIdx">
                   <span class="col set">
                     <!-- Abhaken (laufendes Workout): Nummer antippen = Satz gemacht, nochmal = zurück.
                          Nicht abgehakte Sätze erscheinen grau (übernommene Werte vom letzten Mal). -->
@@ -442,13 +443,14 @@
                           step="1"
                           inputmode="numeric"
                           :readonly="isMobile"
+                          :placeholder="repsPlaceholderFor(i)"
                           @focus="trackFieldAnchor(i, rIdx, 'reps')"
                           @click="trackFieldAnchor(i, rIdx, 'reps')"
                           @input="() => { clampRowValueNullable(row, 'reps', 0, 500, 1); triggerAutoSave() }"
                           @wheel.prevent="onNumberWheel($event, row, 'reps', 1, 0, 500)"
                           @keydown="onNumberKeyDown($event, false)"
-                          @focus.prevent="openPicker(row, 'reps', 1, 0, 500)"
-                          @click.prevent="openPicker(row, 'reps', 1, 0, 500)"
+                          @focus.prevent="openPicker(row, 'reps', 1, 0, 500, '', repTargetsByIndex[i]?.min || 0)"
+                          @click.prevent="openPicker(row, 'reps', 1, 0, 500, '', repTargetsByIndex[i]?.min || 0)"
                         />
                         <div v-if="!isMobile" class="spinner-vertical">
                         <button
@@ -490,6 +492,7 @@
                           step="0.25"
                           inputmode="decimal"
                           :readonly="isMobile"
+                          :placeholder="t('workoutDetail.weightKgShort')"
                           @focus="trackFieldAnchor(i, rIdx, 'weight')"
                           @click="trackFieldAnchor(i, rIdx, 'weight')"
                           @input="() => { clampRowValue(row, 'weight', 0, 1000, 0.25); triggerAutoSave() }"
@@ -929,7 +932,7 @@ import { getCurrentInstance } from 'vue'
 import NumberPicker from '@/components/NumberPicker.vue'
 import { useExerciseTranslation, getEnglishExerciseName } from '@/utils/exerciseTranslation'
 import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
-import { getRepTarget, getProgressionStatus, isNoLoadExercise, resolveExerciseGoal, sanitizeExerciseTrainingType, classifyExercise } from '@/utils/weightSuggestion'
+import { getRepTarget, getProgressionStatus, isNoLoadExercise, resolveExerciseGoal, sanitizeExerciseTrainingType, classifyExercise, compatibleSessions, splitMainAndBackoffSets, getWorkingSets } from '@/utils/weightSuggestion'
 import { prepareHistoryCandidates, findRecentSessionExercises } from '@/utils/lastSessionLookup'
 import { sanitizeWorkoutGoal } from '@/utils/workoutGoal'
 import WorkoutGoalPicker from '@/components/WorkoutGoalPicker.vue'
@@ -2018,6 +2021,37 @@ function customRestForIndex(index) {
   return sanitizeCustomRest(ex?.restSeconds) || sanitizeCustomRest(lastSessionByIndex.value[index]?.restSeconds) || null
 }
 
+// Platzhalter im leeren Wiederholungsfeld: der Bereich, den die App auswertet (Kraft 1-6,
+// Muskelaufbau 8-12) - keine erfundene Zahl.
+function repsPlaceholderFor(index) {
+  const target = repTargetsByIndex.value[index]
+  return target ? t('workoutDetail.repsPlaceholder', { min: target.min, max: target.max }) : ''
+}
+
+// Neue Workouts (Generator/manuell) starten mit leeren Sätzen. Gibt es eine frühere Session
+// DERSELBEN Trainingsart, werden deren Hauptsätze übernommen (grau, bis abgehakt) - wie bei
+// Favoriten. Nur leere Sätze werden gefüllt, eingetragene Werte bleiben unangetastet.
+function prefillEmptyExercisesFromHistory() {
+  if (!setTrackingActive.value || isFavoriteSourceRoute()) return
+  const exercises = workout.value?.exercises || []
+  exercises.forEach((ex, index) => {
+    const rows = (ex?.setDetails || []).filter((row) => row && !row.isWarmup)
+    if (!rows.length) return
+    const isEmpty = (row) => (row.reps == null || row.reps === '' || Number(row.reps) === 0)
+      && (row.weight == null || row.weight === '' || Number(row.weight) === 0)
+    if (!rows.every(isEmpty)) return
+    const info = progressionInfoByIndex.value[index] || {}
+    const [last] = compatibleSessions(info, recentSessionsByIndex.value[index] || [], goalByIndex.value[index])
+    const split = last ? splitMainAndBackoffSets(getWorkingSets(last)) : null
+    if (!split?.main?.length) return
+    rows.forEach((row, k) => {
+      const source = split.main[Math.min(k, split.main.length - 1)]
+      row.reps = source.reps
+      row.weight = source.weight
+    })
+  })
+}
+
 // "Für diese Übung merken" in der Pausen-Leiste: gilt ab jetzt für diese Übung, wird mit dem
 // Workout gespeichert und in den Favoriten übernommen (exercise.restSeconds).
 function rememberRestForExercise({ exIndex, seconds }) {
@@ -2258,6 +2292,9 @@ const recentSessionsByIndex = computed(() => {
 
 const lastSessionByIndex = computed(() => recentSessionsByIndex.value.map((list) => list[0] || null))
 
+// Leere Sätze neuer Workouts aus einer passenden früheren Session füllen, sobald der Verlauf da ist.
+watch(recentSessionsByIndex, () => prefillEmptyExercisesFromHistory())
+
 // Steigern / Knapp dran / Halten (utils/weightSuggestion.js getProgressionStatus), null = nur Ziel.
 const progressionStatusByIndex = computed(() =>
   lastSessionByIndex.value.map((last, index) =>
@@ -2271,10 +2308,12 @@ const progressionStatusByIndex = computed(() =>
 function progressionHintText(index) {
   const status = progressionStatusByIndex.value[index]
   const params = status
-    ? { next: formatKg(status.suggestion?.suggestedWeights?.[0] ?? status.weight), weight: formatKg(status.weight), reps: status.targetReps, sets: status.sets, done: status.totalReps, total: status.targetTotal, missing: status.missingReps, nextReps: status.nextReps, min: status.min, max: status.max }
+    ? { next: formatKg(status.suggestion?.suggestedWeights?.[0] ?? status.weight), weight: formatKg(status.weight), reps: status.targetReps, sets: status.sets, done: status.totalReps, total: status.targetTotal, missing: status.missingReps, nextReps: status.nextReps, min: status.min, max: status.max, minReps: status.minReps }
     : null
   // Bereich 8-12: "3x12 geschafft" statt "3x12" aus dem Ziel - Wiederholungen = erreichte Zahl.
+  if (status?.state === 'increase' && status.aboveScheme) return t('workoutDetail.weightSuggestionReasonAbove', params)
   if (status?.state === 'increase') return t('workoutDetail.weightSuggestionReason', { ...params, reps: status.mode === 'range' ? status.max : status.targetReps })
+  if (status?.state === 'climb' && status.belowRange) return t('workoutDetail.progressionBelowRange', params)
   if (status?.state === 'confirm') return t('workoutDetail.progressionConfirm', params)
   if (status?.state === 'climb') return t('workoutDetail.progressionClimb', params)
   if (status?.state === 'close') return t('workoutDetail.progressionClose', params)
@@ -2930,7 +2969,9 @@ function addSetRow(exIndex, event = null) {
   if (!ex) return
   if (!Array.isArray(ex.setDetails)) ex.setDetails = []
   const lastWorking = [...ex.setDetails].reverse().find(s => !s.isWarmup)
-  ex.setDetails.push({ reps: lastWorking?.reps || 10, weight: lastWorking?.weight || 0, isWarmup: false })
+  // Keine erfundenen Werte (User-Report: "10" und "0 kg" vorausgefüllt): Werte des letzten Satzes
+  // übernehmen, sonst leer - Platzhalter zeigen den Zielbereich bzw. "kg".
+  ex.setDetails.push({ reps: lastWorking?.reps ?? null, weight: lastWorking?.weight ?? null, isWarmup: false })
   try { triggerAutoSave() } catch {}
 }
 

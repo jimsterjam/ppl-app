@@ -135,3 +135,22 @@ describe('Trainingsart je Übung', () => {
     assert.notEqual(focus?.kind, 'speed')
   })
 })
+
+describe('Trainingsart-passende Historie und Übergang 7', () => {
+  test('Muskelaufbau unter 8 Wdh. -> nur Hinweis "eher zu schwer"', () => {
+    const focus = buildNextSessionFocus({
+      workout: { goal: 'hypertrophy', exercises: [{ name: 'Kniebeugen mit der Langhantel', setDetails: sets([7, 7, 6], 100) }] }
+    })
+    assert.equal(focus.kind, 'below')
+    assert.match(focus.text, /unter 8 Wdh\. ist 100 kg für Muskelaufbau eher zu schwer/)
+  })
+
+  test('Plateau zählt nur Sessions derselben Trainingsart', () => {
+    const squat = (reps, goal) => ({ goal, exercises: [{ name: 'Kniebeugen mit der Langhantel', setDetails: sets(reps, 100) }] })
+    const focus = buildNextSessionFocus({
+      workout: { goal: 'strength', exercises: squat([5, 5, 4, 4, 3]).exercises },
+      history: [squat([10, 10, 10], 'hypertrophy'), squat([5, 5, 4, 4, 4], 'strength')]
+    })
+    assert.notEqual(focus.kind, 'plateau')
+  })
+})

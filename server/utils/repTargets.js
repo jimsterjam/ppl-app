@@ -1,6 +1,6 @@
 // Vorgaben des Workout-Generators je Trainingsziel und Übungsrolle (Schritt A, Absprache Paul):
 //   Muskelaufbau: alle Übungen 8-12 Wdh., 2-4 Sätze (Standard 3).
-//   Kraft:        Grundübungen 3-5 Wdh., 3-5 Sätze (Standard 4), schwere Übungen zuerst;
+//   Kraft:        Grundübungen 3-6 Wdh. (7 = Übergang, ab da zu leicht), 3-5 Sätze (Standard 4);
 //                 Zubehör/Isolation 8-12 Wdh., 2-4 Sätze (Standard 3).
 // Pausen = Standard des Pausentimers (client/src/utils/restTimerRules.js).
 // Die Wiederholungen liegen jeweils im Bereich der Fortschrittslogik im Workout
@@ -12,7 +12,7 @@ export const GENERATOR_RULES = Object.freeze({
     isolation: Object.freeze({ reps: [8, 12], defaultReps: 10, sets: [2, 4], defaultSets: 3, rest: 90 })
   }),
   strength: Object.freeze({
-    compound: Object.freeze({ reps: [3, 5], defaultReps: 5, sets: [3, 5], defaultSets: 4, rest: 180 }),
+    compound: Object.freeze({ reps: [3, 6], defaultReps: 5, sets: [3, 5], defaultSets: 4, rest: 180 }),
     isolation: Object.freeze({ reps: [8, 12], defaultReps: 10, sets: [2, 4], defaultSets: 3, rest: 120 })
   })
 });

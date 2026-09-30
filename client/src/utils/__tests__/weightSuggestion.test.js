@@ -224,9 +224,11 @@ describe('Schema statt fester Zahl', () => {
     expect(getRepTarget(squat, 'strength', { sessions: [sets([1, 1, 1, 1, 1, 1])] }).target).toBe(1)
     expect(getRepTarget(squat, 'strength', { sessions: [sets([5, 5, 5, 5])] }).target).toBe(5)
     expect(getRepTarget(squat, 'strength', { sessions: [sets([6, 6, 6, 6, 6, 6])] }).target).toBe(6)
-    // Gleichstand -> höhere Zahl; über 6 wird auf 6 begrenzt; ohne Verlauf 5
+    // Gleichstand -> höhere Zahl; 7 wird auf 6 begrenzt; alles über 7 ist kein Kraft-Schema
+    // (Muskelaufbau-Session) und zählt nicht; ohne Verlauf 5
     expect(getRepTarget(squat, 'strength', { sessions: [sets([5, 5, 4, 4])] }).target).toBe(5)
-    expect(getRepTarget(squat, 'strength', { sessions: [sets([8, 8, 8])] }).target).toBe(6)
+    expect(getRepTarget(squat, 'strength', { sessions: [sets([7, 7, 7])] }).target).toBe(6)
+    expect(getRepTarget(squat, 'strength', { sessions: [sets([8, 8, 8])] }).target).toBe(5)
     expect(getRepTarget(squat, 'strength').target).toBe(5)
   })
 
@@ -252,5 +254,36 @@ describe('Schema statt fester Zahl', () => {
     // nach einer Steigerung auch unter 8: weiter klettern, nie senken
     expect(getProgressionStatus(squat, sets([7, 7, 6], 62.5), 'hypertrophy')).toMatchObject({ state: 'climb', nextReps: 7 })
     expect(getWeightSuggestion(squat, sets([10, 10, 10], 60), 'hypertrophy')).toBeNull()
+  })
+})
+
+describe('Trainingsart-passende Historie und 7er-Übergang', () => {
+  const sets = (reps, weight = 100, extra = {}) => ({ ...session(reps.map((r) => ({ reps: r, weight }))), ...extra })
+
+  it('Kraft-Session (5x85) zählt nicht für Muskelaufbau (User-Report)', () => {
+    const kraft = sets([5, 5, 5], 85, { __workoutGoal: 'strength' })
+    expect(getProgressionStatus(squat, kraft, 'hypertrophy')).toBeNull()
+    // alte Session ohne Ziel: 5 Wdh. sind für 8-12 unplausibel -> ebenfalls ignoriert
+    expect(getProgressionStatus(squat, sets([5, 5, 5], 85), 'hypertrophy')).toBeNull()
+    // Muskelaufbau-Session davor wird dann genommen
+    const hyp = sets([10, 10, 10], 60, { __workoutGoal: 'hypertrophy' })
+    expect(getProgressionStatus(squat, kraft, 'hypertrophy', { previousSessions: [hyp] })).toMatchObject({ state: 'climb', weight: 60 })
+  })
+
+  it('Muskelaufbau-Session zählt nicht für das Kraft-Schema', () => {
+    const hyp = sets([12, 12, 12], 60, { __workoutGoal: 'hypertrophy' })
+    expect(getProgressionStatus(squat, hyp, 'strength')).toBeNull()
+    expect(getRepTarget(squat, 'strength', { sessions: [hyp] }).target).toBe(5)
+  })
+
+  it('Kraft: 7+ in allen Hauptsätzen -> mehr Gewicht, deutlich über dem Schema', () => {
+    const s = getProgressionStatus(squat, sets([7, 7, 8]), 'strength', { previousSessions: [sets([5, 5, 5])] })
+    expect(s).toMatchObject({ state: 'increase', aboveScheme: true })
+    expect(getProgressionStatus(squat, sets([5, 5, 5]), 'strength').aboveScheme).toBe(false)
+  })
+
+  it('Muskelaufbau unter 8 -> klettern mit Hinweis "unter dem Zielbereich"', () => {
+    expect(getProgressionStatus(squat, sets([7, 7, 7], 60), 'hypertrophy')).toMatchObject({ state: 'climb', nextReps: 8, belowRange: true })
+    expect(getProgressionStatus(squat, sets([9, 9, 9], 60), 'hypertrophy').belowRange).toBe(false)
   })
 })
