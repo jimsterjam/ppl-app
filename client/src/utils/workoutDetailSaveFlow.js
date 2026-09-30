@@ -1,6 +1,7 @@
 import { sanitizeWorkoutGoal } from './workoutGoal'
 import { buildWorkoutNotesSummary } from './workoutNotes'
 import { sanitizeExerciseTrainingType } from './weightSuggestion'
+import { sanitizeCustomRest } from './restTimerRules'
 
 export function getExercisesMissingNotes(exercises = [], getNote) {
   const missing = []
@@ -35,6 +36,8 @@ export function normalizeWorkoutForSave({ workout, exerciseNotes, sessionStopwat
       setDetails: ex.setDetails || [],
       // Eigene Trainingsart der Übung (siehe weightSuggestion.js resolveExerciseGoal) - nur wenn gewählt.
       ...(sanitizeExerciseTrainingType(ex.trainingType) ? { trainingType: ex.trainingType } : {}),
+      // Vom Nutzer gemerkte Pausendauer (Pausentimer) - nur wenn gesetzt.
+      ...(sanitizeCustomRest(ex.restSeconds) ? { restSeconds: ex.restSeconds } : {}),
       note: Array.isArray(exerciseNotes) && typeof exerciseNotes[idx] !== 'undefined'
         ? exerciseNotes[idx]
         : (typeof ex.note === 'string' ? ex.note : '')

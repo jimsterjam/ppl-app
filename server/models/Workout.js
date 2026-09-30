@@ -65,6 +65,9 @@ const workoutSchema = new mongoose.Schema({
     // ('strength'|'hypertrophy'|'explosive'); fehlt = Workout-Ziel bzw. automatische Erkennung
     // (siehe client/src/utils/weightSuggestion.js resolveExerciseGoal).
     trainingType: { type: String, enum: ['strength', 'hypertrophy', 'explosive'], default: undefined },
+    // Vom Nutzer gemerkte Pausendauer zwischen Sätzen in Sekunden (Pausentimer); fehlt = Standard
+    // je Trainingsart (client/src/utils/restTimerRules.js).
+    restSeconds: { type: Number, min: 15, max: 600 },
     // Tatsächlich bewegtes externes Gewicht für diese Übung in dieser Session (Kap. 24.2:
     // strikt getrennt von athleteBodyweightKg - z.B. Zusatzgewicht am Gürtel bei
     // Klimmzügen. Additiv/optional, null = nicht erfasst.)

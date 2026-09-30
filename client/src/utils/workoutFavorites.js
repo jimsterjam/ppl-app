@@ -3,6 +3,7 @@ import { fetchFavoriteWorkoutsRemote, pushFavoriteWorkoutRemote, deleteFavoriteW
 import { logger } from './logger'
 import { sanitizeWorkoutGoal } from './workoutGoal'
 import { sanitizeExerciseTrainingType } from './weightSuggestion'
+import { sanitizeCustomRest } from './restTimerRules'
 
 // Favoriten wurden bisher AUSSCHLIESSLICH in localStorage gehalten - bei Geräteverlust,
 // Neuinstallation oder einem Identitätswechsel (z.B. Login über einen anderen Firebase-
@@ -162,7 +163,9 @@ function buildFavoriteWorkoutPayload(workout, type) {
       // exercise.note hier stillschweigend nicht übernommen (Feld fehlte in diesem Mapping).
       note: String(exercise?.note || '').trim(),
       // Eigene Trainingsart der Übung (z.B. Muskelaufbau im Kraft-Workout) - nur wenn gewählt.
-      ...(sanitizeExerciseTrainingType(exercise?.trainingType) ? { trainingType: exercise.trainingType } : {})
+      ...(sanitizeExerciseTrainingType(exercise?.trainingType) ? { trainingType: exercise.trainingType } : {}),
+      // Gemerkte Pausendauer der Übung (Pausentimer) - nur wenn gesetzt.
+      ...(sanitizeCustomRest(exercise?.restSeconds) ? { restSeconds: exercise.restSeconds } : {})
     })).filter((exercise) => exercise.name)
   }
 }

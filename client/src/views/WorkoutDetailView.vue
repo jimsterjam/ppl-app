@@ -416,7 +416,7 @@
                 v-for="(row, rIdx) in (ex.setDetails || [])"
                 :key="`${ex.exerciseId || i}-working-row-${rIdx}`"
               >
-                <div v-if="!row.isWarmup" class="set-row" :class="{ 'set-row-empty': isRowEmpty(row), 'set-row--open': !isRowDone(row), 'set-row--done': setTrackingActive && isRowDone(row) }" :data-set-index="rIdx">
+                <div v-if="!row.isWarmup" class="set-row" :class="{ 'set-row-empty': isRowEmpty(row), 'set-row--open': !isRowDone(row), 'set-row--done': setTrackingActive && isRowDone(row), 'set-row--next': nextSetHighlight.exIndex === i && nextSetHighlight.rowIndex === rIdx }" :data-set-index="rIdx">
                   <span class="col set">
                     <!-- Abhaken (laufendes Workout): Nummer antippen = Satz gemacht, nochmal = zurück.
                          Nicht abgehakte Sätze erscheinen grau (übernommene Werte vom letzten Mal). -->
@@ -427,7 +427,7 @@
                       :class="{ done: isRowDone(row) }"
                       :aria-pressed="isRowDone(row)"
                       :aria-label="t(isRowDone(row) ? 'workoutDetail.setUndoneAria' : 'workoutDetail.setDoneAria', { set: getSetLabel(ex.setDetails, rIdx) })"
-                      @click="toggleRowDone(row)"
+                      @click="toggleRowDone(row, i, rIdx)"
                     >{{ isRowDone(row) ? '✓' : getSetLabel(ex.setDetails, rIdx) }}</button>
                     <template v-else>{{ getSetLabel(ex.setDetails, rIdx) }}</template>
                   </span>
@@ -820,6 +820,8 @@
     />
 
     <WorkoutTimerConfig v-if="showTimerConfig" @close="showTimerConfig = false" />
+    <!-- Pausentimer zwischen Sätzen (startet beim Abhaken, siehe toggleRowDone). -->
+    <RestTimerBar @remember="rememberRestForExercise" />
 
     <!-- Speichern-Overlay -->
     <Transition name="save-fade">
@@ -927,7 +929,7 @@ import { getCurrentInstance } from 'vue'
 import NumberPicker from '@/components/NumberPicker.vue'
 import { useExerciseTranslation, getEnglishExerciseName } from '@/utils/exerciseTranslation'
 import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
-import { getRepTarget, getProgressionStatus, isNoLoadExercise, resolveExerciseGoal, sanitizeExerciseTrainingType } from '@/utils/weightSuggestion'
+import { getRepTarget, getProgressionStatus, isNoLoadExercise, resolveExerciseGoal, sanitizeExerciseTrainingType, classifyExercise } from '@/utils/weightSuggestion'
 import { prepareHistoryCandidates, findLastSessionExercise } from '@/utils/lastSessionLookup'
 import { sanitizeWorkoutGoal } from '@/utils/workoutGoal'
 import WorkoutGoalPicker from '@/components/WorkoutGoalPicker.vue'
@@ -982,6 +984,9 @@ import {
 } from '@/utils/workoutDetailPersistState'
 import { normalizeWorkoutForSave } from '@/utils/workoutDetailSaveFlow'
 import { startAiWarmup } from '@/utils/aiWarmup'
+import { useRestTimerStore } from '@/stores/restTimerStore'
+import { restSecondsFor, sanitizeCustomRest } from '@/utils/restTimerRules'
+import RestTimerBar from '@/components/timer/RestTimerBar.vue'
 import { buildSaveReview, removeOpenSets, markAllSetsDone } from '@/utils/saveReview'
 import {
   shouldKeepAsDraft as shouldKeepAsDraftUtil,
@@ -1469,6 +1474,7 @@ async function syncStartedFavoriteFromWorkout(workoutLike = null) {
       weight: Number(exercise.weight) || Number(exercise.setDetails?.[0]?.weight) || 0,
       rest: Number(exercise.rest) || 90,
       ...(sanitizeExerciseTrainingType(exercise.trainingType) ? { trainingType: exercise.trainingType } : {}),
+      ...(sanitizeCustomRest(exercise.restSeconds) ? { restSeconds: exercise.restSeconds } : {}),
       setDetails: Array.isArray(exercise.setDetails) && exercise.setDetails.length
         ? exercise.setDetails
         : [{
@@ -1975,11 +1981,73 @@ function isRowDone(row) {
   return row?.done === true
 }
 
-function toggleRowDone(row) {
+function toggleRowDone(row, exIndex = -1, rowIndex = -1) {
   if (!row || !setTrackingActive.value) return
   row.done = !isRowDone(row)
+  // Pausentimer: Satz fertig -> Pause startet jetzt (nicht nach fester Arbeitszeit - wie lange
+  // ein Satz dauert, weiß die App nicht). Haken wieder weg -> diese Pause abbrechen.
+  if (row.done && !row.isWarmup && exIndex >= 0) {
+    if (restTimer.autoStart) {
+      const name = getTranslatedExerciseName(workout.value?.exercises?.[exIndex]?.name || '')
+      restTimer.start({
+        seconds: restSecondsForIndex(exIndex),
+        exerciseName: name,
+        exIndex,
+        rowIndex,
+        notifyTitle: t('restTimer.notifyTitle'),
+        notifyBody: t('restTimer.notifyBody', { name })
+      })
+    }
+  } else if (!row.done) {
+    restTimer.stopFor(exIndex, rowIndex)
+  }
   try { triggerAutoSave() } catch {}
 }
+
+// --- Pausentimer -----------------------------------------------------------------------------
+const restTimer = useRestTimerStore()
+
+// Dauer: gemerkte Dauer der Übung > Standard je Trainingsart/Übungsart (restTimerRules.js).
+function restSecondsForIndex(index) {
+  const ex = workout.value?.exercises?.[index]
+  const type = classifyExercise(progressionInfoByIndex.value[index] || {})
+  return restSecondsFor(goalByIndex.value[index], type, customRestForIndex(index))
+}
+
+// Gemerkte Pause: an der Übung, sonst aus der letzten Session dieser Übung (bleibt so auch ohne
+// Favoriten-Update von Session zu Session erhalten - wie bei der Trainingsart).
+function customRestForIndex(index) {
+  const ex = workout.value?.exercises?.[index]
+  return sanitizeCustomRest(ex?.restSeconds) || sanitizeCustomRest(lastSessionByIndex.value[index]?.restSeconds) || null
+}
+
+// "Für diese Übung merken" in der Pausen-Leiste: gilt ab jetzt für diese Übung, wird mit dem
+// Workout gespeichert und in den Favoriten übernommen (exercise.restSeconds).
+function rememberRestForExercise({ exIndex, seconds }) {
+  const ex = workout.value?.exercises?.[exIndex]
+  const value = sanitizeCustomRest(seconds)
+  if (!ex || !value) return
+  ex.restSeconds = value
+  if (!isFavoriteAdjustMode.value) {
+    try { triggerAutoSave() } catch {}
+  }
+}
+
+// Pause vorbei: nächsten offenen Arbeitssatz dieser Übung kurz hervorheben.
+const nextSetHighlight = ref({ exIndex: -1, rowIndex: -1 })
+let nextSetHighlightTimer = null
+watch(() => restTimer.finishedAt, (finishedAt) => {
+  if (!finishedAt) return
+  const exIndex = restTimer.exIndex
+  const sets = workout.value?.exercises?.[exIndex]?.setDetails || []
+  const rowIndex = sets.findIndex((row) => row && !row.isWarmup && row.done !== true)
+  if (rowIndex < 0) return
+  nextSetHighlight.value = { exIndex, rowIndex }
+  clearTimeout(nextSetHighlightTimer)
+  nextSetHighlightTimer = setTimeout(() => { nextSetHighlight.value = { exIndex: -1, rowIndex: -1 } }, 5000)
+})
+restTimer.restore()
+onBeforeUnmount(() => clearTimeout(nextSetHighlightTimer))
 
 async function loadProgressionData() {
   const currentId = String(workout.value?._id || workout.value?.id || '')
@@ -3140,7 +3208,7 @@ async function performSaveWorkout(updateFavorite = false, { deferAiFeedback = fa
     const normalized = normalizeWorkoutForSave({
       // Eigene Trainingsart mitspeichern - auch wenn sie nur aus der letzten Session übernommen
       // wurde, damit die Wahl von Session zu Session erhalten bleibt.
-      workout: { ...w, exercises: (w.exercises || []).map((ex, idx) => ({ ...ex, trainingType: trainingTypeOverride(idx) || undefined })) },
+      workout: { ...w, exercises: (w.exercises || []).map((ex, idx) => ({ ...ex, trainingType: trainingTypeOverride(idx) || undefined, restSeconds: customRestForIndex(idx) || undefined })) },
       exerciseNotes: exerciseNotes.value,
       sessionStopwatchStore,
       userId: resolvedUserId
@@ -3452,6 +3520,7 @@ function buildFavoriteSourceWorkout() {
       weight: Number(exercise.weight) || Number(exercise.setDetails?.[0]?.weight) || 0,
       rest: Number(exercise.rest) || 90,
       ...(sanitizeExerciseTrainingType(exercise.trainingType) ? { trainingType: exercise.trainingType } : {}),
+      ...(sanitizeCustomRest(exercise.restSeconds) ? { restSeconds: exercise.restSeconds } : {}),
       setDetails: Array.isArray(exercise.setDetails) && exercise.setDetails.length
         ? exercise.setDetails
         : [{
@@ -4529,6 +4598,15 @@ onBeforeUnmount(() => {
 }
 .review-defer input { margin-top: 3px; }
 .review-defer small { display: block; margin-top: 2px; color: var(--muted); font-size: 0.78rem; line-height: 1.35; }
+/* Pause vorbei: nächster Satz kurz hervorgehoben. */
+.set-row.set-row--next {
+  box-shadow: 0 0 0 2px var(--accent);
+  border-radius: 6px;
+  animation: next-set-pulse 1s ease-in-out 3;
+}
+@keyframes next-set-pulse {
+  50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 50%, transparent); }
+}
 /* Nicht abgehakt: Werte grau = nur übernommen / noch nicht gemacht. */
 /* Abgehakte Sätze ganz hinterlegen - Fortschritt auf einen Blick. */
 .set-row.set-row--done {

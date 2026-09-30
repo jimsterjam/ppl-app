@@ -319,6 +319,7 @@ export const messages = {
       end: 'Beenden',
       reset: 'Zuruecksetzen',
       configTitle: 'Timer konfigurieren',
+      intervalHint: 'Der Intervall-Timer unten ist für Übungen auf Zeit (z. B. Plank, HIIT). Die Pause zwischen normalen Sätzen startet automatisch, sobald du einen Satz abhakst.',
       hours: 'Stunden',
       minutes: 'Minuten',
       seconds: 'Sekunden',
@@ -502,6 +503,18 @@ export const messages = {
         'Trizepsdrücken': 'Triceps Extension',
         'Rudern': 'Rows'
       }
+    },
+    restTimer: {
+      label: 'Pause',
+      finished: 'Pause vorbei – nächster Satz',
+      skip: 'Überspringen',
+      minusAria: 'Pause 15 Sekunden kürzer',
+      plusAria: 'Pause 15 Sekunden länger',
+      remember: '{time} für diese Übung merken',
+      notifyTitle: 'Pause vorbei',
+      notifyBody: 'Weiter mit dem nächsten Satz: {name}',
+      autoStartLabel: 'Pause nach jedem Satz automatisch starten',
+      autoStartHint: 'Startet beim Abhaken eines Satzes. Die Dauer passt zur Übung (z. B. 3 Min. bei schweren Grundübungen) und lässt sich in der Pausen-Leiste anpassen.'
     },
     workoutDetail: {
       repTargetShort: 'Ziel {reps} Wdh.',
@@ -1470,6 +1483,7 @@ export const messages = {
       end: 'End',
       reset: 'Reset',
       configTitle: 'Configure timer',
+      intervalHint: 'The interval timer below is for timed exercises (e.g. plank, HIIT). The rest between regular sets starts automatically as soon as you check off a set.',
       hours: 'Hours',
       minutes: 'Minutes',
       seconds: 'Seconds',
@@ -1646,6 +1660,18 @@ export const messages = {
         'Trizepsdrücken': 'Triceps Extension',
         'Rudern': 'Rows'
       }
+    },
+    restTimer: {
+      label: 'Rest',
+      finished: 'Rest over – next set',
+      skip: 'Skip',
+      minusAria: 'Rest 15 seconds shorter',
+      plusAria: 'Rest 15 seconds longer',
+      remember: 'Remember {time} for this exercise',
+      notifyTitle: 'Rest over',
+      notifyBody: 'Next set: {name}',
+      autoStartLabel: 'Start rest automatically after each set',
+      autoStartHint: 'Starts when you check off a set. The duration fits the exercise (e.g. 3 min for heavy compound lifts) and can be adjusted in the rest bar.'
     },
     workoutDetail: {
       repTargetShort: 'Target {reps} reps',
