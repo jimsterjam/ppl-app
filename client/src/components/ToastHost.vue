@@ -1,6 +1,6 @@
 <template>
   <!-- Single bottom toaster: alle Nachrichten unten anzeigen -->
-  <div class="toast-host bottom" aria-live="polite" aria-atomic="true" v-if="messages.length">
+  <div v-if="messages.length" class="toast-host bottom" aria-live="polite" aria-atomic="true">
     <transition-group name="toast" tag="div">
       <div v-for="m in messages" :key="m.id" class="toast" :class="m.type">
         <span class="icon">{{ 

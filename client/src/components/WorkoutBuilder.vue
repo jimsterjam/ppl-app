@@ -9,17 +9,15 @@ import { useAuthStore } from '@/stores/authStore'
 import { useFirebaseAuth } from '@/utils/firebaseAuth';
 import { useSubscriptionStore } from '@/stores/subscriptionStore';
 import { useToastStore } from '@/stores/toastStore';
-import AppModal from '@/components/AppModal.vue';
 import StepIndicator from '@/components/StepIndicator.vue';
 import BottomNav from '@/components/BottomNav.vue';
-import { getAllExercisesOffline, saveWorkoutOffline, deleteWorkoutOffline, getWorkoutOffline, setMetadata } from '@/utils/offlineStorage';
-import { deleteWorkout as deleteServerWorkout } from '@/api/workouts';
+import { saveWorkoutOffline } from '@/utils/offlineStorage';
 import { getMergedSortedExercises } from '@/utils/exerciseList';
 import { searchAndRankExercises } from '@/utils/exerciseSearch'
 import { consumeWorkoutBuilderPrefill, normalizeBuilderWorkoutType, readWorkoutBuilderRouteState, getDetailDraftKey } from '@/utils/workoutBuilderFlow'
 import { logger } from '@/utils/logger'
 import { useExerciseTranslation, getEnglishExerciseName } from '@/utils/exerciseTranslation'
-import { getActiveDraft, setActiveDraft } from '@/utils/activeWorkoutDraft'
+import { setActiveDraft } from '@/utils/activeWorkoutDraft'
 
 
 // --- State & Stores ---
@@ -548,7 +546,7 @@ watch(() => `${route.query.quick || ''}:${route.query.favoriteStart || ''}`, () 
 						<label for="equipment-filter-select" style="font-weight:600;">
 							{{ t('builder.filterEquipment') !== 'builder.filterEquipment' ? t('builder.filterEquipment') : 'Equipment filtern' }}
 						</label>
-						<select id="equipment-filter-select" v-model="selectedEquipment" @change="setEquipment($event.target.value)" style="padding:7px 12px; border-radius:8px; border:1px solid #e5e7eb; min-width:140px;">
+						<select id="equipment-filter-select" v-model="selectedEquipment" style="padding:7px 12px; border-radius:8px; border:1px solid #e5e7eb; min-width:140px;" @change="setEquipment($event.target.value)">
 							<option :value="''">{{ t('exercises.filters.all') }}</option>
 							<option v-for="equipmentOption in allEquipmentTypes" :key="equipmentOption" :value="equipmentOption">{{ equipmentTranslation(equipmentOption) }}</option>
 						 </select>
@@ -582,7 +580,7 @@ watch(() => `${route.query.quick || ''}:${route.query.favoriteStart || ''}`, () 
 				<ul class="selected-exercise-list">
 					<li v-for="(exercise, index) in selectedExercises" :key="exercise._id" class="selected-exercise-item" draggable="true" @dragstart="onDragStart(index)" @dragover.prevent="onDrop(index)">
 						<span class="exercise-name">{{ getTranslatedExerciseName(exercise.displayName || exercise.name) }}</span>
-						<button class="remove-btn" @click="removeExercise(index)" :aria-label="t('builder.removeExercise')">×</button>
+						<button class="remove-btn" :aria-label="t('builder.removeExercise')" @click="removeExercise(index)">×</button>
 					</li>
 				</ul>
 				<p v-if="errorMsg" class="error-hint">{{ errorMsg }}</p>

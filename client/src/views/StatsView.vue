@@ -15,7 +15,7 @@
         <RecentWorkouts :workouts="recentWorkoutsSource" :show-view-all="false" @delete="handleDeleteRecentWorkout" />
       </section>
 
-      <section class="section" id="feedback-history-section">
+      <section id="feedback-history-section" class="section">
         <AIFeedbackHistory :highlight-workout-id="String(route.query.highlightWorkoutId || '')" />
       </section>
 
@@ -149,7 +149,7 @@
         <div class="day-overlay-panel glass">
           <div class="day-overlay-header">
             <h4 class="day-overlay-title">{{ formatDayOverlayDate(calendarDayOverlay.key) }}</h4>
-            <button class="day-overlay-close" type="button" @click="closeDayOverlay" :aria-label="$t('common.close')">&times;</button>
+            <button class="day-overlay-close" type="button" :aria-label="$t('common.close')" @click="closeDayOverlay">&times;</button>
           </div>
           <div class="day-overlay-body">
             <div

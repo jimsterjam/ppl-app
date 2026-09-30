@@ -36,7 +36,7 @@
         <div class="modal-content" @click.stop>
           <div class="modal-header">
             <h3>{{ $t('settings.profilePictureChoiceTitle') }}</h3>
-            <button class="close-btn" @click="closeChoiceModal" :aria-label="$t('common.close')">×</button>
+            <button class="close-btn" :aria-label="$t('common.close')" @click="closeChoiceModal">×</button>
           </div>
           <div class="modal-body">
             <div class="avatar-choice-actions">
@@ -64,7 +64,7 @@
         <div class="modal-content" @click.stop>
           <div class="modal-header">
             <h3>{{ $t('settings.profilePictureCropTitle') }}</h3>
-            <button class="close-btn" :disabled="cropProcessing" @click="cancelAvatarCrop" :aria-label="$t('common.close')">×</button>
+            <button class="close-btn" :disabled="cropProcessing" :aria-label="$t('common.close')" @click="cancelAvatarCrop">×</button>
           </div>
           <div class="modal-body">
             <p class="hint" style="margin-top:0">{{ $t('settings.profilePictureCropHint') }}</p>
@@ -82,7 +82,7 @@
             <div class="avatar-crop-controls">
               <label class="crop-label">
                 <span>{{ $t('settings.profilePictureCropZoom') }}</span>
-                <input type="range" min="1" max="3" step="0.01" v-model.number="cropZoom" :disabled="cropProcessing" />
+                <input v-model.number="cropZoom" type="range" min="1" max="3" step="0.01" :disabled="cropProcessing" />
               </label>
             </div>
 

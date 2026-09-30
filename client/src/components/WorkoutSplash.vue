@@ -1,5 +1,5 @@
 <template>
-  <div class="splash" @click="skip" @keydown.enter.prevent="skip" tabindex="0">
+  <div class="splash" tabindex="0" @click="skip" @keydown.enter.prevent="skip">
     <div class="overlay">
       <div
         v-if="currentWord"

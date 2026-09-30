@@ -5,8 +5,6 @@ import sharp from 'sharp';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import mongoose from 'mongoose';
-import { ObjectId } from 'mongodb';
 import { firebaseAuthMiddleware } from '../middleware/firebaseAuth.js';
 import { requireAdminKey } from '../middleware/adminAuth.js';
 // Clerk-Import entfernt

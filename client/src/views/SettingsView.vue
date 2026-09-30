@@ -213,7 +213,7 @@
       <section class="card danger-zone">
         <h3>{{ $t('settings.dangerZone') }}</h3>
         <p class="hint">{{ $t('settings.dangerZoneHint') }}</p>
-        <button class="danger-btn" @click="showDeleteConfirm = true" :disabled="isDeleting">
+        <button class="danger-btn" :disabled="isDeleting" @click="showDeleteConfirm = true">
           <span v-if="isDeleting" class="spinner spin-indicator" aria-hidden="true"></span>
           <span v-else>🗑️</span>
           {{ isDeleting ? $t('settings.deleting') : $t('settings.deleteAllData') }}
@@ -223,7 +223,7 @@
       <section class="card danger-zone account-danger">
         <h3>{{ $t('settings.dangerZoneAccountTitle') }}</h3>
         <p class="hint">{{ $t('settings.dangerZoneHint') }}</p>
-        <button class="danger-btn account-delete-btn" @click="showDeleteAccountConfirm = true" :disabled="isDeletingAccount">
+        <button class="danger-btn account-delete-btn" :disabled="isDeletingAccount" @click="showDeleteAccountConfirm = true">
           <span v-if="isDeletingAccount" class="spinner spin-indicator" aria-hidden="true"></span>
           <span v-else>🗑️</span>
           {{ isDeletingAccount ? $t('settings.deletingAccount') : $t('settings.deleteAccount') }}
@@ -275,14 +275,14 @@
               type="text" 
               :placeholder="$t('settings.deletePlaceholder')"
               :disabled="isDeleting"
-              @keyup.enter="confirmDelete"
               autocomplete="off"
+              @keyup.enter="confirmDelete"
             />
           </div>
         </div>
         
         <div class="modal-actions">
-          <button class="cancel-btn" @click="showDeleteConfirm = false" :disabled="isDeleting">
+          <button class="cancel-btn" :disabled="isDeleting" @click="showDeleteConfirm = false">
             {{ $t('common.cancel') }}
           </button>
           <button 
@@ -337,14 +337,14 @@
               type="text" 
               :placeholder="$t('settings.deleteAccountPlaceholder')"
               :disabled="isDeletingAccount"
-              @keyup.enter="confirmDeleteAccount"
               autocomplete="off"
+              @keyup.enter="confirmDeleteAccount"
             />
           </div>
         </div>
         
         <div class="modal-actions">
-          <button class="cancel-btn" @click="showDeleteAccountConfirm = false" :disabled="isDeletingAccount">
+          <button class="cancel-btn" :disabled="isDeletingAccount" @click="showDeleteAccountConfirm = false">
             {{ $t('common.cancel') }}
           </button>
           <button 

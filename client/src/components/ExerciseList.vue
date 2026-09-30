@@ -8,7 +8,7 @@
         <label for="type-filter-select" class="equipment-filter-label">
           {{ t('exercises.filters.type') }}
         </label>
-        <select id="type-filter-select" v-model="selectedCategory" @change="setCategory($event.target.value)" class="equipment-filter-select">
+        <select id="type-filter-select" v-model="selectedCategory" class="equipment-filter-select" @change="setCategory($event.target.value)">
           <option :value="''">{{ t('exercises.filters.all') }}</option>
           <option v-for="cat in quickCategories" :key="cat.value" :value="cat.value">{{ cat.label }}</option>
         </select>
@@ -18,7 +18,7 @@
         <label for="equipment-filter-select" class="equipment-filter-label">
           {{ t('builder.filterEquipment') }}
         </label>
-        <select id="equipment-filter-select" v-model="selectedEquipment" @change="setEquipment($event.target.value)" class="equipment-filter-select">
+        <select id="equipment-filter-select" v-model="selectedEquipment" class="equipment-filter-select" @change="setEquipment($event.target.value)">
           <option :value="''">{{ t('exercises.filters.all') }}</option>
           <option v-for="equip in allEquipmentTypes" :key="equip" :value="equip">{{ getTranslatedEquipment(equip) }}</option>
         </select>

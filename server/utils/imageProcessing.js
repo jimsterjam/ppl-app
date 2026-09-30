@@ -1,6 +1,5 @@
 import sharp from 'sharp';
 import mongoose from 'mongoose';
-import { ObjectId } from 'mongodb';
 import fs from 'fs';
 import path from 'path';
 

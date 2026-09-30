@@ -88,6 +88,7 @@
             <span class="bodyweight-spacer"></span>
             <input
               id="athlete-bodyweight-input"
+              v-model="athleteBodyweightKg"
               type="number"
               min="0"
               max="400"
@@ -95,7 +96,6 @@
               inputmode="decimal"
               :placeholder="bodyweightPlaceholder"
               :aria-label="t('workoutDetail.bodyweightLabel')"
-              v-model="athleteBodyweightKg"
             />
             <span class="unit">kg</span>
           </div>
@@ -259,7 +259,7 @@
               </template>
             </div>
 
-            <div class="ex-sets" v-if="!isReordering">
+            <div v-if="!isReordering" class="ex-sets">
 
               <!-- Hinweis vor dem Eintragen (UI-Überarbeitung): Steigern / Knapp dran / Halten /
                    Explosiv / Ziel als farbiger Kasten oben statt einer Zeile unter den Sätzen. -->
@@ -411,7 +411,7 @@
               </div>
 
               <!-- Arbeitssätze -->
-              <div class="sets-section-divider" v-if="hasWarmupSets(ex)"></div>
+              <div v-if="hasWarmupSets(ex)" class="sets-section-divider"></div>
               <div class="sets-section-label working-label">{{ t('workoutDetail.workingSetsLabel') }}</div>
               <template
                 v-for="(row, rIdx) in (ex.setDetails || [])"
@@ -560,7 +560,7 @@
                   :title="t('onboarding.hintFirstNoteTitle')"
                   :text="t('onboarding.hintFirstNoteText')"
                 />
-                <textarea :value="getNote(i)" @input="setNote(i, $event.target.value)" rows="2" style="width:100%;resize:vertical" :placeholder="t('workoutDetail.notePlaceholder')"></textarea>
+                <textarea :value="getNote(i)" rows="2" style="width:100%;resize:vertical" :placeholder="t('workoutDetail.notePlaceholder')" @input="setNote(i, $event.target.value)"></textarea>
               </div>
             </div>
           </div>
@@ -947,7 +947,6 @@ import { isDefaultExerciseOneRepMaxEligible, isAddedWeightOneRepMaxExercise } fr
 import { useUserStore } from '@/stores/userStore'
 import { useAuthStore } from '@/stores/authStore'
 import HeaderBar from '@/components/HeaderBar.vue'
-import BottomNav from '@/components/BottomNav.vue'
 import OneTimeHint from '@/components/OneTimeHint.vue'
 import AppModal from '@/components/AppModal.vue'
 import ExerciseList from '@/components/ExerciseList.vue'
@@ -966,7 +965,6 @@ import { resolveRealIdFromDraftId as _resolveRealIdFromDraftId, snapshotCore } f
 import { logDiagnostic } from '@/utils/diagnosticsLog'
 import { useWorkoutPicker } from '@/composables/useWorkoutPicker'
 import { useWorkoutExerciseOrdering } from '@/composables/useWorkoutExerciseOrdering'
-import { saveWorkoutService } from '@/utils/SaveWorkoutService'
 import { useSessionStopwatchStore } from '@/stores/sessionStopwatch'
 import { resolveServerMediaUrl } from '@/api/http'
 import { purgePendingCreateQueueForWorkoutId } from '@/utils/offlineStorage'
@@ -977,7 +975,7 @@ import {
   normalizeFavoriteName,
   normalizeWorkoutType
 } from '@/utils/workoutFavorites'
-import { clearActiveDraft, getActiveDraft, setActiveDraft, updateActiveDraft, findActiveDraftByWorkoutId } from '@/utils/activeWorkoutDraft'
+import { getActiveDraft, setActiveDraft, findActiveDraftByWorkoutId } from '@/utils/activeWorkoutDraft'
 import {
   clearAllDetailDraftSnapshots as clearAllDetailDraftSnapshotsUtil,
   clearAllWorkoutMapKeys as clearAllWorkoutMapKeysUtil,

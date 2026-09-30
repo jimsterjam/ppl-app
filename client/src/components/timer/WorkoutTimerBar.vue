@@ -10,10 +10,11 @@
   </div>
   <div class="timer-bar" :class="[timerStateClass, { expanded: isExpanded, 'portrait-fullscreen': isExpanded && !isLandscape, 'landscape-fullscreen': isExpanded && isLandscape }]">
     <span class="timer-accent" aria-hidden="true" />
-    <span v-if="timerStore.countdownOverlayNumber" 
-          :key="pulseKey" 
-          class="timer-pulse" 
-          aria-hidden="true" />
+    <span
+      v-if="timerStore.countdownOverlayNumber"
+      :key="pulseKey"
+      class="timer-pulse"
+      aria-hidden="true" />
     <div class="timer-main" role="button" tabindex="0" @click="toggleExpandedFromMain" @keydown.enter.prevent="toggleExpandedFromMain" @keydown.space.prevent="toggleExpandedFromMain">
       <div class="timer-status">
         <span class="status-text">{{ statusLabel }}</span>

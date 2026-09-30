@@ -8,8 +8,8 @@
         <button class="btn primary" @click="onConfirm">{{ confirmText }}</button>
       </header>
 
-      <div v-if="!splitDecimals" class="picker-wheel" ref="wheelRef">
-        <div class="wheel-virtual" ref="listRef" @scroll="onScroll">
+      <div v-if="!splitDecimals" ref="wheelRef" class="picker-wheel">
+        <div ref="listRef" class="wheel-virtual" @scroll="onScroll">
           <div class="wheel-spacer" :style="{ height: totalHeight + 'px' }"></div>
           <div class="wheel-items">
             <div
@@ -27,8 +27,8 @@
       </div>
 
       <div v-else class="picker-split">
-        <div class="split-wheel" ref="wholeWheelRef">
-          <div class="wheel-virtual" ref="wholeListRef" @scroll="onWholeScroll">
+        <div ref="wholeWheelRef" class="split-wheel">
+          <div ref="wholeListRef" class="wheel-virtual" @scroll="onWholeScroll">
             <div class="wheel-spacer" :style="{ height: wholeTotalHeight + 'px' }"></div>
             <div class="wheel-items">
               <div
@@ -44,8 +44,8 @@
             </div>
           </div>
         </div>
-        <div class="split-wheel" ref="decimalWheelRef">
-          <div class="wheel-virtual" ref="decimalListRef" @scroll="onDecimalScroll">
+        <div ref="decimalWheelRef" class="split-wheel">
+          <div ref="decimalListRef" class="wheel-virtual" @scroll="onDecimalScroll">
             <div class="wheel-spacer" :style="{ height: decimalTotalHeight + 'px' }"></div>
             <div class="wheel-items">
               <div

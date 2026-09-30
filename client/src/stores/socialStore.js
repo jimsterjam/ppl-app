@@ -23,7 +23,6 @@
  */
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { getAuthToken } from '@/utils/authToken'
 // Avoid useClerk/useAuth in stores (would call inject() outside setup).
 
 export const useSocialStore = defineStore('social', () => {
