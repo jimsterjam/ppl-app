@@ -43,6 +43,20 @@ export function prepareHistoryCandidates(historyWorkouts = [], currentWorkoutId 
     .sort((a, b) => ts(b) - ts(a))
 }
 
+/**
+ * Dieselbe Übung aus den neuesten passenden Sessions (neueste zuerst), höchstens `limit` Stück -
+ * Grundlage für die Schema-Erkennung (5x5, 6x1 ...) und die Bestätigungs-Regel bei Singles.
+ */
+export function findRecentSessionExercises(currentExercise = {}, candidates = [], limit = 3) {
+  const found = []
+  for (const workout of candidates) {
+    if (found.length >= limit) break
+    const match = findLastSessionExercise(currentExercise, [workout])
+    if (match) found.push(match)
+  }
+  return found
+}
+
 /** Übung aus der neuesten passenden Session, oder null. */
 export function findLastSessionExercise(currentExercise = {}, candidates = []) {
   const target = matchKeys(currentExercise)

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { prepareHistoryCandidates, findLastSessionExercise } from '../lastSessionLookup.js'
+import { prepareHistoryCandidates, findLastSessionExercise, findRecentSessionExercises } from '../lastSessionLookup.js'
 
 const sets = (weight) => [{ reps: 10, weight }]
 
@@ -45,5 +45,17 @@ describe('findLastSessionExercise', () => {
       { _id: 'x', completed: true, exercises: [{ name: 'Y', setDetails: [{ reps: 5, weight: 20, isWarmup: true }] }] }
     ], 'current')
     expect(findLastSessionExercise({ name: 'Y' }, c)).toBeNull()
+  })
+})
+
+describe('findRecentSessionExercises', () => {
+  it('liefert die letzten Sessions derselben Übung, neueste zuerst, höchstens limit', () => {
+    const candidates = prepareHistoryCandidates([
+      { _id: 'a', date: '2026-09-01', completed: true, exercises: [{ name: 'X', setDetails: sets(50) }] },
+      { _id: 'b', date: '2026-09-10', completed: true, exercises: [{ name: 'Y', setDetails: sets(99) }] },
+      { _id: 'c', date: '2026-09-20', completed: true, exercises: [{ name: 'X', setDetails: sets(60) }] }
+    ], 'current')
+    expect(findRecentSessionExercises({ name: 'X' }, candidates, 3).map((e) => e.setDetails[0].weight)).toEqual([60, 50])
+    expect(findRecentSessionExercises({ name: 'X' }, candidates, 1)).toHaveLength(1)
   })
 })

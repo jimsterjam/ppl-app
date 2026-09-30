@@ -89,7 +89,8 @@ export function buildSaveReview({
 
       if (reps === 0) {
         check.push({ kind: 'zeroReps', exIndex, name, set: label })
-      } else if (target > 0 && reps > target * 2) {
+      // Mehr als doppelt so viele (bei Singles/kleinen Zielen mindestens +4), z.B. 25 statt 12.
+      } else if (target > 0 && reps > Math.max(target * 2, target + 4)) {
         check.push({ kind: 'repsOutlier', exIndex, name, set: label, reps, target })
       }
     })

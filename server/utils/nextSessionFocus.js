@@ -91,17 +91,44 @@ const TEXTS = {
     increase: (n, p) => `Nächstes Mal – ${n}: ${p.weight} kg probieren. Schaffst du nicht alle Wiederholungen, bleib dabei, bis es klappt.`,
     speed: (n) => `Nächstes Mal – ${n}: Bleibt jede Wiederholung schnell, nimm etwas mehr Gewicht. Wirst du in den letzten Wiederholungen deutlich langsamer, bleib beim Gewicht.`,
     close: (n, p) => `Nächstes Mal – ${n}: gleiches Gewicht (${p.weight} kg), diesmal fehlte nur 1 Wiederholung. Ziel: ${p.reps} Wdh. in jedem Satz.`,
-    hold: (n, p) => `Nächstes Mal – ${n}: gleiches Gewicht (${p.weight} kg). Ziel: ${p.reps} Wdh. in jedem Satz.`
+    hold: (n, p) => `Nächstes Mal – ${n}: gleiches Gewicht (${p.weight} kg). Ziel: ${p.reps} Wdh. in jedem Satz.`,
+    climb: (n, p) => `Nächstes Mal – ${n}: ${p.nextReps} Wdh. pro Satz mit ${p.weight} kg versuchen. Bei ${p.max} in allen Sätzen gibt es mehr Gewicht.`,
+    confirm: (n, p) => `Nächstes Mal – ${n}: ${p.sets}×${p.reps} mit ${p.weight} kg noch einmal bestätigen, dann mehr Gewicht.`,
+    plateau: (n, p) => `Hinweis – ${n}: seit ${p.sessions} Einheiten bei ${p.weight} kg. Ein kleinerer Steigerungsschritt oder etwas längere Pausen können helfen.`
   },
   en: {
     increase: (n, p) => `Next time – ${n}: try ${p.weight} kg. If you don't hit all reps, stay there until you do.`,
     speed: (n) => `Next time – ${n}: if every rep stays fast, add a little weight. If you slow down noticeably on the last reps, keep the weight.`,
     close: (n, p) => `Next time – ${n}: same weight (${p.weight} kg), only 1 rep was missing this time. Goal: ${p.reps} reps in every set.`,
-    hold: (n, p) => `Next time – ${n}: same weight (${p.weight} kg). Goal: ${p.reps} reps in every set.`
+    hold: (n, p) => `Next time – ${n}: same weight (${p.weight} kg). Goal: ${p.reps} reps in every set.`,
+    climb: (n, p) => `Next time – ${n}: try ${p.nextReps} reps per set at ${p.weight} kg. Once every set hits ${p.max}, add weight.`,
+    confirm: (n, p) => `Next time – ${n}: confirm ${p.sets}×${p.reps} at ${p.weight} kg once more, then add weight.`,
+    plateau: (n, p) => `Note – ${n}: ${p.sessions} sessions at ${p.weight} kg. A smaller increase step or slightly longer rests can help.`
   }
 };
 
-const PRIORITY = { increase: 1, speed: 2, close: 3, hold: 4 };
+// Keine Senkung, nur ein Hinweis (Absprache Paul): nach PLATEAU_SESSIONS Einheiten mit demselben
+// Hauptgewicht ohne Steigerung.
+export const PLATEAU_SESSIONS = 3;
+const PRIORITY = { increase: 1, plateau: 2, speed: 3, confirm: 4, close: 5, climb: 6, hold: 7 };
+
+// Dieselbe Übung aus früheren Workouts (neueste zuerst), passend über den Namen.
+function previousSessionsOf(ex, history, limit) {
+  const name = String(ex?.name || '').trim().toLowerCase();
+  const found = [];
+  for (const w of Array.isArray(history) ? history : []) {
+    if (found.length >= limit) break;
+    const match = (w?.exercises || []).find((item) => String(item?.name || '').trim().toLowerCase() === name
+      && engine.getWorkingSets(item).length > 0);
+    if (match) found.push(match);
+  }
+  return found;
+}
+
+function mainWeightOf(sessionExercise) {
+  const split = engine.splitMainAndBackoffSets(engine.getWorkingSets(sessionExercise));
+  return split ? split.weight : null;
+}
 
 /**
  * Wählt EINE Übung und baut die "Nächstes Mal"-Zeile.
@@ -111,9 +138,11 @@ const PRIORITY = { increase: 1, speed: 2, close: 3, hold: 4 };
  * @param {'de'|'en'} [params.language]
  * @param {Map<string, object>} [params.profileHintByName] - Übungsprofil je Name (lowercase)
  * @param {Map<string, string>} [params.englishNameByName] - englischer Anzeigename je Name (lowercase), z.B. aus der DB
+ * @param {Array} [params.history] - frühere abgeschlossene Workouts, neueste zuerst (ohne das aktuelle) -
+ *   für Schema-Erkennung, Bestätigungs-Regel bei Singles und den Plateau-Hinweis
  * @returns {null | { kind, exercise, text }}
  */
-export function buildNextSessionFocus({ workout, language = 'de', profileHintByName = new Map(), englishNameByName = new Map() } = {}) {
+export function buildNextSessionFocus({ workout, language = 'de', profileHintByName = new Map(), englishNameByName = new Map(), history = [] } = {}) {
   if (!engine?.getProgressionStatus) return null;
   const lang = language === 'en' ? 'en' : 'de';
   const goal = workout?.goal || 'hypertrophy';
@@ -128,11 +157,23 @@ export function buildNextSessionFocus({ workout, language = 'de', profileHintByN
     if (exGoal === 'explosive') {
       if (hasLoad(ex)) candidate = { kind: 'speed', params: {} };
     } else {
-      const status = engine.getProgressionStatus(info, ex, exGoal);
+      const previousSessions = previousSessionsOf(ex, history, PLATEAU_SESSIONS - 1);
+      const status = engine.getProgressionStatus(info, ex, exGoal, { previousSessions });
+      const params = {
+        weight: formatKg(status?.weight, lang),
+        reps: status?.targetReps,
+        sets: status?.sets,
+        nextReps: status?.nextReps,
+        max: status?.max
+      };
       if (status?.state === 'increase' && status.suggestion?.suggestedWeights?.length) {
         candidate = { kind: 'increase', params: { weight: formatKg(status.suggestion.suggestedWeights[0], lang) } };
-      } else if (status?.state === 'close' || status?.state === 'hold') {
-        candidate = { kind: status.state, params: { weight: formatKg(status.weight, lang), reps: status.targetReps } };
+      } else if (status && previousSessions.length >= PLATEAU_SESSIONS - 1
+        && previousSessions.every((prev) => mainWeightOf(prev) === status.weight)) {
+        // Seit mehreren Einheiten dasselbe Gewicht ohne Steigerung -> nur ein Hinweis, keine Senkung.
+        candidate = { kind: 'plateau', params: { ...params, sessions: PLATEAU_SESSIONS } };
+      } else if (['confirm', 'close', 'climb', 'hold'].includes(status?.state)) {
+        candidate = { kind: status.state, params };
       }
     }
 

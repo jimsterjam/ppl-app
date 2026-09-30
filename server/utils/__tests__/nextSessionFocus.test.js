@@ -41,18 +41,42 @@ describe('buildNextSessionFocus', () => {
     assert.equal(focus.text, 'Next time – Barbell Speed Squat: if every rep stays fast, add a little weight. If you slow down noticeably on the last reps, keep the weight.')
   })
 
-  test('Knapp dran vor Halten', () => {
+  test('Kraft: knapp dran vor Halten', () => {
     const focus = buildNextSessionFocus({
       workout: {
-        goal: 'hypertrophy',
+        goal: 'strength',
         exercises: [
-          { name: 'Kniebeugen mit der Langhantel', setDetails: sets([10, 8, 7], 80) },
-          { name: 'Beinbeuger liegend', setDetails: sets([12, 12, 11], 40) }
+          { name: 'Kniebeugen mit der Langhantel', setDetails: sets([5, 5, 5, 5, 4], 100) }
         ]
       }
     })
     assert.equal(focus.kind, 'close')
-    assert.equal(focus.text, 'Nächstes Mal – Lever Lying Leg Curl: gleiches Gewicht (40 kg), diesmal fehlte nur 1 Wiederholung. Ziel: 12 Wdh. in jedem Satz.')
+    assert.equal(focus.text, 'Nächstes Mal – Barbell High Bar Squat: gleiches Gewicht (100 kg), diesmal fehlte nur 1 Wiederholung. Ziel: 5 Wdh. in jedem Satz.')
+  })
+
+  test('Muskelaufbau 8-12: eine Wiederholung mehr', () => {
+    const focus = buildNextSessionFocus({
+      workout: { goal: 'hypertrophy', exercises: [{ name: 'Beinbeuger liegend', setDetails: sets([12, 12, 11], 40) }] }
+    })
+    assert.equal(focus.kind, 'climb')
+    assert.equal(focus.text, 'Nächstes Mal – Lever Lying Leg Curl: 12 Wdh. pro Satz mit 40 kg versuchen. Bei 12 in allen Sätzen gibt es mehr Gewicht.')
+  })
+
+  test('Singles: erst bestätigen, nach zweimal steigern', () => {
+    const workout = { goal: 'strength', exercises: [{ name: 'Kniebeugen mit der Langhantel', setDetails: sets([1, 1, 1, 1, 1, 1], 140) }] }
+    assert.equal(buildNextSessionFocus({ workout }).kind, 'confirm')
+    const history = [{ exercises: [{ name: 'Kniebeugen mit der Langhantel', setDetails: sets([1, 1, 1, 1, 1, 1], 140) }] }]
+    assert.equal(buildNextSessionFocus({ workout, history }).kind, 'increase')
+  })
+
+  test('3 Einheiten dasselbe Gewicht ohne Steigerung -> nur Hinweis, keine Senkung', () => {
+    const squat = (reps) => ({ exercises: [{ name: 'Kniebeugen mit der Langhantel', setDetails: sets(reps, 100) }] })
+    const focus = buildNextSessionFocus({
+      workout: { goal: 'strength', exercises: squat([5, 5, 4, 4, 3]).exercises },
+      history: [squat([5, 5, 5, 4, 4]), squat([5, 5, 4, 4, 4])]
+    })
+    assert.equal(focus.kind, 'plateau')
+    assert.equal(focus.text, 'Hinweis – Barbell High Bar Squat: seit 3 Einheiten bei 100 kg. Ein kleinerer Steigerungsschritt oder etwas längere Pausen können helfen.')
   })
 
   test('Pyramide / Körpergewicht-Speed-Übung / nichts Passendes -> keine Zeile', () => {
@@ -95,8 +119,8 @@ describe('Trainingsart je Übung', () => {
         ]
       }
     })
-    assert.equal(focus.kind, 'close')
-    assert.match(focus.text, /Ziel: 12 Wdh\./)
+    assert.equal(focus.kind, 'climb')
+    assert.match(focus.text, /Bei 12 in allen Sätzen/)
 
     const jumps = buildNextSessionFocus({
       workout: { goal: 'strength', exercises: [{ name: 'Trap Bar Jumps', setDetails: sets([3, 3, 3], 30) }] }

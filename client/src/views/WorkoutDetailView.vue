@@ -930,7 +930,7 @@ import NumberPicker from '@/components/NumberPicker.vue'
 import { useExerciseTranslation, getEnglishExerciseName } from '@/utils/exerciseTranslation'
 import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
 import { getRepTarget, getProgressionStatus, isNoLoadExercise, resolveExerciseGoal, sanitizeExerciseTrainingType, classifyExercise } from '@/utils/weightSuggestion'
-import { prepareHistoryCandidates, findLastSessionExercise } from '@/utils/lastSessionLookup'
+import { prepareHistoryCandidates, findRecentSessionExercises } from '@/utils/lastSessionLookup'
 import { sanitizeWorkoutGoal } from '@/utils/workoutGoal'
 import WorkoutGoalPicker from '@/components/WorkoutGoalPicker.vue'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -2129,7 +2129,7 @@ const showTrainingTypeControl = computed(() => !!workout.value && workout.value.
 
 const repTargetsByIndex = computed(() =>
   progressionInfoByIndex.value.map((info, index) =>
-    isNoLoadExercise(info) ? null : getRepTarget(info, goalByIndex.value[index])
+    isNoLoadExercise(info) ? null : getRepTarget(info, goalByIndex.value[index], { sessions: recentSessionsByIndex.value[index] || [] })
   )
 )
 
@@ -2149,10 +2149,18 @@ const trainingTypeModalDefault = computed(() => {
 
 const trainingTypeOptions = computed(() => {
   const info = progressionInfoByIndex.value[trainingTypeModalIndex.value] || {}
-  const target = (goal) => getRepTarget(info, goal)?.target
+  const sessions = recentSessionsByIndex.value[trainingTypeModalIndex.value] || []
+  const strengthTarget = getRepTarget(info, 'strength', { sessions })
   return [
-    { value: 'strength', label: t('workoutDetail.trainingType_strength'), description: t('workoutDetail.trainingTypeStrengthDesc', { reps: target('strength') }) },
-    { value: 'hypertrophy', label: t('workoutDetail.trainingType_hypertrophy'), description: t('workoutDetail.trainingTypeHypertrophyDesc', { reps: target('hypertrophy') }) },
+    {
+      value: 'strength',
+      label: t('workoutDetail.trainingType_strength'),
+      // Isolationsübungen laufen auch im Kraft-Workout im Bereich 8-12 (Zubehör).
+      description: strengthTarget?.mode === 'range'
+        ? t('workoutDetail.trainingTypeStrengthAccessoryDesc')
+        : t('workoutDetail.trainingTypeStrengthDesc')
+    },
+    { value: 'hypertrophy', label: t('workoutDetail.trainingType_hypertrophy'), description: t('workoutDetail.trainingTypeHypertrophyDesc') },
     { value: 'explosive', label: t('workoutDetail.trainingType_explosive'), description: t('workoutDetail.trainingTypeExplosiveDesc') }
   ]
 })
@@ -2167,8 +2175,14 @@ function openTrainingTypeModal(index) {
 function trainingTypeChipText(index) {
   const goal = goalByIndex.value[index]
   const label = t(`workoutDetail.trainingType_${goal || 'hypertrophy'}`)
-  const target = repTargetsByIndex.value[index]?.target
-  return goal !== 'explosive' && target ? t('workoutDetail.trainingTypeChip', { type: label, reps: target }) : label
+  const target = repTargetsByIndex.value[index]
+  if (goal === 'explosive' || !target) return label
+  // Bereich (8-12) bzw. festes Schema "5x5" (Sätze = Arbeitssätze dieser Übung).
+  if (target.mode === 'range') return t('workoutDetail.trainingTypeChipRange', { type: label, min: target.min, max: target.max })
+  const sets = (workout.value?.exercises?.[index]?.setDetails || []).filter((row) => row && !row.isWarmup).length
+  return sets
+    ? t('workoutDetail.trainingTypeChipScheme', { type: label, sets, reps: target.target })
+    : t('workoutDetail.trainingTypeChip', { type: label, reps: target.target })
 }
 
 // Zustand für die Farbe des Hinweiskastens.
@@ -2242,18 +2256,25 @@ const showWeightSuggestionInfo = ref(false)
 
 // Dieselbe Übung aus der letzten abgeschlossenen Session (Basis für Hinweiszeile, Chip und die
 // Speicher-Prüfung "Gewicht auffällig").
-const lastSessionByIndex = computed(() => {
+// Letzte bis zu 3 Sessions je Übung (neueste zuerst): Schema-Erkennung (5x5, 6x1 ...) und
+// Bestätigungs-Regel bei Singles brauchen mehr als nur die letzte Session.
+const recentSessionsByIndex = computed(() => {
   const candidates = progressionHistory.value
-  return (workout.value?.exercises || []).map((ex) => findLastSessionExercise(
+  return (workout.value?.exercises || []).map((ex) => findRecentSessionExercises(
     { name: ex?.name, exerciseId: ex?.exerciseId, _id: ex?._id, muscleGroup: ex?.muscleGroup },
-    candidates
+    candidates,
+    3
   ))
 })
+
+const lastSessionByIndex = computed(() => recentSessionsByIndex.value.map((list) => list[0] || null))
 
 // Steigern / Knapp dran / Halten (utils/weightSuggestion.js getProgressionStatus), null = nur Ziel.
 const progressionStatusByIndex = computed(() =>
   lastSessionByIndex.value.map((last, index) =>
-    getProgressionStatus(progressionInfoByIndex.value[index], last, goalByIndex.value[index])
+    getProgressionStatus(progressionInfoByIndex.value[index], last, goalByIndex.value[index], {
+      previousSessions: (recentSessionsByIndex.value[index] || []).slice(1)
+    })
   )
 )
 
@@ -2261,13 +2282,18 @@ const progressionStatusByIndex = computed(() =>
 function progressionHintText(index) {
   const status = progressionStatusByIndex.value[index]
   const params = status
-    ? { next: formatKg(status.suggestion?.suggestedWeights?.[0] ?? status.weight), weight: formatKg(status.weight), reps: status.targetReps, sets: status.sets, done: status.totalReps, total: status.targetTotal, missing: status.missingReps }
+    ? { next: formatKg(status.suggestion?.suggestedWeights?.[0] ?? status.weight), weight: formatKg(status.weight), reps: status.targetReps, sets: status.sets, done: status.totalReps, total: status.targetTotal, missing: status.missingReps, nextReps: status.nextReps, min: status.min, max: status.max }
     : null
-  if (status?.state === 'increase') return t('workoutDetail.weightSuggestionReason', params)
+  // Bereich 8-12: "3x12 geschafft" statt "3x12" aus dem Ziel - Wiederholungen = erreichte Zahl.
+  if (status?.state === 'increase') return t('workoutDetail.weightSuggestionReason', { ...params, reps: status.mode === 'range' ? status.max : status.targetReps })
+  if (status?.state === 'confirm') return t('workoutDetail.progressionConfirm', params)
+  if (status?.state === 'climb') return t('workoutDetail.progressionClimb', params)
   if (status?.state === 'close') return t('workoutDetail.progressionClose', params)
   if (status?.state === 'hold') return t('workoutDetail.progressionHold', params)
   if (goalByIndex.value[index] === 'explosive') return t('workoutDetail.explosiveExplain')
-  return t('workoutDetail.repTargetExplain', { reps: repTargetsByIndex.value[index]?.target })
+  const target = repTargetsByIndex.value[index]
+  if (target?.mode === 'range') return t('workoutDetail.repRangeExplain', { min: target.min, max: target.max })
+  return t('workoutDetail.repTargetExplain', { reps: target?.target })
 }
 
 function formatKg(value) {

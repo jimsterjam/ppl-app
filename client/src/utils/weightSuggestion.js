@@ -11,9 +11,9 @@
 export const TRAINING_GOALS = Object.freeze(['hypertrophy', 'strength'])
 export const DEFAULT_TRAINING_GOAL = 'hypertrophy'
 
-// Wiederholungsbereiche pro Trainingsziel und Übungsart. Vorschlag erst, wenn alle Arbeitssätze das
-// obere Ende (max) erreicht haben. Der Quick Generator (server/utils/repTargets.js) nutzt dieselben
-// Werte - bei Änderungen beide Stellen anpassen.
+// Wiederholungsbereiche des Quick Generators (server/utils/repTargets.js, per Test abgeglichen).
+// Die Fortschrittslogik im Workout nutzt seit dem Schema-Umbau PROGRESSION_RANGES (unten) - der
+// Generator wird in einem eigenen Schritt angeglichen (Absprache Paul: "A noch nicht umsetzen").
 export const REP_TARGETS = Object.freeze({
   strength: Object.freeze({
     compound: Object.freeze({ min: 3, max: 5 }),
@@ -90,13 +90,59 @@ export function classifyExercise(info = {}) {
   return equipmentValues(info).some((eq) => eq === 'langhantel' || eq === 'barbell') ? 'compound' : 'isolation'
 }
 
-/** Wiederholungsziel für eine Übung, oder null (keine Gewichtssteigerung sinnvoll). */
-export function getRepTarget(info = {}, goal = DEFAULT_TRAINING_GOAL) {
+// --- Fortschrittslogik: Schema statt fester Zahl (Absprache Paul) ---------------------------
+// Kraft (Grundübungen): festes Schema im Bereich 1-6 Wdh. (5x5, 6x1, 4x5 ...). Die Ziel-
+//   Wiederholungen liest die App aus den letzten Sessions (häufigste Wdh.-Zahl der Hauptsätze);
+//   ohne Verlauf 5. Mehr Gewicht, wenn alle Hauptsätze das Schema schaffen. Bei 1-3 Wdh.
+//   (Singles/Doubles/Triples) erst, wenn das zweimal hintereinander mit demselben Gewicht klappt.
+// Muskelaufbau (und Zubehör-/Isolationsübungen im Kraft-Workout): Bereich 8-12, Wiederholungen
+//   klettern (3x10 -> 3x11 -> 3x12), mehr Gewicht erst bei 12 in allen Hauptsätzen.
+// Die Satzanzahl gibt die App nie vor.
+export const PROGRESSION_RANGES = Object.freeze({
+  strength: Object.freeze({ min: 1, max: 6 }),
+  hypertrophy: Object.freeze({ min: 8, max: 12 })
+})
+export const DEFAULT_STRENGTH_REPS = 5
+// Bis zu dieser Wdh.-Zahl muss das Schema zweimal hintereinander geschafft werden.
+export const CONFIRM_REPS_MAX = 3
+
+/**
+ * Ziel-Wiederholungen eines festen Kraft-Schemas aus den letzten Sessions (neueste zuerst):
+ * häufigste Wdh.-Zahl der Hauptsätze, bei Gleichstand die höhere, begrenzt auf 1-6.
+ */
+export function detectSchemeReps(sessions = []) {
+  const counts = new Map()
+  for (const session of (Array.isArray(sessions) ? sessions : []).slice(0, 3)) {
+    const split = session ? splitMainAndBackoffSets(getWorkingSets(session)) : null
+    for (const set of split?.main || []) counts.set(set.reps, (counts.get(set.reps) || 0) + 1)
+  }
+  if (!counts.size) return DEFAULT_STRENGTH_REPS
+  let best = 0
+  let bestCount = 0
+  for (const [reps, count] of counts) {
+    if (count > bestCount || (count === bestCount && reps > best)) { best = reps; bestCount = count }
+  }
+  const { min, max } = PROGRESSION_RANGES.strength
+  return Math.min(max, Math.max(min, best))
+}
+
+/**
+ * Wiederholungsziel einer Übung, oder null (keine Gewichtssteigerung sinnvoll).
+ * @param {object} [options]
+ * @param {Array} [options.sessions] - dieselbe Übung aus den letzten Sessions, neueste zuerst
+ *   (nur für feste Kraft-Schemata relevant)
+ * @returns {null | { type, mode: 'fixed'|'range', min, max, target }}
+ */
+export function getRepTarget(info = {}, goal = DEFAULT_TRAINING_GOAL, { sessions = [] } = {}) {
   if (goal === 'explosive') return null // Tempo zählt, kein Wiederholungsziel
   const type = classifyExercise(info)
   if (type === 'core') return null
-  const range = REP_TARGETS[normalizeTrainingGoal(goal)][type]
-  return { type, min: range.min, max: range.max, target: range.max }
+  if (normalizeTrainingGoal(goal) === 'strength' && type === 'compound') {
+    const { min, max } = PROGRESSION_RANGES.strength
+    return { type, mode: 'fixed', min, max, target: detectSchemeReps(sessions) }
+  }
+  const { min, max } = PROGRESSION_RANGES.hypertrophy
+  return { type, mode: 'range', min, max, target: max }
 }
 
 function equipmentValues(info = {}) {
@@ -148,88 +194,90 @@ export function splitMainAndBackoffSets(working = []) {
   return { main: working.slice(0, k), backoff, weight }
 }
 
-/**
- * Gewichtsvorschlag für die aktuelle Session.
- * @param {object} info - Übungsinfos (name, name_en, category, equipment, aiMetadata)
- * @param {object|null} lastSessionExercise - dieselbe Übung aus der letzten abgeschlossenen Session
- * @param {string} goal - 'hypertrophy' | 'strength'
- * @returns {null | { targetReps, increment, baseWeight, suggestedWeights: number[] }}
- *   suggestedWeights[k] = Vorschlag für den k-ten Arbeitssatz (Gewicht letztes Mal + Schrittweite;
- *   da alle Arbeitssätze dasselbe Gewicht haben müssen, sind alle Werte gleich).
- */
-export function getWeightSuggestion(info = {}, lastSessionExercise = null, goal = DEFAULT_TRAINING_GOAL) {
-  if (!lastSessionExercise) return null
-  if (isNoLoadExercise(info)) return null
-
-  const target = getRepTarget(info, goal)
-  if (!target) return null
-
-  const working = getWorkingSets(lastSessionExercise)
-  if (!working.length) return null
-  // Satz ohne Gewicht = Körpergewicht-Satz -> kein Gewichtsvorschlag.
-  if (working.some((set) => set.weight <= 0)) return null
-  // Das Gewicht gilt erst als geschafft, wenn ALLE Hauptsätze mit demselben Gewicht liefen
-  // (z.B. 5x5 mit 100 kg). Deutlich leichtere Zusatzsätze danach zählen nicht; kleine
-  // Reduzierungen (100/100/100/95/95) oder Steigerungen innerhalb der Sätze -> kein Vorschlag.
-  // Aufwärm-/Ramp-Up-Sätze zählen ohnehin nicht (isWarmup).
-  const split = splitMainAndBackoffSets(working)
-  if (!split) return null
-  const main = split.main
-  // Nur wenn ALLE Hauptsätze das Ziel erreicht haben - sonst gleiches Gewicht, kein Hinweis.
-  if (!main.every((set) => set.reps >= target.target)) return null
-  // Bewusst KEIN Vergleich der Satzanzahl mit früheren Sessions: Favoriten werden mit den Sätzen
-  // der letzten Session vorausgefüllt, nicht gemachte Sätze bleiben meist stehen - der Vergleich
-  // hätte kaum gegriffen, aber bewusste Umstellungen (z.B. 5 -> 3 Sätze) bestraft.
-
+function buildSuggestion(info, split, target) {
   const increment = incrementFor(info)
   return {
     targetReps: target.target,
     increment,
     baseWeight: split.weight,
-    suggestedWeights: main.map((set) => roundKg(set.weight + increment)),
-    // Anzahl Zusatzsätze letztes Mal - dort gibt es keinen Chip (siehe getSuggestionForSet).
+    // Vorschlag je Hauptsatz (alle gleich, da Hauptsätze dasselbe Gewicht haben).
+    suggestedWeights: split.main.map((set) => roundKg(set.weight + increment)),
+    // Anzahl Zusatzsätze letztes Mal - dort gibt es keinen Vorschlag (siehe getSuggestionForSet).
     backoffSets: split.backoff.length
   }
 }
 
+// Wurde das Schema in dieser (früheren) Session mit demselben Hauptgewicht geschafft?
+function schemeAchieved(sessionExercise, weight, reps) {
+  const split = sessionExercise ? splitMainAndBackoffSets(getWorkingSets(sessionExercise)) : null
+  return !!split && split.weight === weight && split.main.every((set) => set.reps >= reps)
+}
+
 /**
- * Zustand für die Hinweiszeile unter der Übung (Einschätzung der letzten Session):
- *   'increase' - alle Arbeitssätze am Ziel -> mehr Gewicht (zusätzlich Chip, siehe getWeightSuggestion)
- *   'close'    - knapp dran: genau ein Satz, und der nur 1 Wdh. unter dem Ziel -> gleiches Gewicht
- *   'hold'     - sonst -> gleiches Gewicht, bis alle Sätze das Ziel schaffen
- * null = keine Einschätzung möglich (keine Historie, Körpergewicht, unterschiedliche Gewichte, ...),
- * dann zeigt die App nur das Wiederholungsziel. Senkungen werden nie vorgeschlagen.
- * @returns {null | { state, targetReps, weight, sets, totalReps, targetTotal, missingReps, suggestion }}
+ * Einschätzung der letzten Session für Hinweis, Vorschlag und "Nächstes Mal":
+ *   'increase' - alle Hauptsätze am Ziel -> mehr Gewicht (suggestion gesetzt)
+ *   'confirm'  - Kraft-Schema mit 1-3 Wdh. geschafft, aber erst einmal -> nochmal bestätigen
+ *   'climb'    - Bereich 8-12: noch nicht überall 12 -> nächstes Mal eine Wdh. mehr (nextReps)
+ *   'close'    - festes Schema, knapp dran: genau ein Satz 1 Wdh. zu wenig -> gleiches Gewicht
+ *   'hold'     - festes Schema, sonst -> gleiches Gewicht
+ * null = keine Einschätzung (keine Historie, Körpergewicht, Pyramide, ...). Nie Senkungen.
+ * @param {object} [options]
+ * @param {Array} [options.previousSessions] - dieselbe Übung aus den Sessions VOR der letzten,
+ *   neueste zuerst (für Schema-Erkennung und die Bestätigungs-Regel bei 1-3 Wdh.)
  */
-export function getProgressionStatus(info = {}, lastSessionExercise = null, goal = DEFAULT_TRAINING_GOAL) {
+export function getProgressionStatus(info = {}, lastSessionExercise = null, goal = DEFAULT_TRAINING_GOAL, { previousSessions = [] } = {}) {
   if (!lastSessionExercise || isNoLoadExercise(info)) return null
-  const target = getRepTarget(info, goal)
+  const target = getRepTarget(info, goal, { sessions: [lastSessionExercise, ...previousSessions] })
   if (!target) return null
   const all = getWorkingSets(lastSessionExercise)
+  // Satz ohne Gewicht = Körpergewicht-Satz -> kein Gewichtsvorschlag.
   if (!all.length || all.some((set) => set.weight <= 0)) return null
-  // Nur Hauptsätze zählen (siehe splitMainAndBackoffSets) - Zusatzsätze bleiben außen vor.
+  // Nur Hauptsätze zählen (siehe splitMainAndBackoffSets) - Zusatzsätze bleiben außen vor;
+  // kleine Reduzierungen, Steigerungen innerhalb der Sätze oder Pyramiden -> keine Einschätzung.
   const split = splitMainAndBackoffSets(all)
   if (!split) return null
   const working = split.main
-  const firstWeight = split.weight
 
   const totalReps = working.reduce((sum, set) => sum + set.reps, 0)
   const targetTotal = working.length * target.target
   const missingReps = working.reduce((sum, set) => sum + Math.max(0, target.target - set.reps), 0)
   const below = working.filter((set) => set.reps < target.target)
+  const minReps = Math.min(...working.map((set) => set.reps))
   const base = {
+    mode: target.mode,
     targetReps: target.target,
-    weight: firstWeight,
+    min: target.min,
+    max: target.max,
+    weight: split.weight,
     sets: working.length,
     totalReps,
     targetTotal,
-    missingReps
+    missingReps,
+    minReps
   }
+
   if (!below.length) {
-    return { ...base, state: 'increase', suggestion: getWeightSuggestion(info, lastSessionExercise, goal) }
+    // Singles/Doubles/Triples: erst nach zweimal Schaffen steigern (Maximalversuche).
+    if (target.mode === 'fixed' && target.target <= CONFIRM_REPS_MAX &&
+      !schemeAchieved(previousSessions[0], split.weight, target.target)) {
+      return { ...base, state: 'confirm', suggestion: null }
+    }
+    return { ...base, state: 'increase', suggestion: buildSuggestion(info, split, target) }
+  }
+  if (target.mode === 'range') {
+    return { ...base, state: 'climb', nextReps: Math.min(target.max, minReps + 1), suggestion: null }
   }
   const state = below.length === 1 && below[0].reps === target.target - 1 ? 'close' : 'hold'
   return { ...base, state, suggestion: null }
+}
+
+/**
+ * Gewichtsvorschlag für die aktuelle Session (nur im Zustand 'increase').
+ * @returns {null | { targetReps, increment, baseWeight, suggestedWeights: number[], backoffSets }}
+ */
+export function getWeightSuggestion(info = {}, lastSessionExercise = null, goal = DEFAULT_TRAINING_GOAL, options = {}) {
+  const status = getProgressionStatus(info, lastSessionExercise, goal, options)
+  return status?.state === 'increase' ? status.suggestion : null
 }
 
 /** Vorschlag für den k-ten Arbeitssatz der aktuellen Session (mehr Sätze als letztes Mal -> letzter Wert). */

@@ -21,13 +21,14 @@ function session(sets) {
 describe('classifyExercise / getRepTarget', () => {
   it('Grundübung aus dem Katalog', () => {
     expect(classifyExercise(squat)).toBe('compound')
-    expect(getRepTarget(squat, 'strength')).toMatchObject({ min: 3, max: 5, target: 5 })
-    expect(getRepTarget(squat, 'hypertrophy')).toMatchObject({ min: 6, max: 10, target: 10 })
+    expect(getRepTarget(squat, 'strength')).toMatchObject({ mode: 'fixed', min: 1, max: 6, target: 5 })
+    expect(getRepTarget(squat, 'hypertrophy')).toMatchObject({ mode: 'range', min: 8, max: 12, target: 12 })
   })
 
   it('Katalog-Fehler: Seitheben wird trotz "compound" als Isolation behandelt', () => {
     expect(classifyExercise(lateralRaise)).toBe('isolation')
-    expect(getRepTarget(lateralRaise, 'strength').target).toBe(10)
+    // Isolation im Kraft-Workout = Zubehör -> Bereich 8-12 wie Muskelaufbau
+    expect(getRepTarget(lateralRaise, 'strength')).toMatchObject({ mode: 'range', target: 12 })
     expect(getRepTarget(lateralRaise, 'hypertrophy').target).toBe(12)
   })
 
@@ -61,8 +62,8 @@ describe('getWeightSuggestion', () => {
   it('Aufwärmsätze werden ignoriert', () => {
     const last = session([
       { reps: 3, weight: 20, isWarmup: true },
-      { reps: 10, weight: 60 },
-      { reps: 10, weight: 60 }
+      { reps: 12, weight: 60 },
+      { reps: 12, weight: 60 }
     ])
     expect(getWeightSuggestion(squat, last, 'hypertrophy')?.suggestedWeights).toEqual([62.5, 62.5])
   })
@@ -213,5 +214,43 @@ describe('Zusatzsätze (Back-off) nach den Hauptsätzen', () => {
 
   it('Pyramide (erster Satz nicht der schwerste) -> weiter kein Vorschlag', () => {
     expect(getWeightSuggestion(squat, sets([[5, 90], [5, 100], [5, 80]]), 'strength')).toBeNull()
+  })
+})
+
+describe('Schema statt fester Zahl', () => {
+  const sets = (reps, weight = 100) => session(reps.map((r) => ({ reps: r, weight })))
+
+  it('Kraft: Schema wird aus den Sessions erkannt (6x1, 4x5, 6x6)', () => {
+    expect(getRepTarget(squat, 'strength', { sessions: [sets([1, 1, 1, 1, 1, 1])] }).target).toBe(1)
+    expect(getRepTarget(squat, 'strength', { sessions: [sets([5, 5, 5, 5])] }).target).toBe(5)
+    expect(getRepTarget(squat, 'strength', { sessions: [sets([6, 6, 6, 6, 6, 6])] }).target).toBe(6)
+    // Gleichstand -> höhere Zahl; über 6 wird auf 6 begrenzt; ohne Verlauf 5
+    expect(getRepTarget(squat, 'strength', { sessions: [sets([5, 5, 4, 4])] }).target).toBe(5)
+    expect(getRepTarget(squat, 'strength', { sessions: [sets([8, 8, 8])] }).target).toBe(6)
+    expect(getRepTarget(squat, 'strength').target).toBe(5)
+  })
+
+  it('Kraft 4x5 geschafft -> mehr Gewicht, 5/5/5/4/3 -> Halten', () => {
+    expect(getProgressionStatus(squat, sets([5, 5, 5, 5]), 'strength').state).toBe('increase')
+    expect(getProgressionStatus(squat, sets([5, 5, 5, 4, 3]), 'strength').state).toBe('hold')
+  })
+
+  it('Singles (6x1): erst nach zweimal Schaffen mit demselben Gewicht steigern', () => {
+    const singles = sets([1, 1, 1, 1, 1, 1], 140)
+    expect(getProgressionStatus(squat, singles, 'strength').state).toBe('confirm')
+    expect(getProgressionStatus(squat, singles, 'strength', { previousSessions: [sets([1, 1, 1, 1, 1, 1], 140)] }).state).toBe('increase')
+    expect(getProgressionStatus(squat, singles, 'strength', { previousSessions: [sets([1, 1, 1, 1, 1, 1], 137.5)] }).state).toBe('confirm')
+    // 5x5 braucht keine Bestätigung
+    expect(getProgressionStatus(squat, sets([5, 5, 5, 5, 5]), 'strength').state).toBe('increase')
+  })
+
+  it('Muskelaufbau 8-12: klettern, erst bei 12 überall mehr Gewicht', () => {
+    const s10 = getProgressionStatus(squat, sets([10, 10, 10], 60), 'hypertrophy')
+    expect(s10).toMatchObject({ state: 'climb', minReps: 10, nextReps: 11, max: 12 })
+    expect(getProgressionStatus(squat, sets([12, 11, 10], 60), 'hypertrophy').nextReps).toBe(11)
+    expect(getProgressionStatus(squat, sets([12, 12, 12], 60), 'hypertrophy').state).toBe('increase')
+    // nach einer Steigerung auch unter 8: weiter klettern, nie senken
+    expect(getProgressionStatus(squat, sets([7, 7, 6], 62.5), 'hypertrophy')).toMatchObject({ state: 'climb', nextReps: 7 })
+    expect(getWeightSuggestion(squat, sets([10, 10, 10], 60), 'hypertrophy')).toBeNull()
   })
 })
