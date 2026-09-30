@@ -937,7 +937,14 @@ router.post('/quick-generator', aiAuthMiddleware, async (req, res) => {
     let errorType = null;
     if (openaiClient && aiAllowedForUser) {
       try {
-        suggestion = await generateQuickGeneratorWithOpenAI(context, openaiClient, { requestId });
+        // Zeitbudget (Fehlerbild 30.09.): der KI-Relay schlief (Render Free-Plan), das Wecken dauerte
+        // über 100 s, die App gab nach 45 s auf und meldete einen Netzwerkfehler. Der Generator baut
+        // das Workout ohnehin aus Vorlagen und Katalog - kommt die KI nicht rechtzeitig, wird ohne
+        // sie generiert (Demo-/Vorlagenpfad unten) statt den Nutzer warten zu lassen.
+        suggestion = await withTimeBudget(
+          generateQuickGeneratorWithOpenAI(context, openaiClient, { requestId }),
+          QUICK_GENERATOR_AI_BUDGET_MS
+        );
         if (suggestion) {
           usedRemote = true;
           await markAiUse(entitlements);
@@ -2965,6 +2972,21 @@ async function generateGPT4Suggestion(workoutContext, openaiClient, options = {}
   return validateAiSuggestionPayload(parsed);
 }
 
+// Maximale Wartezeit auf die KI beim Generieren (deutlich unter dem App-Timeout von 45 s).
+const QUICK_GENERATOR_AI_BUDGET_MS = 25000;
+
+function withTimeBudget(promise, ms) {
+  let timer = null;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const error = new Error(`AI time budget of ${ms} ms exceeded`);
+      error.code = 'AI_TIMEOUT';
+      reject(error);
+    }, ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
 async function generateQuickGeneratorWithOpenAI(context, openaiClient, options = {}) {
   const requestId = options.requestId || '';
   const prompt = createQuickGeneratorPrompt(context);
@@ -2974,7 +2996,8 @@ async function generateQuickGeneratorWithOpenAI(context, openaiClient, options =
   // "Quick-Generator liefert immer dasselbe (Demo-)Workout"-Symptom führte (siehe initializeOpenAI-
   // Fix weiter oben - DIESER Call hier lief bereits vorher korrekt über den Relay, sobald
   // initializeOpenAI() überhaupt erst einen Client zurückgab).
-  await ensureRelayAwake();
+  // Kurz halten: das Gesamtbudget (QUICK_GENERATOR_AI_BUDGET_MS) begrenzt ohnehin.
+  await ensureRelayAwake({ maxWaitMs: 15000 });
 
   const completion = await withAiRetry(async () => openaiClient.chat.completions.create({
     model: 'gpt-4o-mini',

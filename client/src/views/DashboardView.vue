@@ -229,6 +229,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onActivated, onUnmounted, nextTick, watch } from 'vue'
+import { startAiWarmup } from '@/utils/aiWarmup'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
@@ -1065,6 +1066,11 @@ let removeAfterEachHook = null
 const onWindowFocus = () => { if (isSignedIn.value) loadWorkoutsData(true) }
 
 // Mounted: Auth & Refresh
+// Dashboard ist der Startpunkt für neue Workouts: Server und KI-Relay (Render Free-Plan) schon
+// hier wecken, damit Generator und Feedback später ohne Kaltstart-Wartezeit laufen.
+const stopAiWarmup = startAiWarmup()
+onUnmounted(stopAiWarmup)
+
 onMounted(() => {
   draftSourceLogged.value = false
   window.addEventListener('online', onOnlineStatus)

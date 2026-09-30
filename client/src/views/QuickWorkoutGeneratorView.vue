@@ -192,6 +192,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { startAiWarmup } from '@/utils/aiWarmup'
 import { useI18n } from 'vue-i18n'
 import { useRouter, useRoute } from 'vue-router'
 import HeaderBar from '@/components/HeaderBar.vue'
@@ -217,6 +218,11 @@ const preview = ref(null)
 const { lock: lockBodyScroll, unlock: unlockBodyScroll } = useScrollLock()
 watch(preview, (value) => (value ? lockBodyScroll() : unlockBodyScroll()))
 onBeforeUnmount(unlockBodyScroll)
+
+// Server und KI-Relay schon beim Öffnen des Generators wecken (Render Free-Plan) - während der
+// Nutzer die Optionen wählt, fahren beide hoch, statt erst beim Tippen auf "Generieren".
+const stopAiWarmup = startAiWarmup()
+onBeforeUnmount(stopAiWarmup)
 // Zwischenspeicher für die gemappten Builder-Übungen, während der Nutzer die Vorschau sieht -
 // erst bei "Ins Workout übernehmen" tatsächlich in den Prefill-Speicher schreiben/navigieren.
 let pendingBuilderPrefill = null
