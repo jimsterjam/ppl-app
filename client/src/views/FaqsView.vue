@@ -59,7 +59,7 @@ const version = computed(() => pkg?.version || '0.0.0')
 
 // FAQ modal state
 const selectedFaqKey = ref('')
-const baseKeys = ['gettingStarted', 'pushPullLegs', 'navigation', 'workouts', 'progressRules', 'progression', 'weightSuggestion', 'restPauses', 'aiCoach', 'uploads', 'privacy', 'statsReading']
+const baseKeys = ['gettingStarted', 'workoutFlow', 'symbols', 'progression', 'weightSuggestion', 'restPauses', 'workouts', 'pushPullLegs', 'navigation', 'progressRules', 'aiCoach', 'statsReading', 'uploads', 'privacy']
 const items = computed(() => baseKeys.map(key => ({ key })))
 
 function openFaq(faqKey) {
@@ -224,6 +224,8 @@ function splitParagraphs(text) {
   margin: 0 0 16px 0;
   line-height: 1.6;
   color: var(--fg);
+  /* Einfache Zeilenumbrüche (\n) im Text als Zeilen zeigen, z.B. die Liste in "Symbole & Farben". */
+  white-space: pre-line;
 }
 
 .modal-body p:last-child {
