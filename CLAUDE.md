@@ -91,7 +91,9 @@ die lokale Cowork-Sandbox. In Cloud-Sessions gilt stattdessen:
 
 - **Nie auf `main` pushen oder mergen.** Immer eigener Branch `claude/<kurzbeschreibung>` +
   Pull Request gegen `main`. Paul prüft und mergt; erst der Merge löst den Render-Deploy aus.
-  Zusätzlich technisch gesperrt über `.claude/settings.json`.
+  Zusätzlich technisch gesperrt über `.claude/settings.json` (deny-Regeln für Merge/Auto-Merge)
+  und den PreToolUse-Hook `.claude/hooks/block-main-push.sh` (blockiert jedes `git push` auf
+  `main` und GitHub-Dateiänderungen direkt auf `main`).
 - **Vor dem PR:** `cd server && npm test`, `cd client && npm test` (inkl. i18n-Konsistenztest),
   im Root `npm run lint`. Ergebnis in die PR-Beschreibung.
 - **PR-Beschreibung auf Deutsch:** Was/Warum, was verifiziert vs. nur per Code-Lektüre geprüft ist,
