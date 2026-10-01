@@ -824,7 +824,7 @@
 
     <WorkoutTimerConfig v-if="showTimerConfig" @close="showTimerConfig = false" />
     <!-- Pausentimer zwischen Sätzen (startet beim Abhaken, siehe toggleRowDone). -->
-    <RestTimerBar @remember="rememberRestForExercise" />
+    <RestTimerBar :next-set="restNextSet" @remember="rememberRestForExercise" />
 
     <!-- Speichern-Overlay -->
     <Transition name="save-fade">
@@ -2061,6 +2061,29 @@ function rememberRestForExercise({ exIndex, seconds }) {
     try { triggerAutoSave() } catch {}
   }
 }
+
+// Pausentimer-Vollbild: nächster offener Arbeitssatz ab der Übung der laufenden Pause (diese
+// Übung zuerst, sonst die folgenden). Satznummer zählt nur Arbeitssätze, wie in der Tabelle.
+const restNextSet = computed(() => {
+  if (!restTimer.isVisible || restTimer.exIndex < 0) return null
+  const exercises = workout.value?.exercises || []
+  for (let i = restTimer.exIndex; i < exercises.length; i++) {
+    let setNumber = 0
+    for (const row of exercises[i]?.setDetails || []) {
+      if (!row || row.isWarmup) continue
+      setNumber += 1
+      if (row.done !== true) {
+        return {
+          name: getTranslatedExerciseName(exercises[i]?.name || ''),
+          setNumber,
+          reps: row.reps,
+          weight: row.weight
+        }
+      }
+    }
+  }
+  return null
+})
 
 // Pause vorbei: nächsten offenen Arbeitssatz dieser Übung kurz hervorheben.
 const nextSetHighlight = ref({ exIndex: -1, rowIndex: -1 })

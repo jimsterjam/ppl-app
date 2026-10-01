@@ -6,9 +6,14 @@
 import { defineStore } from 'pinia'
 import { emitTimerSignal, ensureAudioUnlocked } from '@/utils/timerAudio'
 import { clampRestSeconds, REST_STEP_SECONDS } from '@/utils/restTimerRules'
+import { acquireKeepAwake, releaseKeepAwake } from '@/utils/keepAwakeGuard'
 
 const STATE_KEY = 'ppl_rest_timer_state_v1'
 const AUTO_KEY = 'ppl_rest_timer_auto_v1'
+// Anzeige: groß in der Mitte (Vollbild, Standard) oder nur als Leiste unten.
+const FULLSCREEN_KEY = 'ppl_rest_timer_fullscreen_v1'
+// Bildschirm bleibt an, solange eine Pause läuft bzw. "Pause vorbei" sichtbar ist.
+const KEEP_AWAKE_TAG = 'rest-timer'
 const NOTIFICATION_ID = 940001
 // So lange bleibt "Nächster Satz" nach Ablauf sichtbar.
 const FINISHED_VISIBLE_MS = 6000
@@ -18,6 +23,15 @@ let tickHandle = null
 function readAuto() {
   try {
     const raw = localStorage.getItem(AUTO_KEY)
+    return raw === null ? true : raw === '1'
+  } catch {
+    return true
+  }
+}
+
+function readFullscreen() {
+  try {
+    const raw = localStorage.getItem(FULLSCREEN_KEY)
     return raw === null ? true : raw === '1'
   } catch {
     return true
@@ -54,6 +68,9 @@ async function scheduleNotification(at, title, body) {
 export const useRestTimerStore = defineStore('restTimer', {
   state: () => ({
     autoStart: readAuto(),
+    fullscreen: readFullscreen(),
+    // Vollbild für DIESE Pause minimiert (Leiste unten); jede neue Pause startet wieder groß.
+    minimized: false,
     endsAt: 0,
     durationSec: 0,
     // Dauer beim Start (Standard bzw. gemerkt) - Abweichung zeigt "Für diese Übung merken".
@@ -74,12 +91,27 @@ export const useRestTimerStore = defineStore('restTimer', {
     isVisible() {
       return this.isRunning || this.showFinished
     },
-    isAdjusted: (s) => s.durationSec !== s.baseSec
+    isAdjusted: (s) => s.durationSec !== s.baseSec,
+    /** Große Anzeige in der Mitte statt Leiste. */
+    showOverlay() {
+      return this.isVisible && this.fullscreen && !this.minimized
+    }
   },
   actions: {
     setAutoStart(value) {
       this.autoStart = !!value
       try { localStorage.setItem(AUTO_KEY, this.autoStart ? '1' : '0') } catch {}
+    },
+    setFullscreen(value) {
+      this.fullscreen = !!value
+      try { localStorage.setItem(FULLSCREEN_KEY, this.fullscreen ? '1' : '0') } catch {}
+    },
+    /** Vollbild verkleinern - die Pause läuft unverändert als Leiste weiter. */
+    minimize() {
+      this.minimized = true
+    },
+    expand() {
+      this.minimized = false
     },
     start({ seconds, exerciseName = '', exIndex = -1, rowIndex = -1, notifyTitle = '', notifyBody = '' }) {
       const sec = clampRestSeconds(seconds)
@@ -94,8 +126,10 @@ export const useRestTimerStore = defineStore('restTimer', {
       this.endsAt = this.nowMs + sec * 1000
       this.notifyTitle = notifyTitle
       this.notifyBody = notifyBody
+      this.minimized = false
       this.persist()
       this.startTick()
+      acquireKeepAwake(KEEP_AWAKE_TAG)
       scheduleNotification(this.endsAt, notifyTitle, notifyBody)
     },
     adjust(deltaSec = REST_STEP_SECONDS) {
@@ -131,8 +165,10 @@ export const useRestTimerStore = defineStore('restTimer', {
       this.baseSec = 0
       this.exIndex = -1
       this.rowIndex = -1
+      this.minimized = false
       this.stopTick()
       cancelNotification()
+      releaseKeepAwake(KEEP_AWAKE_TAG)
       this.persist()
     },
     tick() {
@@ -176,6 +212,7 @@ export const useRestTimerStore = defineStore('restTimer', {
         }
         Object.assign(this, saved, { nowMs: Date.now() })
         this.startTick()
+        acquireKeepAwake(KEEP_AWAKE_TAG)
       } catch {}
     }
   }

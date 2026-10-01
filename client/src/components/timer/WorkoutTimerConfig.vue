@@ -15,6 +15,12 @@
             <span>{{ t('restTimer.autoStartLabel') }}</span>
           </label>
           <small class="rest-auto-hint">{{ t('restTimer.autoStartHint') }}</small>
+          <!-- Anzeige der Pause: groß in der Mitte (Standard) oder nur als Leiste unten. -->
+          <label class="rest-auto-toggle rest-fullscreen-toggle">
+            <input type="checkbox" :checked="restTimer.fullscreen" @change="restTimer.setFullscreen($event.target.checked)" />
+            <span>{{ t('restTimer.fullscreenLabel') }}</span>
+          </label>
+          <small class="rest-auto-hint">{{ t('restTimer.fullscreenHint') }}</small>
           <p class="interval-hint">{{ t('timer.intervalHint') }}</p>
         </div>
 
@@ -506,6 +512,7 @@ function saveAndStart() {
   cursor: not-allowed;
 }
 .rest-auto-toggle { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+.rest-fullscreen-toggle { margin-top: 12px; }
 .rest-auto-hint { display: block; margin-top: 4px; color: var(--muted); font-size: 0.8rem; line-height: 1.4; }
 .interval-hint { margin: 10px 0 0; color: var(--muted); font-size: 0.8rem; line-height: 1.4; }
 </style>

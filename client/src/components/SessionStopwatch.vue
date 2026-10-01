@@ -114,7 +114,6 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSessionStopwatch } from '@/composables/useSessionStopwatch'
-import { releaseKeepAwake } from '@/utils/keepAwakeGuard'
 import { useScrollLock } from '@/composables/useScrollLock'
 
 // User-Report: alle Texte in der App sollen DE+EN verfügbar sein - diese Komponente war bisher
@@ -242,12 +241,11 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   document.removeEventListener('pointerdown', onOutsideClick)
-  // Sicherheitsnetz: falls die Komponente verschwindet (z.B. Workout-Ansicht
-  // verlassen) während die Stoppuhr noch lief, darf der Bildschirm wieder
-  // einschlafen dürfen - der Store selbst gibt den Tag zwar bei stop()/reset()
-  // frei, aber nicht automatisch beim Unmount der Anzeige.
-  releaseKeepAwake('session-stopwatch')
-  // Sicherheitsnetz analog: Scroll-Lock nicht offen lassen, falls die Komponente bei
+  // Bewusst KEIN releaseKeepAwake() hier: die Stoppuhr läuft im Store weiter, auch wenn diese
+  // Anzeige verschwindet (z.B. Wechsel Dashboard -> Workout). Früher gab das Unmount die
+  // Bildschirm-an-Sperre frei und das Display ging trotz laufender Stoppuhr aus (User-Report
+  // 2026-10-01). Freigabe nur über stop()/reset() im Store (stores/sessionStopwatch.js).
+  // Sicherheitsnetz: Scroll-Lock nicht offen lassen, falls die Komponente bei
   // geöffnetem Overlay verschwindet.
   unlockBodyScroll()
 })

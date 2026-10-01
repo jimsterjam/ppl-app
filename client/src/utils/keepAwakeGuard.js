@@ -20,18 +20,32 @@ import { logger } from './logger'
 
 const activeTags = new Set()
 
-export async function acquireKeepAwake(tag) {
-  if (typeof window === 'undefined') return
-  const key = String(tag || 'unknown')
-  const wasEmpty = activeTags.size === 0
-  activeTags.add(key)
-  if (!wasEmpty) return
+// keepAwake() bei JEDEM acquire aufrufen (nicht nur beim ersten Tag): der Aufruf ist auf iOS
+// idempotent (isIdleTimerDisabled = true), und ein einmal fehlgeschlagener Aufruf wird so beim
+// nächsten acquire nachgeholt statt dauerhaft verloren zu sein.
+async function applyKeepAwake(reason) {
   try {
     await KeepAwake.keepAwake()
-    logger.debug('[keepAwakeGuard] Keep-Awake aktiviert', { tag: key })
+    logger.debug('[keepAwakeGuard] Keep-Awake aktiviert', { reason, tags: Array.from(activeTags) })
   } catch (err) {
     logger.warn('[keepAwakeGuard] keepAwake() fehlgeschlagen:', err?.message)
   }
+}
+
+export async function acquireKeepAwake(tag) {
+  if (typeof window === 'undefined') return
+  const key = String(tag || 'unknown')
+  activeTags.add(key)
+  await applyKeepAwake(key)
+}
+
+/**
+ * Nach Rückkehr in die App (Hintergrund -> Vordergrund) erneut setzen, falls noch etwas läuft:
+ * iOS setzt die Sperre beim App-Wechsel teilweise zurück (Aufruf in main.js).
+ */
+export async function reapplyKeepAwake() {
+  if (typeof window === 'undefined' || activeTags.size === 0) return
+  await applyKeepAwake('app-active')
 }
 
 export async function releaseKeepAwake(tag) {

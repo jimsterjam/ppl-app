@@ -514,7 +514,17 @@ export const messages = {
       notifyTitle: 'Pause vorbei',
       notifyBody: 'Weiter mit dem nächsten Satz: {name}',
       autoStartLabel: 'Pause nach jedem Satz automatisch starten',
-      autoStartHint: 'Startet beim Abhaken eines Satzes. Die Dauer passt zur Übung (z. B. 3 Min. bei schweren Grundübungen) und lässt sich in der Pausen-Leiste anpassen.'
+      autoStartHint: 'Startet beim Abhaken eines Satzes. Die Dauer passt zur Übung (z. B. 3 Min. bei schweren Grundübungen) und lässt sich in der Pausen-Leiste anpassen.',
+      fullscreenLabel: 'Pause groß in der Mitte anzeigen',
+      fullscreenHint: 'Gut lesbar auch aus etwas Entfernung. Mit „Verkleinern“ wird daraus die Leiste unten – die Pause läuft weiter.',
+      overlayAria: 'Pausentimer',
+      nextSet: 'Nächster Satz',
+      setNumber: 'Satz {n}',
+      setTarget: '{reps} × {weight} kg',
+      setTargetReps: '{reps} Wdh.',
+      continue: 'Weiter',
+      minimize: 'Verkleinern',
+      expandAria: 'Pause groß anzeigen'
     },
     workoutDetail: {
       repTargetShort: 'Ziel {reps} Wdh.',
@@ -1680,7 +1690,17 @@ export const messages = {
       notifyTitle: 'Rest over',
       notifyBody: 'Next set: {name}',
       autoStartLabel: 'Start rest automatically after each set',
-      autoStartHint: 'Starts when you check off a set. The duration fits the exercise (e.g. 3 min for heavy compound lifts) and can be adjusted in the rest bar.'
+      autoStartHint: 'Starts when you check off a set. The duration fits the exercise (e.g. 3 min for heavy compound lifts) and can be adjusted in the rest bar.',
+      fullscreenLabel: 'Show rest timer large in the center',
+      fullscreenHint: 'Easy to read from a distance. "Minimize" turns it into the bar at the bottom – the rest keeps running.',
+      overlayAria: 'Rest timer',
+      nextSet: 'Next set',
+      setNumber: 'Set {n}',
+      setTarget: '{reps} × {weight} kg',
+      setTargetReps: '{reps} reps',
+      continue: 'Continue',
+      minimize: 'Minimize',
+      expandAria: 'Show rest timer full screen'
     },
     workoutDetail: {
       repTargetShort: 'Target {reps} reps',
