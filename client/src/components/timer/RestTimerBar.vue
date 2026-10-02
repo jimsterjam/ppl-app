@@ -68,7 +68,7 @@
     <div
       v-else-if="rest.isVisible"
       class="rest-bar"
-      :class="{ compact: compact, finished: rest.showFinished }"
+      :class="{ compact: compact, finished: rest.showFinished, 'has-expand': rest.fullscreen && !rest.showFinished }"
       role="timer"
       aria-live="polite"
     >
@@ -77,6 +77,14 @@
         <button type="button" class="rest-btn" @click="rest.clear()">{{ t('common.close') }}</button>
       </template>
       <template v-else>
+        <button
+          v-if="rest.fullscreen"
+          type="button"
+          class="rest-expand"
+          :aria-label="t('restTimer.expandAria')"
+          :title="t('restTimer.expandAria')"
+          @click="rest.expand()"
+        >⤢</button>
         <div class="rest-info">
           <span class="rest-label">{{ t('restTimer.label') }}<template v-if="rest.exerciseName"> · {{ rest.exerciseName }}</template></span>
           <span class="rest-time">{{ timeText }}</span>
@@ -85,14 +93,6 @@
           <button type="button" class="rest-btn" :aria-label="t('restTimer.minusAria')" @click="rest.adjust(-REST_STEP_SECONDS)">−15</button>
           <button type="button" class="rest-btn" :aria-label="t('restTimer.plusAria')" @click="rest.adjust(REST_STEP_SECONDS)">+15</button>
           <button type="button" class="rest-btn skip" @click="rest.skip()">{{ t('restTimer.skip') }}</button>
-          <button
-            v-if="rest.fullscreen"
-            type="button"
-            class="rest-btn"
-            :aria-label="t('restTimer.expandAria')"
-            :title="t('restTimer.expandAria')"
-            @click="rest.expand()"
-          >⤢</button>
         </div>
         <button
           v-if="rest.isAdjusted && !remembered"
@@ -368,7 +368,30 @@ onBeforeUnmount(unlock)
   text-align: left;
   cursor: pointer;
 }
+.rest-expand {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 44px;
+  height: 44px;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  border: 1px solid var(--card-border);
+  background: var(--surface);
+  color: var(--fg);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.rest-bar.has-expand { padding-right: 58px; }
 .rest-bar.compact { padding: 6px 10px; }
+.rest-bar.compact.has-expand { padding-right: 50px; }
+.rest-bar.compact .rest-expand { top: 4px; right: 4px; width: 36px; height: 36px; font-size: 1.2rem; }
 .rest-bar.compact .rest-time { font-size: 1.3rem; }
 .rest-bar.compact .rest-btn { min-height: 32px; padding: 0 8px; }
 </style>

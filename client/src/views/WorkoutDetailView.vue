@@ -296,7 +296,7 @@
                 class="warmup-toggle"
                 :aria-expanded="isWarmupOpen(i)"
                 @click="toggleWarmups(i)"
-              >{{ isWarmupOpen(i) ? '▾' : '▸' }} {{ t('workoutDetail.warmupSetsLabel') }} ({{ warmupCount(ex) }})</button>
+              ><span>{{ t('workoutDetail.warmupSetsLabel') }} ({{ warmupCount(ex) }})</span><ChevronDown class="warmup-chevron" :class="{ open: isWarmupOpen(i) }" aria-hidden="true" /></button>
               <template
                 v-for="(row, rIdx) in (ex.setDetails || [])"
                 :key="`${ex.exerciseId || i}-row-${rIdx}`"
@@ -954,7 +954,7 @@ import WorkoutTimerConfig from '@/components/timer/WorkoutTimerConfig.vue'
 import SessionStopwatch from '@/components/SessionStopwatch.vue'
 // Einheitliches Icon-Set statt Emoji/ASCII-Mix (🗑️/📝/⋮⋮/▲▼/＋/−) - wie im Rest der App
 // (siehe z.B. BottomNav.vue, AiFeedbackRatingWidget.vue) bereits lucide-vue-next genutzt.
-import { Clock, Trash2, StickyNote, GripVertical, Plus, Minus, Info, Weight } from 'lucide-vue-next'
+import { Clock, Trash2, StickyNote, GripVertical, Plus, Minus, Info, Weight, ChevronDown } from 'lucide-vue-next'
 import { useToastStore } from '@/stores/toastStore'
 import { useTimerStore } from '@/stores/timerStore'
 import { useI18n } from 'vue-i18n'
@@ -4530,20 +4530,32 @@ onBeforeUnmount(() => {
 }
 .warmup-toggle {
   min-width: 0;
-  min-height: 0;
-  display: block;
-  padding: 4px 0;
-  margin: 2px 0;
-  border: none;
-  background: transparent;
-  color: color-mix(in srgb, #f59e0b 65%, var(--muted));
+  min-height: 40px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 12px;
+  margin: 4px 0;
+  border: 1px solid color-mix(in srgb, #f59e0b 45%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, #f59e0b 10%, transparent);
+  color: color-mix(in srgb, #f59e0b 80%, var(--fg));
   font: inherit;
-  font-size: 0.72rem;
-  font-weight: 600;
+  font-size: 0.78rem;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   cursor: pointer;
 }
+.warmup-chevron {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  transition: transform 0.2s ease;
+}
+.warmup-chevron.open { transform: rotate(180deg); }
 .ex-bottom-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .ex-note-actions { display: inline-flex; align-items: center; gap: 6px; }
 .ex-note-actions .has-note { color: var(--fg); }
