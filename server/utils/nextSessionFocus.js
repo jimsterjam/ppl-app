@@ -30,6 +30,11 @@ try {
   engine = null;
 }
 
+// Für utils/stagnationDiagnosis.js: dieselbe Progressionslogik wie Workout-Hinweis und Fokus-Zeile.
+export function getProgressionEngine() {
+  return engine;
+}
+
 let catalog = null;
 let catalogList = [];
 function loadCatalog() {
@@ -58,7 +63,8 @@ export function __setFocusCatalogForTests(entries) {
   }
 }
 
-function exerciseInfo(ex = {}) {
+// Auch von utils/stagnationDiagnosis.js genutzt (gleiche Katalog-Einordnung wie hier).
+export function exerciseInfo(ex = {}) {
   const catalogMap = loadCatalog();
   const cat = catalogMap.get(String(ex?.name || '').trim().toLowerCase())
     || findCatalogEntryForName(catalogList, ex?.name)
