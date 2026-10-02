@@ -24,6 +24,8 @@
 
       <SessionStopwatch @session-time="onSessionTime" />
 
+      <CoachDiagnosisRow />
+
       <section class="quick-start">
         <div v-if="!showStartOptions" class="quick-grid">
           <WorkoutCard
@@ -258,6 +260,7 @@ import WorkoutTimerConfig from '@/components/timer/WorkoutTimerConfig.vue'
 import OneTimeHint from '@/components/OneTimeHint.vue'
 import { logger } from '@/utils/logger'
 import SessionStopwatch from '@/components/SessionStopwatch.vue'
+import CoachDiagnosisRow from '@/components/CoachDiagnosisRow.vue'
 import AvatarEditor from '@/components/AvatarEditor.vue'
 import NameEditModal from '@/components/NameEditModal.vue'
 import WorkoutGoalPicker from '@/components/WorkoutGoalPicker.vue'
