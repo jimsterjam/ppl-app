@@ -70,6 +70,18 @@ const userProfileSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  // Stillstand-Diagnose: "Ist so geplant" je Übung und Ursache (siehe utils/stagnationDiagnosis.js,
+  // routes/coach.js). Bis "until" ausgeblendet, danach fragt die App erneut nach. Nur Werte, die
+  // der Server selbst geprüft hat (Schlüssel aus der aktuellen Diagnose, Ursache aus fester Liste).
+  coachDiagnosisAcks: {
+    type: [{
+      _id: false,
+      key: { type: String, maxlength: 160 },
+      cause: { type: String, enum: ['insufficient_data', 'low_frequency', 'repeating', 'plateau', 'plateau_long'] },
+      until: { type: Date }
+    }],
+    default: []
+  },
   // Onboarding-Flow (5-seitige Einführung nach erstem Login, siehe OnboardingFlow.vue) +
   // einmalige kontextuelle Hinweise (siehe OneTimeHint.vue). Server-seitig statt nur lokal
   // gespeichert, damit der Status geräteübergreifend konsistent ist (z.B. Login auf neuem

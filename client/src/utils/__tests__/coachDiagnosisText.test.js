@@ -6,7 +6,7 @@ import { diagnosisTextKeys, DIAGNOSIS_CAUSES } from '../coachDiagnosisText.js'
 // Beispiel-Einträge wie vom Server (server/utils/stagnationDiagnosis.js) - je Ursache und Variante.
 const ITEMS = [
   { name: 'Bench Press', cause: 'insufficient_data', logged: 5, complete: 1 },
-  { name: 'Bench Press', cause: 'low_frequency', weeks: 8, sessions: 3, weight: 80, sets: 3 },
+  { name: 'Bench Press', cause: 'low_frequency', weeks: 8, sessions: 3, weight: 80, sets: 3, usualDays: 7, recentDays: 21 },
   { name: 'Bench Press', cause: 'repeating', weeks: 4, sessions: 4, weight: 80, sets: 3, reps: 8, nextReps: 9, nextWeight: null },
   { name: 'Squat', cause: 'repeating', weeks: 4, sessions: 4, weight: 100, sets: 5, reps: 5, nextReps: null, nextWeight: 102.5 },
   { name: 'Squat', cause: 'plateau', weeks: 4, sessions: 4, weight: 100, sets: 5, deloadWeight: 90 },
@@ -55,7 +55,8 @@ describe('diagnosisTextKeys', () => {
           expect(text, `${locale}: ${key} hat offene Platzhalter`).not.toMatch(/\{\w+\}|undefined|NaN/)
         }
       }
-      for (const key of ['title', 'rowLocked', 'rowStalledMany', 'basis', 'stalledFor', 'causeLabel', 'nextLabel', 'noneText']) {
+      for (const key of ['title', 'rowLocked', 'rowStalledMany', 'basis', 'stalledFor', 'causeLabel', 'nextLabel', 'noneText',
+        'plannedButton', 'plannedHint', 'recheckQuestion', 'recheckYes', 'recheckNo', 'snoozedOne', 'snoozedMany', 'actionFailed']) {
         expect(t(`coachDiagnosis.${key}`, { count: 3, weeks: 4 })).not.toBe(`coachDiagnosis.${key}`)
       }
     })

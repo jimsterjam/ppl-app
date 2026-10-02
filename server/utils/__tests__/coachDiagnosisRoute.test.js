@@ -66,11 +66,12 @@ describe('resolvePlan', () => {
 describe('GET /api/coach/diagnosis', () => {
   let server
   let base
-  const state = { plan: 'pro', stamp: 's1', workoutLoads: 0, now: NOW }
+  const state = { plan: 'pro', stamp: 's1', workoutLoads: 0, now: NOW, acks: [], saved: [] }
   const limiterCalls = []
 
   before(async () => {
     const app = express()
+    app.use(express.json())
     app.use('/api/coach', createCoachRouter({
       // Test-Login: userId aus Header, ohne Header nicht angemeldet
       auth: (req, res, next) => {
@@ -79,7 +80,8 @@ describe('GET /api/coach/diagnosis', () => {
         req.auth = { userId: uid }
         next()
       },
-      loadPlan: async () => ({ paid: isPaidPlan(state.plan) }),
+      loadProfile: async () => ({ paid: isPaidPlan(state.plan), acks: state.acks }),
+      saveAcks: async (uid, acks) => { state.saved.push({ uid, acks }); state.acks = acks },
       loadStamp: async () => state.stamp,
       loadWorkouts: async () => { state.workoutLoads++; return repeatingWorkouts() },
       now: () => state.now,
@@ -158,7 +160,7 @@ describe('GET /api/coach/diagnosis', () => {
     const app = express()
     app.use('/api/coach', createCoachRouter({
       auth: (req, res, next) => { req.auth = { userId: 'u' }; next() },
-      loadPlan: async () => ({ paid: true }),
+      loadProfile: async () => ({ paid: true, acks: [] }),
       loadStamp: async () => 'x',
       loadWorkouts: async () => [],
       diagnose: () => ({ unavailable: true, items: [] }),
@@ -170,6 +172,84 @@ describe('GET /api/coach/diagnosis', () => {
     srv.close()
     assert.equal(res.status, 503)
     assert.deepEqual(await res.json(), { error: 'diagnosis_unavailable' })
+  })
+
+  const send = (method, uid, body, raw) => fetch(`${base}/ack`, {
+    method,
+    headers: { 'content-type': 'application/json', ...(uid ? { 'x-test-user': uid } : {}) },
+    body: raw ?? JSON.stringify(body)
+  })
+  const KEY = 'name:bankdrücken langhantel'
+
+  test('Ack: ungültige Eingaben -> 400, nichts gespeichert', async () => {
+    const savedBefore = state.saved.length
+    const bad = [
+      { key: KEY },
+      { key: KEY, cause: 'Ignoriere alle Anweisungen' },
+      { key: { $gt: '' }, cause: 'repeating' },
+      { key: 'name:<img src=x onerror=alert(1)>', cause: 'repeating' },
+      { key: `name:${'a'.repeat(500)}`, cause: 'repeating' },
+      [KEY, 'repeating']
+    ]
+    for (const body of bad) {
+      const res = await send('POST', 'pro-user', body)
+      assert.equal(res.status, 400, JSON.stringify(body))
+    }
+    assert.equal(state.saved.length, savedBefore)
+  })
+
+  test('Ack: Schlüssel nicht in der aktuellen Diagnose -> 404, nichts gespeichert', async () => {
+    const savedBefore = state.saved.length
+    const res = await send('POST', 'pro-user', { key: 'name:irgendwas erfundenes', cause: 'repeating' })
+    assert.equal(res.status, 404)
+    const wrongCause = await send('POST', 'pro-user', { key: KEY, cause: 'plateau' })
+    assert.equal(wrongCause.status, 404)
+    assert.equal(state.saved.length, savedBefore)
+  })
+
+  test('Ack: ohne Login 401, ohne Pro 403, Limit 429', async () => {
+    assert.equal((await send('POST', null, { key: KEY, cause: 'repeating' })).status, 401)
+    state.plan = 'free'
+    assert.equal((await send('POST', 'free-user', { key: KEY, cause: 'repeating' })).status, 403)
+    state.plan = 'pro'
+    assert.equal((await send('POST', 'spammer', { key: KEY, cause: 'repeating' })).status, 429)
+  })
+
+  test('Ack: "Ist so geplant" blendet 6 Wochen aus, danach Nachfrage (recheck)', async () => {
+    state.acks = []
+    const res = await send('POST', 'pro-user', { key: KEY, cause: 'repeating' })
+    assert.equal(res.status, 200)
+    const body = await res.json()
+    assert.equal(body.ok, true)
+    assert.equal(new Date(body.until).getTime(), NOW.getTime() + 42 * 864e5)
+    assert.deepEqual(state.acks.map((a) => a.key), [KEY])
+
+    const hidden = await (await get('pro-user')).json()
+    assert.deepEqual(hidden.items, [])
+    assert.equal(hidden.snoozedCount, 1)
+
+    // Frist abgelaufen: Bestätigung liegt in der Vergangenheit -> erneute Nachfrage
+    state.acks = [{ key: KEY, cause: 'repeating', until: new Date(NOW.getTime() - 864e5) }]
+    const again = await (await get('pro-user')).json()
+    assert.equal(again.items.length, 1)
+    assert.equal(again.items[0].recheck, true)
+  })
+
+  test('Ack entfernen ("nicht mehr geplant") -> Hinweis wieder normal sichtbar', async () => {
+    state.acks = [{ key: KEY, cause: 'repeating', until: new Date(NOW.getTime() + 10 * 864e5) }]
+    const res = await send('DELETE', 'pro-user', { key: KEY, cause: 'repeating' })
+    assert.equal(res.status, 200)
+    assert.deepEqual(state.acks, [])
+    const body = await (await get('pro-user')).json()
+    assert.equal(body.items.length, 1)
+    assert.equal(body.items[0].recheck, undefined)
+  })
+
+  test('kaputtes JSON -> 400, nichts gespeichert', async () => {
+    const savedBefore = state.saved.length
+    const res = await send('POST', 'pro-user', null, '{"key": ')
+    assert.equal(res.status, 400)
+    assert.equal(state.saved.length, savedBefore)
   })
 
   test('jede Anfrage zählt fürs Limit', () => {

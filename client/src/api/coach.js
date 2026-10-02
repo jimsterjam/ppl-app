@@ -23,3 +23,23 @@ export async function fetchStagnationDiagnosis(token) {
     return { status: 'error' }
   }
 }
+
+/**
+ * "Ist so geplant" (planned = true) bzw. Bestätigung zurücknehmen (planned = false).
+ * Schickt nur Schlüssel und Ursache aus der Diagnose - keinen freien Text.
+ * @returns {Promise<boolean>} true bei Erfolg
+ */
+export async function setDiagnosisPlanned(token, { key, cause }, planned) {
+  try {
+    const res = await api.request({
+      url: '/diagnosis/ack',
+      method: planned ? 'post' : 'delete',
+      data: { key, cause },
+      headers: token ? { Authorization: `Bearer ${token}` } : {}
+    })
+    return res.status >= 200 && res.status < 300 && res.data?.ok === true
+  } catch (error) {
+    logger.warn('[coach] "Ist so geplant" konnte nicht gespeichert werden', { status: error?.response?.status || null })
+    return false
+  }
+}
