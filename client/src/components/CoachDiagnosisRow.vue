@@ -36,7 +36,22 @@
           </header>
           <p><span class="coach-label">{{ t('coachDiagnosis.causeLabel') }}</span> {{ entry.cause }}</p>
           <p><span class="coach-label">{{ t('coachDiagnosis.nextLabel') }}</span> {{ entry.next }}</p>
+          <!-- Nach 6 Wochen: erneut nachfragen, ob es noch so geplant ist. -->
+          <div v-if="entry.item.recheck" class="coach-recheck">
+            <p>{{ t('coachDiagnosis.recheckQuestion') }}</p>
+            <div class="coach-actions">
+              <button type="button" class="coach-btn" :disabled="busyKey === entry.item.key" @click="markPlanned(entry.item)">{{ t('coachDiagnosis.recheckYes') }}</button>
+              <button type="button" class="coach-btn secondary" :disabled="busyKey === entry.item.key" @click="unmarkPlanned(entry.item)">{{ t('coachDiagnosis.recheckNo') }}</button>
+            </div>
+          </div>
+          <div v-else class="coach-actions">
+            <button type="button" class="coach-btn secondary" :disabled="busyKey === entry.item.key" @click="markPlanned(entry.item)">{{ t('coachDiagnosis.plannedButton') }}</button>
+            <small class="coach-muted">{{ t('coachDiagnosis.plannedHint') }}</small>
+          </div>
         </article>
+        <p v-if="actionError" class="coach-error" role="alert">{{ t('coachDiagnosis.actionFailed') }}</p>
+        <p v-if="snoozedCount === 1" class="coach-basis">{{ t('coachDiagnosis.snoozedOne') }}</p>
+        <p v-else-if="snoozedCount > 1" class="coach-basis">{{ t('coachDiagnosis.snoozedMany', { count: snoozedCount }) }}</p>
         <p class="coach-basis">{{ t('coachDiagnosis.basis', { count: result?.analyzedExercises || 0 }) }}</p>
       </template>
     </div>
@@ -60,7 +75,7 @@ import UpgradeModal from '@/components/UpgradeModal.vue'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useAuthStore } from '@/stores/authStore'
 import { getAuthToken } from '@/utils/authToken'
-import { fetchStagnationDiagnosis } from '@/api/coach'
+import { fetchStagnationDiagnosis, setDiagnosisPlanned } from '@/api/coach'
 import { diagnosisTextKeys } from '@/utils/coachDiagnosisText'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 
@@ -78,10 +93,13 @@ const state = ref('idle') // idle | loading | ok | locked | rate_limited | error
 const result = ref(null)
 const showDetails = ref(false)
 const showUpgrade = ref(false)
+const busyKey = ref('')
+const actionError = ref(false)
 
 const hasAccess = computed(() => subscriptionStore.isPremium && state.value !== 'locked')
 const items = computed(() => (Array.isArray(result.value?.items) ? result.value.items : []))
 const stalledCount = computed(() => Number(result.value?.stalledCount) || 0)
+const snoozedCount = computed(() => Number(result.value?.snoozedCount) || 0)
 
 const rowStatus = computed(() => {
   if (!hasAccess.value) return t('coachDiagnosis.rowLocked')
@@ -104,7 +122,8 @@ const entries = computed(() => items.value
     const keys = diagnosisTextKeys(item, locale.value)
     if (!keys) return null
     return {
-      key: `${item.name}-${index}`,
+      item,
+      key: `${item.key || item.name}-${index}`,
       name: getTranslatedExerciseName(item.name) || item.name,
       weeksText: keys.showWeeks ? t('coachDiagnosis.stalledFor', { weeks: item.weeks }) : '',
       cause: t(keys.causeKey, keys.params),
@@ -141,6 +160,53 @@ async function load({ force = false } = {}) {
     Object.assign(clientCache, { uid, at: Date.now(), response })
   }
   applyResponse(response)
+}
+
+function invalidateClientCache() {
+  clientCache.response = null
+  clientCache.at = 0
+}
+
+// "Ist so geplant" / "Ja, weiter so": Hinweis lokal ausblenden, Server merkt es sich 6 Wochen.
+async function markPlanned(item) {
+  if (busyKey.value) return
+  busyKey.value = item.key
+  actionError.value = false
+  const token = await getAuthToken().catch(() => null)
+  const ok = await setDiagnosisPlanned(token, item, true)
+  busyKey.value = ''
+  if (!ok) {
+    actionError.value = true
+    return
+  }
+  invalidateClientCache()
+  const remaining = items.value.filter((i) => i.key !== item.key)
+  const isStall = item.cause !== 'insufficient_data'
+  result.value = {
+    ...result.value,
+    items: remaining,
+    stalledCount: Math.max(0, stalledCount.value - (isStall ? 1 : 0)),
+    snoozedCount: snoozedCount.value + 1
+  }
+}
+
+// "Nein, Hinweis zeigen": Bestätigung entfernen, Hinweis bleibt normal sichtbar.
+async function unmarkPlanned(item) {
+  if (busyKey.value) return
+  busyKey.value = item.key
+  actionError.value = false
+  const token = await getAuthToken().catch(() => null)
+  const ok = await setDiagnosisPlanned(token, item, false)
+  busyKey.value = ''
+  if (!ok) {
+    actionError.value = true
+    return
+  }
+  invalidateClientCache()
+  result.value = {
+    ...result.value,
+    items: items.value.map((i) => (i.key === item.key ? { ...i, recheck: false } : i))
+  }
 }
 
 function onRowClick() {
@@ -217,4 +283,21 @@ watch(() => subscriptionStore.isPremium, (premium) => { if (premium) load({ forc
 .coach-label { font-weight: 700; }
 .coach-muted, .coach-basis { color: var(--muted); font-size: 0.82rem; margin: 0; }
 .coach-none { margin: 0; }
+.coach-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 4px; }
+.coach-btn {
+  min-height: 0;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--fg);
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.coach-btn.secondary { background: transparent; border-color: var(--line-strong); }
+.coach-btn:disabled { opacity: 0.6; cursor: default; }
+.coach-recheck { display: grid; gap: 4px; margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--line-strong); }
+.coach-recheck p { font-weight: 600; }
+.coach-error { margin: 0; color: var(--danger, #e5484d); font-size: 0.82rem; }
 </style>

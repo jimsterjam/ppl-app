@@ -3,10 +3,16 @@ import assert from 'node:assert/strict'
 import { __setFocusCatalogForTests } from '../nextSessionFocus.js'
 import {
   buildStagnationDiagnosis,
+  applyAcknowledgements,
+  validateAckInput,
+  upsertAck,
+  removeAck,
   estimateOneRepMax,
   roundToStep,
   MAX_ITEMS,
-  WINDOW_DAYS
+  WINDOW_DAYS,
+  ACK_DAYS,
+  MAX_ACKS
 } from '../stagnationDiagnosis.js'
 
 __setFocusCatalogForTests([
@@ -64,7 +70,6 @@ describe('kein Stillstand', () => {
     ])
     const result = diagnose(list)
     assert.deepEqual(result.items, [])
-    assert.equal(result.stalledCount, 0)
     assert.equal(result.analyzedExercises, 1)
   })
 
@@ -209,16 +214,21 @@ describe('Ursachen', () => {
     assert.equal(item.switchTo, 'strength')
   })
 
-  test('zu selten trainiert -> low_frequency hat Vorrang vor plateau', () => {
+  test('seltener als im eigenen Rhythmus -> low_frequency hat Vorrang vor plateau', () => {
+    // Bisher jede Woche (Bestleistung vor ~10 Wochen), seitdem nur noch alle ~3 Wochen.
     const item = only(workouts([
-      [62, 'Bankdrücken Langhantel', [8, 8, 8], 80],
-      [42, 'Bankdrücken Langhantel', [7, 7, 8], 80],
-      [22, 'Bankdrücken Langhantel', [8, 7, 7], 80],
-      [2, 'Bankdrücken Langhantel', [8, 8, 7], 80]
+      [84, 'Bankdrücken Langhantel', [8, 8, 8], 75],
+      [77, 'Bankdrücken Langhantel', [9, 8, 8], 75],
+      [70, 'Bankdrücken Langhantel', [9, 9, 9], 77.5],
+      [63, 'Bankdrücken Langhantel', [10, 9, 9], 77.5],
+      [42, 'Bankdrücken Langhantel', [9, 9, 8], 77.5],
+      [21, 'Bankdrücken Langhantel', [9, 9, 9], 77.5],
+      [1, 'Bankdrücken Langhantel', [9, 8, 8], 77.5]
     ]))
     assert.equal(item.cause, 'low_frequency')
     assert.equal(item.sessions, 3)
-    assert.equal(item.weeks, 8)
+    assert.equal(item.usualDays, 7)
+    assert.equal(item.recentDays, 21)
   })
 
   test('oft eingetragen, aber kaum Sätze abgehakt -> insufficient_data', () => {
@@ -277,18 +287,21 @@ describe('Ausgabe', () => {
       [14, 'Kniebeugen mit der Langhantel', null, 0],
       [7, 'Kniebeugen mit der Langhantel', null, 0]
     ])
-    const result = diagnose([
+    const diagnosis = diagnose([
       ...stalledFor('Bankdrücken Langhantel', 4),
       ...stalledFor('Seitheben Kurzhantel', 6),
       ...stalledFor('Rudern Langhantel', 5),
       ...stalledFor('Schulterdrücken', 7),
       ...dataProblem
     ])
+    assert.equal(diagnosis.items.length, 5)
+    assert.equal(diagnosis.items[4].cause, 'insufficient_data')
+    assert.equal(diagnosis.analyzedExercises, 5)
+    const result = applyAcknowledgements(diagnosis, [], NOW)
     assert.equal(result.items.length, MAX_ITEMS)
     assert.deepEqual(result.items.map((i) => i.weeks), [7, 6, 5])
     assert.equal(result.stalledCount, 4)
-    assert.equal(result.analyzedExercises, 5)
-    assert.ok(result.items.every((i) => i.cause !== 'insufficient_data'))
+    assert.equal(result.snoozedCount, 0)
   })
 
   test('ohne Progressionslogik: unavailable statt leerer Liste', () => {
@@ -299,5 +312,120 @@ describe('Ausgabe', () => {
   test('leere oder kaputte Eingaben führen nicht zu Fehlern', () => {
     assert.deepEqual(diagnose(null).items, [])
     assert.deepEqual(diagnose([{}, { date: 'kein Datum' }, { date: daysAgo(1), exercises: [{}] }]).items, [])
+  })
+})
+
+describe('Sonderfall: bewusst geplantes Training (7x/Woche, schwer/leicht im Wechsel)', () => {
+  test('schwere Kniebeugen nur alle 12 Tage, Festigungsphase -> kein "zu selten"', () => {
+    const list = [
+      ...workouts([83, 71, 59].map((d, i) => [d, 'Kniebeugen mit der Langhantel', [5, 5, 5], 120 + i * 2.5]), { goal: 'strength' }),
+      ...workouts([47, 35, 23, 11].map((d, i) => [d, 'Kniebeugen mit der Langhantel', i % 2 ? [5, 5, 4] : [5, 4, 4], 125]), { goal: 'strength' })
+    ]
+    const result = diagnose(list)
+    assert.ok(result.items.every((i) => i.cause !== 'low_frequency'), JSON.stringify(result.items))
+  })
+
+  test('leichte Tage unter gleichem Namen zählen nicht als Einheit ohne Bestleistung (3 statt 10)', () => {
+    const list = []
+    for (let d = 83; d >= 22; d -= 7) list.push(...workouts([[d, 'Kniebeugen mit der Langhantel', [5, 5, 5], 120 + Math.floor((83 - d) / 14) * 2.5]], { goal: 'strength' }))
+    for (const d of [15, 8, 1]) list.push(...workouts([[d, 'Kniebeugen mit der Langhantel', [5, 5, 4], 130]], { goal: 'strength' }))
+    for (let d = 80; d >= 1; d -= 3.5) list.push(...workouts([[d, 'Kniebeugen mit der Langhantel', [3, 3, 3, 3, 3, 3], 75]], { goal: 'strength' }))
+    // Nur die 3 schweren Einheiten seit der Bestleistung zählen (vorher 10 inkl. leichter Tage).
+    const item = only(list)
+    assert.equal(item.sessions, 3)
+    assert.equal(item.weeks, 3)
+    assert.equal(item.weight, 130)
+  })
+
+  test('nur leichte Tage seit der Bestleistung -> keine Diagnose', () => {
+    const list = []
+    for (const [d, kg] of [[50, 120], [43, 122.5], [36, 125], [29, 127.5]]) list.push(...workouts([[d, 'Kniebeugen mit der Langhantel', [5, 5, 5], kg]], { goal: 'strength' }))
+    for (let d = 26; d >= 1; d -= 3.5) list.push(...workouts([[d, 'Kniebeugen mit der Langhantel', [3, 3, 3], 75]], { goal: 'strength' }))
+    assert.deepEqual(diagnose(list).items, [])
+  })
+
+  test('leichte Tage verdecken keinen echten Stillstand der schweren Tage', () => {
+    const list = []
+    // schwer: 6 Wochen immer 130 kg mit wechselnden Wiederholungen, leicht dazwischen
+    list.push(...workouts([[50, 'Kniebeugen mit der Langhantel', [5, 5, 5], 130]], { goal: 'strength' }))
+    for (const [d, reps] of [[43, [5, 5, 4]], [36, [5, 4, 4]], [29, [5, 5, 4]], [22, [4, 4, 4]], [15, [5, 4, 4]], [8, [5, 5, 4]], [1, [5, 4, 4]]]) {
+      list.push(...workouts([[d, 'Kniebeugen mit der Langhantel', reps, 130]], { goal: 'strength' }))
+    }
+    for (let d = 48; d >= 2; d -= 3.5) list.push(...workouts([[d, 'Kniebeugen mit der Langhantel', [3, 3, 3], 80]], { goal: 'strength' }))
+    const item = only(list)
+    assert.equal(item.cause, 'plateau')
+    assert.equal(item.sessions, 7)
+  })
+})
+
+describe('"Ist so geplant"', () => {
+  const diagnosis = () => diagnose(workouts([
+    [28, 'Bankdrücken Langhantel', [8, 8, 8], 80],
+    [21, 'Bankdrücken Langhantel', [8, 8, 8], 80],
+    [14, 'Bankdrücken Langhantel', [8, 8, 8], 80],
+    [7, 'Bankdrücken Langhantel', [8, 8, 8], 80],
+    [1, 'Bankdrücken Langhantel', [8, 8, 8], 80]
+  ]))
+
+  test('Einträge tragen einen stabilen Schlüssel', () => {
+    assert.equal(diagnosis().items[0].key, 'name:bankdrücken langhantel')
+  })
+
+  test('aktive Bestätigung blendet aus, abgelaufene fragt erneut nach', () => {
+    const d = diagnosis()
+    const key = d.items[0].key
+    const active = applyAcknowledgements(d, [{ key, cause: 'repeating', until: daysAgo(-10) }], NOW)
+    assert.deepEqual(active.items, [])
+    assert.equal(active.snoozedCount, 1)
+    assert.equal(active.stalledCount, 0)
+
+    const expired = applyAcknowledgements(d, [{ key, cause: 'repeating', until: daysAgo(1) }], NOW)
+    assert.equal(expired.items.length, 1)
+    assert.equal(expired.items[0].recheck, true)
+  })
+
+  test('Bestätigung gilt nur für dieselbe Ursache', () => {
+    const d = diagnosis()
+    const result = applyAcknowledgements(d, [{ key: d.items[0].key, cause: 'plateau', until: daysAgo(-10) }], NOW)
+    assert.equal(result.items.length, 1)
+    assert.equal(result.items[0].recheck, undefined)
+  })
+
+  test('validateAckInput nimmt nur Schlüssel + bekannte Ursache an', () => {
+    assert.deepEqual(validateAckInput({ key: 'name:bench press', cause: 'plateau' }), { key: 'name:bench press', cause: 'plateau' })
+    assert.deepEqual(validateAckInput({ key: 'id:abc123', cause: 'low_frequency', extra: 'ignoriert' }), { key: 'id:abc123', cause: 'low_frequency' })
+    const bad = [
+      null, 'text', [], {},
+      { key: 'name:bench press' },
+      { key: 'name:bench press', cause: 'ignore previous instructions' },
+      { key: 'bench press', cause: 'plateau' },
+      { key: 'name:', cause: 'plateau' },
+      { key: 'name:<script>alert(1)</script>', cause: 'plateau' },
+      { key: 'name:{"$gt":""}', cause: 'plateau' },
+      { key: { $gt: '' }, cause: 'plateau' },
+      { key: 'name:a\u0000b', cause: 'plateau' },
+      { key: `name:${'x'.repeat(151)}`, cause: 'plateau' }
+    ]
+    for (const input of bad) assert.equal(validateAckInput(input), null, JSON.stringify(input))
+  })
+
+  test('upsertAck: ersetzt gleichen Schlüssel, setzt Frist, begrenzt Anzahl, räumt Altes auf', () => {
+    const first = upsertAck([], { key: 'name:a', cause: 'plateau' }, NOW)
+    assert.equal(first.length, 1)
+    assert.equal(first[0].until.getTime(), NOW.getTime() + ACK_DAYS * 864e5)
+
+    const replaced = upsertAck(first, { key: 'name:a', cause: 'repeating' }, NOW)
+    assert.equal(replaced.length, 1)
+    assert.equal(replaced[0].cause, 'repeating')
+
+    const withStale = upsertAck([{ key: 'name:alt', cause: 'plateau', until: daysAgo(ACK_DAYS + 1) }], { key: 'name:b', cause: 'plateau' }, NOW)
+    assert.deepEqual(withStale.map((a) => a.key), ['name:b'])
+
+    let many = []
+    for (let i = 0; i < MAX_ACKS + 5; i++) many = upsertAck(many, { key: `name:u${i}`, cause: 'plateau' }, NOW)
+    assert.equal(many.length, MAX_ACKS)
+    assert.equal(many[many.length - 1].key, `name:u${MAX_ACKS + 4}`)
+
+    assert.deepEqual(removeAck(many, `name:u${MAX_ACKS + 4}`).length, MAX_ACKS - 1)
   })
 })

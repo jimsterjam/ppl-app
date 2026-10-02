@@ -21,6 +21,8 @@ export function diagnosisTextKeys(item, locale = 'de') {
     nextReps: item.nextReps,
     logged: item.logged,
     complete: item.complete,
+    usualDays: item.usualDays,
+    recentDays: item.recentDays,
     weight: formatKg(item.weight, locale),
     nextWeight: formatKg(item.nextWeight, locale),
     deloadWeight: formatKg(item.deloadWeight, locale)
