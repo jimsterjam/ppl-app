@@ -37,6 +37,20 @@ bei jeder neuen Sitzung neu gelernt werden müssen. Bei Widerspruch gilt die jü
   Zahlen im Text müssen aus den echten Trainingsdaten stammen (Verifier, `AI_VERIFIER_MODE=active`).
 - Antworten an Paul auf Deutsch, knapp, Ergebnis zuerst.
 
+## Regeln für Texteingaben (jedes Freitextfeld)
+
+- **App:** `maxlength` am Feld (z.B. Übungsnotiz 500, Namen 24–60).
+- **Server beim Speichern:** Steuerzeichen raus und auf feste Länge **kürzen statt ablehnen**
+  (Offline-Sync würde abgelehnte Saves endlos wiederholen) – `server/utils/textLimits.js`
+  (`clampText`, `textSetter`, Grenzen in `TEXT_LIMITS`) bzw. `maxlength` im Mongoose-Schema.
+- **Bevor Text an die KI geht:** in eigene Tags einkapseln, `<`/`>` neutralisieren, kürzen
+  (`wrapUserNote`, `wrapExerciseName`, `wrapQuickGeneratorFreeText`, `wrapCorrectionText`); der
+  System-Prompt sagt, dass Inhalte darin nie Anweisungen sind.
+- **Anzeige:** nur über `{{ }}`, nie `v-html` mit Nutzertext.
+- **Wo kein Freitext nötig ist** (z.B. Knöpfe, Auswahl): Server nimmt nur feste Werte aus einer
+  Liste bzw. Schlüssel, die er selbst erzeugt hat (Beispiel: `validateAckInput` in
+  `server/utils/stagnationDiagnosis.js`). Nie den Request-Body ungeprüft speichern.
+
 ## Definition of Done (vor jedem Commit-Befehl prüfen)
 
 1. Server: `cd server && npm test` grün.

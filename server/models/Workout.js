@@ -1,3 +1,4 @@
+import { TEXT_LIMITS, textSetter } from '../utils/textLimits.js';
 import mongoose from "mongoose";
 
 // Hilfsfunktion zur Kanonisierung des Workout-Typs
@@ -28,7 +29,8 @@ const workoutSchema = new mongoose.Schema({
   name: {
     type: String,
     required: true,
-    default: 'Neues Workout'
+    default: 'Neues Workout',
+    set: textSetter(TEXT_LIMITS.workoutName)
   },
   // Kanonischer Workout-Typ (push|pull|legs|fullbody)
   type: {
@@ -50,7 +52,8 @@ const workoutSchema = new mongoose.Schema({
   },
   exercises: [{
     exerciseId: { type: String },
-    name: String,
+    // Freitext-Felder: Steuerzeichen raus, auf feste Länge gekürzt (utils/textLimits.js).
+    name: { type: String, set: textSetter(TEXT_LIMITS.exerciseName) },
     sets: Number,
     reps: Number,
     weight: Number,
@@ -60,7 +63,7 @@ const workoutSchema = new mongoose.Schema({
     // gilt nur für dieses eine Workout, im Gegensatz zur persistenten, übungsgebundenen
     // "exerciseNote" in models/UserExerciseNote.js. Feldname bewusst NICHT umbenannt,
     // um bestehende Clients/Daten nicht zu brechen - nur semantisch hier dokumentiert).
-    note: String,
+    note: { type: String, set: textSetter(TEXT_LIMITS.exerciseNote, { multiline: true }) },
     // Trainingsart DIESER Übung, falls vom Nutzer abweichend vom Workout-Ziel gewählt
     // ('strength'|'hypertrophy'|'explosive'); fehlt = Workout-Ziel bzw. automatische Erkennung
     // (siehe client/src/utils/weightSuggestion.js resolveExerciseGoal).
@@ -77,7 +80,7 @@ const workoutSchema = new mongoose.Schema({
       reps: Number,
       weight: Number,
       restTime: Number, // in Sekunden
-      notes: String,
+      notes: { type: String, set: textSetter(TEXT_LIMITS.setNote, { multiline: true }) },
       isWarmup: { type: Boolean, default: false },
       // Im laufenden Workout abgehakt (Client: Satznummer antippen). Bewusst OHNE Default: fehlt
       // das Feld (alle Workouts vor dieser Änderung), gilt der Satz als gemacht. Beim finalen
@@ -105,7 +108,7 @@ const workoutSchema = new mongoose.Schema({
   // Nutzer wählbares Trainingsdatum) und `createdAt` (oft schon beim Draft gesetzt, also vor
   // dem eigentlichen Abschluss) sind dafür beide ungeeignet.
   completedAt: { type: Date, default: null },
-  notes: String
+  notes: { type: String, set: textSetter(TEXT_LIMITS.workoutNotes, { multiline: true }) }
   ,
   // Optionales Workout-Coverbild
   imageUrl: { type: String },

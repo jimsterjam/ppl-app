@@ -560,7 +560,7 @@
                   :title="t('onboarding.hintFirstNoteTitle')"
                   :text="t('onboarding.hintFirstNoteText')"
                 />
-                <textarea :value="getNote(i)" rows="2" style="width:100%;resize:vertical" :placeholder="t('workoutDetail.notePlaceholder')" @input="setNote(i, $event.target.value)"></textarea>
+                <textarea :value="getNote(i)" rows="2" maxlength="500" style="width:100%;resize:vertical" :placeholder="t('workoutDetail.notePlaceholder')" @input="setNote(i, $event.target.value)"></textarea>
               </div>
             </div>
           </div>
