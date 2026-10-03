@@ -15,6 +15,18 @@ export const REST_MIN_SECONDS = 15
 export const REST_MAX_SECONDS = 600
 export const REST_STEP_SECONDS = 15
 
+// Letzte Sekunden der Pause: farblich hervorgehoben, und eine minimierte Leiste wechselt
+// automatisch wieder auf die große Anzeige.
+export const REST_ENDING_MS = 10000
+
+/**
+ * Soll die minimierte Pause jetzt wieder groß werden? Nur einmal pro Pause (autoExpanded), damit
+ * ein erneutes Verkleinern in den letzten Sekunden respektiert wird.
+ */
+export function shouldAutoExpandRest({ minimized, fullscreen, running, remainingMs, autoExpanded }) {
+  return !!(minimized && fullscreen && running && !autoExpanded && remainingMs <= REST_ENDING_MS)
+}
+
 export function clampRestSeconds(value) {
   const n = Math.round(Number(value) || 0)
   return Math.min(REST_MAX_SECONDS, Math.max(REST_MIN_SECONDS, n))

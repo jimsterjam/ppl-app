@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { restSecondsFor, clampRestSeconds, sanitizeCustomRest, formatRest } from '../restTimerRules.js'
+import { restSecondsFor, clampRestSeconds, sanitizeCustomRest, formatRest, shouldAutoExpandRest } from '../restTimerRules.js'
 
 describe('restTimerRules', () => {
   it('Standarddauer je Trainingsart und Übungsart', () => {
@@ -25,5 +25,15 @@ describe('restTimerRules', () => {
     expect(formatRest(125000)).toBe('2:05')
     expect(formatRest(0)).toBe('0:00')
     expect(formatRest(59001)).toBe('1:00')
+  })
+
+  it('minimierte Pause wird bei <= 10 s einmalig wieder groß', () => {
+    const base = { minimized: true, fullscreen: true, running: true, remainingMs: 10000, autoExpanded: false }
+    expect(shouldAutoExpandRest(base)).toBe(true)
+    expect(shouldAutoExpandRest({ ...base, remainingMs: 10001 })).toBe(false)
+    expect(shouldAutoExpandRest({ ...base, minimized: false })).toBe(false)
+    expect(shouldAutoExpandRest({ ...base, fullscreen: false })).toBe(false)
+    expect(shouldAutoExpandRest({ ...base, running: false })).toBe(false)
+    expect(shouldAutoExpandRest({ ...base, autoExpanded: true })).toBe(false)
   })
 })
