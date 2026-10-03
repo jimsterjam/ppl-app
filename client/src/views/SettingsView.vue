@@ -859,35 +859,15 @@ async function confirmDeleteAccount() {
     const debugToken = await getIdToken().catch(() => null)
     logger.debug('[SettingsView] Delete account token:', debugToken)
 
-    // 2. Backend-Daten-Purge vor Account-Löschung
-    try {
-      const token = await getIdToken()
-      if (token) {
-        const purgeRes = await fetch('/api/account/purge', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          }
-        })
-        const purgeJson = await purgeRes.json().catch(() => ({}))
-        logger.debug('🧹 Account Purge:', purgeRes.status, purgeJson)
-      } else {
-        logger.warn('⚠️ Kein Token verfügbar – Purge übersprungen')
-      }
-    } catch (e) {
-      logger.warn('⚠️ Account Purge fehlgeschlagen, fahre fort')
-    }
-
-    // 3. Firebase-Account löschen
+    // 2. Firebase-Account löschen
     await deleteCurrentAccount(confirmAccountText.value)
 
-    // 4. Frontend Cleanup
+    // 3. Frontend Cleanup
     localStorage.clear()
     sessionStorage.clear()
     toast.show($t('settings.deleteAccountSuccess'), { type: 'success', duration: 3000 })
 
-    // 5. Nach Löschen zur Welcome-Seite navigieren
+    // 4. Nach Löschen zur Welcome-Seite navigieren
     setTimeout(() => {
       router.push({ name: 'welcome' })
     }, 100)
