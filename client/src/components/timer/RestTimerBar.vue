@@ -110,7 +110,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRestTimerStore } from '@/stores/restTimerStore'
 import { useTimerStore } from '@/stores/timerStore'
-import { formatRest, REST_STEP_SECONDS } from '@/utils/restTimerRules'
+import { formatRest, REST_ENDING_MS, REST_STEP_SECONDS } from '@/utils/restTimerRules'
 import { useScrollLock } from '@/composables/useScrollLock'
 
 const props = defineProps({
@@ -125,13 +125,12 @@ const timerStore = useTimerStore()
 // Umfang des Fortschrittsrings (r = 46 im viewBox 0..100).
 const RING_LENGTH = 2 * Math.PI * 46
 // Letzte Sekunden farblich hervorheben - auch aus Entfernung erkennbar.
-const ENDING_MS = 10000
 
 // Intervall-Timer aktiv (große Leiste oben) -> Pause kompakter.
 const compact = computed(() => timerStore.isActive && timerStore.miniVisible)
 
 const timeText = computed(() => formatRest(rest.remainingMs))
-const isEnding = computed(() => rest.isRunning && rest.remainingMs <= ENDING_MS)
+const isEnding = computed(() => rest.isRunning && rest.remainingMs <= REST_ENDING_MS)
 const ringOffset = computed(() => {
   const total = (rest.durationSec || 0) * 1000
   const share = total > 0 ? Math.min(1, Math.max(0, rest.remainingMs / total)) : 0

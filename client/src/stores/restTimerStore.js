@@ -5,7 +5,7 @@
 // bzw. nach einem App-Neustart korrekt weiterläuft.
 import { defineStore } from 'pinia'
 import { emitTimerSignal, ensureAudioUnlocked } from '@/utils/timerAudio'
-import { clampRestSeconds, REST_STEP_SECONDS } from '@/utils/restTimerRules'
+import { clampRestSeconds, REST_ENDING_MS, REST_STEP_SECONDS, shouldAutoExpandRest } from '@/utils/restTimerRules'
 import { acquireKeepAwake, releaseKeepAwake } from '@/utils/keepAwakeGuard'
 
 const STATE_KEY = 'ppl_rest_timer_state_v1'
@@ -71,6 +71,8 @@ export const useRestTimerStore = defineStore('restTimer', {
     fullscreen: readFullscreen(),
     // Vollbild für DIESE Pause minimiert (Leiste unten); jede neue Pause startet wieder groß.
     minimized: false,
+    // Automatisches Vergrößern bei <= 10 s ist für diese Pause schon passiert.
+    autoExpanded: false,
     endsAt: 0,
     durationSec: 0,
     // Dauer beim Start (Standard bzw. gemerkt) - Abweichung zeigt "Für diese Übung merken".
@@ -127,6 +129,7 @@ export const useRestTimerStore = defineStore('restTimer', {
       this.notifyTitle = notifyTitle
       this.notifyBody = notifyBody
       this.minimized = false
+      this.autoExpanded = false
       this.persist()
       this.startTick()
       acquireKeepAwake(KEEP_AWAKE_TAG)
@@ -138,6 +141,8 @@ export const useRestTimerStore = defineStore('restTimer', {
       const nextRemaining = Math.max(0, remainingSec + deltaSec)
       this.durationSec = clampRestSeconds(this.durationSec + deltaSec)
       this.endsAt = Date.now() + nextRemaining * 1000
+      // Pause wieder länger als 10 s (+15): beim erneuten Erreichen darf wieder vergrößert werden.
+      if (nextRemaining * 1000 > REST_ENDING_MS) this.autoExpanded = false
       this.persist()
       if (nextRemaining <= 0) this.finish()
       else scheduleNotification(this.endsAt, this.notifyTitle, this.notifyBody)
@@ -166,6 +171,7 @@ export const useRestTimerStore = defineStore('restTimer', {
       this.exIndex = -1
       this.rowIndex = -1
       this.minimized = false
+      this.autoExpanded = false
       this.stopTick()
       cancelNotification()
       releaseKeepAwake(KEEP_AWAKE_TAG)
@@ -174,6 +180,16 @@ export const useRestTimerStore = defineStore('restTimer', {
     tick() {
       this.nowMs = Date.now()
       if (this.isRunning && this.remainingMs <= 0) this.finish()
+      if (shouldAutoExpandRest({
+        minimized: this.minimized,
+        fullscreen: this.fullscreen,
+        running: this.isRunning,
+        remainingMs: this.remainingMs,
+        autoExpanded: this.autoExpanded
+      })) {
+        this.autoExpanded = true
+        this.minimized = false
+      }
       if (!this.isVisible && this.finishedAt) {
         // "Nächster Satz" wurde lange genug gezeigt.
         this.clear()
