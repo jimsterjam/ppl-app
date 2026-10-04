@@ -13,6 +13,12 @@
 import { logger } from '../utils/logger.js';
 import { determineTrendWithProfile, resolveEffectiveProfile, buildNoteContext } from './exerciseAnalysisRules.js';
 
+// Satzgewichte und ihre Änderungen auf 2 Nachkommastellen: 1,25-kg-Scheiben ergeben Werte wie
+// 31,25 kg - auf 1 Stelle gerundet wurde daraus 31,3 kg bzw. "+1,2 kg" (User-Report 04.10.).
+function round2(n) {
+  return Math.round(Number(n) * 100) / 100;
+}
+
 /**
  * Berechne echte Exercise-Stats
  * Nutzt setDetails wenn vorhanden (modern), sonst weight/reps/sets (legacy)
@@ -77,7 +83,7 @@ function getWorkingSetsArray(exercise) {
     return exercise.setDetails
       .filter(set => !set?.isWarmup)
       .map(set => ({
-        weight: Math.round((Number(set?.weight) || 0) * 10) / 10,
+        weight: round2(Number(set?.weight) || 0),
         reps: Number(set?.reps) || 0
       }));
   }
@@ -133,7 +139,7 @@ export function buildSetsComparison(currentEx, previousEx) {
       current_reps: set.reps,
       previous_weight: prev.weight,
       previous_reps: prev.reps,
-      weight_change_kg: Math.round((set.weight - prev.weight) * 10) / 10,
+      weight_change_kg: round2(set.weight - prev.weight),
       reps_change: set.reps - prev.reps,
       is_new_set: false,
       // Vorher kein Trainingsgewicht (reine Körpergewichtsübung) -> die jetzige Last ist ein
@@ -159,7 +165,7 @@ export function buildTopWeightChange(currentEx, previousEx) {
   return {
     top_weight_current: current,
     top_weight_previous: previous,
-    top_weight_change: Math.round((current - previous) * 10) / 10
+    top_weight_change: round2(current - previous)
   };
 }
 
@@ -201,8 +207,7 @@ export function buildTopWeightChange(currentEx, previousEx) {
  *     setDetails) - Fallback auf die bisherige Session-Ø-Differenz.
  */
 export function resolveSatzgenauWeightChange(setsComparison, fallbackWeightChangeKg = 0) {
-  const round1 = (n) => Math.round(Number(n) * 10) / 10;
-  const fallbackKg = round1(Number(fallbackWeightChangeKg) || 0);
+  const fallbackKg = round2(Number(fallbackWeightChangeKg) || 0);
 
   const comparable = (Array.isArray(setsComparison) ? setsComparison : [])
     .filter((s) => s && s.is_new_set !== true && typeof s.weight_change_kg === 'number');
@@ -211,12 +216,12 @@ export function resolveSatzgenauWeightChange(setsComparison, fallbackWeightChang
     return { weightChangeKg: fallbackKg, scope: 'unknown', setNumbers: [] };
   }
 
-  const changed = comparable.filter((s) => round1(s.weight_change_kg) !== 0);
+  const changed = comparable.filter((s) => round2(s.weight_change_kg) !== 0);
   if (changed.length === 0) {
     return { weightChangeKg: 0, scope: 'none', setNumbers: [] };
   }
 
-  const distinctValues = [...new Set(changed.map((s) => round1(s.weight_change_kg)))];
+  const distinctValues = [...new Set(changed.map((s) => round2(s.weight_change_kg)))];
   if (distinctValues.length > 1) {
     const allUp = distinctValues.every((v) => v > 0);
     const allDown = distinctValues.every((v) => v < 0);
@@ -749,21 +754,18 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
       } : {})
     })),
 
-    // Top-Übungen für AI-Schwerpunkt. weight_change_kg bewusst mit ausgegeben (additiv,
-    // gehört bereits zu ex.changes) - eine reine Volumenveränderung ohne Gewichtsbezug kann
-    // die KI sonst dazu verleiten, einen Volumenrückgang isoliert zu bewerten, obwohl im
-    // selben Zeitraum z.B. das Gewicht gestiegen ist (bewusster Tausch Volumen<->Intensität,
-    // siehe "Keine automatische Bewertung von Gewichts-/Volumenveränderungen" im System-Prompt).
+    // Top-Übungen für AI-Schwerpunkt - nur Volumen. Bewusst OHNE Gewichtsänderung: das war die
+    // Ø-Differenz über alle Sätze (z.B. "+0,5 kg" bei Pull-Ups, obwohl nur Satz 2 und 3 schwerer
+    // waren, User-Report 04.10.) - Gewichtsaussagen kommen ausschließlich aus sets_comparison
+    // (Regel 3).
     top_improvements: topProgress.map(ex => ({
       exercise: ex.exerciseNameForAI || ex.exercise,
-      volume_change_percent: ex.changes.volume_change_percent,
-      weight_change_kg: ex.changes.weight_change
+      volume_change_percent: ex.changes.volume_change_percent
     })),
 
     top_declines: topDeclines.map(ex => ({
       exercise: ex.exerciseNameForAI || ex.exercise,
-      volume_change_percent: ex.changes.volume_change_percent,
-      weight_change_kg: ex.changes.weight_change
+      volume_change_percent: ex.changes.volume_change_percent
     }))
   };
 }

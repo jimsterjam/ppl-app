@@ -571,12 +571,12 @@ ${trainingAnalysis.bodyweight_correlation ? `
 
 ## Größte Volumenveränderungen nach oben (nur zur Einordnung - NICHT als Reihenfolge verwenden)
 ${topImprovements.length > 0
-  ? topImprovements.map(e => `- ${this.wrapExerciseName(e.exercise)}: Volumen +${e.volume_change_percent}%, Gewicht ${e.weight_change_kg > 0 ? '+' : ''}${e.weight_change_kg}kg`).join('\n')
+  ? topImprovements.map(e => `- ${this.wrapExerciseName(e.exercise)}: Volumen +${e.volume_change_percent}%`).join('\n')
   : '- Keine nennenswerten Veränderungen'}
 
 ## Größte Volumenveränderungen nach unten
 ${topDeclines.length > 0
-  ? topDeclines.map(e => `- ${this.wrapExerciseName(e.exercise)}: Volumen ${e.volume_change_percent}%, Gewicht ${e.weight_change_kg > 0 ? '+' : ''}${e.weight_change_kg}kg`).join('\n')
+  ? topDeclines.map(e => `- ${this.wrapExerciseName(e.exercise)}: Volumen ${e.volume_change_percent}%`).join('\n')
   : '- Keine nennenswerten Veränderungen'}
 
 ## Detaillierte Übungsdaten (in Workout-Reihenfolge)

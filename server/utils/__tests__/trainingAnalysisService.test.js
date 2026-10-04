@@ -554,3 +554,37 @@ describe('resolveSatzgenauWeightChange: gleiche Richtung vs. gegenläufig', () =
     assert.equal(analysis.changes.top_weight_change, 0)
   })
 })
+
+// User-Report 04.10.: Weighted Pull-Up mit 1,25-kg-Schritten. 31,25 kg wurde auf 31,3 gerundet
+// (Satz 2 "+1,2 kg" statt "+1,25 kg"), und an die KI ging zusätzlich die Ø-Gewichtsänderung
+// über alle Sätze ("+0,5 kg"), die zu keinem echten Satz passt.
+describe('Pull-Up-Beispiel vom 04.10.: 1,25-kg-Schritte, keine Ø-Werte an die KI', () => {
+  const sets = (list) => list.map(([reps, weight]) => ({ reps, weight, isWarmup: false }))
+  const last = { name: 'Weighted Pull-Up', setDetails: sets([[4, 32.5], [5, 31.25], [5, 30], [5, 30], [5, 30], [5, 25], [6, 22.5]]) }
+  const today = { name: 'Weighted Pull-Up', setDetails: sets([[5, 32.5], [5, 32.5], [5, 32.5], [5, 30], [5, 30], [5, 25], [6, 22.5]]) }
+
+  test('Satzvergleich behält 2 Nachkommastellen (31,25 bleibt 31,25)', () => {
+    const result = buildSetsComparison(today, last)
+    assert.equal(result[1].previous_weight, 31.25)
+    assert.equal(result[1].weight_change_kg, 1.25)
+    assert.equal(result[2].weight_change_kg, 2.5)
+    assert.equal(result[0].weight_change_kg, 0)
+    assert.equal(result[0].reps_change, 1)
+  })
+
+  test('satzgenaue Gewichtsänderung: Satz 2 und 3, Spanne 1,25 bis 2,5 kg', () => {
+    const resolved = resolveSatzgenauWeightChange(buildSetsComparison(today, last), 0)
+    assert.equal(resolved.scope, 'increased')
+    assert.deepEqual(resolved.setNumbers, [2, 3])
+    assert.equal(resolved.minKg, 1.25)
+    assert.equal(resolved.maxKg, 2.5)
+  })
+
+  test('Top-Listen für die KI enthalten keine Ø-Gewichtsänderung', () => {
+    const analysis = analyzeExercise('Weighted Pull-Up', today, last, 5)
+    const structured = structureAnalysisForAI([analysis])
+    for (const entry of [...structured.top_improvements, ...structured.top_declines]) {
+      assert.equal('weight_change_kg' in entry, false)
+    }
+  })
+})

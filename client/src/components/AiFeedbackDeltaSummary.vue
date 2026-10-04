@@ -39,8 +39,9 @@ const { getTranslatedExerciseName } = useExerciseTranslation()
 
 function formatNumber(value) {
   const isDe = String(locale.value || 'de').toLowerCase().startsWith('de')
-  const rounded = Math.round(Math.abs(value) * 10) / 10
-  return new Intl.NumberFormat(isDe ? 'de-DE' : 'en-US', { maximumFractionDigits: 1 }).format(rounded)
+  // 2 Nachkommastellen: 1,25-kg-Schritte (z.B. "+1,25 kg") nicht auf 1,3 runden.
+  const rounded = Math.round(Math.abs(value) * 100) / 100
+  return new Intl.NumberFormat(isDe ? 'de-DE' : 'en-US', { maximumFractionDigits: 2 }).format(rounded)
 }
 
 const rows = computed(() => {

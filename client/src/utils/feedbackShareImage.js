@@ -87,7 +87,8 @@ function drawRoundedRect(ctx, x, y, width, height, radius) {
 }
 
 function formatSigned(value) {
-  const rounded = Math.round(value * 10) / 10
+  // 2 Nachkommastellen, damit 1,25-kg-Schritte nicht zu 1,3 werden.
+  const rounded = Math.round(value * 100) / 100
   if (rounded > 0) return `+${rounded}`
   return `${rounded}`
 }
