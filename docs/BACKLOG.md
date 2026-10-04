@@ -18,7 +18,6 @@ Zuletzt aktualisiert: 2026-10-03
 
 | # | Prio | Aufgabe | Hinweise |
 |---|---|---|---|
-| A2 | P2 | `TESTPHASE-TESTMATRIX.md` Abschnitt 0 auf aktuellen Stand bringen | Erledigt: #1 (Timer-Guard bewusst entfernt, 30.09.), #3 (Monatskontingent greift in `/:id/ai-analysis`), #5 (`WORKOUT_EDIT_WINDOW_HOURS`), #6 (Error-Handler in `client/src/main.js` + `server/app.js`). Offen: #2, #7, #8. Code verweist auf die Datei – nicht umbenennen. |
 | A3 | P2 | Lint-Warnungen abbauen (aktuell 97, v. a. `no-unused-vars`) | Kleine PRs je Bereich (z. B. nur `server/routes`), keine Verhaltensänderung. Zahl darf nur sinken. |
 | A4 | P3 | Erledigte Planungsdokumente im Root nach `docs/archive/` verschieben | `WORKOUT_FIX_PLAN.md` (komplett ✅), `CODE_OPTIMIZATION_PLAN.md`/`MOBILE_OPTIMIZATION_PLAN.md` (fast fertig), Ollama-Dokumente. **Vorher** Verweise prüfen (Code-Kommentare, `.github/agents/`, `agents.md`) und mit anpassen. |
 | A5 | P3 | `server/.env.example` anlegen (nur Variablennamen + Kommentar, **keine Werte**) | Aus `server/utils/validateEnv.js` und `process.env.*`-Nutzung ableiten. Offener Punkt aus `CODE_OPTIMIZATION_PLAN.md`. |
@@ -69,6 +68,7 @@ Nur Produkt-/Architekturentscheidungen mit Datum. Dauerhafte Arbeitsregeln gehö
 
 ## Erledigt (die letzten 15)
 
+- 2026-10-03 – A2 Testmatrix Abschnitt 0 aktualisiert (#1, #3, #4, #5, #6 erledigt; #2, #7, #8 offen)
 - 2026-10-03 – A1 Toter Aufruf `/api/account/purge` aus SettingsView entfernt (Löschung läuft über `/api/account/delete`)
 - 2026-10-03 – #11 Pausentimer klappt bei 10 s Restzeit wieder groß auf
 - 2026-10-02 – #10 Pausentimer: Expand-Button oben rechts, Warmup-Toggle deutlicher
