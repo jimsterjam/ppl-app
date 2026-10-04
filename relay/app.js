@@ -30,6 +30,11 @@ export function createApp(config) {
 
   const app = express();
 
+  // Render setzt einen Proxy davor (X-Forwarded-For). Ohne diese Einstellung meldet
+  // express-rate-limit ERR_ERL_UNEXPECTED_X_FORWARDED_FOR und kann Clients nicht sauber
+  // unterscheiden (in den Render-Logs vom 29.09. sichtbar).
+  app.set('trust proxy', 1);
+
   // CSP/COEP hier ohne Nutzen (reine Server-zu-Server-API, kein HTML), Standard-Header genügen.
   app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
   app.use(express.json({ limit: '2mb' }));
