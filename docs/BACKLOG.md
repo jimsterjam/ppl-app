@@ -18,7 +18,6 @@ Zuletzt aktualisiert: 2026-10-03
 
 | # | Prio | Aufgabe | Hinweise |
 |---|---|---|---|
-| A1 | P1 | Toten Aufruf `/api/account/purge` aus `client/src/views/SettingsView.vue` (~Z. 866) entfernen | Endpoint existiert nicht (nur `/api/account/delete`), Testmatrix Blocker #4. Verhalten der Kontolöschung darf sich nicht ändern. |
 | A3 | P2 | Lint-Warnungen abbauen (aktuell 97, v. a. `no-unused-vars`) | Kleine PRs je Bereich (z. B. nur `server/routes`), keine Verhaltensänderung. Zahl darf nur sinken. |
 | A4 | P3 | Erledigte Planungsdokumente im Root nach `docs/archive/` verschieben | `WORKOUT_FIX_PLAN.md` (komplett ✅), `CODE_OPTIMIZATION_PLAN.md`/`MOBILE_OPTIMIZATION_PLAN.md` (fast fertig), Ollama-Dokumente. **Vorher** Verweise prüfen (Code-Kommentare, `.github/agents/`, `agents.md`) und mit anpassen. |
 | A5 | P3 | `server/.env.example` anlegen (nur Variablennamen + Kommentar, **keine Werte**) | Aus `server/utils/validateEnv.js` und `process.env.*`-Nutzung ableiten. Offener Punkt aus `CODE_OPTIMIZATION_PLAN.md`. |
@@ -70,6 +69,7 @@ Nur Produkt-/Architekturentscheidungen mit Datum. Dauerhafte Arbeitsregeln gehö
 ## Erledigt (die letzten 15)
 
 - 2026-10-03 – A2 Testmatrix Abschnitt 0 aktualisiert (#1, #3, #4, #5, #6 erledigt; #2, #7, #8 offen)
+- 2026-10-03 – A1 Toter Aufruf `/api/account/purge` aus SettingsView entfernt (Löschung läuft über `/api/account/delete`)
 - 2026-10-03 – #11 Pausentimer klappt bei 10 s Restzeit wieder groß auf
 - 2026-10-02 – #10 Pausentimer: Expand-Button oben rechts, Warmup-Toggle deutlicher
 - 2026-10-02 – #9 Texteingaben: Längengrenzen beim Speichern, Regeln in CLAUDE.md
