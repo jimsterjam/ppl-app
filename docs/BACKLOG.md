@@ -20,7 +20,6 @@ Zuletzt aktualisiert: 2026-10-03
 |---|---|---|---|
 | A3 | P2 | Lint-Warnungen abbauen (aktuell 97, v. a. `no-unused-vars`) | Kleine PRs je Bereich (z. B. nur `server/routes`), keine Verhaltensänderung. Zahl darf nur sinken. |
 | A4 | P3 | Erledigte Planungsdokumente im Root nach `docs/archive/` verschieben | `WORKOUT_FIX_PLAN.md` (komplett ✅), `CODE_OPTIMIZATION_PLAN.md`/`MOBILE_OPTIMIZATION_PLAN.md` (fast fertig), Ollama-Dokumente. **Vorher** Verweise prüfen (Code-Kommentare, `.github/agents/`, `agents.md`) und mit anpassen. |
-| A5 | P3 | `server/.env.example` anlegen (nur Variablennamen + Kommentar, **keine Werte**) | Aus `server/utils/validateEnv.js` und `process.env.*`-Nutzung ableiten. Offener Punkt aus `CODE_OPTIMIZATION_PLAN.md`. |
 | A6 | P3 | Tests für Flows aus `TESTPHASE-TESTMATRIX.md` ohne Testabdeckung ergänzen | Erst Lücke benennen, dann je Flow ein kleiner PR. Nur reine Logik (Utils), keine UI-Mount-Tests ohne Infrastruktur. |
 
 ## Offen – Freigabe nötig [F]
@@ -68,6 +67,7 @@ Nur Produkt-/Architekturentscheidungen mit Datum. Dauerhafte Arbeitsregeln gehö
 
 ## Erledigt (die letzten 15)
 
+- 2026-10-04 – A5 `server/.env.example` angelegt (nur Namen/Platzhalter), `.gitignore` lässt sie zu
 - 2026-10-03 – A2 Testmatrix Abschnitt 0 aktualisiert (#1, #3, #4, #5, #6 erledigt; #2, #7, #8 offen)
 - 2026-10-03 – A1 Toter Aufruf `/api/account/purge` aus SettingsView entfernt (Löschung läuft über `/api/account/delete`)
 - 2026-10-03 – #11 Pausentimer klappt bei 10 s Restzeit wieder groß auf
