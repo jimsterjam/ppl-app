@@ -1701,9 +1701,6 @@ router.delete("/", firebaseAuthMiddleware, async (req, res) => {
       });
     }
 
-    // Zähle Workouts vor dem Löschen
-    const count = await Workout.countDocuments({ userId });
-    
     // Lösche alle Workouts des Users
     const result = await Workout.deleteMany({ userId });
 
@@ -3454,7 +3451,6 @@ function sortByPatternPriority(exercises = [], patternPriority = []) {
 
 function buildDeterministicExerciseOrder(exercises = [], context = {}, targetExerciseCount = 5) {
   const requestedType = normalizeRequestedType(context.requestedType || context.focus);
-  const goal = normalizeGoal(context.goal);
   const maxCount = Math.max(3, Math.min(6, Number(targetExerciseCount) || 5));
 
   const preferredBySplit = {
