@@ -291,7 +291,7 @@ router.delete('/:id/image', firebaseAuthMiddleware, async (req, res) => {
     for (const filePath of filesToDelete) {
       try { 
         fs.unlinkSync(filePath); 
-      } catch (err) {
+      } catch {
         logger.debug(`File ${filePath} not found or already deleted`);
       }
     }

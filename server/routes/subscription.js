@@ -169,7 +169,7 @@ router.get('/status', firebaseAuthMiddleware, async (req, res) => {
 router.post('/upgrade', firebaseAuthMiddleware, async (req, res) => {
   try {
     const userId = req.auth?.userId
-    const { plan, paymentMethod, cycle } = req.body
+    const { plan, cycle } = req.body
     
     // Validate plan
     if (!['pro', 'elite'].includes(plan)) {
@@ -226,14 +226,12 @@ router.post('/upgrade', firebaseAuthMiddleware, async (req, res) => {
 // AI Coach Recommendations
 router.post('/ai/workout-suggestion', firebaseAuthMiddleware, async (req, res) => {
   try {
-    const userId = req.auth?.userId
     
     // Check if user has AI Coach feature
     // const hasAI = await checkSubscriptionFeature(userId, 'ai_coach')
     // if (!hasAI) return res.status(403).json({ error: 'AI Coach requires Pro subscription' })
     
     // AI Logic hier - für Demo: einfache Regeln
-    const lastWorkouts = [] // aus DB laden
     const suggestion = {
       recommendedType: 'push',
       reason: 'Du hast seit 3 Tagen kein Push-Training gemacht',
@@ -256,7 +254,6 @@ router.post('/ai/workout-suggestion', firebaseAuthMiddleware, async (req, res) =
 // Progress Analysis
 router.get('/ai/analyze-progress', firebaseAuthMiddleware, async (req, res) => {
   try {
-    const userId = req.auth?.userId
     
     // Analyse der letzten 4 Wochen
     const insights = [
@@ -329,7 +326,6 @@ router.post('/social/share-workout', firebaseAuthMiddleware, async (req, res) =>
 // Friends Feed
 router.get('/social/friends-feed', firebaseAuthMiddleware, async (req, res) => {
   try {
-    const userId = req.auth?.userId
     
     // Mock Feed
     const feed = [

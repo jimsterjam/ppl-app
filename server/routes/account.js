@@ -146,7 +146,7 @@ router.post('/delete', firebaseAuthMiddleware, async (req, res) => {
     const up = s.toString().toUpperCase().trim();
     try {
       return up.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    } catch (e) {
+    } catch {
       return up;
     }
   };
@@ -200,8 +200,8 @@ router.post('/delete', firebaseAuthMiddleware, async (req, res) => {
       try {
         const main = path.join(uploadsRoot, 'workouts', `${w._id}.jpg`);
         const thumb = path.join(uploadsRoot, 'workouts', `${w._id}_thumb.jpg`);
-        try { await fs.unlink(main); report.filesDeleted.push(main); } catch (e) {}
-        try { await fs.unlink(thumb); report.filesDeleted.push(thumb); } catch (e) {}
+        try { await fs.unlink(main); report.filesDeleted.push(main); } catch {}
+        try { await fs.unlink(thumb); report.filesDeleted.push(thumb); } catch {}
       } catch (e) { report.errors.push(String(e)); }
     }
 
@@ -209,8 +209,8 @@ router.post('/delete', firebaseAuthMiddleware, async (req, res) => {
       try {
         const exMain = path.join(uploadsRoot, 'exercises', `${ex._id}.jpg`);
         const exThumb = path.join(uploadsRoot, 'exercises', `${ex._id}_thumb.jpg`);
-        try { await fs.unlink(exMain); report.filesDeleted.push(exMain); } catch (e) {}
-        try { await fs.unlink(exThumb); report.filesDeleted.push(exThumb); } catch (e) {}
+        try { await fs.unlink(exMain); report.filesDeleted.push(exMain); } catch {}
+        try { await fs.unlink(exThumb); report.filesDeleted.push(exThumb); } catch {}
       } catch (e) { report.errors.push(String(e)); }
     }
 
@@ -223,7 +223,7 @@ router.post('/delete', firebaseAuthMiddleware, async (req, res) => {
           try { await fs.unlink(p); report.filesDeleted.push(p); } catch (e) { report.errors.push(`unlink ${p}: ${e}`); }
         }
       }
-    } catch (e) { /* ignore if folder missing */ }
+    } catch { /* ignore if folder missing */ }
 
     // --- Step 3: Delete GridFS files for exercises (exercise images stored in GridFS bucket 'exerciseImages') ---
     try {
