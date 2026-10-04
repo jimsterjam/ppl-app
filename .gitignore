@@ -42,6 +42,7 @@ server/tmp/
 server/logs/
 server/.env
 server/.env.*
+!server/.env.example
 server/serviceAccount.json
 # Lokale Rohdaten-Logs des Qualitäts-Loop-Runners (scripts/qualityLoopRunner.js) - reine
 # Testlauf-Ausgaben mit echten (aber synthetischen) Feedback-Texten, kein Quellcode, nicht für
