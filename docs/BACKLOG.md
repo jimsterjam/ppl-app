@@ -10,7 +10,7 @@ trägt ihre Backlog-Änderung mit; bis zum Merge steht sie nur dort).
 Kennzeichnung: **[A]** autonom erlaubt · **[F]** Freigabe von Paul nötig · **[P]** wartet auf Paul
 (Info, Entscheidung oder Handgriff außerhalb des Repos). Priorität: P1 (zuerst) bis P3.
 
-Zuletzt aktualisiert: 2026-10-03
+Zuletzt aktualisiert: 2026-10-04
 
 ---
 
@@ -20,6 +20,8 @@ Zuletzt aktualisiert: 2026-10-03
 |---|---|---|---|
 | A3 | P2 | Lint-Warnungen abbauen (aktuell 82, v. a. `no-unused-vars`) | Kleine PRs je Bereich, keine Verhaltensänderung, Zahl darf nur sinken. `server/routes` teils erledigt (PR dieser Runde); dort bleiben nur ungenutzte Funktionen in `workouts.js` (`countMatchingCompletedWorkouts`, `validateAndMapExercisesWithAutoAdd`, `estimateWorkoutDurationSeconds`) – Entfernen oder Nutzen klären. Größte Reste: `WorkoutDetailView.vue` (13), `StatsView.vue` (10), `relay/app.test.js` (6). |
 | A4 | P3 | Erledigte Planungsdokumente im Root nach `docs/archive/` verschieben | `WORKOUT_FIX_PLAN.md` (komplett ✅), `CODE_OPTIMIZATION_PLAN.md`/`MOBILE_OPTIMIZATION_PLAN.md` (fast fertig), Ollama-Dokumente. **Vorher** Verweise prüfen (Code-Kommentare, `.github/agents/`, `agents.md`) und mit anpassen. |
+| A7 | P2 | KI-Analyse vergleicht auch mit unfertigen Workouts | `analyzeWorkoutProgression` und `buildVolumeHistory` (`server/services/trainingAnalysisService.js`) nehmen das jüngste frühere Workout mit der Übung – ohne Prüfung auf `completed`/Entwurf. Die „Nächstes Mal“-Zeile filtert das bereits (`routes/workouts.js`, `history`-Filter). Gleichen Filter übernehmen + Regressionstest. |
+| A8 | P3 | Relay-Wecken nur einmal gleichzeitig | `ensureRelayAwake` (`server/utils/aiClientFactory.js`) läuft bei parallelen Aufrufen (Warmup, Analyse, Verifier, Nachladen) mehrfach mit je 25 Anfragen. Auf einen gemeinsamen laufenden Versuch warten. Rein technisch, kein Verhalten für Nutzer. |
 | A6 | P3 | Tests für Flows aus `TESTPHASE-TESTMATRIX.md` ohne Testabdeckung ergänzen | Erst Lücke benennen, dann je Flow ein kleiner PR. Nur reine Logik (Utils), keine UI-Mount-Tests ohne Infrastruktur. |
 
 ## Offen – Freigabe nötig [F]
@@ -28,18 +30,20 @@ Zuletzt aktualisiert: 2026-10-03
 |---|---|---|
 | F1 | Kostenlos = Tracking ohne Limits, KI nur mit Pro | Entscheidung getroffen (01.10.). Umsetzung: `FREE_AI_MONTHLY_LIMIT` → 0, Limits 3 Workouts/Woche + 6 Übungen in `client/src/stores/subscriptionStore.js` entfernen. **Zeitpunkt** mit Paul abstimmen (Tester verlieren KI-Feedback). |
 | F2 | In-App-Kauf (StoreKit) für Pro | Offen: RevenueCat oder StoreKit direkt; eine oder zwei Abo-Stufen. Braucht App-Store-Connect-Vertrag (P2). |
-| F3 | Stillstand-Diagnose v2 | Rückblick in Einheiten statt 12 Wochen, Berechnung nach Workout-Speichern statt beim Dashboard-Öffnen, „Warum?“-Begründung mit Daten, Antworten „Probiere ich aus / Mache ich bewusst so / Passt nicht“. Nach Tester-Gesprächen (P1). |
-| F4 | Modell „Persönlicher Rahmen, ehrlicher Maßstab“ (Trainingsprofil, Phasen wie Diät/krank, Ziel „Halten“) | Konzept im Chat 02.10. Nach Tester-Gesprächen. |
+| F3 | Stillstand-Diagnose v2 | Rückblick in Einheiten statt 12 Wochen, Berechnung nach Workout-Speichern statt beim Dashboard-Öffnen, „Warum?“-Begründung mit Daten, Antworten „Probiere ich aus / Mache ich bewusst so / Passt nicht“. Wartet nicht mehr auf Tester-Gespräche (04.10.). |
+| F4 | Modell „Persönlicher Rahmen, ehrlicher Maßstab“ (Trainingsprofil, Phasen wie Diät/krank, Ziel „Halten“) | Konzept im Chat 02.10. Wartet nicht mehr auf Tester-Gespräche (04.10.). |
 | F5 | Berichte (Monatsanalyse als PDF/CSV) | Neue Abhängigkeit (z. B. `pdfkit`) braucht Freigabe. |
 | F6 | KI-Schwellen auf Produktionswerte vor Launch | `AI_FEEDBACK_MIN_REPETITIONS`/`_HISTORY_DAYS` stehen auf 1 (Prod: 8/28) – Render-Variablen, macht Paul. |
 | F7 | Crash-Reporting (z. B. Sentry) | Neuer externer Dienst + Datenübertragung. |
 | F8 | Android-Version | Zurückgestellt (01.10.), erst App Store fertig. |
+| F9 | „KI-Feedback“ ist eine Zusammenfassung | Vorschlag 04.10.: Zusammenfassung ohne KI (feste Texte, echte Zahlen, kostenlos), KI nur für echtes Coaching (Ursache, nächste Einheit, Verlauf über Wochen – vgl. F3/F4), Bezeichnung in der App anpassen. Produkt-/Preisentscheidung. |
+| F10 | KI-Relay zuverlässig erreichbar machen | Render Free liefert beim Aufwecken teils 429 (Logs 01.–04.10.), GitHub-Pinger läuft unregelmäßig (Median 16 Min., bis 109 Min.). Optionen: Relay auf Render Starter (~7 $/Monat), Relay als Cloudflare Worker (kostenlos, neuer Dienst), Server auf Starter und Relay weglassen. Entscheidung + Konto/Secrets: Paul. |
 
 ## Wartet auf Paul [P]
 
 | # | Was |
 |---|---|
-| P1 | Tester-Gespräche (Leitfaden im Chat 02.10.) – Notizen an Claude geben |
+| P1 | Tester-Gespräche (Leitfaden im Chat 02.10.) – optional, keine Voraussetzung mehr für F3/F4 (04.10.) |
 | P2 | App Store Connect: Bezahlvertrag/Steuer/Bank, Screenshots, Texte, Support-URL, Datenschutzangaben, Demo-Zugang |
 | P3 | Impressum/Datenschutz: echte Angaben (beim Wechsel TestFlight → App Store), öffentliche Datenschutz-URL |
 | P4 | iOS-Build mit Stand `main` testen: Diagnose (#7/#8), FAQ (#6), Texteingaben (#9), Pausentimer (#10/#11) |
@@ -47,6 +51,8 @@ Zuletzt aktualisiert: 2026-10-03
 ## Bekannte Probleme
 
 - KI-Feedback-Schwellen stehen auf Testwerten (siehe F6).
+- KI-Feedback bleibt bis zu 30 Min. auf „Wird erstellt…“, wenn der Relay nicht erreichbar ist (429), erst dann „Nicht erstellt“ – siehe F10.
+- Render baut den Relay vom Branch `ai-relay`, nicht von `main`; dort fehlt u. a. `trust proxy` aus `main`.
 - Kein Remote-Crash-Reporting; Fehler bei Testern nur über „Debug-Log kopieren“ in den Einstellungen.
 - Pro-Upgrade ist ein Schein-Upgrade ohne Zahlung (`server/routes/subscription.js` `/upgrade`).
 - Stillstand-Diagnose sieht Bestleistungen älter als 12 Wochen nicht („seit X Wochen“ zu niedrig) – Teil von F3.
@@ -57,6 +63,8 @@ Zuletzt aktualisiert: 2026-10-03
 
 Nur Produkt-/Architekturentscheidungen mit Datum. Dauerhafte Arbeitsregeln gehören in `CLAUDE.md`.
 
+- 2026-10-04 – KI-Text mit einer Zahl, die nicht aus den Trainingsdaten stammt, wird nicht ausgeliefert (fester Hinweis statt Text).
+- 2026-10-04 – Tester-Gespräche sind keine Voraussetzung mehr für neue Coach-Funktionen.
 - 2026-10-03 – Autonomer Arbeitsmodus: Backlog in `docs/BACKLOG.md`, Ablauf im Skill `weiterarbeiten`.
 - 2026-10-02 – Texteingaben werden beim Speichern gekürzt statt abgelehnt (Offline-Sync).
 - 2026-10-02 – „Ist so geplant“ blendet Diagnose 6 Wochen aus, danach Nachfrage.
@@ -67,6 +75,7 @@ Nur Produkt-/Architekturentscheidungen mit Datum. Dauerhafte Arbeitsregeln gehö
 
 ## Erledigt (die letzten 15)
 
+- 2026-10-04 – Feedback-Zahlen: 1,25-kg-Schritte genau (31,25 statt 31,3), keine Ø-Gewichte an die KI, KI-Text mit erfundener Zahl wird zurückgehalten
 - 2026-10-04 – A5 `server/.env.example` angelegt (nur Namen/Platzhalter), `.gitignore` lässt sie zu
 - 2026-10-03 – A2 Testmatrix Abschnitt 0 aktualisiert (#1, #3, #4, #5, #6 erledigt; #2, #7, #8 offen)
 - 2026-10-03 – A1 Toter Aufruf `/api/account/purge` aus SettingsView entfernt (Löschung läuft über `/api/account/delete`)

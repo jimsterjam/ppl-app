@@ -44,6 +44,7 @@ import { decideExerciseMatch } from '../utils/exerciseMatching.js';
 import { getMaxExerciseCount } from '../utils/exerciseCountTarget.js';
 import { applyGeneratorRule } from '../utils/repTargets.js';
 import { buildNextSessionFocus, applyNextSessionFocus } from '../utils/nextSessionFocus.js';
+import { guardFeedbackNumbers } from '../utils/feedbackNumberGuard.js';
 import { resolveListFeedbackStatus, FEEDBACK_PENDING_FAILED_AFTER_MS } from '../utils/feedbackStatus.js';
 import { findCatalogEntryForName, catalogReference } from '../utils/catalogMatch.js';
 import { resolveEnglishExerciseName, resolveFeedbackLanguage } from '../utils/feedbackLocalization.js';
@@ -2377,6 +2378,18 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
       // utils/nextSessionFocus.js). Erst NACH dem Verifier anhängen - dessen Zahlenprüfung kennt
       // z.B. das vorgeschlagene Gewicht nicht. Der Shadow-Verifier unten prüft den KI-Entwurf.
       const draftForVerifier = aiResult.feedback;
+
+      // Letzte Sicherung: Text mit einer Zahl, die nicht aus den Trainingsdaten stammt, wird nicht
+      // ausgeliefert (auch nicht nach gescheiterter Korrektur) - siehe utils/feedbackNumberGuard.js.
+      const numberGuard = guardFeedbackNumbers(aiResult.feedback, structuredAnalysis);
+      if (numberGuard.withheld) {
+        logger.warn('⚠️ KI-Feedback zurückgehalten: Zahl passt nicht zu den Trainingsdaten', {
+          requestId, workoutId, invalidNumbers: numberGuard.invalidNumbers
+        });
+        aiResult.feedback = numberGuard.text;
+        aiResult.metadata = { ...(aiResult.metadata || {}), aiTextWithheld: true };
+      }
+
       try {
         const profileHintByName = new Map(
           exerciseAnalyses
@@ -2401,7 +2414,8 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
       // Kontingent erst bei tatsächlich erfolgreicher Generierung verbrauchen (nicht bei
       // Health-Check-Fehlschlag/network_unavailable oben oder einem AI-Fehler unten) - konsistent
       // mit /quick-generator und /ai-suggestion, die ebenfalls nur bei echtem Erfolg zählen.
-      await markAiUse(entitlements);
+      // Zurückgehaltener KI-Text zählt nicht gegen das Kontingent (Nutzer bekommt keinen KI-Text).
+      if (!numberGuard.withheld) await markAiUse(entitlements);
       await Workout.updateOne(
         { _id: workoutId, userId },
         {
