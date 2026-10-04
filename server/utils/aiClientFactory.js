@@ -165,37 +165,110 @@ export function markRelayContact() {
  *   Anfragen während des Hochfahrens zu vermeiden - nicht bestätigt, aber als Vorsichtsmaßnahme
  *   günstig)
  */
-export async function ensureRelayAwake({ maxWaitMs = 100000, pollIntervalMs = 4000 } = {}) {
-  if (getAiClientMode() !== 'relay') return;
-  if (Date.now() - lastRelayContactAt < RELAY_WARM_ASSUMPTION_MS) return;
+// Nachtrag (2026-10-04, User-Report "Feedback laden bleibt hängen"): Production-Logs zeigten
+// ~20 PARALLELE Weck-Schleifen (jeder /ai-warmup-Aufruf, jede Feedback-Anfrage, jeder erneute
+// Versuch der App startete eine eigene), jede pingte alle 4 s - rund 1 Anfrage/s an den
+// schlafenden Relay. Render antwortete durchgehend mit 429, der Relay startete in der Zeit gar
+// nicht. Deshalb jetzt:
+// - EINE gemeinsame Weck-Schleife für alle Aufrufer (wakeInFlight),
+// - bei 429 deutlich langsamer (10 s, 20 s, 40 s bzw. Retry-After), sonst wie bisher,
+// - nach einer gescheiterten Schleife eine Pause (RELAY_WAKE_COOLDOWN_MS), in der nicht sofort
+//   wieder eine neue Schleife losläuft - der eigentliche Call versucht es dann einmal direkt.
+const RELAY_WAKE_MAX_MS = 100000;
+const RELAY_WAKE_COOLDOWN_MS = 60 * 1000;
+const RELAY_429_BASE_DELAY_MS = 10000;
+const RELAY_429_MAX_DELAY_MS = 40000;
+let wakeInFlight = null;
+let lastWakeFailureAt = 0;
+let relayFetch = (...args) => fetch(...args);
 
+/**
+ * Wartezeit bis zum nächsten Weck-Versuch. 429 = "zu viele Anfragen": Retry-After beachten,
+ * sonst 10 s, 20 s, 40 s (gedeckelt). Andere Fehler (z. B. 502 beim Hochfahren): pollIntervalMs.
+ * @param {{ status?: number, retryAfter?: string|null, consecutive429?: number, pollIntervalMs?: number }} p
+ */
+export function nextRelayWakeDelayMs({ status, retryAfter = null, consecutive429 = 1, pollIntervalMs = 4000 } = {}) {
+  if (status !== 429) return pollIntervalMs;
+  const retryAfterSec = Number(retryAfter);
+  const fromHeader = Number.isFinite(retryAfterSec) && retryAfterSec > 0 ? retryAfterSec * 1000 : 0;
+  const backoff = RELAY_429_BASE_DELAY_MS * 2 ** Math.max(0, consecutive429 - 1);
+  return Math.min(RELAY_429_MAX_DELAY_MS, Math.max(fromHeader, backoff));
+}
+
+async function runRelayWakeLoop({ maxWaitMs, pollIntervalMs }) {
   const healthUrl = `${String(process.env.AI_RELAY_URL).trim().replace(/\/+$/, '')}/healthz`;
-  const deadline = Date.now() + maxWaitMs;
+  const startedAt = Date.now();
+  const deadline = startedAt + maxWaitMs;
   let attempt = 0;
+  let consecutive429 = 0;
   let lastErrorMessage = '';
 
   while (Date.now() < deadline) {
     attempt += 1;
+    let delayMs = pollIntervalMs;
     try {
-      const response = await fetch(healthUrl, { signal: AbortSignal.timeout(5000) });
+      const response = await relayFetch(healthUrl, { signal: AbortSignal.timeout(5000) });
       if (response.ok) {
         markRelayContact();
+        lastWakeFailureAt = 0;
         if (attempt > 1) {
-          logger.info('✅ Relay aufgeweckt', { attempt, elapsedMs: Date.now() - (deadline - maxWaitMs) });
+          logger.info('✅ Relay aufgeweckt', { attempt, elapsedMs: Date.now() - startedAt });
         }
-        return;
+        return true;
       }
       lastErrorMessage = `Status ${response.status}`;
+      consecutive429 = response.status === 429 ? consecutive429 + 1 : 0;
+      delayMs = nextRelayWakeDelayMs({
+        status: response.status,
+        retryAfter: response.headers?.get?.('retry-after') ?? null,
+        consecutive429,
+        pollIntervalMs
+      });
     } catch (error) {
       lastErrorMessage = error.message;
+      consecutive429 = 0;
     }
-    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) break;
+    // unref: die Hintergrund-Schleife soll einen Prozess (Tests, Shutdown) nicht am Leben halten.
+    await new Promise((resolve) => setTimeout(resolve, Math.min(delayMs, remaining)).unref?.());
   }
 
+  lastWakeFailureAt = Date.now();
   logger.warn('⚠️ Relay antwortete auch nach Wake-Up-Versuchen nicht - versuche echten Call trotzdem', {
     attempts: attempt,
     lastError: lastErrorMessage
   });
+  return false;
+}
+
+export async function ensureRelayAwake({ maxWaitMs = RELAY_WAKE_MAX_MS, pollIntervalMs = 4000 } = {}) {
+  if (getAiClientMode() !== 'relay') return;
+  if (Date.now() - lastRelayContactAt < RELAY_WARM_ASSUMPTION_MS) return;
+  // Gerade erst vergeblich versucht: nicht sofort die nächste Ping-Serie starten.
+  if (!wakeInFlight && lastWakeFailureAt && Date.now() - lastWakeFailureAt < RELAY_WAKE_COOLDOWN_MS) return;
+
+  if (!wakeInFlight) {
+    wakeInFlight = runRelayWakeLoop({ maxWaitMs: RELAY_WAKE_MAX_MS, pollIntervalMs })
+      .catch(() => false)
+      .finally(() => { wakeInFlight = null; });
+  }
+  // Aufrufer mit kürzerem Budget (z. B. Generator 15 s) warten nur so lange - die gemeinsame
+  // Schleife läuft für die anderen weiter.
+  let timer = null;
+  await Promise.race([
+    wakeInFlight,
+    new Promise((resolve) => { timer = setTimeout(resolve, maxWaitMs); })
+  ]);
+  clearTimeout(timer);
+}
+
+/** Nur für Tests: fetch ersetzen und internen Zustand zurücksetzen. */
+export function __resetRelayWakeForTests({ fetchImpl } = {}) {
+  relayFetch = fetchImpl || ((...args) => fetch(...args));
+  wakeInFlight = null;
+  lastWakeFailureAt = 0;
+  lastRelayContactAt = 0;
 }
 
 export default {
