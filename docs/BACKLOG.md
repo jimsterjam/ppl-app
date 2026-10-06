@@ -10,7 +10,7 @@ trägt ihre Backlog-Änderung mit; bis zum Merge steht sie nur dort).
 Kennzeichnung: **[A]** autonom erlaubt · **[F]** Freigabe von Paul nötig · **[P]** wartet auf Paul
 (Info, Entscheidung oder Handgriff außerhalb des Repos). Priorität: P1 (zuerst) bis P3.
 
-Zuletzt aktualisiert: 2026-10-04
+Zuletzt aktualisiert: 2026-10-06
 
 ---
 
@@ -20,7 +20,6 @@ Zuletzt aktualisiert: 2026-10-04
 |---|---|---|---|
 | A3 | P2 | Lint-Warnungen abbauen (aktuell 82, v. a. `no-unused-vars`) | Kleine PRs je Bereich, keine Verhaltensänderung, Zahl darf nur sinken. `server/routes` teils erledigt (PR dieser Runde); dort bleiben nur ungenutzte Funktionen in `workouts.js` (`countMatchingCompletedWorkouts`, `validateAndMapExercisesWithAutoAdd`, `estimateWorkoutDurationSeconds`) – Entfernen oder Nutzen klären. Größte Reste: `WorkoutDetailView.vue` (13), `StatsView.vue` (10), `relay/app.test.js` (6). |
 | A4 | P3 | Erledigte Planungsdokumente im Root nach `docs/archive/` verschieben | `WORKOUT_FIX_PLAN.md` (komplett ✅), `CODE_OPTIMIZATION_PLAN.md`/`MOBILE_OPTIMIZATION_PLAN.md` (fast fertig), Ollama-Dokumente. **Vorher** Verweise prüfen (Code-Kommentare, `.github/agents/`, `agents.md`) und mit anpassen. |
-| A7 | P2 | KI-Analyse vergleicht auch mit unfertigen Workouts | `analyzeWorkoutProgression` und `buildVolumeHistory` (`server/services/trainingAnalysisService.js`) nehmen das jüngste frühere Workout mit der Übung – ohne Prüfung auf `completed`/Entwurf. Die „Nächstes Mal“-Zeile filtert das bereits (`routes/workouts.js`, `history`-Filter). Gleichen Filter übernehmen + Regressionstest. |
 | A8 | P3 | Relay-Wecken nur einmal gleichzeitig | `ensureRelayAwake` (`server/utils/aiClientFactory.js`) läuft bei parallelen Aufrufen (Warmup, Analyse, Verifier, Nachladen) mehrfach mit je 25 Anfragen. Auf einen gemeinsamen laufenden Versuch warten. Rein technisch, kein Verhalten für Nutzer. |
 | A6 | P3 | Tests für Flows aus `TESTPHASE-TESTMATRIX.md` ohne Testabdeckung ergänzen | Erst Lücke benennen, dann je Flow ein kleiner PR. Nur reine Logik (Utils), keine UI-Mount-Tests ohne Infrastruktur. |
 
@@ -75,6 +74,7 @@ Nur Produkt-/Architekturentscheidungen mit Datum. Dauerhafte Arbeitsregeln gehö
 
 ## Erledigt (die letzten 15)
 
+- 2026-10-06 – A7 KI-Analyse vergleicht nur noch mit abgeschlossenen Workouts (Entwürfe/unfertige zählen weder als letzte Session noch im Verlauf noch beim Körpergewicht)
 - 2026-10-04 – Feedback-Zahlen: 1,25-kg-Schritte genau (31,25 statt 31,3), keine Ø-Gewichte an die KI, KI-Text mit erfundener Zahl wird zurückgehalten
 - 2026-10-04 – A5 `server/.env.example` angelegt (nur Namen/Platzhalter), `.gitignore` lässt sie zu
 - 2026-10-03 – A2 Testmatrix Abschnitt 0 aktualisiert (#1, #3, #4, #5, #6 erledigt; #2, #7, #8 offen)

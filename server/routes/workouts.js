@@ -20,7 +20,8 @@ import {
   buildVolumeHistory,
   findWorkoutsAffectedByDeletion,
   resolveSatzgenauWeightChange,
-  resolveBodyweightCorrelation
+  resolveBodyweightCorrelation,
+  isFinishedWorkout
 } from '../services/trainingAnalysisService.js';
 import {
   buildFeedbackVersion,
@@ -2403,7 +2404,7 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
           englishNameByName: enNameByExerciseName,
           // Frühere abgeschlossene Workouts (neueste zuerst) - Schema, Singles-Regel, Plateau.
           history: allWorkouts.filter((w) => String(w._id) !== String(currentWorkout._id)
-            && w.completed !== false && w.isDraft !== true && w._isDraft !== true
+            && isFinishedWorkout(w)
             && new Date(w.date || 0) <= new Date(currentWorkout.date || Date.now()))
         });
         aiResult.feedback = applyNextSessionFocus(aiResult.feedback, focus);

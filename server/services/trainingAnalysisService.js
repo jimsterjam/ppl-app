@@ -20,6 +20,17 @@ function round2(n) {
 }
 
 /**
+ * Zählt ein Workout als "Vergleichs-Session"? Nur abgeschlossene, keine Entwürfe: angefangene
+ * und nie gespeicherte Workouts landen per Sync ebenfalls auf dem Server (mit ggf. Platzhalter-
+ * Gewichten) und dürfen weder als "letzte Session" noch im Verlauf auftauchen. Gleiche Regel wie
+ * bei der "Nächstes Mal"-Zeile (routes/workouts.js); ein fehlendes completed-Feld (alte Daten)
+ * gilt weiter als abgeschlossen.
+ */
+export function isFinishedWorkout(w) {
+  return !!w && w.completed !== false && w.isDraft !== true && w._isDraft !== true;
+}
+
+/**
  * Berechne echte Exercise-Stats
  * Nutzt setDetails wenn vorhanden (modern), sonst weight/reps/sets (legacy)
  * Ignoriert Warm-up Sets
@@ -458,6 +469,7 @@ export function analyzeWorkoutProgression(currentWorkout, allWorkouts, profileMa
 
       const previousWorkout = allWorkouts.find(w => {
         if (w._id.toString() === currentWorkout._id.toString()) return false;
+        if (!isFinishedWorkout(w)) return false;
         if (!isStrictlyBeforeCurrent(w)) return false;
         return w.exercises?.some(e => (e.name || '').toLowerCase() === exerciseName.toLowerCase());
       });
@@ -532,6 +544,7 @@ export function buildVolumeHistory(exerciseName, currentWorkout, allWorkouts, ma
 
   const priorMatches = (allWorkouts || [])
     .filter(w => w._id.toString() !== currentWorkout._id.toString())
+    .filter(isFinishedWorkout)
     .filter(isStrictlyBeforeCurrent)
     .filter(w => (w.exercises || []).some(e => (e.name || '').toLowerCase() === exerciseName.toLowerCase()))
     .slice(0, Math.max(0, maxPoints - 1));
@@ -593,6 +606,7 @@ export function resolveBodyweightCorrelation(currentWorkout, allWorkouts, exerci
 
   const previousWithBodyweight = (allWorkouts || [])
     .filter(w => (w._id?.toString?.() ?? String(w._id)) !== currentIdStr)
+    .filter(isFinishedWorkout)
     .filter(isStrictlyBeforeCurrent)
     .find(w => typeof w.athleteBodyweightKg === 'number' && Number.isFinite(w.athleteBodyweightKg));
 
