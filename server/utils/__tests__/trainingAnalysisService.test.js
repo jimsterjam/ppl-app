@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
-const { calculateExerciseStats, analyzeExercise, buildSetsComparison, resolveSatzgenauWeightChange, buildTopWeightChange, resolveBodyweightCorrelation, structureAnalysisForAI } = await import(
+const { calculateExerciseStats, analyzeExercise, analyzeWorkoutProgression, buildVolumeHistory, buildSetsComparison, resolveSatzgenauWeightChange, buildTopWeightChange, resolveBodyweightCorrelation, structureAnalysisForAI } = await import(
   join(__dirname, '../../services/trainingAnalysisService.js')
 )
 
@@ -586,5 +586,56 @@ describe('Pull-Up-Beispiel vom 04.10.: 1,25-kg-Schritte, keine Ø-Werte an die K
     for (const entry of [...structured.top_improvements, ...structured.top_declines]) {
       assert.equal('weight_change_kg' in entry, false)
     }
+  })
+})
+
+// Backlog A7: Als "letzte Session" darf nur ein abgeschlossenes Workout gelten. Entwürfe und
+// nicht abgeschlossene Workouts (z.B. angefangen und nie gespeichert, mit Platzhalter-Gewicht)
+// werden zum Server synchronisiert und haben die Übung ebenfalls - sie verfälschten den
+// Vergleich ("nächstes Workout mit dem jüngsten anderen Workout, egal ob fertig").
+describe('Vergleich nur mit abgeschlossenen Workouts (A7)', () => {
+  const sets = (list) => list.map(([reps, weight]) => ({ reps, weight, isWarmup: false }))
+  const workout = (id, date, extra, list) => ({
+    _id: id, date, createdAt: date, completed: true,
+    exercises: [{ name: 'Weighted Pull-Up', setDetails: sets(list) }],
+    ...extra
+  })
+  const real = workout('real', '2026-09-29T08:00:00Z', {}, [[5, 30], [5, 30]])
+  const draft = workout('draft', '2026-10-02T08:00:00Z', { completed: false }, [[5, 5], [5, 5]])
+  const flaggedDraft = workout('flagged', '2026-10-03T08:00:00Z', { isDraft: true }, [[5, 5], [5, 5]])
+  const current = workout('cur', '2026-10-04T08:00:00Z', {}, [[5, 32.5], [5, 32.5]])
+  // DESC nach Datum wie in routes/workouts.js
+  const all = [current, flaggedDraft, draft, real]
+
+  test('analyzeWorkoutProgression: Entwürfe (completed:false, isDraft) werden übersprungen', () => {
+    const [analysis] = analyzeWorkoutProgression(current, all)
+    assert.equal(analysis.setsComparison[0].previous_weight, 30)
+    assert.equal(analysis.setsComparison[0].weight_change_kg, 2.5)
+    assert.equal(analysis.period_days, 5)
+  })
+
+  test('Workout ohne completed-Feld (alte Daten) zählt weiter als abgeschlossen', () => {
+    const legacy = workout('legacy', '2026-09-20T08:00:00Z', {}, [[5, 27.5]])
+    delete legacy.completed
+    const [analysis] = analyzeWorkoutProgression(current, [current, draft, legacy])
+    assert.equal(analysis.setsComparison[0].previous_weight, 27.5)
+  })
+
+  test('nur Entwürfe vorhanden -> erste Session, kein Vergleich', () => {
+    const [analysis] = analyzeWorkoutProgression(current, [current, draft, flaggedDraft])
+    assert.equal(analysis.previous, null)
+    assert.equal(analysis.progression, 'first_session')
+  })
+
+  test('buildVolumeHistory: Entwürfe zählen nicht als Datenpunkt', () => {
+    const history = buildVolumeHistory('Weighted Pull-Up', current, all)
+    assert.deepEqual(history, [300, 325])
+  })
+
+  test('Körpergewicht-Vergleich: Entwurf mit Körpergewicht wird übersprungen', () => {
+    const withBw = (w, kg) => ({ ...w, athleteBodyweightKg: kg })
+    const cur = withBw(current, 80)
+    const result = resolveBodyweightCorrelation(cur, [cur, withBw(draft, 99), withBw(real, 82)], [])
+    assert.equal(result?.previous_bodyweight_kg, 82)
   })
 })
