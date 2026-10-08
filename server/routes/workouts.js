@@ -21,6 +21,7 @@ import {
   findWorkoutsAffectedByDeletion,
   resolveSatzgenauWeightChange,
   resolveBodyweightCorrelation,
+  resolveRepsSetChanges,
   isFinishedWorkout
 } from '../services/trainingAnalysisService.js';
 import {
@@ -45,7 +46,7 @@ import { decideExerciseMatch } from '../utils/exerciseMatching.js';
 import { getMaxExerciseCount } from '../utils/exerciseCountTarget.js';
 import { applyGeneratorRule } from '../utils/repTargets.js';
 import { buildNextSessionFocus, applyNextSessionFocus } from '../utils/nextSessionFocus.js';
-import { guardFeedbackNumbers } from '../utils/feedbackNumberGuard.js';
+import { sanitizeCoachText, buildBodyweightFactLine } from '../utils/feedbackFactGuard.js';
 import { resolveListFeedbackStatus, FEEDBACK_PENDING_FAILED_AFTER_MS } from '../utils/feedbackStatus.js';
 import { findCatalogEntryForName, catalogReference } from '../utils/catalogMatch.js';
 import { resolveEnglishExerciseName, resolveFeedbackLanguage } from '../utils/feedbackLocalization.js';
@@ -2338,6 +2339,8 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
         ...(typeof weightChange.minKg === 'number' ? { weight_change_min_kg: weightChange.minKg, weight_change_max_kg: weightChange.maxKg } : {}),
         // Schwerster Satz - Maßstab bei gegenläufigen Sätzen ('mixed', z.B. Pyramide).
         ...(typeof ex.changes?.top_weight_current === 'number' ? { top_weight_kg: ex.changes.top_weight_current, top_weight_change_kg: ex.changes.top_weight_change } : {}),
+        // Wiederholungsänderung je Satz (nur Sätze mit Änderung) - die App zeigt sie selbst an.
+        reps_set_changes: resolveRepsSetChanges(ex.setsComparison),
         volume_change_percent: ex.changes?.volume_change_percent ?? 0,
         is_first_session: ex.progression === 'first_session',
         is_notable: isNotable,
@@ -2380,16 +2383,24 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
       // z.B. das vorgeschlagene Gewicht nicht. Der Shadow-Verifier unten prüft den KI-Entwurf.
       const draftForVerifier = aiResult.feedback;
 
-      // Letzte Sicherung: Text mit einer Zahl, die nicht aus den Trainingsdaten stammt, wird nicht
-      // ausgeliefert (auch nicht nach gescheiterter Korrektur) - siehe utils/feedbackNumberGuard.js.
-      const numberGuard = guardFeedbackNumbers(aiResult.feedback, structuredAnalysis);
-      if (numberGuard.withheld) {
-        logger.warn('⚠️ KI-Feedback zurückgehalten: Zahl passt nicht zu den Trainingsdaten', {
-          requestId, workoutId, invalidNumbers: numberGuard.invalidNumbers
+      // Fakten kommen vom Code, die KI liefert nur die Einordnung (siehe utils/feedbackFactGuard.js):
+      // Zeilen mit Zahlen, Satzbezug oder einer Aussage zu Gewicht/Wiederholungen/Sätzen werden
+      // entfernt - die App zeigt diese Fakten selbst aus der Satz-Berechnung (ai_analysis_snapshot).
+      // Gilt auch nach gescheiterter Korrektur im Verifier-Loop.
+      const feedbackLanguage = structuredAnalysis?.response_language === 'en' ? 'en' : 'de';
+      const coachText = sanitizeCoachText(aiResult.feedback, {
+        language: feedbackLanguage,
+        exerciseNames: exerciseAnalyses.flatMap((ex) => [ex.exercise, ex.exerciseNameForAI]).filter(Boolean)
+      });
+      if (coachText.droppedLines > 0) {
+        logger.warn('⚠️ KI-Text: Zeilen mit Faktenaussage entfernt', {
+          requestId, workoutId, droppedLines: coachText.droppedLines, reasons: coachText.reasons, allDropped: coachText.allDropped
         });
-        aiResult.feedback = numberGuard.text;
-        aiResult.metadata = { ...(aiResult.metadata || {}), aiTextWithheld: true };
       }
+      aiResult.feedback = coachText.text;
+      // Körpergewicht-Gegenüberstellung als feste Zeile (früher schrieb sie die KI).
+      const bodyweightLine = buildBodyweightFactLine(bodyweightCorrelation, feedbackLanguage);
+      if (bodyweightLine) aiResult.feedback = `${aiResult.feedback}\n\n${bodyweightLine}`;
 
       try {
         const profileHintByName = new Map(
@@ -2415,8 +2426,8 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
       // Kontingent erst bei tatsächlich erfolgreicher Generierung verbrauchen (nicht bei
       // Health-Check-Fehlschlag/network_unavailable oben oder einem AI-Fehler unten) - konsistent
       // mit /quick-generator und /ai-suggestion, die ebenfalls nur bei echtem Erfolg zählen.
-      // Zurückgehaltener KI-Text zählt nicht gegen das Kontingent (Nutzer bekommt keinen KI-Text).
-      if (!numberGuard.withheld) await markAiUse(entitlements);
+      // Blieb vom KI-Text nichts übrig, zählt das nicht gegen das Kontingent (Nutzer bekommt keinen KI-Text).
+      if (!coachText.allDropped) await markAiUse(entitlements);
       await Workout.updateOne(
         { _id: workoutId, userId },
         {

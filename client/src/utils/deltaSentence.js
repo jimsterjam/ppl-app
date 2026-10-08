@@ -8,6 +8,12 @@
 //                             Vergleich, sondern schwerster Satz + insgesamt bewegtes Gewicht
 //                             (alte Einträge ohne top_weight_kg: neutraler Hinweis + Gesamtbilanz)
 //
+// Wiederholungen (reps_set_changes, siehe resolveRepsSetChanges in trainingAnalysisService.js):
+//   je Satz mit Änderung, gleiche Änderung zusammengefasst ("1 Wdh. mehr (Satz 1 und 2), 1 Wdh.
+//   weniger (Satz 7)"). Ältere Einträge ohne reps_set_changes zeigen weiter die Gesamt-Differenz.
+//   Alle Fakten zu Sätzen kommen aus dieser Berechnung - der KI-Text nennt sie nie (siehe
+//   server/utils/feedbackFactGuard.js).
+//
 // "eine klare Steigerung" nur, wenn mindestens ein Wert gestiegen und keiner gesunken ist.
 
 // Gesamtbilanz erst ab dieser Änderung (in %) erwähnen/werten.
@@ -27,6 +33,11 @@ export function buildDeltaSentence(item = {}, t, fmt) {
   const volumePct = Number(item.volume_change_percent) || 0
   const hasTop = typeof item.top_weight_kg === 'number'
   const topChange = Number(item.top_weight_change_kg) || 0
+
+  // null = älterer Eintrag ohne Satz-Daten zu den Wiederholungen
+  const repsSetChanges = Array.isArray(item.reps_set_changes)
+    ? item.reps_set_changes.filter((c) => c && Number(c.change) !== 0 && Number.isFinite(Number(c.change)))
+    : null
 
   const weightClauses = []
   // Werte für die Steigerungs-Wertung (Vorzeichen zählt).
@@ -65,13 +76,30 @@ export function buildDeltaSentence(item = {}, t, fmt) {
     signals.push(weightChangeKg)
   }
 
+  // Wiederholungen: je Satz (neue Einträge) bzw. Gesamt-Differenz (ältere Einträge, oder wenn nur
+  // zusätzliche/fehlende Sätze die Summe verändern - dann gibt es keine vergleichbaren Sätze).
+  const repsClauses = []
+  let repsChanged = false
+  if (repsSetChanges) {
+    for (const group of groupRepsChanges(repsSetChanges)) {
+      repsClauses.push(t(
+        group.change > 0 ? 'feedbackHistory.deltaRepsMoreInSet' : 'feedbackHistory.deltaRepsLessInSet',
+        { n: fmt(group.change), sets: formatSetList(group.sets, t) }
+      ))
+      signals.push(group.change)
+    }
+    repsChanged = repsClauses.length > 0
+  }
+  if (!repsChanged && repsChange !== 0 && (!repsSetChanges || setsChange !== 0)) {
+    repsClauses.push(t(repsChange > 0 ? 'feedbackHistory.deltaRepsMore' : 'feedbackHistory.deltaRepsLess', { n: fmt(repsChange) }))
+    signals.push(repsChange)
+    repsChanged = true
+  }
+
   const weightChanged = scope === 'mixed' || weightClauses.length > 0
   const parts = []
   if (weightClauses.length) parts.push(weightClauses.join(', '))
-  if (repsChange !== 0) {
-    parts.push(t(repsChange > 0 ? 'feedbackHistory.deltaRepsMore' : 'feedbackHistory.deltaRepsLess', { n: fmt(repsChange) }))
-    signals.push(repsChange)
-  }
+  if (repsClauses.length) parts.push(repsClauses.join(', '))
   if (setsChange !== 0) {
     parts.push(t(setsChange > 0 ? 'feedbackHistory.deltaSetsMore' : 'feedbackHistory.deltaSetsLess', { n: fmt(setsChange) }))
     signals.push(setsChange)
@@ -80,15 +108,15 @@ export function buildDeltaSentence(item = {}, t, fmt) {
   if (!parts.length) return t('feedbackHistory.deltaNoChange')
 
   // Nachsatz: was gleich geblieben ist (nach Kategorien Gewicht / Wdh. / Sätze).
-  const changedCount = [weightChanged, repsChange !== 0, setsChange !== 0].filter(Boolean).length
+  const changedCount = [weightChanged, repsChanged, setsChange !== 0].filter(Boolean).length
   let suffix = ''
   if (changedCount === 1) {
     if (weightChanged) suffix = t('feedbackHistory.deltaSuffixWeightChanged')
-    else if (repsChange !== 0) suffix = t('feedbackHistory.deltaSuffixRepsChanged')
+    else if (repsChanged) suffix = t('feedbackHistory.deltaSuffixRepsChanged')
     else suffix = t('feedbackHistory.deltaSuffixSetsChanged')
   } else if (changedCount === 2) {
     if (!weightChanged) suffix = t('feedbackHistory.deltaSuffixOnlyWeightUnchanged')
-    else if (repsChange === 0) suffix = t('feedbackHistory.deltaSuffixOnlyRepsUnchanged')
+    else if (!repsChanged) suffix = t('feedbackHistory.deltaSuffixOnlyRepsUnchanged')
     else suffix = t('feedbackHistory.deltaSuffixOnlySetsUnchanged')
   }
 
@@ -97,6 +125,22 @@ export function buildDeltaSentence(item = {}, t, fmt) {
   if (suffix) sentence += `, ${suffix}`
   sentence += isImprovement ? ` – ${t('feedbackHistory.deltaImprovement')}.` : '.'
   return sentence
+}
+
+// Gleiche Änderung zusammenfassen: [{set_number:1,change:1},{set_number:2,change:1},{set_number:7,change:-1}]
+// -> [{change:1,sets:[1,2]},{change:-1,sets:[7]}] (Reihenfolge nach erstem Auftreten).
+function groupRepsChanges(changes) {
+  const groups = []
+  for (const c of changes) {
+    const change = Number(c.change)
+    let group = groups.find((g) => g.change === change)
+    if (!group) {
+      group = { change, sets: [] }
+      groups.push(group)
+    }
+    group.sets.push(c.set_number)
+  }
+  return groups
 }
 
 // "3" oder "1, 2 und 3"

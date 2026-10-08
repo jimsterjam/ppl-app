@@ -33,8 +33,8 @@ import { getCoachSystemPromptText } from './OpenAIProvider.js';
 import VerifierAudit from '../models/VerifierAudit.js';
 import { languageDirective, EXERCISE_ORDER_DIRECTIVE, reorderBulletLinesByExerciseOrder } from '../utils/feedbackLocalization.js';
 
-const MIN_EXPECTED_WORDS = 40;
-const MAX_EXPECTED_WORDS = 220;
+const MIN_EXPECTED_WORDS = 20;
+const MAX_EXPECTED_WORDS = 180;
 
 // Deterministisches Sicherheitsnetz gegen Regel-4-Fehlklassifizierung durch den KI-Verifier
 // (siehe verifyFeedbackWithAI): trotz Few-Shot-Beispielen in getVerifierChecklistText() stempelte
@@ -245,7 +245,7 @@ export function checkNumberConsistency(feedbackText, structuredAnalysis) {
 }
 
 /**
- * Regel 17 (Wortbudget, ca. 80-150 Wörter) - grobzügiger Toleranzrahmen (40-220), da es hier
+ * Regel 17 (Wortbudget, ca. 40-100 Wörter) - grobzügiger Toleranzrahmen (20-180), da es hier
  * nur um klare Ausreißer geht (z.B. ein komplett zu langer Report-Text statt Chat-Nachricht),
  * nicht um eine exakte Wortzahl-Kontrolle.
  *
@@ -259,7 +259,7 @@ export function checkWordBudget(feedbackText) {
       ok: false,
       violations: [{
         rule: 17,
-        issue: `Wortanzahl (${wordCount}) deutlich außerhalb des erwarteten Rahmens (ca. 80-150 Wörter)`,
+        issue: `Wortanzahl (${wordCount}) deutlich außerhalb des erwarteten Rahmens (ca. 40-100 Wörter)`,
         value: wordCount
       }]
     };
@@ -345,7 +345,7 @@ Entwurfstext. Du generierst KEIN neues Feedback, du prüfst nur.
     externalLoadRelevant=false).
 14/15. Technikfokus-/Speed-Übungen nicht anhand von Gewicht/Volumen bewertet.
 16. Keine stumpfe Auflistung ALLER Rohzahlen je Übung (Dopplung zur separaten UI-Übersicht).
-17. Ton/Format: warme, kurze Chat-Nachricht (~80-150 Wörter), keine Überschriften/Report-Stil.
+17. Ton/Format: warme, kurze Chat-Nachricht (~40-100 Wörter), keine Überschriften/Report-Stil.
 18. Körpergewicht-Kraft-Gegenüberstellung (bodyweight_correlation, falls im Datensatz vorhanden):
     die Körpergewichtsänderung und die Kraft-Zusammenfassung dürfen NUR nebeneinander genannt
     werden, NIEMALS als Ursache-Wirkung verknüpft (z.B. "weil du zugenommen hast, bist du stärker
@@ -581,7 +581,7 @@ export function buildRevisionUserPrompt(structuredAnalysis, feedbackText, violat
   const hasExecutionOrGenericAdviceViolation = violations.some((v) => v.rule === 4 || v.rule === 11);
   // Bug-Fix Nr. 2 (Quality-Loop-Analyse): "ersatzlos weglassen" führte in der Praxis oft dazu,
   // dass der Text auf 30-40 Wörter zusammenschrumpfte und dadurch NEU gegen Regel 17
-  // (Wortbudget ~80-150) verstieß - eine Regel wurde behoben, eine andere dafür provoziert.
+  // (Wortbudget ~40-100) verstieß - eine Regel wurde behoben, eine andere dafür provoziert.
   // Deshalb jetzt an die tatsächliche aktuelle Wortzahl gekoppelt: nur wirklich ersatzlos
   // weglassen, wenn danach noch genug Text übrig bleibt, sonst durch eine kurze, aus den Daten
   // ableitbare Aussage ersetzen (damit die Länge erhalten bleibt).
@@ -593,14 +593,14 @@ oder eine generische Empfehlung NICHT durch eine ähnlich geartete neue Formulie
 auf die Technik" durch "achte darauf, wie sich das Gewicht anfühlt" zu ersetzen behebt den
 Verstoß NICHT, da beides eine unzulässige Aussage zu subjektivem Empfinden/Ausführung ist).
 ${closeToMinWords
-    ? `Der Entwurf hat aktuell nur ca. ${currentWordCount} Wörter (Ziel: ca. 80-150) - lass die
+    ? `Der Entwurf hat aktuell nur ca. ${currentWordCount} Wörter (Ziel: ca. 40-100) - lass die
 beanstandete Stelle deshalb NICHT ersatzlos weg (der Text würde sonst zu kurz werden und gegen
 Regel 17 verstoßen), sondern ERSETZE sie durch eine kurze, rein aus den Trainingsdaten
-ableitbare, konkrete Aussage (z.B. eine Zahl oder einen Trend aus den Daten), die ungefähr
-gleich lang ist wie die gestrichene Stelle.`
+ableitbare Einordnung (ohne Zahlen, ohne Satz-/Gewichts-/Wiederholungsaussage - FAKTEN-REGEL),
+die ungefähr gleich lang ist wie die gestrichene Stelle.`
     : `Lass die Stelle ERSATZLOS weg (der Text ist lang genug, das verkraftet die Wortzahl) oder
-ersetze sie durch eine rein aus den Trainingsdaten ableitbare, konkrete Aussage (z.B. eine Zahl
-oder einen Trend aus den Daten) - beides ist hier möglich.`}`
+ersetze sie durch eine rein aus den Trainingsdaten ableitbare Einordnung (ohne Zahlen, ohne
+Satz-/Gewichts-/Wiederholungsaussage - FAKTEN-REGEL) - beides ist hier möglich.`}`
     : '';
 
   return `TRAININGSDATEN (JSON, verbindliche Fakten):

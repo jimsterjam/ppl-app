@@ -338,7 +338,7 @@ describe('buildRevisionUserPrompt', () => {
   })
 
   test('Regel 4/11 bei kurzem Entwurf: NICHT ersatzlos weglassen, sondern datenbasiert ersetzen (Regel-17-Schutz)', () => {
-    const shortText = Array(50).fill('Wort').join(' ')
+    const shortText = Array(30).fill('Wort').join(' ')
     const prompt = buildRevisionUserPrompt({}, shortText, [{ rule: 4, issue: 'Ausführungsbezug' }])
     assert.match(prompt, /NICHT ersatzlos weg/)
     assert.match(prompt, /Regel 17/)

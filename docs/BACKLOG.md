@@ -10,7 +10,7 @@ trägt ihre Backlog-Änderung mit; bis zum Merge steht sie nur dort).
 Kennzeichnung: **[A]** autonom erlaubt · **[F]** Freigabe von Paul nötig · **[P]** wartet auf Paul
 (Info, Entscheidung oder Handgriff außerhalb des Repos). Priorität: P1 (zuerst) bis P3.
 
-Zuletzt aktualisiert: 2026-10-06
+Zuletzt aktualisiert: 2026-10-08
 
 ---
 
@@ -21,6 +21,7 @@ Zuletzt aktualisiert: 2026-10-06
 | A3 | P2 | Lint-Warnungen abbauen (aktuell 82, v. a. `no-unused-vars`) | Kleine PRs je Bereich, keine Verhaltensänderung, Zahl darf nur sinken. `server/routes` teils erledigt (PR dieser Runde); dort bleiben nur ungenutzte Funktionen in `workouts.js` (`countMatchingCompletedWorkouts`, `validateAndMapExercisesWithAutoAdd`, `estimateWorkoutDurationSeconds`) – Entfernen oder Nutzen klären. Größte Reste: `WorkoutDetailView.vue` (13), `StatsView.vue` (10), `relay/app.test.js` (6). |
 | A4 | P3 | Erledigte Planungsdokumente im Root nach `docs/archive/` verschieben | `WORKOUT_FIX_PLAN.md` (komplett ✅), `CODE_OPTIMIZATION_PLAN.md`/`MOBILE_OPTIMIZATION_PLAN.md` (fast fertig), Ollama-Dokumente. **Vorher** Verweise prüfen (Code-Kommentare, `.github/agents/`, `agents.md`) und mit anpassen. |
 | A8 | P3 | Relay-Wecken nur einmal gleichzeitig | `ensureRelayAwake` (`server/utils/aiClientFactory.js`) läuft bei parallelen Aufrufen (Warmup, Analyse, Verifier, Nachladen) mehrfach mit je 25 Anfragen. Auf einen gemeinsamen laufenden Versuch warten. Rein technisch, kein Verhalten für Nutzer. |
+| A9 | P3 | Eval-/Qualitäts-Skripte an die FAKTEN-REGEL anpassen | `server/scripts/evalCases/*.js`, `qualityLoopRunner.js`, `regressionTest_aiCoach.js` erwarten noch Texte mit Zahlen/Satzaussagen (alter Prompt). Nicht Teil von CI. Mit echtem KI-Zugang prüfen, wie der neue Prompt wirkt. |
 | A6 | P3 | Tests für Flows aus `TESTPHASE-TESTMATRIX.md` ohne Testabdeckung ergänzen | Erst Lücke benennen, dann je Flow ein kleiner PR. Nur reine Logik (Utils), keine UI-Mount-Tests ohne Infrastruktur. |
 
 ## Offen – Freigabe nötig [F]
@@ -35,7 +36,8 @@ Zuletzt aktualisiert: 2026-10-06
 | F6 | KI-Schwellen auf Produktionswerte vor Launch | `AI_FEEDBACK_MIN_REPETITIONS`/`_HISTORY_DAYS` stehen auf 1 (Prod: 8/28) – Render-Variablen, macht Paul. |
 | F7 | Crash-Reporting (z. B. Sentry) | Neuer externer Dienst + Datenübertragung. |
 | F8 | Android-Version | Zurückgestellt (01.10.), erst App Store fertig. |
-| F9 | „KI-Feedback“ ist eine Zusammenfassung | Vorschlag 04.10.: Zusammenfassung ohne KI (feste Texte, echte Zahlen, kostenlos), KI nur für echtes Coaching (Ursache, nächste Einheit, Verlauf über Wochen – vgl. F3/F4), Bezeichnung in der App anpassen. Produkt-/Preisentscheidung. |
+| F9 | „KI-Feedback“ ist eine Zusammenfassung | **Teil 1 erledigt (08.10.):** alle Fakten (Zahlen, Sätze, Richtung) schreibt der Code, die KI nur die Einordnung – erzwungen durch `feedbackFactGuard.js`. **Offen:** KI nur für echtes Coaching (Ursache, nächste Einheit, Verlauf über Wochen – vgl. F3/F4), Bezeichnung in der App anpassen („Zusammenfassung“ statt „KI-Feedback“), Preis-/Pro-Frage. |
+| F11 | Auswertung auch ohne KI anzeigen | Die fest berechnete Übersicht (Sätze, Gewicht, Wiederholungen, „Nächstes Mal“) braucht keine KI. Fällt die KI aus (Relay-429, Timeout), bleibt das Feedback bisher „Wird erstellt…“. Vorschlag: Übersicht sofort speichern/zeigen, KI-Einordnung nachliefern. Berührt Ablauf, Kontingent und Anzeige – Freigabe nötig. |
 | F10 | KI-Relay zuverlässig erreichbar machen | Render Free liefert beim Aufwecken teils 429 (Logs 01.–04.10.), GitHub-Pinger läuft unregelmäßig (Median 16 Min., bis 109 Min.). Optionen: Relay auf Render Starter (~7 $/Monat), Relay als Cloudflare Worker (kostenlos, neuer Dienst), Server auf Starter und Relay weglassen. Entscheidung + Konto/Secrets: Paul. |
 
 ## Wartet auf Paul [P]
@@ -62,6 +64,7 @@ Zuletzt aktualisiert: 2026-10-06
 
 Nur Produkt-/Architekturentscheidungen mit Datum. Dauerhafte Arbeitsregeln gehören in `CLAUDE.md`.
 
+- 2026-10-08 – Fakten vom Code, KI nur Einordnung: Der KI-Text darf keine Zahlen, Satzbezüge und keine Aussage zu Gewicht/Wiederholungen/Sätzen enthalten; entsprechende Zeilen werden entfernt, die Übersicht zeigt die Fakten je Satz.
 - 2026-10-04 – KI-Text mit einer Zahl, die nicht aus den Trainingsdaten stammt, wird nicht ausgeliefert (fester Hinweis statt Text).
 - 2026-10-04 – Tester-Gespräche sind keine Voraussetzung mehr für neue Coach-Funktionen.
 - 2026-10-03 – Autonomer Arbeitsmodus: Backlog in `docs/BACKLOG.md`, Ablauf im Skill `weiterarbeiten`.
@@ -74,6 +77,7 @@ Nur Produkt-/Architekturentscheidungen mit Datum. Dauerhafte Arbeitsregeln gehö
 
 ## Erledigt (die letzten 15)
 
+- 2026-10-08 – F9 Teil 1: Fakten je Satz kommen nur noch vom Code (Übersicht inkl. Wiederholungen je Satz), KI-Text ohne Zahlen/Satzaussagen (Auslöser: „Satz 7 von 6 auf 5“, tatsächlich 6 → 6)
 - 2026-10-06 – A7 KI-Analyse vergleicht nur noch mit abgeschlossenen Workouts (Entwürfe/unfertige zählen weder als letzte Session noch im Verlauf noch beim Körpergewicht)
 - 2026-10-04 – Feedback-Zahlen: 1,25-kg-Schritte genau (31,25 statt 31,3), keine Ø-Gewichte an die KI, KI-Text mit erfundener Zahl wird zurückgehalten
 - 2026-10-04 – A5 `server/.env.example` angelegt (nur Namen/Platzhalter), `.gitignore` lässt sie zu
@@ -88,4 +92,3 @@ Nur Produkt-/Architekturentscheidungen mit Datum. Dauerhafte Arbeitsregeln gehö
 - 2026-10-01 – #5 Push/Merge auf `main` für Claude technisch gesperrt
 - 2026-10-01 – #4 Impressum ohne `v-html`
 - 2026-09-30 – #3 Lint-Autofix (240 → 100 Warnungen)
-- 2026-09-30 – #2 Timer-Guard-Test an neues Verhalten angepasst

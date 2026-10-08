@@ -946,6 +946,10 @@ export const messages = {
       deltaVolumeDown: 'insgesamt {pct} % weniger Gewicht bewegt',
       deltaRepsMore: '{n} Wiederholungen mehr geschafft',
       deltaRepsLess: '{n} Wiederholungen weniger geschafft',
+      // Wiederholungen je Satz (neue Einträge, siehe reps_set_changes) - benennt die betroffenen
+      // Sätze, damit eine Änderung nie dem falschen Satz zugeordnet wird.
+      deltaRepsMoreInSet: '{n} Wdh. mehr (Satz {sets})',
+      deltaRepsLessInSet: '{n} Wdh. weniger (Satz {sets})',
       deltaSetsMore: '{n} Sätze mehr gemacht',
       deltaSetsLess: '{n} Sätze weniger gemacht',
       // Nachsätze für den Fall, dass nur EIN Wert sich verändert hat - benennen explizit, dass
@@ -2160,6 +2164,8 @@ export const messages = {
       deltaVolumeDown: '{pct}% less total weight moved',
       deltaRepsMore: 'did {n} more reps',
       deltaRepsLess: 'did {n} fewer reps',
+      deltaRepsMoreInSet: 'reps +{n} (set {sets})',
+      deltaRepsLessInSet: 'reps −{n} (set {sets})',
       deltaSetsMore: 'did {n} more sets',
       deltaSetsLess: 'did {n} fewer sets',
       deltaSuffixWeightChanged: 'with the same number of sets and reps',
