@@ -10,7 +10,7 @@ trägt ihre Backlog-Änderung mit; bis zum Merge steht sie nur dort).
 Kennzeichnung: **[A]** autonom erlaubt · **[F]** Freigabe von Paul nötig · **[P]** wartet auf Paul
 (Info, Entscheidung oder Handgriff außerhalb des Repos). Priorität: P1 (zuerst) bis P3.
 
-Zuletzt aktualisiert: 2026-10-08
+Zuletzt aktualisiert: 2026-10-09
 
 ---
 
@@ -22,6 +22,8 @@ Zuletzt aktualisiert: 2026-10-08
 | A4 | P3 | Erledigte Planungsdokumente im Root nach `docs/archive/` verschieben | `WORKOUT_FIX_PLAN.md` (komplett ✅), `CODE_OPTIMIZATION_PLAN.md`/`MOBILE_OPTIMIZATION_PLAN.md` (fast fertig), Ollama-Dokumente. **Vorher** Verweise prüfen (Code-Kommentare, `.github/agents/`, `agents.md`) und mit anpassen. |
 | A8 | P3 | Relay-Wecken nur einmal gleichzeitig | `ensureRelayAwake` (`server/utils/aiClientFactory.js`) läuft bei parallelen Aufrufen (Warmup, Analyse, Verifier, Nachladen) mehrfach mit je 25 Anfragen. Auf einen gemeinsamen laufenden Versuch warten. Rein technisch, kein Verhalten für Nutzer. |
 | A9 | P3 | Eval-/Qualitäts-Skripte an die FAKTEN-REGEL anpassen | `server/scripts/evalCases/*.js`, `qualityLoopRunner.js`, `regressionTest_aiCoach.js` erwarten noch Texte mit Zahlen/Satzaussagen (alter Prompt). Nicht Teil von CI. Mit echtem KI-Zugang prüfen, wie der neue Prompt wirkt. |
+| A10 | P3 | Startton in `WorkoutSplash.vue` lädt `/sounds/start-long.mp3`, die Datei gibt es nicht | `client/public/sounds/` existiert nicht (nie im Repo). Ton klären (Datei ergänzen oder Synthese wie im Timer) – ohne Ton-Entscheidung von Paul nur melden. |
+| A11 | P3 | Intervall-Timer-Mitteilungen (`timerStore.js`) ohne Ton | Gleiches Muster wie beim Pausentimer: ohne `sound` stumm im Hintergrund. Nach dem Test von `rest-end.wav` (P4) übernehmen. |
 | A6 | P3 | Tests für Flows aus `TESTPHASE-TESTMATRIX.md` ohne Testabdeckung ergänzen | Erst Lücke benennen, dann je Flow ein kleiner PR. Nur reine Logik (Utils), keine UI-Mount-Tests ohne Infrastruktur. |
 
 ## Offen – Freigabe nötig [F]
@@ -47,7 +49,7 @@ Zuletzt aktualisiert: 2026-10-08
 | P1 | Tester-Gespräche (Leitfaden im Chat 02.10.) – optional, keine Voraussetzung mehr für F3/F4 (04.10.) |
 | P2 | App Store Connect: Bezahlvertrag/Steuer/Bank, Screenshots, Texte, Support-URL, Datenschutzangaben, Demo-Zugang |
 | P3 | Impressum/Datenschutz: echte Angaben (beim Wechsel TestFlight → App Store), öffentliche Datenschutz-URL |
-| P4 | iOS-Build mit Stand `main` testen: Diagnose (#7/#8), FAQ (#6), Texteingaben (#9), Pausentimer (#10/#11) |
+| P4 | iOS-Build mit Stand `main` testen: Diagnose (#7/#8), FAQ (#6), Texteingaben (#9), Pausentimer (#10/#11), Pausen-Gong nach App-Wechsel und im Hintergrund (Xcode: `rest-end.wav` unter App und in „Copy Bundle Resources“ prüfen; Einstellungen → Debug-Log kopieren: Einträge `audio-state`, `audio-rearm`) |
 
 ## Bekannte Probleme
 
@@ -77,6 +79,7 @@ Nur Produkt-/Architekturentscheidungen mit Datum. Dauerhafte Arbeitsregeln gehö
 
 ## Erledigt (die letzten 15)
 
+- 2026-10-09 – Pausen-Gong nach App-Wechsel (iOS-Zustand „interrupted“) und Ton der Pausenende-Mitteilung im Hintergrund (`rest-end.wav`); auf dem Gerät noch ungeprüft (P4)
 - 2026-10-08 – F9 Teil 1: Fakten je Satz kommen nur noch vom Code (Übersicht inkl. Wiederholungen je Satz), KI-Text ohne Zahlen/Satzaussagen (Auslöser: „Satz 7 von 6 auf 5“, tatsächlich 6 → 6)
 - 2026-10-06 – A7 KI-Analyse vergleicht nur noch mit abgeschlossenen Workouts (Entwürfe/unfertige zählen weder als letzte Session noch im Verlauf noch beim Körpergewicht)
 - 2026-10-04 – Feedback-Zahlen: 1,25-kg-Schritte genau (31,25 statt 31,3), keine Ø-Gewichte an die KI, KI-Text mit erfundener Zahl wird zurückgehalten
@@ -91,4 +94,3 @@ Nur Produkt-/Architekturentscheidungen mit Datum. Dauerhafte Arbeitsregeln gehö
 - 2026-10-01 – #6 FAQ aktualisiert, neue Einträge Ablauf/Symbole, Ziel-Abfrage 8–12/1–6
 - 2026-10-01 – #5 Push/Merge auf `main` für Claude technisch gesperrt
 - 2026-10-01 – #4 Impressum ohne `v-html`
-- 2026-09-30 – #3 Lint-Autofix (240 → 100 Warnungen)

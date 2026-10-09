@@ -26,6 +26,7 @@ import { startFeedbackTracker, FEEDBACK_READY_EVENT } from '@/utils/feedbackTrac
 import { useToastStore } from '@/stores/toastStore'
 import { stripWorkoutNameDate } from '@/utils/workoutName'
 import { reapplyKeepAwake } from '@/utils/keepAwakeGuard'
+import { rearmAudio } from '@/utils/timerAudio'
 // Bewusst NICHT statisch importiert (siehe warmupExercisesArea unten): defaultExercisesLoader.js
 // importiert die ~3,3MB große Übungsdatenbank (default-exercises.json) statisch - ein Top-Level-
 // Import hier würde sie fest in den Haupt-Bundle-Chunk backen, obwohl sie erst gebraucht wird,
@@ -398,6 +399,8 @@ CapacitorApp.addListener('appStateChange', async ({ isActive }) => {
     }
     // Bildschirm-an-Sperre (Stoppuhr/Pausentimer) nach App-Wechsel neu setzen.
     reapplyKeepAwake()
+    // iOS stoppt den Ton im Hintergrund - wieder aufwecken, sonst bleibt der Pausen-Gong stumm.
+    rearmAudio()
     await tryRestoreLastRoute('appState-active')
     timerStore.restoreState('appState-active')
   } catch {}
@@ -412,6 +415,7 @@ if (typeof document !== 'undefined') {
     } else {
       timerStore.setAppActive(true)
       reapplyKeepAwake()
+      rearmAudio()
     }
   })
 }
