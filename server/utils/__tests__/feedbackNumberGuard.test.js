@@ -36,3 +36,51 @@ describe('guardFeedbackNumbers', () => {
     assert.equal(/\d/.test(withheldFeedbackText('en')), false)
   })
 })
+
+// User-Report 04.10. abends: trotz Sicherung kam "27,5kg" durch - die alte Prüfung ließ jede
+// Kommazahl zu, deren auf eine ganze Zahl gerundeter Wert irgendwo in den Daten stand (hier
+// z.B. 28 Tage seit der letzten Session).
+describe('guardFeedbackNumbers - Report 04.10. abends (drei Übungen)', () => {
+  const row = (w) => ({ name: 'Lever T Bar Row', setDetails: sets([[10, w], [10, w], [10, w]]) })
+  const fly = (r) => ({ name: 'Reverse Fly Seated Parallel Grip', setDetails: sets([[r, 20], [r, 20], [r, 20]]) })
+  const data = () => ({
+    ...structureAnalysisForAI([
+      analyzeExercise('Weighted Pull-Up', today, last, 28),
+      analyzeExercise('Lever T Bar Row', row(42.5), row(40), 28),
+      analyzeExercise('Reverse Fly Seated Parallel Grip', fly(12), fly(10), 28)
+    ]),
+    response_language: 'de'
+  })
+  const reportText = [
+    'Guter Trainingstag!  Kurz zusammengefasst:',
+    '',
+    '- Weighted Pull-Up: Bei den ersten drei Sätzen hast du 27,5kg genutzt, was eine super Steigerung ist – mehr Wiederholungen in Satz 1.',
+    '- Lever T Bar Row: Gewicht in allen Sätzen um 2,5kg erhöht – stabil!',
+    '- Reverse Fly Seated Parallel Grip: Tolle Leistung mit 20% mehr Volumen durch zwei Wiederholungen mehr in jedem Satz.'
+  ].join('\n')
+
+  test('Text aus dem Report wird zurückgehalten (27,5 kg trotz 28 in den Daten)', () => {
+    const result = guardFeedbackNumbers(reportText, data())
+    assert.equal(result.withheld, true)
+    assert.ok(result.invalidNumbers.includes(27.5))
+  })
+
+  test('korrekte Fassung bleibt stehen', () => {
+    const text = reportText.replace('27,5kg', '32,5kg')
+    const result = guardFeedbackNumbers(text, data())
+    assert.equal(result.withheld, false)
+  })
+
+  test('kg-Zahl einer anderen Übung zählt nicht (32,5 kg gehört zu den Pull-Ups, nicht zur Row)', () => {
+    const text = '- Lever T Bar Row: alle Sätze mit 32,5kg.'
+    const result = guardFeedbackNumbers(text, data())
+    assert.equal(result.withheld, true)
+    assert.deepEqual(result.invalidNumbers, [32.5])
+  })
+
+  test('forceWithhold (Verifier konnte Zahlen-Fund nicht korrigieren) hält auch sauberen Text zurück', () => {
+    const result = guardFeedbackNumbers('Weighted Pull-Up: gut gemacht.', data(), { forceWithhold: true })
+    assert.equal(result.withheld, true)
+    assert.equal(result.text, withheldFeedbackText('de'))
+  })
+})

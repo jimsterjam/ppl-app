@@ -24,9 +24,11 @@ export function withheldFeedbackText(language = 'de') {
  * @param {Object} structuredAnalysis - Ergebnis von structureAnalysisForAI()
  * @returns {{ text: string, withheld: boolean, invalidNumbers: number[] }}
  */
-export function guardFeedbackNumbers(feedbackText, structuredAnalysis) {
+export function guardFeedbackNumbers(feedbackText, structuredAnalysis, { forceWithhold = false } = {}) {
   const check = checkNumberConsistency(feedbackText, structuredAnalysis);
-  if (check.ok) return { text: feedbackText, withheld: false, invalidNumbers: [] };
+  // forceWithhold: der Verifier-Loop hat einen Zahlen-Fund (z.B. falsche kg-Angabe der Prüf-KI)
+  // nicht korrigieren können (runVerificationLoop -> withholdText).
+  if (check.ok && !forceWithhold) return { text: feedbackText, withheld: false, invalidNumbers: [] };
   return {
     text: withheldFeedbackText(structuredAnalysis?.response_language),
     withheld: true,

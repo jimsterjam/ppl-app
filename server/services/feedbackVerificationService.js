@@ -63,6 +63,12 @@ export function isQuoteVerifiable(violation, feedbackText) {
   return normalize(feedbackText).includes(normalize(quote));
 }
 
+/** Regel-1-Fund der Prüf-KI mit einer kg-Angabe im Zitat (siehe verifyFeedbackWithAI, Filter 3). */
+export function isWeightBackedRule1Violation(violation) {
+  if (Number(violation?.rule) !== 1) return false;
+  return /\d+(?:[.,]\d+)?\s*(?:kg|kilo)/i.test(String(violation?.quote || ''));
+}
+
 export function isKeywordBackedRule4Violation(violation) {
   // Bug-Fix Nr. 2 (Quality-Loop-Analyse, zweite Runde): NUR `quote` (das tatsächliche Zitat aus
   // dem Entwurf) zählt, NICHT `issue` (die Begründung). Grund: das Modell schreibt in `issue`
@@ -113,17 +119,42 @@ function round1(n) {
  */
 export function collectAllowedNumbers(structuredAnalysis) {
   const allowed = new Set();
-  const add = (value) => {
-    if (value === null || value === undefined) return;
-    const n = Number(value);
-    if (!Number.isFinite(n)) return;
+  for (const n of collectRawDataNumbers(structuredAnalysis)) {
     allowed.add(round1(n));
     allowed.add(round1(Math.abs(n)));
     allowed.add(Math.round(n));
     allowed.add(Math.round(Math.abs(n)));
+  }
+  return allowed;
+}
+
+function round2(n) {
+  return Math.round(Number(n) * 100) / 100;
+}
+
+/**
+ * Rohwerte (ungerundet) aller Zahlen, die legitim aus den Daten stammen - Grundlage für die
+ * großzügige Menge (collectAllowedNumbers) UND den exakten Abgleich von Kommazahlen
+ * (checkNumberConsistency).
+ *
+ * Bewusst NICHT enthalten (User-Report 04.10., "27,5 kg" bei Weighted Pull-Ups): die
+ * Session-Durchschnitte current_weight/previous_weight und changes.weight_change_kg (Ø-Differenz)
+ * - die KI sieht sie im Prompt nicht (nur satzgenaue Werte), eine solche Zahl im Text ist also
+ * nie ein legitimes Zitat.
+ *
+ * @param {Object} structuredAnalysis
+ * @returns {number[]}
+ */
+export function collectRawDataNumbers(structuredAnalysis) {
+  const values = [];
+  const add = (value) => {
+    if (value === null || value === undefined) return;
+    const n = Number(value);
+    if (!Number.isFinite(n)) return;
+    values.push(n);
   };
 
-  if (!structuredAnalysis || typeof structuredAnalysis !== 'object') return allowed;
+  if (!structuredAnalysis || typeof structuredAnalysis !== 'object') return values;
 
   add(structuredAnalysis.total_exercises_analyzed);
   add(structuredAnalysis.athlete_bodyweight_kg);
@@ -145,11 +176,9 @@ export function collectAllowedNumbers(structuredAnalysis) {
   }
 
   for (const ex of structuredAnalysis.exercises || []) {
-    add(ex.current_weight);
     add(ex.current_reps);
     add(ex.current_sets);
     add(ex.current_volume);
-    add(ex.previous_weight);
     add(ex.previous_reps);
     add(ex.previous_sets);
     add(ex.previous_volume);
@@ -165,11 +194,14 @@ export function collectAllowedNumbers(structuredAnalysis) {
     add(ex.estimated_1rm_kg);
     add(ex.current_weight_percent_of_1rm);
 
-    add(ex.changes?.weight_change_kg);
     add(ex.changes?.reps_change);
     add(ex.changes?.sets_change);
     add(ex.changes?.volume_change_kg);
     add(ex.changes?.volume_change_percent);
+    // Schwerster Satz (echte Satzgewichte, kein Durchschnitt).
+    add(ex.changes?.top_set_weight_kg);
+    add(ex.changes?.previous_top_set_weight_kg);
+    add(ex.changes?.top_set_weight_change_kg);
 
     // Bug-Fix (Quality-Loop-Analyse): Zahlen, die direkt aus einer Nutzer-Notiz zitiert werden
     // (z.B. "Bewusster Deload alle 6 Wochen" in note_context.persistent.text), sind eine
@@ -208,14 +240,115 @@ export function collectAllowedNumbers(structuredAnalysis) {
 
   for (const e of structuredAnalysis.top_improvements || []) {
     add(e.volume_change_percent);
-    add(e.weight_change_kg);
   }
   for (const e of structuredAnalysis.top_declines || []) {
     add(e.volume_change_percent);
-    add(e.weight_change_kg);
   }
 
-  return allowed;
+  return values;
+}
+
+/**
+ * Gewichtswerte (kg) EINER Übung, die im Text als "… kg" stehen dürfen: Satzgewichte jetzt und
+ * vorher, Gewichtsänderung je Satz, schwerster Satz, hinterlegtes 1RM.
+ */
+function weightValuesForExercise(ex) {
+  const values = [];
+  const add = (v) => {
+    const n = Number(v);
+    if (v === null || v === undefined || !Number.isFinite(n)) return;
+    values.push(round2(n), round2(Math.abs(n)));
+  };
+  for (const s of ex?.sets_comparison || []) {
+    add(s.current_weight);
+    add(s.previous_weight);
+    add(s.weight_change_kg);
+  }
+  add(ex?.changes?.top_set_weight_kg);
+  add(ex?.changes?.previous_top_set_weight_kg);
+  add(ex?.changes?.top_set_weight_change_kg);
+  add(ex?.estimated_1rm_kg);
+  return values;
+}
+
+function bodyweightValues(structuredAnalysis) {
+  const bc = structuredAnalysis?.bodyweight_correlation || {};
+  return [
+    structuredAnalysis?.athlete_bodyweight_kg,
+    bc.current_bodyweight_kg,
+    bc.previous_bodyweight_kg,
+    bc.bodyweight_change_kg
+  ]
+    .filter((v) => v !== null && v !== undefined && Number.isFinite(Number(v)))
+    .flatMap((v) => [round2(v), round2(Math.abs(Number(v)))]);
+}
+
+/**
+ * Kopie ohne Session-Durchschnitte (current_weight/previous_weight, changes.weight_change_kg) -
+ * für die JSON-Daten an Prüf- und Korrektur-KI. Die Coach-KI sieht diese Werte im Prompt nicht;
+ * stünden sie hier, könnte die Korrektur genau so eine Ø-Zahl wieder einbauen.
+ */
+export function withoutAverageWeights(structuredAnalysis) {
+  if (!structuredAnalysis || typeof structuredAnalysis !== 'object') return structuredAnalysis;
+  return {
+    ...structuredAnalysis,
+    exercises: (structuredAnalysis.exercises || []).map((ex) => {
+      // eslint-disable-next-line no-unused-vars
+      const { current_weight, previous_weight, ...rest } = ex || {};
+      if (rest.changes && typeof rest.changes === 'object') {
+        // eslint-disable-next-line no-unused-vars
+        const { weight_change_kg, ...changes } = rest.changes;
+        rest.changes = changes;
+      }
+      return rest;
+    })
+  };
+}
+
+const KG_MENTION_RE = /(\d+(?:[.,]\d+)?)\s*(?:kg|kilo)/gi;
+
+/**
+ * Regel 1, Teil 2: Jede kg-Angabe muss EXAKT (2 Nachkommastellen) ein Gewicht derselben Übung
+ * sein. Zuordnung über die Zeile: nennt die Zeile eine Übung, zählen nur deren Gewichte; sonst
+ * die Gewichte aller Übungen. Körpergewicht-Werte sind immer erlaubt.
+ *
+ * User-Report 04.10.: "Weighted Pull-Up: Bei den ersten drei Sätzen hast du 27,5kg genutzt" -
+ * die Sätze hatten 32,5 kg. Der alte Check ließ 27,5 durch, weil gerundet 28 irgendwo in den
+ * Daten stand.
+ *
+ * @returns {{ ok: boolean, violations: Array<{rule:number, issue:string, value:number, quote:string}> }}
+ */
+export function checkWeightMentions(feedbackText, structuredAnalysis) {
+  const exercises = Array.isArray(structuredAnalysis?.exercises) ? structuredAnalysis.exercises : [];
+  const perExercise = exercises.map((ex) => ({
+    name: String(ex?.exercise || '').trim().toLowerCase(),
+    weights: new Set(weightValuesForExercise(ex))
+  }));
+  const allWeights = new Set(perExercise.flatMap((e) => [...e.weights]));
+  const bodyweight = new Set(bodyweightValues(structuredAnalysis));
+  const violations = [];
+
+  for (const line of String(feedbackText ?? '').split('\n')) {
+    const lower = line.toLowerCase();
+    // Längster passender Name gewinnt (z.B. "Barbell Row" vs. "Row").
+    const match = perExercise
+      .filter((e) => e.name && lower.includes(e.name))
+      .sort((a, b) => b.name.length - a.name.length)[0];
+    const allowed = match ? match.weights : allWeights;
+    for (const m of line.matchAll(KG_MENTION_RE)) {
+      const value = round2(Number(m[1].replace(',', '.')));
+      if (!Number.isFinite(value) || allowed.has(value) || bodyweight.has(value)) continue;
+      violations.push({
+        rule: 1,
+        issue: match
+          ? 'Gewichtsangabe passt zu keinem Satz dieser Übung'
+          : 'Gewichtsangabe passt zu keinem Satzgewicht in den Trainingsdaten',
+        value,
+        quote: m[0]
+      });
+    }
+  }
+  return { ok: violations.length === 0, violations };
 }
 
 /**
@@ -228,17 +361,29 @@ export function collectAllowedNumbers(structuredAnalysis) {
  * @returns {{ ok: boolean, violations: Array<{rule: number, issue: string, value: number}> }}
  */
 export function checkNumberConsistency(feedbackText, structuredAnalysis) {
+  const raw = collectRawDataNumbers(structuredAnalysis);
   const allowed = collectAllowedNumbers(structuredAnalysis);
+  // Kommazahlen exakt (2 Nachkommastellen): 27,5 darf nicht über "gerundet 28" durchrutschen.
+  const exact = new Set(raw.flatMap((n) => [round2(n), round2(Math.abs(n))]));
   const found = extractNumbersFromText(feedbackText);
   const violations = [];
 
   for (const n of found) {
-    if (allowed.has(round1(n)) || allowed.has(Math.round(n))) continue;
+    const ok = Number.isInteger(n)
+      ? allowed.has(n)
+      : exact.has(round2(n));
+    if (ok) continue;
     violations.push({
       rule: 1,
       issue: 'Im Entwurf genannte Zahl kommt in den Trainingsdaten nicht vor',
       value: n
     });
+  }
+
+  // kg-Angaben zusätzlich je Übung prüfen (Zahl kommt vor, gehört aber zu etwas anderem).
+  const weightCheck = checkWeightMentions(feedbackText, structuredAnalysis);
+  for (const v of weightCheck.violations) {
+    if (!violations.some((existing) => existing.value === v.value)) violations.push(v);
   }
 
   return { ok: violations.length === 0, violations };
@@ -413,7 +558,7 @@ export function buildVerifierUserPrompt(structuredAnalysis, feedbackText, determ
     : '';
 
   return `TRAININGSDATEN (JSON, verbindliche Fakten):
-${JSON.stringify(structuredAnalysis)}
+${JSON.stringify(withoutAverageWeights(structuredAnalysis))}
 
 ENTWURFSTEXT DES COACHES:
 <draft>${String(feedbackText ?? '').replace(/[<>]/g, '')}</draft>${hints}
@@ -512,14 +657,18 @@ export async function verifyFeedbackWithAI(structuredAnalysis, feedbackText, opt
   // nachweislich unzuverlässiger (z.B. wurde "100%" als falsch moniert, obwohl genau dieser Wert
   // in den Daten steht) - ein rein KI-basierter Regel-1-Fund fügt also nur Rauschen/False-
   // Positives hinzu, ohne echten zusätzlichen Nutzen gegenüber dem Code-Check.
-  const droppedAiRule1 = verifiableViolations.filter((v) => v.rule === 1);
+  // Ausnahme (User-Report 04.10.): Regel-1-Funde, deren wörtliches Zitat eine kg-Angabe enthält,
+  // bleiben erhalten - dort lag die Prüf-KI richtig ("27,5kg" statt 32,5 kg), während der
+  // Code-Check die Zahl durchließ.
+  const droppedAiRule1 = verifiableViolations.filter((v) => v.rule === 1 && !isWeightBackedRule1Violation(v));
   if (droppedAiRule1.length > 0) {
     logger.debug('🧹 Verifier: KI-eigener Regel-1-Fund verworfen (deterministischer Check ist bereits maßgeblich)', {
       requestId,
       dropped: droppedAiRule1.map((v) => ({ issue: v.issue, quote: v.quote }))
     });
   }
-  const violations = verifiableViolations.filter((v) => v.rule !== 1 && (v.rule !== 4 || isKeywordBackedRule4Violation(v)));
+  const violations = verifiableViolations.filter((v) =>
+    (v.rule !== 1 || isWeightBackedRule1Violation(v)) && (v.rule !== 4 || isKeywordBackedRule4Violation(v)));
 
   // Bug-Fix (per Quality-Loop-Batch-Analyse gefunden, scripts/qualityLoopRunner.js): `ok`
   // ausschließlich anhand der tatsächlich benannten `violations` bestimmen, NICHT zusätzlich am
@@ -604,7 +753,7 @@ oder einen Trend aus den Daten) - beides ist hier möglich.`}`
     : '';
 
   return `TRAININGSDATEN (JSON, verbindliche Fakten):
-${JSON.stringify(structuredAnalysis)}
+${JSON.stringify(withoutAverageWeights(structuredAnalysis))}
 
 BISHERIGER ENTWURFSTEXT (enthält mindestens einen bestätigten Regelverstoß):
 <draft>${String(feedbackText ?? '').replace(/[<>]/g, '')}</draft>
@@ -832,9 +981,16 @@ export async function runVerificationLoop({ structuredAnalysis, feedbackText, re
     }
   }
 
+  // Zahlen-Verstoß (Regel 1) ohne erfolgreiche Korrektur: Text NICHT ausliefern (der Aufrufer
+  // ersetzt ihn durch den festen Hinweis, siehe utils/feedbackNumberGuard.js). Früher ging in
+  // diesem Fall der Originaltext raus - genau so kam "27,5kg" beim Nutzer an (User-Report 04.10.).
+  const hadRule1 = [...deterministic.violations, ...(aiResult?.violations || [])].some((v) => v.rule === 1);
+  const withholdText = mode === 'active' && hadRule1 && revisionSucceeded !== true;
+
   logger.debug('🔍 Feedback-Verifier: Prüfung abgeschlossen', {
     requestId,
     mode,
+    withholdText,
     deterministicOk: deterministic.ok,
     aiOk: aiResult?.ok ?? null,
     aiCheckFailed,
@@ -864,6 +1020,7 @@ export async function runVerificationLoop({ structuredAnalysis, feedbackText, re
     triggeredRules,
     revisionAttempted,
     revisionSucceeded,
+    withholdText,
     feedbackText: finalFeedbackText
   };
 }

@@ -2349,6 +2349,7 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
     if (aiResult?.feedback) {
       const verifierMode = getVerifierMode();
       let verifierMetadata = null;
+      let verifierWithhold = false;
 
       // Feedback-Qualitäts-Loop, Phase 2 (AI_VERIFIER_MODE=active): VOR dem Persistieren/
       // Versenden prüfen und bei einem bestätigten Verstoß gezielt korrigieren (siehe
@@ -2366,6 +2367,7 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
             requestId
           });
           aiResult.feedback = verification.feedbackText || aiResult.feedback;
+          verifierWithhold = verification.withholdText === true;
           verifierMetadata = {
             revisionAttempted: verification.revisionAttempted,
             revisionSucceeded: verification.revisionSucceeded
@@ -2382,7 +2384,7 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
 
       // Letzte Sicherung: Text mit einer Zahl, die nicht aus den Trainingsdaten stammt, wird nicht
       // ausgeliefert (auch nicht nach gescheiterter Korrektur) - siehe utils/feedbackNumberGuard.js.
-      const numberGuard = guardFeedbackNumbers(aiResult.feedback, structuredAnalysis);
+      const numberGuard = guardFeedbackNumbers(aiResult.feedback, structuredAnalysis, { forceWithhold: verifierWithhold });
       if (numberGuard.withheld) {
         logger.warn('⚠️ KI-Feedback zurückgehalten: Zahl passt nicht zu den Trainingsdaten', {
           requestId, workoutId, invalidNumbers: numberGuard.invalidNumbers
