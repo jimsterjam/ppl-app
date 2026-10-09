@@ -390,7 +390,7 @@ export function checkNumberConsistency(feedbackText, structuredAnalysis) {
 }
 
 /**
- * Regel 17 (Wortbudget, ca. 80-150 Wörter) - grobzügiger Toleranzrahmen (40-220), da es hier
+ * Regel 17 (Wortbudget, ca. 60-130 Wörter) - grobzügiger Toleranzrahmen (40-220), da es hier
  * nur um klare Ausreißer geht (z.B. ein komplett zu langer Report-Text statt Chat-Nachricht),
  * nicht um eine exakte Wortzahl-Kontrolle.
  *
@@ -404,7 +404,7 @@ export function checkWordBudget(feedbackText) {
       ok: false,
       violations: [{
         rule: 17,
-        issue: `Wortanzahl (${wordCount}) deutlich außerhalb des erwarteten Rahmens (ca. 80-150 Wörter)`,
+        issue: `Wortanzahl (${wordCount}) deutlich außerhalb des erwarteten Rahmens (ca. 60-130 Wörter)`,
         value: wordCount
       }]
     };
@@ -470,13 +470,19 @@ Entwurfstext. Du generierst KEIN neues Feedback, du prüfst nur.
    - AUSNAHME: hat eine Übung profile_hint.exerciseType = "technique" ODER erwähnt ihre Notiz
      Technikfokus, ist laut Regel 13/14 GENAU EIN neutraler Satz zur Technik dieser Übung
      ausdrücklich erlaubt und KEIN Regel-4-Verstoß (z.B. "Diese Übung war technikfokussiert" oder
-     ein einzelner Hinweis, weiter an der Technik zu arbeiten). Melde Regel 4 in diesem Fall nur,
-     wenn es MEHR als ein solcher Satz zu dieser Übung ist oder eine konkrete Ausführungs-/
-     Tempo-/Schmerz-Bewertung dazukommt.
+     ein einzelner Hinweis, weiter an der Technik zu arbeiten). Gleiches gilt, wenn die Notiz eine
+     BEWUSSTE Entscheidung beschreibt (z.B. weniger Gewicht, um den Zielmuskel besser zu treffen):
+     diese Entscheidung zu bestätigen und kurz fachlich einzuordnen (bis zu ZWEI Sätze, z.B. "gute
+     Entscheidung, bei Muskelaufbau zählt der Reiz am Zielmuskel") ist KEIN Regel-4-Verstoß. Melde
+     Regel 4 in diesem Fall nur, wenn es mehr als zwei solcher Sätze zu dieser Übung sind oder die
+     TATSÄCHLICHE Ausführung bewertet wird (z.B. "deine Technik war sauber") - die kennt die App nicht.
 5. Keine medizinischen Diagnosen (Verletzung, Überlastung, Gelenkproblem, Regenerationsproblem).
 6. Fakt und Interpretation klar getrennt, keine Interpretation als Tatsache formuliert.
 7. Keine endgültigen Urteile/Anweisungen bei mehrdeutiger Datenlage - nur bedingte Hinweise.
 8. Keine automatische Wertung von Gewichts-/Volumenveränderung als per se positiv/negativ.
+   KEIN Verstoß: eine in der Notiz begründete, bewusste Gewichtsänderung als gute Entscheidung zu
+   bestätigen. Ein Verstoß ist dagegen, eine solche bewusste Reduktion als Verlust/Rückschritt zu
+   formulieren.
 9. Keine Überinterpretation einer einzelnen Trainingseinheit als langfristige Entwicklung.
 10. Trend über mehrere Einheiten: einzelne Abweichungen NICHT als Trend verallgemeinern. Nur ein
     tatsächlich belegter, wiederkehrender Verlauf (z.B. durch eine bestätigte persistente Notiz,
@@ -485,12 +491,14 @@ Entwurfstext. Du generierst KEIN neues Feedback, du prüfst nur.
     widersprüchlichen Daten keine eindeutige Entwicklung behaupten.
 11. Keine erfundene/generische Empfehlung ohne konkreten Datenbezug; maximal 3 Hinweise.
 12. Notizen des Nutzers korrekt berücksichtigt (z.B. Stagnation nicht negativ bewertet, wenn
-    eine Notiz das erklärt).
+    eine Notiz das erklärt; eine bewusste Entscheidung aus der Notiz nicht als Rückschritt
+    dargestellt).
 13. Übungsprofil (profile_hint) beachtet, falls vorhanden (z.B. keine Gewichtsaussage bei
     externalLoadRelevant=false).
 14/15. Technikfokus-/Speed-Übungen nicht anhand von Gewicht/Volumen bewertet.
 16. Keine stumpfe Auflistung ALLER Rohzahlen je Übung (Dopplung zur separaten UI-Übersicht).
-17. Ton/Format: warme, kurze Chat-Nachricht (~80-150 Wörter), keine Überschriften/Report-Stil.
+17. Ton/Format: warme, kurze Chat-Nachricht (~60-130 Wörter), keine Überschriften/Report-Stil.
+    Es müssen NICHT alle Übungen vorkommen - höchstens 3 herausgegriffene Übungen sind gewollt.
 18. Körpergewicht-Kraft-Gegenüberstellung (bodyweight_correlation, falls im Datensatz vorhanden):
     die Körpergewichtsänderung und die Kraft-Zusammenfassung dürfen NUR nebeneinander genannt
     werden, NIEMALS als Ursache-Wirkung verknüpft (z.B. "weil du zugenommen hast, bist du stärker
@@ -742,7 +750,7 @@ oder eine generische Empfehlung NICHT durch eine ähnlich geartete neue Formulie
 auf die Technik" durch "achte darauf, wie sich das Gewicht anfühlt" zu ersetzen behebt den
 Verstoß NICHT, da beides eine unzulässige Aussage zu subjektivem Empfinden/Ausführung ist).
 ${closeToMinWords
-    ? `Der Entwurf hat aktuell nur ca. ${currentWordCount} Wörter (Ziel: ca. 80-150) - lass die
+    ? `Der Entwurf hat aktuell nur ca. ${currentWordCount} Wörter (Ziel: ca. 60-130) - lass die
 beanstandete Stelle deshalb NICHT ersatzlos weg (der Text würde sonst zu kurz werden und gegen
 Regel 17 verstoßen), sondern ERSETZE sie durch eine kurze, rein aus den Trainingsdaten
 ableitbare, konkrete Aussage (z.B. eine Zahl oder einen Trend aus den Daten), die ungefähr

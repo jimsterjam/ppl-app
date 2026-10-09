@@ -33,8 +33,13 @@ bei jeder neuen Sitzung neu gelernt werden müssen. Bei Widerspruch gilt die jü
   Keine Einstellung dafür. Wdh.-Ziele: `REP_TARGETS`
   (Client `utils/weightSuggestion.js` = Server `utils/repTargets.js`, per Test abgeglichen).
 - **KI-Feedback:** Text in der App-Sprache (Client schickt `language`, Server
-  `resolveFeedbackLanguage`), Aufzählung in Workout-Reihenfolge (`reorderBulletLinesByExerciseOrder`),
-  Zahlen im Text müssen aus den echten Trainingsdaten stammen (Verifier, `AI_VERIFIER_MODE=active`).
+  `resolveFeedbackLanguage`), **Coach statt Protokoll** (Absprache 09.10.): höchstens 3 Übungen mit
+  Besonderheit (Notiz/bewusste Entscheidung > klarer Schritt nach vorn > Auffälligkeit), je Übung
+  „was passiert ist + warum sinnvoll“, Rest weglassen bzw. eine Sammelzeile ohne Zahlen; die
+  genannten Übungen in Workout-Reihenfolge (`reorderBulletLinesByExerciseOrder`). Bewusste
+  Entscheidungen aus der Notiz (z.B. weniger Gewicht für den Zielmuskel) bestätigen statt als
+  „weniger Gewicht“ formulieren (Prompt-Regeln 8, 12, 14, 27). Zahlen im Text müssen aus den echten
+  Trainingsdaten stammen (Verifier, `AI_VERIFIER_MODE=active`).
 - Antworten an Paul auf Deutsch, knapp, Ergebnis zuerst.
 
 ## Regeln für Texteingaben (jedes Freitextfeld)
