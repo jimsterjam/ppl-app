@@ -180,6 +180,9 @@ const workoutSchema = new mongoose.Schema({
     top_weight_kg: { type: Number },
     top_weight_change_kg: { type: Number },
     volume_change_percent: { type: Number, default: 0 },
+    // Wiederholungsänderung je Satz (nur Sätze mit Änderung != 0), siehe resolveRepsSetChanges.
+    // Fehlt bei älteren Einträgen -> die App fällt auf die Gesamt-Differenz (reps_change) zurück.
+    reps_set_changes: [{ _id: false, set_number: Number, change: Number }],
     is_first_session: { type: Boolean, default: false },
     // Nur gesetzt, wenn die Übung eine tatsächlich auffällige Veränderung zeigt (siehe
     // routes/workouts.js) - "history" enthält dann bis zu 4 Volumen-Werte (älteste zuerst,

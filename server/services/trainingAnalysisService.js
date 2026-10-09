@@ -261,6 +261,20 @@ export function resolveSatzgenauWeightChange(setsComparison, fallbackWeightChang
 }
 
 /**
+ * Wiederholungsänderung je Satz (nur Sätze mit echtem Vorher-Wert und Änderung != 0), direkt aus
+ * dem Satzvergleich. Fakten über einzelne Sätze kommen ausschließlich aus dieser Berechnung und
+ * werden von der App selbst angezeigt (AiFeedbackDeltaSummary) - der KI-Text nennt sie nie.
+ *
+ * @param {Array<Object>} setsComparison - Ergebnis von buildSetsComparison()
+ * @returns {{ set_number: number, change: number }[]}
+ */
+export function resolveRepsSetChanges(setsComparison) {
+  return (Array.isArray(setsComparison) ? setsComparison : [])
+    .filter((s) => s && s.is_new_set !== true && Number.isFinite(Number(s.reps_change)) && Number(s.reps_change) !== 0)
+    .map((s) => ({ set_number: s.set_number, change: Number(s.reps_change) }));
+}
+
+/**
  * Bestimme Trend basierend auf Gewichts- und Volumenveränderung
  *
  * @param {number} weightChange - Kg-Differenz
