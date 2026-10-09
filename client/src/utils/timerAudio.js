@@ -2,21 +2,107 @@
  * Web Audio Engine für den Timer.
  * Kapselt AudioContext, Master-Gain-Chain und alle Ton-Synthesen.
  * Enthält eigenen Signal-Dedup-Guard (signalHistory).
+ *
+ * Zustand des AudioContext (iOS/WebView): 'running' spielt, alles andere nicht. Geht die App in den
+ * Hintergrund, setzt iOS ihn auf 'interrupted' (nicht 'suspended') - früher wurde nur 'suspended'
+ * wieder gestartet, nach dem Zurückkehren blieb der Pausentimer-Gong deshalb stumm (Tester-
+ * Meldung 09.10.). Jetzt gilt: alles außer 'running' wird neu gestartet, ein vom System
+ * geschlossener Kontext ('closed') wird neu aufgebaut, und beim Zurückkehren in die App bzw. beim
+ * nächsten Antippen wird der Kontext aktiv wieder aufgeweckt (iOS erlaubt das nur per Geste).
  */
+import { logDiagnostic } from '@/utils/diagnosticsLog'
 
 let audioContext = null
 let audioMasterNode = null
+let audioSubNode = null
 let audioUnlocked = false
+let gestureArmed = false
 const signalHistory = new Map()
+
+// iOS beantwortet resume() im Zustand 'interrupted' teils nie - nicht endlos darauf warten.
+const RESUME_TIMEOUT_MS = 600
+const GESTURE_EVENTS = ['touchend', 'pointerup', 'click', 'keydown']
+
+function resetAudioGraph() {
+  audioContext = null
+  audioMasterNode = null
+  audioSubNode = null
+  audioUnlocked = false
+}
+
+function watchContextState(ctx) {
+  try {
+    ctx.addEventListener?.('statechange', () => {
+      logDiagnostic('audio-state', { state: ctx.state })
+      if (ctx.state !== 'running') {
+        audioUnlocked = false
+        armGestureResume()
+      }
+    })
+  } catch {}
+}
 
 export function getAudioContext() {
   if (typeof window === 'undefined') return null
+  if (audioContext && audioContext.state === 'closed') resetAudioGraph()
   if (!audioContext) {
     const Ctx = window.AudioContext || window.webkitAudioContext
     if (!Ctx) return null
     audioContext = new Ctx()
+    watchContextState(audioContext)
   }
   return audioContext
+}
+
+// Startet einen nicht laufenden Kontext (suspended UND interrupted), ohne zu warten.
+function kickAudio(ctx) {
+  if (!ctx || ctx.state === 'running') return
+  try { ctx.resume()?.catch?.(() => {}) } catch {}
+}
+
+/** Startet den Kontext und wartet höchstens kurz darauf. @returns {Promise<boolean>} läuft er jetzt? */
+export function resumeAudio() {
+  const ctx = getAudioContext()
+  if (!ctx) return Promise.resolve(false)
+  if (ctx.state === 'running') return Promise.resolve(true)
+  // resume() MUSS synchron aufgerufen werden (nicht in einem späteren Microtask): iOS erlaubt den Start
+  // nur innerhalb der Nutzer-Geste.
+  let pending = null
+  try { pending = ctx.resume() } catch {}
+  const attempt = Promise.resolve(pending).catch(() => {})
+  const timeout = new Promise((resolve) => setTimeout(resolve, RESUME_TIMEOUT_MS))
+  return Promise.race([attempt, timeout]).then(() => ctx.state === 'running')
+}
+
+/**
+ * Wartet auf die nächste Nutzer-Geste und startet den Kontext dann (iOS erlaubt das nach einer
+ * Unterbrechung nur innerhalb einer Geste). Mehrfaches Aufrufen ist harmlos.
+ */
+export function armGestureResume() {
+  if (gestureArmed || typeof document === 'undefined') return
+  gestureArmed = true
+  const handler = () => {
+    GESTURE_EVENTS.forEach((name) => document.removeEventListener(name, handler, true))
+    gestureArmed = false
+    ensureAudioUnlocked()
+    // Läuft er danach immer noch nicht, beim nächsten Antippen erneut versuchen.
+    setTimeout(() => {
+      if (audioContext && audioContext.state !== 'running') armGestureResume()
+    }, RESUME_TIMEOUT_MS + 100)
+  }
+  GESTURE_EVENTS.forEach((name) => document.addEventListener(name, handler, { capture: true, passive: true }))
+}
+
+/**
+ * Beim Zurückkehren in die App aufrufen: stoppt iOS den Kontext im Hintergrund, wird er hier sofort
+ * (und beim nächsten Antippen) wieder gestartet, damit der nächste Gong zu hören ist.
+ */
+export function rearmAudio() {
+  if (!audioContext) return
+  logDiagnostic('audio-rearm', { state: audioContext.state })
+  if (audioContext.state === 'running') return
+  armGestureResume()
+  ensureAudioUnlocked()
 }
 
 export function getAudioMasterNode() {
@@ -52,8 +138,8 @@ export const ensureAudioUnlocked = () => {
   if (!ctx) return false
   const unlock = async () => {
     try {
-      if (ctx.state === 'suspended') {
-        await ctx.resume()
+      if (ctx.state !== 'running') {
+        await resumeAudio()
       }
       const master = getAudioMasterNode()
       if (!master) return false
@@ -82,7 +168,7 @@ export const ensureAudioUnlocked = () => {
 export const playBeep = (frequency = 880, durationMs = 250, whenOffsetSec = 0, peakGain = 0.5) => {
   const ctx = getAudioContext()
   if (!ctx) return
-  if (ctx.state === 'suspended') ctx.resume().catch(() => {})
+  kickAudio(ctx)
   const master = getAudioMasterNode()
   if (!master) return
   const osc = ctx.createOscillator()
@@ -115,7 +201,7 @@ export const playBeep = (frequency = 880, durationMs = 250, whenOffsetSec = 0, p
 export const playSiren = (durationMs = 1500) => {
   const ctx = getAudioContext()
   if (!ctx) return
-  if (ctx.state === 'suspended') ctx.resume().catch(() => {})
+  kickAudio(ctx)
   const master = getAudioMasterNode()
   if (!master) return
 
@@ -152,7 +238,7 @@ export const playSiren = (durationMs = 1500) => {
 export const playWhistleStart = (durationMs = 1900) => {
   const ctx = getAudioContext()
   if (!ctx) return
-  if (ctx.state === 'suspended') ctx.resume().catch(() => {})
+  kickAudio(ctx)
   const master = getAudioMasterNode()
   if (!master) return
 
@@ -218,7 +304,6 @@ export const playWhistleStart = (durationMs = 1900) => {
 // Sub-bass output chain – bypasses the 580 Hz highpass master so deep
 // frequencies (Chinese gong fundamental) reach the speakers.
 // ---------------------------------------------------------------------------
-let audioSubNode = null
 function getAudioSubNode() {
   const ctx = getAudioContext()
   if (!ctx) return null
@@ -243,7 +328,7 @@ function getAudioSubNode() {
 export const playBoxGong = (intensity = 1.0) => {
   const ctx = getAudioContext()
   if (!ctx) return
-  if (ctx.state === 'suspended') ctx.resume().catch(() => {})
+  kickAudio(ctx)
   const master = getAudioMasterNode()
   if (!master) return
   const now = ctx.currentTime
@@ -281,7 +366,7 @@ export const playBoxGong = (intensity = 1.0) => {
 export const playChineseGong = (intensity = 1.0) => {
   const ctx = getAudioContext()
   if (!ctx) return
-  if (ctx.state === 'suspended') ctx.resume().catch(() => {})
+  kickAudio(ctx)
   const now = ctx.currentTime
   const vol = Math.max(0.005, Math.min(1.5, Number(intensity) || 1.0))
 
@@ -338,7 +423,7 @@ export const playChineseGong = (intensity = 1.0) => {
 export const playBell = (intensity = 1.0) => {
   const ctx = getAudioContext()
   if (!ctx) return
-  if (ctx.state === 'suspended') ctx.resume().catch(() => {})
+  kickAudio(ctx)
   const master = getAudioMasterNode()
   if (!master) return
   const now = ctx.currentTime
@@ -391,9 +476,8 @@ export const clearSignalHistory = () => {
 export const emitTimerSignal = ({ eventKey, soundEnabled, soundType = 'box-gong', kind }) => {
   if (!shouldEmitSignal(eventKey)) return
 
-  try {
-    if (soundEnabled) {
-      ensureAudioUnlocked()
+  const play = () => {
+    try {
       if (kind === 'round-start') {
         playWhistleStart(1900)
       } else if (kind === 'session-end') {
@@ -414,6 +498,24 @@ export const emitTimerSignal = ({ eventKey, soundEnabled, soundType = 'box-gong'
         else if (soundType === 'bell') playBell(0.85)
         else playBeep(1360, 170, 0, 0.56)
       }
+    } catch {}
+  }
+
+  try {
+    if (!soundEnabled) return
+    ensureAudioUnlocked()
+    const ctx = getAudioContext()
+    if (ctx && ctx.state !== 'running') {
+      // Kontext steht (z.B. 'interrupted' nach dem Hintergrund): erst starten, dann spielen. Klappt der
+      // Start nicht, trotzdem spielen - und beim nächsten Antippen erneut aufwecken.
+      const before = ctx.state
+      resumeAudio().then((running) => {
+        logDiagnostic('audio-signal-resume', { kind, before, running, state: ctx.state })
+        if (!running) armGestureResume()
+        play()
+      }, play)
+      return
     }
+    play()
   } catch {}
 }
