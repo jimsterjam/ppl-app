@@ -152,9 +152,26 @@ describe('checkNumberConsistency', () => {
       current_reps: 24,
       current_sets: 3,
       current_volume: 1920,
-      changes: { weight_change_kg: 2.5, reps_change: 0, sets_change: 0, volume_change_kg: 60, volume_change_percent: 3.1 }
+      changes: { weight_change_kg: 2.5, reps_change: 0, sets_change: 0, volume_change_kg: 60, volume_change_percent: 3.1 },
+      // Gewichte zählen nur noch satzgenau (Ø-Werte current_weight/weight_change_kg sieht die KI
+      // nicht, siehe collectRawDataNumbers) - deshalb hier echte Sätze.
+      sets_comparison: [
+        { set_number: 1, current_weight: 80, current_reps: 8, previous_weight: 77.5, previous_reps: 8, weight_change_kg: 2.5, reps_change: 0 }
+      ]
     }]
   }
+
+  test('Ø-Gewicht ohne passenden Satz zählt nicht mehr als belegt', () => {
+    const avgOnly = { exercises: [{ current_weight: 27.6, current_reps: 5, changes: { weight_change_kg: 0.4 } }] }
+    assert.equal(checkNumberConsistency('Du hast 27,6kg genutzt.', avgOnly).ok, false)
+  })
+
+  test('Kommazahl wird exakt geprüft, nicht über die gerundete Ganzzahl (27,5 ≠ 28)', () => {
+    const withTwentyEight = { exercises: [{ period_days: 28, sets_comparison: [{ set_number: 1, current_weight: 32.5, current_reps: 5 }] }] }
+    const result = checkNumberConsistency('Bei 27,5kg geblieben.', withTwentyEight)
+    assert.equal(result.ok, false)
+    assert.ok(result.violations.some((v) => v.value === 27.5))
+  })
 
   test('Text, der nur Zahlen aus den Daten nennt, ist ok', () => {
     const result = checkNumberConsistency('Beim Bankdrücken 2,5kg mehr bei 80kg Gewicht - läuft 💪', structuredAnalysis)
