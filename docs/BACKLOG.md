@@ -68,6 +68,7 @@ Nur Produkt-/Architekturentscheidungen mit Datum. Dauerhafte Arbeitsregeln gehö
 
 - 2026-10-10 – Pausenende außerhalb der App: AlarmKit-Wecker (iOS 26, alle Geräte) statt normaler Mitteilung; Mitteilung nur noch Ersatz (Mitteilungston kam beim Test nicht).
 - 2026-10-10 – Pausentimer-Einstellungen: Timer-Knopf öffnet Auswahl „Pausentimer“ / „Workout-Timer“. Pausentimer: Schalter, Pausenzeiten je Ziel (Kraft, Muskelaufbau, Speed) und Übungsart (nur im Gerät gespeichert, Vorrang: gemerkte Pause der Übung > eigener Standard > eingebauter Standard) und Ton am Pausenende (Standard iOS-Wecker + 4 eigene Melodien). Melodien: Noten in `restMelodies.js`, Wecker-Dateien `rest-alarm-<id>.wav` per `node scripts/generate-rest-melodies.mjs` erzeugt (nicht von Hand ändern). Kein „nur Mitteilung“ (Absprache).
+- 2026-10-10 – Pausentimer-Einstellungen entschlackt (Absprache Paul): „Pause automatisch starten“ und „groß in der Mitte“ sind fest an (kein Schalter; frühere Geräte-Werte werden ignoriert), Hinweis zum iOS-Standardton entfernt, Stepper −15/+15 verkleinert.
 - 2026-10-08 – Fakten vom Code, KI nur Einordnung: Der KI-Text darf keine Zahlen, Satzbezüge und keine Aussage zu Gewicht/Wiederholungen/Sätzen enthalten; entsprechende Zeilen werden entfernt, die Übersicht zeigt die Fakten je Satz.
 - 2026-10-04 – KI-Text mit einer Zahl, die nicht aus den Trainingsdaten stammt, wird nicht ausgeliefert (fester Hinweis statt Text).
 - 2026-10-04 – Tester-Gespräche sind keine Voraussetzung mehr für neue Coach-Funktionen.
