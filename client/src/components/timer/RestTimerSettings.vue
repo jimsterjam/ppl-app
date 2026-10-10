@@ -8,20 +8,6 @@
         </header>
 
         <div class="rest-settings-body">
-          <!-- Verhalten: wirkt sofort -->
-          <section class="section">
-            <label class="toggle">
-              <input type="checkbox" :checked="restTimer.autoStart" @change="restTimer.setAutoStart($event.target.checked)" />
-              <span>{{ t('restTimer.autoStartLabel') }}</span>
-            </label>
-            <small class="hint">{{ t('restTimer.autoStartHint') }}</small>
-            <label class="toggle">
-              <input type="checkbox" :checked="restTimer.fullscreen" @change="restTimer.setFullscreen($event.target.checked)" />
-              <span>{{ t('restTimer.fullscreenLabel') }}</span>
-            </label>
-            <small class="hint">{{ t('restTimer.fullscreenHint') }}</small>
-          </section>
-
           <!-- Pausenzeiten je Ziel und Übungsart -->
           <section class="section">
             <h4>{{ t('restTimer.durationsTitle') }}</h4>
@@ -56,7 +42,6 @@
                 <button type="button" class="play-btn" :aria-label="t('restTimer.soundPreviewAria', { name: t(`restTimer.sound_${id}`) })" @click="preview(id)">▶</button>
               </div>
             </div>
-            <small class="hint">{{ t('restTimer.soundDefaultHint') }}</small>
           </section>
         </div>
 
@@ -156,17 +141,17 @@ function preview(id) {
 .rest-settings-body { padding: 20px 22px 24px; display: flex; flex-direction: column; gap: 24px; overflow-y: auto; }
 .section { display: flex; flex-direction: column; gap: 10px; }
 .section h4 { margin: 0; font-size: 1.05rem; font-weight: 800; }
-.toggle { display: flex; align-items: center; gap: 10px; font-weight: 600; }
 .hint { color: var(--muted); font-size: 0.8rem; line-height: 1.4; }
 .goal-block { display: flex; flex-direction: column; gap: 8px; padding: 12px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--card-border) 70%, transparent); background: color-mix(in srgb, var(--surface) 80%, transparent); }
 .goal-name { font-size: 0.95rem; }
-.duration-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.duration-label { display: flex; flex-direction: column; gap: 2px; font-weight: 600; }
+.duration-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 10px; }
+.duration-label { display: flex; flex-direction: column; gap: 2px; font-weight: 600; flex: 1 1 110px; min-width: 0; overflow-wrap: anywhere; }
 .duration-label small { color: var(--muted); font-weight: 400; font-size: 0.75rem; }
-.stepper { display: flex; align-items: center; gap: 8px; }
+.stepper { display: flex; align-items: center; gap: 6px; margin-left: auto; }
 .step-btn {
-  min-width: 52px;
-  padding: 9px 10px;
+  min-width: 42px;
+  padding: 8px 6px;
+  font-size: 0.8rem;
   border-radius: 10px;
   border: 1px solid var(--card-border);
   background: transparent;
@@ -176,7 +161,7 @@ function preview(id) {
   cursor: pointer;
 }
 .step-btn:active { transform: scale(0.97); }
-.duration-value { min-width: 54px; text-align: center; font-size: 1.15rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.duration-value { min-width: 44px; text-align: center; font-size: 1.05rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 .duration-value.changed { color: var(--accent-color); }
 .sound-list { display: flex; flex-direction: column; gap: 8px; }
 .sound-row {

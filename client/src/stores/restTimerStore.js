@@ -14,9 +14,6 @@ import { scheduleRestEndSignal, cancelRestEndSignal } from '@/utils/restEndSigna
 export { buildRestNotification, NOTIFICATION_DELAY_MS } from '@/utils/restEndSignal'
 
 const STATE_KEY = 'ppl_rest_timer_state_v1'
-const AUTO_KEY = 'ppl_rest_timer_auto_v1'
-// Anzeige: groß in der Mitte (Vollbild, Standard) oder nur als Leiste unten.
-const FULLSCREEN_KEY = 'ppl_rest_timer_fullscreen_v1'
 // Ton am Pausenende (Melodie-ID, utils/restMelodies.js) und eigene Standard-Pausen je Ziel/Übungsart.
 const SOUND_KEY = 'ppl_rest_timer_sound_v1'
 const DURATIONS_KEY = 'ppl_rest_timer_durations_v1'
@@ -26,24 +23,6 @@ const KEEP_AWAKE_TAG = 'rest-timer'
 const FINISHED_VISIBLE_MS = 6000
 const TICK_MS = 250
 let tickHandle = null
-
-function readAuto() {
-  try {
-    const raw = localStorage.getItem(AUTO_KEY)
-    return raw === null ? true : raw === '1'
-  } catch {
-    return true
-  }
-}
-
-function readFullscreen() {
-  try {
-    const raw = localStorage.getItem(FULLSCREEN_KEY)
-    return raw === null ? true : raw === '1'
-  } catch {
-    return true
-  }
-}
 
 function readSound() {
   try {
@@ -63,8 +42,11 @@ function readDurations() {
 
 export const useRestTimerStore = defineStore('restTimer', {
   state: () => ({
-    autoStart: readAuto(),
-    fullscreen: readFullscreen(),
+    // Immer an (Absprache Paul 10.10.): Pause startet beim Abhaken eines Satzes und erscheint groß in
+    // der Mitte; verkleinern/überspringen geht während der Pause. Frühere Schalter-Werte im Gerät
+    // (ppl_rest_timer_auto_v1 / _fullscreen_v1) werden bewusst nicht mehr gelesen.
+    autoStart: true,
+    fullscreen: true,
     soundId: readSound(),
     // Eigene Standard-Pausen: { strength: { compound: 200 }, ... } - nur gesetzte Werte.
     durations: readDurations(),
@@ -100,14 +82,6 @@ export const useRestTimerStore = defineStore('restTimer', {
     }
   },
   actions: {
-    setAutoStart(value) {
-      this.autoStart = !!value
-      try { localStorage.setItem(AUTO_KEY, this.autoStart ? '1' : '0') } catch {}
-    },
-    setFullscreen(value) {
-      this.fullscreen = !!value
-      try { localStorage.setItem(FULLSCREEN_KEY, this.fullscreen ? '1' : '0') } catch {}
-    },
     setSound(id) {
       this.soundId = sanitizeRestSound(id)
       try { localStorage.setItem(SOUND_KEY, this.soundId) } catch {}
