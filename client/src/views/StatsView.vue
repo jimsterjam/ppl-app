@@ -15,6 +15,10 @@
         <RecentWorkouts :workouts="recentWorkoutsSource" :show-view-all="false" @delete="handleDeleteRecentWorkout" />
       </section>
 
+      <section class="section">
+        <MonthlyReportsSection />
+      </section>
+
       <section id="feedback-history-section" class="section">
         <AIFeedbackHistory :highlight-workout-id="String(route.query.highlightWorkoutId || '')" />
       </section>
@@ -200,6 +204,7 @@ import AppModal from '@/components/AppModal.vue'
 import UpgradeModal from '@/components/UpgradeModal.vue'
 import RecentWorkouts from '@/components/RecentWorkouts.vue'
 import AIFeedbackHistory from '@/components/AIFeedbackHistory.vue'
+import MonthlyReportsSection from '@/components/MonthlyReportsSection.vue'
 import ProgressThreeMonthsSection from '@/components/stats/ProgressThreeMonthsSection.vue'
 import WorkoutComparisonSection from '@/components/stats/WorkoutComparisonSection.vue'
 import PostWorkoutSummary from '@/components/PostWorkoutSummary.vue'
