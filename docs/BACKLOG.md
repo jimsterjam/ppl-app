@@ -49,7 +49,7 @@ Zuletzt aktualisiert: 2026-10-10
 | P1 | Tester-Gespräche (Leitfaden im Chat 02.10.) – optional, keine Voraussetzung mehr für F3/F4 (04.10.) |
 | P2 | App Store Connect: Bezahlvertrag/Steuer/Bank, Screenshots, Texte, Support-URL, Datenschutzangaben, Demo-Zugang |
 | P3 | Impressum/Datenschutz: echte Angaben (beim Wechsel TestFlight → App Store), öffentliche Datenschutz-URL |
-| P4 | iOS-Build mit Stand `main` testen: Diagnose (#7/#8), FAQ (#6), Texteingaben (#9), Pausentimer (#10/#11), Pausen-Gong nach App-Wechsel und Pausen-Wecker (AlarmKit, iOS 26) bei gesperrtem Bildschirm und Stumm-Schalter. Xcode: `rest-end.wav` in „Copy Bundle Resources“, `RestAlarmPlugin.swift` und `MainViewController.swift` unter „Compile Sources“; **Build-Fehler im Swift-Plugin an Claude melden** (nicht kompiliert). Debug-Log kopieren: `audio-state`, `audio-rearm`, `rest-alarm`, `rest-notification` |
+| P4 | iOS-Build mit Stand `main` testen: Diagnose (#7/#8), FAQ (#6), Texteingaben (#9), Pausentimer (#10/#11), Pausen-Gong nach App-Wechsel und Pausen-Wecker (AlarmKit, iOS 26) bei gesperrtem Bildschirm und Stumm-Schalter. Xcode: `rest-end.wav` und `rest-alarm.wav` in „Copy Bundle Resources“, `RestAlarmPlugin.swift` und `MainViewController.swift` unter „Compile Sources“; **Build-Fehler im Swift-Plugin an Claude melden** (nicht kompiliert). Debug-Log kopieren: `audio-state`, `audio-rearm`, `rest-alarm`, `rest-notification` |
 
 ## Bekannte Probleme
 
@@ -67,6 +67,7 @@ Zuletzt aktualisiert: 2026-10-10
 Nur Produkt-/Architekturentscheidungen mit Datum. Dauerhafte Arbeitsregeln gehören in `CLAUDE.md`.
 
 - 2026-10-10 – Pausenende außerhalb der App: AlarmKit-Wecker (iOS 26, alle Geräte) statt normaler Mitteilung; Mitteilung nur noch Ersatz (Mitteilungston kam beim Test nicht).
+- 2026-10-10 – Wecker-Ton: eigener, tieferer Gong (`rest-alarm.wav`, 3 Schläge, Pause, 3 Durchgänge, 24 s). iOS wiederholt ihn bis „Stopp“; Dauerklingeln lässt sich mit AlarmKit nicht abstellen (kein Auto-Ende belegt). Mitteilung behält `rest-end.wav`.
 - 2026-10-08 – Fakten vom Code, KI nur Einordnung: Der KI-Text darf keine Zahlen, Satzbezüge und keine Aussage zu Gewicht/Wiederholungen/Sätzen enthalten; entsprechende Zeilen werden entfernt, die Übersicht zeigt die Fakten je Satz.
 - 2026-10-04 – KI-Text mit einer Zahl, die nicht aus den Trainingsdaten stammt, wird nicht ausgeliefert (fester Hinweis statt Text).
 - 2026-10-04 – Tester-Gespräche sind keine Voraussetzung mehr für neue Coach-Funktionen.

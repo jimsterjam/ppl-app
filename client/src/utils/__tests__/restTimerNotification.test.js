@@ -45,4 +45,28 @@ describe('Pausenende-Mitteilung', () => {
     expect(pbx.split(`${fileRef[1]} /* rest-end.wav */,`).length).toBe(2)
     expect(pbx.split(`${buildFile[1]} /* rest-end.wav in Resources */,`).length).toBe(2)
   })
+
+  it('Wecker-Ton liegt im iOS-Projekt und ist im Xcode-Projekt als Ressource eingetragen', () => {
+    const iosDir = resolve(dirname(fileURLToPath(import.meta.url)), '../../../ios/App')
+    const wav = resolve(iosDir, 'App/rest-alarm.wav')
+    expect(existsSync(wav)).toBe(true)
+    const header = readFileSync(wav).subarray(0, 12).toString('latin1')
+    expect(header.startsWith('RIFF')).toBe(true)
+    expect(header.endsWith('WAVE')).toBe(true)
+    // AlarmKit-Töne: unter 30 Sekunden (länger wird abgeschnitten)
+    const bytes = readFileSync(wav)
+    const byteRate = bytes.readUInt32LE(28)
+    const dataSize = bytes.readUInt32LE(40)
+    expect(dataSize / byteRate).toBeLessThan(30)
+
+    const pbx = readFileSync(resolve(iosDir, 'App.xcodeproj/project.pbxproj'), 'utf8')
+    const fileRef = pbx.match(/([0-9A-F]{24}) \/\* rest-alarm\.wav \*\/ = \{isa = PBXFileReference;/)
+    const buildFile = pbx.match(/([0-9A-F]{24}) \/\* rest-alarm\.wav in Resources \*\/ = \{isa = PBXBuildFile; fileRef = ([0-9A-F]{24})/)
+    expect(fileRef).not.toBeNull()
+    expect(buildFile).not.toBeNull()
+    expect(buildFile[2]).toBe(fileRef[1])
+    // in der Gruppe "App" und in der Resources-Phase aufgeführt
+    expect(pbx.split(`${fileRef[1]} /* rest-alarm.wav */,`).length).toBe(2)
+    expect(pbx.split(`${buildFile[1]} /* rest-alarm.wav in Resources */,`).length).toBe(2)
+  })
 })

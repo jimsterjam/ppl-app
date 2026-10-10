@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { scheduleRestEndSignal, cancelRestEndSignal, NOTIFICATION_DELAY_MS, NOTIFICATION_SOUND } from '../restEndSignal.js'
+import { scheduleRestEndSignal, cancelRestEndSignal, NOTIFICATION_DELAY_MS, ALARM_SOUND } from '../restEndSignal.js'
 
 // Pausenende bei gesperrtem Bildschirm: Wecker (AlarmKit, iOS 26) bevorzugt, sonst Mitteilung.
 describe('scheduleRestEndSignal', () => {
@@ -12,7 +12,7 @@ describe('scheduleRestEndSignal', () => {
     const cancelNotification = vi.fn()
     const used = await scheduleRestEndSignal(at, texts, { scheduleAlarm, scheduleNotification, cancelNotification })
     expect(used).toBe('alarm')
-    expect(scheduleAlarm).toHaveBeenCalledWith({ at: at + NOTIFICATION_DELAY_MS, title: 'Pause vorbei', stopLabel: 'Stopp', sound: NOTIFICATION_SOUND })
+    expect(scheduleAlarm).toHaveBeenCalledWith({ at: at + NOTIFICATION_DELAY_MS, title: 'Pause vorbei', stopLabel: 'Stopp', sound: ALARM_SOUND })
     expect(scheduleNotification).not.toHaveBeenCalled()
     expect(cancelNotification).toHaveBeenCalled()
   })

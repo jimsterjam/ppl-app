@@ -11,8 +11,11 @@ import { cancelRestAlarm, scheduleRestAlarm } from '@/utils/restAlarm'
 import { logDiagnostic } from '@/utils/diagnosticsLog'
 
 export const NOTIFICATION_ID = 940001
-// Ton von Wecker und Mitteilung (Datei im iOS-Projekt: ios/App/App/rest-end.wav, als Ressource eingetragen).
+// Ton der Mitteilung (Datei im iOS-Projekt: ios/App/App/rest-end.wav, als Ressource eingetragen).
 export const NOTIFICATION_SOUND = 'rest-end.wav'
+// Ton des Weckers (ios/App/App/rest-alarm.wav): tiefer, ausklingender Gong, 3 Schläge, Pause, 3 Schläge ...
+// (3 Durchgänge, 24 s; iOS wiederholt die Datei, bis der Nutzer "Stopp" drückt).
+export const ALARM_SOUND = 'rest-alarm.wav'
 export const NOTIFICATION_DELAY_MS = 1200
 
 async function getLocalNotifications() {
@@ -69,7 +72,7 @@ export async function scheduleRestEndSignal(at, { title, body, stopLabel }, deps
   const alarm = deps.scheduleAlarm || scheduleRestAlarm
   const notify = deps.scheduleNotification || scheduleNotification
   const cancelNote = deps.cancelNotification || cancelNotification
-  const result = await alarm({ at: at + NOTIFICATION_DELAY_MS, title, stopLabel, sound: NOTIFICATION_SOUND })
+  const result = await alarm({ at: at + NOTIFICATION_DELAY_MS, title, stopLabel, sound: ALARM_SOUND })
   if (result?.scheduled) {
     // Der Wecker übernimmt - eine frühere Ersatz-Mitteilung darf nicht zusätzlich kommen.
     await cancelNote()
