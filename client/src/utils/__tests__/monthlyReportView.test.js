@@ -71,7 +71,7 @@ describe('Beispielbericht', () => {
     }
   })
 
-  it('Übungsnamen englisch (App-Regel)', () => {
-    expect(sample.facts.exercises.map((e) => e.name)).toEqual(['Barbell Bench Press', 'Barbell Squat', 'Pull-Up'])
+  it('Übungsnamen englisch, wie im Übungskatalog (App-Regel)', () => {
+    expect(sample.facts.exercises.map((e) => e.name)).toEqual(['Bench Press Barbell', 'Barbell High Bar Squat', 'Pull-Up'])
   })
 })
