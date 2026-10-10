@@ -56,6 +56,14 @@
         </section>
 
         <p class="muted basis">{{ t('monthlyReport.basis') }}</p>
+
+        <!-- PDF: für Pro (auch beim Beispiel, damit man sieht, wie es aussieht) -->
+        <div v-if="isPro" class="pdf">
+          <button type="button" class="pdf-btn" :disabled="pdfBusy" @click="savePdfFile">
+            {{ pdfBusy ? t('monthlyReport.pdfBusy') : t('monthlyReport.pdfButton') }}
+          </button>
+          <p v-if="pdfFailed" class="pdf-error" role="alert">{{ t('monthlyReport.pdfError') }}</p>
+        </div>
       </template>
     </div>
   </AppModal>
@@ -73,6 +81,8 @@ import { buildSampleReport } from '@/utils/sampleMonthlyReport'
 import { diagnosisTextKeys } from '@/utils/coachDiagnosisText'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 import { compareWithPrevious, conclusionKey, formatNumber, formatReportPeriod } from '@/utils/monthlyReportView'
+import { buildMonthlyReportPdf, reportPdfFileName } from '@/utils/monthlyReportPdf'
+import { savePdf } from '@/utils/savePdf'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -126,6 +136,23 @@ const stagnation = computed(() => (facts.value.stagnation?.items || [])
     }
   })
   .filter(Boolean))
+
+const pdfBusy = ref(false)
+const pdfFailed = ref(false)
+
+async function savePdfFile() {
+  if (pdfBusy.value || !report.value) return
+  pdfBusy.value = true
+  pdfFailed.value = false
+  try {
+    const bytes = buildMonthlyReportPdf(report.value, { t, locale: locale.value, translateName: getTranslatedExerciseName })
+    await savePdf(bytes, reportPdfFileName(report.value), { title: t('monthlyReport.modalTitle') })
+  } catch {
+    pdfFailed.value = true
+  } finally {
+    pdfBusy.value = false
+  }
+}
 
 async function load() {
   if (props.example || !props.reportId) {
@@ -191,4 +218,18 @@ watch(() => props.modelValue, (open) => { if (open) load() }, { immediate: true 
 .stall p { margin: 0; line-height: 1.45; font-size: 0.9rem; }
 .label { font-weight: 700; }
 .basis { font-size: 0.78rem; }
+.pdf { display: grid; gap: 6px; justify-items: start; }
+.pdf-btn {
+  min-height: 0;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--fg);
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.pdf-btn:disabled { opacity: 0.6; cursor: default; }
+.pdf-error { margin: 0; color: var(--danger, #e5484d); font-size: 0.82rem; }
 </style>
