@@ -11,6 +11,7 @@
  * nächsten Antippen wird der Kontext aktiv wieder aufgeweckt (iOS erlaubt das nur per Geste).
  */
 import { logDiagnostic } from '@/utils/diagnosticsLog'
+import { getRestMelody } from '@/utils/restMelodies'
 
 let audioContext = null
 let audioMasterNode = null
@@ -460,6 +461,44 @@ export const playBell = (intensity = 1.0) => {
   strikeOsc.connect(strikeGain); strikeGain.connect(master)
   strikeOsc.start(now); strikeOsc.stop(now + 0.045)
 }
+// ---------------------------------------------------------------------------
+// Pausenende-Melodie (utils/restMelodies.js) - einmal abspielen. Dieselben Noten und Obertöne
+// erzeugt der Generator für die Wecker-Dateien, damit App und Wecker gleich klingen. Läuft über den
+// Sub-Zweig ohne Hochpass, sonst gingen die tiefen Töne (G3 = 196 Hz) verloren.
+// @returns {boolean} false: unbekannte Melodie bzw. kein Audio (dann spielt der Aufrufer den Gong)
+// ---------------------------------------------------------------------------
+export const playRestMelody = (melodyId, intensity = 1.0) => {
+  const melody = getRestMelody(melodyId)
+  if (!melody) return false
+  const ctx = getAudioContext()
+  if (!ctx) return false
+  kickAudio(ctx)
+  const sub = getAudioSubNode()
+  if (!sub) return false
+  const vol = Math.max(0.005, Math.min(1.5, Number(intensity) || 1.0))
+  const ampSum = melody.timbre.reduce((sum, p) => sum + p.amp, 0)
+  const start = ctx.currentTime + 0.02
+  for (const note of melody.notes) {
+    const t0 = start + note.at
+    const t1 = t0 + melody.ringSec
+    for (const partial of melody.timbre) {
+      const peak = Math.max(0.0002, vol * 0.5 * note.vel * partial.amp / ampSum)
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.type = 'sine'
+      osc.frequency.value = note.hz * partial.mult
+      gain.gain.setValueAtTime(0.0001, t0)
+      gain.gain.linearRampToValueAtTime(peak, t0 + 0.004)
+      // exp(-3 t / decay) wie im Generator, am Ende kurz auf 0 (kein Knacken)
+      gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, peak * Math.exp(-3 * melody.ringSec / partial.decay)), t1)
+      gain.gain.linearRampToValueAtTime(0, t1 + 0.03)
+      osc.connect(gain); gain.connect(sub)
+      osc.start(t0); osc.stop(t1 + 0.04)
+    }
+  }
+  return true
+}
+
 export const shouldEmitSignal = (eventKey) => {
   if (!eventKey) return false
   const now = Date.now()
@@ -473,13 +512,16 @@ export const clearSignalHistory = () => {
   signalHistory.clear()
 }
 
-export const emitTimerSignal = ({ eventKey, soundEnabled, soundType = 'box-gong', kind }) => {
+export const emitTimerSignal = ({ eventKey, soundEnabled, soundType = 'box-gong', kind, melodyId = null }) => {
   if (!shouldEmitSignal(eventKey)) return
 
   const play = () => {
     try {
       if (kind === 'round-start') {
         playWhistleStart(1900)
+      } else if (kind === 'rest-end') {
+        // Pausenende: gewählte Melodie, ohne Auswahl bzw. bei 'default' der bisherige Gong.
+        if (!melodyId || !playRestMelody(melodyId)) playWhistleStart(1900)
       } else if (kind === 'session-end') {
         playSiren(1200)
       } else if (kind === 'countdown-3') {

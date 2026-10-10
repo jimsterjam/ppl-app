@@ -2006,11 +2006,12 @@ function toggleRowDone(row, exIndex = -1, rowIndex = -1) {
 // --- Pausentimer -----------------------------------------------------------------------------
 const restTimer = useRestTimerStore()
 
-// Dauer: gemerkte Dauer der Übung > Standard je Trainingsart/Übungsart (restTimerRules.js).
+// Dauer: gemerkte Dauer der Übung > eigener Standard (Pausentimer-Einstellungen) > eingebauter Standard
+// je Trainingsart/Übungsart (restTimerRules.js).
 function restSecondsForIndex(index) {
   const ex = workout.value?.exercises?.[index]
   const type = classifyExercise(progressionInfoByIndex.value[index] || {})
-  return restSecondsFor(goalByIndex.value[index], type, customRestForIndex(index))
+  return restSecondsFor(goalByIndex.value[index], type, customRestForIndex(index), restTimer.durations)
 }
 
 // Gemerkte Pause: an der Übung, sonst aus der letzten Session dieser Übung (bleibt so auch ohne

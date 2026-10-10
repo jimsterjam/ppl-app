@@ -17,6 +17,10 @@
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */; };
 		5E57E2D1A1B2C3D4E5F60718 /* rest-end.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E57E2D0A1B2C3D4E5F60718 /* rest-end.wav */; };
+		5E57E265A1B2C3D4E5F60718 /* rest-alarm-deep.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E57E264A1B2C3D4E5F60718 /* rest-alarm-deep.wav */; };
+		5E57E267A1B2C3D4E5F60718 /* rest-alarm-chimes.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E57E266A1B2C3D4E5F60718 /* rest-alarm-chimes.wav */; };
+		5E57E269A1B2C3D4E5F60718 /* rest-alarm-marimba.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E57E268A1B2C3D4E5F60718 /* rest-alarm-marimba.wav */; };
+		5E57E271A1B2C3D4E5F60718 /* rest-alarm-bright.wav in Resources */ = {isa = PBXBuildFile; fileRef = 5E57E270A1B2C3D4E5F60718 /* rest-alarm-bright.wav */; };
 		5E57E2D3A1B2C3D4E5F60718 /* RestAlarmPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E57E2D2A1B2C3D4E5F60718 /* RestAlarmPlugin.swift */; };
 		5E57E2D5A1B2C3D4E5F60718 /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E57E2D4A1B2C3D4E5F60718 /* MainViewController.swift */; };
 /* End PBXBuildFile section */
@@ -36,6 +40,10 @@
 		AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.release.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.release.xcconfig"; sourceTree = "<group>"; };
 		FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.debug.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.debug.xcconfig"; sourceTree = "<group>"; };
 		5E57E2D0A1B2C3D4E5F60718 /* rest-end.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = rest-end.wav; sourceTree = "<group>"; };
+		5E57E264A1B2C3D4E5F60718 /* rest-alarm-deep.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = rest-alarm-deep.wav; sourceTree = "<group>"; };
+		5E57E266A1B2C3D4E5F60718 /* rest-alarm-chimes.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = rest-alarm-chimes.wav; sourceTree = "<group>"; };
+		5E57E268A1B2C3D4E5F60718 /* rest-alarm-marimba.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = rest-alarm-marimba.wav; sourceTree = "<group>"; };
+		5E57E270A1B2C3D4E5F60718 /* rest-alarm-bright.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = rest-alarm-bright.wav; sourceTree = "<group>"; };
 		5E57E2D2A1B2C3D4E5F60718 /* RestAlarmPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestAlarmPlugin.swift; sourceTree = "<group>"; };
 		5E57E2D4A1B2C3D4E5F60718 /* MainViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainViewController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -91,6 +99,10 @@
 				2FAD9762203C412B000D30F8 /* config.xml */,
 				50B271D01FEDC1A000F3C39B /* public */,
 				5E57E2D0A1B2C3D4E5F60718 /* rest-end.wav */,
+				5E57E264A1B2C3D4E5F60718 /* rest-alarm-deep.wav */,
+				5E57E266A1B2C3D4E5F60718 /* rest-alarm-chimes.wav */,
+				5E57E268A1B2C3D4E5F60718 /* rest-alarm-marimba.wav */,
+				5E57E270A1B2C3D4E5F60718 /* rest-alarm-bright.wav */,
 				5E57E2D2A1B2C3D4E5F60718 /* RestAlarmPlugin.swift */,
 				5E57E2D4A1B2C3D4E5F60718 /* MainViewController.swift */,
 			);
@@ -171,6 +183,10 @@
 				504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */,
 				50B271D11FEDC1A000F3C39B /* public in Resources */,
 				5E57E2D1A1B2C3D4E5F60718 /* rest-end.wav in Resources */,
+				5E57E265A1B2C3D4E5F60718 /* rest-alarm-deep.wav in Resources */,
+				5E57E267A1B2C3D4E5F60718 /* rest-alarm-chimes.wav in Resources */,
+				5E57E269A1B2C3D4E5F60718 /* rest-alarm-marimba.wav in Resources */,
+				5E57E271A1B2C3D4E5F60718 /* rest-alarm-bright.wav in Resources */,
 				504EC30F1FED79650016851F /* Assets.xcassets in Resources */,
 				50379B232058CBB4000EE86E /* capacitor.config.json in Resources */,
 				504EC30D1FED79650016851F /* Main.storyboard in Resources */,

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { scheduleRestEndSignal, cancelRestEndSignal, NOTIFICATION_DELAY_MS, NOTIFICATION_SOUND } from '../restEndSignal.js'
+import { scheduleRestEndSignal, cancelRestEndSignal, NOTIFICATION_DELAY_MS } from '../restEndSignal.js'
 
 // Pausenende bei gesperrtem Bildschirm: Wecker (AlarmKit, iOS 26) bevorzugt, sonst Mitteilung.
 describe('scheduleRestEndSignal', () => {
@@ -12,9 +12,18 @@ describe('scheduleRestEndSignal', () => {
     const cancelNotification = vi.fn()
     const used = await scheduleRestEndSignal(at, texts, { scheduleAlarm, scheduleNotification, cancelNotification })
     expect(used).toBe('alarm')
-    expect(scheduleAlarm).toHaveBeenCalledWith({ at: at + NOTIFICATION_DELAY_MS, title: 'Pause vorbei', stopLabel: 'Stopp', sound: NOTIFICATION_SOUND })
+    expect(scheduleAlarm).toHaveBeenCalledWith({ at: at + NOTIFICATION_DELAY_MS, title: 'Pause vorbei', stopLabel: 'Stopp', sound: undefined })
     expect(scheduleNotification).not.toHaveBeenCalled()
     expect(cancelNotification).toHaveBeenCalled()
+  })
+
+  it('gewählte Melodie: ihre Datei geht an den Wecker, ohne Auswahl der iOS-Standardton', async () => {
+    const scheduleAlarm = vi.fn().mockResolvedValue({ scheduled: true })
+    const deps = { scheduleAlarm, scheduleNotification: vi.fn(), cancelNotification: vi.fn() }
+    await scheduleRestEndSignal(at, { ...texts, alarmSound: 'rest-alarm-deep.wav' }, deps)
+    expect(scheduleAlarm.mock.calls[0][0].sound).toBe('rest-alarm-deep.wav')
+    await scheduleRestEndSignal(at, { ...texts, alarmSound: null }, deps)
+    expect(scheduleAlarm.mock.calls[1][0].sound).toBeUndefined()
   })
 
   it.each([
