@@ -24,7 +24,7 @@
 
       <SessionStopwatch @session-time="onSessionTime" />
 
-      <CoachDiagnosisRow />
+      <MonthlyReportRow />
 
       <section class="quick-start">
         <div v-if="!showStartOptions" class="quick-grid">
@@ -264,7 +264,7 @@ import RestTimerSettings from '@/components/timer/RestTimerSettings.vue'
 import OneTimeHint from '@/components/OneTimeHint.vue'
 import { logger } from '@/utils/logger'
 import SessionStopwatch from '@/components/SessionStopwatch.vue'
-import CoachDiagnosisRow from '@/components/CoachDiagnosisRow.vue'
+import MonthlyReportRow from '@/components/MonthlyReportRow.vue'
 import AvatarEditor from '@/components/AvatarEditor.vue'
 import NameEditModal from '@/components/NameEditModal.vue'
 import WorkoutGoalPicker from '@/components/WorkoutGoalPicker.vue'
