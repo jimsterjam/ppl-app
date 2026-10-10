@@ -48,13 +48,13 @@ export function buildSampleReport(now = new Date()) {
         sets: sessions * 12
       })),
       exercises: [
-        { key: 'name:barbell bench press', name: 'Barbell Bench Press', metric: 'weight', points: benchPoints(now) },
-        { key: 'name:barbell squat', name: 'Barbell Squat', metric: 'weight', points: squatPoints(now) },
+        { key: 'name:bench press barbell', name: 'Bench Press Barbell', metric: 'weight', points: benchPoints(now) },
+        { key: 'name:barbell high bar squat', name: 'Barbell High Bar Squat', metric: 'weight', points: squatPoints(now) },
         { key: 'name:pull-up', name: 'Pull-Up', metric: 'reps', points: pullUpPoints(now) }
       ],
       stagnation: {
         items: [
-          { key: 'name:overhead press', name: 'Overhead Press', goal: 'hypertrophy', cause: 'repeating', weeks: 5, sessions: 4, weight: 40, sets: 3, reps: 8, nextReps: 9, nextWeight: null }
+          { key: 'name:barbell seated overhead press', name: 'Barbell Seated Overhead Press', goal: 'hypertrophy', cause: 'repeating', weeks: 5, sessions: 4, weight: 40, sets: 3, reps: 8, nextReps: 9, nextWeight: null }
         ],
         analyzedExercises: 9
       }

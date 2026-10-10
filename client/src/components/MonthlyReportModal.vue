@@ -31,6 +31,16 @@
 
         <p v-if="conclusion" class="conclusion">{{ t(`monthlyReport.conclusion_${conclusion}`) }}</p>
 
+        <!-- Einheiten je Woche und Gewicht je Übung (Diagramme, inline SVG) -->
+        <ReportWeeksChart v-if="facts.weeks?.length" :weeks="facts.weeks" />
+        <ReportWeightChart
+          v-if="facts.exercises?.length"
+          :key="report.id"
+          :curves="facts.exercises"
+          :period-start="report.periodStart"
+          :period-end="report.periodEnd"
+        />
+
         <!-- Stillstand (bisherige Diagnose, ohne "Geplant"-Knöpfe) -->
         <section class="block">
           <h5>{{ t('monthlyReport.stagnationTitle') }}</h5>
@@ -55,6 +65,8 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppModal from '@/components/AppModal.vue'
+import ReportWeeksChart from '@/components/ReportWeeksChart.vue'
+import ReportWeightChart from '@/components/ReportWeightChart.vue'
 import { fetchMonthlyReport } from '@/api/reports'
 import { getAuthToken } from '@/utils/authToken'
 import { buildSampleReport } from '@/utils/sampleMonthlyReport'
