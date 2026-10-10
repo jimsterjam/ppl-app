@@ -1993,7 +1993,8 @@ function toggleRowDone(row, exIndex = -1, rowIndex = -1) {
         exIndex,
         rowIndex,
         notifyTitle: t('restTimer.notifyTitle'),
-        notifyBody: t('restTimer.notifyBody', { name })
+        notifyBody: t('restTimer.notifyBody', { name }),
+        alarmStopLabel: t('restTimer.alarmStop')
       })
     }
   } else if (!row.done) {

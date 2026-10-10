@@ -13,7 +13,8 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         guard let windowScene = (scene as? UIWindowScene) else { return }
 
         window = UIWindow(windowScene: windowScene)
-        window?.rootViewController = CAPBridgeViewController()
+        // MainViewController = CAPBridgeViewController + eigenes Plugin RestAlarm (siehe MainViewController.swift)
+        window?.rootViewController = MainViewController()
         window?.makeKeyAndVisible()
     }
 }
