@@ -15,6 +15,7 @@ import feedbackRoutes from "./routes/feedback.js";
 import adminFeedbackInsightsRoutes from "./routes/adminFeedbackInsights.js";
 import adminVerifierAuditRoutes from "./routes/adminVerifierAudit.js";
 import coachRoutes from "./routes/coach.js";
+import monthlyReportRoutes from "./routes/monthlyReports.js";
 import { logger } from './utils/logger.js';
 import UserProfile from './models/UserProfile.js';
 
@@ -148,6 +149,7 @@ app.use("/api/feedback", feedbackRoutes);
 app.use("/api/admin/feedback-insights", adminFeedbackInsightsRoutes);
 app.use("/api/admin/verifier-audit", adminVerifierAuditRoutes);
 app.use("/api/coach", coachRoutes);
+app.use("/api/reports", monthlyReportRoutes);
 
 // Healthcheck
 app.get('/api/health', (req, res) => {

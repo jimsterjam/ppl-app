@@ -10,6 +10,7 @@ import CustomExercise from '../models/CustomExercise.js';
 import FavoriteWorkout from '../models/FavoriteWorkout.js';
 import FeedbackRating from '../models/FeedbackRating.js';
 import UserExerciseNote from '../models/UserExerciseNote.js';
+import MonthlyReport from '../models/MonthlyReport.js';
 import AppFeedback from '../models/AppFeedback.js';
 import UserProfile from '../models/UserProfile.js';
 import { firebaseAuthMiddleware } from '../middleware/firebaseAuth.js';
@@ -60,7 +61,7 @@ async function getOrCreateProfile(uid) {
 // - maschinenlesbar, deckt Art. 20 direkt mit ab. Umfasst bewusst genau die Collections, die
 // tatsächlich eine userId/uid-Bindung an diesen Nutzer haben:
 //   UserProfile (uid), Workout, Exercise (eigene Übungen), CustomExercise, FavoriteWorkout,
-//   FeedbackRating, UserExerciseNote, AppFeedback.
+//   FeedbackRating, UserExerciseNote, AppFeedback, MonthlyReport.
 // Bewusst NICHT enthalten: FeedbackQualitySignal (laut eigenem Modell-Kommentar absichtlich
 // nicht mit einer userId verknüpfbar/anonymisiert) und PromptImprovementProposal (aggregierter
 // Admin-Vorschlag ohne userId-Feld - kein personenbezogenes Datum dieses Nutzers).
@@ -79,7 +80,8 @@ router.get('/export', firebaseAuthMiddleware, async (req, res) => {
       favoriteWorkouts,
       feedbackRatings,
       exerciseNotes,
-      appFeedback
+      appFeedback,
+      monthlyReports
     ] = await Promise.all([
       UserProfile.findOne({ uid: tokenUid }).lean(),
       Workout.find({ userId: tokenUid }).lean(),
@@ -88,7 +90,8 @@ router.get('/export', firebaseAuthMiddleware, async (req, res) => {
       FavoriteWorkout.find({ userId: tokenUid }).lean(),
       FeedbackRating.find({ userId: tokenUid }).lean(),
       UserExerciseNote.find({ userId: tokenUid }).lean(),
-      AppFeedback.find({ userId: tokenUid }).lean()
+      AppFeedback.find({ userId: tokenUid }).lean(),
+      MonthlyReport.find({ userId: tokenUid }).lean()
     ]);
 
     const exportPayload = {
@@ -100,7 +103,8 @@ router.get('/export', firebaseAuthMiddleware, async (req, res) => {
       favoriteWorkouts,
       feedbackRatings,
       exerciseNotes,
-      appFeedback
+      appFeedback,
+      monthlyReports
     };
 
     console.info(`[account/export] Datenexport erstellt (uid=${tokenUid}, workouts=${workouts.length})`);
@@ -187,7 +191,8 @@ router.post('/delete', firebaseAuthMiddleware, async (req, res) => {
         favoriteWorkouts: 0,
         feedbackRatings: 0,
         exerciseNotes: 0,
-        appFeedback: 0
+        appFeedback: 0,
+        monthlyReports: 0
       },
       deletedAuth: false,
       errors: []
@@ -301,6 +306,13 @@ router.post('/delete', firebaseAuthMiddleware, async (req, res) => {
       report.dbDeleted.appFeedback = appFeedbackDeleteResult.deletedCount || 0;
     } catch (e) {
       report.errors.push(`AppFeedback delete failed: ${e?.message || e}`);
+    }
+
+    try {
+      const monthlyReportDeleteResult = await MonthlyReport.deleteMany({ userId: tokenUid });
+      report.dbDeleted.monthlyReports = monthlyReportDeleteResult.deletedCount || 0;
+    } catch (e) {
+      report.errors.push(`MonthlyReport delete failed: ${e?.message || e}`);
     }
 
     // --- Step 5: Delete Firebase Auth account (best effort) ---
