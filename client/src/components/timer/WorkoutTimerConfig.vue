@@ -7,22 +7,8 @@
       </header>
 
       <div class="timer-config-body">
-        <!-- Pausentimer zwischen Sätzen (stores/restTimerStore.js): startet beim Abhaken eines
-             Satzes - unabhängig von diesem Intervall-Timer für Übungen auf Zeit. Wirkt sofort. -->
-        <div class="section rest-auto-section">
-          <label class="rest-auto-toggle">
-            <input type="checkbox" :checked="restTimer.autoStart" @change="restTimer.setAutoStart($event.target.checked)" />
-            <span>{{ t('restTimer.autoStartLabel') }}</span>
-          </label>
-          <small class="rest-auto-hint">{{ t('restTimer.autoStartHint') }}</small>
-          <!-- Anzeige der Pause: groß in der Mitte (Standard) oder nur als Leiste unten. -->
-          <label class="rest-auto-toggle rest-fullscreen-toggle">
-            <input type="checkbox" :checked="restTimer.fullscreen" @change="restTimer.setFullscreen($event.target.checked)" />
-            <span>{{ t('restTimer.fullscreenLabel') }}</span>
-          </label>
-          <small class="rest-auto-hint">{{ t('restTimer.fullscreenHint') }}</small>
-          <p class="interval-hint">{{ t('timer.intervalHint') }}</p>
-        </div>
+        <!-- Der Pausentimer zwischen Sätzen hat eigene Einstellungen (RestTimerSettings.vue). -->
+        <p class="interval-hint">{{ t('timer.intervalHint') }}</p>
 
         <!-- Modus -->
         <div class="section">
@@ -169,14 +155,12 @@
 <script setup>
 import { computed, reactive, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRestTimerStore } from '@/stores/restTimerStore'
 import { useTimerStore } from '@/stores/timerStore'
 import NumberPicker from '@/components/NumberPicker.vue'
 import { playBoxGong, playChineseGong, playBell } from '@/utils/timerAudio'
 
 const emit = defineEmits(['close'])
 const { t, locale } = useI18n()
-const restTimer = useRestTimerStore()
 const timerStore = useTimerStore()
 
 const mode = ref(String(timerStore.config.mode || 'interval') === 'stopwatch' ? 'stopwatch' : 'interval')
@@ -511,8 +495,5 @@ function saveAndStart() {
   opacity: 0.45;
   cursor: not-allowed;
 }
-.rest-auto-toggle { display: flex; align-items: center; gap: 10px; font-weight: 600; }
-.rest-fullscreen-toggle { margin-top: 12px; }
-.rest-auto-hint { display: block; margin-top: 4px; color: var(--muted); font-size: 0.8rem; line-height: 1.4; }
 .interval-hint { margin: 10px 0 0; color: var(--muted); font-size: 0.8rem; line-height: 1.4; }
 </style>

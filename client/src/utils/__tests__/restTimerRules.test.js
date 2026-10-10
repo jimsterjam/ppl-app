@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { restSecondsFor, clampRestSeconds, sanitizeCustomRest, formatRest, shouldAutoExpandRest } from '../restTimerRules.js'
+import { restSecondsFor, clampRestSeconds, sanitizeCustomRest, formatRest, shouldAutoExpandRest, sanitizeRestOverrides, defaultRestSeconds } from '../restTimerRules.js'
 
 describe('restTimerRules', () => {
   it('Standarddauer je Trainingsart und Übungsart', () => {
@@ -35,5 +35,40 @@ describe('restTimerRules', () => {
     expect(shouldAutoExpandRest({ ...base, fullscreen: false })).toBe(false)
     expect(shouldAutoExpandRest({ ...base, running: false })).toBe(false)
     expect(shouldAutoExpandRest({ ...base, autoExpanded: true })).toBe(false)
+  })
+})
+
+// Wunsch Paul 10.10.: Standard-Pausen je Ziel (Kraft, Muskelaufbau, Speed) und Übungsart einstellbar.
+describe('eigene Standard-Pausen', () => {
+  const own = { strength: { compound: 240 }, hypertrophy: { isolation: 60 } }
+
+  it('eigener Wert ersetzt den eingebauten Standard, nur für das gesetzte Ziel und die Übungsart', () => {
+    expect(restSecondsFor('strength', 'compound', null, own)).toBe(240)
+    expect(restSecondsFor('strength', 'isolation', null, own)).toBe(120)
+    expect(restSecondsFor('hypertrophy', 'isolation', null, own)).toBe(60)
+    expect(restSecondsFor('hypertrophy', 'core', null, own)).toBe(60)
+    expect(restSecondsFor('explosive', 'compound', null, own)).toBe(120)
+  })
+
+  it('Vorrang: gemerkte Pause der Übung > eigener Standard > eingebauter Standard', () => {
+    expect(restSecondsFor('strength', 'compound', 200, own)).toBe(200)
+    expect(restSecondsFor('strength', 'compound', null, own)).toBe(240)
+    expect(restSecondsFor('strength', 'compound', null, null)).toBe(180)
+  })
+
+  it('defaultRestSeconds liefert die eingebauten Werte', () => {
+    expect(defaultRestSeconds('strength', 'compound')).toBe(180)
+    expect(defaultRestSeconds('explosive', 'isolation')).toBe(120)
+  })
+
+  it('sanitizeRestOverrides: nur bekannte Ziele/Arten und gültige Sekunden', () => {
+    expect(sanitizeRestOverrides({
+      strength: { compound: 200.4, isolation: 5, core: 100 },
+      hypertrophy: 'x',
+      evil: { compound: 100 },
+      explosive: { compound: 9999, isolation: 90 }
+    })).toEqual({ strength: { compound: 200 }, explosive: { isolation: 90 } })
+    expect(sanitizeRestOverrides(null)).toEqual({})
+    expect(sanitizeRestOverrides('x')).toEqual({})
   })
 })

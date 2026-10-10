@@ -55,10 +55,12 @@
           <button class="quick-fav-shortcut" type="button" @click="openAllFavorites">
             ★ {{ $t('dashboard.allFavorites') }}
           </button>
-          <button class="quick-timer-btn" type="button" @click="showTimerConfig = true">
+          <button class="quick-timer-btn" type="button" @click="showTimerMenu = true">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true" style="vertical-align:-2px;margin-right:5px"><circle cx="12" cy="13" r="8"/><polyline points="12 9 12 13 15 13"/><path d="M9 2h6M12 2v3"/></svg>
             Timer
           </button>
+          <TimerMenu v-if="showTimerMenu" @close="showTimerMenu = false" @select="onTimerMenuSelect" />
+          <RestTimerSettings v-if="showRestSettings" @close="showRestSettings = false" />
           <WorkoutTimerConfig v-if="showTimerConfig" @close="showTimerConfig = false" />
         </div>
 
@@ -257,6 +259,8 @@ import HeaderBar from "../components/HeaderBar.vue";
 import WorkoutCard from "../components/WorkoutCard.vue";
 import AppModal from "../components/AppModal.vue";
 import WorkoutTimerConfig from '@/components/timer/WorkoutTimerConfig.vue'
+import TimerMenu from '@/components/timer/TimerMenu.vue'
+import RestTimerSettings from '@/components/timer/RestTimerSettings.vue'
 import OneTimeHint from '@/components/OneTimeHint.vue'
 import { logger } from '@/utils/logger'
 import SessionStopwatch from '@/components/SessionStopwatch.vue'
@@ -283,6 +287,14 @@ const showFavoriteDeleteConfirm = ref(false)
 const pendingFavoriteToDelete = ref(null)
 const showDiscardDraftConfirm = ref(false)
 const showTimerConfig = ref(false)
+// Timer-Knopf: erst Auswahl "Pausentimer" oder "Workout-Timer"
+const showTimerMenu = ref(false)
+const showRestSettings = ref(false)
+function onTimerMenuSelect(target) {
+  showTimerMenu.value = false
+  if (target === 'rest') showRestSettings.value = true
+  else showTimerConfig.value = true
+}
 const detailDraft = ref(null)
 const showInfoModal = ref(false)
 const infoMessage = ref('')

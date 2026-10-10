@@ -5,7 +5,8 @@
 // bzw. nach einem App-Neustart korrekt weiterläuft.
 import { defineStore } from 'pinia'
 import { emitTimerSignal, ensureAudioUnlocked } from '@/utils/timerAudio'
-import { clampRestSeconds, REST_ENDING_MS, REST_STEP_SECONDS, shouldAutoExpandRest } from '@/utils/restTimerRules'
+import { clampRestSeconds, REST_ENDING_MS, REST_STEP_SECONDS, sanitizeRestOverrides, shouldAutoExpandRest } from '@/utils/restTimerRules'
+import { alarmSoundFile, sanitizeRestSound } from '@/utils/restMelodies'
 import { acquireKeepAwake, releaseKeepAwake } from '@/utils/keepAwakeGuard'
 import { scheduleRestEndSignal, cancelRestEndSignal } from '@/utils/restEndSignal'
 
@@ -16,6 +17,9 @@ const STATE_KEY = 'ppl_rest_timer_state_v1'
 const AUTO_KEY = 'ppl_rest_timer_auto_v1'
 // Anzeige: groß in der Mitte (Vollbild, Standard) oder nur als Leiste unten.
 const FULLSCREEN_KEY = 'ppl_rest_timer_fullscreen_v1'
+// Ton am Pausenende (Melodie-ID, utils/restMelodies.js) und eigene Standard-Pausen je Ziel/Übungsart.
+const SOUND_KEY = 'ppl_rest_timer_sound_v1'
+const DURATIONS_KEY = 'ppl_rest_timer_durations_v1'
 // Bildschirm bleibt an, solange eine Pause läuft bzw. "Pause vorbei" sichtbar ist.
 const KEEP_AWAKE_TAG = 'rest-timer'
 // So lange bleibt "Nächster Satz" nach Ablauf sichtbar.
@@ -41,10 +45,29 @@ function readFullscreen() {
   }
 }
 
+function readSound() {
+  try {
+    return sanitizeRestSound(localStorage.getItem(SOUND_KEY))
+  } catch {
+    return sanitizeRestSound(null)
+  }
+}
+
+function readDurations() {
+  try {
+    return sanitizeRestOverrides(JSON.parse(localStorage.getItem(DURATIONS_KEY) || 'null'))
+  } catch {
+    return {}
+  }
+}
+
 export const useRestTimerStore = defineStore('restTimer', {
   state: () => ({
     autoStart: readAuto(),
     fullscreen: readFullscreen(),
+    soundId: readSound(),
+    // Eigene Standard-Pausen: { strength: { compound: 200 }, ... } - nur gesetzte Werte.
+    durations: readDurations(),
     // Vollbild für DIESE Pause minimiert (Leiste unten); jede neue Pause startet wieder groß.
     minimized: false,
     // Automatisches Vergrößern bei <= 10 s ist für diese Pause schon passiert.
@@ -85,6 +108,23 @@ export const useRestTimerStore = defineStore('restTimer', {
       this.fullscreen = !!value
       try { localStorage.setItem(FULLSCREEN_KEY, this.fullscreen ? '1' : '0') } catch {}
     },
+    setSound(id) {
+      this.soundId = sanitizeRestSound(id)
+      try { localStorage.setItem(SOUND_KEY, this.soundId) } catch {}
+    },
+    /** Eigene Standard-Pause setzen; value = null/Standardwert entfernt den eigenen Wert. */
+    setDuration(goal, type, value) {
+      const next = sanitizeRestOverrides({
+        ...this.durations,
+        [goal]: { ...this.durations?.[goal], [type]: value == null ? null : clampRestSeconds(value) }
+      })
+      this.durations = next
+      try { localStorage.setItem(DURATIONS_KEY, JSON.stringify(next)) } catch {}
+    },
+    resetDurations() {
+      this.durations = {}
+      try { localStorage.removeItem(DURATIONS_KEY) } catch {}
+    },
     /** Vollbild verkleinern - die Pause läuft unverändert als Leiste weiter. */
     minimize() {
       this.minimized = true
@@ -118,7 +158,8 @@ export const useRestTimerStore = defineStore('restTimer', {
       scheduleRestEndSignal(this.endsAt, {
         title: this.notifyTitle,
         body: this.notifyBody,
-        stopLabel: this.alarmStopLabel
+        stopLabel: this.alarmStopLabel,
+        alarmSound: alarmSoundFile(this.soundId)
       }).catch(() => {})
     },
     adjust(deltaSec = REST_STEP_SECONDS) {
@@ -145,7 +186,7 @@ export const useRestTimerStore = defineStore('restTimer', {
       this.finishedAt = Date.now()
       this.endsAt = this.finishedAt
       cancelRestEndSignal().catch(() => {})
-      emitTimerSignal({ eventKey: `rest-end-${this.finishedAt}`, soundEnabled: true, kind: 'round-start' })
+      emitTimerSignal({ eventKey: `rest-end-${this.finishedAt}`, soundEnabled: true, kind: 'rest-end', melodyId: this.soundId })
       try { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([200, 100, 200]) } catch {}
       this.persist()
     },

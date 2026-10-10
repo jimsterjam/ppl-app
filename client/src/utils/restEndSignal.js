@@ -11,7 +11,8 @@ import { cancelRestAlarm, scheduleRestAlarm } from '@/utils/restAlarm'
 import { logDiagnostic } from '@/utils/diagnosticsLog'
 
 export const NOTIFICATION_ID = 940001
-// Ton von Wecker und Mitteilung (Datei im iOS-Projekt: ios/App/App/rest-end.wav, als Ressource eingetragen).
+// Ton der Ersatz-Mitteilung (Datei im iOS-Projekt: ios/App/App/rest-end.wav, als Ressource eingetragen).
+// Der Wecker nutzt die Melodie aus den Einstellungen (restMelodies.js).
 export const NOTIFICATION_SOUND = 'rest-end.wav'
 export const NOTIFICATION_DELAY_MS = 1200
 
@@ -62,14 +63,14 @@ async function scheduleNotification(at, title, body) {
 /**
  * Wecker (bzw. Ersatz-Mitteilung) für das Pausenende planen; ersetzt einen vorherigen.
  * @param {number} at - Pausenende in ms seit 1970
- * @param {{ title: string, body: string, stopLabel: string }} texts
+ * @param {{ title: string, body: string, stopLabel: string, alarmSound?: string|null }} texts - alarmSound: Datei im App-Paket; leer = Standard-Wecker von iOS
  * @param {object} [deps] - nur für Tests
  */
-export async function scheduleRestEndSignal(at, { title, body, stopLabel }, deps = {}) {
+export async function scheduleRestEndSignal(at, { title, body, stopLabel, alarmSound = null }, deps = {}) {
   const alarm = deps.scheduleAlarm || scheduleRestAlarm
   const notify = deps.scheduleNotification || scheduleNotification
   const cancelNote = deps.cancelNotification || cancelNotification
-  const result = await alarm({ at: at + NOTIFICATION_DELAY_MS, title, stopLabel, sound: NOTIFICATION_SOUND })
+  const result = await alarm({ at: at + NOTIFICATION_DELAY_MS, title, stopLabel, sound: alarmSound || undefined })
   if (result?.scheduled) {
     // Der Wecker übernimmt - eine frühere Ersatz-Mitteilung darf nicht zusätzlich kommen.
     await cancelNote()

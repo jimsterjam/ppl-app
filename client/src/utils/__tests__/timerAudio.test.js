@@ -151,4 +151,18 @@ describe('timerAudio: Zustand des AudioContext', () => {
     expect(log.resumeCalls).toBe(0)
     expect(log.oscStarts).toBe(0)
   })
+
+  it('Pausenende mit Melodie: spielt die Noten, nicht den Gong; unbekannte ID fällt auf den Gong zurück', async () => {
+    const log = installFakeAudioContext()
+    const audio = await freshAudio()
+    audio.emitTimerSignal({ eventKey: 'm1', soundEnabled: true, kind: 'rest-end', melodyId: 'marimba' })
+    const melodyOscs = log.oscStarts
+    // 8 Noten x 3 Obertöne (+ 1 Entsperr-Oszillator)
+    expect(melodyOscs).toBeGreaterThanOrEqual(24)
+    audio.emitTimerSignal({ eventKey: 'm2', soundEnabled: true, kind: 'rest-end', melodyId: 'default' })
+    const gongOscs = log.oscStarts - melodyOscs
+    // Gong: Grundton + 2 Obertöne + Anschlag = 4
+    expect(gongOscs).toBe(4)
+    expect(audio.playRestMelody('nope')).toBe(false)
+  })
 })
