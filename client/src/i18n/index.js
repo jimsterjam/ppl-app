@@ -513,6 +513,8 @@ export const messages = {
       remember: '{time} für diese Übung merken',
       notifyTitle: 'Pause vorbei',
       notifyBody: 'Weiter mit dem nächsten Satz: {name}',
+      // Beschriftung des Stopp-Knopfs am Wecker (iOS 26, Pausenende bei gesperrtem Bildschirm)
+      alarmStop: 'Stopp',
       autoStartLabel: 'Pause nach jedem Satz automatisch starten',
       autoStartHint: 'Startet beim Abhaken eines Satzes. Die Dauer passt zur Übung (z. B. 3 Min. bei schweren Grundübungen) und lässt sich in der Pausen-Leiste anpassen.',
       fullscreenLabel: 'Pause groß in der Mitte anzeigen',
@@ -1736,6 +1738,7 @@ export const messages = {
       remember: 'Remember {time} for this exercise',
       notifyTitle: 'Rest over',
       notifyBody: 'Next set: {name}',
+      alarmStop: 'Stop',
       autoStartLabel: 'Start rest automatically after each set',
       autoStartHint: 'Starts when you check off a set. The duration fits the exercise (e.g. 3 min for heavy compound lifts) and can be adjusted in the rest bar.',
       fullscreenLabel: 'Show rest timer large in the center',

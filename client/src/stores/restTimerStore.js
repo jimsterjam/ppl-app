@@ -4,10 +4,13 @@
 // Zeitbasis ist ein fester Endzeitpunkt (endsAt), damit die Pause auch bei gesperrtem Display
 // bzw. nach einem App-Neustart korrekt weiterläuft.
 import { defineStore } from 'pinia'
-import { Capacitor } from '@capacitor/core'
 import { emitTimerSignal, ensureAudioUnlocked } from '@/utils/timerAudio'
 import { clampRestSeconds, REST_ENDING_MS, REST_STEP_SECONDS, shouldAutoExpandRest } from '@/utils/restTimerRules'
 import { acquireKeepAwake, releaseKeepAwake } from '@/utils/keepAwakeGuard'
+import { scheduleRestEndSignal, cancelRestEndSignal } from '@/utils/restEndSignal'
+
+// Weiterhin hier exportiert (Tests/Aufrufer): Mitteilung und Verzögerung leben in utils/restEndSignal.js
+export { buildRestNotification, NOTIFICATION_DELAY_MS } from '@/utils/restEndSignal'
 
 const STATE_KEY = 'ppl_rest_timer_state_v1'
 const AUTO_KEY = 'ppl_rest_timer_auto_v1'
@@ -15,14 +18,6 @@ const AUTO_KEY = 'ppl_rest_timer_auto_v1'
 const FULLSCREEN_KEY = 'ppl_rest_timer_fullscreen_v1'
 // Bildschirm bleibt an, solange eine Pause läuft bzw. "Pause vorbei" sichtbar ist.
 const KEEP_AWAKE_TAG = 'rest-timer'
-const NOTIFICATION_ID = 940001
-// Ton der Mitteilung, wenn die App im Hintergrund ist (Datei im iOS-Projekt: ios/App/App/rest-end.wav,
-// im Xcode-Projekt als Ressource eingetragen). Ohne `sound` bleibt die Mitteilung auf iOS stumm.
-const NOTIFICATION_SOUND = 'rest-end.wav'
-// Die Mitteilung kommt etwas NACH dem Pausenende: Läuft die App im Vordergrund, beendet sie die Pause
-// und nimmt die Mitteilung zurück (finish -> cancelNotification), bevor sie auslöst - sonst gäbe es
-// Gong UND Mitteilungston gleichzeitig.
-export const NOTIFICATION_DELAY_MS = 1200
 // So lange bleibt "Nächster Satz" nach Ablauf sichtbar.
 const FINISHED_VISIBLE_MS = 6000
 const TICK_MS = 250
@@ -46,44 +41,6 @@ function readFullscreen() {
   }
 }
 
-async function getLocalNotifications() {
-  try {
-    const module = await import('@capacitor/local-notifications')
-    return module?.LocalNotifications || null
-  } catch {
-    return null
-  }
-}
-
-async function cancelNotification() {
-  const LocalNotifications = await getLocalNotifications()
-  if (!LocalNotifications) return
-  try { await LocalNotifications.cancel({ notifications: [{ id: NOTIFICATION_ID }] }) } catch {}
-}
-
-/** Mitteilung für das Pausenende (mit Ton auf iOS). Exportiert für Tests. */
-export function buildRestNotification(at, title, body, platform = 'web') {
-  return {
-    id: NOTIFICATION_ID,
-    title,
-    body,
-    schedule: { at: new Date(at + NOTIFICATION_DELAY_MS), allowWhileIdle: true },
-    ...(platform === 'ios' ? { sound: NOTIFICATION_SOUND } : {})
-  }
-}
-
-async function scheduleNotification(at, title, body) {
-  const LocalNotifications = await getLocalNotifications()
-  if (!LocalNotifications) return
-  try {
-    await LocalNotifications.cancel({ notifications: [{ id: NOTIFICATION_ID }] })
-    await LocalNotifications.requestPermissions()
-    await LocalNotifications.schedule({
-      notifications: [buildRestNotification(at, title, body, Capacitor.getPlatform())]
-    })
-  } catch {}
-}
-
 export const useRestTimerStore = defineStore('restTimer', {
   state: () => ({
     autoStart: readAuto(),
@@ -103,7 +60,8 @@ export const useRestTimerStore = defineStore('restTimer', {
     nowMs: Date.now(),
     // Texte für die Mitteilung (von der View in App-Sprache übergeben).
     notifyTitle: '',
-    notifyBody: ''
+    notifyBody: '',
+    alarmStopLabel: ''
   }),
   getters: {
     isRunning: (s) => s.endsAt > 0 && s.finishedAt === 0,
@@ -134,7 +92,7 @@ export const useRestTimerStore = defineStore('restTimer', {
     expand() {
       this.minimized = false
     },
-    start({ seconds, exerciseName = '', exIndex = -1, rowIndex = -1, notifyTitle = '', notifyBody = '' }) {
+    start({ seconds, exerciseName = '', exIndex = -1, rowIndex = -1, notifyTitle = '', notifyBody = '', alarmStopLabel = '' }) {
       const sec = clampRestSeconds(seconds)
       ensureAudioUnlocked()
       this.durationSec = sec
@@ -147,12 +105,21 @@ export const useRestTimerStore = defineStore('restTimer', {
       this.endsAt = this.nowMs + sec * 1000
       this.notifyTitle = notifyTitle
       this.notifyBody = notifyBody
+      this.alarmStopLabel = alarmStopLabel
       this.minimized = false
       this.autoExpanded = false
       this.persist()
       this.startTick()
       acquireKeepAwake(KEEP_AWAKE_TAG)
-      scheduleNotification(this.endsAt, notifyTitle, notifyBody)
+      this.scheduleEndSignal()
+    },
+    /** Wecker (bzw. Ersatz-Mitteilung) für das Pausenende - nur relevant, wenn die App nicht vorn ist. */
+    scheduleEndSignal() {
+      scheduleRestEndSignal(this.endsAt, {
+        title: this.notifyTitle,
+        body: this.notifyBody,
+        stopLabel: this.alarmStopLabel
+      }).catch(() => {})
     },
     adjust(deltaSec = REST_STEP_SECONDS) {
       if (!this.isRunning) return
@@ -164,7 +131,7 @@ export const useRestTimerStore = defineStore('restTimer', {
       if (nextRemaining * 1000 > REST_ENDING_MS) this.autoExpanded = false
       this.persist()
       if (nextRemaining <= 0) this.finish()
-      else scheduleNotification(this.endsAt, this.notifyTitle, this.notifyBody)
+      else this.scheduleEndSignal()
     },
     skip() {
       this.clear()
@@ -177,7 +144,7 @@ export const useRestTimerStore = defineStore('restTimer', {
       if (this.finishedAt) return
       this.finishedAt = Date.now()
       this.endsAt = this.finishedAt
-      cancelNotification()
+      cancelRestEndSignal().catch(() => {})
       emitTimerSignal({ eventKey: `rest-end-${this.finishedAt}`, soundEnabled: true, kind: 'round-start' })
       try { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([200, 100, 200]) } catch {}
       this.persist()
@@ -192,7 +159,7 @@ export const useRestTimerStore = defineStore('restTimer', {
       this.minimized = false
       this.autoExpanded = false
       this.stopTick()
-      cancelNotification()
+      cancelRestEndSignal().catch(() => {})
       releaseKeepAwake(KEEP_AWAKE_TAG)
       this.persist()
     },
