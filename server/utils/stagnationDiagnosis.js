@@ -55,13 +55,13 @@ export const DIAGNOSIS_CAUSES = Object.freeze(['insufficient_data', 'low_frequen
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const SMALL_STEP_EQUIPMENT = new Set(['kurzhanteln', 'kurzhantel', 'dumbbell', 'dumbbells', 'kettlebell']);
 
-function workoutDate(workout) {
+export function workoutDate(workout) {
   const raw = workout?.date || workout?.completedAt;
   const date = raw ? new Date(raw) : null;
   return date && !Number.isNaN(date.getTime()) ? date : null;
 }
 
-function exerciseKey(ex) {
+export function exerciseKey(ex) {
   const id = String(ex?.exerciseId || '').trim();
   if (id) return `id:${id}`;
   const name = String(ex?.name || '').trim().toLowerCase();
