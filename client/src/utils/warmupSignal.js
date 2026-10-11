@@ -35,8 +35,9 @@ export async function scheduleWarmupNotification(at, { title, body }) {
   const LocalNotifications = await getLocalNotifications()
   if (!LocalNotifications) return
   try {
-    await LocalNotifications.cancel({ notifications: [{ id: WARMUP_NOTIFICATION_ID }] })
+    // Erst die Erlaubnis (fragt iOS nur beim ersten Mal), dann aufräumen - ein Fehler beim Aufräumen darf sie nicht verhindern.
     const permission = await LocalNotifications.requestPermissions()
+    try { await LocalNotifications.cancel({ notifications: [{ id: WARMUP_NOTIFICATION_ID }] }) } catch {}
     await LocalNotifications.schedule({ notifications: [buildWarmupNotification(at, title, body, Capacitor.getPlatform())] })
     logDiagnostic('warmup-notification', { permission: permission?.display })
   } catch (error) {

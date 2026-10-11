@@ -24,9 +24,33 @@ export async function getNotificationPermission() {
   }
 }
 
-/** Hinweis nur, wenn die Erlaubnis verweigert wurde und der Nutzer ihn nicht schon ausgeblendet hat. */
+/**
+ * Hinweis, solange Mitteilungen nicht erlaubt sind: 'prompt' (iOS hat noch nie gefragt -> Knopf "Erlauben") oder
+ * 'denied' (-> Knopf "Einstellungen öffnen"). Nicht mehr, sobald der Nutzer ihn ausgeblendet hat.
+ */
 export function shouldShowNotificationHint({ permission, dismissed }) {
-  return permission === 'denied' && !dismissed
+  return (permission === 'denied' || permission === 'prompt') && !dismissed
+}
+
+/** Löst die iOS-Frage aus (nur wirksam, solange noch nie gefragt wurde). @returns {Promise<'granted'|'denied'|'prompt'|'unsupported'>} */
+export async function requestNotificationPermission() {
+  try {
+    if (!Capacitor.isNativePlatform()) return 'unsupported'
+    const { LocalNotifications } = await import('@capacitor/local-notifications')
+    const { display } = await LocalNotifications.requestPermissions()
+    if (display === 'granted') return 'granted'
+    if (display === 'denied') return 'denied'
+    return 'prompt'
+  } catch (error) {
+    logger.warn('[notificationPermission] Anfrage fehlgeschlagen', { message: error?.message })
+    return 'unsupported'
+  }
+}
+
+/** Fragt nur, wenn iOS noch nie gefragt hat (z. B. beim ersten Start eines Timers). Wirft nie. */
+export async function ensureNotificationPermission() {
+  const permission = await getNotificationPermission()
+  return permission === 'prompt' ? requestNotificationPermission() : permission
 }
 
 export function isNotificationHintDismissed() {

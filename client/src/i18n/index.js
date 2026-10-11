@@ -1228,6 +1228,8 @@ export const messages = {
       rangeStrength: 'meist 1–6 Wdh.'
     },
     notifyHint: {
+      textAsk: 'Mitteilungen erlauben, damit du das Ende eines Timers auch bei gesperrtem Bildschirm mitbekommst.',
+      allow: 'Erlauben',
       text: 'Mitteilungen sind aus – du hörst das Ende eines Timers nur, solange die App offen ist.',
       openSettings: 'Einstellungen öffnen',
       dismiss: 'Ausblenden'
@@ -2524,6 +2526,8 @@ export const messages = {
       rangeStrength: 'mostly 1–6 reps'
     },
     notifyHint: {
+      textAsk: 'Allow notifications so you notice when a timer ends, even with the screen locked.',
+      allow: 'Allow',
       text: 'Notifications are off – you will only hear a timer end while the app is open.',
       openSettings: 'Open settings',
       dismiss: 'Dismiss'
