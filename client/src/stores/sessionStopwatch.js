@@ -129,6 +129,18 @@ export const useSessionStopwatchStore = defineStore('sessionStopwatch', () => {
     clearPersistedState()
   }
 
+  /**
+   * Gesamttimer starten, aber nur wenn er noch gar nicht benutzt wurde (Absprache Paul 11.10.): Wer ihn
+   * schon gestartet hat - ob er läuft oder pausiert ist -, behält seinen Stand. Aufrufer: Start eines
+   * Warm-up-Timers und erster abgehakter Arbeitssatz (WorkoutDetailView).
+   * @returns {boolean} true, wenn er jetzt gestartet wurde
+   */
+  function startIfIdle() {
+    if (startedAt.value) return false
+    start()
+    return true
+  }
+
   function toggleStartStop() {
     if (!startedAt.value) {
       start()
@@ -150,6 +162,7 @@ export const useSessionStopwatchStore = defineStore('sessionStopwatch', () => {
     stop,
     resume,
     reset,
+    startIfIdle,
     toggleStartStop
   }
 })

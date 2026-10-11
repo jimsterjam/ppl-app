@@ -52,6 +52,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useWarmupTimerStore } from '@/stores/warmupTimerStore'
+import { useSessionStopwatchStore } from '@/stores/sessionStopwatch'
 import { formatRest } from '@/utils/restTimerRules'
 import {
   WARMUP_STEPS, WARMUP_TIMER_SECONDS, currentWarmupStep, emptyWarmup, jointsTypeFor, nextWarmupStep, sanitizeWarmup
@@ -73,6 +74,7 @@ const emit = defineEmits(['update:warmup', 'open-media'])
 
 const { t } = useI18n()
 const warmupTimer = useWarmupTimerStore()
+const sessionStopwatch = useSessionStopwatchStore()
 const banner = ref('')
 
 const state = computed(() => sanitizeWarmup(props.warmup) || emptyWarmup())
@@ -120,6 +122,8 @@ const progressPercent = (step) => {
 
 function startTimer(step) {
   banner.value = ''
+  // Mit dem Warm-up beginnt das Training: Gesamttimer (Gym-Zeit) mitstarten, falls er noch nicht benutzt wurde.
+  sessionStopwatch.startIfIdle()
   const next = nextWarmupStep(state.value, step)
   warmupTimer.start({
     step,

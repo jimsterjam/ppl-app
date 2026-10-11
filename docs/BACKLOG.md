@@ -69,6 +69,7 @@ Zuletzt aktualisiert: 2026-10-10
 
 Nur Produkt-/Architekturentscheidungen mit Datum. Dauerhafte Arbeitsregeln gehören in `CLAUDE.md`.
 
+- 2026-10-11 – Gesamttimer (Gym-Zeit) und Warm-up (Absprache Paul): Der Start eines Warm-up-Timers startet die Gym-Zeit mit, und der erste abgehakte Arbeitssatz startet sie, falls sie noch nicht benutzt wurde (z. B. Warm-up ausgelassen). Läuft sie oder ist sie pausiert, bleibt sie unberührt. Die Warm-up-Zeit zählt damit zur gespeicherten Dauer des Workouts.
 - 2026-10-11 – Warm-up (Absprache Paul): feste, nicht einklappbare Karte oben im laufenden Workout: 5 Min. Cardio (Timer), Gelenke aufwärmen 2 Min. (Timer), eine einfache Körpergewichts-Übung zur ersten Hauptübung (kein Timer). Überspringen = nicht abhaken, keine Rückfrage. Timer-Ende: Mitteilung mit Ton (kein Wecker; Stumm-Schalter/Fokus dämpfen sie), in der App Ton wie beim Pausentimer; Bildschirm bleibt an; es läuft nur ein Timer, der Pausentimer beendet einen Warm-up-Timer. Gespeichert: nur die drei Haken je Workout (null = ältere Workouts).
 - 2026-10-11 – Großansicht einer Übung: Gibt es kein Video (eigene Übungen, fehlende Katalog-Videos), zeigt sie das Foto (Absprache Paul).
 - 2026-10-10 – Coach-Diagnose-Zeile (Dashboard) entfällt ersatzlos: Der Stillstand steht im Monatsbericht. „Ist so geplant“ im Client entfernt; Server-Routen und gespeicherte Bestätigungen bleiben vorerst für ältere App-Builds (F12).

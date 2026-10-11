@@ -2001,6 +2001,9 @@ function toggleRowDone(row, exIndex = -1, rowIndex = -1) {
   // Pausentimer: Satz fertig -> Pause startet jetzt (nicht nach fester Arbeitszeit - wie lange
   // ein Satz dauert, weiß die App nicht). Haken wieder weg -> diese Pause abbrechen.
   if (row.done && !row.isWarmup && exIndex >= 0) {
+    // Erster abgehakter Arbeitssatz: Gesamttimer (Gym-Zeit) starten, falls er noch nicht benutzt wurde
+    // (z. B. Warm-up ausgelassen). Läuft er oder ist er pausiert, bleibt er unberührt.
+    sessionStopwatchStore.startIfIdle()
     if (restTimer.autoStart) {
       const name = getTranslatedExerciseName(workout.value?.exercises?.[exIndex]?.name || '')
       // Das Training hat begonnen: ein noch laufender Warm-up-Timer wäre jetzt nur störend (und seine Mitteilung
