@@ -32,6 +32,14 @@ export function shouldShowNotificationHint({ permission, dismissed }) {
   return (permission === 'denied' || permission === 'prompt') && !dismissed
 }
 
+/**
+ * Ausblenden gilt nur für den Zustand, in dem es getippt wurde: Wer den "Erlauben"-Hinweis ausblendet und später
+ * in der iOS-Frage ablehnt, bekommt "Mitteilungen sind aus" trotzdem (Fund Paul 11.10.).
+ */
+export function isHintDismissedFor(permission) {
+  return getDismissedState() === permission
+}
+
 /** Löst die iOS-Frage aus (nur wirksam, solange noch nie gefragt wurde). @returns {Promise<'granted'|'denied'|'prompt'|'unsupported'>} */
 export async function requestNotificationPermission() {
   try {
@@ -53,12 +61,21 @@ export async function ensureNotificationPermission() {
   return permission === 'prompt' ? requestNotificationPermission() : permission
 }
 
-export function isNotificationHintDismissed() {
-  try { return localStorage.getItem(DISMISS_KEY) === '1' } catch { return false }
+function getDismissedState() {
+  try {
+    const value = localStorage.getItem(DISMISS_KEY)
+    // '1' = älterer Stand (nur "denied" konnte ausgeblendet werden)
+    return value === '1' ? 'denied' : value
+  } catch { return null }
 }
 
-export function dismissNotificationHint() {
-  try { localStorage.setItem(DISMISS_KEY, '1') } catch {}
+export function isNotificationHintDismissed(permission) {
+  return permission ? isHintDismissedFor(permission) : getDismissedState() !== null
+}
+
+/** @param {'prompt'|'denied'} permission Zustand, in dem ausgeblendet wurde */
+export function dismissNotificationHint(permission = 'denied') {
+  try { localStorage.setItem(DISMISS_KEY, permission) } catch {}
 }
 
 /** Öffnet die iPhone-Einstellungen der App (dort: Mitteilungen). @returns {Promise<boolean>} geklappt? */

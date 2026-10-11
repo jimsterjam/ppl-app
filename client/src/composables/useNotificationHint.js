@@ -17,11 +17,11 @@ export function useNotificationHint() {
 
   function apply(next) {
     permission.value = next
-    visible.value = shouldShowNotificationHint({ permission: next, dismissed: isNotificationHintDismissed() })
+    visible.value = shouldShowNotificationHint({ permission: next, dismissed: isNotificationHintDismissed(next) })
   }
 
   function dismiss() {
-    dismissNotificationHint()
+    dismissNotificationHint(permission.value)
     visible.value = false
   }
 

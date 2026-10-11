@@ -93,9 +93,21 @@ describe('Mitteilungs-Erlaubnis', () => {
   })
 
   it('Ausblenden wird gemerkt', () => {
-    expect(isNotificationHintDismissed()).toBe(false)
-    dismissNotificationHint()
-    expect(isNotificationHintDismissed()).toBe(true)
+    expect(isNotificationHintDismissed('denied')).toBe(false)
+    dismissNotificationHint('denied')
+    expect(isNotificationHintDismissed('denied')).toBe(true)
+  })
+
+  it('Ausblenden bei "noch nie gefragt" blendet "Mitteilungen sind aus" später nicht mit aus', () => {
+    dismissNotificationHint('prompt')
+    expect(isNotificationHintDismissed('prompt')).toBe(true)
+    expect(isNotificationHintDismissed('denied')).toBe(false)
+  })
+
+  it('älterer Stand ("1") zählt als ausgeblendet für "denied"', () => {
+    localStorage.setItem('ppl_notification_hint_dismissed_v1', '1')
+    expect(isNotificationHintDismissed('denied')).toBe(true)
+    expect(isNotificationHintDismissed('prompt')).toBe(false)
   })
 
   it('Einstellungen öffnen: iOS springt in die App-Einstellungen, Web tut nichts', async () => {
