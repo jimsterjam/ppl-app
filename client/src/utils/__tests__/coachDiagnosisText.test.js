@@ -55,8 +55,8 @@ describe('diagnosisTextKeys', () => {
           expect(text, `${locale}: ${key} hat offene Platzhalter`).not.toMatch(/\{\w+\}|undefined|NaN/)
         }
       }
-      for (const key of ['title', 'rowLocked', 'rowStalledMany', 'basis', 'stalledFor', 'causeLabel', 'nextLabel', 'noneText',
-        'plannedButton', 'plannedHint', 'recheckQuestion', 'recheckYes', 'recheckNo', 'snoozedOne', 'snoozedMany', 'actionFailed']) {
+      // Übrig sind die Texte, die der Monatsbericht für den Stillstand nutzt
+      for (const key of ['stalledFor', 'causeLabel', 'nextLabel']) {
         expect(t(`coachDiagnosis.${key}`, { count: 3, weeks: 4 })).not.toBe(`coachDiagnosis.${key}`)
       }
     })
