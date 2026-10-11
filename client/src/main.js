@@ -14,6 +14,7 @@ import { useOnboardingStore } from './stores/onboardingStore'
 import { useTimerStore } from './stores/timerStore'
 import { initFirebaseAuth, useFirebaseAuth, isEffectivelyEmailVerified } from './utils/firebaseAuth'
 import { reconcileFavoritesWithServer } from './utils/workoutFavorites'
+import { syncCustomExercisesWithServer } from '@/api/customExercises'
 import { App as CapacitorApp } from '@capacitor/app'
 import { logger } from '@/utils/logger'
 import { setCacheLimits } from '@/utils/assetCache'
@@ -295,6 +296,11 @@ async function bootstrapAuth() {
             .catch((error) => {
               logger.warn('[main] Favoriten-Abgleich fehlgeschlagen:', error)
             })
+
+          // Eigene Übungen: nach Neuinstallation/Gerätewechsel vom Server holen, offline angelegte nachliefern.
+          syncCustomExercisesWithServer(token, user.uid)
+            .then((result) => logger.debug('[main] Eigene Übungen abgeglichen', result))
+            .catch((error) => logger.warn('[main] Abgleich eigener Übungen fehlgeschlagen:', error))
 
           // Falls beim letzten App-Ende noch nachträgliche KI-Analysen offen waren (z.B. App
           // wurde geschlossen, bevor eine temporäre Workout-ID real aufgelöst wurde), hier

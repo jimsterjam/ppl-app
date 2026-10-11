@@ -128,3 +128,40 @@ export async function deleteCustomExercise(id, token = null) {
   await deleteCustomExerciseOffline(id)
   return { success: true, _id: id }
 }
+
+/**
+ * Gleicht die eigenen Übungen nach dem Login mit dem Server ab (Absprache Paul 11.10.: nach einer Neuinstallation
+ * waren sie weg, weil nur der lokale Speicher gelesen und die Server-Liste nie geladen wurde):
+ *  1. Nur offline angelegte Übungen (lokale custom_-ID, _pendingSync) werden zum Server hochgeladen.
+ *  2. Danach wird die Server-Liste geladen und lokal zwischengespeichert.
+ * Wirft nie; Fehler einzelner Übungen stoppen den Abgleich nicht.
+ * @returns {Promise<{uploaded: number, downloaded: number}>}
+ */
+export async function syncCustomExercisesWithServer(token, userId) {
+  const result = { uploaded: 0, downloaded: 0 }
+  if (!token || !userId || !isOnline()) return result
+  try {
+    const local = await getAllCustomExercisesOffline({ userId })
+    const pending = local.filter((ex) => String(ex?._id || '').startsWith('custom_') && String(ex?.name || '').trim())
+    const config = { headers: { Authorization: `Bearer ${token}` } }
+    for (const ex of pending) {
+      try {
+        const res = await api.post('', {
+          name: ex.name, muscleGroup: ex.muscleGroup, description: ex.description, notes: ex.notes
+        }, config)
+        if (res.data?._id) {
+          await saveCustomExerciseOffline({ ...res.data, _pendingSync: false })
+          await deleteCustomExerciseOffline(ex._id)
+          result.uploaded += 1
+        }
+      } catch (error) {
+        logger.warn('⚠️ CustomExercises API - Nachliefern fehlgeschlagen', error?.message)
+      }
+    }
+    const remote = await fetchCustomExercises(token, userId)
+    result.downloaded = remote.length
+  } catch (error) {
+    logger.warn('⚠️ CustomExercises API - Abgleich fehlgeschlagen', error?.message)
+  }
+  return result
+}
