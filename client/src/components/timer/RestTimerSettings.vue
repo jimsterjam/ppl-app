@@ -8,6 +8,8 @@
         </header>
 
         <div class="rest-settings-body">
+          <NotificationHint />
+
           <!-- Pausenzeiten je Ziel und Übungsart -->
           <section class="section">
             <h4>{{ t('restTimer.durationsTitle') }}</h4>
@@ -57,6 +59,7 @@
 import { computed, onBeforeUnmount, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useScrollLock } from '@/composables/useScrollLock'
+import NotificationHint from '@/components/NotificationHint.vue'
 import { useRestTimerStore } from '@/stores/restTimerStore'
 import { defaultRestSeconds, formatRest, REST_GOALS, REST_STEP_SECONDS, REST_TYPES, restSecondsFor } from '@/utils/restTimerRules'
 import { REST_SOUND_IDS } from '@/utils/restMelodies'

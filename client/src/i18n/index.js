@@ -1227,6 +1227,11 @@ export const messages = {
       rangeHypertrophy: 'meist 8–12 Wdh.',
       rangeStrength: 'meist 1–6 Wdh.'
     },
+    notifyHint: {
+      text: 'Mitteilungen sind aus – du hörst das Ende eines Timers nur, solange die App offen ist.',
+      openSettings: 'Einstellungen öffnen',
+      dismiss: 'Ausblenden'
+    },
     warmup: {
       title: 'Warm-up',
       cardioTitle: '5 Min. Cardio',
@@ -2517,6 +2522,11 @@ export const messages = {
       required: 'Choose a goal first.',
       rangeHypertrophy: 'mostly 8–12 reps',
       rangeStrength: 'mostly 1–6 reps'
+    },
+    notifyHint: {
+      text: 'Notifications are off – you will only hear a timer end while the app is open.',
+      openSettings: 'Open settings',
+      dismiss: 'Dismiss'
     },
     warmup: {
       title: 'Warm-up',

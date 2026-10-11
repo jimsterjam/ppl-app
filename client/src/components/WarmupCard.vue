@@ -4,6 +4,7 @@
        der dritte Schritt ist eine einfache Körpergewichts-Übung. Überspringen = nicht abhaken. -->
   <section class="warmup-card" :aria-label="t('warmup.title')">
     <h3 class="warmup-title">{{ t('warmup.title') }}</h3>
+    <NotificationHint />
     <p v-if="banner" class="warmup-banner" role="status">{{ banner }}</p>
 
     <ul class="warmup-list">
@@ -51,6 +52,7 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import NotificationHint from '@/components/NotificationHint.vue'
 import { useWarmupTimerStore } from '@/stores/warmupTimerStore'
 import { useSessionStopwatchStore } from '@/stores/sessionStopwatch'
 import { formatRest } from '@/utils/restTimerRules'
