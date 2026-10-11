@@ -345,7 +345,7 @@ onMounted(async () => {
   background: none;
   border: none;
   padding: 0;
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: 0.82rem;
   font-weight: 500;
   cursor: pointer;

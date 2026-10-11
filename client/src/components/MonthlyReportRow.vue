@@ -104,7 +104,7 @@ watch(() => authStore.uid, () => { store.reset(); refresh(true) })
   cursor: pointer;
 }
 .report-row.attention { border-color: color-mix(in srgb, var(--accent) 55%, var(--line-strong)); }
-.report-row-icon { width: 20px; height: 20px; flex: 0 0 auto; color: var(--accent); }
+.report-row-icon { width: 20px; height: 20px; flex: 0 0 auto; color: var(--accent-text); }
 .report-row-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .report-row-title { font-weight: 700; font-size: 0.9rem; }
 .report-row-status {
@@ -122,7 +122,7 @@ watch(() => authStore.uid, () => { store.reset(); refresh(true) })
   font-size: 0.72rem;
   font-weight: 700;
   background: color-mix(in srgb, var(--accent) 18%, transparent);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .report-row-chevron { width: 18px; height: 18px; flex: 0 0 auto; color: var(--muted); }
 </style>

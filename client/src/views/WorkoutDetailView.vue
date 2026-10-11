@@ -4322,7 +4322,7 @@ onBeforeUnmount(() => {
   border-radius: 50%;
 }
 .progression-info-btn:active {
-  color: var(--accent);
+  color: var(--accent-text);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 .weight-suggestion-info-text { margin: 0 0 10px; line-height: 1.45; }
@@ -4414,7 +4414,7 @@ onBeforeUnmount(() => {
 }
 .bodyweight-info-btn:hover,
 .bodyweight-info-btn[aria-pressed="true"] {
-  color: var(--accent);
+  color: var(--accent-text);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
 }
 .bodyweight-hint {
@@ -4504,7 +4504,7 @@ onBeforeUnmount(() => {
 }
 .favorite-save {
   border-color: color-mix(in srgb, var(--accent) 60%, var(--line-strong));
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .favorite-save:hover {
   background: color-mix(in srgb, var(--accent) 10%, var(--bg-panel));
@@ -4571,6 +4571,7 @@ onBeforeUnmount(() => {
 .warmup-label {
   color: color-mix(in srgb, #f59e0b 65%, var(--muted));
 }
+[data-theme="light"] .warmup-label { color: var(--warning-text); }
 .working-label {
   padding-top: 2px;
 }
@@ -4635,7 +4636,7 @@ onBeforeUnmount(() => {
 .ex-bottom-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .ex-note-actions { display: inline-flex; align-items: center; gap: 6px; }
 .ex-note-actions .has-note { color: var(--fg); }
-.note-check { color: var(--accent); }
+.note-check { color: var(--accent-text); }
 .ex-note-field { margin-top: 4px; }
 .exercise-menu-actions { display: flex; flex-direction: column; gap: 8px; }
 .exercise-menu-btn {
@@ -4804,6 +4805,8 @@ onBeforeUnmount(() => {
   cursor: pointer;
   font-size: 0.82rem;
 }
+[data-theme="light"] .add-warmup-btn,
+[data-theme="light"] .warmup-actions--empty .add-warmup-btn:hover { color: var(--warning-text); }
 .add-warmup-btn:active {
   opacity: 0.7;
 }

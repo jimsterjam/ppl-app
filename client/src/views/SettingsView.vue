@@ -1027,7 +1027,7 @@ async function confirmDeleteAccount() {
 
 .theme-options { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 .opt { display: inline-flex; gap: 8px; align-items: center; background: var(--surface); border: 1px solid var(--card-border); padding: 8px 10px; border-radius: 10px; }
-.toggle { margin-left: auto; background: var(--accent); color: #fff; border: none; border-radius: 10px; padding: 10px 12px; }
+.toggle { margin-left: auto; background: var(--accent); color: var(--accent-contrast, #060606); border: none; border-radius: 10px; padding: 10px 12px; }
 
 .goal-row { display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: center; }
 .goal-input { display: inline-flex; align-items: center; border: 1px solid var(--card-border); border-radius: 10px; overflow: hidden; }

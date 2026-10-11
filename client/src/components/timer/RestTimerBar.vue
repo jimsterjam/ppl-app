@@ -284,7 +284,7 @@ onBeforeUnmount(unlock)
   padding: 0 12px;
   border: none;
   background: transparent;
-  color: var(--accent);
+  color: var(--accent-text);
   font: inherit;
   font-size: 1rem;
   font-weight: 600;
@@ -360,7 +360,7 @@ onBeforeUnmount(unlock)
   padding: 2px 0;
   border: none;
   background: transparent;
-  color: var(--accent);
+  color: var(--accent-text);
   font: inherit;
   font-size: 0.8rem;
   font-weight: 600;

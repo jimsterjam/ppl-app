@@ -356,7 +356,7 @@ function updateOrientation() {
   --timer-icon-bg: transparent;
   --timer-icon-border: color-mix(in srgb, var(--accent) 85%, transparent);
   --timer-primary-bg: var(--accent);
-  --timer-primary-fg: var(--accent-color-contrast, #060606);
+  --timer-primary-fg: var(--accent-contrast, #060606);
   --timer-primary-active-bg: color-mix(in srgb, var(--bg-panel) 92%, black 8%);
   --timer-progress-track: color-mix(in srgb, var(--fg) 16%, transparent);
   --timer-paused-fill: color-mix(in srgb, var(--fg) 42%, transparent);
@@ -554,14 +554,14 @@ function updateOrientation() {
 .interval-text {
   font-size: 0.86em;
   letter-spacing: 0.07em;
-  color: color-mix(in srgb, var(--fg) 62%, transparent);
+  color: color-mix(in srgb, var(--fg) 72%, transparent);
 }
 
 .timer-time {
   font-size: var(--timer-time-size);
   font-weight: 800;
   letter-spacing: -0.02em;
-  color: var(--accent);
+  color: var(--accent-text);
   text-shadow:
     0 1px 0 color-mix(in srgb, white 22%, transparent),
     0 2px 8px rgba(0, 0, 0, 0.32);
@@ -605,7 +605,7 @@ function updateOrientation() {
 }
 
 .timer-bar.running .timer-time {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .timer-controls {
@@ -699,7 +699,7 @@ function updateOrientation() {
 .timer-progress-fill {
   display: block;
   height: 100%;
-  background: var(--accent);
+  background: var(--accent-text);
   transition: width 0.2s ease;
 }
 
@@ -799,7 +799,7 @@ function updateOrientation() {
   font-size: clamp(100px, 20vw, 280px);
   font-weight: 700;
   letter-spacing: -0.02em;
-  color: var(--accent);
+  color: var(--accent-text);
   text-align: center;
   line-height: 1;
   width: auto;

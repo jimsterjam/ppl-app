@@ -488,7 +488,7 @@ function saveAndStart() {
 
 .primary-btn {
   background: color-mix(in srgb, var(--accent) 72%, transparent);
-  color: var(--accent-color-contrast, #060606);
+  color: var(--accent-contrast, #060606);
 }
 
 .primary-btn:disabled {

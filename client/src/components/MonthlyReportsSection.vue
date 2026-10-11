@@ -116,7 +116,7 @@ onMounted(() => { if (subscriptionStore.isPremium) store.refresh() })
   font-size: 0.72rem;
   font-weight: 700;
   background: color-mix(in srgb, var(--accent) 18%, transparent);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 .reports-chevron { width: 18px; height: 18px; flex: 0 0 auto; color: var(--muted); }
 .reports-empty { margin: 0; color: var(--muted); font-size: 0.85rem; }

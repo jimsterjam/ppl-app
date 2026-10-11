@@ -636,7 +636,7 @@ onBeforeUnmount(() => {
 
 .secondary {
   background-color: var(--surface);
-  color: var(--accent);
+  color: var(--accent-text);
   border: 1px solid var(--card-border);
 }
 

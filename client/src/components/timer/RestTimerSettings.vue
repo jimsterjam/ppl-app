@@ -210,5 +210,5 @@ function preview(id) {
 }
 .ghost-btn { background: transparent; color: var(--fg); align-self: flex-start; }
 .ghost-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-.primary-btn { background: color-mix(in srgb, var(--accent) 72%, transparent); color: var(--accent-color-contrast, #060606); }
+.primary-btn { background: color-mix(in srgb, var(--accent) 72%, transparent); color: var(--accent-contrast, #060606); }
 </style>

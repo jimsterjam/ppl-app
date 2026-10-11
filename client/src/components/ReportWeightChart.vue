@@ -107,8 +107,8 @@ const ariaLabel = computed(() => `${selected.value ? displayName(selected.value)
 .chart { width: 100%; height: auto; display: block; }
 .grid line { stroke: var(--line-strong); stroke-width: 1; stroke-dasharray: 3 3; }
 .grid text, .axis { fill: var(--muted); font-size: 9px; }
-.line { fill: none; stroke: var(--accent); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
-.dot { fill: var(--accent); stroke: var(--bg-panel); stroke-width: 1.5; }
+.line { fill: none; stroke: var(--accent-text); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; }
+.dot { fill: var(--accent-text); stroke: var(--bg-panel); stroke-width: 1.5; }
 .summary { margin: 0; font-weight: 600; font-size: 0.88rem; line-height: 1.4; }
 .hint { margin: 0; color: var(--muted); font-size: 0.78rem; line-height: 1.4; }
 </style>

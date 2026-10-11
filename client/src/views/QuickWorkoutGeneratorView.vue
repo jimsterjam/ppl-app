@@ -632,7 +632,7 @@ textarea {
 .preview-stat-value {
   font-size: 1.4rem;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .preview-stat-label {

@@ -217,7 +217,7 @@ onMounted(() => {
 .warmup-text strong { font-size: 0.88rem; }
 .warmup-text span { color: var(--muted); font-size: 0.76rem; line-height: 1.35; }
 .warmup-row.done .warmup-text strong { text-decoration: line-through; color: var(--muted); }
-.warmup-row.done .warmup-text span { opacity: 0.7; }
+.warmup-row.done .warmup-text span { color: var(--muted); }
 .warmup-video {
   flex: 0 0 40px;
   width: 40px;
@@ -229,7 +229,7 @@ onMounted(() => {
   border-radius: 10px;
   border: 1px solid var(--line-soft, rgba(255, 255, 255, 0.1));
   background: var(--card-soft);
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: 0.8rem;
   cursor: pointer;
 }
@@ -250,6 +250,6 @@ onMounted(() => {
 }
 .warmup-btn.ghost { background: transparent; color: var(--fg); border: 1px solid var(--line-strong); padding: 8px 16px; font-size: 0.82rem; }
 .warmup-progress { height: 6px; border-radius: 99px; background: var(--card-soft); margin-top: 8px; overflow: hidden; }
-.warmup-progress i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+.warmup-progress i { display: block; height: 100%; background: var(--accent-text); border-radius: 99px; }
 .warmup-note { display: block; margin-top: 6px; color: var(--muted); font-size: 0.74rem; }
 </style>
