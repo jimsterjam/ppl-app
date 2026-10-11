@@ -56,6 +56,14 @@ function resolveId(exercise) {
   return /^\d+$/.test(str) ? str.padStart(4, '0') : str
 }
 
+// Videos gibt es nur für Katalog-Übungen (numerische IDs, "ex_0001" -> "0001"). Eigene Übungen haben
+// IDs wie "custom_..." oder eine Mongo-ObjectId und nur ein Foto - dafür gibt es kein Video (und keine
+// Anfrage ins Leere, die die Großansicht leer ließ).
+function catalogVideoId(exercise) {
+  const id = resolveId(exercise)
+  return id && /^\d+$/.test(id) ? id : null
+}
+
 function resolveVersion(exercise) {
   return exercise?.mediaVersion || exercise?.version || 'v1'
 }
@@ -80,7 +88,7 @@ function deriveLegacyCandidates(exercise, ext = 'mp4') {
 
 function buildExerciseMediaCandidates(exercise, size = 360, ext = 'mp4') {
   const candidates = []
-  const id = resolveId(exercise)
+  const id = catalogVideoId(exercise)
   const version = resolveVersion(exercise)
 
   if (id) {
@@ -123,7 +131,7 @@ export function buildExerciseMediaUrl(exercise, size = 360, ext = 'mp4') {
 }
 
 export function buildExerciseCacheKey(exercise, size = 360, ext = 'mp4') {
-  const id = resolveId(exercise)
+  const id = catalogVideoId(exercise)
   if (!id) return null
   const version = resolveVersion(exercise)
   return `exercises/${size}/${id}.${version}.${ext}`
