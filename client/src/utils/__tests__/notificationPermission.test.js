@@ -3,15 +3,16 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 const mocks = vi.hoisted(() => ({
   isNative: vi.fn(),
   checkPermissions: vi.fn(),
+  requestPermissions: vi.fn(),
   openUrl: vi.fn()
 }))
 vi.mock('@capacitor/core', () => ({ Capacitor: { isNativePlatform: mocks.isNative } }))
-vi.mock('@capacitor/local-notifications', () => ({ LocalNotifications: { checkPermissions: mocks.checkPermissions } }))
+vi.mock('@capacitor/local-notifications', () => ({ LocalNotifications: { checkPermissions: mocks.checkPermissions, requestPermissions: mocks.requestPermissions } }))
 vi.mock('@capacitor/app', () => ({ App: { openUrl: mocks.openUrl } }))
 vi.mock('@/utils/logger', () => ({ logger: { warn: vi.fn(), info: vi.fn(), debug: vi.fn(), error: vi.fn() } }))
 
 import {
-  getNotificationPermission, shouldShowNotificationHint, openAppSettings,
+  getNotificationPermission, shouldShowNotificationHint, requestNotificationPermission, ensureNotificationPermission, openAppSettings,
   dismissNotificationHint, isNotificationHintDismissed
 } from '../notificationPermission.js'
 
@@ -52,12 +53,43 @@ describe('Mitteilungs-Erlaubnis', () => {
     expect(await getNotificationPermission()).toBe('unsupported')
   })
 
-  it('Hinweis nur bei verweigerter Erlaubnis und solange nicht ausgeblendet', () => {
-    expect(shouldShowNotificationHint({ permission: 'denied', dismissed: false })).toBe(true)
-    expect(shouldShowNotificationHint({ permission: 'denied', dismissed: true })).toBe(false)
-    for (const permission of ['granted', 'prompt', 'unsupported']) {
+  it('Hinweis bei "noch nie gefragt" und "verweigert", solange nicht ausgeblendet', () => {
+    for (const permission of ['denied', 'prompt']) {
+      expect(shouldShowNotificationHint({ permission, dismissed: false })).toBe(true)
+      expect(shouldShowNotificationHint({ permission, dismissed: true })).toBe(false)
+    }
+    for (const permission of ['granted', 'unsupported']) {
       expect(shouldShowNotificationHint({ permission, dismissed: false })).toBe(false)
     }
+  })
+
+  it('Erlaubnis anfragen: liefert den neuen Zustand, Web tut nichts', async () => {
+    mocks.isNative.mockReturnValue(true)
+    mocks.requestPermissions.mockResolvedValue({ display: 'denied' })
+    expect(await requestNotificationPermission()).toBe('denied')
+    mocks.requestPermissions.mockResolvedValue({ display: 'granted' })
+    expect(await requestNotificationPermission()).toBe('granted')
+    mocks.requestPermissions.mockRejectedValue(new Error('boom'))
+    expect(await requestNotificationPermission()).toBe('unsupported')
+    mocks.isNative.mockReturnValue(false)
+    mocks.requestPermissions.mockClear()
+    expect(await requestNotificationPermission()).toBe('unsupported')
+    expect(mocks.requestPermissions).not.toHaveBeenCalled()
+  })
+
+  it('ensure: fragt nur, wenn iOS noch nie gefragt hat', async () => {
+    mocks.isNative.mockReturnValue(true)
+    mocks.checkPermissions.mockResolvedValue({ display: 'prompt' })
+    mocks.requestPermissions.mockResolvedValue({ display: 'granted' })
+    expect(await ensureNotificationPermission()).toBe('granted')
+    expect(mocks.requestPermissions).toHaveBeenCalledTimes(1)
+
+    mocks.requestPermissions.mockClear()
+    for (const display of ['granted', 'denied']) {
+      mocks.checkPermissions.mockResolvedValue({ display })
+      expect(await ensureNotificationPermission()).toBe(display)
+    }
+    expect(mocks.requestPermissions).not.toHaveBeenCalled()
   })
 
   it('Ausblenden wird gemerkt', () => {

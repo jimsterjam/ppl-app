@@ -53,6 +53,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import NotificationHint from '@/components/NotificationHint.vue'
+import { ensureNotificationPermission } from '@/utils/notificationPermission'
 import { useWarmupTimerStore } from '@/stores/warmupTimerStore'
 import { useSessionStopwatchStore } from '@/stores/sessionStopwatch'
 import { formatRest } from '@/utils/restTimerRules'
@@ -122,8 +123,11 @@ const progressPercent = (step) => {
   return Math.min(100, Math.max(0, Math.round((1 - timeShown(step) / total) * 100)))
 }
 
-function startTimer(step) {
+async function startTimer(step) {
   banner.value = ''
+  // Beim ersten Start zuerst die Mitteilungs-Erlaubnis erfragen (iOS fragt nur einmal; ohne Frage fehlt die App
+  // später unter Einstellungen > Mitteilungen). Wirft nie.
+  await ensureNotificationPermission()
   // Mit dem Warm-up beginnt das Training: Gesamttimer (Gym-Zeit) mitstarten, falls er noch nicht benutzt wurde.
   sessionStopwatch.startIfIdle()
   const next = nextWarmupStep(state.value, step)

@@ -2,20 +2,31 @@
 // Prüft beim Einbinden und jedes Mal, wenn der Nutzer in die App zurückkehrt (z. B. aus den iPhone-Einstellungen).
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import {
-  dismissNotificationHint, getNotificationPermission, isNotificationHintDismissed, openAppSettings, shouldShowNotificationHint
+  dismissNotificationHint, getNotificationPermission, isNotificationHintDismissed, openAppSettings,
+  requestNotificationPermission, shouldShowNotificationHint
 } from '@/utils/notificationPermission'
 
 export function useNotificationHint() {
   const visible = ref(false)
+  // 'prompt' = iOS hat noch nie gefragt (Knopf Erlauben), 'denied' = abgelehnt (Knopf Einstellungen)
+  const permission = ref('granted')
 
   async function refresh() {
-    const permission = await getNotificationPermission()
-    visible.value = shouldShowNotificationHint({ permission, dismissed: isNotificationHintDismissed() })
+    apply(await getNotificationPermission())
+  }
+
+  function apply(next) {
+    permission.value = next
+    visible.value = shouldShowNotificationHint({ permission: next, dismissed: isNotificationHintDismissed() })
   }
 
   function dismiss() {
     dismissNotificationHint()
     visible.value = false
+  }
+
+  async function allow() {
+    apply(await requestNotificationPermission())
   }
 
   async function openSettings() {
@@ -31,5 +42,5 @@ export function useNotificationHint() {
     if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVisible)
   })
 
-  return { visible, refresh, dismiss, openSettings }
+  return { visible, permission, refresh, dismiss, allow, openSettings }
 }

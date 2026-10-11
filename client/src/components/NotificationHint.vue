@@ -1,9 +1,10 @@
 <template>
-  <!-- Kurzer Hinweis, wenn die Mitteilungen für die App ausgeschaltet sind (iOS fragt nur einmal). -->
+  <!-- Kurzer Hinweis, wenn Mitteilungen noch nicht erlaubt (iOS hat nie gefragt) oder ausgeschaltet sind (iOS fragt nur einmal). -->
   <div v-if="hint.visible.value" class="notify-hint" role="note">
-    <p class="notify-hint-text">{{ t('notifyHint.text') }}</p>
+    <p class="notify-hint-text">{{ hint.permission.value === 'prompt' ? t('notifyHint.textAsk') : t('notifyHint.text') }}</p>
     <div class="notify-hint-actions">
-      <button type="button" class="notify-hint-btn" @click="hint.openSettings()">{{ t('notifyHint.openSettings') }}</button>
+      <button v-if="hint.permission.value === 'prompt'" type="button" class="notify-hint-btn" @click="hint.allow()">{{ t('notifyHint.allow') }}</button>
+      <button v-else type="button" class="notify-hint-btn" @click="hint.openSettings()">{{ t('notifyHint.openSettings') }}</button>
       <button type="button" class="notify-hint-btn ghost" @click="hint.dismiss()">{{ t('notifyHint.dismiss') }}</button>
     </div>
   </div>
