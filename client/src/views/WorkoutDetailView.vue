@@ -2918,6 +2918,8 @@ function shouldAutoScroll() {
 async function discardDraftAndLeave() {
   const routeId = String(route.params.id || '')
   bypassTimerLeaveGuard.value = true
+  // Abgebrochenes Workout: ein laufender Warm-up-Timer (inkl. Mitteilung) endet mit.
+  warmupTimer.cancel()
   await discardDraftAndLeaveFlow({
     route,
     workout: workout.value,
@@ -3512,6 +3514,7 @@ async function performSaveWorkout(updateFavorite = false, { deferAiFeedback = fa
         await postSaveCleanup()
         timerStore.reset()
         sessionStopwatchStore.reset()
+        warmupTimer.cancel()
         bypassTimerLeaveGuard.value = true
         goToPostWorkoutSummary(realId, { deferred: deferAiFeedback })
         return
@@ -3571,6 +3574,7 @@ async function performSaveWorkout(updateFavorite = false, { deferAiFeedback = fa
       await postSaveCleanup()
       timerStore.reset()
       sessionStopwatchStore.reset()
+      warmupTimer.cancel()
       bypassTimerLeaveGuard.value = true
       goToPostWorkoutSummary(savedWorkout?._id || id, { deferred: deferAiFeedback })
       return
@@ -3589,6 +3593,7 @@ async function performSaveWorkout(updateFavorite = false, { deferAiFeedback = fa
     await postSaveCleanup()
     timerStore.reset()
     sessionStopwatchStore.reset()
+    warmupTimer.cancel()
     bypassTimerLeaveGuard.value = true
     goToPostWorkoutSummary(id, { deferred: deferAiFeedback })
   } catch (e) {
