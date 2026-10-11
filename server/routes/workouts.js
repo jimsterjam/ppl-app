@@ -4373,7 +4373,7 @@ function createWorkoutPrompt(context) {
   
   Erfahrungslevel: ${context.experienceLevel || 'unbekannt'}
   Verfügbare Zeit: ${context.timeAvailable || '45'} Minuten
-  Fokus: ${context.focus || 'Ganzkörper'}
+  Fokus: ${context.focus || 'Full Body'}
   Letzte Workouts: ${context.recentWorkouts || 'keine Daten'}
   Verletzungen: ${context.injuries || 'keine'}
   

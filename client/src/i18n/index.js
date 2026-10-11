@@ -718,7 +718,7 @@ export const messages = {
       pushDay: 'Push Day',
       pullDay: 'Pull Day',
       legsDay: 'Leg Day',
-      fullBodyDay: 'Ganzkörper',
+      fullBodyDay: 'Full Body',
       impulseTitle: 'Kurzer Impuls',
       continue: 'Weiter',
       selectType: 'Typ auswählen',
