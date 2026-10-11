@@ -480,7 +480,7 @@ onMounted(() => {
 .picker-header { display:flex; align-items:center; justify-content:space-between; padding:8px 4px }
 .picker-header .title { font-weight:700; font-family: var(--font-heading); }
 .btn { background: transparent; border: none; padding: 8px 12px; font-size: 16px }
-.btn.primary { color: var(--accent) }
+.btn.primary { color: var(--accent-text) }
 
 .picker-wheel { height: 40vh; overflow: hidden; margin: 6px 0 }
 .wheel-virtual { position: relative; height:100%; overflow-y: auto; scroll-behavior: smooth; -webkit-overflow-scrolling: touch; touch-action: pan-y; }

@@ -533,7 +533,7 @@ function onPillPointerUp() {
 }
 
 [data-theme="light"] .nav-btn:not(.active) {
-  color: #64748b;
+  color: #475569;
 }
 
 .nav-btn:active {
@@ -543,7 +543,7 @@ function onPillPointerUp() {
 .nav-btn.active {
   /* War #ffffff (weiß auf akzentfarbener Pille) — die Pille ist nach Video-Abgleich jetzt
      neutral/grau, die Akzentfarbe sitzt stattdessen auf Icon+Label, wie im echten App Store. */
-  color: var(--accent);
+  color: var(--accent-text);
   /* Bug (User-Report "Pille lässt sich nicht verschieben"): .nav-btn liegt auf z-index: 2,
      die Pille darunter auf z-index: 1 — der aktive Button deckt die Pille exakt ab, jeder
      Pointerdown auf der sichtbar-aktiven Pille landete deshalb immer auf dem Button statt auf
@@ -586,7 +586,7 @@ function onPillPointerUp() {
 
 .nav-btn.active .icon-svg {
   fill: none;
-  stroke: var(--accent);
+  stroke: var(--accent-text);
   stroke-width: 2.2;
 }
 
@@ -690,7 +690,7 @@ function onPillPointerUp() {
     color: var(--accent-color);
     background: color-mix(in srgb, var(--accent-color) 12%, transparent);
   }
-  .nav-btn.active .icon-svg { fill: none; stroke: var(--accent-color); }
+  .nav-btn.active .icon-svg { fill: none; stroke: var(--accent-text); }
   .nav-btn:not(.active) .icon-svg { stroke: var(--fg); }
   .icon { width: 24px; height: 24px; }
   .icon-svg { width: 20px; height: 20px; }

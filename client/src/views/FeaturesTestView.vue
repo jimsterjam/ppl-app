@@ -177,7 +177,7 @@ import HeaderBar from '@/components/HeaderBar.vue'
 
 .config-value {
   font-weight: 700;
-  color: var(--accent);
+  color: var(--accent-text);
   font-size: 1.1rem;
 }
 

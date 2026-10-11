@@ -55,7 +55,7 @@ const bars = computed(() => {
   background: var(--card-soft);
   overflow: hidden;
 }
-.bar { display: block; width: 100%; border-radius: 8px 8px 0 0; background: var(--accent); }
+.bar { display: block; width: 100%; border-radius: 8px 8px 0 0; background: var(--accent-text); }
 .label { color: var(--muted); font-size: 0.72rem; text-align: center; }
 .hint { margin: 0; color: var(--muted); font-size: 0.78rem; line-height: 1.4; }
 </style>

@@ -243,7 +243,7 @@ function handleSkip() {
   content: '✓';
   position: absolute;
   left: 0;
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 700;
 }
 

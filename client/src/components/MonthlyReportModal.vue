@@ -201,7 +201,7 @@ watch(() => props.modelValue, (open) => { if (open) load() }, { immediate: true 
 .stat-label { color: var(--muted); font-size: 0.78rem; }
 .stat-value { font-size: 1.2rem; font-variant-numeric: tabular-nums; }
 .stat-compare { font-size: 0.74rem; color: var(--muted); line-height: 1.3; }
-.stat-compare.more { color: var(--accent); }
+.stat-compare.more { color: var(--accent-text); }
 .conclusion { margin: 0; font-weight: 600; line-height: 1.45; }
 .block { display: grid; gap: 8px; }
 .block h5 { margin: 0; font-size: 0.95rem; }

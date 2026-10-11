@@ -641,12 +641,12 @@ watch(() => route.query?.emailVerified, (val) => {
 
     .resend-btn.ghost {
         background: transparent;
-        color: var(--accent);
+        color: var(--accent-text);
     }
 
     .forgot-password {
         background: transparent;
-        color: var(--accent);
+        color: var(--accent-text);
         border: none;
         cursor: pointer;
         font-size: 14px;
@@ -704,7 +704,7 @@ watch(() => route.query?.emailVerified, (val) => {
 
     .mode-badge.mode-signin {
         background: var(--surface);
-        color: var(--accent);
+        color: var(--accent-text);
         border: 1px solid var(--accent);
     }
 

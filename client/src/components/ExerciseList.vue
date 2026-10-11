@@ -644,7 +644,7 @@ function closeMedia() {
   padding: 2px 6px;
   border-radius: 6px;
   background: color-mix(in srgb, var(--accent, #4f9dff) 20%, transparent);
-  color: var(--accent, #4f9dff);
+  color: var(--accent-text, #4f9dff);
   font-size: 0.65rem;
   font-weight: 700;
   vertical-align: middle;

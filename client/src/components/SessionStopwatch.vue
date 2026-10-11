@@ -328,7 +328,7 @@ onBeforeUnmount(() => {
   font-weight: 800;
   line-height: 1.1;
   letter-spacing: 0.02em;
-  color: color-mix(in srgb, var(--fg) 45%, transparent);
+  color: color-mix(in srgb, var(--fg) 72%, transparent);
 }
 
 .sw-card--running .sw-card-time {
@@ -563,17 +563,17 @@ onBeforeUnmount(() => {
   font-weight: 800;
   font-variant-numeric: tabular-nums;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  color: color-mix(in srgb, var(--fg) 45%, transparent);
+  color: color-mix(in srgb, var(--fg) 72%, transparent);
   line-height: 1;
   letter-spacing: 0.04em;
 }
 
 .sw-time--running {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .sw-time--paused {
-  color: color-mix(in srgb, var(--fg) 55%, transparent);
+  color: color-mix(in srgb, var(--fg) 72%, transparent);
 }
 
 /* Buttons */
@@ -599,19 +599,19 @@ onBeforeUnmount(() => {
 
 .sw-btn--primary {
   background: var(--accent);
-  color: var(--accent-color-contrast, #060606);
+  color: var(--accent-contrast, #060606);
   border-color: var(--accent);
 }
 
 .sw-btn--secondary {
   background: color-mix(in srgb, var(--accent) 15%, transparent);
-  color: var(--accent);
+  color: var(--accent-text);
   border-color: color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
 .sw-btn--ghost {
   background: transparent;
-  color: color-mix(in srgb, var(--fg) 60%, transparent);
+  color: color-mix(in srgb, var(--fg) 72%, transparent);
   border-color: var(--card-border);
 }
 </style>
