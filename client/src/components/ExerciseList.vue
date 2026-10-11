@@ -150,6 +150,7 @@
           muted
           loop
           playsinline
+          @error="onMediaVideoError"
         ></video>
         <img
           v-else
@@ -575,6 +576,14 @@ function openMedia(exercise) {
       }
     }
   }).catch(() => {})
+}
+
+// Kein Video vorhanden oder nicht ladbar: stattdessen das Foto groß zeigen (Absprache Paul).
+function onMediaVideoError() {
+  if (!mediaExercise.value) return
+  // Spätere Ergebnisse von resolveExerciseMedia für diese Anfrage verwerfen (sonst käme das Video zurück).
+  mediaRequestId.value += 1
+  mediaUrl.value = getExerciseLargeImage(mediaExercise.value)
 }
 
 function closeMedia() {
