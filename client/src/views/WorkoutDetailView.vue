@@ -102,6 +102,18 @@
           <small v-if="showBodyweightHint" class="bodyweight-hint">{{ t('workoutDetail.bodyweightHint') }}</small>
         </div>
 
+          <!-- Warm-up (Absprache Paul 11.10.): fest oben im laufenden Workout, nicht einklappbar. -->
+          <WarmupCard
+            v-if="setTrackingActive && workout && !isReordering"
+            :warmup="workout.warmup || null"
+            :workout-type="workout.type || 'fullbody'"
+            :workout-key="warmupKey"
+            :first-exercise-name="warmupFirstExerciseName"
+            :specific="warmupSpecific"
+            @update:warmup="onWarmupUpdate"
+            @open-media="openExerciseMedia"
+          />
+
           <div id="exercises" ref="exListRef" class="ex-list glass" :class="{ reordering: isReordering }">
 
           <div class="ex-list-header">
@@ -987,6 +999,9 @@ import { normalizeWorkoutForSave } from '@/utils/workoutDetailSaveFlow'
 import { startAiWarmup } from '@/utils/aiWarmup'
 import { buildCatalogIndex, findCatalogEntry } from '@/utils/exerciseMatch'
 import { useRestTimerStore } from '@/stores/restTimerStore'
+import { useWarmupTimerStore } from '@/stores/warmupTimerStore'
+import WarmupCard from '@/components/WarmupCard.vue'
+import { emptyWarmup, pickWarmupExercise, sanitizeWarmup } from '@/utils/warmupPlan'
 import { restSecondsFor, sanitizeCustomRest } from '@/utils/restTimerRules'
 import RestTimerBar from '@/components/timer/RestTimerBar.vue'
 import { buildSaveReview, removeOpenSets, markAllSetsDone } from '@/utils/saveReview'
@@ -1987,6 +2002,9 @@ function toggleRowDone(row, exIndex = -1, rowIndex = -1) {
   if (row.done && !row.isWarmup && exIndex >= 0) {
     if (restTimer.autoStart) {
       const name = getTranslatedExerciseName(workout.value?.exercises?.[exIndex]?.name || '')
+      // Das Training hat begonnen: ein noch laufender Warm-up-Timer wäre jetzt nur störend (und seine Mitteilung
+      // käme mitten im Satz).
+      if (warmupTimer.isActive) warmupTimer.cancel()
       restTimer.start({
         seconds: restSecondsForIndex(exIndex),
         exerciseName: name,
@@ -2005,6 +2023,45 @@ function toggleRowDone(row, exIndex = -1, rowIndex = -1) {
 
 // --- Pausentimer -----------------------------------------------------------------------------
 const restTimer = useRestTimerStore()
+const warmupTimer = useWarmupTimerStore()
+
+// --- Warm-up-Karte -----------------------------------------------------------------------------
+// Je Workout wird nur gespeichert, welche der drei Schritte abgehakt sind (workout.warmup, siehe
+// utils/warmupPlan.js). Der Timer ist an den aktiven Entwurf des Nutzers gebunden, nicht an die Workout-ID:
+// die wechselt beim Speichern von der Entwurfs- zur Server-ID, der Timer soll dabei nicht verloren gehen.
+const warmupKey = computed(() => `warmup-${resolveActiveWorkoutUserId() || 'guest'}`)
+const warmupFirstExercise = computed(() => workout.value?.exercises?.[0] || null)
+const warmupFirstExerciseName = computed(() => {
+  const name = warmupFirstExercise.value?.name
+  return name ? (getTranslatedExerciseName(name) || name) : ''
+})
+
+// Einfache Körpergewichts-Übung zur ersten Hauptübung (Katalog, mit Video); null = nur Text.
+const warmupSpecific = computed(() => {
+  const first = warmupFirstExercise.value
+  if (!first) return null
+  const firstEntry = lookupDefaultExercise(first)
+  const pick = pickWarmupExercise({ name: first.name, name_en: firstEntry?.name_en, target: firstEntry?.target })
+  if (!pick) return null
+  const entry = findCatalogEntry(defaultExerciseIndex.value, { _id: pick.catalogId })
+  if (!entry) return null // Katalog noch nicht geladen
+  return { name: getTranslatedExerciseName(entry.name) || pick.name, entry }
+})
+
+function onWarmupUpdate(next) {
+  const clean = sanitizeWarmup(next)
+  if (!clean || !workout.value) return
+  workout.value = { ...workout.value, warmup: clean }
+  try { triggerAutoSave() } catch {}
+}
+
+// Ein laufendes Workout bekommt beim Öffnen sofort ein leeres Warm-up: "Karte wurde gezeigt, nichts abgehakt"
+// (= übersprungen) lässt sich so von Workouts ohne Karte (null, ältere Daten) unterscheiden.
+watch([setTrackingActive, () => workout.value?._id, () => !!workout.value], () => {
+  if (!setTrackingActive.value || !workout.value || workout.value.warmup) return
+  workout.value = { ...workout.value, warmup: emptyWarmup() }
+  try { triggerAutoSave() } catch {}
+}, { immediate: true })
 
 // Dauer: gemerkte Dauer der Übung > eigener Standard (Pausentimer-Einstellungen) > eingebauter Standard
 // je Trainingsart/Übungsart (restTimerRules.js).

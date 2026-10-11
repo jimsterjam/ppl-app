@@ -1,4 +1,5 @@
 import { TEXT_LIMITS, textSetter } from '../utils/textLimits.js';
+import { sanitizeWarmup } from '../utils/workoutWarmup.js';
 import mongoose from "mongoose";
 
 // Hilfsfunktion zur Kanonisierung des Workout-Typs
@@ -129,6 +130,20 @@ const workoutSchema = new mongoose.Schema({
     type: String,
     default: null,
     set: (v) => (v === 'hypertrophy' || v === 'strength' ? v : null)
+  },
+
+  // Warm-up-Karte (Cardio, Gelenke, übungsspezifisch): je Schritt abgehakt oder nicht. null = Workout
+  // von vor dieser Funktion (unbekannt). Der Setter lässt nur die drei Booleans durch - kein Freitext
+  // (siehe utils/workoutWarmup.js).
+  warmup: {
+    type: {
+      _id: false,
+      cardio: { type: Boolean, default: false },
+      joints: { type: Boolean, default: false },
+      specific: { type: Boolean, default: false }
+    },
+    default: null,
+    set: sanitizeWarmup
   },
 
   // KI-generiertes Trainings-Feedback (einmal generiert, danach wiederverwendet)
