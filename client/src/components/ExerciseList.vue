@@ -192,6 +192,7 @@ import { searchAndRankExercises } from '@/utils/exerciseSearch'
 import AddCustomExerciseModal from '@/components/AddCustomExerciseModal.vue'
 import AppModal from '@/components/AppModal.vue'
 import { deleteCustomExercise } from '@/api/customExercises'
+import { getAllCustomExercisesOffline, OFFLINE_WORKOUTS_UPDATED_EVENT } from '@/utils/offlineStorage'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { resolveServerMediaUrl } from '@/api/http'
 
@@ -250,6 +251,7 @@ async function confirmDeleteCustom() {
     const token = await getIdToken().catch(() => null)
     await deleteCustomExercise(exercise._id, token)
     emit('custom-added')
+    reloadIfStandalone()
   } catch (err) {
     logger.error('[ExerciseList] Löschen fehlgeschlagen', err)
   } finally {
@@ -257,15 +259,22 @@ async function confirmDeleteCustom() {
   }
 }
 
+// Ohne items lädt die Liste selbst - dann nach jeder Änderung neu laden (mit items übernimmt das der Aufrufer).
+function reloadIfStandalone() {
+  if (!Array.isArray(props.items)) loadExercises()
+}
+
 function onCustomExerciseCreated() {
   showAddCustomModal.value = false
   emit('custom-added')
+  reloadIfStandalone()
 }
 
 function onCustomExerciseUpdated() {
   showAddCustomModal.value = false
   editingCustomExercise.value = null
   emit('custom-added')
+  reloadIfStandalone()
 }
 
 // Reaktive Variablen
@@ -358,6 +367,14 @@ async function loadExercises() {
       ? props.items
       : (getCachedDefaultExercises().length ? getCachedDefaultExercises() : await loadDefaultExercises())
     let allExercises = Array.isArray(source) ? [...source] : []
+    // Eigenständige Liste (Tab "Übungen", ohne items): eigene Übungen dieses Kontos dazunehmen. Der Workout-Builder
+    // liefert sie bereits über items mit.
+    if (!Array.isArray(props.items) && props.userId) {
+      const custom = await getAllCustomExercisesOffline({ userId: props.userId }).catch(() => [])
+      allExercises = [...allExercises, ...custom.map(ex => ({
+        ...ex, displayName: ex.name || '', _isCustom: true, __canonKey: `custom__${String(ex._id || '').toLowerCase()}`
+      }))]
+    }
     if (selectedCategory.value) {
       allExercises = allExercises.filter(ex => ex.category === selectedCategory.value)
     }
@@ -403,7 +420,14 @@ onMounted(() => {
   loadExercises()
 });
 
+// Abgleich nach Login/Neuinstallation (syncCustomExercisesWithServer) legt Übungen erst nachträglich lokal ab.
+function onCustomExercisesChanged(event) {
+  if (String(event?.detail?.type || '').startsWith('custom-exercise')) reloadIfStandalone()
+}
+if (typeof window !== 'undefined') window.addEventListener(OFFLINE_WORKOUTS_UPDATED_EVENT, onCustomExercisesChanged)
+
 onBeforeUnmount(() => {
+  if (typeof window !== 'undefined') window.removeEventListener(OFFLINE_WORKOUTS_UPDATED_EVENT, onCustomExercisesChanged)
   if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
 })
 

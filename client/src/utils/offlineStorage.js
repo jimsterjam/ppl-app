@@ -628,6 +628,7 @@ export async function cacheCustomExercises(exercises) {
       _syncedAt: Date.now()
     }))
     await db.customExercises.bulkPut(cleanExercises)
+    if (cleanExercises.length) emitOfflineWorkoutsUpdated({ type: 'custom-exercise-cache', count: cleanExercises.length })
     logger.debug('💾 Offline Storage - Eigene Übungen cached:', cleanExercises.length)
     return cleanExercises.length
   } catch (error) {

@@ -2,17 +2,22 @@
   <div class="exercises-view">
     <HeaderBar :title="t('exercises.title')" />
     <main class="exercises-content">
-      <ExerciseList :show-title="false" />
+      <ExerciseList :show-title="false" :user-id="userId" />
     </main>
   </div>
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useAuthStore } from '@/stores/authStore'
 import HeaderBar from '@/components/HeaderBar.vue'
 import ExerciseList from '@/components/ExerciseList.vue'
 
 const { t } = useI18n()
+// Mit userId erscheint "Eigene Übung hinzufügen" und die eigenen Übungen stehen in der Liste (nur für dieses Konto).
+const authStore = useAuthStore()
+const userId = computed(() => authStore.user?.uid || '')
 </script>
 
 <style scoped>
