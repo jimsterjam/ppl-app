@@ -4,19 +4,14 @@ const THEME_KEY = 'theme'
 const THEME_ACCENT_KEY = 'theme-accent'
 const ACCENT_MODES = ['lime', 'ocean', 'violet', 'sunset']
 
-function getSystemTheme() {
-  if (typeof window === 'undefined') return 'dark'
-  return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches
-    ? 'light'
-    : 'dark'
-}
-
 function getInitialTheme() {
   try {
     const saved = localStorage.getItem(THEME_KEY)
     if (saved === 'light' || saved === 'dark') return saved
   } catch {}
-  return getSystemTheme()
+  // Erstinstallation (nichts gespeichert): immer dunkel + Lime (Absprache Paul 12.10.), unabhängig von der
+  // System-Einstellung - wirkt hochwertiger. Der Nutzer stellt es danach selbst um.
+  return 'dark'
 }
 
 function getInitialAccent() {
