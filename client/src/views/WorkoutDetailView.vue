@@ -2148,21 +2148,18 @@ const restNextSet = computed(() => {
   return null
 })
 
-// Pause vorbei: nächsten offenen Arbeitssatz dieser Übung kurz hervorheben.
-const nextSetHighlight = ref({ exIndex: -1, rowIndex: -1 })
-let nextSetHighlightTimer = null
-watch(() => restTimer.finishedAt, (finishedAt) => {
-  if (!finishedAt) return
-  const exIndex = restTimer.exIndex
-  const sets = workout.value?.exercises?.[exIndex]?.setDetails || []
-  const rowIndex = sets.findIndex((row) => row && !row.isWarmup && row.done !== true)
-  if (rowIndex < 0) return
-  nextSetHighlight.value = { exIndex, rowIndex }
-  clearTimeout(nextSetHighlightTimer)
-  nextSetHighlightTimer = setTimeout(() => { nextSetHighlight.value = { exIndex: -1, rowIndex: -1 } }, 5000)
+// Aktueller Satz (Absprache Paul 13.10.): der erste noch nicht abgehakte Arbeitssatz im Workout leuchtet
+// (Rahmen der Eingabefelder), bis er abgehakt wird - dann der nächste. Gilt nur im laufenden Workout.
+const nextSetHighlight = computed(() => {
+  if (!setTrackingActive.value || isReordering.value) return { exIndex: -1, rowIndex: -1 }
+  const exercises = workout.value?.exercises || []
+  for (let exIndex = 0; exIndex < exercises.length; exIndex += 1) {
+    const rowIndex = (exercises[exIndex]?.setDetails || []).findIndex((row) => row && !row.isWarmup && row.done !== true)
+    if (rowIndex >= 0) return { exIndex, rowIndex }
+  }
+  return { exIndex: -1, rowIndex: -1 }
 })
 restTimer.restore()
-onBeforeUnmount(() => clearTimeout(nextSetHighlightTimer))
 
 async function loadProgressionData() {
   const currentId = String(workout.value?._id || workout.value?.id || '')
@@ -4753,14 +4750,19 @@ onBeforeUnmount(() => {
 }
 .review-defer input { margin-top: 3px; }
 .review-defer small { display: block; margin-top: 2px; color: var(--muted); font-size: 0.78rem; line-height: 1.35; }
-/* Pause vorbei: nächster Satz kurz hervorgehoben. */
-.set-row.set-row--next {
-  box-shadow: 0 0 0 2px var(--accent);
-  border-radius: 6px;
-  animation: next-set-pulse 1s ease-in-out 3;
+/* Aktueller Satz: Rahmen der Eingabefelder pulsieren in der Akzentfarbe (im hellen Modus die dunkle Variante),
+   bis der Satz abgehakt ist. Takt wie der Punkt am Workout-Symbol im Menü. */
+.set-row.set-row--next .col input {
+  border-color: var(--accent-text);
+  box-shadow: 0 0 0 1px var(--accent-text);
+  animation: current-set-glow 2.5s ease-in-out infinite;
 }
-@keyframes next-set-pulse {
-  50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 50%, transparent); }
+@keyframes current-set-glow {
+  0%, 100% { border-color: var(--accent-text); box-shadow: 0 0 0 1px var(--accent-text), 0 0 10px color-mix(in srgb, var(--accent-text) 55%, transparent); }
+  50% { border-color: color-mix(in srgb, var(--accent-text) 35%, var(--card-border)); box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-text) 35%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .set-row.set-row--next .col input { animation: none; }
 }
 /* Nicht abgehakt: Werte grau = nur übernommen / noch nicht gemacht. */
 /* Abgehakte Sätze ganz hinterlegen - Fortschritt auf einen Blick. */
