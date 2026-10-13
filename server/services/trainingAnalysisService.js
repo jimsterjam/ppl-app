@@ -82,6 +82,40 @@ export function calculateExerciseStats(exercise) {
 }
 
 /**
+ * Übung wurde nicht gemacht: sie hat Arbeitssätze, aber keiner davon wurde abgehakt (done:false,
+ * siehe Client saveReview/markOpenSetsNotDone). Ältere Daten ohne done-Angabe zählen als gemacht.
+ * Nicht gemachte Übungen fließen NICHT in die Zahlen-Analysen ein (calculateExerciseStats -> null), werden
+ * der KI aber als "nicht gemacht" samt Notiz mitgegeben (collectNotDoneExercises).
+ */
+export function isExerciseNotDone(exercise) {
+  const sets = Array.isArray(exercise?.setDetails) ? exercise.setDetails.filter(set => set && !set.isWarmup) : [];
+  return sets.length > 0 && sets.every(set => set.done === false);
+}
+
+/**
+ * Nicht gemachte Übungen des aktuellen Workouts für den KI-Kontext (Absprache Paul 13.10.):
+ * [{ exercise, exerciseNameForAI, workoutIndex, note, noteContext }] - ohne jede Zahl.
+ */
+export function collectNotDoneExercises(currentWorkout, { userNoteByExerciseName = new Map(), enNameByExerciseName = new Map() } = {}) {
+  const result = [];
+  (currentWorkout?.exercises || []).forEach((exercise, workoutIndex) => {
+    if (!isExerciseNotDone(exercise)) return;
+    const name = exercise.name || 'Unknown';
+    const lookupKey = name.toLowerCase();
+    const note = typeof exercise.note === 'string' ? exercise.note.trim() : '';
+    const userNote = userNoteByExerciseName.get(lookupKey) || null;
+    result.push({
+      exercise: name,
+      exerciseNameForAI: enNameByExerciseName.get(lookupKey) || name,
+      workoutIndex,
+      note: note || null,
+      noteContext: buildNoteContext({ sessionNote: note, userNote })
+    });
+  });
+  return result;
+}
+
+/**
  * Working-Sets (ohne Warm-ups) als flache {weight, reps}-Liste, in Satz-Reihenfolge.
  * Grundlage für den Pro-Satz-Vergleich (buildSetsComparison) - siehe dort für den Hintergrund.
  *
@@ -449,7 +483,7 @@ export function analyzeWorkoutProgression(currentWorkout, allWorkouts, profileMa
     enNameByExerciseName = new Map()
   } = profileMaps || {};
 
-  for (const exercise of currentWorkout.exercises || []) {
+  for (const [workoutIndex, exercise] of (currentWorkout.exercises || []).entries()) {
     const exerciseName = exercise.name || 'Unknown';
     const lookupKey = exerciseName.toLowerCase();
     // Nur das an die KI gereichte Label wechselt auf Englisch - alle internen Vergleiche/Lookups
@@ -510,6 +544,7 @@ export function analyzeWorkoutProgression(currentWorkout, allWorkouts, profileMa
       // an dieser Stelle hätte beides kaputt gemacht. Nur structureAnalysisForAI() (baut die
       // KI-Eingabe) liest exerciseNameForAI.
       if (analysis) analysis.exerciseNameForAI = exerciseNameForAI;
+      if (analysis) analysis.workoutIndex = workoutIndex;
 
       if (analysis) {
         analysisResults.push(analysis);
@@ -673,7 +708,7 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
     return null;
   }
 
-  const { athleteBodyweightKg = null, bodyweightCorrelation = null } = options || {};
+  const { athleteBodyweightKg = null, bodyweightCorrelation = null, notDoneExercises = [] } = options || {};
 
   // Statistiken über alle Übungen
   const positiveExercises = exerciseAnalyses.filter(e => e.progression === 'positive');
@@ -692,7 +727,7 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
     .sort((a, b) => (a.changes.volume_change_percent || 0) - (b.changes.volume_change_percent || 0))
     .slice(0, 3);
 
-  return {
+  const structured = {
     analysis_date: new Date().toISOString(),
     total_exercises_analyzed: exerciseAnalyses.length,
 
@@ -713,7 +748,7 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
       negative: negativeExercises.length
     },
 
-    // Detaillierte Übungs-Analysen (für AI)
+    // Detaillierte Übungs-Analysen (für AI); nicht gemachte Übungen werden danach einsortiert (mergeNotDoneExercises)
     exercises: exerciseAnalyses.map(ex => ({
       // Bug-Fix (User-Report): KI-Feedback nannte Katalog-Übungen immer auf Deutsch statt
       // Englisch - siehe exerciseNameForAI in analyzeWorkoutProgression()/dem Fallback in
@@ -796,6 +831,30 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
       volume_change_percent: ex.changes.volume_change_percent
     }))
   };
+
+  // Nicht gemachte Übungen (Absprache Paul 13.10.): ohne Zahlen, nur "nicht gemacht" + Notiz, in Workout-Reihenfolge
+  // einsortiert. Zählen nicht in total_exercises_analyzed/progression_summary.
+  if (Array.isArray(notDoneExercises) && notDoneExercises.length > 0) {
+    const entries = structured.exercises.map((entry, i) => ({
+      index: Number.isFinite(exerciseAnalyses[i]?.workoutIndex) ? exerciseAnalyses[i].workoutIndex : 1000 + i,
+      entry
+    }));
+    for (const item of notDoneExercises) {
+      entries.push({
+        index: item.workoutIndex,
+        entry: {
+          exercise: item.exerciseNameForAI || item.exercise,
+          exercise_not_done: true,
+          ...(item.note ? { note: item.note } : {}),
+          ...(item.noteContext ? { note_context: item.noteContext } : {})
+        }
+      });
+    }
+    entries.sort((a, b) => a.index - b.index);
+    structured.exercises = entries.map(item => item.entry);
+  }
+
+  return structured;
 }
 
 /**
