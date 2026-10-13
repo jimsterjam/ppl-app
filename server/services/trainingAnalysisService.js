@@ -51,7 +51,7 @@ export function calculateExerciseStats(exercise) {
 
   // Moderne Struktur: setDetails mit isWarmup-Flag
   if (Array.isArray(exercise.setDetails) && exercise.setDetails.length > 0) {
-    const workingSets = exercise.setDetails.filter(set => !set.isWarmup);
+    const workingSets = exercise.setDetails.filter(set => !set.isWarmup && set.done !== false);
     if (workingSets.length === 0) return null; // Keine echten Sets
 
     const avgWeight = workingSets.reduce((sum, set) => sum + (set.weight || 0), 0) / workingSets.length;
@@ -92,7 +92,7 @@ function getWorkingSetsArray(exercise) {
   if (!exercise) return [];
   if (Array.isArray(exercise.setDetails) && exercise.setDetails.length > 0) {
     return exercise.setDetails
-      .filter(set => !set?.isWarmup)
+      .filter(set => !set?.isWarmup && set?.done !== false)
       .map(set => ({
         weight: round2(Number(set?.weight) || 0),
         reps: Number(set?.reps) || 0

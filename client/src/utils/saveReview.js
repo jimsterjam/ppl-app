@@ -4,7 +4,9 @@
 // kann immer trotzdem speichern. Reine Logik ohne Vue, damit jede Regel direkt testbar ist.
 //
 // Zwei Gruppen:
-//   forgotten - wahrscheinlich vergessen: nicht abgehakte Sätze, Übung ohne gemachte Sätze
+//   forgotten - Hinweis auf Nicht-Gemachtes: ganze Übung nicht gemacht, nicht abgehakte Sätze, Übung ohne Sätze
+//               (Absprache Paul 13.10.: die App entfernt nie etwas - sie weist nur hin, gespeichert wird exakt
+//               das Gemachte und das Nicht-Gemachte)
 //   check     - bitte prüfen: auffälliges Gewicht, 0 kg, auffällige Wiederholungen, Feedback fehlt
 
 // Grenzen für "Gewicht auffällig" im Vergleich zum schwersten Arbeitssatz der letzten Session.
@@ -69,7 +71,13 @@ export function buildSaveReview({
       forgotten.push({ kind: 'noSets', exIndex, name })
     } else if (trackingActive) {
       const open = sets.map((set, i) => (isDone(set) ? null : setLabelFor(sets, i))).filter(Boolean)
-      if (open.length) forgotten.push({ kind: 'openSets', exIndex, name, sets: open.join(', '), count: open.length })
+      const workingDone = sets.filter((set) => !set?.isWarmup && isDone(set))
+      if (open.length && !workingDone.length) {
+        // Kein einziger Arbeitssatz abgehakt: Übung wurde nicht gemacht (bleibt im Workout, wird so gespeichert).
+        forgotten.push({ kind: 'notDone', exIndex, name })
+      } else if (open.length) {
+        forgotten.push({ kind: 'openSets', exIndex, name, sets: open.join(', '), count: open.length })
+      }
     }
 
     // --- bitte prüfen (nur gemachte Arbeitssätze) ---
@@ -101,16 +109,18 @@ export function buildSaveReview({
     }
   })
 
-  const hasOpenSets = forgotten.some((item) => item.kind === 'openSets')
+  const hasOpenSets = forgotten.some((item) => item.kind === 'openSets' || item.kind === 'notDone')
   return { forgotten, check, hasOpenSets, isEmpty: !forgotten.length && !check.length }
 }
 
-/** Entfernt alle nicht abgehakten Arbeitssätze (Aufwärmsätze und Übungen bleiben erhalten). */
-export function removeOpenSets(exercises = []) {
-  return (Array.isArray(exercises) ? exercises : []).map((ex) => ({
-    ...ex,
-    setDetails: (Array.isArray(ex?.setDetails) ? ex.setDetails : []).filter((set) => set?.isWarmup === true || set?.done === true)
-  }))
+/**
+ * Beim Speichern eines laufenden Workouts: jeden nicht abgehakten Arbeitssatz ausdrücklich als "nicht gemacht"
+ * (done:false) festhalten. Ohne den Wert zählen ältere Sätze ohne Angabe als gemacht. Aufwärmsätze bleiben unberührt.
+ */
+export function markOpenSetsNotDone(setDetails = []) {
+  return (Array.isArray(setDetails) ? setDetails : []).map((set) => (
+    !set || set.isWarmup || set.done === true ? set : { ...set, done: false }
+  ))
 }
 
 /** Markiert alle Arbeitssätze als gemacht (Aufwärmsätze bleiben ohne Haken). */

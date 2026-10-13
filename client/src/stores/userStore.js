@@ -172,7 +172,7 @@ export const useUserStore = defineStore("user", {
         ;(workout.exercises || []).forEach((ex) => {
           if (Array.isArray(ex.setDetails) && ex.setDetails.length) {
             ex.setDetails.forEach((set) => {
-              if (set?.isWarmup) return // Warmup-Sätze nicht ins Volumen einrechnen
+              if (set?.isWarmup || set?.done === false) return // Warmup-Sätze und nicht gemachte Sätze nicht ins Volumen einrechnen
               const reps = Number(set?.reps) || 0
               const weight = Number(set?.weight) || 0
               total += reps * weight

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildSaveReview, removeOpenSets, markAllSetsDone, setLabelFor } from '../saveReview.js'
+import { buildSaveReview, markOpenSetsNotDone, markAllSetsDone, setLabelFor } from '../saveReview.js'
 
 const done = (reps, weight, extra = {}) => ({ reps, weight, done: true, ...extra })
 const open = (reps, weight, extra = {}) => ({ reps, weight, ...extra })
@@ -26,6 +26,22 @@ describe('buildSaveReview', () => {
       getNote: feedback
     })
     expect(review.forgotten).toEqual([{ kind: 'openSets', exIndex: 0, name: 'Squat', sets: '3, 4', count: 2 }])
+    expect(review.hasOpenSets).toBe(true)
+  })
+
+  it('Übung ohne einen einzigen abgehakten Arbeitssatz -> notDone (bleibt im Workout), Teilmenge -> openSets', () => {
+    const review = buildSaveReview({
+      exercises: [
+        { name: 'Row', setDetails: [open(8, 50), open(8, 50)] },
+        { name: 'Squat', setDetails: [open(5, 60, { isWarmup: true }), done(5, 100), open(5, 100)] }
+      ],
+      trackingActive: true,
+      getNote: feedback
+    })
+    expect(review.forgotten).toEqual([
+      { kind: 'notDone', exIndex: 0, name: 'Row' },
+      { kind: 'openSets', exIndex: 1, name: 'Squat', sets: '2', count: 1 }
+    ])
     expect(review.hasOpenSets).toBe(true)
   })
 
@@ -111,15 +127,19 @@ describe('buildSaveReview', () => {
   })
 })
 
-describe('removeOpenSets / markAllSetsDone / setLabelFor', () => {
+describe('markOpenSetsNotDone / markAllSetsDone / setLabelFor', () => {
   const exercises = [{ name: 'Squat', setDetails: [done(5, 100), open(5, 100)] }]
 
-  it('entfernt nur nicht abgehakte Arbeitssätze, Aufwärmsatz und Übung bleiben', () => {
-    expect(removeOpenSets(exercises)[0].setDetails).toEqual([done(5, 100)])
+  it('nichts wird entfernt: nicht abgehakte Arbeitssätze bekommen ausdrücklich done:false, Aufwärmsätze bleiben', () => {
     const warm = open(5, 60, { isWarmup: true })
-    expect(removeOpenSets([{ name: 'Squat', setDetails: [warm, open(5, 100)] }])[0].setDetails).toEqual([warm])
-    expect(markAllSetsDone([{ name: 'Squat', setDetails: [warm] }])[0].setDetails[0].done).toBeUndefined()
-    expect(removeOpenSets([{ name: 'Row', setDetails: [open(5, 50)] }])[0]).toEqual({ name: 'Row', setDetails: [] })
+    const result = markOpenSetsNotDone([warm, done(5, 100), open(5, 100), open(5, 90, { done: false })])
+    expect(result).toHaveLength(4)
+    expect(result[0]).toEqual(warm)
+    expect(result[1].done).toBe(true)
+    expect(result[2]).toEqual({ reps: 5, weight: 100, done: false })
+    expect(result[3].done).toBe(false)
+    expect(markOpenSetsNotDone([open(5, 50)])).toEqual([{ reps: 5, weight: 50, done: false }])
+    expect(markOpenSetsNotDone(undefined)).toEqual([])
   })
 
   it('markiert alle Sätze als gemacht, ohne das Original zu verändern', () => {

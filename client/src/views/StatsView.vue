@@ -374,7 +374,7 @@ const personalBest = computed(() => {
     ;(workout.exercises || []).forEach((ex) => {
       if (Array.isArray(ex.setDetails) && ex.setDetails.length) {
         ex.setDetails.forEach((set) => {
-          if (set?.isWarmup) return // Warmup-Gewichte nicht als Bestleistung werten
+          if (set?.isWarmup || set?.done === false) return // Warmup-Gewichte und nicht gemachte Sätze nicht als Bestleistung werten
           const weight = Number(set?.weight) || 0
           if (weight > best) best = weight
         })
@@ -488,7 +488,7 @@ watch(calendarViewDate, () => {
 
 function getWorkingSetsStat(exercise) {
   if (Array.isArray(exercise.setDetails)) {
-    return exercise.setDetails.filter(s => !s.isWarmup)
+    return exercise.setDetails.filter(s => !s.isWarmup && s.done !== false)
   }
   return []
 }
@@ -731,7 +731,7 @@ function calcWorkoutVolume(workout) {
   ;(workout.exercises || []).forEach((ex) => {
     if (Array.isArray(ex.setDetails) && ex.setDetails.length) {
       ex.setDetails.forEach((set) => {
-        if (set?.isWarmup) return
+        if (set?.isWarmup || set?.done === false) return // nicht gemachte Sätze zählen nicht
         const reps = Number(set?.reps) || 0
         const weight = Number(set?.weight) || 0
         if (!reps && !weight) return // leere Zeilen überspringen
@@ -1038,7 +1038,7 @@ function collectMuscleSets(list) {
       if (!base[bucketKey]) base[bucketKey] = { sets: 0, reps: 0 }
       if (Array.isArray(exercise.setDetails) && exercise.setDetails.length) {
         exercise.setDetails.forEach(set => {
-          if (set?.isWarmup) return // Warmup-Sätze nicht in Muskelgruppen-Statistik zählen
+          if (set?.isWarmup || set?.done === false) return // Warmup-Sätze und nicht gemachte Sätze nicht in Muskelgruppen-Statistik zählen
           base[bucketKey].sets += 1
           base[bucketKey].reps += Number(set?.reps) || 0
         })
