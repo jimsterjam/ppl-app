@@ -124,7 +124,7 @@ function calcWorkoutVolume(workout) {
     const setDetails = Array.isArray(exercise?.setDetails) ? exercise.setDetails : []
     if (setDetails.length) {
       for (const set of setDetails) {
-        if (set?.isWarmup) continue
+        if (set?.isWarmup || set?.done === false) continue
         const reps = Number(set?.reps) || 0
         const weight = Number(set?.weight) || 0
         total += reps * weight

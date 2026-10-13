@@ -8,7 +8,7 @@
 function getWorkingSets(exercise) {
   if (Array.isArray(exercise.setDetails) && exercise.setDetails.length) {
     return exercise.setDetails
-      .filter(s => !s.isWarmup)
+      .filter(s => !s.isWarmup && s.done !== false)
       .map(s => ({ reps: Number(s.reps) || 0, weight: Number(s.weight) || 0 }))
   }
   const sets = Number(exercise.sets) || 1
@@ -77,7 +77,7 @@ function berechneStaerke(curr, prev) {
 function countWorkingSets(workout) {
   return (workout.exercises || []).reduce((total, ex) => {
     if (Array.isArray(ex.setDetails) && ex.setDetails.length)
-      return total + ex.setDetails.filter(s => !s.isWarmup).length
+      return total + ex.setDetails.filter(s => !s.isWarmup && s.done !== false).length
     return total + (Number(ex.sets) || 1)
   }, 0)
 }
@@ -185,7 +185,7 @@ export function estimateOneRepMaxEpley(weight, reps) {
 function getExerciseSetDetails(exercise) {
   if (Array.isArray(exercise?.setDetails) && exercise.setDetails.length) {
     return exercise.setDetails
-      .filter((set) => !set?.isWarmup)
+      .filter((set) => !set?.isWarmup && set?.done !== false)
       .map((set) => ({
         reps: Number(set?.reps) || 0,
         weight: Number(set?.weight) || 0

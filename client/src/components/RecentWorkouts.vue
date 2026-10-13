@@ -95,6 +95,7 @@
                         <span v-if="set.reps" class="reps">{{ set.reps }} {{ t('common.reps') }}</span>
                         <span v-if="set.weight" class="weight">{{ set.weight }}kg</span>
                         <span v-if="!set.reps && !set.weight" class="no-data">{{ t('recent.noData') }}</span>
+                        <span v-if="set.done === false" class="not-done">{{ t('recent.notDone') }}</span>
                       </span>
                     </div>
                   </div>
@@ -962,4 +963,5 @@ function deleteWorkoutItem(workout) {
     font-size: 0.7rem;
   }
 }
+.set-item .not-done { margin-left: 6px; font-size: 0.72rem; color: var(--muted); font-style: italic; }
 </style>

@@ -33,7 +33,7 @@ export function calculateExerciseVolume(exercise) {
   if (!exercise) return 0;
   if (Array.isArray(exercise.setDetails) && exercise.setDetails.length) {
     return exercise.setDetails.reduce((sum, set) => {
-      if (set?.isWarmup) return sum;
+      if (set?.isWarmup || set?.done === false) return sum; // Warm-up und nicht gemachte Sätze zählen nicht
       const reps = Number(set?.reps ?? exercise.reps ?? 0);
       const weight = Number(set?.weight ?? exercise.weight ?? 0);
       // Leere Zeilen (reps=null/0 UND weight=0) überspringen
@@ -51,7 +51,7 @@ export function getExerciseBestWeight(exercise) {
   let best = Number(exercise?.weight) || 0;
   if (Array.isArray(exercise?.setDetails)) {
     exercise.setDetails.forEach((set) => {
-      if (set?.isWarmup) return;
+      if (set?.isWarmup || set?.done === false) return;
       const current = Number(set?.weight) || 0;
       if (current > best) best = current;
     });

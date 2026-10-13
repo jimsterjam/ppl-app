@@ -675,7 +675,7 @@
     <AppModal
       v-model="showSaveReviewModal"
       :title="t('workoutDetail.reviewTitle')"
-      :confirm-text="saveReview.hasOpenSets ? t('workoutDetail.reviewRemoveOpen') : t('workoutDetail.reviewSaveAnyway')"
+      :confirm-text="t('workoutDetail.reviewSaveAnyway')"
       :cancel-text="t('workoutDetail.reviewBack')"
       :extra-text="saveReview.hasOpenSets ? t('workoutDetail.reviewMarkAllDone') : ''"
       type="warning"
@@ -1005,7 +1005,7 @@ import WarmupCard from '@/components/WarmupCard.vue'
 import { emptyWarmup, pickWarmupExercise, sanitizeWarmup } from '@/utils/warmupPlan'
 import { restSecondsFor, sanitizeCustomRest } from '@/utils/restTimerRules'
 import RestTimerBar from '@/components/timer/RestTimerBar.vue'
-import { buildSaveReview, removeOpenSets, markAllSetsDone } from '@/utils/saveReview'
+import { buildSaveReview, markAllSetsDone } from '@/utils/saveReview'
 import {
   shouldKeepAsDraft as shouldKeepAsDraftUtil,
   clearActiveDraftForCurrentUser as clearActiveDraftForCurrentUserUtil,
@@ -1875,6 +1875,7 @@ function reviewItemText(item) {
   }
   const keys = {
     openSets: item.count === 1 ? 'reviewOpenSet' : 'reviewOpenSets',
+    notDone: 'reviewNotDone',
     noSets: 'reviewNoSets',
     weightOutlier: 'reviewWeightOutlier',
     zeroWeight: 'reviewZeroWeight',
@@ -1890,11 +1891,8 @@ function proceedAfterReview() {
   saveWorkout(pendingUpdateFavoriteOnSave, { deferAiFeedback: reviewDeferAi.value })
 }
 
-// Hervorgehobener Button: mit offenen Sätzen "Nicht abgehakte entfernen", sonst "Trotzdem speichern".
+// Speichern, wie es ist: Nicht Abgehaktes bleibt erhalten und wird als "nicht gemacht" gespeichert (nichts wird entfernt).
 function onReviewConfirm() {
-  if (saveReview.value.hasOpenSets && workout.value) {
-    workout.value.exercises = removeOpenSets(workout.value.exercises)
-  }
   proceedAfterReview()
 }
 
@@ -3313,6 +3311,8 @@ async function performSaveWorkout(updateFavorite = false, { deferAiFeedback = fa
   // daher muss es vor cancelPendingAutoSave() und vor dem ersten await stehen.
   saving.value = true
   suppressDraftPersistence.value = true
+  // Vor jedem await festhalten: laufendes Workout (Abhaken aktiv)? Dann werden nicht abgehakte Sätze als "nicht gemacht" gespeichert.
+  const trackingAtSave = setTrackingActive.value
 
   // Bildschirm bleibt an, bis Speichern + anschließende KI-Analyse abgeschlossen sind (User-
   // Wunsch: Standby darf diese Vorgänge nicht abbrechen). Bei Erfolg übernimmt
@@ -3355,7 +3355,8 @@ async function performSaveWorkout(updateFavorite = false, { deferAiFeedback = fa
       workout: { ...w, exercises: (w.exercises || []).map((ex, idx) => ({ ...ex, trainingType: trainingTypeOverride(idx) || undefined, restSeconds: customRestForIndex(idx) || undefined })) },
       exerciseNotes: exerciseNotes.value,
       sessionStopwatchStore,
-      userId: resolvedUserId
+      userId: resolvedUserId,
+      trackingActive: trackingAtSave
     })
     // Wird weiter unten für die Erfolgsmeldung ("Gespeichert. Dauer: X min") gebraucht -
     // aus dem normalisierten Ergebnis lesen statt separat neu zu berechnen.

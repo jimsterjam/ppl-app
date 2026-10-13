@@ -3,6 +3,7 @@ import { buildWorkoutNotesSummary } from './workoutNotes'
 import { sanitizeExerciseTrainingType } from './weightSuggestion'
 import { sanitizeCustomRest } from './restTimerRules'
 import { sanitizeWarmup } from './warmupPlan'
+import { markOpenSetsNotDone } from './saveReview'
 
 export function getExercisesMissingNotes(exercises = [], getNote) {
   const missing = []
@@ -24,7 +25,7 @@ export function resolveFinalDurationMinutes({ workout, sessionStopwatchStore }) 
   return timerDurationMinutes > 0 ? timerDurationMinutes : existingDuration
 }
 
-export function normalizeWorkoutForSave({ workout, exerciseNotes, sessionStopwatchStore, userId }) {
+export function normalizeWorkoutForSave({ workout, exerciseNotes, sessionStopwatchStore, userId, trackingActive = false }) {
   const w = workout || {}
   const exercises = (w.exercises || []).map((ex, idx) => {
     const firstWorkingSet = (ex.setDetails || []).find(s => !s.isWarmup)
@@ -34,7 +35,8 @@ export function normalizeWorkoutForSave({ workout, exerciseNotes, sessionStopwat
       muscleGroup: ex.muscleGroup,
       reps: firstWorkingSet?.reps ?? ex.reps ?? 10,
       weight: firstWorkingSet?.weight ?? ex.weight ?? 0,
-      setDetails: ex.setDetails || [],
+      // Laufendes Workout: nicht abgehakte Arbeitssätze werden als "nicht gemacht" (done:false) gespeichert.
+      setDetails: trackingActive ? markOpenSetsNotDone(ex.setDetails) : (ex.setDetails || []),
       // Eigene Trainingsart der Übung (siehe weightSuggestion.js resolveExerciseGoal) - nur wenn gewählt.
       ...(sanitizeExerciseTrainingType(ex.trainingType) ? { trainingType: ex.trainingType } : {}),
       // Vom Nutzer gemerkte Pausendauer (Pausentimer) - nur wenn gesetzt.
