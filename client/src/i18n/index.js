@@ -595,6 +595,7 @@ export const messages = {
       reviewOpenSet: '{name}: Satz {sets} nicht abgehakt',
       reviewOpenSets: '{name}: Sätze {sets} nicht abgehakt',
       reviewNotDone: '{name}: nicht gemacht',
+      notDoneBadge: 'Nicht gemacht',
       reviewNoSets: '{name}: keine Sätze eingetragen',
       reviewWeightOutlier: '{name} Satz {set}: {weight} kg (letztes Mal {lastWeight} kg)',
       reviewZeroWeight: '{name} Satz {set}: 0 kg (letztes Mal mit Gewicht)',
@@ -908,6 +909,7 @@ export const messages = {
     },
     postWorkout: {
       title: 'Workout abgeschlossen!',
+      notDoneTitle: 'Nicht gemacht',
       analyzing: 'Analysiere deinen Trainingsfortschritt...',
       feedback: 'Dein Feedback',
       gotIt: 'Verstanden',
@@ -1906,6 +1908,7 @@ export const messages = {
       reviewOpenSet: '{name}: set {sets} not checked',
       reviewOpenSets: '{name}: sets {sets} not checked',
       reviewNotDone: '{name}: not done',
+      notDoneBadge: 'Not done',
       reviewNoSets: '{name}: no sets entered',
       reviewWeightOutlier: '{name} set {set}: {weight} kg (last time {lastWeight} kg)',
       reviewZeroWeight: '{name} set {set}: 0 kg (last time with weight)',
@@ -2218,6 +2221,7 @@ export const messages = {
       favoriteNameRequired: 'Please enter a name.'
     },
     postWorkout: {
+      notDoneTitle: 'Not done',
       title: 'Workout complete!',
       analyzing: 'Analyzing your training progress...',
       feedback: 'Your feedback',

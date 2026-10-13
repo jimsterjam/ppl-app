@@ -20,6 +20,17 @@
       @primary="showFeedbackDialog = true"
     />
 
+
+    <div v-if="notDoneExercises.length" class="not-done-section">
+      <h3>{{ t('postWorkout.notDoneTitle') }}</h3>
+      <ul>
+        <li v-for="item in notDoneExercises" :key="item.name">
+          <strong>{{ getTranslatedExerciseName(item.name) }}</strong>
+          <span v-if="item.note" class="not-done-note">{{ item.note }}</span>
+        </li>
+      </ul>
+    </div>
+
     <!-- Feature "Feedback später bewerten": Workout wurde absichtlich OHNE automatische
          KI-Analyse gespeichert (Nutzer wollte erst in Ruhe Notizen ergänzen, siehe
          WorkoutDetailView.vue). Kein Lade-Spinner, da hier gar nichts lädt/läuft - das würde
@@ -142,7 +153,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { getAppLanguage } from '@/i18n'
 import { useRouter } from 'vue-router'
@@ -161,6 +172,9 @@ import AiFeedbackDeltaSummary from '@/components/AiFeedbackDeltaSummary.vue'
 import AiFeedbackRatingWidget from '@/components/AiFeedbackRatingWidget.vue'
 import OneTimeHint from '@/components/OneTimeHint.vue'
 import AppFeedbackDialog from '@/components/AppFeedbackDialog.vue'
+import { useUserStore } from '@/stores/userStore'
+import { useExerciseTranslation } from '@/utils/exerciseTranslation'
+import { getNotDoneExercises } from '@/utils/notDoneExercises'
 
 const showFeedbackDialog = ref(false)
 
@@ -182,8 +196,17 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 const { t } = useI18n()
+const { getTranslatedExerciseName } = useExerciseTranslation()
+const userStore = useUserStore()
 const router = useRouter()
 const { getIdToken } = useFirebaseAuth()
+
+// Nicht gemachte Übungen dieses Workouts (nur Hinweis mit Notiz - nichts wird entfernt, siehe utils/notDoneExercises.js)
+const notDoneExercises = computed(() => {
+  const ids = [props.workoutId, resolvedWorkoutIdForRating.value].filter(Boolean).map(String)
+  const workout = (userStore.workouts || []).find((w) => ids.includes(String(w?._id || w?.id || '')))
+  return getNotDoneExercises(workout)
+})
 
 const showSummary = ref(true)
 const deferredConfirmation = ref(props.deferred)
@@ -589,6 +612,11 @@ onBeforeUnmount(() => {
   flex-direction: column;
   gap: 0.75rem;
 }
+
+.not-done-section { margin: 0.5rem 0 0.75rem; padding: 0.6rem 0.8rem; border-radius: 12px; border: 1px solid var(--line-strong); }
+.not-done-section h3 { margin: 0 0 0.35rem; font-size: 0.9rem; font-weight: 600; color: var(--muted); }
+.not-done-section ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.3rem; }
+.not-done-note { display: block; color: var(--muted); font-size: 0.85rem; white-space: pre-wrap; word-break: break-word; }
 
 .feedback-section h3 {
   margin: 0;
