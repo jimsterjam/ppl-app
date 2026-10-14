@@ -987,7 +987,8 @@ import {
   updateFavoriteWorkout,
   getFavoriteNameValidationError,
   normalizeFavoriteName,
-  normalizeWorkoutType
+  normalizeWorkoutType,
+  buildStartedFavoriteWorkout
 } from '@/utils/workoutFavorites'
 import { getActiveDraft, setActiveDraft, findActiveDraftByWorkoutId } from '@/utils/activeWorkoutDraft'
 import {
@@ -1478,30 +1479,7 @@ async function syncStartedFavoriteFromWorkout(workoutLike = null) {
   const source = workoutLike && typeof workoutLike === 'object' ? workoutLike : workout.value
   if (!source) return
 
-  const payloadWorkout = {
-    name: source.name,
-    type: source.type,
-    notes: buildWorkoutNotesSummary(source.exercises || []),
-    exercises: (source.exercises || []).map((exercise) => ({
-      _id: exercise._id || exercise.exerciseId || null,
-      exerciseId: exercise.exerciseId || exercise._id || null,
-      name: exercise.name,
-      muscleGroup: exercise.muscleGroup,
-      category: exercise.category || source.type,
-      sets: Number(exercise.sets) || Number(exercise.setDetails?.length) || 3,
-      reps: Number(exercise.reps) || Number(exercise.setDetails?.[0]?.reps) || 10,
-      weight: Number(exercise.weight) || Number(exercise.setDetails?.[0]?.weight) || 0,
-      rest: Number(exercise.rest) || 90,
-      ...(sanitizeExerciseTrainingType(exercise.trainingType) ? { trainingType: exercise.trainingType } : {}),
-      ...(sanitizeCustomRest(exercise.restSeconds) ? { restSeconds: exercise.restSeconds } : {}),
-      setDetails: Array.isArray(exercise.setDetails) && exercise.setDetails.length
-        ? exercise.setDetails
-        : [{
-            reps: Number(exercise.reps) || 10,
-            weight: Number(exercise.weight) || 0
-          }]
-    }))
-  }
+  const payloadWorkout = buildStartedFavoriteWorkout(source)
 
   updateFavoriteWorkout({
     userId: getFavoriteUserId(),
