@@ -10,13 +10,23 @@ import { defineStore } from 'pinia'
 import { emitTimerSignal, ensureAudioUnlocked } from '@/utils/timerAudio'
 import { acquireKeepAwake, releaseKeepAwake } from '@/utils/keepAwakeGuard'
 import { scheduleWarmupNotification, cancelWarmupNotification } from '@/utils/warmupSignal'
-import { WARMUP_TIMER_SECONDS } from '@/utils/warmupPlan'
+import { WARMUP_ADJUST_SECONDS, WARMUP_TIMER_SECONDS, clampWarmupSeconds, sanitizeWarmupDurations } from '@/utils/warmupPlan'
 import { useRestTimerStore } from '@/stores/restTimerStore'
 
 const STATE_KEY = 'ppl_warmup_timer_v1'
+// Vom Nutzer gewählte Zeit je Schritt ({ cardio: 360, ... }) - nur gesetzte Werte, sonst gilt die Empfehlung.
+const DURATIONS_KEY = 'ppl_warmup_durations_v1'
 const KEEP_AWAKE_TAG = 'warmup-timer'
 const TICK_MS = 250
 let tickHandle = null
+
+function readDurations() {
+  try {
+    return sanitizeWarmupDurations(JSON.parse(localStorage.getItem(DURATIONS_KEY) || 'null'))
+  } catch {
+    return {}
+  }
+}
 
 const IDLE = Object.freeze({
   step: '',
@@ -32,6 +42,7 @@ export const useWarmupTimerStore = defineStore('warmupTimer', {
   state: () => ({
     ...IDLE,
     nowMs: Date.now(),
+    durations: readDurations(),
     // Abgelaufene Schritte, die die Karte noch abhaken muss: [{ step, workoutKey }]
     finished: []
   }),
@@ -39,6 +50,8 @@ export const useWarmupTimerStore = defineStore('warmupTimer', {
     isRunning: (s) => s.endsAt > 0,
     isPaused: (s) => s.endsAt === 0 && s.pausedRemainingMs > 0,
     isActive: (s) => s.endsAt > 0 || s.pausedRemainingMs > 0,
+    /** Zeit des Schritts in Sekunden: gemerkte Wahl des Nutzers oder die Empfehlung. */
+    secondsFor: (s) => (step) => s.durations?.[step] || WARMUP_TIMER_SECONDS[step] || 0,
     remainingMs(s) {
       if (s.endsAt > 0) return Math.max(0, s.endsAt - s.nowMs)
       return s.pausedRemainingMs
@@ -49,7 +62,7 @@ export const useWarmupTimerStore = defineStore('warmupTimer', {
      * @param {{ step: 'cardio'|'joints', workoutKey: string, notifyTitle?: string, notifyBody?: string, seconds?: number }} options
      */
     start({ step, workoutKey = '', notifyTitle = '', notifyBody = '', seconds }) {
-      const sec = Number(seconds) > 0 ? Math.round(Number(seconds)) : WARMUP_TIMER_SECONDS[step]
+      const sec = Number(seconds) > 0 ? Math.round(Number(seconds)) : this.secondsFor(step)
       if (!sec) return
       ensureAudioUnlocked()
       this.cancel()
@@ -65,6 +78,32 @@ export const useWarmupTimerStore = defineStore('warmupTimer', {
       this.startTick()
       acquireKeepAwake(KEEP_AWAKE_TAG)
       this.scheduleNotification()
+    },
+    /**
+     * Zeit des Schritts um delta Sekunden ändern (−15 / +15). Vor dem Start, im Lauf und in der Pause; die neue Zeit
+     * wird für die nächsten Male gemerkt. Läuft der Timer, verschiebt sich das Ende (und die Mitteilung).
+     */
+    adjust(step, delta = WARMUP_ADJUST_SECONDS) {
+      if (!WARMUP_TIMER_SECONDS[step]) return
+      const own = this.step === step
+      const base = own && this.isActive ? this.durationSec : this.secondsFor(step)
+      const next = clampWarmupSeconds(base + delta)
+      const applied = next - base
+      this.durations = { ...this.durations, [step]: next }
+      try { localStorage.setItem(DURATIONS_KEY, JSON.stringify(this.durations)) } catch {}
+      if (!own || !this.isActive || applied === 0) return
+      this.durationSec = next
+      if (this.isRunning) {
+        const remaining = this.endsAt - Date.now() + applied * 1000
+        this.nowMs = Date.now()
+        if (remaining <= 0) { this.finish(); return }
+        this.endsAt = Date.now() + remaining
+        this.persist()
+        this.scheduleNotification()
+      } else {
+        this.pausedRemainingMs = Math.max(1000, this.pausedRemainingMs + applied * 1000)
+        this.persist()
+      }
     },
     pause() {
       if (!this.isRunning) return
