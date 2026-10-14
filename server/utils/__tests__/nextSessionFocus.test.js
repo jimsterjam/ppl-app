@@ -51,7 +51,7 @@ describe('buildNextSessionFocus', () => {
       }
     })
     assert.equal(focus.kind, 'close')
-    assert.equal(focus.text, 'Nächstes Mal – Barbell High Bar Squat: gleiches Gewicht (100 kg), diesmal fehlte nur 1 Wiederholung. Ziel: 5 Wdh. in jedem Satz.')
+    assert.equal(focus.text, 'Nächstes Mal – Barbell High Bar Squat: gleiches Gewicht (100 kg), diesmal fehlte nur 1 Wiederholung. Ziel: 5 Wdh. in jedem Satz – schaffst du das, ist danach mehr Gewicht dran.')
   })
 
   test('Muskelaufbau 8-12: eine Wiederholung mehr', () => {

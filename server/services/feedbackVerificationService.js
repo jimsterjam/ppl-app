@@ -535,6 +535,11 @@ Entwurfstext. Du generierst KEIN neues Feedback, du prüfst nur.
 23. Vermeidung bestimmter vorsichtig/warnend klingender Formulierungen: "achte darauf",
     "behalte im Blick", "passe an", "sei vorsichtig" gelten als Verstoß, wenn sie im Entwurf
     wörtlich oder sinngemäß vorkommen.
+24. Fortschrittszustand (progression_state, falls im Datensatz vorhanden): bei "almost_there" darf der Text die Übung
+    NICHT als Rückschritt oder Kompromiss formulieren (z.B. "zwar mehr Gewicht, aber eine Wiederholung weniger",
+    "dafür weniger Wiederholungen") - der Fortschritt ist eindeutig und soll motivierend eingeordnet werden. Eine
+    Formulierung wie "du arbeitest an deiner Grenze, da fehlt nur noch ein kleines Stück" ist ausdrücklich ERLAUBT.
+    Bei "ready_to_increase" gilt dasselbe für Erfolg, bei "hold_weight" darf kein Vorwurf entstehen.
 
 Antworte AUSSCHLIESSLICH als valides JSON-Objekt, keine Erklärung davor/danach:
 {
@@ -864,7 +869,8 @@ export const RULE_LABELS = {
   20: 'Geschaffte Wiederholung weniger als geplant (v.a. letzter Satz) fälschlich als Rückschritt statt als Ermüdung/Leistungsgrenze gewertet',
   21: 'Mehr Gewicht/weniger Wiederholungen anhand des Gesamtvolumens statt der Zielerreichung bewertet, oder eine deutlich verfehlte Wiederholungszahl als Rückschritt statt als vorsichtigen Verdacht (Gewicht evtl. zu hoch) formuliert',
   22: 'Identische Zahlen wie letzte Session fälschlich als Stagnation statt Konsolidierung gewertet, oder Plateau-Hinweis ohne 3+ unveränderte Sessions',
-  23: 'Vorsichtig/warnend klingende Formulierung genutzt ("achte darauf", "behalte im Blick", "passe an", "sei vorsichtig") statt handlungsorientierter Sprache'
+  23: 'Vorsichtig/warnend klingende Formulierung genutzt ("achte darauf", "behalte im Blick", "passe an", "sei vorsichtig") statt handlungsorientierter Sprache',
+  24: 'Fortschrittszustand (almost_there/ready_to_increase/hold_weight) als Rückschritt, Kompromiss ("zwar ... aber") oder Vorwurf formuliert',
 };
 
 export function getRuleLabel(ruleNumber) {
