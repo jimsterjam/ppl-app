@@ -1,3 +1,5 @@
+import { clampText, TEXT_LIMITS } from '../utils/textLimits.js';
+
 // Reine Validierungs-/Limit-Logik für Favoriten-Workouts, bewusst aus der Route
 // herausgezogen, damit sie ohne Express/MongoDB/Firebase-Admin testbar ist
 // (gleiches Muster wie server/middleware/firebaseAuth.js -> isEmailVerifiedFromToken).
@@ -42,4 +44,18 @@ export function validateFavoritePayload({ clientId, type, name, workout } = {}) 
 // übernimmt der Aufrufer).
 export function isFavoriteLimitExceeded(existingCount) {
   return Number(existingCount || 0) >= MAX_FAVORITES_PER_TYPE;
+}
+
+// Notizen je Übung im Favoriten (Mixed-Feld, kein Schema-Setter): Steuerzeichen raus und auf das gleiche Limit wie
+// im Workout kürzen statt ablehnen (Offline-Sync würde abgelehnte Saves endlos wiederholen).
+export function sanitizeFavoriteWorkout(workout) {
+  if (!workout || typeof workout !== 'object' || !Array.isArray(workout.exercises)) return workout;
+  return {
+    ...workout,
+    exercises: workout.exercises.map((exercise) => (
+      exercise && typeof exercise === 'object' && 'note' in exercise
+        ? { ...exercise, note: clampText(exercise.note, TEXT_LIMITS.exerciseNote, { multiline: true }) }
+        : exercise
+    ))
+  };
 }

@@ -77,3 +77,20 @@ describe('isFavoriteLimitExceeded', () => {
     assert.equal(isFavoriteLimitExceeded(MAX_FAVORITES_PER_TYPE + 5), true)
   })
 })
+
+import { sanitizeFavoriteWorkout } from '../../services/favoriteWorkoutValidation.js';
+import { TEXT_LIMITS } from '../textLimits.js';
+
+// Absprache Paul 14.10.: Favoriten speichern die Notiz je Übung mit - serverseitig gekürzt statt abgelehnt.
+test('Favorit: Übungsnotiz wird gekürzt und von Steuerzeichen befreit, Rest bleibt unverändert', () => {
+  const long = 'a'.repeat(TEXT_LIMITS.exerciseNote + 50);
+  const result = sanitizeFavoriteWorkout({
+    name: 'Push',
+    exercises: [{ name: 'Bench', note: long }, { name: 'Row', note: 'ok\u0000text' }, { name: 'Dips' }]
+  });
+  assert.equal(result.exercises[0].note.length, TEXT_LIMITS.exerciseNote);
+  assert.equal(result.exercises[1].note, 'oktext');
+  assert.equal('note' in result.exercises[2], false);
+  assert.equal(result.name, 'Push');
+  assert.deepEqual(sanitizeFavoriteWorkout(null), null);
+});

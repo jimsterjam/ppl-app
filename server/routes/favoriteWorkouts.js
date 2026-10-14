@@ -5,6 +5,7 @@ import { logger } from "../utils/logger.js";
 import {
   normalizeFavoriteType,
   validateFavoritePayload,
+  sanitizeFavoriteWorkout,
   isFavoriteLimitExceeded
 } from "../services/favoriteWorkoutValidation.js";
 
@@ -53,7 +54,7 @@ router.post("/", firebaseAuthMiddleware, async (req, res) => {
         $set: {
           type: normalizedType,
           name: String(name).trim(),
-          workout
+          workout: sanitizeFavoriteWorkout(workout)
         }
       },
       { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }

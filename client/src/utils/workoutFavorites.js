@@ -4,6 +4,7 @@ import { logger } from './logger'
 import { sanitizeWorkoutGoal } from './workoutGoal'
 import { sanitizeExerciseTrainingType } from './weightSuggestion'
 import { sanitizeCustomRest } from './restTimerRules'
+import { buildWorkoutNotesSummary } from './workoutNotes'
 
 // Favoriten wurden bisher AUSSCHLIESSLICH in localStorage gehalten - bei Geräteverlust,
 // Neuinstallation oder einem Identitätswechsel (z.B. Login über einen anderen Firebase-
@@ -167,6 +168,40 @@ function buildFavoriteWorkoutPayload(workout, type) {
       // Gemerkte Pausendauer der Übung (Pausentimer) - nur wenn gesetzt.
       ...(sanitizeCustomRest(exercise?.restSeconds) ? { restSeconds: exercise.restSeconds } : {})
     })).filter((exercise) => exercise.name)
+  }
+}
+
+/**
+ * Workout-Daten für "Speichern + Favorit aktualisieren": der Favorit bildet die letzte Session ab (Absprache Paul
+ * 14.10.) - inklusive der Notiz je Übung, damit sie beim nächsten Start wieder im Workout steht. Vorher fehlte
+ * `note` in diesem Mapping, und das Aktualisieren löschte die Notizen des Favoriten.
+ */
+export function buildStartedFavoriteWorkout(source) {
+  const workout = source && typeof source === 'object' ? source : {}
+  return {
+    name: workout.name,
+    type: workout.type,
+    notes: buildWorkoutNotesSummary(workout.exercises || []),
+    exercises: (workout.exercises || []).map((exercise) => ({
+      _id: exercise._id || exercise.exerciseId || null,
+      exerciseId: exercise.exerciseId || exercise._id || null,
+      name: exercise.name,
+      muscleGroup: exercise.muscleGroup,
+      category: exercise.category || workout.type,
+      sets: Number(exercise.sets) || Number(exercise.setDetails?.length) || 3,
+      reps: Number(exercise.reps) || Number(exercise.setDetails?.[0]?.reps) || 10,
+      weight: Number(exercise.weight) || Number(exercise.setDetails?.[0]?.weight) || 0,
+      rest: Number(exercise.rest) || 90,
+      note: typeof exercise.note === 'string' ? exercise.note : '',
+      ...(sanitizeExerciseTrainingType(exercise.trainingType) ? { trainingType: exercise.trainingType } : {}),
+      ...(sanitizeCustomRest(exercise.restSeconds) ? { restSeconds: exercise.restSeconds } : {}),
+      setDetails: Array.isArray(exercise.setDetails) && exercise.setDetails.length
+        ? exercise.setDetails
+        : [{
+            reps: Number(exercise.reps) || 10,
+            weight: Number(exercise.weight) || 0
+          }]
+    }))
   }
 }
 
