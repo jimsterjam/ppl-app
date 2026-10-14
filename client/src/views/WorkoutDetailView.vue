@@ -200,6 +200,7 @@
                 <div class="ex-text">
                   <div class="ex-title-row">
                     <strong>{{ getTranslatedExerciseName(ex.name) }}</strong>
+                    <span v-if="!setTrackingActive && isExerciseNotDone(ex)" class="ex-not-done-badge">{{ t('workoutDetail.notDoneBadge') }}</span>
                     <div class="ex-title-actions">
                       <button
                         v-if="showTrainingTypeControl"
@@ -1006,6 +1007,7 @@ import { emptyWarmup, pickWarmupExercise, sanitizeWarmup } from '@/utils/warmupP
 import { restSecondsFor, sanitizeCustomRest } from '@/utils/restTimerRules'
 import RestTimerBar from '@/components/timer/RestTimerBar.vue'
 import { buildSaveReview, markAllSetsDone } from '@/utils/saveReview'
+import { isExerciseNotDone } from '@/utils/notDoneExercises'
 import {
   shouldKeepAsDraft as shouldKeepAsDraftUtil,
   clearActiveDraftForCurrentUser as clearActiveDraftForCurrentUserUtil,
@@ -4545,6 +4547,7 @@ onBeforeUnmount(() => {
 .ex-thumb { width: 56px; height: 56px; flex-shrink: 0; object-fit: contain; background: var(--surface); border: 1px solid var(--card-border); border-radius: 8px; padding: 4px; cursor: pointer; }
 .ex-text { flex: 1; min-width: 0; }
 .ex-title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.ex-not-done-badge { flex-shrink: 0; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line-strong); color: var(--muted); font-size: 0.72rem; font-weight: 600; }
 .ex-text strong { display: block; color: var(--fg); font-size: 0.95rem; }
 .ex-text small { display: block; color: var(--muted); font-size: 0.8rem; margin-top: 2px; }
 .last-performance-hint {
