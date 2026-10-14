@@ -11,6 +11,30 @@ export const WARMUP_JOINTS_SECONDS = 2 * 60
 // Schritte mit Timer
 export const WARMUP_TIMER_SECONDS = Object.freeze({ cardio: WARMUP_CARDIO_SECONDS, joints: WARMUP_JOINTS_SECONDS })
 
+// Zeit je Timer-Schritt ist nur eine Empfehlung (Absprache Paul 14.10.): der Nutzer stellt sie in 15-s-Schritten
+// selbst ein, die App merkt sich die gewählte Zeit je Schritt.
+export const WARMUP_ADJUST_SECONDS = 15
+export const WARMUP_MIN_SECONDS = 15
+export const WARMUP_MAX_SECONDS = 30 * 60
+
+/** Zeit in Sekunden auf den erlaubten Bereich bringen (ganze Sekunden). */
+export function clampWarmupSeconds(value) {
+  const n = Math.round(Number(value))
+  if (!Number.isFinite(n)) return WARMUP_MIN_SECONDS
+  return Math.min(WARMUP_MAX_SECONDS, Math.max(WARMUP_MIN_SECONDS, n))
+}
+
+/** Gemerkte Zeiten bereinigen: nur bekannte Timer-Schritte mit gültiger Zahl, sonst weglassen. */
+export function sanitizeWarmupDurations(value) {
+  const result = {}
+  if (!value || typeof value !== 'object') return result
+  for (const step of Object.keys(WARMUP_TIMER_SECONDS)) {
+    const n = Number(value[step])
+    if (Number.isFinite(n) && n > 0) result[step] = clampWarmupSeconds(n)
+  }
+  return result
+}
+
 /** Neues Warm-up: Karte wurde gezeigt, noch nichts abgehakt. */
 export function emptyWarmup() {
   return { cardio: false, joints: false, specific: false }

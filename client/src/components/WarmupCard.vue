@@ -3,7 +3,8 @@
        Abhaken. Cardio und Gelenke haben einen Timer (läuft nach "Start", hakt den Schritt am Ende selbst ab),
        der dritte Schritt ist eine einfache Körpergewichts-Übung. Überspringen = nicht abhaken. -->
   <section class="warmup-card" :aria-label="t('warmup.title')">
-    <h3 class="warmup-title">{{ t('warmup.title') }}</h3>
+    <h3 class="warmup-title">{{ t('warmup.title') }} <span class="warmup-optional">{{ t('warmup.optional') }}</span></h3>
+    <p class="warmup-optional-hint">{{ t('warmup.optionalHint') }}</p>
     <NotificationHint />
     <p v-if="banner" class="warmup-banner" role="status">{{ banner }}</p>
 
@@ -35,6 +36,8 @@
         <div v-if="row.open && row.timed" class="warmup-timer">
           <div class="warmup-timer-row">
             <span class="warmup-time" :class="{ paused: timerPaused(row.step) }">{{ formatRest(timeShown(row.step)) }}</span>
+            <button type="button" class="warmup-adjust" :aria-label="t('warmup.minusAria')" :disabled="!canAdjust(row.step, -WARMUP_ADJUST_SECONDS)" @click="warmupTimer.adjust(row.step, -WARMUP_ADJUST_SECONDS)">−15</button>
+            <button type="button" class="warmup-adjust" :aria-label="t('warmup.plusAria')" :disabled="!canAdjust(row.step, WARMUP_ADJUST_SECONDS)" @click="warmupTimer.adjust(row.step, WARMUP_ADJUST_SECONDS)">+15</button>
             <button v-if="timerRunning(row.step)" type="button" class="warmup-btn ghost" @click="warmupTimer.pause()">{{ t('warmup.pause') }}</button>
             <button v-else-if="timerPaused(row.step)" type="button" class="warmup-btn" @click="warmupTimer.resume()">{{ t('warmup.resume') }}</button>
             <button v-else type="button" class="warmup-btn" @click="startTimer(row.step)">{{ t('warmup.start') }}</button>
@@ -58,7 +61,8 @@ import { useWarmupTimerStore } from '@/stores/warmupTimerStore'
 import { useSessionStopwatchStore } from '@/stores/sessionStopwatch'
 import { formatRest } from '@/utils/restTimerRules'
 import {
-  WARMUP_STEPS, WARMUP_TIMER_SECONDS, currentWarmupStep, emptyWarmup, jointsTypeFor, nextWarmupStep, sanitizeWarmup
+  WARMUP_ADJUST_SECONDS, WARMUP_MAX_SECONDS, WARMUP_MIN_SECONDS, WARMUP_STEPS, WARMUP_TIMER_SECONDS,
+  currentWarmupStep, emptyWarmup, jointsTypeFor, nextWarmupStep, sanitizeWarmup
 } from '@/utils/warmupPlan'
 
 const props = defineProps({
@@ -92,16 +96,21 @@ const labels = computed(() => ({
   }
 }))
 
+// Die Zeit ist nur eine Empfehlung: "Empfehlung: 5 Min. · Rad, Crosstrainer, ..."
+function recommendedHint(step, hint) {
+  return t('warmup.recommendedHint', { minutes: Math.round(WARMUP_TIMER_SECONDS[step] / 60), hint })
+}
+
 const rows = computed(() => WARMUP_STEPS.map((step) => {
   const timed = !!WARMUP_TIMER_SECONDS[step]
   let title
   let hint
   if (step === 'cardio') {
     title = t('warmup.cardioTitle')
-    hint = t('warmup.cardioHint')
+    hint = recommendedHint(step, t('warmup.cardioHint'))
   } else if (step === 'joints') {
     title = t('warmup.jointsTitle')
-    hint = t(`warmup.jointsHint_${jointsTypeFor(props.workoutType)}`)
+    hint = recommendedHint(step, t(`warmup.jointsHint_${jointsTypeFor(props.workoutType)}`))
   } else if (props.specific) {
     title = t('warmup.specificTitle', { name: props.specific.name })
     hint = props.firstExerciseName ? t('warmup.specificHint', { exercise: props.firstExerciseName }) : t('warmup.specificHintShort')
@@ -117,9 +126,14 @@ const rows = computed(() => WARMUP_STEPS.map((step) => {
 const ownTimer = (step) => warmupTimer.step === step && warmupTimer.workoutKey === props.workoutKey
 const timerRunning = (step) => ownTimer(step) && warmupTimer.isRunning
 const timerPaused = (step) => ownTimer(step) && warmupTimer.isPaused
-const timeShown = (step) => (ownTimer(step) && warmupTimer.isActive ? warmupTimer.remainingMs : WARMUP_TIMER_SECONDS[step] * 1000)
+const timeShown = (step) => (ownTimer(step) && warmupTimer.isActive ? warmupTimer.remainingMs : warmupTimer.secondsFor(step) * 1000)
+const totalSeconds = (step) => (ownTimer(step) && warmupTimer.isActive ? warmupTimer.durationSec : warmupTimer.secondsFor(step))
+function canAdjust(step, delta) {
+  const next = totalSeconds(step) + delta
+  return next >= WARMUP_MIN_SECONDS && next <= WARMUP_MAX_SECONDS
+}
 const progressPercent = (step) => {
-  const total = (WARMUP_TIMER_SECONDS[step] || 1) * 1000
+  const total = (totalSeconds(step) || 1) * 1000
   return Math.min(100, Math.max(0, Math.round((1 - timeShown(step) / total) * 100)))
 }
 
@@ -181,7 +195,22 @@ onMounted(() => {
   padding: 6px 14px 8px;
   margin: 0 0 12px;
 }
-.warmup-title { margin: 0; padding: 8px 0 4px; font-size: 1rem; }
+.warmup-title { margin: 0; padding: 8px 0 2px; font-size: 1rem; }
+.warmup-optional { margin-left: 6px; font-size: 0.78rem; font-weight: 600; color: var(--muted); }
+.warmup-optional-hint { margin: 0 0 6px; color: var(--muted); font-size: 0.78rem; line-height: 1.35; }
+.warmup-adjust {
+  min-height: 0;
+  min-width: 44px;
+  padding: 6px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--fg);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.warmup-adjust:disabled { opacity: 0.4; cursor: default; }
 .warmup-banner {
   margin: 6px 0 4px;
   padding: 9px 12px;
