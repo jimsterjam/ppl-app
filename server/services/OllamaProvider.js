@@ -133,6 +133,10 @@ ${topDeclines.length > 0
 ## Detaillierte Übungsanalyse
 ${exercises
   .map(ex => {
+    if (ex.exercise_not_done) {
+      return `### ${ex.exercise}
+- Diese Übung wurde NICHT gemacht (ausgelassen). Keine Zahlen, nichts unterstellen.${ex.note ? `\n- Notiz des Nutzers: ${ex.note}` : ''}`;
+    }
     let exPrompt = `### ${ex.exercise}
 - Progression: ${ex.progression}
 - Zeitraum: ${ex.period_description}

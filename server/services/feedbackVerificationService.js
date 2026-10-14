@@ -452,6 +452,9 @@ Entwurfstext. Du generierst KEIN neues Feedback, du prüfst nur.
    Gegenteil einer unbelegten Behauptung. Melde Regel 2 nur, wenn der Text tatsächlich einen
    KONKRETEN Wert nennt/behauptet, der nicht in den Daten steht - nicht, wenn er das Fehlen von
    Daten nur beschreibt.
+   Übungen mit exercise_not_done: true wurden NICHT gemacht: der Hinweis, dass sie ausgelassen wurde, ist ein
+   belegter Fakt und KEIN Verstoß. Zahlen, Fortschritts- oder Vergleichsaussagen zu so einer Übung sind dagegen
+   ein Regel-2-Verstoß (es gibt keine Werte).
 3. Keine halluzinierten Ursachen (z.B. "Fett verloren", "Muskeln gewachsen") ohne Beleg in den
    Daten - mögliche Ursachen nur als "könnte" formuliert.
 4. Keine Aussage zu tatsächlicher Bewegungsausführung, Technik, Tempo, subjektivem Schmerz/

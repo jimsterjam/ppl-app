@@ -337,6 +337,15 @@ KRITISCHE REGELN:
     zu Ausführung/Zielmuskel nur, wenn eine Notiz das Thema selbst anspricht (Regel 4) - ohne
     Notiz bleibt es bei der allgemeinen Einordnung, ohne eine Faktenaussage zur Veränderung.
 
+28. NICHT GEMACHTE ÜBUNGEN (exercise_not_done: true): Der Nutzer hat diese Übung in dieser Session
+    ausgelassen. Das ist eine Tatsache, kein Fehler - nichts unterstellen, nicht tadeln, nicht zum
+    Nachholen auffordern (Regel 25). Keine Zahlen und kein Vergleich zu dieser Übung (es gibt keine).
+    Mit Notiz: den genannten Grund aufgreifen und bestätigen (z.B. Schmerz/Müdigkeit/Zeit ->
+    ausgelassen war nachvollziehbar), Regel 12. Ohne Notiz: höchstens eine kurze, neutrale Zeile,
+    dass sie ausgelassen wurde - keine Vermutung über den Grund. Sie zählt wie jede Übung mit
+    Besonderheit zur Höchstgrenze von 3 Übungen; ohne Notiz hat sie die niedrigste Priorität.
+    Alle anderen Übungen bleiben unverändert in der Auswertung.
+
 OUTPUT-FORMAT ("Coach statt Protokoll" - Standard):
 Ungefähr 60-130 Wörter. KEINE sichtbaren Überschriften, kein Markdown-Fettdruck - einfache
 Zeilen reichen. Du schreibst ausschließlich die Einordnung - alle Fakten zeigt die App (FAKTEN-
@@ -585,6 +594,23 @@ ${exercises
     // Grundlage für Gewichts-/Wiederholungsangaben ist die satzgenaue Sätze-Liste unten (siehe
     // Regel 3) - Gesamtvolumen bleibt als reine Tendenz-Kennzahl bestehen (das ist eine legitime
     // Summe, keine irreführende Durchschnittsbildung von Gewicht/Wiederholungen).
+    // Nicht gemachte Übung (Regel 28): keine Zahlen, nur der Fakt "nicht gemacht" und ggf. die Notiz.
+    if (ex.exercise_not_done) {
+      let skipped = `### ${exerciseIndex + 1}. ${this.wrapExerciseName(ex.exercise)}
+- Diese Übung wurde in dieser Session NICHT gemacht (der Nutzer hat sie ausgelassen). Keine Zahlen, kein Vergleich (siehe Regel 28).`;
+      if (ex.note_context?.persistent) {
+        skipped += `
+
+**Persönliche Notiz${ex.note_context.persistent.confirmed ? ' (bestätigt)' : ' (nicht bestätigt)'}:** ${this.wrapUserNote(ex.note_context.persistent.text)}`;
+      }
+      if (ex.note_context?.session || ex.note) {
+        skipped += `
+
+**Notiz zu dieser Session (Grund, falls genannt):** ${this.wrapUserNote(ex.note_context?.session || ex.note)}`;
+      }
+      return skipped;
+    }
+
     let exPrompt = `### ${exerciseIndex + 1}. ${this.wrapExerciseName(ex.exercise)}
 - Zeitraum: ${ex.period_description} (${ex.period_days} Tage)
 - Gesamtvolumen (Gewicht × Wiederholungen, Summe über alle Sätze) aktuell: ${ex.current_volume}kg`;

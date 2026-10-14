@@ -22,7 +22,9 @@ import {
   resolveSatzgenauWeightChange,
   resolveBodyweightCorrelation,
   resolveRepsSetChanges,
-  isFinishedWorkout
+  isFinishedWorkout,
+  isExerciseNotDone,
+  collectNotDoneExercises
 } from '../services/trainingAnalysisService.js';
 import {
   buildFeedbackVersion,
@@ -2170,7 +2172,7 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
 
     // Fallback: Wenn keine Vorwerte existieren, nutze aktuelle Übungen als Basis-Analyse
     if (exerciseAnalyses.length === 0) {
-      exerciseAnalyses = (currentWorkout.exercises || []).map(ex => {
+      exerciseAnalyses = (currentWorkout.exercises || []).map((ex, workoutIndex) => ({ ex, workoutIndex })).filter(({ ex }) => !isExerciseNotDone(ex)).map(({ ex, workoutIndex }) => {
         const lookupKey = (ex.name || '').trim().toLowerCase();
         const userNote = userNoteByExerciseName.get(lookupKey) || null;
         const globalProfile = profileByExerciseName.get(lookupKey) || null;
@@ -2178,6 +2180,7 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
         const sessionNote = (typeof ex.note === 'string' ? ex.note.trim() : '') || '';
         return {
           exercise: ex.name || 'Unknown',
+          workoutIndex,
           // Gleicher Fix wie in analyzeWorkoutProgression() (trainingAnalysisService.js): nur
           // dieses separate Feld (von structureAnalysisForAI() gelesen) wechselt auf Englisch,
           // "exercise" bleibt Deutsch für Frontend-Snapshot/buildVolumeHistory-Lookups.
@@ -2230,7 +2233,10 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
     const bodyweightCorrelation = resolveBodyweightCorrelation(currentWorkout, allWorkouts, exerciseAnalyses);
 
     // 4. Strukturiere Daten für AI (Mini-Datensatz)
+    // Nicht gemachte Übungen (done:false): ohne Zahlen, aber mit "nicht gemacht" + Notiz an die KI (Regel 28).
+    const notDoneExercises = collectNotDoneExercises(currentWorkout, { userNoteByExerciseName, enNameByExerciseName });
     const structuredAnalysis = structureAnalysisForAI(exerciseAnalyses, {
+      notDoneExercises,
       // Null-Annahmen-Prinzip (Kap. 24): nur ausgeben, wenn für DIESE Session tatsächlich
       // erfasst (siehe optionales Eingabefeld in WorkoutDetailView.vue) - sonst korrekt
       // weggelassen.
@@ -2390,7 +2396,7 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
       const feedbackLanguage = structuredAnalysis?.response_language === 'en' ? 'en' : 'de';
       const coachText = sanitizeCoachText(aiResult.feedback, {
         language: feedbackLanguage,
-        exerciseNames: exerciseAnalyses.flatMap((ex) => [ex.exercise, ex.exerciseNameForAI]).filter(Boolean)
+        exerciseNames: [...exerciseAnalyses, ...notDoneExercises].flatMap((ex) => [ex.exercise, ex.exerciseNameForAI]).filter(Boolean)
       });
       if (coachText.droppedLines > 0) {
         logger.warn('⚠️ KI-Text: Zeilen mit Faktenaussage entfernt', {
