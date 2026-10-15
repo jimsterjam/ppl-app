@@ -1,4 +1,5 @@
 <script setup>
+import { measureModeField } from '@/utils/measureMode'
 import ExerciseList from '@/components/ExerciseList.vue'
 
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
@@ -367,6 +368,7 @@ async function createWorkout() {
 				weight: (ex.setDetails || []).find(s => !s.isWarmup)?.weight ?? ex.weight ?? 0,
 				category: ex.category,
 				note: typeof ex.note === 'string' ? ex.note : '',
+				...measureModeField(ex.measureMode),
 				setDetails: ex.setDetails || []
 			})),
 			date: new Date().toISOString(),

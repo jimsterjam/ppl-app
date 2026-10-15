@@ -5,6 +5,7 @@ import { sanitizeWorkoutGoal } from './workoutGoal'
 import { sanitizeExerciseTrainingType } from './weightSuggestion'
 import { sanitizeCustomRest } from './restTimerRules'
 import { buildWorkoutNotesSummary } from './workoutNotes'
+import { measureModeField } from './measureMode'
 
 // Favoriten wurden bisher AUSSCHLIESSLICH in localStorage gehalten - bei Geräteverlust,
 // Neuinstallation oder einem Identitätswechsel (z.B. Login über einen anderen Firebase-
@@ -151,9 +152,11 @@ function buildFavoriteWorkoutPayload(workout, type) {
       rest: Number(exercise?.rest) || 90,
       setDetails: Array.isArray(exercise?.setDetails) && exercise.setDetails.length
         ? exercise.setDetails.map((set) => ({
-            reps: Number(set?.reps) || 10,
+            // Zeit halten: keine Wiederholungen (kein erfundener Standardwert 10, der sonst in die Statistik liefe)
+            reps: Number(set?.reps) || (exercise?.measureMode === 'time' ? 0 : 10),
             weight: Number(set?.weight) || 0,
-            ...(set?.isWarmup ? { isWarmup: true } : {})
+            ...(set?.isWarmup ? { isWarmup: true } : {}),
+            ...(Number(set?.durationSeconds) > 0 ? { durationSeconds: Number(set.durationSeconds) } : {})
           }))
         : [{
             reps: Number(exercise?.reps) || 10,
@@ -163,6 +166,7 @@ function buildFavoriteWorkoutPayload(workout, type) {
       // Start dieses Favoriten sichtbar ist, was beim letzten Mal notiert wurde - vorher wurde
       // exercise.note hier stillschweigend nicht übernommen (Feld fehlte in diesem Mapping).
       note: String(exercise?.note || '').trim(),
+      ...measureModeField(exercise?.measureMode),
       // Eigene Trainingsart der Übung (z.B. Muskelaufbau im Kraft-Workout) - nur wenn gewählt.
       ...(sanitizeExerciseTrainingType(exercise?.trainingType) ? { trainingType: exercise.trainingType } : {}),
       // Gemerkte Pausendauer der Übung (Pausentimer) - nur wenn gesetzt.
@@ -193,6 +197,7 @@ export function buildStartedFavoriteWorkout(source) {
       weight: Number(exercise.weight) || Number(exercise.setDetails?.[0]?.weight) || 0,
       rest: Number(exercise.rest) || 90,
       note: typeof exercise.note === 'string' ? exercise.note : '',
+      ...measureModeField(exercise.measureMode),
       ...(sanitizeExerciseTrainingType(exercise.trainingType) ? { trainingType: exercise.trainingType } : {}),
       ...(sanitizeCustomRest(exercise.restSeconds) ? { restSeconds: exercise.restSeconds } : {}),
       setDetails: Array.isArray(exercise.setDetails) && exercise.setDetails.length

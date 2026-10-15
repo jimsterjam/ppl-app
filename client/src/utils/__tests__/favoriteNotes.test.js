@@ -43,3 +43,15 @@ describe('Favoriten speichern Notizen mit', () => {
     expect(buildStartedFavoriteWorkout(null).exercises).toEqual([])
   })
 })
+
+describe('Favoriten behalten Messart und Zeit', () => {
+  it('Zeit-Übung: measureMode und durationSeconds bleiben im Favoriten', () => {
+    const payload = buildStartedFavoriteWorkout({ name: 'Core', type: 'fullbody', exercises: [{ name: 'Plank', measureMode: 'time', setDetails: [{ durationSeconds: 45 }, { durationSeconds: 40 }] }] })
+    expect(payload.exercises[0].measureMode).toBe('time')
+    saveFavoriteWorkout({ userId: 'u2', type: 'fullbody', name: 'Core', workout: payload })
+    const stored = getFavoritesByType('u2', 'fullbody')[0].workout.exercises[0]
+    expect(stored.measureMode).toBe('time')
+    expect(stored.setDetails.map((s) => s.durationSeconds)).toEqual([45, 40])
+    expect(stored.setDetails.map((s) => s.reps)).toEqual([0, 0])
+  })
+})

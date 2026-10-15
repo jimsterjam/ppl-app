@@ -346,6 +346,13 @@ KRITISCHE REGELN:
     Besonderheit zur Höchstgrenze von 3 Übungen; ohne Notiz hat sie die niedrigste Priorität.
     Alle anderen Übungen bleiben unverändert in der Auswertung.
 
+30. ÜBUNGEN AUF ZEIT (measure_mode: "time" oder "repsTime"): Hier gibt es KEIN Gewicht und keine kg-Aussage.
+    - "time" (Zeit halten, z.B. Plank): Fortschritt = länger gehalten. Mit time_trend "more" freue dich mit
+      dem Nutzer, bei "less" ruhig und ohne Vorwurf (Ermüdung gehört dazu), bei "same" neutral.
+    - "repsTime" (Wiederholungen in fester Zeit): Fortschritt = mehr Wiederholungen im selben Zeitfenster.
+    - Keine Zahlen, keine Sekunden, keine Gewichtsempfehlung (FAKTEN-REGEL, Regel 25). Eine Notiz hat Vorrang (Regel 12).
+    - Zählt zur Höchstgrenze von 3 Übungen mit Besonderheit und hat nur mit auffälligem Verlauf oder Notiz Priorität.
+
 OUTPUT-FORMAT ("Coach statt Protokoll" - Standard):
 Ungefähr 60-130 Wörter. KEINE sichtbaren Überschriften, kein Markdown-Fettdruck - einfache
 Zeilen reichen. Du schreibst ausschließlich die Einordnung - alle Fakten zeigt die App (FAKTEN-
@@ -609,6 +616,22 @@ ${exercises
 **Notiz zu dieser Session (Grund, falls genannt):** ${this.wrapUserNote(ex.note_context?.session || ex.note)}`;
       }
       return skipped;
+    }
+
+    // Übung auf Zeit (Regel 30): keine kg-/Satzdaten, nur Messart und Verlauf gegenüber der letzten Session.
+    if (ex.measure_mode) {
+      let timed = `### ${exerciseIndex + 1}. ${this.wrapExerciseName(ex.exercise)}
+- Messart: ${ex.measure_mode === 'time' ? 'Zeit halten (Ergebnis ist die Zeit, kein Gewicht, keine Wiederholungen)' : 'Wiederholungen in fester Zeit (Zeit ist der Rahmen, Ergebnis sind die Wiederholungen, kein Gewicht)'} (siehe Regel 30)`;
+      if (ex.time_trend) {
+        timed += `
+- Verlauf gegenüber der letzten Session: ${ex.time_trend === 'more' ? (ex.measure_mode === 'time' ? 'länger gehalten' : 'mehr Wiederholungen') : ex.time_trend === 'less' ? (ex.measure_mode === 'time' ? 'kürzer gehalten' : 'weniger Wiederholungen') : 'gleich'}`;
+      }
+      if (ex.note_context?.session || ex.note) {
+        timed += `
+
+**Notiz zu dieser Session:** ${this.wrapUserNote(ex.note_context?.session || ex.note)}`;
+      }
+      return timed;
     }
 
     let exPrompt = `### ${exerciseIndex + 1}. ${this.wrapExerciseName(ex.exercise)}
