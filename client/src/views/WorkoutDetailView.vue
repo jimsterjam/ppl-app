@@ -278,7 +278,7 @@
               <!-- Hinweis vor dem Eintragen (UI-Überarbeitung): Steigern / Knapp dran / Halten /
                    Explosiv / Ziel als farbiger Kasten oben statt einer Zeile unter den Sätzen. -->
               <div
-                v-if="showProgressionHints && (repTargetsByIndex[i] || goalByIndex[i] === 'explosive')"
+                v-if="showProgressionHints && (repTargetsByIndex[i] || goalByIndex[i] === 'explosive' || goalByIndex[i] === 'technique')"
                 class="progression-callout"
                 :class="`progression-callout--${progressionStateFor(i)}`"
               >
@@ -811,6 +811,15 @@
           />
           {{ t('workoutDetail.trackOneRepMax') }}
         </label>
+        <!-- Messart (Absprache Paul 16.10.): Gewicht + Wdh., Zeit halten oder Wdh. in fester Zeit - für jede Übung. -->
+        <label v-if="showTrainingTypeControl" class="exercise-menu-field">
+          <span>{{ t('exercises.measureModeLabel') }}</span>
+          <select :value="sanitizeMeasureMode(exerciseMenuExercise.measureMode)" @change="setExerciseMeasureMode(exerciseMenuIndex, $event.target.value)">
+            <option value="weight">{{ t('exercises.measureMode_weight') }}</option>
+            <option value="time">{{ t('exercises.measureMode_time') }}</option>
+            <option value="repsTime">{{ t('exercises.measureMode_repsTime') }}</option>
+          </select>
+        </label>
         <button type="button" class="exercise-menu-btn danger" @click="exerciseMenuRemove">
           {{ t('workoutDetail.exerciseMenuRemove') }}
         </button>
@@ -1038,7 +1047,7 @@ import { restSecondsFor, sanitizeCustomRest } from '@/utils/restTimerRules'
 import RestTimerBar from '@/components/timer/RestTimerBar.vue'
 import { buildSaveReview, markAllSetsDone } from '@/utils/saveReview'
 import { isExerciseNotDone } from '@/utils/notDoneExercises'
-import { showsReps, showsTime, showsWeight, DURATION_MAX_SECONDS, DURATION_STEP_SECONDS } from '@/utils/measureMode'
+import { showsReps, showsTime, showsWeight, sanitizeMeasureMode, DURATION_MAX_SECONDS, DURATION_STEP_SECONDS } from '@/utils/measureMode'
 import {
   shouldKeepAsDraft as shouldKeepAsDraftUtil,
   clearActiveDraftForCurrentUser as clearActiveDraftForCurrentUserUtil,
@@ -1869,7 +1878,8 @@ function computeSaveReview() {
     getNote,
     lastSessions: lastSessionByIndex.value,
     repTargets: repTargetsByIndex.value,
-    noLoad: progressionInfoByIndex.value.map((info) => isNoLoadExercise(info))
+    // Technik-Übungen: keine Gewichts-/Wiederholungsprüfung (der Nutzer entscheidet selbst)
+    noLoad: progressionInfoByIndex.value.map((info, index) => isNoLoadExercise(info) || goalByIndex.value[index] === 'technique')
   })
 }
 
@@ -2286,7 +2296,8 @@ const trainingTypeOptions = computed(() => {
         : t('workoutDetail.trainingTypeStrengthDesc')
     },
     { value: 'hypertrophy', label: t('workoutDetail.trainingType_hypertrophy'), description: t('workoutDetail.trainingTypeHypertrophyDesc') },
-    { value: 'explosive', label: t('workoutDetail.trainingType_explosive'), description: t('workoutDetail.trainingTypeExplosiveDesc') }
+    { value: 'explosive', label: t('workoutDetail.trainingType_explosive'), description: t('workoutDetail.trainingTypeExplosiveDesc') },
+    { value: 'technique', label: t('workoutDetail.trainingType_technique'), description: t('workoutDetail.trainingTypeTechniqueDesc') }
   ]
 })
 
@@ -2301,7 +2312,7 @@ function trainingTypeChipText(index) {
   const goal = goalByIndex.value[index]
   const label = t(`workoutDetail.trainingType_${goal || 'hypertrophy'}`)
   const target = repTargetsByIndex.value[index]
-  if (goal === 'explosive' || !target) return label
+  if (goal === 'explosive' || goal === 'technique' || !target) return label
   // Bereich (8-12) bzw. festes Schema "5x5" (Sätze = Arbeitssätze dieser Übung).
   if (target.mode === 'range') return t('workoutDetail.trainingTypeChipRange', { type: label, min: target.min, max: target.max })
   const sets = (workout.value?.exercises?.[index]?.setDetails || []).filter((row) => row && !row.isWarmup).length
@@ -2342,6 +2353,21 @@ const showExerciseMenu = ref(false)
 const exerciseMenuIndex = ref(-1)
 const exerciseMenuExercise = computed(() => workout.value?.exercises?.[exerciseMenuIndex.value] || null)
 const exerciseMenuName = computed(() => getTranslatedExerciseName(exerciseMenuExercise.value?.name || ''))
+
+// Messart einer Übung ändern (Menü ⋮). Eingetragene Werte bleiben erhalten, die Satzzeile zeigt nur die passenden Felder.
+function setExerciseMeasureMode(index, value) {
+  const ex = workout.value?.exercises?.[index]
+  if (!ex) return
+  const mode = sanitizeMeasureMode(value)
+  if (mode === 'weight') delete ex.measureMode
+  else ex.measureMode = mode
+  if (showsTime(mode)) {
+    for (const row of ex.setDetails || []) {
+      if (row && !row.isWarmup && row.durationSeconds == null) row.durationSeconds = null
+    }
+  }
+  try { triggerAutoSave() } catch {}
+}
 
 function openExerciseMenu(index) {
   exerciseMenuIndex.value = index
@@ -2421,6 +2447,7 @@ function progressionHintText(index) {
   if (status?.state === 'close') return t('workoutDetail.progressionClose', params)
   if (status?.state === 'hold') return t('workoutDetail.progressionHold', params)
   if (goalByIndex.value[index] === 'explosive') return t('workoutDetail.explosiveExplain')
+  if (goalByIndex.value[index] === 'technique') return t('workoutDetail.techniqueHint')
   const target = repTargetsByIndex.value[index]
   if (target?.mode === 'range') return t('workoutDetail.repRangeExplain', { min: target.min, max: target.max })
   return t('workoutDetail.repTargetExplain', { reps: target?.target })
@@ -4575,6 +4602,8 @@ onBeforeUnmount(() => {
 .ex-thumb { width: 56px; height: 56px; flex-shrink: 0; object-fit: contain; background: var(--surface); border: 1px solid var(--card-border); border-radius: 8px; padding: 4px; cursor: pointer; }
 .ex-text { flex: 1; min-width: 0; }
 .ex-title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.exercise-menu-field { display: grid; gap: 6px; font-size: 0.88rem; color: var(--muted); }
+.exercise-menu-field select { min-height: 40px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--card-border); background: var(--surface); color: var(--fg); font-size: 0.95rem; }
 .ex-not-done-badge { flex-shrink: 0; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line-strong); color: var(--muted); font-size: 0.72rem; font-weight: 600; }
 .ex-text strong { display: block; color: var(--fg); font-size: 0.95rem; }
 .ex-text small { display: block; color: var(--muted); font-size: 0.8rem; margin-top: 2px; }

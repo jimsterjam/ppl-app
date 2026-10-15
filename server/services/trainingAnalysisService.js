@@ -424,7 +424,7 @@ export function analyzeExercise(exerciseName, currentEx, previousEx = null, days
     oneRepMax,
     // Vom Nutzer gewählte Trainingsart DIESER Übung (abweichend vom Workout-Ziel), siehe
     // Workout.exercises[].trainingType - verbindlich für die Einordnung (Regel 26 im Prompt).
-    trainingType: ['strength', 'hypertrophy', 'explosive'].includes(currentEx?.trainingType) ? currentEx.trainingType : null,
+    trainingType: ['strength', 'hypertrophy', 'explosive', 'technique'].includes(currentEx?.trainingType) ? currentEx.trainingType : null,
     // Kap. 26: schlanker Hinweis fürs Prompt (Phase 4), damit die AI z.B. bei einer reinen
     // Technikübung nicht trotzdem eine Gewichtssteigerung empfiehlt. Nur gesetzt, wenn ein
     // Profil (global oder per User-Override) tatsächlich vorliegt - sonst weiterhin keine
