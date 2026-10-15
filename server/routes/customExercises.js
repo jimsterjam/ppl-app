@@ -36,7 +36,7 @@ router.post("/", firebaseAuthMiddleware, async (req, res) => {
   const requestId = `custom_ex_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   try {
     const { userId } = req.auth;
-    const { name, muscleGroup, description, notes } = req.body;
+    const { name, muscleGroup, description, notes, measureMode } = req.body;
 
     if (!name || !String(name).trim()) {
       return res.status(400).json({ error: "Name ist erforderlich" });
@@ -49,7 +49,8 @@ router.post("/", firebaseAuthMiddleware, async (req, res) => {
       name: String(name).trim(),
       muscleGroup: muscleGroup || 'other',
       description: description || '',
-      notes: notes || ''
+      notes: notes || '',
+      measureMode
     });
 
     logger.info("[POST /api/custom-exercises] saved", { requestId, exerciseId: exercise?._id, userId });
@@ -70,7 +71,7 @@ router.put("/:id", firebaseAuthMiddleware, async (req, res) => {
     if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
       return res.status(400).json({ error: 'Ungültige Übungs-ID' });
     }
-    const { name, muscleGroup, description, notes } = req.body;
+    const { name, muscleGroup, description, notes, measureMode } = req.body;
     if (name !== undefined && !String(name).trim()) {
       return res.status(400).json({ error: "Name darf nicht leer sein" });
     }
@@ -80,6 +81,7 @@ router.put("/:id", firebaseAuthMiddleware, async (req, res) => {
     if (muscleGroup !== undefined) update.muscleGroup = muscleGroup || 'other';
     if (notes !== undefined) update.notes = notes || '';
     if (description !== undefined) update.description = description || '';
+    if (measureMode !== undefined) update.measureMode = ['time', 'repsTime'].includes(measureMode) ? measureMode : 'weight';
 
     const exercise = await CustomExercise.findOneAndUpdate(
       { _id: req.params.id, userId },

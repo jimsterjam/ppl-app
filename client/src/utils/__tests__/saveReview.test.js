@@ -152,3 +152,26 @@ describe('markOpenSetsNotDone / markAllSetsDone / setLabelFor', () => {
     expect([0, 1, 2, 3].map((i) => setLabelFor(sets, i))).toEqual(['W1', '1', 'W2', '2'])
   })
 })
+
+describe('Messarten (Zeit halten / Wiederholungen in Zeit)', () => {
+  it('"Zeit halten": keine Wiederholungs- oder Gewichtswarnung', () => {
+    const review = buildSaveReview({
+      exercises: [{ name: 'Plank', measureMode: 'time', setDetails: [{ durationSeconds: 45, done: true }, { durationSeconds: 40, done: true }] }],
+      trackingActive: true,
+      getNote: feedback,
+      lastSessions: [lastAt(0)]
+    })
+    expect(review.check).toEqual([])
+    expect(review.isEmpty).toBe(true)
+  })
+
+  it('"Wiederholungen in Zeit": 0 Wiederholungen wird weiter gemeldet, Gewicht nie', () => {
+    const review = buildSaveReview({
+      exercises: [{ name: 'Burpees', measureMode: 'repsTime', setDetails: [{ reps: 0, durationSeconds: 30, done: true }] }],
+      trackingActive: true,
+      getNote: feedback,
+      lastSessions: [lastAt(80)]
+    })
+    expect(review.check.map((c) => c.kind)).toEqual(['zeroReps'])
+  })
+})

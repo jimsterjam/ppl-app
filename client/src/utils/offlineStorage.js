@@ -648,7 +648,8 @@ export async function cacheCustomExercises(exercises) {
 //     Snatch/Clean/Clean and Jerk (ids 9009-9011) ergänzt.
 // v3: Dubletten-Bereinigung (30.09.): 1731 in 0296 zusammengeführt, gleich benannte Varianten
 //     eindeutig benannt (z.B. Brustpresse Scheiben/Steckgewicht), alte Namen als "aliases".
-const DEFAULT_EXERCISES_SEED_VERSION = 3
+// v4: 3533 "quads (bodyweight squat)" heißt jetzt "bodyweight squat" (Suche nach Squat mit Körpergewicht-Filter), alte Namen als "aliases".
+const DEFAULT_EXERCISES_SEED_VERSION = 4
 const DEFAULT_EXERCISES_SEED_VERSION_KEY = 'default_exercises_seed_version'
 
 /**

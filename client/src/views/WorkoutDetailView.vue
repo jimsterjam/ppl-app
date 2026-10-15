@@ -296,10 +296,11 @@
               </div>
 
               <!-- Spaltenkopf immer sichtbar; "kg" steht nur hier, nicht mehr in jedem Feld. -->
-              <div v-if="(ex.setDetails || []).length" class="set-row header">
+              <div v-if="(ex.setDetails || []).length" class="set-row header" :class="{ 'set-row--time-only': !showsReps(ex.measureMode) }">
                 <span class="col set">{{ t('workoutDetail.set') }}</span>
-                <span class="col reps">{{ t('workoutDetail.reps') }}</span>
-                <span class="col weight">{{ t('workoutDetail.weightKgShort') }}</span>
+                <span v-if="showsReps(ex.measureMode)" class="col reps">{{ t('workoutDetail.reps') }}</span>
+                <span v-if="showsWeight(ex.measureMode)" class="col weight">{{ t('workoutDetail.weightKgShort') }}</span>
+                <span v-else class="col weight">{{ t('workoutDetail.durationShort') }}</span>
                 <span class="col actions"></span>
               </div>
 
@@ -420,18 +421,18 @@
                   </span>
                 </div>
               </template>
-              <div v-if="!hasWarmupSets(ex) || isWarmupOpen(i)" class="row-actions warmup-actions" :class="{ 'warmup-actions--empty': !hasWarmupSets(ex) }">
+              <div v-if="showsWeight(ex.measureMode) && (!hasWarmupSets(ex) || isWarmupOpen(i))" class="row-actions warmup-actions" :class="{ 'warmup-actions--empty': !hasWarmupSets(ex) }">
                 <button class="add-warmup-btn" @click="addWarmupSetRow(i, $event)"><Plus class="btn-icon btn-icon--inline" aria-hidden="true" /> {{ t('workoutDetail.addWarmupSet') }}</button>
               </div>
 
               <!-- Arbeitssätze -->
               <div v-if="hasWarmupSets(ex)" class="sets-section-divider"></div>
-              <div class="sets-section-label working-label">{{ t('workoutDetail.workingSetsLabel') }}</div>
+              <div v-if="showsWeight(ex.measureMode)" class="sets-section-label working-label">{{ t('workoutDetail.workingSetsLabel') }}</div>
               <template
                 v-for="(row, rIdx) in (ex.setDetails || [])"
                 :key="`${ex.exerciseId || i}-working-row-${rIdx}`"
               >
-                <div v-if="!row.isWarmup" class="set-row" :class="{ 'set-row-empty': !setTrackingActive && isRowEmpty(row), 'set-row--open': !isRowDone(row), 'set-row--done': setTrackingActive && isRowDone(row), 'set-row--next': nextSetHighlight.exIndex === i && nextSetHighlight.rowIndex === rIdx }" :data-set-index="rIdx">
+                <div v-if="!row.isWarmup" class="set-row" :class="{ 'set-row-empty': !setTrackingActive && isRowEmpty(row), 'set-row--open': !isRowDone(row), 'set-row--done': setTrackingActive && isRowDone(row), 'set-row--next': nextSetHighlight.exIndex === i && nextSetHighlight.rowIndex === rIdx, 'set-row--time-only': !showsReps(ex.measureMode) }" :data-set-index="rIdx">
                   <span class="col set">
                     <!-- Abhaken (laufendes Workout): Nummer antippen = Satz gemacht, nochmal = zurück.
                          Nicht abgehakte Sätze erscheinen grau (übernommene Werte vom letzten Mal). -->
@@ -446,7 +447,7 @@
                     >{{ isRowDone(row) ? '✓' : getSetLabel(ex.setDetails, rIdx) }}</button>
                     <template v-else>{{ getSetLabel(ex.setDetails, rIdx) }}</template>
                   </span>
-                  <span class="col reps">
+                  <span v-if="showsReps(ex.measureMode)" class="col reps">
                     <div class="number-with-spinner">
                         <input
                           v-model.number="row.reps"
@@ -494,7 +495,7 @@
                       </div>
                     </div>
                   </span>
-                  <span class="col weight">
+                  <span v-if="showsWeight(ex.measureMode)" class="col weight">
                     <div class="weight-input">
                       <div class="number-with-spinner">
                         <input
@@ -540,6 +541,34 @@
                             @touchend.prevent="stopSpin(row, 'weight')"
                             @touchcancel.prevent="stopSpin(row, 'weight')"
                           >▼</button>
+                        </div>
+                      </div>
+                    </div>
+                  </span>
+                  <span v-else class="col weight">
+                    <div class="weight-input">
+                      <div class="number-with-spinner">
+                        <input
+                          v-model.number="row.durationSeconds"
+                          data-field="durationSeconds"
+                          type="number"
+                          min="0"
+                          :max="DURATION_MAX_SECONDS"
+                          :step="DURATION_STEP_SECONDS"
+                          inputmode="numeric"
+                          :readonly="isMobile"
+                          :placeholder="t('workoutDetail.durationShort')"
+                          @focus="trackFieldAnchor(i, rIdx, 'durationSeconds')"
+                          @click="trackFieldAnchor(i, rIdx, 'durationSeconds')"
+                          @input="() => { clampRowValueNullable(row, 'durationSeconds', 0, DURATION_MAX_SECONDS, DURATION_STEP_SECONDS); triggerAutoSave() }"
+                          @wheel.prevent="onNumberWheel($event, row, 'durationSeconds', DURATION_STEP_SECONDS, 0, DURATION_MAX_SECONDS)"
+                          @keydown="onNumberKeyDown($event, false)"
+                          @focus.prevent="openPicker(row, 'durationSeconds', DURATION_STEP_SECONDS, 0, DURATION_MAX_SECONDS, t('workoutDetail.durationPickerTitle'))"
+                          @click.prevent="openPicker(row, 'durationSeconds', DURATION_STEP_SECONDS, 0, DURATION_MAX_SECONDS, t('workoutDetail.durationPickerTitle'))"
+                        />
+                        <div v-if="!isMobile" class="spinner-vertical">
+                          <button type="button" class="spin-btn up" :aria-label="t('workoutDetail.incrementDuration')" @click="adjustRowField(row, 'durationSeconds', 1, DURATION_STEP_SECONDS, 0, DURATION_MAX_SECONDS)">▲</button>
+                          <button type="button" class="spin-btn down" :aria-label="t('workoutDetail.decrementDuration')" @click="adjustRowField(row, 'durationSeconds', -1, DURATION_STEP_SECONDS, 0, DURATION_MAX_SECONDS)">▼</button>
                         </div>
                       </div>
                     </div>
@@ -1009,6 +1038,7 @@ import { restSecondsFor, sanitizeCustomRest } from '@/utils/restTimerRules'
 import RestTimerBar from '@/components/timer/RestTimerBar.vue'
 import { buildSaveReview, markAllSetsDone } from '@/utils/saveReview'
 import { isExerciseNotDone } from '@/utils/notDoneExercises'
+import { showsReps, showsTime, showsWeight, DURATION_MAX_SECONDS, DURATION_STEP_SECONDS } from '@/utils/measureMode'
 import {
   shouldKeepAsDraft as shouldKeepAsDraftUtil,
   clearActiveDraftForCurrentUser as clearActiveDraftForCurrentUserUtil,
@@ -2078,7 +2108,19 @@ function prefillEmptyExercisesFromHistory() {
     if (!rows.length) return
     const isEmpty = (row) => (row.reps == null || row.reps === '' || Number(row.reps) === 0)
       && (row.weight == null || row.weight === '' || Number(row.weight) === 0)
+      && !(Number(row.durationSeconds) > 0)
     if (!rows.every(isEmpty)) return
+    // Zeit-Übungen: Zeit/Wiederholungen der letzten Session übernehmen (grau, bis abgehakt).
+    if (showsTime(ex.measureMode)) {
+      const lastTimed = ((recentSessionsByIndex.value[index] || [])[0]?.setDetails || []).filter((row) => row && !row.isWarmup && row.done !== false)
+      if (!lastTimed.length) return
+      rows.forEach((row, k) => {
+        const source = lastTimed[Math.min(k, lastTimed.length - 1)]
+        row.durationSeconds = Number(source.durationSeconds) > 0 ? Number(source.durationSeconds) : null
+        if (showsReps(ex.measureMode)) row.reps = source.reps ?? null
+      })
+      return
+    }
     const info = progressionInfoByIndex.value[index] || {}
     const [last] = compatibleSessions(info, recentSessionsByIndex.value[index] || [], goalByIndex.value[index])
     const split = last ? splitMainAndBackoffSets(getWorkingSets(last)) : null
@@ -2177,7 +2219,8 @@ function progressionInfo(ex) {
     category: cat.category_raw || cat.category || ex?.category,
     equipment: cat.equipment || ex?.equipment,
     equipment_en: cat.equipment_en || ex?.equipment_en,
-    aiMetadata: cat.aiMetadata || ex?.aiMetadata
+    aiMetadata: cat.aiMetadata || ex?.aiMetadata,
+    measureMode: ex?.measureMode
   }
 }
 
@@ -2185,7 +2228,7 @@ function progressionInfo(ex) {
 const progressionInfoByIndex = computed(() =>
   (workout.value?.exercises || []).map((ex) => progressionInfo({
     name: ex?.name, exerciseId: ex?.exerciseId, _id: ex?._id, category: ex?.category,
-    equipment: ex?.equipment, equipment_en: ex?.equipment_en, aiMetadata: ex?.aiMetadata
+    equipment: ex?.equipment, equipment_en: ex?.equipment_en, aiMetadata: ex?.aiMetadata, measureMode: ex?.measureMode
   }))
 )
 
@@ -3040,7 +3083,12 @@ function addSetRow(exIndex, event = null) {
   const lastWorking = [...ex.setDetails].reverse().find(s => !s.isWarmup)
   // Keine erfundenen Werte (User-Report: "10" und "0 kg" vorausgefüllt): Werte des letzten Satzes
   // übernehmen, sonst leer - Platzhalter zeigen den Zielbereich bzw. "kg".
-  ex.setDetails.push({ reps: lastWorking?.reps ?? null, weight: lastWorking?.weight ?? null, isWarmup: false })
+  ex.setDetails.push({
+    reps: lastWorking?.reps ?? null,
+    weight: lastWorking?.weight ?? null,
+    ...(showsTime(ex.measureMode) ? { durationSeconds: lastWorking?.durationSeconds ?? null } : {}),
+    isWarmup: false
+  })
   try { triggerAutoSave() } catch {}
 }
 
@@ -3176,7 +3224,7 @@ function clampRowValueNullable(row, field, min = 0, max = Infinity, step = 1) {
 // Eine Satz-Zeile gilt als leer, wenn Reps nicht gesetzt UND Gewicht 0 ist.
 // Leere Zeilen werden ausgegraut und gehen nicht in Stats ein.
 function isRowEmpty(row) {
-  return (row.reps == null || row.reps === '') && (row.weight == null || Number(row.weight) === 0)
+  return (row.reps == null || row.reps === '') && (row.weight == null || Number(row.weight) === 0) && !(Number(row.durationSeconds) > 0)
 }
 
 function adjustRowField(row, field, direction = 1, step = 1, min = -Infinity, max = Infinity) {
@@ -4257,6 +4305,8 @@ onBeforeUnmount(() => {
   padding: 6px 0;
 }
 .set-row.header { color: var(--muted); font-size: 0.75rem; padding-top: 0; }
+/* Messart "Zeit halten": keine Wdh.-Spalte, die Zeit nimmt den Platz ein. */
+.set-row.set-row--time-only { grid-template-columns: 34px 1fr 36px; }
 /* Spaltentitel mittig über den (mittig ausgerichteten) Werten. */
 .set-row.header .col { text-align: center; }
 .set-row .col input { width: 100%; min-height: 40px; padding: 8px 6px; border-radius: 6px; border: 1px solid var(--card-border); background: var(--surface); color: var(--fg); text-align: center; font-size: 1.1rem; font-weight: 600; font-variant-numeric: tabular-nums; }

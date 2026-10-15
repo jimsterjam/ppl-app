@@ -178,6 +178,8 @@ function equipmentValues(info = {}) {
 }
 
 export function isNoLoadExercise(info = {}) {
+  // Zeit-Übungen (Messart 'time'/'repsTime') haben kein Gewicht: keine Gewichtsvorschläge/Wiederholungsziele.
+  if (info.measureMode === 'time' || info.measureMode === 'repsTime') return true
   if (equipmentValues(info).some((eq) => NO_LOAD_EQUIPMENT.has(eq))) return true
   // Speed-Varianten werden über Tempo gesteuert, nicht über Gewicht.
   return /speed/i.test(`${info.name_en || ''} ${info.name || ''}`)

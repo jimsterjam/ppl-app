@@ -50,6 +50,14 @@
         </select>
       </label>
       <label class="field">
+        <span>{{ t('exercises.measureModeLabel') }}</span>
+        <select v-model="measureMode">
+          <option value="weight">{{ t('exercises.measureMode_weight') }}</option>
+          <option value="time">{{ t('exercises.measureMode_time') }}</option>
+          <option value="repsTime">{{ t('exercises.measureMode_repsTime') }}</option>
+        </select>
+      </label>
+      <label class="field">
       <span>{{ t('exercises.descriptionLabel') }}</span>
         <textarea
           v-model="description"
@@ -81,6 +89,7 @@ import { createCustomExercise, updateCustomExercise, uploadCustomExerciseImage }
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { compressImageFile } from '@/utils/imageCompression'
 import { logger } from '@/utils/logger'
+import { sanitizeMeasureMode } from '@/utils/measureMode'
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera'
 
 const props = defineProps({
@@ -103,6 +112,8 @@ const errorMsg = ref('')
 const selectedImageFile = ref(null)
 const imagePreviewUrl = ref('')
 const description = ref('')
+// Messart (Absprache Paul 15.10.): Gewicht + Wdh. (Standard), Zeit halten oder Wdh. in fester Zeit
+const measureMode = ref('weight')
 
 const isEditMode = computed(() => Boolean(props.exercise?._id))
 // Bild-Upload braucht eine bereits synchronisierte Server-ID (kein custom_-Präfix)
@@ -119,12 +130,14 @@ watch(() => props.modelValue, (val) => {
       muscleGroup.value = props.exercise?.muscleGroup || ''
       description.value = props.exercise?.description || ''
       notes.value = props.exercise?.notes || ''
+      measureMode.value = sanitizeMeasureMode(props.exercise?.measureMode)
       imagePreviewUrl.value = props.exercise?.imageUrl || ''
     } else {
       name.value = ''
       muscleGroup.value = ''
       description.value = ''
       notes.value = ''
+      measureMode.value = 'weight'
       imagePreviewUrl.value = ''
     }
   }
@@ -183,7 +196,8 @@ async function onConfirm() {
         name: trimmedName,
         muscleGroup: muscleGroup.value || 'other',
         description: description.value.trim() || '',
-        notes: notes.value.trim() || ''
+        notes: notes.value.trim() || '',
+        measureMode: sanitizeMeasureMode(measureMode.value)
       }, token)
 
       if (selectedImageFile.value && canUploadImage.value) {
@@ -204,7 +218,8 @@ async function onConfirm() {
         name: trimmedName,
         muscleGroup: muscleGroup.value || 'other',
         description: description.value.trim() || '',
-        notes: notes.value.trim() || ''
+        notes: notes.value.trim() || '',
+        measureMode: sanitizeMeasureMode(measureMode.value)
       }, token)
 
       if (selectedImageFile.value && result?._id && !String(result._id).startsWith('custom_')) {

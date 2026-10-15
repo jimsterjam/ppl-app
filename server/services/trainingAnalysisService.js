@@ -325,6 +325,35 @@ export function determineTrend(weightChange, volumeChange) {
   }
 }
 
+/** Messart der Übung: 'time' (Zeit halten), 'repsTime' (Wiederholungen in fester Zeit) oder null (Wdh. + kg). */
+export function getMeasureMode(exercise) {
+  return ['time', 'repsTime'].includes(exercise?.measureMode) ? exercise.measureMode : null;
+}
+
+function totalSeconds(exercise) {
+  return (Array.isArray(exercise?.setDetails) ? exercise.setDetails : [])
+    .filter(set => set && !set.isWarmup && set.done !== false)
+    .reduce((sum, set) => sum + (Number(set.durationSeconds) || 0), 0);
+}
+
+function totalReps(exercise) {
+  return (Array.isArray(exercise?.setDetails) ? exercise.setDetails : [])
+    .filter(set => set && !set.isWarmup && set.done !== false)
+    .reduce((sum, set) => sum + (Number(set.reps) || 0), 0);
+}
+
+/** Zeit-/Wiederholungsverlauf einer Zeit-Übung gegenüber der letzten Session: 'more' | 'less' | 'same' | null (kein Vergleich). */
+export function compareTimedExercise(currentEx, previousEx) {
+  const mode = getMeasureMode(currentEx);
+  if (!mode || !previousEx) return null;
+  const pick = mode === 'time' ? totalSeconds : totalReps;
+  const now = pick(currentEx);
+  const before = pick(previousEx);
+  if (!before) return null;
+  if (now > before) return 'more';
+  return now < before ? 'less' : 'same';
+}
+
 /**
  * Analysiere eine einzelne Übung (aktuell vs. vorherig)
  *
@@ -388,6 +417,8 @@ export function analyzeExercise(exerciseName, currentEx, previousEx = null, days
     },
     progression: 'first_session',
     period_days: daysDiff,
+    // Zeit-Übung (Absprache Paul 15.10.): keine kg-Analyse, nur Messart + Verlauf (Regel 30).
+    ...(getMeasureMode(currentEx) ? { measureMode: getMeasureMode(currentEx), timeTrend: compareTimedExercise(currentEx, previousEx) } : {}),
     note: note || null,
     noteContext,
     oneRepMax,
@@ -754,6 +785,7 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
       // Englisch - siehe exerciseNameForAI in analyzeWorkoutProgression()/dem Fallback in
       // routes/workouts.js. Fällt ohne Katalog-Match (z.B. eigene Übung) auf ex.exercise zurück.
       exercise: ex.exerciseNameForAI || ex.exercise,
+      ...(ex.measureMode ? { measure_mode: ex.measureMode, ...(ex.timeTrend ? { time_trend: ex.timeTrend } : {}) } : {}),
       current_weight: ex.current?.weight || 0,
       current_reps: ex.current?.reps || 0,
       current_sets: ex.current?.sets || 0,

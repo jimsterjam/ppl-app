@@ -81,7 +81,9 @@ export function buildSaveReview({
     }
 
     // --- bitte prüfen (nur gemachte Arbeitssätze) ---
-    const lastMax = noLoad[exIndex] ? 0 : lastMaxWorkingWeight(lastSessions[exIndex])
+    // Zeit-Übungen (Messart 'time'/'repsTime'): keine Gewichts- bzw. (bei 'time') Wiederholungsprüfung.
+    const mode = ex?.measureMode === 'time' || ex?.measureMode === 'repsTime' ? ex.measureMode : 'weight'
+    const lastMax = noLoad[exIndex] || mode !== 'weight' ? 0 : lastMaxWorkingWeight(lastSessions[exIndex])
     const target = num(repTargets[exIndex]?.target)
     sets.forEach((set, i) => {
       if (!set || set.isWarmup || !isDone(set)) return
@@ -95,7 +97,9 @@ export function buildSaveReview({
         check.push({ kind: 'weightOutlier', exIndex, name, set: label, weight, lastWeight: lastMax })
       }
 
-      if (reps === 0) {
+      if (mode === 'time') {
+        // Zeit halten: Wiederholungen gibt es nicht
+      } else if (reps === 0) {
         check.push({ kind: 'zeroReps', exIndex, name, set: label })
       // Mehr als doppelt so viele (bei Singles/kleinen Zielen mindestens +4), z.B. 25 statt 12.
       } else if (target > 0 && reps > Math.max(target * 2, target + 4)) {

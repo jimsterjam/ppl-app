@@ -4,6 +4,7 @@ import { sanitizeExerciseTrainingType } from './weightSuggestion'
 import { sanitizeCustomRest } from './restTimerRules'
 import { sanitizeWarmup } from './warmupPlan'
 import { markOpenSetsNotDone } from './saveReview'
+import { measureModeField } from './measureMode'
 
 export function getExercisesMissingNotes(exercises = [], getNote) {
   const missing = []
@@ -37,6 +38,7 @@ export function normalizeWorkoutForSave({ workout, exerciseNotes, sessionStopwat
       weight: firstWorkingSet?.weight ?? ex.weight ?? 0,
       // Laufendes Workout: nicht abgehakte Arbeitssätze werden als "nicht gemacht" (done:false) gespeichert.
       setDetails: trackingActive ? markOpenSetsNotDone(ex.setDetails) : (ex.setDetails || []),
+      ...measureModeField(ex.measureMode),
       // Eigene Trainingsart der Übung (siehe weightSuggestion.js resolveExerciseGoal) - nur wenn gewählt.
       ...(sanitizeExerciseTrainingType(ex.trainingType) ? { trainingType: ex.trainingType } : {}),
       // Vom Nutzer gemerkte Pausendauer (Pausentimer) - nur wenn gesetzt.

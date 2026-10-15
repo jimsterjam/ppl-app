@@ -3,7 +3,8 @@ function normalizeText(value) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, ' ')
+    // Bindestrich wie Leerzeichen: "push-up" (Katalog) == "push up" (Suche)
+    .replace(/[^a-z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
 }
@@ -16,30 +17,53 @@ const VARIANT_MARKERS = [
   'sitzend', 'neutral', 'sumo', 'rumanisch', 'rumanisches', 'variante'
 ]
 
+// Hauptübungen: Suche nach genau diesem Begriff zeigt zuerst die Basisübungen (Absprache Paul 15.10.), danach die
+// Varianten. `basics` = englische Katalognamen (normalisiert, Bindestrich = Leerzeichen) in fester Reihenfolge.
 const CANONICAL_GROUPS = [
   {
     id: 'pullup',
-    aliases: ['pull up', 'pullup', 'pull ups', 'pullups', 'chin up', 'chinup', 'klimmzug', 'klimmzuge', 'klimmzuege']
+    aliases: ['pull up', 'pullup', 'pull ups', 'pullups', 'chin up', 'chinup', 'klimmzug', 'klimmzuge', 'klimmzuege'],
+    basics: ['pull up', 'chin up']
   },
   {
     id: 'benchpress',
-    aliases: ['bench press', 'benchpress', 'bankdrucken', 'bankdruecken', 'bankdruck', 'flat bench press']
+    aliases: ['bench press', 'benchpress', 'bankdrucken', 'bankdruecken', 'bankdruck', 'flat bench press'],
+    basics: ['bench press barbell', 'dumbbell bench press']
   },
   {
     id: 'squat',
-    aliases: ['squat', 'squats', 'kniebeuge', 'kniebeugen']
+    aliases: ['squat', 'squats', 'kniebeuge', 'kniebeugen'],
+    basics: ['full squat', 'barbell high bar squat', 'bodyweight squat', 'dumbbell goblet squat']
   },
   {
     id: 'deadlift',
-    aliases: ['deadlift', 'deadlifts', 'kreuzheben']
+    aliases: ['deadlift', 'deadlifts', 'kreuzheben'],
+    basics: ['barbell deadlift']
   },
   {
     id: 'dip',
-    aliases: ['dip', 'dips']
+    aliases: ['dip', 'dips'],
+    basics: []
   },
   {
     id: 'pushup',
-    aliases: ['push up', 'pushup', 'push ups', 'pushups', 'liegestutz', 'liegestuetz', 'liegestutze', 'liegestuetze']
+    aliases: ['push up', 'pushup', 'push ups', 'pushups', 'liegestutz', 'liegestuetz', 'liegestutze', 'liegestuetze'],
+    basics: ['push up']
+  },
+  {
+    id: 'lunge',
+    aliases: ['lunge', 'lunges', 'ausfallschritt', 'ausfallschritte'],
+    basics: ['walking lunge', 'dumbbell lunge', 'barbell lunge']
+  },
+  {
+    id: 'curl',
+    aliases: ['curl', 'curls', 'bizepscurl', 'biceps curl', 'bicep curl', 'bizeps curl'],
+    basics: ['barbell curl', 'dumbbell biceps curl']
+  },
+  {
+    id: 'row',
+    aliases: ['row', 'rows', 'rudern'],
+    basics: ['barbell bent over row']
   }
 ]
 
@@ -47,15 +71,12 @@ function hasVariantMarker(text) {
   return VARIANT_MARKERS.some((marker) => text.includes(marker))
 }
 
-function getCanonicalGroup(queryNormalized, queryTokens) {
-  return CANONICAL_GROUPS.find((group) => {
-    return group.aliases.some((alias) => {
-      const normalizedAlias = normalizeText(alias)
-      if (!normalizedAlias) return false
-      if (queryNormalized.includes(normalizedAlias)) return true
-      return queryTokens.includes(normalizedAlias)
-    })
-  }) || null
+function getCanonicalGroup(queryNormalized) {
+  // Ganze Wörter/Wortfolgen (nicht Teilstrings): "arrow" ist keine Rudern-Suche.
+  return CANONICAL_GROUPS.find((group) => group.aliases.some((alias) => {
+    const normalizedAlias = normalizeText(alias)
+    return normalizedAlias && hasWord(queryNormalized, normalizedAlias)
+  })) || null
 }
 
 function scoreTokenMatch(primary, secondary, token) {
@@ -102,7 +123,10 @@ export function searchAndRankExercises(items, query, options = {}) {
   if (!queryNormalized) return list
 
   const baseTokens = queryNormalized.split(' ').filter(Boolean)
-  const canonicalGroup = getCanonicalGroup(queryNormalized, baseTokens)
+  const canonicalGroup = getCanonicalGroup(queryNormalized)
+  // Basisübungen nur zuerst, wenn der Suchbegriff genau die Übungsgruppe benennt ("squat"), nicht bei "goblet squat".
+  const basicsFirst = canonicalGroup
+    && canonicalGroup.aliases.some((alias) => normalizeText(alias) === queryNormalized)
   const expandedTokens = new Set(baseTokens)
 
   if (canonicalGroup) {
@@ -145,6 +169,14 @@ export function searchAndRankExercises(items, query, options = {}) {
 
       const variant = hasVariantMarker(primary)
       if (variant) score -= 140
+
+      // Kürzere Namen vor langen Varianten (weniger zusätzliche Wörter als die Suche).
+      score -= 15 * Math.max(0, primary.split(' ').length - baseTokens.length)
+
+      if (basicsFirst) {
+        const basicIndex = canonicalGroup.basics.indexOf(primary)
+        if (basicIndex !== -1) score += 1000000 - basicIndex * 10000
+      }
 
       if (canonicalGroup) {
         const matchesCanonical = canonicalGroup.aliases.some((alias) => {

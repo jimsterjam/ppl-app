@@ -50019,8 +50019,12 @@
   {
     "_id": "ex_3533",
     "id": "3533",
-    "name": "Quadrizeps (Kniebeugen mit Körpergewicht)",
-    "name_en": "quads (bodyweight squat)",
+    "name": "Kniebeuge mit Körpergewicht",
+    "aliases": [
+      "Quadrizeps (Kniebeugen mit Körpergewicht)",
+      "quads (bodyweight squat)"
+    ],
+    "name_en": "bodyweight squat",
     "category": "Legs",
     "category_raw": "strength",
     "muscleGroup": "Quadrizeps",

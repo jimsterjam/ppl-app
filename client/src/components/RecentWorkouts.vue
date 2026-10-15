@@ -94,7 +94,8 @@
                       <span class="set-details">
                         <span v-if="set.reps" class="reps">{{ set.reps }} {{ t('common.reps') }}</span>
                         <span v-if="set.weight" class="weight">{{ set.weight }}kg</span>
-                        <span v-if="!set.reps && !set.weight" class="no-data">{{ t('recent.noData') }}</span>
+                        <span v-if="set.durationSeconds" class="weight">{{ set.durationSeconds }} {{ t('workoutDetail.durationShort') }}</span>
+                        <span v-if="!set.reps && !set.weight && !set.durationSeconds" class="no-data">{{ t('recent.noData') }}</span>
                         <span v-if="set.done === false" class="not-done">{{ t('recent.notDone') }}</span>
                       </span>
                     </div>
@@ -517,7 +518,8 @@ async function repeatWorkout(sourceWorkout) {
       ? ex.setDetails.map(s => ({
           reps: Number(s?.reps) || 0,
           weight: Number(s?.weight) || 0,
-          ...(s?.isWarmup ? { isWarmup: true } : {})
+          ...(s?.isWarmup ? { isWarmup: true } : {}),
+          ...(Number(s?.durationSeconds) > 0 ? { durationSeconds: Number(s.durationSeconds) } : {})
         }))
       : [{ reps: Number(ex.reps) || 10, weight: Number(ex.weight) || 0 }]
     return { ...ex, setDetails, reps: Number(setDetails[0]?.reps) || 0, weight: Number(setDetails[0]?.weight) || 0 }

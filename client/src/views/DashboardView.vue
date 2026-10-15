@@ -457,7 +457,7 @@ function buildFavoriteDetailDraft(favorite) {
   const userId = String(getCurrentUser?.()?.uid || authStore.user?.uid || authStore.uid || 'guest')
   const exercises = (Array.isArray(fav.exercises) ? fav.exercises : []).map((exercise = {}) => {
     const setDetails = Array.isArray(exercise?.setDetails) && exercise.setDetails.length > 0
-      ? exercise.setDetails.map((set) => ({ reps: Number(set?.reps) || 0, weight: Number(set?.weight) || 0, ...(set?.isWarmup ? { isWarmup: true } : {}) }))
+      ? exercise.setDetails.map((set) => ({ reps: Number(set?.reps) || 0, weight: Number(set?.weight) || 0, ...(set?.isWarmup ? { isWarmup: true } : {}), ...(Number(set?.durationSeconds) > 0 ? { durationSeconds: Number(set.durationSeconds) } : {}) }))
       : []
     return {
       ...exercise,
