@@ -47,7 +47,7 @@ import {
 import { decideExerciseMatch } from '../utils/exerciseMatching.js';
 import { getMaxExerciseCount } from '../utils/exerciseCountTarget.js';
 import { applyGeneratorRule } from '../utils/repTargets.js';
-import { buildNextSessionFocus, applyNextSessionFocus } from '../utils/nextSessionFocus.js';
+import { buildNextSessionFocus, buildProgressionStates, applyNextSessionFocus } from '../utils/nextSessionFocus.js';
 import { sanitizeCoachText, buildBodyweightFactLine } from '../utils/feedbackFactGuard.js';
 import { resolveListFeedbackStatus, FEEDBACK_PENDING_FAILED_AFTER_MS } from '../utils/feedbackStatus.js';
 import { findCatalogEntryForName, catalogReference } from '../utils/catalogMatch.js';
@@ -2235,8 +2235,25 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
     // 4. Strukturiere Daten für AI (Mini-Datensatz)
     // Nicht gemachte Übungen (done:false): ohne Zahlen, aber mit "nicht gemacht" + Notiz an die KI (Regel 28).
     const notDoneExercises = collectNotDoneExercises(currentWorkout, { userNoteByExerciseName, enNameByExerciseName });
+    // Fortschrittszustand je Übung (z. B. "almost_there") aus derselben Logik wie Workout-Hinweis und "Nächstes Mal"-Zeile
+    // - die KI bekommt ihn als Tatsache (Regel 29). Fehler dabei dürfen die Auswertung nie stoppen.
+    let progressionStates = null;
+    try {
+      progressionStates = buildProgressionStates({
+        workout: currentWorkout,
+        profileHintByName: new Map(
+          exerciseAnalyses.filter((ex) => ex?.profileHint).map((ex) => [String(ex.exercise || '').trim().toLowerCase(), ex.profileHint])
+        ),
+        history: allWorkouts.filter((w) => String(w._id) !== String(currentWorkout._id)
+          && isFinishedWorkout(w)
+          && new Date(w.date || 0) <= new Date(currentWorkout.date || Date.now()))
+      });
+    } catch (e) {
+      logger.warn('⚠️ Fortschrittszustände konnten nicht gebaut werden', { requestId, error: e.message });
+    }
     const structuredAnalysis = structureAnalysisForAI(exerciseAnalyses, {
       notDoneExercises,
+      progressionStates,
       // Null-Annahmen-Prinzip (Kap. 24): nur ausgeben, wenn für DIESE Session tatsächlich
       // erfasst (siehe optionales Eingabefeld in WorkoutDetailView.vue) - sonst korrekt
       // weggelassen.

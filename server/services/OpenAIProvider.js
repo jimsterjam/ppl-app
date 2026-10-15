@@ -137,6 +137,7 @@ KRITISCHE REGELN:
    Tausch von Volumen gegen Intensität sein, keine Abweichung, die korrigiert werden muss.
    Ohne Angaben zu Ausführung/Technik lässt sich das allein anhand der Zahlen nicht
    bewerten - beide Fakten neutral nebeneinanderstellen, nicht gegeneinander aufrechnen.
+   (Ausnahme: hat die Übung einen progression_state, gilt Regel 29 - der Fortschritt ist dann eindeutig.)
    Gleiches gilt umgekehrt für eine Gewichtsreduzierung.
    - AUSNAHME BEWUSSTE ENTSCHEIDUNG: Erklärt eine Notiz die Änderung als bewusste Entscheidung
      (z.B. weniger Gewicht, um den Zielmuskel besser zu treffen, sauberer/langsamer auszuführen,
@@ -345,6 +346,26 @@ KRITISCHE REGELN:
     dass sie ausgelassen wurde - keine Vermutung über den Grund. Sie zählt wie jede Übung mit
     Besonderheit zur Höchstgrenze von 3 Übungen; ohne Notiz hat sie die niedrigste Priorität.
     Alle anderen Übungen bleiben unverändert in der Auswertung.
+
+29. FORTSCHRITT ERKENNEN (progression_state, falls angegeben): Die App hat bereits berechnet, wo der Nutzer
+    bei dieser Übung steht - das ist verbindlich, du deutest es nur motivierend aus. Ohne Zahlen, ohne
+    Gewichte, ohne Satznummern (FAKTEN-REGEL):
+    - almost_there: Das Ziel wurde nur ganz knapp verfehlt (ein Satz um eine Wiederholung) - das ist
+      ein Fortschritt, kein Rückschritt, auch wenn das Gewicht gestiegen ist. Ordne es motivierend ein:
+      der Nutzer arbeitet an seiner Grenze, es fehlt nur noch ein kleines Stück, man sieht, dass er
+      vorankommt. Erkläre den Weg in Worten: schafft er das Ziel mit diesem Gewicht, ist danach mehr
+      Gewicht dran. VERBOTEN ist das Muster "zwar ..., aber ..." sowie "dafür ... weniger" - es rechnet
+      Gewicht gegen Wiederholungen auf und wirkt wie ein Rückschritt. Das ist die Ausnahme von Regel 8
+      (neutral nebeneinanderstellen): bei almost_there ist der Fortschritt eindeutig.
+    - ready_to_increase: Das Ziel wurde in allen Sätzen geschafft - ein klarer Erfolg. Freu dich mit
+      dem Nutzer; die App sagt unten, womit er es als Nächstes versucht (Regel 25).
+    - hold_weight: Das Ziel ist noch nicht erreicht - ruhig und ermutigend: am Gewicht dranbleiben, es
+      klappt Schritt für Schritt. Kein Vorwurf.
+    - build_reps: Erst die Wiederholungen aufbauen, dann kommt mehr Gewicht.
+    - confirm_once_more: Das Schema noch einmal bestätigen, dann mehr Gewicht.
+    Eine Notiz des Nutzers (Regel 12) hat weiter Vorrang. Die Übung zählt zur Höchstgrenze von 3 Übungen
+    mit Besonderheit; almost_there und ready_to_increase gehören dort zu den bevorzugten Kandidaten.
+    Keine Empfehlungszeile für die nächste Einheit schreiben (Regel 25) - nur die motivierende Einordnung.
 
 30. ÜBUNGEN AUF ZEIT (measure_mode: "time" oder "repsTime"): Hier gibt es KEIN Gewicht und keine kg-Aussage.
     - "time" (Zeit halten, z.B. Plank): Fortschritt = länger gehalten. Mit time_trend "more" freue dich mit
@@ -661,6 +682,13 @@ ${ex.sets_comparison.map(s => {
       exPrompt += `
 
 **Keine Satzdaten erfasst** - zu dieser Übung liegen keine echten Arbeitssätze vor. Triff dazu KEINE Gewichts-/Wiederholungsaussage.`;
+    }
+
+    // Fortschrittszustand der App (Regel 29): verbindliche Einordnung, ob das Ziel erreicht/knapp verfehlt wurde.
+    if (ex.progression_state) {
+      exPrompt += `
+
+**Fortschrittszustand (App-Logik, verbindlich, siehe Regel 29):** ${ex.progression_state}`;
     }
 
     if (ex.profile_hint?.exerciseType) {

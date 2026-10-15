@@ -103,7 +103,7 @@ const TEXTS = {
   de: {
     increase: (n, p) => `Nächstes Mal – ${n}: ${p.weight} kg probieren. Schaffst du nicht alle Wiederholungen, bleib dabei, bis es klappt.`,
     speed: (n) => `Nächstes Mal – ${n}: Bleibt jede Wiederholung schnell, nimm etwas mehr Gewicht. Wirst du in den letzten Wiederholungen deutlich langsamer, bleib beim Gewicht.`,
-    close: (n, p) => `Nächstes Mal – ${n}: gleiches Gewicht (${p.weight} kg), diesmal fehlte nur 1 Wiederholung. Ziel: ${p.reps} Wdh. in jedem Satz.`,
+    close: (n, p) => `Nächstes Mal – ${n}: gleiches Gewicht (${p.weight} kg), diesmal fehlte nur 1 Wiederholung. Ziel: ${p.reps} Wdh. in jedem Satz – schaffst du das, ist danach mehr Gewicht dran.`,
     hold: (n, p) => `Nächstes Mal – ${n}: gleiches Gewicht (${p.weight} kg). Ziel: ${p.reps} Wdh. in jedem Satz.`,
     climb: (n, p) => `Nächstes Mal – ${n}: ${p.nextReps} Wdh. pro Satz mit ${p.weight} kg versuchen. Bei ${p.max} in allen Sätzen gibt es mehr Gewicht.`,
     confirm: (n, p) => `Nächstes Mal – ${n}: ${p.sets}×${p.reps} mit ${p.weight} kg noch einmal bestätigen, dann mehr Gewicht.`,
@@ -113,7 +113,7 @@ const TEXTS = {
   en: {
     increase: (n, p) => `Next time – ${n}: try ${p.weight} kg. If you don't hit all reps, stay there until you do.`,
     speed: (n) => `Next time – ${n}: if every rep stays fast, add a little weight. If you slow down noticeably on the last reps, keep the weight.`,
-    close: (n, p) => `Next time – ${n}: same weight (${p.weight} kg), only 1 rep was missing this time. Goal: ${p.reps} reps in every set.`,
+    close: (n, p) => `Next time – ${n}: same weight (${p.weight} kg), only 1 rep was missing this time. Goal: ${p.reps} reps in every set – once you hit that, more weight is next.`,
     hold: (n, p) => `Next time – ${n}: same weight (${p.weight} kg). Goal: ${p.reps} reps in every set.`,
     climb: (n, p) => `Next time – ${n}: try ${p.nextReps} reps per set at ${p.weight} kg. Once every set hits ${p.max}, add weight.`,
     confirm: (n, p) => `Next time – ${n}: confirm ${p.sets}×${p.reps} at ${p.weight} kg once more, then add weight.`,
@@ -146,6 +146,71 @@ function mainWeightOf(sessionExercise) {
   return split ? split.weight : null;
 }
 
+// Einordnung EINER Übung nach der Progressionslogik (wie im Workout-Hinweis): { kind, params } oder null.
+function resolveCandidate({ ex, info, hint, goal, history, lang }) {
+  let candidate = null;
+  const exGoal = exerciseGoal(info, ex, goal, hint);
+  if (exGoal === 'explosive') {
+    if (hasLoad(ex)) candidate = { kind: 'speed', params: {} };
+    return candidate;
+  }
+  const previousSessions = previousSessionsOf(ex, history, PLATEAU_SESSIONS + 1);
+  const status = engine.getProgressionStatus(info, ex, exGoal, { previousSessions });
+  const compatible = engine.compatibleSessions ? engine.compatibleSessions(info, previousSessions, exGoal) : previousSessions;
+  const params = {
+    weight: formatKg(status?.weight, lang),
+    reps: status?.targetReps,
+    sets: status?.sets,
+    nextReps: status?.nextReps,
+    max: status?.max
+  };
+  if (status?.state === 'increase' && status.suggestion?.suggestedWeights?.length) {
+    candidate = { kind: 'increase', params: { weight: formatKg(status.suggestion.suggestedWeights[0], lang) } };
+  } else if (status?.state === 'climb' && status.belowRange) {
+    // Muskelaufbau unter 8 Wdh.: nur Hinweis im Feedback, keine direkte Senkung (Absprache Paul).
+    candidate = { kind: 'below', params: { ...params, min: status.min } };
+  } else if (status && compatible.length >= PLATEAU_SESSIONS - 1
+    && compatible.slice(0, PLATEAU_SESSIONS - 1).every((prev) => mainWeightOf(prev) === status.weight)) {
+    // Seit mehreren Einheiten dasselbe Gewicht ohne Steigerung -> nur ein Hinweis, keine Senkung.
+    candidate = { kind: 'plateau', params: { ...params, sessions: PLATEAU_SESSIONS } };
+  } else if (['confirm', 'close', 'climb', 'hold'].includes(status?.state)) {
+    candidate = { kind: status.state, params };
+  }
+  return candidate;
+}
+
+// Zustand je Übung für die KI (Regel 29): dieselbe Progressionslogik wie Workout-Hinweis und "Nächstes Mal"-Zeile.
+const AI_PROGRESSION_STATES = {
+  close: 'almost_there',
+  increase: 'ready_to_increase',
+  hold: 'hold_weight',
+  climb: 'build_reps',
+  confirm: 'confirm_once_more'
+};
+
+/**
+ * Fortschrittszustand je Übung als Tatsache für die KI (Absprache Paul 14.10.): z. B. "almost_there" = Ziel nur knapp
+ * verfehlt (ein Satz genau 1 Wdh. zu wenig). Nur Zustände, die dem Nutzer etwas sagen; sonst kein Eintrag.
+ * @returns {Map<string, string>} Übungsname (lowercase) -> Zustand
+ */
+export function buildProgressionStates({ workout, profileHintByName = new Map(), history = [] } = {}) {
+  const states = new Map();
+  if (!engine?.getProgressionStatus) return states;
+  const goal = workout?.goal || 'hypertrophy';
+  for (const ex of Array.isArray(workout?.exercises) ? workout.exercises : []) {
+    try {
+      const key = String(ex?.name || '').trim().toLowerCase();
+      const info = exerciseInfo(ex);
+      const candidate = resolveCandidate({ ex, info, hint: profileHintByName.get(key) || null, goal, history, lang: 'de' });
+      const state = candidate ? AI_PROGRESSION_STATES[candidate.kind] : null;
+      if (state) states.set(key, state);
+    } catch {
+      // eine Übung ohne Einordnung darf die Auswertung nie stoppen
+    }
+  }
+  return states;
+}
+
 /**
  * Wählt EINE Übung und baut die "Nächstes Mal"-Zeile.
  * Basis ist das gerade gespeicherte Workout: für die nächste Einheit ist es "die letzte Session".
@@ -167,35 +232,7 @@ export function buildNextSessionFocus({ workout, language = 'de', profileHintByN
   (Array.isArray(workout?.exercises) ? workout.exercises : []).forEach((ex, order) => {
     const info = exerciseInfo(ex);
     const hint = profileHintByName.get(String(ex?.name || '').trim().toLowerCase()) || null;
-    let candidate = null;
-
-    const exGoal = exerciseGoal(info, ex, goal, hint);
-    if (exGoal === 'explosive') {
-      if (hasLoad(ex)) candidate = { kind: 'speed', params: {} };
-    } else {
-      const previousSessions = previousSessionsOf(ex, history, PLATEAU_SESSIONS + 1);
-      const status = engine.getProgressionStatus(info, ex, exGoal, { previousSessions });
-      const compatible = engine.compatibleSessions ? engine.compatibleSessions(info, previousSessions, exGoal) : previousSessions;
-      const params = {
-        weight: formatKg(status?.weight, lang),
-        reps: status?.targetReps,
-        sets: status?.sets,
-        nextReps: status?.nextReps,
-        max: status?.max
-      };
-      if (status?.state === 'increase' && status.suggestion?.suggestedWeights?.length) {
-        candidate = { kind: 'increase', params: { weight: formatKg(status.suggestion.suggestedWeights[0], lang) } };
-      } else if (status?.state === 'climb' && status.belowRange) {
-        // Muskelaufbau unter 8 Wdh.: nur Hinweis im Feedback, keine direkte Senkung (Absprache Paul).
-        candidate = { kind: 'below', params: { ...params, min: status.min } };
-      } else if (status && compatible.length >= PLATEAU_SESSIONS - 1
-        && compatible.slice(0, PLATEAU_SESSIONS - 1).every((prev) => mainWeightOf(prev) === status.weight)) {
-        // Seit mehreren Einheiten dasselbe Gewicht ohne Steigerung -> nur ein Hinweis, keine Senkung.
-        candidate = { kind: 'plateau', params: { ...params, sessions: PLATEAU_SESSIONS } };
-      } else if (['confirm', 'close', 'climb', 'hold'].includes(status?.state)) {
-        candidate = { kind: status.state, params };
-      }
-    }
+    const candidate = resolveCandidate({ ex, info, hint, goal, history, lang });
 
     if (!candidate) return;
     if (!best || PRIORITY[candidate.kind] < PRIORITY[best.kind] ||

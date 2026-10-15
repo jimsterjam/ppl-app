@@ -739,7 +739,7 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
     return null;
   }
 
-  const { athleteBodyweightKg = null, bodyweightCorrelation = null, notDoneExercises = [] } = options || {};
+  const { athleteBodyweightKg = null, bodyweightCorrelation = null, notDoneExercises = [], progressionStates = null } = options || {};
 
   // Statistiken über alle Übungen
   const positiveExercises = exerciseAnalyses.filter(e => e.progression === 'positive');
@@ -820,6 +820,11 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
       // Sätze gegenläufig verändert (z.B. verschobene Pyramide) - siehe Regel 24 im Prompt.
       ...(Array.isArray(ex.setsComparison) && resolveSatzgenauWeightChange(ex.setsComparison, 0).scope === 'mixed'
         ? { set_changes_opposite_directions: true }
+        : {}),
+
+      // Fortschrittszustand aus der App-Logik (Regel 29), z.B. "almost_there" - nur wenn vorhanden.
+      ...(progressionStates?.get?.(String(ex.exercise || '').trim().toLowerCase())
+        ? { progression_state: progressionStates.get(String(ex.exercise || '').trim().toLowerCase()) }
         : {}),
 
       // Trend (von Backend berechnet)
