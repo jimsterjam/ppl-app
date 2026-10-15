@@ -130,6 +130,9 @@
         </div>
       </div>
 
+      <!-- Weitere Übungen laden sich beim Scrollen von selbst nach (Fund Paul 16.10.: ohne Suche stand z. B. "Calf Press
+           Lever Seated" erst nach mehrmaligem "Mehr laden" in der Liste); der Knopf bleibt als Rückfall. -->
+      <div v-if="canLoadMore" ref="loadMoreSentinel" class="load-more-sentinel" aria-hidden="true"></div>
       <button v-if="canLoadMore" class="load-more-btn" type="button" @click="loadMore">
         {{ t('exercises.loadMore') }}
       </button>
@@ -182,7 +185,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch, computed } from 'vue';
+import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue';
 import { useI18n } from 'vue-i18n'
 import { logger } from '@/utils/logger'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
@@ -525,6 +528,22 @@ function onSearchInput(event) {
 function loadMore() {
   visibleCount.value += searchQuery.value.trim() ? 120 : 80
 }
+
+// Automatisch nachladen, sobald das Listenende ins Bild kommt. Nach jedem Nachladen wird neu beobachtet, damit auch
+// bei weiterhin sichtbarem Ende der nächste Block kommt.
+const loadMoreSentinel = ref(null)
+let loadMoreObserver = null
+function observeLoadMore() {
+  if (typeof IntersectionObserver === 'undefined') return
+  loadMoreObserver?.disconnect()
+  if (!loadMoreSentinel.value) return
+  loadMoreObserver = new IntersectionObserver((entries) => {
+    if (entries.some((entry) => entry.isIntersecting) && canLoadMore.value) loadMore()
+  }, { rootMargin: '400px 0px' })
+  loadMoreObserver.observe(loadMoreSentinel.value)
+}
+watch([loadMoreSentinel, visibleCount, () => filteredExercises.value.length], () => nextTick(observeLoadMore))
+onBeforeUnmount(() => loadMoreObserver?.disconnect())
 
 // Anzeige-Labels für Schnellfilter (Werte bleiben API-kompatibel)
 const quickCategories = [
@@ -915,6 +934,7 @@ function closeMedia() {
   gap: 20px;
   grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
 }
+.load-more-sentinel { height: 1px; }
 .load-more-btn {
   display: block;
   margin: 18px auto 0;
