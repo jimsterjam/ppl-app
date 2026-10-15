@@ -205,7 +205,7 @@
                       <button
                         v-if="showTrainingTypeControl"
                         type="button"
-                        class="training-type-chip"
+                        class="training-type-chip opens-menu"
                         :aria-label="t('workoutDetail.trainingTypeAria', { name: getTranslatedExerciseName(ex.name) })"
                         @click="openTrainingTypeModal(i)"
                       >{{ trainingTypeChipText(i) }}</button>
@@ -214,7 +214,7 @@
                         class="ex-more-btn"
                         :aria-label="t('workoutDetail.exerciseMenuAria', { name: getTranslatedExerciseName(ex.name) })"
                         @click="openExerciseMenu(i)"
-                      >⋮</button>
+                      ><MoreVertical class="ex-more-icon" aria-hidden="true" /></button>
                     </div>
                   </div>
                   <small>{{ getTranslatedMuscleGroup ? getTranslatedMuscleGroup(ex.muscleGroup) : ex.muscleGroup }}</small>
@@ -1006,7 +1006,7 @@ import WorkoutTimerConfig from '@/components/timer/WorkoutTimerConfig.vue'
 import SessionStopwatch from '@/components/SessionStopwatch.vue'
 // Einheitliches Icon-Set statt Emoji/ASCII-Mix (🗑️/📝/⋮⋮/▲▼/＋/−) - wie im Rest der App
 // (siehe z.B. BottomNav.vue, AiFeedbackRatingWidget.vue) bereits lucide-vue-next genutzt.
-import { Clock, Trash2, StickyNote, GripVertical, Plus, Minus, Info, Weight, ChevronDown } from 'lucide-vue-next'
+import { Clock, Trash2, StickyNote, GripVertical, Plus, Minus, Info, Weight, ChevronDown, MoreVertical } from 'lucide-vue-next'
 import { useToastStore } from '@/stores/toastStore'
 import { useTimerStore } from '@/stores/timerStore'
 import { useI18n } from 'vue-i18n'
@@ -4603,7 +4603,7 @@ onBeforeUnmount(() => {
 .ex-text { flex: 1; min-width: 0; }
 .ex-title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .exercise-menu-field { display: grid; gap: 6px; font-size: 0.88rem; color: var(--muted); }
-.exercise-menu-field select { min-height: 40px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--card-border); background: var(--surface); color: var(--fg); font-size: 0.95rem; }
+.exercise-menu-field select { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--card-border); background-color: var(--surface); color: var(--fg); font-size: 0.95rem; }
 .ex-not-done-badge { flex-shrink: 0; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line-strong); color: var(--muted); font-size: 0.72rem; font-weight: 600; }
 .ex-text strong { display: block; color: var(--fg); font-size: 0.95rem; }
 .ex-text small { display: block; color: var(--muted); font-size: 0.8rem; margin-top: 2px; }
@@ -4650,19 +4650,22 @@ onBeforeUnmount(() => {
 }
 .ex-title-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 .ex-more-btn {
-  min-width: 0;
-  min-height: 0;
-  width: 26px;
-  height: 32px;
+  /* Deutlich größer und als Knopf erkennbar (Absprache Paul 16.10.): 44x44 Tippfläche, sichtbarer Rand. */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  width: 44px;
+  height: 44px;
   padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--muted);
-  font-size: 1.2rem;
-  font-weight: 700;
-  line-height: 1;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--fg);
   cursor: pointer;
 }
+.ex-more-icon { width: 24px; height: 24px; stroke-width: 2.6; }
 .warmup-toggle {
   min-width: 0;
   min-height: 40px;
