@@ -31,7 +31,9 @@ export function normalizeTrainingGoal(goal) {
 // eine eigene Trainingsart wählen (exercise.trainingType), z.B. im Kraft-Workout Hack Calf Raise
 // auf Muskelaufbau. Explosive Übungen (Sprünge, Speed-Varianten, Umsetzen/Reißen) werden
 // automatisch erkannt: dort zählt das Tempo, es gibt kein Wiederholungsziel.
-export const EXERCISE_TRAINING_TYPES = Object.freeze(['strength', 'hypertrophy', 'explosive'])
+// 'technique' (Absprache Paul 16.10.): kein Wiederholungsziel, kein Gewichtsvorschlag, kein Tempo-Maßstab - der Nutzer
+// entscheidet selbst, wann er steigert.
+export const EXERCISE_TRAINING_TYPES = Object.freeze(['strength', 'hypertrophy', 'explosive', 'technique'])
 
 const EXPLOSIVE_NAME_PATTERN = /\bspeed\b|jump|sprung|explosiv|plyo|\bclean\b|snatch|reißen|power start|medicine ball.*throw|überkopfwurf|brustwurf/i
 // Treffer, die trotz Stichwort NICHT explosiv sind (Griffart, Bauchübung, Seilspringen).
@@ -48,7 +50,7 @@ export function sanitizeExerciseTrainingType(value) {
 
 /**
  * Wirksame Trainingsart einer Übung: eigene Wahl > automatisch explosiv > Workout-Ziel.
- * @returns {'strength'|'hypertrophy'|'explosive'}
+ * @returns {'strength'|'hypertrophy'|'explosive'|'technique'}
  */
 export function resolveExerciseGoal(info = {}, workoutGoal = DEFAULT_TRAINING_GOAL, override = null) {
   const own = sanitizeExerciseTrainingType(override)
@@ -101,7 +103,7 @@ export const TRANSITION_REPS = 7
 
 /** 'fixed' (Kraft-Grundübung, festes Schema) oder 'range' (8-12) - null = kein Wdh.-Ziel. */
 export function progressionModeFor(info = {}, goal = DEFAULT_TRAINING_GOAL) {
-  if (goal === 'explosive') return null
+  if (goal === 'explosive' || goal === 'technique') return null
   const type = classifyExercise(info)
   if (type === 'core') return null
   return normalizeTrainingGoal(goal) === 'strength' && type === 'compound' ? 'fixed' : 'range'
@@ -162,6 +164,7 @@ export function detectSchemeReps(sessions = []) {
  */
 export function getRepTarget(info = {}, goal = DEFAULT_TRAINING_GOAL, { sessions = [] } = {}) {
   if (goal === 'explosive') return null // Tempo zählt, kein Wiederholungsziel
+  if (goal === 'technique') return null // Technik: der Nutzer entscheidet selbst
   const type = classifyExercise(info)
   if (type === 'core') return null
   if (normalizeTrainingGoal(goal) === 'strength' && type === 'compound') {

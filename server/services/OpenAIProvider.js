@@ -374,6 +374,13 @@ KRITISCHE REGELN:
     - Keine Zahlen, keine Sekunden, keine Gewichtsempfehlung (FAKTEN-REGEL, Regel 25). Eine Notiz hat Vorrang (Regel 12).
     - Zählt zur Höchstgrenze von 3 Übungen mit Besonderheit und hat nur mit auffälligem Verlauf oder Notiz Priorität.
 
+31. TECHNIK-ÜBUNGEN (training_type: "technique"): Der Nutzer hat diese Übung selbst als Technik-Übung gewählt. Es
+    geht weder um Gewicht noch um Wiederholungen oder Tempo, und der Nutzer entscheidet SELBST, wann er das Level
+    erhöht - gib keine Vorgabe und keine Empfehlung dazu (Regel 25), bewerte weder Fortschritt noch Rückschritt.
+    - Mit Notiz: greife die Notiz auf und bestätige sie (Regel 12).
+    - Ohne Notiz: höchstens ein neutraler Halbsatz, dass die Übung als Technik-Übung lief, oder weglassen.
+    - Keine Zahlen (FAKTEN-REGEL). Zählt zur Höchstgrenze von 3 Übungen mit Besonderheit, niedrige Priorität ohne Notiz.
+
 OUTPUT-FORMAT ("Coach statt Protokoll" - Standard):
 Ungefähr 60-130 Wörter. KEINE sichtbaren Überschriften, kein Markdown-Fettdruck - einfache
 Zeilen reichen. Du schreibst ausschließlich die Einordnung - alle Fakten zeigt die App (FAKTEN-
@@ -637,6 +644,18 @@ ${exercises
 **Notiz zu dieser Session (Grund, falls genannt):** ${this.wrapUserNote(ex.note_context?.session || ex.note)}`;
       }
       return skipped;
+    }
+
+    // Technik-Übung (Regel 31): keine Zahlen, kein Vergleich - der Nutzer entscheidet selbst, nur Hinweis + Notiz.
+    if (ex.training_type === 'technique') {
+      let technique = `### ${exerciseIndex + 1}. ${this.wrapExerciseName(ex.exercise)}
+- Trainingsart: Technik (vom Nutzer gewählt) - keine Auswertung von Gewicht, Wiederholungen oder Volumen (siehe Regel 31)`;
+      if (ex.note_context?.session || ex.note) {
+        technique += `
+
+**Notiz zu dieser Session:** ${this.wrapUserNote(ex.note_context?.session || ex.note)}`;
+      }
+      return technique;
     }
 
     // Übung auf Zeit (Regel 30): keine kg-/Satzdaten, nur Messart und Verlauf gegenüber der letzten Session.

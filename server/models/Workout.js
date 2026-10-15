@@ -68,7 +68,7 @@ const workoutSchema = new mongoose.Schema({
     // Trainingsart DIESER Übung, falls vom Nutzer abweichend vom Workout-Ziel gewählt
     // ('strength'|'hypertrophy'|'explosive'); fehlt = Workout-Ziel bzw. automatische Erkennung
     // (siehe client/src/utils/weightSuggestion.js resolveExerciseGoal).
-    trainingType: { type: String, enum: ['strength', 'hypertrophy', 'explosive'], default: undefined },
+    trainingType: { type: String, enum: ['strength', 'hypertrophy', 'explosive', 'technique'], default: undefined },
     // Vom Nutzer gemerkte Pausendauer zwischen Sätzen in Sekunden (Pausentimer); fehlt = Standard
     // je Trainingsart (client/src/utils/restTimerRules.js).
     restSeconds: { type: Number, min: 15, max: 600 },

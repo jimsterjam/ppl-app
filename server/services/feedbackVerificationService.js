@@ -540,6 +540,9 @@ Entwurfstext. Du generierst KEIN neues Feedback, du prüfst nur.
     "dafür weniger Wiederholungen") - der Fortschritt ist eindeutig und soll motivierend eingeordnet werden. Eine
     Formulierung wie "du arbeitest an deiner Grenze, da fehlt nur noch ein kleines Stück" ist ausdrücklich ERLAUBT.
     Bei "ready_to_increase" gilt dasselbe für Erfolg, bei "hold_weight" darf kein Vorwurf entstehen.
+25. Technik-Übungen (training_type "technique"): keine Bewertung von Gewicht, Wiederholungen oder Fortschritt und keine
+    Empfehlung, wann der Nutzer steigern soll - er entscheidet selbst. Eine bloße Notiz-Bestätigung oder ein
+    neutraler Halbsatz ist erlaubt.
 
 Antworte AUSSCHLIESSLICH als valides JSON-Objekt, keine Erklärung davor/danach:
 {
@@ -871,6 +874,7 @@ export const RULE_LABELS = {
   22: 'Identische Zahlen wie letzte Session fälschlich als Stagnation statt Konsolidierung gewertet, oder Plateau-Hinweis ohne 3+ unveränderte Sessions',
   23: 'Vorsichtig/warnend klingende Formulierung genutzt ("achte darauf", "behalte im Blick", "passe an", "sei vorsichtig") statt handlungsorientierter Sprache',
   24: 'Fortschrittszustand (almost_there/ready_to_increase/hold_weight) als Rückschritt, Kompromiss ("zwar ... aber") oder Vorwurf formuliert',
+  25: 'Technik-Übung (training_type technique) nach Gewicht/Wiederholungen/Fortschritt bewertet oder mit einer Steigerungsempfehlung versehen',
 };
 
 export function getRuleLabel(ruleNumber) {
