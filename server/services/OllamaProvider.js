@@ -145,6 +145,10 @@ ${exercises
 - Gewicht: ${ex.current_weight}kg
 - Wiederholungen (gesamt über alle Sätze): ${ex.current_reps}`;
 
+    if (ex.progression_state) {
+      exPrompt += `\n\nFortschrittszustand (App-Logik, verbindlich): ${ex.progression_state} – motivierend einordnen, nicht als Rückschritt (kein "zwar ... aber").`;
+    }
+
     if (ex.previous_weight !== undefined) {
       exPrompt += `
 
