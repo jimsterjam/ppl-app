@@ -474,11 +474,11 @@ watch(() => `${route.query.quick || ''}:${route.query.favoriteStart || ''}`, () 
 		<div v-if="canRenderBuilder" class="type-select">
 			<label for="wb-type" class="type-label">{{ t('builder.stepType') }}</label>
 			<div v-if="isMobile" class="mobile-type-actions">
-				<button class="open-picker-btn" @click="showTypePicker = true">
+				<button class="open-picker-btn opens-menu" @click="showTypePicker = true">
 					{{ currentTypeLabel ? `${t('builder.stepType')}: ${currentTypeLabel}` : t('builder.selectType') }}
 				</button>
 				<div class="mobile-secondary-actions">
-					<button class="open-picker-btn" @click="showMobilePicker = true">{{ t('builder.pickExercises') }}</button>
+					<button class="open-picker-btn opens-menu" @click="showMobilePicker = true">{{ t('builder.pickExercises') }}</button>
 					<button class="create-btn" :disabled="creating || selectedExercises.length === 0 || !isSignedIn" @click="createWorkout">
 						{{ creating ? t('builder.creating') : `${t('builder.create')} (${selectedExercises.length})` }}
 					</button>
