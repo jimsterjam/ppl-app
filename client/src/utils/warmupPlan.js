@@ -76,14 +76,14 @@ export function jointsTypeFor(type) {
 // Einfache Körpergewichts-Übungen aus dem Katalog (alle mit Video, Anfänger, ohne Gerät):
 //   0659 push-up (wall)                 drücken (Brust, Schulter, Trizeps)
 //   0688 scapular pull-up               ziehen (Rücken)
-//   3533 quads (bodyweight squat)       Kniebeuge (Beine)
+//   3533 bodyweight squat               Kniebeuge (Beine)
 //   3013 low glute bridge on floor      Hüfte (Gesäß, Beinbeuger, Kreuzheben-Muster)
 // Welche passt, entscheidet der Zielmuskel (`target`) der ersten Übung im Katalog, bei Kreuzheben-Mustern
 // der Name. Keine passende (z. B. Bizeps-Curl, Core): null -> Text "leichter Aufwärmsatz".
 export const WARMUP_EXERCISES = Object.freeze({
   push: Object.freeze({ catalogId: 'ex_0659', name: 'push-up (wall)' }),
   pull: Object.freeze({ catalogId: 'ex_0688', name: 'scapular pull-up' }),
-  squat: Object.freeze({ catalogId: 'ex_3533', name: 'quads (bodyweight squat)' }),
+  squat: Object.freeze({ catalogId: 'ex_3533', name: 'bodyweight squat' }),
   hinge: Object.freeze({ catalogId: 'ex_3013', name: 'low glute bridge on floor' })
 })
 
