@@ -577,6 +577,20 @@
                     <button class="remove-row-btn" :title="t('workoutDetail.removeSet')" @click="removeSetRow(i, rIdx)"><Minus class="btn-icon" aria-hidden="true" /></button>
                   </span>
                 </div>
+                <!-- Breiter "Abhaken"-Knopf direkt unter dem aktuellen Satz (Absprache Paul 17.10.): springt nach dem Abhaken
+                     zum nächsten Satz. Während der Pause bleibt er antippbar (dann mit Restzeit). -->
+                <button
+                  v-if="doneBarCurrent && doneBarCurrent.exIndex === i && doneBarCurrent.rowIndex === rIdx"
+                  type="button"
+                  class="set-done-wide"
+                  :class="{ resting: restTimer.isRunning }"
+                  :aria-label="t('setDoneBar.aria', { set: doneBarCurrent.setNumber, name: doneBarCurrent.name })"
+                  @click="onBigDone"
+                >
+                  <Check class="set-done-wide-icon" aria-hidden="true" />
+                  <span>{{ t('setDoneBar.label') }}</span>
+                  <span v-if="restTimer.isRunning" class="set-done-wide-rest">{{ t('setDoneBar.resting', { time: formatRest(restTimer.remainingMs) }) }}</span>
+                </button>
               </template>
 
               <!-- Unten: "+ Satz" und "Dein Feedback" (wird meist nach der Übung ausgefüllt). -->
@@ -877,9 +891,6 @@
     <WorkoutTimerConfig v-if="showTimerConfig" @close="showTimerConfig = false" />
     <!-- Pausentimer zwischen Sätzen (startet beim Abhaken, siehe toggleRowDone). -->
     <RestTimerBar :next-set="restNextSet" @remember="rememberRestForExercise" />
-    <!-- Großer "Satz geschafft"-Haken für den aktuellen Satz (Absprache Paul 16.10.) -->
-    <SetDoneBar :current="doneBarCurrent" :hidden="pickerVisible" @done="onBigDone" />
-    <div v-if="doneBarCurrent" class="done-bar-spacer" aria-hidden="true"></div>
 
     <!-- Speichern-Overlay -->
     <Transition name="save-fade">
@@ -1009,7 +1020,7 @@ import WorkoutTimerConfig from '@/components/timer/WorkoutTimerConfig.vue'
 import SessionStopwatch from '@/components/SessionStopwatch.vue'
 // Einheitliches Icon-Set statt Emoji/ASCII-Mix (🗑️/📝/⋮⋮/▲▼/＋/−) - wie im Rest der App
 // (siehe z.B. BottomNav.vue, AiFeedbackRatingWidget.vue) bereits lucide-vue-next genutzt.
-import { Clock, Trash2, StickyNote, GripVertical, Plus, Minus, Info, Weight, ChevronDown, MoreVertical } from 'lucide-vue-next'
+import { Clock, Trash2, StickyNote, GripVertical, Plus, Minus, Info, Weight, ChevronDown, MoreVertical, Check } from 'lucide-vue-next'
 import { useToastStore } from '@/stores/toastStore'
 import { useTimerStore } from '@/stores/timerStore'
 import { useI18n } from 'vue-i18n'
@@ -1046,9 +1057,8 @@ import { useRestTimerStore } from '@/stores/restTimerStore'
 import { useWarmupTimerStore } from '@/stores/warmupTimerStore'
 import WarmupCard from '@/components/WarmupCard.vue'
 import { emptyWarmup, pickWarmupExercise, sanitizeWarmup } from '@/utils/warmupPlan'
-import { restSecondsFor, sanitizeCustomRest } from '@/utils/restTimerRules'
+import { restSecondsFor, sanitizeCustomRest, formatRest } from '@/utils/restTimerRules'
 import RestTimerBar from '@/components/timer/RestTimerBar.vue'
-import SetDoneBar from '@/components/timer/SetDoneBar.vue'
 import { buildSaveReview, markAllSetsDone } from '@/utils/saveReview'
 import { isExerciseNotDone } from '@/utils/notDoneExercises'
 import { showsReps, showsTime, showsWeight, sanitizeMeasureMode, DURATION_MAX_SECONDS, DURATION_STEP_SECONDS } from '@/utils/measureMode'
@@ -2177,6 +2187,10 @@ function onBigDone() {
   const row = current ? workout.value?.exercises?.[current.exIndex]?.setDetails?.[current.rowIndex] : null
   if (!row) return
   toggleRowDone(row, current.exIndex, current.rowIndex)
+  // Der Knopf springt zum nächsten Satz - dorthin scrollen, damit er sofort wieder erreichbar ist.
+  nextTick(() => {
+    try { document.querySelector('.set-done-wide')?.scrollIntoView({ block: 'center', behavior: 'smooth' }) } catch {}
+  })
   // Kurzes Vibrieren, wo vom Gerät unterstützt (iOS-WebView kennt es nicht).
   try { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(30) } catch {}
 }
@@ -4628,7 +4642,6 @@ onBeforeUnmount(() => {
 .ex-thumb { width: 56px; height: 56px; flex-shrink: 0; object-fit: contain; background: var(--surface); border: 1px solid var(--card-border); border-radius: 8px; padding: 4px; cursor: pointer; }
 .ex-text { flex: 1; min-width: 0; }
 .ex-title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.done-bar-spacer { height: 100px; }
 .exercise-menu-field { display: grid; gap: 6px; font-size: 0.88rem; color: var(--muted); }
 .exercise-menu-field select { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--card-border); background-color: var(--surface); color: var(--fg); font-size: 0.95rem; }
 .ex-not-done-badge { flex-shrink: 0; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line-strong); color: var(--muted); font-size: 0.72rem; font-weight: 600; }
@@ -4777,6 +4790,35 @@ onBeforeUnmount(() => {
 }
 /* Abhaken: Satznummer als runder Button (34px Spalte, volle Zeilenhöhe als Tippfläche). */
 /* Tippfläche vergrößert (Absprache Paul 16.10.): sichtbar 34 px, unsichtbar +8 px oben/unten. */
+.set-done-wide {
+  /* Breiter Knopf in der App-Akzentfarbe wie die übrigen Hauptknöpfe (Absprache Paul 17.10.). */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 54px;
+  margin: 2px 0 10px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(120deg, var(--accent), var(--accent-strong));
+  color: var(--accent-contrast, #060606);
+  font: inherit;
+  font-size: 1.05rem;
+  font-weight: 800;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.set-done-wide:active { transform: scale(0.99); }
+.set-done-wide-icon { width: 24px; height: 24px; stroke-width: 3; }
+.set-done-wide-rest { margin-left: auto; font-size: 0.85rem; font-weight: 700; font-variant-numeric: tabular-nums; opacity: 0.8; }
+/* Pause läuft: zurückhaltender (Rahmen statt Fläche), bleibt antippbar. */
+.set-done-wide.resting {
+  background: transparent;
+  color: var(--fg);
+  border: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+}
 .set-done-btn::after { content: ''; position: absolute; inset: -8px 0; }
 .set-done-btn {
   position: relative;
