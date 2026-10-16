@@ -177,10 +177,11 @@ html {
 }
 
 [data-theme="light"][data-accent="ocean"] {
-  --accent: #3d8ee6;
-  --accent-strong: #6faeef;
-  --accent-contrast: #060606;
-  --accent-soft: rgba(61, 142, 230, 0.2);
+  /* Dunkleres Blau mit weißer Schrift/Icons auf Knöpfen (Kontrast >= 4,5:1, Absprache Paul 18.10.). */
+  --accent: #2a6ec4;
+  --accent-strong: #2c72c9;
+  --accent-contrast: #ffffff;
+  --accent-soft: rgba(42, 110, 196, 0.2);
   --accent-color: #21548b;
   --accent-color-strong: #2f6aa8;
   --accent-color-contrast: #ffffff;
