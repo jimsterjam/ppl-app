@@ -66,7 +66,7 @@
     </div>
 
     <div
-      v-else-if="rest.isVisible"
+      v-else-if="rest.isVisible && !(hideMinimized && !rest.showFinished)"
       class="rest-bar"
       :class="{ compact: compact, finished: rest.showFinished, 'has-expand': rest.fullscreen && !rest.showFinished }"
       role="timer"
@@ -115,7 +115,9 @@ import { useScrollLock } from '@/composables/useScrollLock'
 
 const props = defineProps({
   // Nächster offener Arbeitssatz: { name, setNumber, reps, weight } oder null (WorkoutDetailView).
-  nextSet: { type: Object, default: null }
+  nextSet: { type: Object, default: null },
+  // Verkleinerte Leiste ausblenden, wenn die Pause schon in der Abhaken-Leiste des aktuellen Satzes sichtbar ist.
+  hideMinimized: { type: Boolean, default: false }
 })
 const emit = defineEmits(['remember'])
 const { t, locale } = useI18n()
