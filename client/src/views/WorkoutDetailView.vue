@@ -3005,6 +3005,9 @@ async function discardDraftAndLeave() {
   bypassTimerLeaveGuard.value = true
   // Abgebrochenes Workout: ein laufender Warm-up-Timer (inkl. Mitteilung) endet mit.
   warmupTimer.cancel()
+  // Ebenso Gesamtzeit und laufende Pause: sonst läuft die Stoppuhr nach dem Abbruch weiter.
+  sessionStopwatchStore.reset()
+  restTimer.clear()
   await discardDraftAndLeaveFlow({
     route,
     workout: workout.value,
