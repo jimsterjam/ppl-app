@@ -188,20 +188,22 @@ html {
 }
 
 [data-theme="light"][data-accent="violet"] {
-  --accent: #8863d7;
-  --accent-strong: #a58ae6;
-  --accent-contrast: #060606;
-  --accent-soft: rgba(136, 99, 215, 0.2);
+  /* Weiße Schrift/Icons auf Knöpfen, Kontrast >= 4,5:1 (Absprache Paul 18.10.). */
+  --accent: #7650cc;
+  --accent-strong: #7c58d2;
+  --accent-contrast: #ffffff;
+  --accent-soft: rgba(118, 80, 204, 0.2);
   --accent-color: #56378f;
   --accent-color-strong: #6947a8;
   --accent-color-contrast: #ffffff;
 }
 
 [data-theme="light"][data-accent="sunset"] {
-  --accent: #df6f3f;
-  --accent-strong: #ef916a;
-  --accent-contrast: #060606;
-  --accent-soft: rgba(223, 111, 63, 0.2);
+  /* Weiße Schrift/Icons auf Knöpfen, Kontrast >= 4,5:1 (Absprache Paul 18.10.). */
+  --accent: #b84f27;
+  --accent-strong: #c0532a;
+  --accent-contrast: #ffffff;
+  --accent-soft: rgba(184, 79, 39, 0.2);
   --accent-color: #8a3e1e;
   --accent-color-strong: #a44c27;
   --accent-color-contrast: #ffffff;
