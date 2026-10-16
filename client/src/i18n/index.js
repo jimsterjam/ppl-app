@@ -1242,9 +1242,9 @@ export const messages = {
       rangeStrength: 'meist 1–6 Wdh.'
     },
     setDoneBar: {
-      label: 'Satz {set} geschafft',
+      label: 'Abhaken',
       resting: 'Pause {time}',
-      aria: 'Satz {set} bei {name} als geschafft abhaken'
+      aria: 'Satz {set} bei {name} abhaken'
     },
     notifyHint: {
       textAsk: 'Mitteilungen erlauben, damit du das Ende eines Timers auch bei gesperrtem Bildschirm mitbekommst.',
@@ -2564,9 +2564,9 @@ export const messages = {
       rangeStrength: 'mostly 1–6 reps'
     },
     setDoneBar: {
-      label: 'Set {set} done',
+      label: 'Check off',
       resting: 'Rest {time}',
-      aria: 'Mark set {set} of {name} as done'
+      aria: 'Check off set {set} of {name}'
     },
     notifyHint: {
       textAsk: 'Allow notifications so you notice when a timer ends, even with the screen locked.',
