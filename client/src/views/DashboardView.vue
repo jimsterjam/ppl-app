@@ -240,6 +240,9 @@ import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { useUserStore } from "../stores/userStore";
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useAuthStore } from '@/stores/authStore'
+import { useSessionStopwatchStore } from '@/stores/sessionStopwatch'
+import { useRestTimerStore } from '@/stores/restTimerStore'
+import { useWarmupTimerStore } from '@/stores/warmupTimerStore'
 import { isOnline, getWorkoutOffline, saveWorkoutOffline } from '@/utils/offlineStorage'
 import { isDraftDeleted } from '@/utils/draftTombstones'
 import { deleteWorkout } from '@/api/workouts'
@@ -277,6 +280,9 @@ const { t: $t, locale } = useI18n()
 const router = useRouter()
 const { getIdToken, onAuthStateChanged, getCurrentUser } = useFirebaseAuth()
 const authStore = useAuthStore()
+const sessionStopwatchStore = useSessionStopwatchStore()
+const restTimerStore = useRestTimerStore()
+const warmupTimerStore = useWarmupTimerStore()
 const draftStateVersion = ref(0)
 const user = ref(null)
 const isSignedIn = ref(false)
@@ -1002,6 +1008,10 @@ function openWorkoutInfo(type) {
 
 async function discardDraft() {
   showDiscardDraftConfirm.value = false
+  // Abgebrochenes Workout: Gesamtzeit, Pause und Warm-up-Timer enden mit.
+  sessionStopwatchStore.reset()
+  restTimerStore.clear()
+  if (warmupTimerStore.isActive) warmupTimerStore.cancel()
   // Aktiven Draft aus localStorage entfernen (verhindert Re-Anzeige des Banners)
   const uid = getActiveDraftUserId()
   if (uid) clearActiveDraft(uid)

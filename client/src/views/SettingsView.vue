@@ -3,29 +3,26 @@
     <HeaderBar :title="$t('settings.title')" />
     
     <div class="settings-content">
-      <section class="card">
-        <h3>{{ $t('onboarding.restartTitle') }}</h3>
+      <CollapsibleCard class="card" :title="$t('onboarding.restartTitle')">
         <p class="hint">{{ $t('onboarding.restartSubtitle') }}</p>
         <button class="legal-btn" :disabled="restartingOnboarding" @click="handleRestartOnboarding">
           <span v-if="restartingOnboarding" class="spinner spin-indicator" aria-hidden="true"></span>
           <span v-else>🔄</span>
           <span>{{ $t('onboarding.restartTitle') }}</span>
         </button>
-      </section>
+      </CollapsibleCard>
 
-      <section class="card">
-        <h3>{{ $t('settings.progressRulesTitle') }}</h3>
+      <CollapsibleCard class="card" :title="$t('settings.progressRulesTitle')">
         <p class="hint">{{ $t('settings.progressRulesSubtitle') }}</p>
         <button class="legal-btn" @click="$router.push({ name: 'faqs', query: { open: 'progressRules' } })">
           <span>📈</span>
           <span>{{ $t('settings.progressRulesTitle') }}</span>
         </button>
-      </section>
+      </CollapsibleCard>
 
       <h2 class="section-title">{{ $t('settings.app') }}</h2>
 
-      <section class="card card--app">
-        <h3>{{ $t('settings.theme') }}</h3>
+      <CollapsibleCard class="card card--app" :title="$t('settings.theme')">
         <p class="hint">{{ $t('settings.themeHint') }}</p>
         <div class="theme-options">
           <label class="opt">
@@ -37,10 +34,9 @@
             <span>{{ $t('settings.dark') }}</span>
           </label>
         </div>
-      </section>
+      </CollapsibleCard>
 
-      <section class="card card--app">
-        <h3>{{ $t('settings.colorMode') }}</h3>
+      <CollapsibleCard class="card card--app" :title="$t('settings.colorMode')">
         <p class="hint">{{ $t('settings.colorModeHint') }}</p>
         <div class="theme-options">
           <label v-for="mode in colorModeOptions" :key="mode.value" class="opt">
@@ -54,10 +50,9 @@
             <span>{{ mode.label }}</span>
           </label>
         </div>
-      </section>
+      </CollapsibleCard>
 
-      <section class="card card--app">
-        <h3>{{ $t('settings.weeklyGoal') }}</h3>
+      <CollapsibleCard class="card card--app" :title="$t('settings.weeklyGoal')">
         <p class="hint">{{ $t('settings.weeklyGoalHint') }}</p>
         <div class="goal-row">
           <input
@@ -74,10 +69,9 @@
           </div>
           <span class="goal-badge">{{ weeklyGoal }} {{ $t('settings.perWeek') }}</span>
         </div>
-      </section>
+      </CollapsibleCard>
 
-      <section class="card card--app">
-        <h3>{{ $t('settings.language') }}</h3>
+      <CollapsibleCard class="card card--app" :title="$t('settings.language')">
         <div class="theme-options">
           <label class="opt">
             <input type="radio" name="lang" value="de" :checked="lang === 'de'" @change="setLang('de')" />
@@ -88,12 +82,11 @@
             <span>{{ $t('settings.english') }}</span>
           </label>
         </div>
-      </section>
+      </CollapsibleCard>
 
       <h2 class="section-title">{{ $t('settings.profileSection') }}</h2>
 
-      <section v-if="accountEmail || accountProviderLabel" class="card card--profile account-info-card">
-        <h3>{{ $t('settings.accountInfoTitle') }}</h3>
+      <CollapsibleCard v-if="accountEmail || accountProviderLabel" class="card card--profile account-info-card" :title="$t('settings.accountInfoTitle')">
         <p class="account-email">{{ accountEmail || '—' }}</p>
         <p v-if="accountProviderLabel" class="hint">{{ $t('settings.accountInfoProvider', { provider: accountProviderLabel }) }}</p>
         <p class="hint account-info-note">
@@ -103,7 +96,7 @@
           <code class="account-uid">{{ accountUid }}</code>
           <button type="button" class="uid-copy-btn" @click="copyAccountUid">{{ $t('common.copy') }}</button>
         </div>
-      </section>
+      </CollapsibleCard>
 
       <!-- Profilbild und Benutzername werden jetzt direkt im Dashboard bearbeitet (Klick auf
            Avatar bzw. Namen im Header, siehe AvatarEditor.vue/NameEditModal.vue in
@@ -118,8 +111,7 @@
            Build-Output entfernt statt nur "versteckt". -->
       <!-- data-i18n-ignore: Entwickler-Werkzeuge, nur in Dev-Builds enthalten (nicht TestFlight/App Store) -->
       <template v-if="isDevBuild">
-        <section v-if="isDevelopment" class="card dev-tools" data-i18n-ignore>
-          <h3>🧪 Developer Tools</h3>
+        <CollapsibleCard v-if="isDevelopment" class="card dev-tools" data-i18n-ignore title="🧪 Developer Tools">
           <p class="hint">Features testing and debugging tools</p>
           <button class="dev-btn" @click="goToFeatureTest">
             🚀 Open Features Test Dashboard
@@ -168,76 +160,69 @@
             </div>
             <p class="hint tiny">Local-only override. Clear storage to reset.</p>
           </div>
-        </section>
-        <section v-else class="card dev-unlock" data-i18n-ignore>
-          <h3>🔒 Developer Tools</h3>
+        </CollapsibleCard>
+        <CollapsibleCard v-else class="card dev-unlock" data-i18n-ignore title="🔒 Developer Tools">
           <p class="hint">Tap the badge below five times to unlock QA controls on this device.</p>
           <button class="dev-unlock-badge" @click="handleDevUnlockTap">
             <span v-if="devTapCount === 0">Tap 5x to unlock</span>
             <span v-else>{{ tapsRemaining }} more tap{{ tapsRemaining === 1 ? '' : 's' }}</span>
           </button>
           <p class="hint tiny">Unlock state lives in localStorage and never syncs to production users.</p>
-        </section>
+        </CollapsibleCard>
       </template>
 
       <h2 class="section-title">{{ $t('appFeedback.entryTitle') }}</h2>
 
-      <section class="card">
-        <h3>{{ $t('appFeedback.entryTitle') }}</h3>
+      <CollapsibleCard class="card" :title="$t('appFeedback.entryTitle')">
         <p class="hint">{{ $t('appFeedback.entrySubtitle') }}</p>
         <button class="legal-btn" @click="showFeedbackDialog = true">
           <span>💬</span>
           <span>{{ $t('appFeedback.entryTitle') }}</span>
         </button>
-      </section>
+      </CollapsibleCard>
 
-      <section class="card">
-        <h3>{{ $t('settings.legalTitle') }}</h3>
+      <CollapsibleCard class="card" :title="$t('settings.legalTitle')">
         <p class="hint">{{ $t('settings.legalHint') }}</p>
         <button class="legal-btn" @click="$router.push('/legal')">
           <span>ℹ️</span>
           <span>{{ $t('settings.legalLink') }}</span>
         </button>
-      </section>
+      </CollapsibleCard>
 
-      <section class="card">
-        <h3>{{ $t('settings.exportDataTitle') }}</h3>
+      <CollapsibleCard class="card" :title="$t('settings.exportDataTitle')">
         <p class="hint">{{ $t('settings.exportDataHint') }}</p>
         <button class="legal-btn" :disabled="isExporting" @click="handleExportData">
           <span v-if="isExporting" class="spinner spin-indicator" aria-hidden="true"></span>
           <span v-else>⬇️</span>
           <span>{{ isExporting ? $t('settings.exportDataInProgress') : $t('settings.exportDataTitle') }}</span>
         </button>
-      </section>
+      </CollapsibleCard>
 
-      <section class="card danger-zone">
-        <h3>{{ $t('settings.dangerZone') }}</h3>
+      <CollapsibleCard class="card danger-zone" :title="$t('settings.dangerZone')">
         <p class="hint">{{ $t('settings.dangerZoneHint') }}</p>
         <button class="danger-btn" :disabled="isDeleting" @click="showDeleteConfirm = true">
           <span v-if="isDeleting" class="spinner spin-indicator" aria-hidden="true"></span>
           <span v-else>🗑️</span>
           {{ isDeleting ? $t('settings.deleting') : $t('settings.deleteAllData') }}
         </button>
-      </section>
+      </CollapsibleCard>
 
-      <section class="card danger-zone account-danger">
-        <h3>{{ $t('settings.dangerZoneAccountTitle') }}</h3>
+      <CollapsibleCard class="card danger-zone account-danger" :title="$t('settings.dangerZoneAccountTitle')">
         <p class="hint">{{ $t('settings.dangerZoneHint') }}</p>
         <button class="danger-btn account-delete-btn" :disabled="isDeletingAccount" @click="showDeleteAccountConfirm = true">
           <span v-if="isDeletingAccount" class="spinner spin-indicator" aria-hidden="true"></span>
           <span v-else>🗑️</span>
           {{ isDeletingAccount ? $t('settings.deletingAccount') : $t('settings.deleteAccount') }}
         </button>
-      </section>
+      </CollapsibleCard>
 
       <!-- Nur für den Admin-Testaccount (client/src/config/admin.js). Nur Sichtbarkeit - die
            Daten gibt der Server ausschließlich mit Admin-Schlüssel + passender UID heraus.
            Bewusst nicht übersetzt (data-i18n-ignore), da nur Paul diesen Bereich sieht. -->
-      <section v-if="showVerifierAudit" class="card" data-i18n-ignore>
-        <h3>Verifier-Protokoll (Admin)</h3>
+      <CollapsibleCard v-if="showVerifierAudit" class="card" data-i18n-ignore title="Verifier-Protokoll (Admin)">
         <p class="hint">Ergebnisse der automatischen Prüfung des KI-Feedbacks (Zahlen und Regeln), letzte 30 Tage.</p>
         <VerifierAuditPanel />
-      </section>
+      </CollapsibleCard>
     </div>
 
     <!-- Bestätigungs-Dialog. Teleport + Scroll-Lock (Modal-Muster der App, siehe CLAUDE.md):
@@ -386,6 +371,7 @@ import { deleteAllWorkouts } from '@/api/workouts'
 import { isOnline, db } from '@/utils/offlineStorage'
 import { exportAccountData } from '@/api/account'
 import { isAdminUid } from '@/config/admin'
+import CollapsibleCard from '../components/CollapsibleCard.vue'
 import VerifierAuditPanel from '../components/VerifierAuditPanel.vue'
 
 const themeStore = useThemeStore()
