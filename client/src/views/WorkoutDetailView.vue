@@ -577,20 +577,40 @@
                     <button class="remove-row-btn" :title="t('workoutDetail.removeSet')" @click="removeSetRow(i, rIdx)"><Minus class="btn-icon" aria-hidden="true" /></button>
                   </span>
                 </div>
-                <!-- Breiter "Abhaken"-Knopf direkt unter dem aktuellen Satz (Absprache Paul 17.10.): springt nach dem Abhaken
-                     zum nächsten Satz. Während der Pause bleibt er antippbar (dann mit Restzeit). -->
-                <button
+                <!-- Abhaken-Leiste als Teil des aktuellen Satzes (Absprache Paul 18.10., Variante B): ruhig, ohne eigene
+                     Fläche. Bereit: "Abhaken". Pause läuft: Restzeit + -15/+15/Überspringen (die untere Pausen-Leiste
+                     entfällt dann); abgehakt wird in der Pause über den Haken in der Zeile. -->
+                <div
                   v-if="doneBarCurrent && doneBarCurrent.exIndex === i && doneBarCurrent.rowIndex === rIdx"
-                  type="button"
-                  class="set-done-wide"
+                  :ref="setDoneStripEl"
+                  class="set-done-strip"
                   :class="{ resting: restTimer.isRunning }"
-                  :aria-label="t('setDoneBar.aria', { set: doneBarCurrent.setNumber, name: doneBarCurrent.name })"
-                  @click="onBigDone"
                 >
-                  <Check class="set-done-wide-icon" aria-hidden="true" />
-                  <span>{{ t('setDoneBar.label') }}</span>
-                  <span v-if="restTimer.isRunning" class="set-done-wide-rest">{{ t('setDoneBar.resting', { time: formatRest(restTimer.remainingMs) }) }}</span>
-                </button>
+                  <template v-if="restTimer.isRunning">
+                    <span class="set-done-strip-time" role="timer">{{ t('setDoneBar.resting', { time: formatRest(restTimer.remainingMs) }) }}</span>
+                    <span class="set-done-strip-actions">
+                      <button type="button" class="set-done-strip-btn" :aria-label="t('restTimer.minusAria')" @click="restTimer.adjust(-REST_STEP_SECONDS)">−15</button>
+                      <button type="button" class="set-done-strip-btn" :aria-label="t('restTimer.plusAria')" @click="restTimer.adjust(REST_STEP_SECONDS)">+15</button>
+                      <button type="button" class="set-done-strip-btn" @click="restTimer.skip()">{{ t('restTimer.skip') }}</button>
+                    </span>
+                    <button
+                      v-if="restTimer.isAdjusted && !restRemembered"
+                      type="button"
+                      class="set-done-strip-remember"
+                      @click="rememberCurrentRest"
+                    >{{ t('restTimer.remember', { time: formatRest(restTimer.durationSec * 1000) }) }}</button>
+                  </template>
+                  <button
+                    v-else
+                    type="button"
+                    class="set-done-strip-main"
+                    :aria-label="t('setDoneBar.aria', { set: doneBarCurrent.setNumber, name: doneBarCurrent.name })"
+                    @click="onBigDone"
+                  >
+                    <Check class="set-done-strip-icon" aria-hidden="true" />
+                    <span>{{ t('setDoneBar.label') }}</span>
+                  </button>
+                </div>
               </template>
 
               <!-- Unten: "+ Satz" und "Dein Feedback" (wird meist nach der Übung ausgefüllt). -->
@@ -890,7 +910,7 @@
 
     <WorkoutTimerConfig v-if="showTimerConfig" @close="showTimerConfig = false" />
     <!-- Pausentimer zwischen Sätzen (startet beim Abhaken, siehe toggleRowDone). -->
-    <RestTimerBar :next-set="restNextSet" @remember="rememberRestForExercise" />
+    <RestTimerBar :next-set="restNextSet" :hide-minimized="hideRestBar" @remember="rememberRestForExercise" />
 
     <!-- Speichern-Overlay -->
     <Transition name="save-fade">
@@ -1057,7 +1077,7 @@ import { useRestTimerStore } from '@/stores/restTimerStore'
 import { useWarmupTimerStore } from '@/stores/warmupTimerStore'
 import WarmupCard from '@/components/WarmupCard.vue'
 import { emptyWarmup, pickWarmupExercise, sanitizeWarmup } from '@/utils/warmupPlan'
-import { restSecondsFor, sanitizeCustomRest, formatRest } from '@/utils/restTimerRules'
+import { restSecondsFor, sanitizeCustomRest, formatRest, REST_STEP_SECONDS } from '@/utils/restTimerRules'
 import RestTimerBar from '@/components/timer/RestTimerBar.vue'
 import { buildSaveReview, markAllSetsDone } from '@/utils/saveReview'
 import { isExerciseNotDone } from '@/utils/notDoneExercises'
@@ -2169,7 +2189,28 @@ function rememberRestForExercise({ exIndex, seconds }) {
   }
 }
 
-// Großer "Satz geschafft"-Haken: gilt dem aktuellen Satz (siehe nextSetHighlight), auch bei Zeit-/Technik-Übungen.
+// Pause-Bedienung sitzt in der Abhaken-Leiste des aktuellen Satzes; die untere Leiste erscheint nur, wenn
+// diese Leiste nicht im sichtbaren Bereich ist (weggescrollt) oder es keinen aktuellen Satz mehr gibt.
+const stripVisible = ref(false)
+let stripObserver = null
+function setDoneStripEl(el) {
+  if (stripObserver) { stripObserver.disconnect(); stripObserver = null }
+  if (!el) { stripVisible.value = false; return }
+  if (typeof IntersectionObserver === 'undefined') { stripVisible.value = true; return }
+  // Unten ~80 px abziehen: dort liegt die Bottom-Navigation.
+  stripObserver = new IntersectionObserver(([entry]) => { stripVisible.value = entry.isIntersecting }, { rootMargin: '0px 0px -80px 0px' })
+  stripObserver.observe(el)
+}
+onBeforeUnmount(() => { if (stripObserver) stripObserver.disconnect() })
+const hideRestBar = computed(() => !!doneBarCurrent.value && stripVisible.value && restTimer.isRunning)
+const restRemembered = ref(false)
+watch(() => restTimer.baseSec, () => { restRemembered.value = false })
+function rememberCurrentRest() {
+  rememberRestForExercise({ exIndex: restTimer.exIndex, seconds: restTimer.durationSec })
+  restRemembered.value = true
+}
+
+// "Satz geschafft"-Abhaken: gilt dem aktuellen Satz (siehe nextSetHighlight), auch bei Zeit-/Technik-Übungen.
 const doneBarCurrent = computed(() => {
   if (!setTrackingActive.value || isReordering.value) return null
   const { exIndex, rowIndex } = nextSetHighlight.value
@@ -2189,7 +2230,7 @@ function onBigDone() {
   toggleRowDone(row, current.exIndex, current.rowIndex)
   // Der Knopf springt zum nächsten Satz - dorthin scrollen, damit er sofort wieder erreichbar ist.
   nextTick(() => {
-    try { document.querySelector('.set-done-wide')?.scrollIntoView({ block: 'center', behavior: 'smooth' }) } catch {}
+    try { document.querySelector('.set-done-strip')?.scrollIntoView({ block: 'center', behavior: 'smooth' }) } catch {}
   })
   // Kurzes Vibrieren, wo vom Gerät unterstützt (iOS-WebView kennt es nicht).
   try { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(30) } catch {}
@@ -4789,35 +4830,67 @@ onBeforeUnmount(() => {
   opacity: 0.35;
 }
 /* Abhaken: Satznummer als runder Button (34px Spalte, volle Zeilenhöhe als Tippfläche). */
-/* Tippfläche vergrößert (Absprache Paul 16.10.): sichtbar 34 px, unsichtbar +8 px oben/unten. */
-.set-done-wide {
-  /* Breiter Knopf in der App-Akzentfarbe wie die übrigen Hauptknöpfe (Absprache Paul 17.10.). */
+/* Abhaken-Leiste unter dem aktuellen Satz: gehört optisch zur Zeile (Absprache Paul 18.10.). */
+.set-done-strip {
+  margin: -2px 6px 8px;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--fg);
+}
+.set-done-strip-main {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
+  gap: 8px;
   width: 100%;
-  min-height: 54px;
-  margin: 2px 0 10px;
-  padding: 10px 16px;
+  min-height: 40px;
+  padding: 6px 12px;
   border: none;
-  border-radius: 12px;
-  background: linear-gradient(120deg, var(--accent), var(--accent-strong));
-  color: var(--accent-contrast, #060606);
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
   font: inherit;
-  font-size: 1.05rem;
-  font-weight: 800;
+  font-size: 0.95rem;
+  font-weight: 700;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-.set-done-wide:active { transform: scale(0.99); }
-.set-done-wide-icon { width: 24px; height: 24px; stroke-width: 3; }
-.set-done-wide-rest { margin-left: auto; font-size: 0.85rem; font-weight: 700; font-variant-numeric: tabular-nums; opacity: 0.8; }
-/* Pause läuft: zurückhaltender (Rahmen statt Fläche), bleibt antippbar. */
-.set-done-wide.resting {
+.set-done-strip-main:active { background: color-mix(in srgb, var(--accent) 28%, transparent); }
+.set-done-strip-icon { width: 18px; height: 18px; stroke-width: 3; color: var(--accent-text, var(--fg)); }
+.set-done-strip.resting {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  padding: 6px 8px 6px 12px;
   background: transparent;
+  border: 1px dashed var(--card-border, rgba(128, 128, 128, 0.4));
+}
+.set-done-strip-time { font-weight: 800; font-variant-numeric: tabular-nums; color: var(--accent-text, var(--fg)); }
+.set-done-strip-actions { margin-left: auto; display: flex; gap: 6px; }
+.set-done-strip-btn {
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--card-border, rgba(128, 128, 128, 0.4));
+  border-radius: 8px;
+  background: var(--surface);
   color: var(--fg);
-  border: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.set-done-strip-remember {
+  width: 100%;
+  min-height: 0;
+  padding: 2px 0 4px;
+  border: none;
+  background: transparent;
+  color: var(--accent-text, var(--fg));
+  font: inherit;
+  font-size: 0.8rem;
+  text-decoration: underline;
+  text-align: left;
 }
 .set-done-btn::after { content: ''; position: absolute; inset: -8px 0; }
 .set-done-btn {
