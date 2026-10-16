@@ -1241,6 +1241,11 @@ export const messages = {
       rangeHypertrophy: 'meist 8–12 Wdh.',
       rangeStrength: 'meist 1–6 Wdh.'
     },
+    setDoneBar: {
+      label: 'Satz {set} geschafft',
+      resting: 'Pause {time}',
+      aria: 'Satz {set} bei {name} als geschafft abhaken'
+    },
     notifyHint: {
       textAsk: 'Mitteilungen erlauben, damit du das Ende eines Timers auch bei gesperrtem Bildschirm mitbekommst.',
       allow: 'Erlauben',
@@ -2557,6 +2562,11 @@ export const messages = {
       required: 'Choose a goal first.',
       rangeHypertrophy: 'mostly 8–12 reps',
       rangeStrength: 'mostly 1–6 reps'
+    },
+    setDoneBar: {
+      label: 'Set {set} done',
+      resting: 'Rest {time}',
+      aria: 'Mark set {set} of {name} as done'
     },
     notifyHint: {
       textAsk: 'Allow notifications so you notice when a timer ends, even with the screen locked.',

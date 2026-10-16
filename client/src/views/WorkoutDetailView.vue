@@ -877,6 +877,9 @@
     <WorkoutTimerConfig v-if="showTimerConfig" @close="showTimerConfig = false" />
     <!-- Pausentimer zwischen Sätzen (startet beim Abhaken, siehe toggleRowDone). -->
     <RestTimerBar :next-set="restNextSet" @remember="rememberRestForExercise" />
+    <!-- Großer "Satz geschafft"-Haken für den aktuellen Satz (Absprache Paul 16.10.) -->
+    <SetDoneBar :current="doneBarCurrent" :hidden="pickerVisible" @done="onBigDone" />
+    <div v-if="doneBarCurrent" class="done-bar-spacer" aria-hidden="true"></div>
 
     <!-- Speichern-Overlay -->
     <Transition name="save-fade">
@@ -1045,6 +1048,7 @@ import WarmupCard from '@/components/WarmupCard.vue'
 import { emptyWarmup, pickWarmupExercise, sanitizeWarmup } from '@/utils/warmupPlan'
 import { restSecondsFor, sanitizeCustomRest } from '@/utils/restTimerRules'
 import RestTimerBar from '@/components/timer/RestTimerBar.vue'
+import SetDoneBar from '@/components/timer/SetDoneBar.vue'
 import { buildSaveReview, markAllSetsDone } from '@/utils/saveReview'
 import { isExerciseNotDone } from '@/utils/notDoneExercises'
 import { showsReps, showsTime, showsWeight, sanitizeMeasureMode, DURATION_MAX_SECONDS, DURATION_STEP_SECONDS } from '@/utils/measureMode'
@@ -2153,6 +2157,28 @@ function rememberRestForExercise({ exIndex, seconds }) {
   if (!isFavoriteAdjustMode.value) {
     try { triggerAutoSave() } catch {}
   }
+}
+
+// Großer "Satz geschafft"-Haken: gilt dem aktuellen Satz (siehe nextSetHighlight), auch bei Zeit-/Technik-Übungen.
+const doneBarCurrent = computed(() => {
+  if (!setTrackingActive.value || isReordering.value) return null
+  const { exIndex, rowIndex } = nextSetHighlight.value
+  const ex = workout.value?.exercises?.[exIndex]
+  if (!ex || rowIndex < 0) return null
+  let setNumber = 0
+  for (let i = 0; i <= rowIndex; i += 1) {
+    if (ex.setDetails?.[i] && !ex.setDetails[i].isWarmup) setNumber += 1
+  }
+  return { exIndex, rowIndex, setNumber, name: getTranslatedExerciseName(ex.name || '') }
+})
+
+function onBigDone() {
+  const current = doneBarCurrent.value
+  const row = current ? workout.value?.exercises?.[current.exIndex]?.setDetails?.[current.rowIndex] : null
+  if (!row) return
+  toggleRowDone(row, current.exIndex, current.rowIndex)
+  // Kurzes Vibrieren, wo vom Gerät unterstützt (iOS-WebView kennt es nicht).
+  try { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(30) } catch {}
 }
 
 // Pausentimer-Vollbild: nächster offener Arbeitssatz ab der Übung der laufenden Pause (diese
@@ -4602,6 +4628,7 @@ onBeforeUnmount(() => {
 .ex-thumb { width: 56px; height: 56px; flex-shrink: 0; object-fit: contain; background: var(--surface); border: 1px solid var(--card-border); border-radius: 8px; padding: 4px; cursor: pointer; }
 .ex-text { flex: 1; min-width: 0; }
 .ex-title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.done-bar-spacer { height: 100px; }
 .exercise-menu-field { display: grid; gap: 6px; font-size: 0.88rem; color: var(--muted); }
 .exercise-menu-field select { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--card-border); background-color: var(--surface); color: var(--fg); font-size: 0.95rem; }
 .ex-not-done-badge { flex-shrink: 0; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line-strong); color: var(--muted); font-size: 0.72rem; font-weight: 600; }
@@ -4749,10 +4776,13 @@ onBeforeUnmount(() => {
   opacity: 0.35;
 }
 /* Abhaken: Satznummer als runder Button (34px Spalte, volle Zeilenhöhe als Tippfläche). */
+/* Tippfläche vergrößert (Absprache Paul 16.10.): sichtbar 34 px, unsichtbar +8 px oben/unten. */
+.set-done-btn::after { content: ''; position: absolute; inset: -8px 0; }
 .set-done-btn {
+  position: relative;
   /* min-width/min-height: globale Button-Regel (style.css, 48px) würde in die Wdh.-Spalte ragen. */
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   min-width: 0;
   min-height: 0;
   padding: 0;
