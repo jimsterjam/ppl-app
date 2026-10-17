@@ -22,9 +22,9 @@
                   <small>{{ t('restTimer.defaultValue', { time: formatRest(defaultRestSeconds(goal, type) * 1000) }) }}</small>
                 </div>
                 <div class="stepper">
-                  <button type="button" class="step-btn" :aria-label="stepAria('durationMinusAria', goal, type)" @click="step(goal, type, -REST_STEP_SECONDS)">−15</button>
+                  <button type="button" class="step-btn" :aria-label="stepAria('durationMinusAria', goal, type)" @click="step(goal, type, -REST_STEP_SECONDS)">{{ t('restTimer.minusLabel') }}</button>
                   <output class="duration-value" :class="{ changed: isChanged(goal, type) }">{{ formatRest(secondsFor(goal, type) * 1000) }}</output>
-                  <button type="button" class="step-btn" :aria-label="stepAria('durationPlusAria', goal, type)" @click="step(goal, type, REST_STEP_SECONDS)">+15</button>
+                  <button type="button" class="step-btn" :aria-label="stepAria('durationPlusAria', goal, type)" @click="step(goal, type, REST_STEP_SECONDS)">{{ t('restTimer.plusLabel') }}</button>
                 </div>
               </div>
             </div>
