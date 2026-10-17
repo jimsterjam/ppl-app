@@ -31,8 +31,8 @@
             </div>
           </div>
           <div class="fm-row">
-            <button type="button" class="fm-btn" :aria-label="t('focus.minusSecAria')" @click="adjustSeconds(-15)">−15 s</button>
-            <button type="button" class="fm-btn" :aria-label="t('focus.plusSecAria')" @click="adjustSeconds(15)">+15 s</button>
+            <button type="button" class="fm-btn" :aria-label="t('focus.minusSecAria')" @click="adjustSeconds(-15)">{{ t('restTimer.minusLabel') }}</button>
+            <button type="button" class="fm-btn" :aria-label="t('focus.plusSecAria')" @click="adjustSeconds(15)">{{ t('restTimer.plusLabel') }}</button>
           </div>
         </template>
 

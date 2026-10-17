@@ -36,8 +36,8 @@
         <div v-if="row.open && row.timed" class="warmup-timer">
           <div class="warmup-timer-row">
             <span class="warmup-time" :class="{ paused: timerPaused(row.step) }">{{ formatRest(timeShown(row.step)) }}</span>
-            <button type="button" class="warmup-adjust" :aria-label="t('warmup.minusAria')" :disabled="!canAdjust(row.step, -WARMUP_ADJUST_SECONDS)" @click="warmupTimer.adjust(row.step, -WARMUP_ADJUST_SECONDS)">−15</button>
-            <button type="button" class="warmup-adjust" :aria-label="t('warmup.plusAria')" :disabled="!canAdjust(row.step, WARMUP_ADJUST_SECONDS)" @click="warmupTimer.adjust(row.step, WARMUP_ADJUST_SECONDS)">+15</button>
+            <button type="button" class="warmup-adjust" :aria-label="t('warmup.minusAria')" :disabled="!canAdjust(row.step, -WARMUP_ADJUST_SECONDS)" @click="warmupTimer.adjust(row.step, -WARMUP_ADJUST_SECONDS)">{{ t('restTimer.minusLabel') }}</button>
+            <button type="button" class="warmup-adjust" :aria-label="t('warmup.plusAria')" :disabled="!canAdjust(row.step, WARMUP_ADJUST_SECONDS)" @click="warmupTimer.adjust(row.step, WARMUP_ADJUST_SECONDS)">{{ t('restTimer.plusLabel') }}</button>
             <button v-if="timerRunning(row.step)" type="button" class="warmup-btn ghost" @click="warmupTimer.pause()">{{ t('warmup.pause') }}</button>
             <button v-else-if="timerPaused(row.step)" type="button" class="warmup-btn" @click="warmupTimer.resume()">{{ t('warmup.resume') }}</button>
             <button v-else type="button" class="warmup-btn" @click="startTimer(row.step)">{{ t('warmup.start') }}</button>
@@ -210,6 +210,7 @@ onMounted(() => {
   font-weight: 700;
   cursor: pointer;
 }
+.warmup-adjust { white-space: nowrap; }
 .warmup-adjust:disabled { opacity: 0.4; cursor: default; }
 .warmup-banner {
   margin: 6px 0 4px;
@@ -263,7 +264,7 @@ onMounted(() => {
   cursor: pointer;
 }
 .warmup-timer { padding: 6px 0 0 40px; }
-.warmup-timer-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.warmup-timer-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 10px; }
 .warmup-time { font-family: var(--font-heading, inherit); font-size: 2.1rem; font-weight: 700; letter-spacing: 1px; font-variant-numeric: tabular-nums; }
 .warmup-time.paused { color: var(--muted); }
 .warmup-btn {

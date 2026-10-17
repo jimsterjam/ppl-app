@@ -47,8 +47,8 @@
           </p>
 
           <div class="ro-actions">
-            <button type="button" class="ro-btn" :aria-label="t('restTimer.minusAria')" @click="rest.adjust(-REST_STEP_SECONDS)">−15</button>
-            <button type="button" class="ro-btn" :aria-label="t('restTimer.plusAria')" @click="rest.adjust(REST_STEP_SECONDS)">+15</button>
+            <button type="button" class="ro-btn" :aria-label="t('restTimer.minusAria')" @click="rest.adjust(-REST_STEP_SECONDS)">{{ t('restTimer.minusLabel') }}</button>
+            <button type="button" class="ro-btn" :aria-label="t('restTimer.plusAria')" @click="rest.adjust(REST_STEP_SECONDS)">{{ t('restTimer.plusLabel') }}</button>
           </div>
           <button type="button" class="ro-btn ro-primary" @click="rest.skip()">{{ t('restTimer.skip') }}</button>
 
@@ -90,8 +90,8 @@
           <span class="rest-time">{{ timeText }}</span>
         </div>
         <div class="rest-actions">
-          <button type="button" class="rest-btn" :aria-label="t('restTimer.minusAria')" @click="rest.adjust(-REST_STEP_SECONDS)">−15</button>
-          <button type="button" class="rest-btn" :aria-label="t('restTimer.plusAria')" @click="rest.adjust(REST_STEP_SECONDS)">+15</button>
+          <button type="button" class="rest-btn" :aria-label="t('restTimer.minusAria')" @click="rest.adjust(-REST_STEP_SECONDS)">{{ t('restTimer.minusLabel') }}</button>
+          <button type="button" class="rest-btn" :aria-label="t('restTimer.plusAria')" @click="rest.adjust(REST_STEP_SECONDS)">{{ t('restTimer.plusLabel') }}</button>
           <button type="button" class="rest-btn skip" @click="rest.skip()">{{ t('restTimer.skip') }}</button>
         </div>
         <button
