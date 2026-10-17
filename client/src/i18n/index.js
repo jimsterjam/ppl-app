@@ -664,6 +664,7 @@ export const messages = {
       enlarge: 'vergrößern',
       add: 'hinzufügen',
       addExercise: 'Übung hinzufügen',
+      addExerciseShort: 'Übung',
       weight: 'Gewicht',
       removeSet: 'Satz entfernen',
       addSet: 'Working Set',
@@ -2091,7 +2092,8 @@ export const messages = {
       toastRemoveFailed: 'Remove failed.',
       saveFailed: 'Save failed.',
       uploadFailed: 'Upload failed.',
-      addExercise: 'Add Exercise'
+      addExercise: 'Add Exercise',
+      addExerciseShort: 'Exercise'
     },
     builder: {
       noExercisesInCategory: '😅 No exercises available for this category',
