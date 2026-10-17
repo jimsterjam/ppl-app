@@ -2318,9 +2318,24 @@ watch(() => focus.finishedKey, (key) => {
   completeFocusSet(cur, focus.durationSec)
 })
 
-// Pause vorbei: im Fokus-Modus sofort mit dem nächsten Satz weiter (ohne "Weiter"-Knopf).
+// Zeitübung als nächster Satz (Absprache Paul 20.10.): Vorwarnung bei 10 s und Zähltöne 3-2-1 vor dem Pausenende.
+watch([() => restTimer.isRunning, focusCurrent, () => focus.active], () => {
+  restTimer.cues = restTimer.isRunning && focus.active && !!focusCurrent.value && focusCurrent.value.mode !== 'weight'
+}, { immediate: true })
+
+// Pause vorbei: im Fokus-Modus sofort mit dem nächsten Satz weiter (ohne "Weiter"-Knopf). Ist der nächste Satz eine
+// Zeitübung, läuft deren Timer jetzt automatisch los (Pause regulär abgelaufen; "Überspringen" startet nicht).
 watch(() => restTimer.showFinished, (finished) => {
-  if (finished && focus.visible) restTimer.clear()
+  if (!finished || !focus.active) return
+  const cur = focusCurrent.value
+  if (!cur || cur.mode === 'weight') {
+    if (focus.visible) restTimer.clear()
+    return
+  }
+  restTimer.clear()
+  focus.expand()
+  const planned = Number(cur.row?.durationSeconds)
+  focus.startTimer(cur.key, planned > 0 ? planned : 60)
 })
 
 // Kein offener Satz mehr: Fokus-Modus beenden (zurück zur Übersicht mit Speichern).

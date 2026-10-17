@@ -522,6 +522,9 @@ export const emitTimerSignal = ({ eventKey, soundEnabled, soundType = 'box-gong'
       } else if (kind === 'rest-end') {
         // Pausenende: gewählte Melodie, ohne Auswahl bzw. bei 'default' der bisherige Gong.
         if (!melodyId || !playRestMelody(melodyId)) playWhistleStart(1900)
+      } else if (kind === 'rest-warn') {
+        // Vorwarnung (10 s vor Pausenende bei Zeitübungen): ein einzelner, dezenter Ton.
+        playBell(0.4)
       } else if (kind === 'session-end') {
         playSiren(1200)
       } else if (kind === 'countdown-3') {
