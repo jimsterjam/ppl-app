@@ -173,7 +173,7 @@ const miniTime = computed(() => {
 const miniTitle = computed(() => {
   if (rest.isVisible) return rest.showFinished ? t('restTimer.finished') : t('focus.miniRest')
   if (timerStarted.value) return t('focus.miniHold')
-  return t('focus.miniSet')
+  return t('focus.miniSet', { n: props.current?.setNumber || 1 })
 })
 const miniSub = computed(() => props.current?.name || '')
 

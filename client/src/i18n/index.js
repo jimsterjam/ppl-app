@@ -1242,8 +1242,7 @@ export const messages = {
       rangeStrength: 'meist 1–6 Wdh.'
     },
     focus: {
-      startWorkout: 'Training starten',
-      resume: 'Weiter im Training',
+      startSet: 'Satz {n} starten',
       dialogAria: 'Training',
       overview: 'Übersicht',
       overviewAria: 'Zur Übersicht (Pause und Satz laufen weiter)',
@@ -1271,7 +1270,7 @@ export const messages = {
       openAria: 'Training in Großansicht öffnen',
       miniRest: 'Pause',
       miniHold: 'Satz läuft',
-      miniSet: 'Nächster Satz'
+      miniSet: 'Als Nächstes: Satz {n}'
     },
     setDoneBar: {
       label: 'Abhaken',
@@ -2596,8 +2595,7 @@ export const messages = {
       rangeStrength: 'mostly 1–6 reps'
     },
     focus: {
-      startWorkout: 'Start workout',
-      resume: 'Continue workout',
+      startSet: 'Start set {n}',
       dialogAria: 'Workout',
       overview: 'Overview',
       overviewAria: 'Back to overview (rest and set keep running)',
@@ -2625,7 +2623,7 @@ export const messages = {
       openAria: 'Open workout in full view',
       miniRest: 'Rest',
       miniHold: 'Set running',
-      miniSet: 'Next set'
+      miniSet: 'Next: set {n}'
     },
     setDoneBar: {
       label: 'Check off',
