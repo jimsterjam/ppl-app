@@ -5,20 +5,23 @@
     <div class="content">
       <section class="faq-list glass" :aria-label="$t('nav.faqs')">
         <h3>{{ $t('faqs.title') }}</h3>
-        <div
-          v-for="(item, idx) in items"
-          :key="item.key"
-          class="faq-item"
-        >
-          <button
-            type="button"
-            class="faq-trigger"
-            @click="openFaq(item.key)"
+        <template v-for="group in groups" :key="group.titleKey">
+          <h4 class="faq-group-title">{{ $t(`faqs.${group.titleKey}`) }}</h4>
+          <div
+            v-for="key in group.keys"
+            :key="key"
+            class="faq-item"
           >
-            <span class="title">{{ $t(`faqs.${item.key}`) }}</span>
-            <span class="chevron" aria-hidden="true">▸</span>
-          </button>
-        </div>
+            <button
+              type="button"
+              class="faq-trigger"
+              @click="openFaq(key)"
+            >
+              <span class="title">{{ $t(`faqs.${key}`) }}</span>
+              <span class="chevron" aria-hidden="true">▸</span>
+            </button>
+          </div>
+        </template>
       </section>
 
       <!-- FAQ Modal/Overlay -->
@@ -59,8 +62,15 @@ const version = computed(() => pkg?.version || '0.0.0')
 
 // FAQ modal state
 const selectedFaqKey = ref('')
-const baseKeys = ['gettingStarted', 'workoutFlow', 'symbols', 'progression', 'weightSuggestion', 'restPauses', 'workouts', 'pushPullLegs', 'navigation', 'progressRules', 'aiCoach', 'statsReading', 'uploads', 'privacy']
-const items = computed(() => baseKeys.map(key => ({ key })))
+const baseKeys = ['gettingStarted', 'pushPullLegs', 'navigation', 'workoutFlow', 'focusMode', 'symbols', 'restPauses', 'timedExercises', 'warmup', 'progressRules', 'progression', 'weightSuggestion', 'statsReading', 'aiCoach', 'workouts', 'uploads', 'privacy']
+// Gruppierte Anzeige (Absprache Paul 22.10.): jeder Eintrag steht in genau einer Gruppe.
+const groups = [
+  { titleKey: 'groupStart', keys: ['gettingStarted', 'pushPullLegs', 'navigation'] },
+  { titleKey: 'groupWorkout', keys: ['workoutFlow', 'focusMode', 'symbols', 'restPauses', 'timedExercises', 'warmup'] },
+  { titleKey: 'groupProgress', keys: ['progressRules', 'progression', 'weightSuggestion', 'statsReading'] },
+  { titleKey: 'groupAi', keys: ['aiCoach'] },
+  { titleKey: 'groupAccount', keys: ['workouts', 'uploads', 'privacy'] }
+]
 
 function openFaq(faqKey) {
   selectedFaqKey.value = faqKey
@@ -101,6 +111,16 @@ function splitParagraphs(text) {
   font-size: 1.1rem; 
   font-weight: 600;
 }
+
+.faq-group-title {
+  margin: 18px 0 4px;
+  padding: 0 12px;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.faq-group-title:first-of-type { margin-top: 4px; }
 
 .faq-item + .faq-item { 
   border-top: 1px solid var(--card-border, rgba(125,125,125,0.25)); 

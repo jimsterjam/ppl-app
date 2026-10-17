@@ -331,6 +331,7 @@ watch(() => route.query?.emailVerified, (val) => {
                 <p>{{ t('auth.offlineExpired') }}</p>
             </div>
             <h2>{{ t('welcome.title') }}</h2>
+            <p class="welcome-tagline">{{ t('welcome.tagline') }}</p>
             <div class="mode-badge" :class="isSignUp ? 'mode-signup' : 'mode-signin'">
                 {{ isSignUp ? t('auth.modeSignUp') : t('auth.modeSignIn') }}
             </div>
@@ -759,6 +760,8 @@ watch(() => route.query?.emailVerified, (val) => {
         -webkit-text-fill-color: transparent;
         background-clip: text;
     }
+
+    .welcome-tagline { margin: -0.4rem 0 1rem; text-align: center; }
 
     p {
         line-height: 1.6;

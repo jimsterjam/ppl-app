@@ -22,7 +22,7 @@
         </div>
       </section>
 
-      <SessionStopwatch @session-time="onSessionTime" />
+      <SessionStopwatch v-if="showStopwatchCard" @session-time="onSessionTime" />
 
       <MonthlyReportRow />
 
@@ -59,6 +59,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true" style="vertical-align:-2px;margin-right:5px"><circle cx="12" cy="13" r="8"/><polyline points="12 9 12 13 15 13"/><path d="M9 2h6M12 2v3"/></svg>
             Timer
           </button>
+          <p v-if="isFirstUse" class="quick-first-hint">{{ $t('dashboard.firstHint') }}</p>
           <TimerMenu v-if="showTimerMenu" @close="showTimerMenu = false" @select="onTimerMenuSelect" />
           <RestTimerSettings v-if="showRestSettings" @close="showRestSettings = false" />
           <WorkoutTimerConfig v-if="showTimerConfig" @close="showTimerConfig = false" />
@@ -419,7 +420,12 @@ const weeklyCount = computed(() => {
   const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
   return (store.workouts || []).filter(w => !(w?.isDraft || w?._isDraft) && new Date(w.date || w.updatedAt || 0).getTime() >= cutoff).length
 })
-const weeklyProgressLabel = computed(() => `Wochenfortschritt: ${weeklyCount.value}/${weeklyGoal.value} Trainings`)
+const weeklyProgressLabel = computed(() => $t('dashboard.weeklyProgress', { done: weeklyCount.value, goal: weeklyGoal.value }))
+
+// Erstnutzung (Absprache Paul 22.10.): noch kein abgeschlossenes Workout und kein Entwurf -> kurze Erklärung unter den
+// Kacheln, die Gym-Zeit-Karte erscheint erst, wenn sie gebraucht wird (laufende Zeit oder vorhandene Workouts).
+const isFirstUse = computed(() => !hasDraft.value && !(store.workouts || []).some(w => w?.completed === true))
+const showStopwatchCard = computed(() => !isFirstUse.value || sessionStopwatchStore.elapsedMs > 0)
 
 const lastWorkoutType = computed(() => {
   const last = store.lastSavedWorkout
@@ -1253,6 +1259,14 @@ onActivated(async () => {
   aspect-ratio: unset;
   height: 100%;
   min-height: 0;
+}
+
+.quick-first-hint {
+  grid-column: 1 / -1;
+  margin: 2px 4px 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.4;
 }
 
 .quick-fav-shortcut {
