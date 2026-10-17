@@ -1,5 +1,5 @@
 <template>
-    <div class="workout-detail">
+    <div class="workout-detail" :class="{ 'has-bottom-bar': hasBottomBar }">
       <HeaderBar title="Workout">
         <!-- Gesamtzeit (SessionStopwatch) hier statt weiter unten in der Übungsliste (siehe
              ex-list-header) platziert - Header ist sticky (siehe HeaderBar.vue), bleibt also
@@ -898,10 +898,11 @@
       :hide-minimized="focus.active"
       @remember="rememberRestForExercise"
       @minimize="focus.minimize()"
+      @adjust-next="onNextSetAdjust"
     />
     <FocusMode :current="focusCurrent" @done="onFocusDone" @adjust="onFocusAdjust" @open="openFocus" />
     <button v-if="showFocusStart" type="button" class="focus-start-btn" @click="startFocus">
-      <span aria-hidden="true">▶</span> {{ hasDoneSet ? t('focus.resume') : t('focus.startWorkout') }}
+      <span aria-hidden="true">▶</span> {{ t('focus.startSet', { n: doneBarCurrent.setNumber }) }}
     </button>
 
     <!-- Speichern-Overlay -->
@@ -2214,10 +2215,9 @@ function onBigDone() {
 // (selbst erstellt, generiert, Favorit), da sie nur von setTrackingActive/doneBarCurrent abhängt.
 const focus = useFocusModeStore()
 
-const hasDoneSet = computed(() => (workout.value?.exercises || []).some((ex) =>
-  (ex?.setDetails || []).some((r) => r && !r.isWarmup && r.done === true)
-))
-const showFocusStart = computed(() => !!doneBarCurrent.value && !focus.active && !restTimer.isVisible)
+// Der Knopf erscheint, sobald das Warm-up nicht (mehr) läuft - Warm-up überspringen oder beenden (Absprache Paul 20.10.).
+const hasBottomBar = computed(() => showFocusStart.value || restTimer.isVisible || (focus.active && focus.minimized))
+const showFocusStart = computed(() => !!doneBarCurrent.value && !focus.active && !restTimer.isVisible && !warmupTimer.isActive)
 
 const focusCurrent = computed(() => {
   const cur = doneBarCurrent.value
@@ -2246,6 +2246,8 @@ const focusCurrent = computed(() => {
 })
 
 function startFocus() {
+  // Wer das Warm-up übersprungen hat, hat den Gesamttimer noch nicht gestartet: jetzt starten.
+  sessionStopwatchStore.startIfIdle()
   focus.open()
 }
 
@@ -2255,15 +2257,14 @@ function openFocus() {
   if (restTimer.showFinished) restTimer.clear()
 }
 
-function onFocusAdjust(field, direction) {
-  const cur = focusCurrent.value
-  if (!cur) return
-  const row = cur.row
+function adjustSetField(exIndex, rowIndex, field, direction) {
+  const row = workout.value?.exercises?.[exIndex]?.setDetails?.[rowIndex]
+  if (!row) return
   if (field === 'reps') {
     if (Number(row.reps) > 0) {
       adjustRowField(row, 'reps', direction, 1, 1, 500)
     } else {
-      const tg = repTargetsByIndex.value[cur.exIndex]
+      const tg = repTargetsByIndex.value[exIndex]
       row.reps = Math.max(1, Number(tg?.target) || Number(tg?.min) || 10)
       try { triggerAutoSave() } catch {}
     }
@@ -2276,6 +2277,17 @@ function onFocusAdjust(field, direction) {
     row.durationSeconds = Math.min(DURATION_MAX_SECONDS, Math.max(5, (Number(row.durationSeconds) || 60) + direction))
     try { triggerAutoSave() } catch {}
   }
+}
+
+function onFocusAdjust(field, direction) {
+  const cur = focusCurrent.value
+  if (cur) adjustSetField(cur.exIndex, cur.rowIndex, field, direction)
+}
+
+// Pausen-Ansicht: nächsten Satz vor dem Start noch anpassen.
+function onNextSetAdjust(field, direction) {
+  const next = restNextSet.value
+  if (next) adjustSetField(next.exIndex, next.rowIndex, field, direction)
 }
 
 function completeFocusSet(cur, seconds = 0) {
@@ -2336,11 +2348,16 @@ const restNextSet = computed(() => {
       if (!row || row.isWarmup) continue
       setNumber += 1
       if (row.done !== true) {
+        const mode = !showsTime(exercises[i]?.measureMode) ? 'weight' : (showsReps(exercises[i]?.measureMode) ? 'repsTime' : 'time')
         return {
           name: getTranslatedExerciseName(exercises[i]?.name || ''),
           setNumber,
           reps: row.reps,
-          weight: row.weight
+          weight: row.weight,
+          durationSeconds: row.durationSeconds,
+          mode,
+          exIndex: i,
+          rowIndex: exercises[i].setDetails.indexOf(row)
         }
       }
     }
@@ -3741,6 +3758,8 @@ async function performSaveWorkout(updateFavorite = false, { deferAiFeedback = fa
         await postSaveCleanup()
         timerStore.reset()
         sessionStopwatchStore.reset()
+        restTimer.clear()
+        focus.close()
         warmupTimer.cancel()
         bypassTimerLeaveGuard.value = true
         goToPostWorkoutSummary(realId, { deferred: deferAiFeedback })
@@ -3801,6 +3820,8 @@ async function performSaveWorkout(updateFavorite = false, { deferAiFeedback = fa
       await postSaveCleanup()
       timerStore.reset()
       sessionStopwatchStore.reset()
+      restTimer.clear()
+      focus.close()
       warmupTimer.cancel()
       bypassTimerLeaveGuard.value = true
       goToPostWorkoutSummary(savedWorkout?._id || id, { deferred: deferAiFeedback })
@@ -3820,6 +3841,8 @@ async function performSaveWorkout(updateFavorite = false, { deferAiFeedback = fa
     await postSaveCleanup()
     timerStore.reset()
     sessionStopwatchStore.reset()
+    restTimer.clear()
+    focus.close()
     warmupTimer.cancel()
     bypassTimerLeaveGuard.value = true
     goToPostWorkoutSummary(id, { deferred: deferAiFeedback })
@@ -4923,6 +4946,7 @@ onBeforeUnmount(() => {
   opacity: 0.35;
 }
 /* Abhaken: Satznummer als runder Button (34px Spalte, volle Zeilenhöhe als Tippfläche). */
+.workout-detail.has-bottom-bar { padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 170px); }
 /* Start des Fokus-Modus: fester großer Knopf über der Navigation. */
 .focus-start-btn {
   position: fixed;

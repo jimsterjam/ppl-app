@@ -8,7 +8,7 @@
     <div
       v-if="showOverlay"
       class="rest-overlay"
-      :class="{ finished: rest.showFinished, ending: isEnding }"
+      :class="{ finished: rest.showFinished, ending: isEnding, 'with-next': !!nextSet && !rest.showFinished }"
       role="dialog"
       aria-modal="true"
       :aria-label="t('restTimer.overlayAria')"
@@ -40,11 +40,29 @@
             <span class="ro-time" :class="{ long: timeText.length > 4 }">{{ timeText }}</span>
           </div>
 
-          <p v-if="nextSet" class="ro-next">
+          <div v-if="nextSet" class="ro-next ro-next-edit">
             <span class="ro-next-label">{{ t('restTimer.nextSet') }}</span>
-            <span class="ro-next-name">{{ nextSet.name }}</span>
-            <span class="ro-next-detail">{{ nextSetDetail }}</span>
-          </p>
+            <span class="ro-next-name">{{ nextSet.name }} · {{ t('restTimer.setNumber', { n: nextSet.setNumber }) }}</span>
+            <!-- Vor dem Satz noch anpassbar (z. B. wenn der letzte Satz zu schwer war). -->
+            <div v-if="nextSet.mode && nextSet.mode !== 'time'" class="ro-adjust">
+              <span class="ro-adjust-label">{{ t('focus.reps') }}</span>
+              <button type="button" class="ro-adjust-btn" :aria-label="t('focus.repsMinusAria')" @click="emit('adjust-next', 'reps', -1)">−</button>
+              <span class="ro-adjust-value">{{ nextRepsText }}</span>
+              <button type="button" class="ro-adjust-btn" :aria-label="t('focus.repsPlusAria')" @click="emit('adjust-next', 'reps', 1)">+</button>
+            </div>
+            <div v-if="nextSet.mode === 'weight'" class="ro-adjust">
+              <span class="ro-adjust-label">{{ t('focus.weight') }}</span>
+              <button type="button" class="ro-adjust-btn" :aria-label="t('focus.weightMinusAria')" @click="emit('adjust-next', 'weight', -1)">−</button>
+              <span class="ro-adjust-value">{{ nextWeightText }}<small>kg</small></span>
+              <button type="button" class="ro-adjust-btn" :aria-label="t('focus.weightPlusAria')" @click="emit('adjust-next', 'weight', 1)">+</button>
+            </div>
+            <div v-if="nextSet.mode === 'time' || nextSet.mode === 'repsTime'" class="ro-adjust">
+              <span class="ro-adjust-label">{{ t('focus.holdTime') }}</span>
+              <button type="button" class="ro-adjust-btn" :aria-label="t('focus.minusSecAria')" @click="emit('adjust-next', 'durationSeconds', -15)">−</button>
+              <span class="ro-adjust-value">{{ nextSet.durationSeconds || 60 }}<small>s</small></span>
+              <button type="button" class="ro-adjust-btn" :aria-label="t('focus.plusSecAria')" @click="emit('adjust-next', 'durationSeconds', 15)">+</button>
+            </div>
+          </div>
 
           <div class="ro-actions">
             <button type="button" class="ro-btn" :aria-label="t('restTimer.minusAria')" @click="rest.adjust(-REST_STEP_SECONDS)">−15</button>
@@ -120,7 +138,7 @@ const props = defineProps({
   forceFull: { type: Boolean, default: false },
   hideMinimized: { type: Boolean, default: false }
 })
-const emit = defineEmits(['remember', 'minimize'])
+const emit = defineEmits(['remember', 'minimize', 'adjust-next'])
 const { t, locale } = useI18n()
 const rest = useRestTimerStore()
 const timerStore = useTimerStore()
@@ -141,6 +159,9 @@ const ringOffset = computed(() => {
   const share = total > 0 ? Math.min(1, Math.max(0, rest.remainingMs / total)) : 0
   return RING_LENGTH * (1 - share)
 })
+
+const nextRepsText = computed(() => (Number(props.nextSet?.reps) > 0 ? String(props.nextSet.reps) : '–'))
+const nextWeightText = computed(() => (Number(props.nextSet?.weight) > 0 ? String(props.nextSet.weight) : '–'))
 
 const nextSetDetail = computed(() => {
   const next = props.nextSet
@@ -184,13 +205,14 @@ onBeforeUnmount(unlock)
   /* Über Bottom-Navigation (1200) und Leiste, unter Fenstern (AppModal 1300). */
   z-index: 1290;
   display: flex;
-  align-items: center;
+  align-items: safe center;
   justify-content: center;
   padding: calc(env(safe-area-inset-top, 0px) + 16px) 20px calc(env(safe-area-inset-bottom, 0px) + 16px);
   background: color-mix(in srgb, var(--bg, #08090b) 94%, transparent);
   -webkit-backdrop-filter: blur(6px);
   backdrop-filter: blur(6px);
   color: var(--fg);
+  overflow-y: auto;
   --ro-color: var(--accent);
 }
 .rest-overlay.ending { --ro-color: #ff9f1a; }
@@ -266,6 +288,29 @@ onBeforeUnmount(unlock)
 .ro-next-label { font-size: 0.95rem; color: var(--muted); }
 .ro-next-name { font-size: 1.35rem; font-weight: 700; }
 .ro-next-detail { font-size: 1.2rem; font-variant-numeric: tabular-nums; }
+.ro-next-edit { width: 100%; gap: 8px; }
+.ro-adjust { display: grid; grid-template-columns: 1fr 52px minmax(72px, auto) 52px; align-items: center; gap: 8px; }
+.ro-adjust-label { text-align: left; color: var(--muted); font-size: 0.95rem; }
+.ro-adjust-value { text-align: center; font-size: 1.7rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.ro-adjust-value small { margin-left: 4px; font-size: 0.9rem; font-weight: 600; color: var(--muted); }
+.ro-adjust-btn {
+  min-width: 0;
+  min-height: 52px;
+  padding: 0;
+  border-radius: 14px;
+  border: 1px solid var(--card-border);
+  background: var(--surface);
+  color: var(--fg);
+  font: inherit;
+  font-size: 1.6rem;
+  cursor: pointer;
+}
+.ro-adjust-btn:active { background: color-mix(in srgb, var(--accent) 22%, var(--surface)); }
+/* Mit anpassbarem nächsten Satz: Ring und Zeit kleiner, damit alles auf den Bildschirm passt. */
+.rest-overlay.with-next .ro-ring { width: min(56vw, 230px); }
+.rest-overlay.with-next .ro-time { font-size: clamp(56px, 20vw, 88px); }
+.rest-overlay.with-next .ro-time.long { font-size: clamp(48px, 16vw, 72px); }
+.rest-overlay.with-next .ro-inner { gap: 10px; }
 .ro-actions { display: flex; gap: 12px; width: 100%; }
 .ro-actions .ro-btn { flex: 1; }
 .ro-btn {
