@@ -263,13 +263,13 @@ onMounted(() => {
   font-size: 0.8rem;
   cursor: pointer;
 }
-.warmup-timer { padding: 6px 0 0 40px; }
+.warmup-timer { padding: 6px 0 0; }
 .warmup-timer-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 10px; }
-.warmup-time { font-family: var(--font-heading, inherit); font-size: 2.1rem; font-weight: 700; letter-spacing: 1px; font-variant-numeric: tabular-nums; }
+.warmup-time { font-family: var(--font-heading, inherit); font-size: 1.8rem; font-weight: 700; letter-spacing: 1px; font-variant-numeric: tabular-nums; }
 .warmup-time.paused { color: var(--muted); }
 .warmup-btn {
   min-height: 0;
-  padding: 10px 24px;
+  padding: 10px 18px;
   border-radius: 999px;
   border: 0;
   background: var(--accent);
