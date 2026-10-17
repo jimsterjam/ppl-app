@@ -118,8 +118,8 @@
 
           <div class="ex-list-header">
             <div class="ex-list-actions">
-              <button class="primary add-exercise-btn" type="button" @click="showAddExerciseModal = true">
-                <Plus class="btn-icon" aria-hidden="true" /> {{ t('workoutDetail.addExercise') }}
+              <button class="primary add-exercise-btn" type="button" :aria-label="t('workoutDetail.addExercise')" :title="t('workoutDetail.addExercise')" @click="showAddExerciseModal = true">
+                <Plus class="btn-icon" aria-hidden="true" /> {{ t('workoutDetail.addExerciseShort') }}
               </button>
               <button v-if="!isFavoriteAdjustMode" class="secondary timer-config-btn" type="button" @click="showTimerConfig = true">
                 <Clock class="btn-icon" aria-hidden="true" /> Timer
@@ -4446,7 +4446,7 @@ onBeforeUnmount(() => {
 }
 .ex-list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .ex-list-actions { display: flex; flex-direction: row; gap: 8px; align-items: stretch; width: 100%; }
-.ex-list-actions > button { min-width: 0; min-height: 48px; white-space: nowrap; }
+.ex-list-actions > button { min-width: 0; min-height: 48px; line-height: 1.15; overflow-wrap: anywhere; }
 .ex-list-actions .add-exercise-btn { flex: 1.5 1 0; }
 .ex-list-actions .timer-config-btn { flex: 1 1 0; }
 .ex-list-actions .reorder-toggle { flex: 0 0 auto; min-width: 48px; padding-left: 12px; padding-right: 12px; }
@@ -4954,6 +4954,11 @@ onBeforeUnmount(() => {
   width: 100%;
 }
 .ex-note-actions { flex: 1 1 0; min-width: 0; display: inline-flex; align-items: stretch; gap: 6px; }
+/* Schmale Geräte: Symbole in der Aktionsreihe weglassen, damit die Texte (z. B. „Aufwärmsatz“) in den Knopf passen. */
+@media (max-width: 380px) {
+  .ex-bottom-actions > button .btn-icon,
+  .ex-bottom-actions .ex-note-actions .link:first-child .btn-icon { display: none; }
+}
 .ex-note-actions .has-note { color: var(--fg); }
 .note-check { color: var(--accent-text); }
 .ex-note-field { margin-top: 4px; }
