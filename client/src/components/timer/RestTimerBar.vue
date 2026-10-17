@@ -6,7 +6,7 @@
        die Leiste kompakter gezeigt. -->
   <Teleport to="body">
     <div
-      v-if="rest.showOverlay"
+      v-if="showOverlay"
       class="rest-overlay"
       :class="{ finished: rest.showFinished, ending: isEnding }"
       role="dialog"
@@ -61,12 +61,12 @@
           >{{ t('restTimer.remember', { time: formatRest(rest.durationSec * 1000) }) }}</button>
         </template>
 
-        <button type="button" class="ro-link ro-minimize" @click="rest.minimize()">{{ t('restTimer.minimize') }}</button>
+        <button type="button" class="ro-link ro-minimize" @click="minimizeOverlay">{{ t('restTimer.minimize') }}</button>
       </div>
     </div>
 
     <div
-      v-else-if="rest.isVisible && !(hideMinimized && !rest.showFinished)"
+      v-else-if="rest.isVisible && !hideMinimized"
       class="rest-bar"
       :class="{ compact: compact, finished: rest.showFinished, 'has-expand': rest.fullscreen && !rest.showFinished }"
       role="timer"
@@ -116,10 +116,11 @@ import { useScrollLock } from '@/composables/useScrollLock'
 const props = defineProps({
   // Nächster offener Arbeitssatz: { name, setNumber, reps, weight } oder null (WorkoutDetailView).
   nextSet: { type: Object, default: null },
-  // Verkleinerte Leiste ausblenden, wenn die Pause schon in der Abhaken-Leiste des aktuellen Satzes sichtbar ist.
+  // Fokus-Modus aktiv: Die Großansicht erzwingt das Pausen-Vollbild, minimiert zeigt der Fokus-Modus seine eigene Leiste.
+  forceFull: { type: Boolean, default: false },
   hideMinimized: { type: Boolean, default: false }
 })
-const emit = defineEmits(['remember'])
+const emit = defineEmits(['remember', 'minimize'])
 const { t, locale } = useI18n()
 const rest = useRestTimerStore()
 const timerStore = useTimerStore()
@@ -130,6 +131,8 @@ const RING_LENGTH = 2 * Math.PI * 46
 
 // Intervall-Timer aktiv (große Leiste oben) -> Pause kompakter.
 const compact = computed(() => timerStore.isActive && timerStore.miniVisible)
+
+const showOverlay = computed(() => rest.isVisible && !rest.minimized && (rest.fullscreen || props.forceFull))
 
 const timeText = computed(() => formatRest(rest.remainingMs))
 const isEnding = computed(() => rest.isRunning && rest.remainingMs <= REST_ENDING_MS)
@@ -156,6 +159,11 @@ const nextSetDetail = computed(() => {
 const remembered = ref(false)
 watch(() => rest.baseSec, () => { remembered.value = false })
 
+function minimizeOverlay() {
+  rest.minimize()
+  emit('minimize')
+}
+
 function remember() {
   emit('remember', { exIndex: rest.exIndex, seconds: rest.durationSec })
   remembered.value = true
@@ -164,7 +172,7 @@ function remember() {
 // Modal-Muster: Hintergrund nicht scrollbar, solange das Vollbild offen ist. Schließen/Verkleinern
 // beendet die Pause nicht.
 const { lock, unlock } = useScrollLock()
-watch(() => rest.showOverlay, (open) => (open ? lock() : unlock()), { immediate: true })
+watch(() => showOverlay.value, (open) => (open ? lock() : unlock()), { immediate: true })
 onBeforeUnmount(unlock)
 </script>
 

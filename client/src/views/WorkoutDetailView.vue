@@ -577,31 +577,13 @@
                     <button class="remove-row-btn" :title="t('workoutDetail.removeSet')" @click="removeSetRow(i, rIdx)"><Minus class="btn-icon" aria-hidden="true" /></button>
                   </span>
                 </div>
-                <!-- Abhaken-Leiste als Teil des aktuellen Satzes (Absprache Paul 18.10., Variante B): ruhig, ohne eigene
-                     Fläche. Bereit: "Abhaken". Pause läuft: Restzeit + -15/+15/Überspringen (die untere Pausen-Leiste
-                     entfällt dann); abgehakt wird in der Pause über den Haken in der Zeile. -->
+                <!-- Abhaken-Leiste als Teil des aktuellen Satzes (Absprache Paul 18.10., Variante B). Die Pause zeigt der
+                     Pausentimer (groß bzw. minimiert als Leiste unten), nicht diese Leiste. -->
                 <div
                   v-if="doneBarCurrent && doneBarCurrent.exIndex === i && doneBarCurrent.rowIndex === rIdx"
-                  :ref="setDoneStripEl"
                   class="set-done-strip"
-                  :class="{ resting: restTimer.isRunning }"
                 >
-                  <template v-if="restTimer.isRunning">
-                    <span class="set-done-strip-time" role="timer">{{ t('setDoneBar.resting', { time: formatRest(restTimer.remainingMs) }) }}</span>
-                    <span class="set-done-strip-actions">
-                      <button type="button" class="set-done-strip-btn" :aria-label="t('restTimer.minusAria')" @click="restTimer.adjust(-REST_STEP_SECONDS)">−15</button>
-                      <button type="button" class="set-done-strip-btn" :aria-label="t('restTimer.plusAria')" @click="restTimer.adjust(REST_STEP_SECONDS)">+15</button>
-                      <button type="button" class="set-done-strip-btn" @click="restTimer.skip()">{{ t('restTimer.skip') }}</button>
-                    </span>
-                    <button
-                      v-if="restTimer.isAdjusted && !restRemembered"
-                      type="button"
-                      class="set-done-strip-remember"
-                      @click="rememberCurrentRest"
-                    >{{ t('restTimer.remember', { time: formatRest(restTimer.durationSec * 1000) }) }}</button>
-                  </template>
                   <button
-                    v-else
                     type="button"
                     class="set-done-strip-main"
                     :aria-label="t('setDoneBar.aria', { set: doneBarCurrent.setNumber, name: doneBarCurrent.name })"
@@ -910,7 +892,17 @@
 
     <WorkoutTimerConfig v-if="showTimerConfig" @close="showTimerConfig = false" />
     <!-- Pausentimer zwischen Sätzen (startet beim Abhaken, siehe toggleRowDone). -->
-    <RestTimerBar :next-set="restNextSet" :hide-minimized="hideRestBar" @remember="rememberRestForExercise" />
+    <RestTimerBar
+      :next-set="restNextSet"
+      :force-full="focus.visible"
+      :hide-minimized="focus.active"
+      @remember="rememberRestForExercise"
+      @minimize="focus.minimize()"
+    />
+    <FocusMode :current="focusCurrent" @done="onFocusDone" @adjust="onFocusAdjust" @open="openFocus" />
+    <button v-if="showFocusStart" type="button" class="focus-start-btn" @click="startFocus">
+      <span aria-hidden="true">▶</span> {{ hasDoneSet ? t('focus.resume') : t('focus.startWorkout') }}
+    </button>
 
     <!-- Speichern-Overlay -->
     <Transition name="save-fade">
@@ -1077,8 +1069,10 @@ import { useRestTimerStore } from '@/stores/restTimerStore'
 import { useWarmupTimerStore } from '@/stores/warmupTimerStore'
 import WarmupCard from '@/components/WarmupCard.vue'
 import { emptyWarmup, pickWarmupExercise, sanitizeWarmup } from '@/utils/warmupPlan'
-import { restSecondsFor, sanitizeCustomRest, formatRest, REST_STEP_SECONDS } from '@/utils/restTimerRules'
+import { restSecondsFor, sanitizeCustomRest, formatRest } from '@/utils/restTimerRules'
 import RestTimerBar from '@/components/timer/RestTimerBar.vue'
+import FocusMode from '@/components/FocusMode.vue'
+import { useFocusModeStore } from '@/stores/focusModeStore'
 import { buildSaveReview, markAllSetsDone } from '@/utils/saveReview'
 import { isExerciseNotDone } from '@/utils/notDoneExercises'
 import { showsReps, showsTime, showsWeight, sanitizeMeasureMode, DURATION_MAX_SECONDS, DURATION_STEP_SECONDS } from '@/utils/measureMode'
@@ -2189,27 +2183,6 @@ function rememberRestForExercise({ exIndex, seconds }) {
   }
 }
 
-// Pause-Bedienung sitzt in der Abhaken-Leiste des aktuellen Satzes; die untere Leiste erscheint nur, wenn
-// diese Leiste nicht im sichtbaren Bereich ist (weggescrollt) oder es keinen aktuellen Satz mehr gibt.
-const stripVisible = ref(false)
-let stripObserver = null
-function setDoneStripEl(el) {
-  if (stripObserver) { stripObserver.disconnect(); stripObserver = null }
-  if (!el) { stripVisible.value = false; return }
-  if (typeof IntersectionObserver === 'undefined') { stripVisible.value = true; return }
-  // Unten ~80 px abziehen: dort liegt die Bottom-Navigation.
-  stripObserver = new IntersectionObserver(([entry]) => { stripVisible.value = entry.isIntersecting }, { rootMargin: '0px 0px -80px 0px' })
-  stripObserver.observe(el)
-}
-onBeforeUnmount(() => { if (stripObserver) stripObserver.disconnect() })
-const hideRestBar = computed(() => !!doneBarCurrent.value && stripVisible.value && restTimer.isRunning)
-const restRemembered = ref(false)
-watch(() => restTimer.baseSec, () => { restRemembered.value = false })
-function rememberCurrentRest() {
-  rememberRestForExercise({ exIndex: restTimer.exIndex, seconds: restTimer.durationSec })
-  restRemembered.value = true
-}
-
 // "Satz geschafft"-Abhaken: gilt dem aktuellen Satz (siehe nextSetHighlight), auch bei Zeit-/Technik-Übungen.
 const doneBarCurrent = computed(() => {
   if (!setTrackingActive.value || isReordering.value) return null
@@ -2235,6 +2208,122 @@ function onBigDone() {
   // Kurzes Vibrieren, wo vom Gerät unterstützt (iOS-WebView kennt es nicht).
   try { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(30) } catch {}
 }
+
+// --- Fokus-Modus (Absprache Paul 19.10.) ---------------------------------------------------------
+// Großansicht für den aktuellen Satz (components/FocusMode.vue). Gilt in jedem laufenden Workout gleich
+// (selbst erstellt, generiert, Favorit), da sie nur von setTrackingActive/doneBarCurrent abhängt.
+const focus = useFocusModeStore()
+
+const hasDoneSet = computed(() => (workout.value?.exercises || []).some((ex) =>
+  (ex?.setDetails || []).some((r) => r && !r.isWarmup && r.done === true)
+))
+const showFocusStart = computed(() => !!doneBarCurrent.value && !focus.active && !restTimer.isVisible)
+
+const focusCurrent = computed(() => {
+  const cur = doneBarCurrent.value
+  if (!cur) return null
+  const exercises = workout.value?.exercises || []
+  const ex = exercises[cur.exIndex]
+  const row = ex?.setDetails?.[cur.rowIndex]
+  if (!ex || !row) return null
+  const target = repTargetsByIndex.value[cur.exIndex]
+  let targetText = ''
+  if (target) targetText = target.mode === 'fixed' ? String(target.target || target.max || '') : `${target.min}–${target.max}`
+  const mode = !showsTime(ex.measureMode) ? 'weight' : (showsReps(ex.measureMode) ? 'repsTime' : 'time')
+  return {
+    key: `${cur.exIndex}:${cur.rowIndex}`,
+    exIndex: cur.exIndex,
+    rowIndex: cur.rowIndex,
+    exPos: cur.exIndex + 1,
+    exCount: exercises.length,
+    name: cur.name,
+    setNumber: cur.setNumber,
+    setTotal: (ex.setDetails || []).filter((r) => r && !r.isWarmup).length,
+    mode,
+    row,
+    targetText
+  }
+})
+
+function startFocus() {
+  focus.open()
+}
+
+function openFocus() {
+  focus.expand()
+  restTimer.expand()
+  if (restTimer.showFinished) restTimer.clear()
+}
+
+function onFocusAdjust(field, direction) {
+  const cur = focusCurrent.value
+  if (!cur) return
+  const row = cur.row
+  if (field === 'reps') {
+    if (Number(row.reps) > 0) {
+      adjustRowField(row, 'reps', direction, 1, 1, 500)
+    } else {
+      const tg = repTargetsByIndex.value[cur.exIndex]
+      row.reps = Math.max(1, Number(tg?.target) || Number(tg?.min) || 10)
+      try { triggerAutoSave() } catch {}
+    }
+  } else if (field === 'weight') {
+    const next = Math.round(((Number(row.weight) || 0) + direction * 2.5) * 4) / 4
+    row.weight = Math.min(1000, Math.max(0, next))
+    try { triggerAutoSave() } catch {}
+  } else if (field === 'durationSeconds') {
+    // Hier ist "direction" die Änderung in Sekunden (±15).
+    row.durationSeconds = Math.min(DURATION_MAX_SECONDS, Math.max(5, (Number(row.durationSeconds) || 60) + direction))
+    try { triggerAutoSave() } catch {}
+  }
+}
+
+function completeFocusSet(cur, seconds = 0) {
+  if (!cur?.row || cur.row.done === true) return
+  if (cur.mode === 'time' && seconds > 0) cur.row.durationSeconds = seconds
+  focus.clearTimer()
+  toggleRowDone(cur.row, cur.exIndex, cur.rowIndex)
+  try { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(30) } catch {}
+}
+
+function onFocusDone({ early } = {}) {
+  const cur = focusCurrent.value
+  if (!cur) return
+  let seconds = 0
+  if (early && cur.mode === 'time' && focus.timerKey === cur.key && focus.timerStarted) {
+    seconds = Math.round(focus.durationSec - focus.remainingMs / 1000)
+  }
+  completeFocusSet(cur, seconds)
+}
+
+// Zeitübung: Timer abgelaufen -> Satz automatisch abhaken (Pause startet). Bei "Wiederholungen in fester Zeit"
+// zählt das Ergebnis der Nutzer, daher nur das Signal.
+watch(() => focus.finishedKey, (key) => {
+  if (!key) return
+  focus.consumeFinished()
+  const cur = focusCurrent.value
+  if (!cur || cur.key !== key || cur.mode !== 'time') return
+  completeFocusSet(cur, focus.durationSec)
+})
+
+// Pause vorbei: im Fokus-Modus sofort mit dem nächsten Satz weiter (ohne "Weiter"-Knopf).
+watch(() => restTimer.showFinished, (finished) => {
+  if (finished && focus.visible) restTimer.clear()
+})
+
+// Kein offener Satz mehr: Fokus-Modus beenden (zurück zur Übersicht mit Speichern).
+watch(doneBarCurrent, (cur) => {
+  if (!cur && focus.active) focus.close()
+})
+
+// Zurück in die Übersicht: zum aktuellen Satz scrollen.
+watch(() => focus.minimized, (minimized) => {
+  if (!minimized) return
+  nextTick(() => {
+    try { document.querySelector('.set-done-strip')?.scrollIntoView({ block: 'center', behavior: 'smooth' }) } catch {}
+  })
+})
+onBeforeUnmount(() => focus.close())
 
 // Pausentimer-Vollbild: nächster offener Arbeitssatz ab der Übung der laufenden Pause (diese
 // Übung zuerst, sonst die folgenden). Satznummer zählt nur Arbeitssätze, wie in der Tabelle.
@@ -3049,6 +3138,7 @@ async function discardDraftAndLeave() {
   // Ebenso Gesamtzeit und laufende Pause: sonst läuft die Stoppuhr nach dem Abbruch weiter.
   sessionStopwatchStore.reset()
   restTimer.clear()
+  focus.close()
   await discardDraftAndLeaveFlow({
     route,
     workout: workout.value,
@@ -4833,6 +4923,29 @@ onBeforeUnmount(() => {
   opacity: 0.35;
 }
 /* Abhaken: Satznummer als runder Button (34px Spalte, volle Zeilenhöhe als Tippfläche). */
+/* Start des Fokus-Modus: fester großer Knopf über der Navigation. */
+.focus-start-btn {
+  position: fixed;
+  left: 14px;
+  right: 14px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 78px);
+  z-index: 1240;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 64px;
+  border: none;
+  border-radius: 18px;
+  background: linear-gradient(120deg, var(--accent), var(--accent-strong));
+  color: var(--accent-contrast, #060606);
+  font: inherit;
+  font-size: 1.25rem;
+  font-weight: 800;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
 /* Abhaken-Leiste unter dem aktuellen Satz: gehört optisch zur Zeile (Absprache Paul 18.10.). */
 .set-done-strip {
   margin: -2px 6px 8px;
@@ -4860,41 +4973,6 @@ onBeforeUnmount(() => {
 }
 .set-done-strip-main:active { background: color-mix(in srgb, var(--accent) 28%, transparent); }
 .set-done-strip-icon { width: 18px; height: 18px; stroke-width: 3; color: var(--accent-text, var(--fg)); }
-.set-done-strip.resting {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 8px;
-  padding: 6px 8px 6px 12px;
-  background: transparent;
-  border: 1px dashed var(--card-border, rgba(128, 128, 128, 0.4));
-}
-.set-done-strip-time { font-weight: 800; font-variant-numeric: tabular-nums; color: var(--accent-text, var(--fg)); }
-.set-done-strip-actions { margin-left: auto; display: flex; gap: 6px; }
-.set-done-strip-btn {
-  min-width: 0;
-  min-height: 36px;
-  padding: 0 10px;
-  border: 1px solid var(--card-border, rgba(128, 128, 128, 0.4));
-  border-radius: 8px;
-  background: var(--surface);
-  color: var(--fg);
-  font: inherit;
-  font-size: 0.85rem;
-  font-weight: 600;
-}
-.set-done-strip-remember {
-  width: 100%;
-  min-height: 0;
-  padding: 2px 0 4px;
-  border: none;
-  background: transparent;
-  color: var(--accent-text, var(--fg));
-  font: inherit;
-  font-size: 0.8rem;
-  text-decoration: underline;
-  text-align: left;
-}
 .set-done-btn::after { content: ''; position: absolute; inset: -8px 0; }
 .set-done-btn {
   position: relative;
