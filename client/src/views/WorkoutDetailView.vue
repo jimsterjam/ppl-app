@@ -121,14 +121,22 @@
               <button class="primary add-exercise-btn" type="button" @click="showAddExerciseModal = true">
                 <Plus class="btn-icon" aria-hidden="true" /> {{ t('workoutDetail.addExercise') }}
               </button>
-              <div class="ex-list-actions-row">
-                <button v-if="!isFavoriteAdjustMode" class="secondary timer-config-btn" type="button" @click="showTimerConfig = true">
-                  <Clock class="btn-icon" aria-hidden="true" /> Timer
-                </button>
-                <button class="secondary reorder-toggle" type="button" :aria-pressed="isReordering" @click="toggleReorder">
-                  {{ isReordering ? t('workoutDetail.done') : t('workoutDetail.editOrder') }}
-                </button>
-              </div>
+              <button v-if="!isFavoriteAdjustMode" class="secondary timer-config-btn" type="button" @click="showTimerConfig = true">
+                <Clock class="btn-icon" aria-hidden="true" /> Timer
+              </button>
+              <!-- Reihenfolge: als Symbol (kompakt), im Bearbeiten-Modus "Fertig". -->
+              <button
+                class="secondary reorder-toggle"
+                :class="{ 'reorder-toggle--icon': !isReordering }"
+                type="button"
+                :aria-pressed="isReordering"
+                :aria-label="isReordering ? t('workoutDetail.done') : t('workoutDetail.editOrder')"
+                :title="isReordering ? t('workoutDetail.done') : t('workoutDetail.editOrder')"
+                @click="toggleReorder"
+              >
+                <template v-if="isReordering">{{ t('workoutDetail.done') }}</template>
+                <ArrowUpDown v-else class="btn-icon" aria-hidden="true" />
+              </button>
             </div>
           </div>
     <!-- Modal für Übungsauswahl -->
@@ -200,15 +208,7 @@
                 <div class="ex-text">
                   <div class="ex-title-row">
                     <strong>{{ getTranslatedExerciseName(ex.name) }}</strong>
-                    <span v-if="!setTrackingActive && isExerciseNotDone(ex)" class="ex-not-done-badge">{{ t('workoutDetail.notDoneBadge') }}</span>
                     <div class="ex-title-actions">
-                      <button
-                        v-if="showTrainingTypeControl"
-                        type="button"
-                        class="training-type-chip opens-menu"
-                        :aria-label="t('workoutDetail.trainingTypeAria', { name: getTranslatedExerciseName(ex.name) })"
-                        @click="openTrainingTypeModal(i)"
-                      >{{ trainingTypeChipText(i) }}</button>
                       <button
                         type="button"
                         class="ex-more-btn"
@@ -217,7 +217,18 @@
                       ><MoreVertical class="ex-more-icon" aria-hidden="true" /></button>
                     </div>
                   </div>
-                  <small>{{ getTranslatedMuscleGroup ? getTranslatedMuscleGroup(ex.muscleGroup) : ex.muscleGroup }}</small>
+                  <!-- Zweite Zeile über die ganze Breite: Muskelgruppe, ggf. "nicht gemacht", Trainingsart-Chip. -->
+                  <div class="ex-meta-row">
+                    <small>{{ getTranslatedMuscleGroup ? getTranslatedMuscleGroup(ex.muscleGroup) : ex.muscleGroup }}</small>
+                    <span v-if="!setTrackingActive && isExerciseNotDone(ex)" class="ex-not-done-badge">{{ t('workoutDetail.notDoneBadge') }}</span>
+                    <button
+                      v-if="showTrainingTypeControl"
+                      type="button"
+                      class="training-type-chip opens-menu"
+                      :aria-label="t('workoutDetail.trainingTypeAria', { name: getTranslatedExerciseName(ex.name) })"
+                      @click="openTrainingTypeModal(i)"
+                    >{{ trainingTypeChipText(i) }}</button>
+                  </div>
                   <p v-if="ex.description" class="ex-description">{{ ex.description }}</p>
 
                   <div v-if="showOneRepMax && showOneRepMax[i]" class="one-rep-max-field" style="margin-top: 4px;">
@@ -421,13 +432,8 @@
                   </span>
                 </div>
               </template>
-              <div v-if="showsWeight(ex.measureMode) && (!hasWarmupSets(ex) || isWarmupOpen(i))" class="row-actions warmup-actions" :class="{ 'warmup-actions--empty': !hasWarmupSets(ex) }">
-                <button class="add-warmup-btn" @click="addWarmupSetRow(i, $event)"><Plus class="btn-icon btn-icon--inline" aria-hidden="true" /> {{ t('workoutDetail.addWarmupSet') }}</button>
-              </div>
-
-              <!-- Arbeitssätze -->
-              <div v-if="hasWarmupSets(ex)" class="sets-section-divider"></div>
-              <div v-if="showsWeight(ex.measureMode)" class="sets-section-label working-label">{{ t('workoutDetail.workingSetsLabel') }}</div>
+              <!-- Arbeitssätze (Überschrift nur, wenn es auch Aufwärmsätze gibt) -->
+              <div v-if="showsWeight(ex.measureMode) && hasWarmupSets(ex)" class="sets-section-label working-label">{{ t('workoutDetail.workingSetsLabel') }}</div>
               <template
                 v-for="(row, rIdx) in (ex.setDetails || [])"
                 :key="`${ex.exerciseId || i}-working-row-${rIdx}`"
@@ -597,11 +603,18 @@
 
               <!-- Unten: "+ Satz" und "Dein Feedback" (wird meist nach der Übung ausgefüllt). -->
               <div class="row-actions ex-bottom-actions">
-                <button class="add-row-btn" :title="t('workoutDetail.addSet')" @click="addSetRow(i, $event)"><Plus class="btn-icon btn-icon--inline" aria-hidden="true" /> {{ t('workoutDetail.addSet') }}</button>
+                <button class="add-row-btn" :title="t('workoutDetail.addSet')" :aria-label="t('workoutDetail.addSet')" @click="addSetRow(i, $event)"><Plus class="btn-icon btn-icon--inline" aria-hidden="true" /> {{ t('workoutDetail.addSetShort') }}</button>
+                <button
+                  v-if="showsWeight(ex.measureMode) && (!hasWarmupSets(ex) || isWarmupOpen(i))"
+                  class="add-warmup-btn"
+                  :title="t('workoutDetail.addWarmupSet')"
+                  :aria-label="t('workoutDetail.addWarmupSet')"
+                  @click="addWarmupSetRow(i, $event)"
+                ><Plus class="btn-icon btn-icon--inline" aria-hidden="true" /> {{ t('workoutDetail.addWarmupShort') }}</button>
                 <span class="ex-note-actions">
-                  <button class="link" :class="{ 'has-note': !!getNote(i) }" :aria-expanded="!!(showNote && showNote[i])" @click="toggleNote(i)">
+                  <button class="link" :class="{ 'has-note': !!getNote(i) }" :aria-expanded="!!(showNote && showNote[i])" :aria-label="t('workoutDetail.noteAdd')" @click="toggleNote(i)">
                     <StickyNote class="btn-icon btn-icon--inline" aria-hidden="true" />
-                    {{ t('workoutDetail.noteAdd') }}<span v-if="getNote(i)" class="note-check" aria-hidden="true"> ✓</span>
+                    {{ t('workoutDetail.noteShort') }}<span v-if="getNote(i)" class="note-check" aria-hidden="true"> ✓</span>
                   </button>
                   <button
                     v-if="getNote(i)"
@@ -1033,7 +1046,7 @@ import WorkoutTimerConfig from '@/components/timer/WorkoutTimerConfig.vue'
 import SessionStopwatch from '@/components/SessionStopwatch.vue'
 // Einheitliches Icon-Set statt Emoji/ASCII-Mix (🗑️/📝/⋮⋮/▲▼/＋/−) - wie im Rest der App
 // (siehe z.B. BottomNav.vue, AiFeedbackRatingWidget.vue) bereits lucide-vue-next genutzt.
-import { Clock, Trash2, StickyNote, GripVertical, Plus, Minus, Info, Weight, ChevronDown, MoreVertical, Check } from 'lucide-vue-next'
+import { Clock, ArrowUpDown, Trash2, StickyNote, GripVertical, Plus, Minus, Info, Weight, ChevronDown, MoreVertical, Check } from 'lucide-vue-next'
 import { useToastStore } from '@/stores/toastStore'
 import { useTimerStore } from '@/stores/timerStore'
 import { useI18n } from 'vue-i18n'
@@ -4432,15 +4445,18 @@ onBeforeUnmount(() => {
   line-height: 1.4;
 }
 .ex-list-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-.ex-list-actions { display: flex; flex-direction: column; gap: 8px; align-items: stretch; width: 100%; }
+.ex-list-actions { display: flex; flex-direction: row; gap: 8px; align-items: stretch; width: 100%; }
+.ex-list-actions > button { min-width: 0; min-height: 48px; white-space: nowrap; }
+.ex-list-actions .add-exercise-btn { flex: 1.5 1 0; }
+.ex-list-actions .timer-config-btn { flex: 1 1 0; }
+.ex-list-actions .reorder-toggle { flex: 0 0 auto; min-width: 48px; padding-left: 12px; padding-right: 12px; }
+.ex-list-actions .reorder-toggle--icon { width: 48px; padding: 0; }
 .ex-list-header h3 { margin: 0; font-size: 1.1rem; }
 /* Timer/Reihenfolge sind Werkzeuge, kein Haupt-Call-to-Action wie "Übung hinzufügen" -
    nebeneinander statt gestapelt und in der neutralen .secondary-Optik (siehe unten), damit sie
    nicht mehr optisch mit derselben Akzent-Intensität konkurrieren. Nur der aktive Reihenfolge-
    Modus bekommt weiterhin eine Akzent-Hervorhebung (siehe [aria-pressed="true"] unten), damit
    der Zustand weiterhin erkennbar bleibt. */
-.ex-list-actions-row { display: flex; gap: 8px; width: 100%; }
-.ex-list-actions-row > button { flex: 1; }
 .reorder-toggle[aria-pressed="true"] {
   background: color-mix(in srgb, var(--accent) 20%, var(--bg-panel));
   color: var(--fg-strong);
@@ -4527,11 +4543,9 @@ onBeforeUnmount(() => {
    überzugehen) - macht auf einen Blick klar, wo "Infos zur Übung" aufhört und "Sätze
    eintragen" anfängt, statt dass die ganze Karte wie ein einziger durchgehender Block wirkt. */
 .ex-sets {
-  margin-top: 10px;
-  padding: 10px 10px 6px;
-  background: var(--surface);
-  border: 1px solid var(--card-border);
-  border-radius: 10px;
+  /* Kein eigener Kasten mehr (Absprache Paul 21.10.): die Satzzeilen liegen direkt in der Übungsliste und sind breiter. */
+  margin-top: 6px;
+  padding: 0;
 }
 .set-row {
   /* Gewichtsspalte breiter (1.35fr), Satznummer und Minus-Button schmaler - Platz für den
@@ -4808,16 +4822,21 @@ onBeforeUnmount(() => {
 .banner .dismiss { background: transparent; border: none; color: inherit; cursor: pointer; font-size: 0.9rem; padding: 0; }
 .save-msg { display: block; margin-top: 6px; color: var(--success); font-size: 0.85rem; }
 .save-msg.error { color: var(--danger); }
-.ex-info { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
-.ex-info.minimal { align-items: center; gap: 12px; min-height: 48px; }
+.ex-info { display: grid; grid-template-columns: 56px minmax(0, 1fr); column-gap: 10px; row-gap: 8px; align-items: center; margin-bottom: 8px; }
+.ex-info.minimal { display: flex; align-items: center; gap: 12px; min-height: 48px; }
 .ex-name-only { font-size: 1rem; font-weight: 600; }
 .ex-thumb { width: 56px; height: 56px; flex-shrink: 0; object-fit: contain; background: var(--surface); border: 1px solid var(--card-border); border-radius: 8px; padding: 4px; cursor: pointer; }
-.ex-text { flex: 1; min-width: 0; }
+.ex-text { display: contents; }
+.ex-info > .ex-thumb { grid-column: 1; grid-row: 1; }
+.ex-title-row { grid-column: 2; grid-row: 1; min-width: 0; }
+.ex-meta-row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.ex-meta-row small { margin-top: 0; }
+.ex-info .ex-description, .ex-info .one-rep-max-field { grid-column: 1 / -1; }
 .ex-title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .exercise-menu-field { display: grid; gap: 6px; font-size: 0.88rem; color: var(--muted); }
 .exercise-menu-field select { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--card-border); background-color: var(--surface); color: var(--fg); font-size: 0.95rem; }
 .ex-not-done-badge { flex-shrink: 0; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line-strong); color: var(--muted); font-size: 0.72rem; font-weight: 600; }
-.ex-text strong { display: block; color: var(--fg); font-size: 0.95rem; }
+.ex-text strong { display: block; min-width: 0; flex: 1; color: var(--fg); font-size: 1.05rem; line-height: 1.25; overflow-wrap: anywhere; }
 .ex-text small { display: block; color: var(--muted); font-size: 0.8rem; margin-top: 2px; }
 .last-performance-hint {
   margin: 6px 0 0;
@@ -4849,13 +4868,13 @@ onBeforeUnmount(() => {
 .training-type-chip {
   min-width: 0;
   min-height: 0;
-  padding: 3px 9px;
+  padding: 6px 12px;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
   color: var(--fg);
   font: inherit;
-  font-size: 0.72rem;
+  font-size: 0.82rem;
   font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
@@ -4906,8 +4925,35 @@ onBeforeUnmount(() => {
   transition: transform 0.2s ease;
 }
 .warmup-chevron.open { transform: rotate(180deg); }
-.ex-bottom-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.ex-note-actions { display: inline-flex; align-items: center; gap: 6px; }
+.ex-bottom-actions { display: flex; align-items: stretch; gap: 8px; padding-top: 8px; }
+.ex-bottom-actions > .add-row-btn,
+.ex-bottom-actions > .add-warmup-btn,
+.ex-bottom-actions .ex-note-actions .link:first-child {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 6px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+.ex-bottom-actions > .add-warmup-btn {
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--fg);
+}
+.ex-bottom-actions .ex-note-actions .link:first-child {
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--fg);
+  width: 100%;
+}
+.ex-note-actions { flex: 1 1 0; min-width: 0; display: inline-flex; align-items: stretch; gap: 6px; }
 .ex-note-actions .has-note { color: var(--fg); }
 .note-check { color: var(--accent-text); }
 .ex-note-field { margin-top: 4px; }
@@ -5081,6 +5127,13 @@ onBeforeUnmount(() => {
 .review-defer small { display: block; margin-top: 2px; color: var(--muted); font-size: 0.78rem; line-height: 1.35; }
 /* Aktueller Satz: Rahmen der Eingabefelder pulsieren in der Akzentfarbe (im hellen Modus die dunkle Variante),
    bis der Satz abgehakt ist. Takt wie der Punkt am Workout-Symbol im Menü. */
+.set-row.set-row--next {
+  background: color-mix(in srgb, var(--accent) 11%, transparent);
+  border-radius: 12px;
+  margin: 0 -6px;
+  padding-left: 6px;
+  padding-right: 6px;
+}
 .set-row.set-row--next .col input {
   border-color: var(--accent-text);
   box-shadow: 0 0 0 1px var(--accent-text);
