@@ -23,6 +23,9 @@ const KEEP_AWAKE_TAG = 'rest-timer'
 const FINISHED_VISIBLE_MS = 6000
 const TICK_MS = 250
 let tickHandle = null
+// Töne vor dem Pausenende (nur wenn der nächste Satz eine Zeitübung ist, die gleich automatisch startet).
+let warnedAtTen = false
+let lastCountSec = 0
 
 function readSound() {
   try {
@@ -54,6 +57,8 @@ export const useRestTimerStore = defineStore('restTimer', {
     minimized: false,
     // Automatisches Vergrößern bei <= 10 s ist für diese Pause schon passiert.
     autoExpanded: false,
+    // Töne bei 10 s sowie 3-2-1 vor dem Ende (setzt die Workout-Ansicht, wenn der nächste Satz eine Zeitübung ist).
+    cues: false,
     endsAt: 0,
     durationSec: 0,
     // Dauer beim Start (Standard bzw. gemerkt) - Abweichung zeigt "Für diese Übung merken".
@@ -115,6 +120,8 @@ export const useRestTimerStore = defineStore('restTimer', {
       this.exIndex = exIndex
       this.rowIndex = rowIndex
       this.finishedAt = 0
+      warnedAtTen = false
+      lastCountSec = 0
       this.nowMs = Date.now()
       this.endsAt = this.nowMs + sec * 1000
       this.notifyTitle = notifyTitle
@@ -143,7 +150,11 @@ export const useRestTimerStore = defineStore('restTimer', {
       this.durationSec = clampRestSeconds(this.durationSec + deltaSec)
       this.endsAt = Date.now() + nextRemaining * 1000
       // Pause wieder länger als 10 s (+15): beim erneuten Erreichen darf wieder vergrößert werden.
-      if (nextRemaining * 1000 > REST_ENDING_MS) this.autoExpanded = false
+      if (nextRemaining * 1000 > REST_ENDING_MS) {
+        this.autoExpanded = false
+        warnedAtTen = false
+      }
+      lastCountSec = 0
       this.persist()
       if (nextRemaining <= 0) this.finish()
       else this.scheduleEndSignal()
@@ -173,6 +184,7 @@ export const useRestTimerStore = defineStore('restTimer', {
       this.rowIndex = -1
       this.minimized = false
       this.autoExpanded = false
+      this.cues = false
       this.stopTick()
       cancelRestEndSignal().catch(() => {})
       releaseKeepAwake(KEEP_AWAKE_TAG)
@@ -180,6 +192,7 @@ export const useRestTimerStore = defineStore('restTimer', {
     },
     tick() {
       this.nowMs = Date.now()
+      if (this.isRunning && this.cues) this.playCues()
       if (this.isRunning && this.remainingMs <= 0) this.finish()
       if (shouldAutoExpandRest({
         minimized: this.minimized,
@@ -194,6 +207,20 @@ export const useRestTimerStore = defineStore('restTimer', {
       if (!this.isVisible && this.finishedAt) {
         // "Nächster Satz" wurde lange genug gezeigt.
         this.clear()
+      }
+    },
+    /** Vorwarnung bei 10 s (Glocke) und Zähltöne bei 3, 2, 1 - jeweils einmal. */
+    playCues() {
+      const sec = Math.ceil(this.remainingMs / 1000)
+      if (sec <= 0) return
+      if (sec <= 3) {
+        if (lastCountSec !== sec) {
+          lastCountSec = sec
+          emitTimerSignal({ eventKey: `rest-count-${this.endsAt}-${sec}`, soundEnabled: true, soundType: 'bell', kind: `countdown-${sec}` })
+        }
+      } else if (sec <= 10 && !warnedAtTen) {
+        warnedAtTen = true
+        emitTimerSignal({ eventKey: `rest-warn-${this.endsAt}`, soundEnabled: true, kind: 'rest-warn' })
       }
     },
     startTick() {
