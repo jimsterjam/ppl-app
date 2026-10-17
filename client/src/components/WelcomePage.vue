@@ -486,7 +486,7 @@ watch(() => route.query?.emailVerified, (val) => {
 
     .google-btn {
         background: #fff;
-        color: #757575;
+        color: #1f1f1f;
         border: 1px solid #dadce0;
         padding: 12px 24px;
         border-radius: 8px;
