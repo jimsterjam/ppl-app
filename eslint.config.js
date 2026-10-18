@@ -195,6 +195,15 @@ export default [
       'no-empty': ['warn', { allowEmptyCatch: true }]
     }
   },
+  {
+    files: ['scripts/ui-check/ui-check.mjs'],
+    languageOptions: {
+      globals: {
+        document: 'readonly',
+        getComputedStyle: 'readonly'
+      }
+    }
+  },
   // Vitest config (Node context, ESM)
   {
     files: ['client/vitest.config.js'],
