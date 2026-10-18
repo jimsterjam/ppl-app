@@ -912,8 +912,9 @@
       @remember="rememberRestForExercise"
       @minimize="focus.minimize()"
       @adjust-next="onNextSetAdjust"
+      @spin-next="onNextSetSpin"
     />
-    <FocusMode :current="focusCurrent" @done="onFocusDone" @adjust="onFocusAdjust" @open="openFocus" />
+    <FocusMode :current="focusCurrent" @done="onFocusDone" @adjust="onFocusAdjust" @spin="onFocusSpin" @open="openFocus" />
     <button v-if="showFocusStart" type="button" class="focus-start-btn" @click="startFocus">
       {{ t('focus.startSet', { n: doneBarCurrent.setNumber }) }}
     </button>
@@ -2064,7 +2065,13 @@ function toggleRowDone(row, exIndex = -1, rowIndex = -1) {
     // Erster abgehakter Arbeitssatz: Gesamttimer (Gym-Zeit) starten, falls er noch nicht benutzt wurde
     // (z. B. Warm-up ausgelassen). Läuft er oder ist er pausiert, bleibt er unberührt.
     sessionStopwatchStore.startIfIdle()
-    if (restTimer.autoStart) {
+    // Letzter Arbeitssatz dieser Übung (Absprache Paul 24.10.): keine Pause, es folgt direkt die nächste Übung.
+    const exercise = workout.value?.exercises?.[exIndex]
+    const isLastSetOfExercise = !!exercise && (exercise.setDetails || []).every((r) => !r || r.isWarmup || r === row || r.done === true)
+    if (isLastSetOfExercise) {
+      if (warmupTimer.isActive) warmupTimer.cancel()
+      restTimer.stopFor(exIndex, rowIndex)
+    } else if (restTimer.autoStart) {
       const name = getTranslatedExerciseName(workout.value?.exercises?.[exIndex]?.name || '')
       // Das Training hat begonnen: ein noch laufender Warm-up-Timer wäre jetzt nur störend (und seine Mitteilung
       // käme mitten im Satz).
@@ -2282,7 +2289,7 @@ function adjustSetField(exIndex, rowIndex, field, direction) {
       try { triggerAutoSave() } catch {}
     }
   } else if (field === 'weight') {
-    const next = Math.round(((Number(row.weight) || 0) + direction * 2.5) * 4) / 4
+    const next = Math.round(((Number(row.weight) || 0) + direction * 0.25) * 4) / 4
     row.weight = Math.min(1000, Math.max(0, next))
     try { triggerAutoSave() } catch {}
   } else if (field === 'durationSeconds') {
@@ -2295,6 +2302,38 @@ function adjustSetField(exIndex, rowIndex, field, direction) {
 function onFocusAdjust(field, direction) {
   const cur = focusCurrent.value
   if (cur) adjustSetField(cur.exIndex, cur.rowIndex, field, direction)
+}
+
+// Wiederholungen/Gewicht in der Großansicht wie in der Übersicht (Absprache Paul 24.10.): Gewicht in 0,25-kg-Schritten,
+// gedrückt halten wiederholt und beschleunigt.
+function onFocusSpin(field, direction, active) {
+  const cur = focusCurrent.value
+  if (!cur) return
+  const row = cur.row
+  if (!active) {
+    stopSpin(row, field)
+    return
+  }
+  if (field === 'reps') {
+    if (Number(row.reps) > 0) startSpin(row, 'reps', direction, 1, 1, 500)
+    else adjustSetField(cur.exIndex, cur.rowIndex, 'reps', direction)
+  } else if (field === 'weight') {
+    startSpin(row, 'weight', direction, 0.25, 0, 1000)
+  }
+}
+
+// Pausen-Ansicht: nächsten Satz vor dem Start noch anpassen (gleiche Schritte wie in der Großansicht).
+function onNextSetSpin(field, direction, active) {
+  const next = restNextSet.value
+  const row = next ? workout.value?.exercises?.[next.exIndex]?.setDetails?.[next.rowIndex] : null
+  if (!row) return
+  if (!active) { stopSpin(row, field); return }
+  if (field === 'reps') {
+    if (Number(row.reps) > 0) startSpin(row, 'reps', direction, 1, 1, 500)
+    else adjustSetField(next.exIndex, next.rowIndex, 'reps', direction)
+  } else if (field === 'weight') {
+    startSpin(row, 'weight', direction, 0.25, 0, 1000)
+  }
 }
 
 // Pausen-Ansicht: nächsten Satz vor dem Start noch anpassen.

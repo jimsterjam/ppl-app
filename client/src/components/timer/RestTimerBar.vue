@@ -46,15 +46,15 @@
             <!-- Vor dem Satz noch anpassbar (z. B. wenn der letzte Satz zu schwer war). -->
             <div v-if="nextSet.mode && nextSet.mode !== 'time'" class="ro-adjust">
               <span class="ro-adjust-label">{{ t('focus.reps') }}</span>
-              <button type="button" class="ro-adjust-btn" :aria-label="t('focus.repsMinusAria')" @click="emit('adjust-next', 'reps', -1)">−</button>
+              <button type="button" class="ro-adjust-btn" :aria-label="t('focus.repsMinusAria')" v-bind="spinBind('reps', -1)">−</button>
               <span class="ro-adjust-value">{{ nextRepsText }}</span>
-              <button type="button" class="ro-adjust-btn" :aria-label="t('focus.repsPlusAria')" @click="emit('adjust-next', 'reps', 1)">+</button>
+              <button type="button" class="ro-adjust-btn" :aria-label="t('focus.repsPlusAria')" v-bind="spinBind('reps', 1)">+</button>
             </div>
             <div v-if="nextSet.mode === 'weight'" class="ro-adjust">
               <span class="ro-adjust-label">{{ t('focus.weight') }}</span>
-              <button type="button" class="ro-adjust-btn" :aria-label="t('focus.weightMinusAria')" @click="emit('adjust-next', 'weight', -1)">−</button>
+              <button type="button" class="ro-adjust-btn" :aria-label="t('focus.weightMinusAria')" v-bind="spinBind('weight', -1)">−</button>
               <span class="ro-adjust-value">{{ nextWeightText }}<small>kg</small></span>
-              <button type="button" class="ro-adjust-btn" :aria-label="t('focus.weightPlusAria')" @click="emit('adjust-next', 'weight', 1)">+</button>
+              <button type="button" class="ro-adjust-btn" :aria-label="t('focus.weightPlusAria')" v-bind="spinBind('weight', 1)">+</button>
             </div>
             <div v-if="nextSet.mode === 'time' || nextSet.mode === 'repsTime'" class="ro-adjust">
               <span class="ro-adjust-label">{{ t('focus.holdTime') }}</span>
@@ -124,7 +124,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRestTimerStore } from '@/stores/restTimerStore'
 import { useTimerStore } from '@/stores/timerStore'
@@ -138,7 +138,7 @@ const props = defineProps({
   forceFull: { type: Boolean, default: false },
   hideMinimized: { type: Boolean, default: false }
 })
-const emit = defineEmits(['remember', 'minimize', 'adjust-next'])
+const emit = defineEmits(['remember', 'minimize', 'adjust-next', 'spin-next'])
 const { t, locale } = useI18n()
 const rest = useRestTimerStore()
 const timerStore = useTimerStore()
@@ -179,6 +179,24 @@ const nextSetDetail = computed(() => {
 
 const remembered = ref(false)
 watch(() => rest.baseSec, () => { remembered.value = false })
+
+// Gedrückt halten wiederholt und beschleunigt (wie in der Großansicht); Tastatur: einzelner Schritt.
+function spinBind(field, direction) {
+  return {
+    onPointerdown: (e) => { e.preventDefault(); emit('spin-next', field, direction, true) },
+    onPointerup: () => emit('spin-next', field, direction, false),
+    onPointerleave: () => emit('spin-next', field, direction, false),
+    onPointercancel: () => emit('spin-next', field, direction, false),
+    onKeydown: (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); emit('adjust-next', field, direction) }
+    }
+  }
+}
+function stopAllSpins() {
+  for (const field of ['reps', 'weight']) emit('spin-next', field, 1, false)
+}
+onMounted(() => window.addEventListener('pointerup', stopAllSpins))
+onBeforeUnmount(() => { window.removeEventListener('pointerup', stopAllSpins); stopAllSpins() })
 
 function minimizeOverlay() {
   rest.minimize()

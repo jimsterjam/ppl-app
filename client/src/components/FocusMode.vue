@@ -40,9 +40,9 @@
         <div v-if="current.mode !== 'time'" class="fm-step">
           <p class="fm-step-label">{{ t('focus.reps') }}</p>
           <div class="fm-step-row">
-            <button type="button" class="fm-step-btn" :aria-label="t('focus.repsMinusAria')" @click="emit('adjust', 'reps', -1)">−</button>
+            <button type="button" class="fm-step-btn" :aria-label="t('focus.repsMinusAria')" v-bind="spinBind('reps', -1)">−</button>
             <span class="fm-step-value">{{ repsText }}</span>
-            <button type="button" class="fm-step-btn" :aria-label="t('focus.repsPlusAria')" @click="emit('adjust', 'reps', 1)">+</button>
+            <button type="button" class="fm-step-btn" :aria-label="t('focus.repsPlusAria')" v-bind="spinBind('reps', 1)">+</button>
           </div>
         </div>
 
@@ -50,9 +50,9 @@
         <div v-if="current.mode === 'weight'" class="fm-step">
           <p class="fm-step-label">{{ t('focus.weight') }}</p>
           <div class="fm-step-row">
-            <button type="button" class="fm-step-btn" :aria-label="t('focus.weightMinusAria')" @click="emit('adjust', 'weight', -1)">−</button>
+            <button type="button" class="fm-step-btn" :aria-label="t('focus.weightMinusAria')" v-bind="spinBind('weight', -1)">−</button>
             <span class="fm-step-value">{{ weightText }}<small>kg</small></span>
-            <button type="button" class="fm-step-btn" :aria-label="t('focus.weightPlusAria')" @click="emit('adjust', 'weight', 1)">+</button>
+            <button type="button" class="fm-step-btn" :aria-label="t('focus.weightPlusAria')" v-bind="spinBind('weight', 1)">+</button>
           </div>
         </div>
       </div>
@@ -91,7 +91,7 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useFocusModeStore } from '@/stores/focusModeStore'
 import { useRestTimerStore } from '@/stores/restTimerStore'
@@ -104,7 +104,7 @@ import { useScrollLock } from '@/composables/useScrollLock'
 const props = defineProps({
   current: { type: Object, default: null }
 })
-const emit = defineEmits(['done', 'adjust', 'open'])
+const emit = defineEmits(['done', 'adjust', 'spin', 'open'])
 const { t } = useI18n()
 const focus = useFocusModeStore()
 const rest = useRestTimerStore()
@@ -148,6 +148,24 @@ const weightText = computed(() => {
   const v = Number(row.value?.weight)
   return Number.isFinite(v) && v > 0 ? String(v) : '–'
 })
+
+// Gedrückt halten wiederholt und beschleunigt (wie die Pfeile in der Übersicht); Tastatur: einzelner Schritt.
+function spinBind(field, direction) {
+  return {
+    onPointerdown: (e) => { e.preventDefault(); emit('spin', field, direction, true) },
+    onPointerup: () => emit('spin', field, direction, false),
+    onPointerleave: () => emit('spin', field, direction, false),
+    onPointercancel: () => emit('spin', field, direction, false),
+    onKeydown: (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); emit('adjust', field, direction) }
+    }
+  }
+}
+function stopAllSpins() {
+  for (const field of ['reps', 'weight']) emit('spin', field, 1, false)
+}
+onMounted(() => window.addEventListener('pointerup', stopAllSpins))
+onBeforeUnmount(() => { window.removeEventListener('pointerup', stopAllSpins); stopAllSpins() })
 
 function startTimer() {
   if (!props.current) return
