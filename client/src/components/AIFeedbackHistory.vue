@@ -56,6 +56,7 @@
              normalen Feedback-Texts, der hier ja noch gar nicht existiert. -->
         <div v-if="expandedId === item.workoutId && item.ai_feedback_status === 'deferred'" class="feedback-text pending" @click.stop>
           <p class="pending-hint">{{ t('feedbackHistory.pendingHint') }}</p>
+          <p v-if="costHint" class="quota-hint" role="status">{{ costHint }}</p>
           <p v-if="generateError === item.workoutId" class="generate-error">{{ t('feedbackHistory.generateError') }}</p>
           <button
             class="generate-now-btn"
@@ -74,6 +75,7 @@
 
         <div v-else-if="expandedId === item.workoutId && item.ai_feedback_status === 'failed'" class="feedback-text pending" @click.stop>
           <p class="pending-hint">{{ t('feedbackHistory.failedHint') }}</p>
+          <p v-if="costHint" class="quota-hint" role="status">{{ costHint }}</p>
           <button
             class="generate-now-btn"
             type="button"
@@ -124,7 +126,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { stripWorkoutNameDate } from '@/utils/workoutName'
 import { Share2 } from 'lucide-vue-next'
@@ -140,6 +142,7 @@ import { isValidObjectId } from '@/utils/workoutHelpers'
 import { logger } from '@/utils/logger'
 import { getMetadata, setMetadata, AI_FEEDBACK_UPDATED_EVENT, WORKOUT_DELETED_EVENT } from '@/utils/offlineStorage'
 import { useToastStore } from '@/stores/toastStore'
+import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { logDiagnostic } from '@/utils/diagnosticsLog'
 
 const props = defineProps({
@@ -157,6 +160,14 @@ const props = defineProps({
 const { t, locale } = useI18n()
 const { getIdToken, getCurrentUser } = useFirebaseAuth()
 const toast = useToastStore()
+const subscriptionStore = useSubscriptionStore()
+
+// Gratis-Tarif: eine (Neu-)Auswertung kostet 1 KI-Anfrage (Absprache Paul 24.10.).
+const costHint = computed(() => {
+  if (!Number.isFinite(subscriptionStore.aiRequestsLimit)) return ''
+  if (subscriptionStore.aiRequestsRemaining <= 0) return t('quota.exhausted')
+  return t('quota.costHint', { remaining: subscriptionStore.aiRequestsRemaining, limit: subscriptionStore.aiRequestsLimit })
+})
 
 // Initial nur die letzten 5 Analysen laden - abgeschlossene Analysen ändern sich nie wieder,
 // ältere holt sich der Nutzer bei Bedarf explizit über "Mehr laden" (loadMore()).
@@ -216,6 +227,7 @@ async function generateNow(item) {
   try {
     const token = await getIdToken().catch(() => null)
     const data = await requestAiAnalysis(String(item.workoutId), token, { timeoutMs: REQUEST_TIMEOUT_MS })
+    if (data?.aiUsage) subscriptionStore.applyAiUsageSnapshot(data.aiUsage)
     if (data?.ai_feedback) {
       item.ai_feedback = data.ai_feedback
       item.ai_generated_at = new Date().toISOString()
@@ -488,6 +500,11 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
+.quota-hint {
+  margin: 6px 0 10px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
 .ai-feedback-history {
   padding: 1.25rem;
   border-radius: 1rem;
