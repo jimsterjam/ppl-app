@@ -862,6 +862,9 @@ function startFavoriteWithNewGoal(favorite, goal) {
   if (!result?.success) {
     logger.warn('[Dashboard] Ziel konnte nicht im Favoriten gespeichert werden', result?.code)
   }
+  // Angezeigte Favoritenlisten neu laden, sonst fehlt dort das Ziel bis zum nächsten Öffnen.
+  loadFavoriteWorkoutsForCurrentType()
+  loadAllFavoriteWorkouts()
   const updated = result?.success && result.favorite ? result.favorite : { ...favorite, workout: { ...(favorite?.workout || {}), goal } }
   try {
     openFavoriteInBuilder(updated, { autoStart: true, goal })

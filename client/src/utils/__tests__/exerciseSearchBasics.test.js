@@ -47,3 +47,11 @@ describe('Suche: Basisübungen zuerst', () => {
     expect(entry.aliases).toContain('quads (bodyweight squat)')
   })
 })
+
+describe('Suche: Wortreihenfolge egal', () => {
+  it('"leg curl lying" liefert dasselbe wie "lying leg curl"', () => {
+    const a = search('lying leg curl').slice(0, 5)
+    expect(search('leg curl lying').slice(0, 5)).toEqual(a)
+    expect(a).toContain('lever lying leg curl')
+  })
+})

@@ -186,6 +186,7 @@ export function buildStartedFavoriteWorkout(source) {
     name: workout.name,
     type: workout.type,
     notes: buildWorkoutNotesSummary(workout.exercises || []),
+    goal: sanitizeWorkoutGoal(workout.goal),
     exercises: (workout.exercises || []).map((exercise) => ({
       _id: exercise._id || exercise.exerciseId || null,
       exerciseId: exercise.exerciseId || exercise._id || null,
@@ -285,6 +286,9 @@ export function updateFavoriteWorkout({ userId = 'guest', type = 'push', id, wor
   const current = bucket[foundType][foundIndex] || {}
   const sourceWorkout = workout && typeof workout === 'object' ? workout : current.workout
   const payload = buildFavoriteWorkoutPayload(sourceWorkout, normalizedType || foundType)
+  // Ein Update ohne Ziel (z.B. Sync nach dem Speichern eines Workouts) darf das gespeicherte Ziel
+  // des Favoriten nicht löschen - sonst fragt der Start jedes Mal erneut danach.
+  if (!payload.goal) payload.goal = sanitizeWorkoutGoal(current.workout?.goal)
   const nextName = normalizeFavoriteName(name || current.name || '')
   const nameError = getFavoriteNameValidationError(nextName)
   if (nameError) {

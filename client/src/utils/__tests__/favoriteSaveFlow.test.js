@@ -316,3 +316,27 @@ describe('Favorit starten → Daten eingeben → Speichern', () => {
     expect(totalVolume).not.toBe(oldVolume) // User-Daten weichen vom Template ab
   })
 })
+
+describe('Favorit: Workout-Ziel bleibt gespeichert', () => {
+  it('Update ohne Ziel (Sync nach dem Speichern eines Workouts) löscht das Ziel nicht', () => {
+    const { favorite } = saveFavoriteWorkout({
+      userId: 'u1', type: 'push', name: 'Push A',
+      workout: { name: 'Push A', type: 'push', goal: 'strength', exercises: [] }
+    })
+    expect(getFavoritesByType('u1', 'push')[0].workout.goal).toBe('strength')
+    updateFavoriteWorkout({
+      userId: 'u1', type: 'push', id: favorite.id, name: 'Push A',
+      workout: { name: 'Push A', type: 'push', exercises: [] }
+    })
+    expect(getFavoritesByType('u1', 'push')[0].workout.goal).toBe('strength')
+  })
+
+  it('Update mit neuem Ziel überschreibt das alte', () => {
+    const { favorite } = saveFavoriteWorkout({
+      userId: 'u1', type: 'push', name: 'Push A',
+      workout: { name: 'Push A', type: 'push', goal: 'strength', exercises: [] }
+    })
+    updateFavoriteWorkout({ userId: 'u1', type: 'push', id: favorite.id, workout: { type: 'push', goal: 'hypertrophy', exercises: [] } })
+    expect(getFavoritesByType('u1', 'push')[0].workout.goal).toBe('hypertrophy')
+  })
+})
