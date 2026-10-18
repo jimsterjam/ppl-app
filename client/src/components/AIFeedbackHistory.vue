@@ -2,6 +2,7 @@
   <div class="ai-feedback-history glass">
     <div class="header">
       <h3>{{ t('feedbackHistory.title') }}</h3>
+      <AiQuotaChip />
     </div>
 
     <div v-if="loading && items.length === 0" class="state-message">
@@ -132,6 +133,7 @@ import { Share } from '@capacitor/share'
 import { generateFeedbackShareImage } from '@/utils/feedbackShareImage'
 import { trackPendingFeedback } from '@/utils/feedbackTracker'
 import { REQUEST_TIMEOUT_MS } from '@/utils/feedbackRetryRules'
+import AiQuotaChip from '@/components/AiQuotaChip.vue'
 import AiFeedbackDeltaSummary from '@/components/AiFeedbackDeltaSummary.vue'
 import AiFeedbackRatingWidget from '@/components/AiFeedbackRatingWidget.vue'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
@@ -496,6 +498,7 @@ onBeforeUnmount(() => {
   gap: 1rem;
 }
 
+.header { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .header h3 {
   margin: 0;
   font-size: 1.1rem;

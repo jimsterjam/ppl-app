@@ -7,6 +7,7 @@
         <p class="intro">
           {{ t('quickGenerator.intro') }}
         </p>
+        <AiQuotaChip class="quota-chip-row" />
 
         <!-- Ziel wird einheitlich vorher im Dashboard abgefragt (WorkoutGoalPicker.vue) und hier
              nur angezeigt - keine zweite Abfrage. -->
@@ -126,7 +127,12 @@
           />
         </div>
 
-        <button class="primary generate-btn" type="button" :disabled="loading" @click="generate">
+        <div v-if="quotaBlocked" class="quota-blocked">
+          <p>{{ t('aiQuota.generatorBlocked', { date: quota.resetDateLabel.value }) }}</p>
+          <button class="secondary" type="button" @click="showUpgrade = true">{{ t('aiQuota.proButton') }}</button>
+        </div>
+
+        <button class="primary generate-btn" type="button" :disabled="loading || quotaBlocked" @click="generate">
           {{ t('quickGenerator.generate') }}
         </button>
       </div>
@@ -187,6 +193,8 @@
         </button>
       </div>
     </main>
+
+    <UpgradeModal :show="showUpgrade" limit-type="general" @close="showUpgrade = false" @continue-free="showUpgrade = false" @upgraded="showUpgrade = false; quota.reload()" />
   </div>
 </template>
 
@@ -196,6 +204,10 @@ import { startAiWarmup } from '@/utils/aiWarmup'
 import { useI18n } from 'vue-i18n'
 import { useRouter, useRoute } from 'vue-router'
 import HeaderBar from '@/components/HeaderBar.vue'
+import AiQuotaChip from '@/components/AiQuotaChip.vue'
+import UpgradeModal from '@/components/UpgradeModal.vue'
+import { useAiQuota } from '@/composables/useAiQuota'
+import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { quickGenerateWorkout } from '@/api/workouts'
 import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
@@ -210,6 +222,10 @@ const router = useRouter()
 const route = useRoute()
 const { getIdToken } = useFirebaseAuth()
 
+const quota = useAiQuota()
+const subscriptionStore = useSubscriptionStore()
+const showUpgrade = ref(false)
+const quotaBlocked = computed(() => quota.isFree.value && quota.level.value === 'empty')
 const loading = ref(false)
 const error = ref(null)
 const preview = ref(null)
@@ -326,6 +342,8 @@ async function generate() {
       exerciseCountOverride: form.exerciseCountOverride ?? undefined
     }, token)
 
+    subscriptionStore.applyAiUsageSnapshot(response?.metadata?.aiUsage || response?.aiUsage)
+    quota.reload()
     const rawExercises = Array.isArray(response?.exercises) ? response.exercises : []
     if (rawExercises.length === 0) {
       error.value = t('quickGenerator.error')
@@ -422,6 +440,9 @@ function confirmPreview() {
   gap: 1.25rem;
 }
 
+.quota-chip-row { margin-bottom: 12px; }
+.quota-blocked { margin-bottom: 12px; padding: 12px; border-radius: 12px; background: color-mix(in srgb, var(--danger) 12%, transparent); }
+.quota-blocked p { margin: 0 0 10px; color: var(--danger); font-size: 0.9rem; }
 .intro {
   margin: 0;
   color: var(--muted);

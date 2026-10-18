@@ -14,10 +14,11 @@
 import { ref } from 'vue'
 
 // Karte mit aufklappbarem Inhalt: standardmäßig zu, Tippen auf den Titel klappt auf (Einstellungen).
-defineProps({
-  title: { type: String, required: true }
+const props = defineProps({
+  title: { type: String, required: true },
+  initialOpen: { type: Boolean, default: false }
 })
-const open = ref(false)
+const open = ref(props.initialOpen)
 const bodyId = `cc-body-${Math.random().toString(36).slice(2, 9)}`
 </script>
 
