@@ -88,8 +88,8 @@ for (const theme of themes) for (const accent of accents) for (const locale of l
   await page.goto(`http://localhost:${port}/ui-check-tmp.html?theme=${theme}&accent=${accent}`, { waitUntil: 'networkidle' })
   await page.waitForTimeout(1800)
   const res = await page.evaluate(() => {
-    const parse = (s) => { let m = s.match(/rgba?\(([^)]+)\)/); if (m) { const a = m[1].split(/[ ,\/]+/).map(Number); return [a[0], a[1], a[2], a[3] ?? 1] }
-      m = s.match(/color\(srgb ([^)]+)\)/); if (m) { const a = m[1].split(/[ \/]+/).map(Number); return [a[0] * 255, a[1] * 255, a[2] * 255, a[3] ?? 1] } return [0, 0, 0, 0] }
+    const parse = (s) => { let m = s.match(/rgba?\(([^)]+)\)/); if (m) { const a = m[1].split(/[ ,/]+/).map(Number); return [a[0], a[1], a[2], a[3] ?? 1] }
+      m = s.match(/color\(srgb ([^)]+)\)/); if (m) { const a = m[1].split(/[ /]+/).map(Number); return [a[0] * 255, a[1] * 255, a[2] * 255, a[3] ?? 1] } return [0, 0, 0, 0] }
     const blend = (f, b) => [0, 1, 2].map((i) => f[i] * f[3] + b[i] * (1 - f[3]))
     const bgOf = (el) => { const layers = []; for (let e = el; e; e = e.parentElement) { const c = parse(getComputedStyle(e).backgroundColor); if (c[3] > 0) layers.push(c); if (c[3] >= 1) break }
       let base = parse(getComputedStyle(document.body).backgroundColor).slice(0, 3); if (!base[0] && !base[1] && !base[2] && base.length < 3) base = [255, 255, 255]

@@ -195,6 +195,14 @@ export default [
       'no-empty': ['warn', { allowEmptyCatch: true }]
     }
   },
+  {
+    files: ['scripts/ui-check/ui-check.mjs'],
+    languageOptions: {
+      globals: {
+        ...globals.browser
+      }
+    }
+  },
   // Vitest config (Node context, ESM)
   {
     files: ['client/vitest.config.js'],
