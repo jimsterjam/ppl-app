@@ -13,6 +13,7 @@ import { useSettingsStore } from './stores/settingsStore'
 import { useOnboardingStore } from './stores/onboardingStore'
 import { useTimerStore } from './stores/timerStore'
 import { initFirebaseAuth, useFirebaseAuth, isEffectivelyEmailVerified } from './utils/firebaseAuth'
+import { getActiveDraft, runningWorkoutPath } from './utils/activeWorkoutDraft'
 import { reconcileFavoritesWithServer } from './utils/workoutFavorites'
 import { syncCustomExercisesWithServer } from '@/api/customExercises'
 import { App as CapacitorApp } from '@capacitor/app'
@@ -123,9 +124,21 @@ function warmupExercisesArea() {
   setTimeout(runWarmup, 350)
 }
 
+// Laufendes Workout (aktiver Entwurf des angemeldeten Nutzers) -> Pfad der Workout-Ansicht, sonst null.
+function getRunningWorkoutPath() {
+  try {
+    const uid = String(useFirebaseAuth().getCurrentUser?.()?.uid || useAuthStore(pinia).uid || '').trim()
+    return uid ? runningWorkoutPath(getActiveDraft(uid)) : null
+  } catch {
+    return null
+  }
+}
+
 async function tryRestoreLastRoute(reason = 'unknown') {
   const snapshot = readResumeSnapshot()
-  if (!snapshot) return false
+  // Laufendes Workout hat Vorrang vor dem zuletzt gespeicherten Pfad (Absprache Paul 23.10.).
+  const runningPath = getRunningWorkoutPath()
+  if (!snapshot && !runningPath) return false
 
   const current = router.currentRoute.value
   const currentPath = String(current?.fullPath || '')
@@ -134,21 +147,23 @@ async function tryRestoreLastRoute(reason = 'unknown') {
   // Nicht in laufende Navigation eingreifen; nur von "Start"-Routen zurücksetzen.
   const canOverrideCurrent = currentName === 'welcome' || currentName === 'dashboard' || currentPath === '/'
   if (!canOverrideCurrent) return false
-  if (currentPath === snapshot.fullPath) return false
+  const targetPath = runningPath || snapshot.fullPath
+  if (currentPath === targetPath) return false
 
   try {
-    await router.replace(snapshot.fullPath)
+    await router.replace(targetPath)
     logger.debug('[main] Restored last route', {
       reason,
       from: currentPath,
-      to: snapshot.fullPath,
-      ageMs: Date.now() - snapshot.timestamp
+      to: targetPath,
+      running: Boolean(runningPath),
+      ageMs: snapshot ? Date.now() - snapshot.timestamp : null
     })
     return true
   } catch (error) {
     logger.warn('[main] Route restore failed', {
       reason,
-      to: snapshot.fullPath,
+      to: targetPath,
       message: error?.message || String(error)
     })
     return false

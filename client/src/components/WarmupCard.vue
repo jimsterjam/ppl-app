@@ -3,7 +3,14 @@
        Abhaken. Cardio und Gelenke haben einen Timer (läuft nach "Start", hakt den Schritt am Ende selbst ab),
        der dritte Schritt ist eine einfache Körpergewichts-Übung. Überspringen = nicht abhaken. -->
   <section class="warmup-card" :aria-label="t('warmup.title')">
-    <h3 class="warmup-title">{{ t('warmup.title') }} <span class="warmup-optional">{{ t('warmup.optional') }}</span></h3>
+    <!-- Standardmäßig offen, per Tipp auf die Überschrift zuklappbar (Absprache Paul 23.10.). Läuft ein Timer, bleibt
+         die Restzeit auch zugeklappt sichtbar. -->
+    <button type="button" class="warmup-head" :aria-expanded="open" @click="open = !open">
+      <h3 class="warmup-title">{{ t('warmup.title') }} <span class="warmup-optional">{{ t('warmup.optional') }}</span></h3>
+      <span v-if="!open && warmupTimer.isActive" class="warmup-head-time">{{ formatRest(warmupTimer.remainingMs) }}</span>
+      <span class="warmup-chevron" :class="{ open }" aria-hidden="true"></span>
+    </button>
+    <template v-if="open">
     <p class="warmup-optional-hint">{{ t('warmup.optionalHint') }}</p>
     <NotificationHint />
     <p v-if="banner" class="warmup-banner" role="status">{{ banner }}</p>
@@ -49,6 +56,7 @@
         </div>
       </li>
     </ul>
+    </template>
   </section>
 </template>
 
@@ -83,6 +91,7 @@ const { t } = useI18n()
 const warmupTimer = useWarmupTimerStore()
 const sessionStopwatch = useSessionStopwatchStore()
 const banner = ref('')
+const open = ref(true)
 
 const state = computed(() => sanitizeWarmup(props.warmup) || emptyWarmup())
 const current = computed(() => currentWarmupStep(state.value))
@@ -195,6 +204,34 @@ onMounted(() => {
   padding: 6px 14px 8px;
   margin: 0 0 12px;
 }
+.warmup-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.warmup-head .warmup-title { flex: 1; }
+.warmup-head-time { font-weight: 800; font-variant-numeric: tabular-nums; color: var(--accent-text, var(--fg)); }
+.warmup-chevron {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+}
+.warmup-chevron.open { transform: rotate(-135deg); }
 .warmup-title { margin: 0; padding: 8px 0 2px; font-size: 1rem; }
 .warmup-optional { margin-left: 6px; font-size: 0.78rem; font-weight: 600; color: var(--muted); }
 .warmup-optional-hint { margin: 0 0 6px; color: var(--muted); font-size: 0.78rem; line-height: 1.35; }

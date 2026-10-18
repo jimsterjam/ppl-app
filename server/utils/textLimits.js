@@ -11,7 +11,8 @@ export const TEXT_LIMITS = Object.freeze({
   workoutNotes: 2000,
   exerciseName: 120,
   exerciseNote: 500,
-  setNote: 300
+  setNote: 300,
+  muscleGroup: 24
 });
 
 // Steuerzeichen außer Tab/Zeilenumbruch (für mehrzeilige Felder) bzw. inkl. Zeilenumbruch.
@@ -34,6 +35,15 @@ export function clampText(value, max, { multiline = false } = {}) {
     : text.replace(CONTROL_SINGLELINE, ' ');
   const chars = Array.from(cleaned);
   return chars.length > max ? chars.slice(0, max).join('') : cleaned;
+}
+
+/**
+ * Kategorie einer eigenen Übung (bekannte Gruppe oder Freitext bei "Sonstiges"): Steuerzeichen und < > raus, auf
+ * TEXT_LIMITS.muscleGroup gekürzt, leer -> 'other'.
+ */
+export function normalizeMuscleGroup(value) {
+  const cleaned = clampText(String(value ?? '').replace(/[<>]/g, ''), TEXT_LIMITS.muscleGroup);
+  return String(cleaned).trim() || 'other';
 }
 
 /** Mongoose-Setter: `set: textSetter(TEXT_LIMITS.exerciseNote, { multiline: true })` */

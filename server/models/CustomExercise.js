@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import { normalizeMuscleGroup } from "../utils/textLimits.js";
 
 const customExerciseSchema = new mongoose.Schema({
   userId: {
@@ -11,10 +12,13 @@ const customExerciseSchema = new mongoose.Schema({
     trim: true,
     maxlength: 60
   },
+  // Bekannte Gruppe (chest, back, ...) oder bei "Sonstiges" eine eigene Kategorie als Freitext: Steuerzeichen raus,
+  // < > raus, auf 24 Zeichen gekürzt (kürzen statt ablehnen, siehe utils/textLimits.js).
   muscleGroup: {
     type: String,
     default: 'other',
-    trim: true
+    trim: true,
+    set: normalizeMuscleGroup
   },
   notes: {
     type: String,

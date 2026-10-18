@@ -59,7 +59,7 @@
 
       <div class="fm-actions">
         <button v-if="current.mode !== 'weight' && !timerStarted" type="button" class="fm-cta" @click="startTimer">
-          <span aria-hidden="true">▶</span> {{ t('focus.start') }}
+          {{ t('focus.start') }}
         </button>
         <template v-else-if="current.mode !== 'weight'">
           <button type="button" class="fm-btn fm-btn-wide" @click="toggleTimer">
@@ -85,7 +85,7 @@
         <b>{{ miniTitle }}</b>
         <span v-if="miniSub">{{ miniSub }}</span>
       </span>
-      <span class="fm-mini-go"><span aria-hidden="true">⤢</span> {{ t('focus.open') }}</span>
+      <span class="fm-mini-go" aria-hidden="true"><Maximize2 class="fm-mini-go-icon" /></span>
     </button>
   </Teleport>
 </template>
@@ -96,6 +96,7 @@ import { useI18n } from 'vue-i18n'
 import { useFocusModeStore } from '@/stores/focusModeStore'
 import { useRestTimerStore } from '@/stores/restTimerStore'
 import { useSessionStopwatchStore } from '@/stores/sessionStopwatch'
+import { Maximize2 } from 'lucide-vue-next'
 import { formatRest } from '@/utils/restTimerRules'
 import { useScrollLock } from '@/composables/useScrollLock'
 
@@ -309,7 +310,8 @@ onBeforeUnmount(unlock)
 .fm-mini-text { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
 .fm-mini-text b { font-size: 1rem; }
 .fm-mini-text span { color: var(--muted); font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.fm-mini-go { flex: 0 0 auto; padding: 14px 14px; border-radius: 14px; background: var(--accent); color: var(--accent-contrast, #060606); font-weight: 800; font-size: 0.95rem; }
+.fm-mini-go { flex: 0 0 auto; display: grid; place-items: center; width: 60px; height: 60px; border-radius: 16px; background: var(--accent); color: var(--accent-contrast, #060606); }
+.fm-mini-go-icon { width: 30px; height: 30px; stroke-width: 2.6; }
 
 @media (max-height: 700px) {
   .fm-step-value { font-size: 2.8rem; }
