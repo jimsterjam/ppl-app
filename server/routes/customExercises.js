@@ -8,6 +8,7 @@ import { fileURLToPath } from "url";
 import CustomExercise from "../models/CustomExercise.js";
 import { firebaseAuthMiddleware } from "../middleware/firebaseAuth.js";
 import { logger } from "../utils/logger.js";
+import { normalizeMuscleGroup } from "../utils/textLimits.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const router = express.Router();
@@ -47,7 +48,7 @@ router.post("/", firebaseAuthMiddleware, async (req, res) => {
     const exercise = await CustomExercise.create({
       userId,
       name: String(name).trim(),
-      muscleGroup: muscleGroup || 'other',
+      muscleGroup: normalizeMuscleGroup(muscleGroup),
       description: description || '',
       notes: notes || '',
       measureMode
@@ -78,7 +79,7 @@ router.put("/:id", firebaseAuthMiddleware, async (req, res) => {
 
     const update = {};
     if (name !== undefined) update.name = String(name).trim();
-    if (muscleGroup !== undefined) update.muscleGroup = muscleGroup || 'other';
+    if (muscleGroup !== undefined) update.muscleGroup = normalizeMuscleGroup(muscleGroup);
     if (notes !== undefined) update.notes = notes || '';
     if (description !== undefined) update.description = description || '';
     if (measureMode !== undefined) update.measureMode = ['time', 'repsTime'].includes(measureMode) ? measureMode : 'weight';

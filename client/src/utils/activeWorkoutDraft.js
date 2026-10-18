@@ -60,6 +60,18 @@ export function getActiveDraft(uid) {
   }
 }
 
+/**
+ * Pfad der Workout-Ansicht für ein gerade LAUFENDES Workout (Absprache Paul 23.10.: beim Zurückkehren in die App direkt
+ * dorthin, nicht ins Dashboard). Kein Pfad bei fehlendem Entwurf, bereits abgeschlossenem Workout oder
+ * "Favorit anpassen"-Entwurf.
+ */
+export function runningWorkoutPath(draft) {
+  const workout = draft?.workout
+  if (!workout || workout._adjustDraft === true || workout.completed === true) return null
+  const id = String(workout._id || '').trim() || String(draft?.editingWorkoutId || '').trim() || 'draft'
+  return `/workouts/${encodeURIComponent(id)}`
+}
+
 export function hasActiveDraft(uid) {
   if (!uid) return false
   try {

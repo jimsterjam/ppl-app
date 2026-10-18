@@ -106,27 +106,28 @@
               </h2>
               <p class="sub">{{ ex.renderedCategory || ex.category }} · {{ ex.renderedMuscle || ex.muscleGroup || (ex.muscleGroups?.[0] || '') }}</p>
             </div>
-            <div v-if="ex._isCustom" class="custom-actions">
-              <button
-                class="custom-action-btn"
-                type="button"
-                :title="t('exercises.editCustomTitle')"
-                @click.stop="openEditCustom(ex)"
-              >
-                ✏️
-              </button>
-              <button
-                class="custom-action-btn danger"
-                type="button"
-                :title="t('exercises.deleteCustomTitle')"
-                @click.stop="askDeleteCustom(ex)"
-              >
-                🗑️
-              </button>
-            </div>
           </div>
           <p class="desc">{{ ex.renderedDescription }}</p>
           <p class="equip">{{ t('exercises.equipment') }}: {{ ex.renderedEquipment || ex.equipment }}</p>
+          <!-- Eigene Übungen (Absprache Paul 23.10.): Titel + Bild in einer Zeile, darunter Beschreibung, dann Bearbeiten/Löschen. -->
+          <div v-if="ex._isCustom" class="custom-actions custom-actions--row">
+            <button
+              class="custom-action-btn"
+              type="button"
+              :title="t('exercises.editCustomTitle')"
+              @click.stop="openEditCustom(ex)"
+            >
+              ✏️ {{ t('exercises.editShort') }}
+            </button>
+            <button
+              class="custom-action-btn danger"
+              type="button"
+              :title="t('exercises.deleteCustomTitle')"
+              @click.stop="askDeleteCustom(ex)"
+            >
+              🗑️ {{ t('common.delete') }}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -680,6 +681,22 @@ function closeMedia() {
   margin-left: auto;
   align-self: flex-start;
 }
+.custom-actions--row {
+  gap: 8px;
+  margin: 10px 0 0;
+  align-self: stretch;
+}
+.custom-actions--row .custom-action-btn {
+  flex: 1 1 0;
+  min-height: 44px;
+  border: 1px solid var(--line-strong, var(--card-border));
+  background: var(--surface);
+  color: var(--fg);
+  font-size: 0.95rem;
+  font-weight: 600;
+  opacity: 1;
+}
+.custom-actions--row .custom-action-btn.danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
 
 .custom-action-btn {
   background: none;

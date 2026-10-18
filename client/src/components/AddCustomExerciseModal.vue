@@ -49,6 +49,16 @@
           <option value="other">{{ t('muscleGroups.other') }}</option>
         </select>
       </label>
+      <!-- Bei "Sonstiges" eine eigene Kategorie eingeben (Absprache Paul 23.10.). -->
+      <label v-if="muscleGroup === 'other'" class="field">
+        <span>{{ t('exercises.customCategoryLabel') }}</span>
+        <input
+          v-model="customCategory"
+          type="text"
+          maxlength="24"
+          :placeholder="t('exercises.customCategoryPlaceholder')"
+        />
+      </label>
       <label class="field">
         <span>{{ t('exercises.measureModeLabel') }}</span>
         <select v-model="measureMode">
@@ -106,6 +116,10 @@ const { getIdToken } = useFirebaseAuth()
 const internalOpen = ref(props.modelValue)
 const name = ref('')
 const muscleGroup = ref('')
+const customCategory = ref('')
+const KNOWN_GROUPS = ['chest', 'back', 'shoulders', 'biceps', 'triceps', 'legs', 'glutes', 'abs', 'other']
+// Gespeicherter Wert: bekannte Gruppe oder - bei "Sonstiges" - die eigene Kategorie als Text.
+const savedMuscleGroup = () => (muscleGroup.value === 'other' ? (customCategory.value.trim() || 'other') : (muscleGroup.value || 'other'))
 const notes = ref('')
 const saving = ref(false)
 const errorMsg = ref('')
@@ -127,7 +141,14 @@ watch(() => props.modelValue, (val) => {
     selectedImageFile.value = null
     if (isEditMode.value) {
       name.value = props.exercise?.name || ''
-      muscleGroup.value = props.exercise?.muscleGroup || ''
+      const saved = props.exercise?.muscleGroup || ''
+      if (saved && !KNOWN_GROUPS.includes(saved)) {
+        muscleGroup.value = 'other'
+        customCategory.value = saved
+      } else {
+        muscleGroup.value = saved
+        customCategory.value = ''
+      }
       description.value = props.exercise?.description || ''
       notes.value = props.exercise?.notes || ''
       measureMode.value = sanitizeMeasureMode(props.exercise?.measureMode)
@@ -135,6 +156,7 @@ watch(() => props.modelValue, (val) => {
     } else {
       name.value = ''
       muscleGroup.value = ''
+      customCategory.value = ''
       description.value = ''
       notes.value = ''
       measureMode.value = 'weight'
@@ -194,7 +216,7 @@ async function onConfirm() {
     if (isEditMode.value) {
       result = await updateCustomExercise(props.exercise._id, {
         name: trimmedName,
-        muscleGroup: muscleGroup.value || 'other',
+        muscleGroup: savedMuscleGroup(),
         description: description.value.trim() || '',
         notes: notes.value.trim() || '',
         measureMode: sanitizeMeasureMode(measureMode.value)
@@ -216,7 +238,7 @@ async function onConfirm() {
       result = await createCustomExercise({
         userId: props.userId,
         name: trimmedName,
-        muscleGroup: muscleGroup.value || 'other',
+        muscleGroup: savedMuscleGroup(),
         description: description.value.trim() || '',
         notes: notes.value.trim() || '',
         measureMode: sanitizeMeasureMode(measureMode.value)

@@ -915,7 +915,7 @@
     />
     <FocusMode :current="focusCurrent" @done="onFocusDone" @adjust="onFocusAdjust" @open="openFocus" />
     <button v-if="showFocusStart" type="button" class="focus-start-btn" @click="startFocus">
-      <span aria-hidden="true">▶</span> {{ t('focus.startSet', { n: doneBarCurrent.setNumber }) }}
+      {{ t('focus.startSet', { n: doneBarCurrent.setNumber }) }}
     </button>
 
     <!-- Speichern-Overlay -->
@@ -5006,7 +5006,13 @@ onBeforeUnmount(() => {
   margin: 8px 0 4px;
 }
 .set-row.warmup-row {
-  opacity: 0.7;
+  opacity: 0.85;
+  /* Aufwärmsätze leicht abgesetzt (Absprache Paul 23.10.): dezenter Orange-Ton wie die Aufwärm-Beschriftung. */
+  background: color-mix(in srgb, #f59e0b 10%, transparent);
+  border-radius: 12px;
+  margin: 0 -6px;
+  padding-left: 6px;
+  padding-right: 6px;
 }
 .set-row.set-row-empty {
   opacity: 0.35;
