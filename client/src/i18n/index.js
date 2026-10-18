@@ -1047,6 +1047,22 @@ export const messages = {
       ratingNoteSaved: 'Notiz gespeichert',
       ratingNoteSaveError: 'Notiz konnte nicht gespeichert werden'
     },
+    aiQuota: {
+      title: 'KI-Kontingent',
+      remaining: 'Noch {remaining} von {limit} KI-Anfragen',
+      barAria: 'Verbleibende KI-Anfragen in diesem Monat',
+      renews: 'Erneuert sich am {date}',
+      used: 'Verbraucht diesen Monat: {used}',
+      costRule: 'Eine KI-Auswertung (auch eine Neu-Auswertung) oder ein KI-Workout kostet 1 Anfrage. Beides teilt sich dieses Kontingent.',
+      lowText: 'Das Kontingent wird knapp. Überlege, welche KI-Auswertungen dir wirklich wichtig sind.',
+      emptyText: 'Dein Kontingent ist aufgebraucht. KI-Auswertungen und KI-Workouts sind ab dem {date} wieder möglich – oder jetzt mit Pro unbegrenzt.',
+      proButton: 'Mit Pro unbegrenzt →',
+      unlimited: 'Unbegrenzt – mit Pro hast du keine Begrenzung bei KI-Anfragen.',
+      chip: 'Noch {remaining} von {limit} KI-Anfragen',
+      chipEmpty: 'Kontingent leer – wieder ab {date}',
+      chipAria: 'KI-Kontingent anzeigen',
+      generatorBlocked: 'Dein KI-Kontingent ist aufgebraucht. Ein neues KI-Workout ist ab dem {date} wieder möglich – oder jetzt mit Pro unbegrenzt.'
+    },
     quickGenerator: {
       title: 'KI-Workout generieren',
       intro: 'Beantworte ein paar kurze Fragen, dann erstellen wir ein passendes Workout für dich.',
@@ -2441,6 +2457,22 @@ export const messages = {
       ratingConfirmNoteNo: 'No, thanks',
       ratingNoteSaved: 'Note saved',
       ratingNoteSaveError: 'Could not save note'
+    },
+    aiQuota: {
+      title: 'AI quota',
+      remaining: '{remaining} of {limit} AI requests left',
+      barAria: 'AI requests left this month',
+      renews: 'Renews on {date}',
+      used: 'Used this month: {used}',
+      costRule: 'One AI analysis (including a re-analysis) or one AI workout costs 1 request. Both share this quota.',
+      lowText: 'Your quota is running low. Think about which AI analyses matter most to you.',
+      emptyText: 'Your quota is used up. AI analyses and AI workouts are available again on {date} – or unlimited right now with Pro.',
+      proButton: 'Unlimited with Pro →',
+      unlimited: 'Unlimited – with Pro there is no limit on AI requests.',
+      chip: '{remaining} of {limit} AI requests left',
+      chipEmpty: 'Quota empty – back on {date}',
+      chipAria: 'Show AI quota',
+      generatorBlocked: 'Your AI quota is used up. A new AI workout is available again on {date} – or unlimited right now with Pro.'
     },
     quickGenerator: {
       title: 'Generate AI Workout',

@@ -12,6 +12,11 @@
         </button>
       </CollapsibleCard>
 
+      <!-- Nur für Gratis-Nutzer: verbleibende KI-Anfragen. Deep-Link ?open=aiQuota (Chip in Feedback/Generator). -->
+      <CollapsibleCard v-if="!subscriptionStore.isPremium" class="card" :initial-open="route.query.open === 'aiQuota'" :title="$t('aiQuota.title')">
+        <AiQuotaCard />
+      </CollapsibleCard>
+
       <CollapsibleCard class="card" :title="$t('settings.progressRulesTitle')">
         <p class="hint">{{ $t('settings.progressRulesSubtitle') }}</p>
         <button class="legal-btn" @click="$router.push({ name: 'faqs', query: { open: 'progressRules' } })">
@@ -364,7 +369,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { useI18n } from 'vue-i18n'
 import { computed, ref, watch, onBeforeUnmount } from 'vue'
 import { useScrollLock } from '@/composables/useScrollLock'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { initFirebaseAuth, useFirebaseAuth } from '@/utils/firebaseAuth'
 import { logger } from '@/utils/logger'
 import { deleteAllWorkouts } from '@/api/workouts'
@@ -372,6 +377,7 @@ import { isOnline, db } from '@/utils/offlineStorage'
 import { exportAccountData } from '@/api/account'
 import { isAdminUid } from '@/config/admin'
 import CollapsibleCard from '../components/CollapsibleCard.vue'
+import AiQuotaCard from '../components/AiQuotaCard.vue'
 import VerifierAuditPanel from '../components/VerifierAuditPanel.vue'
 
 const themeStore = useThemeStore()
@@ -469,6 +475,7 @@ const planLabels = {
 }
 
 const router = useRouter()
+const route = useRoute()
 const toast = useToastStore()
 const userStore = useUserStore()
 
