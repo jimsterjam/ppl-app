@@ -9062,54 +9062,14 @@
         "gym_only",
         "gym_plus_bodyweight"
       ]
-    }
-  },
-  {
-    "_id": "ex_2800",
-    "id": "2800",
-    "name": "Langhantel sitzend, alternatives Beinheben (weiblich)",
-    "name_en": "barbell sitted alternate leg raise (female)",
-    "category": "Core",
-    "category_raw": "strength",
-    "muscleGroup": "Bauch",
-    "muscleGroup_en": "abs",
-    "equipment": "Langhantel",
-    "equipment_en": "barbell",
-    "description": "Das abwechselnde Beinheben mit der Langhantel im Sitzen (weiblich) zielt auf die Bauchmuskeln ab und beansprucht gleichzeitig die Hüftbeuger und den Quadrizeps. Die Übung wird im Sitzen auf einer Bank durchgeführt, wobei eine Langhantel über die Oberschenkel gehalten wird und abwechselnd jedes Bein angehoben und dabei gestreckt gehalten wird.",
-    "description_en": "The barbell sitted alternate leg raise (female) targets the abdominal muscles while also engaging the hip flexors and quadriceps. The exercise is performed seated on a bench, holding a barbell across the thighs, and alternately raising each leg while keeping it straight.",
-    "imageUrl": "/exercises/360/2800.gif",
-    "thumbnailUrl": "/exercises/180/2800.gif",
-    "bodyPart": "waist",
-    "target": "abs",
-    "secondaryMuscles": [
-      "hip flexors",
-      "quadriceps"
+    },
+    "aliasIds": [
+      "2800"
     ],
-    "instructions": [
-      "Setzen Sie sich mit geradem Rücken auf eine Bank und halten Sie eine Hantel über Ihre Oberschenkel.",
-      "Legen Sie Ihre Hände zur Unterstützung auf die Seiten der Bank.",
-      "Halten Sie Ihre Beine gerade und heben Sie ein Bein so hoch wie möglich an, während Sie es parallel zum Boden halten.",
-      "Senken Sie das Bein wieder ab und wiederholen Sie den Vorgang mit dem anderen Bein.",
-      "Fahren Sie abwechselnd mit den Beinen fort, bis die gewünschte Anzahl an Wiederholungen erreicht ist."
-    ],
-    "difficulty": "intermediate",
-    "instructions_en": [
-      "Sit on a bench with your back straight and hold a barbell across your thighs.",
-      "Place your hands on the sides of the bench for support.",
-      "Keeping your legs straight, lift one leg up as high as possible while keeping it parallel to the ground.",
-      "Lower the leg back down and repeat with the other leg.",
-      "Continue alternating legs for the desired number of repetitions."
-    ],
-    "aiMetadata": {
-      "exerciseType": "core",
-      "primaryPhase": "core",
-      "minDifficulty": "intermediate",
-      "disallowedGoals": [],
-      "allowedEquipmentModes": [
-        "gym_only",
-        "gym_plus_bodyweight"
-      ]
-    }
+    "aliases": [
+      "barbell sitted alternate leg raise (female)",
+      "Langhantel sitzend, alternatives Beinheben (weiblich)"
+    ]
   },
   {
     "_id": "ex_0100",
@@ -34722,56 +34682,14 @@
         "gym_only",
         "gym_plus_bodyweight"
       ]
-    }
-  },
-  {
-    "_id": "ex_1765",
-    "id": "1765",
-    "name": "Aufrechtes Hantelrudern (hinten)",
-    "name_en": "dumbbell upright row (back pov)",
-    "category": "Push",
-    "category_raw": "strength",
-    "muscleGroup": "Schultern",
-    "muscleGroup_en": "delts",
-    "equipment": "Kurzhanteln",
-    "equipment_en": "dumbbell",
-    "description": "Das aufrechte Rudern mit Hanteln (Rückenposition) ist eine Kraftübung, die auf die Deltamuskeln abzielt, mit sekundärer Betonung auf den Trapezius und den Bizeps. Dabei werden Hanteln von Oberschenkelhöhe auf Schulterhöhe angehoben und mit den Ellbogen geführt.",
-    "description_en": "The dumbbell upright row (back pov) is a strength exercise targeting the deltoids, with secondary emphasis on the traps and biceps. It involves lifting dumbbells from thigh level to shoulder height, leading with the elbows.",
-    "imageUrl": "/exercises/360/1765.gif",
-    "thumbnailUrl": "/exercises/180/1765.gif",
-    "bodyPart": "shoulders",
-    "target": "delts",
-    "secondaryMuscles": [
-      "traps",
-      "biceps"
+    },
+    "aliasIds": [
+      "1765"
     ],
-    "instructions": [
-      "Stehen Sie mit schulterbreit auseinander stehenden Füßen und halten Sie in jeder Hand eine Hantel im Obergriff.",
-      "Lassen Sie die Hanteln vor Ihren Oberschenkeln hängen, wobei Ihre Arme vollständig ausgestreckt sind und Ihre Handflächen Ihrem Körper zugewandt sind.",
-      "Halten Sie Ihren Rücken gerade und Ihren Rumpf angespannt, atmen Sie aus und heben Sie die Hanteln gerade nach oben in Richtung Ihres Kinns, wobei Sie die Ellbogen dabei unterstützen.",
-      "Heben Sie weiter, bis sich die Hanteln auf Schulterhöhe befinden und Ihre Ellbogen zur Seite zeigen.",
-      "Halten Sie oben kurz inne, atmen Sie dann ein und senken Sie die Hanteln langsam wieder in die Ausgangsposition ab.",
-      "Wiederholen Sie dies für die gewünschte Anzahl an Wiederholungen."
-    ],
-    "difficulty": "intermediate",
-    "instructions_en": [
-      "Stand with your feet shoulder-width apart, holding a dumbbell in each hand with an overhand grip.",
-      "Let the dumbbells hang in front of your thighs, with your arms fully extended and your palms facing your body.",
-      "Keeping your back straight and your core engaged, exhale and lift the dumbbells straight up towards your chin, leading with your elbows.",
-      "Continue lifting until the dumbbells are at shoulder height, with your elbows pointing out to the sides.",
-      "Pause for a moment at the top, then inhale and slowly lower the dumbbells back down to the starting position.",
-      "Repeat for the desired number of repetitions."
-    ],
-    "aiMetadata": {
-      "exerciseType": "compound",
-      "primaryPhase": "main",
-      "minDifficulty": "intermediate",
-      "disallowedGoals": [],
-      "allowedEquipmentModes": [
-        "gym_only",
-        "gym_plus_bodyweight"
-      ]
-    }
+    "aliases": [
+      "dumbbell upright row (back pov)",
+      "Aufrechtes Hantelrudern (hinten)"
+    ]
   },
   {
     "_id": "ex_0864",
@@ -43486,7 +43404,14 @@
         "gym_only",
         "gym_plus_bodyweight"
       ]
-    }
+    },
+    "aliasIds": [
+      "2315"
+    ],
+    "aliases": [
+      "calf press lever",
+      "Wadenpresse sitzend im Winkel"
+    ]
   },
   {
     "_id": "ex_0577",
@@ -44467,55 +44392,14 @@
         "gym_only",
         "gym_plus_bodyweight"
       ]
-    }
-  },
-  {
-    "_id": "ex_3195",
-    "id": "3195",
-    "name": "Beinbeugen liegend",
-    "name_en": "leg curl lying",
-    "category": "Legs",
-    "category_raw": "strength",
-    "muscleGroup": "Quadrizeps",
-    "muscleGroup_en": "hamstrings",
-    "equipment": "Maschine",
-    "equipment_en": "leverage machine",
-    "description": "Der Hebel-Liegen-Zwei-Eins-Bein-Curl ist eine Isolationsübung, die mithilfe einer Hebelmaschine auf die hintere Oberschenkelmuskulatur abzielt. Dabei werden die Beine in Richtung der Gesäßmuskulatur gebeugt, während man auf der Maschine liegt, wobei man sich jeweils auf ein Bein konzentriert, um die Intensität und Muskelbeanspruchung zu erhöhen.",
-    "description_en": "The lever lying two-one leg curl is an isolation exercise targeting the hamstrings using a leverage machine. It involves curling the legs towards the glutes while lying on the machine, focusing on one leg at a time for increased intensity and muscle engagement.",
-    "imageUrl": "/exercises/360/3195.gif",
-    "thumbnailUrl": "/exercises/180/3195.gif",
-    "bodyPart": "upper legs",
-    "target": "hamstrings",
-    "secondaryMuscles": [
-      "glutes"
+    },
+    "aliasIds": [
+      "3195"
     ],
-    "instructions": [
-      "Passen Sie das Gerät an Ihren Körper an und setzen Sie sich mit dem Rücken an die Rückenlehne darauf.",
-      "Platzieren Sie Ihre Beine direkt über Ihren Knöcheln auf dem Hebelpolster.",
-      "Halten Sie sich an den Griffen an den Seiten der Maschine fest.",
-      "Halten Sie Ihren Oberkörper ruhig, atmen Sie aus und ziehen Sie Ihre Beine in Richtung Ihrer Gesäßmuskulatur.",
-      "Halten Sie oben kurz inne, atmen Sie dann ein und senken Sie Ihre Beine langsam wieder in die Ausgangsposition.",
-      "Wiederholen Sie dies für die gewünschte Anzahl an Wiederholungen."
-    ],
-    "difficulty": "intermediate",
-    "instructions_en": [
-      "Adjust the machine to fit your body and sit on it with your back against the backrest.",
-      "Place your legs on the lever pad, just above your ankles.",
-      "Grasp the handles on the sides of the machine for support.",
-      "Keeping your upper body still, exhale and curl your legs up towards your glutes.",
-      "Pause for a moment at the top, then inhale and slowly lower your legs back to the starting position.",
-      "Repeat for the desired number of repetitions."
-    ],
-    "aiMetadata": {
-      "exerciseType": "compound",
-      "primaryPhase": "main",
-      "minDifficulty": "intermediate",
-      "disallowedGoals": [],
-      "allowedEquipmentModes": [
-        "gym_only",
-        "gym_plus_bodyweight"
-      ]
-    }
+    "aliases": [
+      "leg curl lying",
+      "Beinbeugen liegend"
+    ]
   },
   {
     "_id": "ex_0587",
@@ -45251,55 +45135,6 @@
     "aiMetadata": {
       "exerciseType": "compound",
       "primaryPhase": "main",
-      "minDifficulty": "beginner",
-      "disallowedGoals": [],
-      "allowedEquipmentModes": [
-        "gym_only",
-        "gym_plus_bodyweight"
-      ]
-    }
-  },
-  {
-    "_id": "ex_2315",
-    "id": "2315",
-    "name": "Wadenpresse sitzend im Winkel",
-    "name_en": "calf press lever",
-    "category": "Legs",
-    "category_raw": "strength",
-    "muscleGroup": "Waden",
-    "muscleGroup_en": "calves",
-    "equipment": "Maschine",
-    "equipment_en": "leverage machine",
-    "description": "Bei der Hebel-Rotations-Wadenübung werden mithilfe einer Hebelmaschine gezielt die Waden trainiert. Dabei werden die Fersen im Sitzen angehoben und abgesenkt, wobei der Schwerpunkt auf der Wadenmuskulatur und den Knöchelstabilisatoren liegt.",
-    "description_en": "The lever rotary calf exercise targets the calves using a leverage machine. It involves raising and lowering the heels while seated, focusing on the calf muscles and ankle stabilizers.",
-    "imageUrl": "/exercises/360/2315.gif",
-    "thumbnailUrl": "/exercises/180/2315.gif",
-    "bodyPart": "lower legs",
-    "target": "calves",
-    "secondaryMuscles": [
-      "soleus",
-      "ankle stabilizers"
-    ],
-    "instructions": [
-      "Stellen Sie die Sitzhöhe so ein, dass Ihre Knie leicht gebeugt sind und Ihre Füße flach auf der Fußplatte stehen.",
-      "Legen Sie Ihre Zehen auf die Fußplatte, sodass Ihre Fersen über die Kante hängen.",
-      "Fassen Sie die Maschine an den Griffen oder an den Seiten an, um Stabilität zu gewährleisten.",
-      "Drücken Sie durch die Fußballen und heben Sie die Fersen so hoch wie möglich an.",
-      "Halten Sie oben kurz inne und senken Sie dann Ihre Fersen langsam wieder in die Ausgangsposition ab.",
-      "Wiederholen Sie dies für die gewünschte Anzahl an Wiederholungen."
-    ],
-    "difficulty": "beginner",
-    "instructions_en": [
-      "Adjust the seat height so that your knees are slightly bent and your feet are flat on the footplate.",
-      "Place your toes on the footplate, with your heels hanging off the edge.",
-      "Grasp the handles or the sides of the machine for stability.",
-      "Push through the balls of your feet, raising your heels as high as possible.",
-      "Pause for a moment at the top, then slowly lower your heels back down to the starting position.",
-      "Repeat for the desired number of repetitions."
-    ],
-    "aiMetadata": {
-      "exerciseType": "isolation",
-      "primaryPhase": "accessory",
       "minDifficulty": "beginner",
       "disallowedGoals": [],
       "allowedEquipmentModes": [
@@ -53120,109 +52955,17 @@
         "gym_only",
         "gym_plus_bodyweight"
       ]
-    }
-  },
-  {
-    "_id": "ex_1464",
-    "id": "1464",
-    "name": "Schlitten 45° Beinpresse (Rückenperspektive)",
-    "name_en": "sled 45° leg press (back pov)",
-    "category": "Legs",
-    "category_raw": "strength",
-    "muscleGroup": "Quadrizeps",
-    "muscleGroup_en": "glutes",
-    "equipment": "Maschine",
-    "equipment_en": "sled machine",
-    "description": "Die Schlitten-45°-Beinpresse (Rücken-POV) ist eine zusammengesetzte Unterkörperübung, die auf einer Schlittenmaschine durchgeführt wird. Es zielt hauptsächlich auf die Gesäßmuskulatur ab, wobei der Schwerpunkt auf dem Quadrizeps, der hinteren Oberschenkelmuskulatur und den Waden liegt. Bei der Bewegung werden die Beine gestreckt und gebeugt, um eine beschwerte Fußplatte vom Körper weg und zum Körper hin zu drücken.",
-    "description_en": "The sled 45° leg press (back POV) is a compound lower body exercise performed on a sled machine. It primarily targets the glutes, with secondary emphasis on the quadriceps, hamstrings, and calves. The movement involves extending and flexing the legs to press a weighted footplate away from and toward the body.",
-    "imageUrl": "/exercises/360/1464.gif",
-    "thumbnailUrl": "/exercises/180/1464.gif",
-    "bodyPart": "upper legs",
-    "target": "glutes",
-    "secondaryMuscles": [
-      "quadriceps",
-      "hamstrings",
-      "calves"
+    },
+    "aliasIds": [
+      "1464",
+      "1463"
     ],
-    "instructions": [
-      "Stellen Sie den Sitz der Schlittenmaschine so ein, dass Ihre Knie einen 45-Grad-Winkel bilden.",
-      "Setzen Sie sich mit dem Rücken an die Rückenlehne und die Füße schulterbreit auseinander auf die Fußplatte auf die Schlittenmaschine.",
-      "Halten Sie die Griffe an den Seiten des Sitzes fest, um Stabilität zu gewährleisten.",
-      "Schieben Sie die Fußplatte vom Körper weg, indem Sie Ihre Beine ausstrecken und Ihre Fersen auf der Fußplatte lassen.",
-      "Halten Sie in der vollständig ausgefahrenen Position einen Moment inne.",
-      "Beugen Sie langsam Ihre Knie und senken Sie die Fußplatte wieder in Richtung Ihres Körpers ab, um die Bewegung zu kontrollieren.",
-      "Wiederholen Sie dies für die gewünschte Anzahl an Wiederholungen."
-    ],
-    "difficulty": "beginner",
-    "instructions_en": [
-      "Adjust the seat of the sled machine so that your knees are at a 45-degree angle.",
-      "Sit on the sled machine with your back against the backrest and your feet shoulder-width apart on the footplate.",
-      "Grip the handles on the sides of the seat for stability.",
-      "Push the footplate away from your body by extending your legs, keeping your heels on the footplate.",
-      "Pause for a moment at the fully extended position.",
-      "Slowly bend your knees and lower the footplate back towards your body, controlling the movement.",
-      "Repeat for the desired number of repetitions."
-    ],
-    "aiMetadata": {
-      "exerciseType": "compound",
-      "primaryPhase": "main",
-      "minDifficulty": "beginner",
-      "disallowedGoals": [],
-      "allowedEquipmentModes": [
-        "gym_only",
-        "gym_plus_bodyweight"
-      ]
-    }
-  },
-  {
-    "_id": "ex_1463",
-    "id": "1463",
-    "name": "Schlitten 45° Beinpresse (Seitenperspektive)",
-    "name_en": "sled 45° leg press (side pov)",
-    "category": "Legs",
-    "category_raw": "strength",
-    "muscleGroup": "Quadrizeps",
-    "muscleGroup_en": "glutes",
-    "equipment": "Maschine",
-    "equipment_en": "sled machine",
-    "description": "Die Schlitten-45°-Beinpresse (Seitenperspektive) ist eine zusammengesetzte Unterkörperübung, die auf einer Schlittenmaschine durchgeführt wird. Es zielt hauptsächlich auf die Gesäßmuskulatur ab und trainiert auch den Quadrizeps, die hintere Oberschenkelmuskulatur und die Waden. Bei der Bewegung wird eine mit Gewichten beschwerte Fußplatte durch Ausstrecken der Beine vom Körper weggedrückt und anschließend durch Beugen der Knie in die Ausgangsposition zurückgekehrt.",
-    "description_en": "The sled 45° leg press (side pov) is a compound lower body exercise performed on a sled machine. It primarily targets the glutes and also works the quadriceps, hamstrings, and calves. The movement involves pressing a weighted footplate away from the body by extending the legs, then returning to the starting position by bending the knees.",
-    "imageUrl": "/exercises/360/1463.gif",
-    "thumbnailUrl": "/exercises/180/1463.gif",
-    "bodyPart": "upper legs",
-    "target": "glutes",
-    "secondaryMuscles": [
-      "quadriceps",
-      "hamstrings",
-      "calves"
-    ],
-    "instructions": [
-      "Stellen Sie den Sitz der Schlittenmaschine so ein, dass Ihre Knie einen 90-Grad-Winkel bilden, wenn Ihre Füße auf der Fußplatte stehen.",
-      "Setzen Sie sich mit dem Rücken flach an die Rückenlehne und die Füße schulterbreit auseinander auf die Fußplatte auf die Schlittenmaschine.",
-      "Halten Sie die Griffe an den Seiten des Sitzes fest, um Stabilität zu gewährleisten.",
-      "Drücken Sie gegen die Fußplatte, um Ihre Beine zu strecken und sie vollständig zu strecken.",
-      "Halten Sie oben kurz inne und beugen Sie dann langsam die Knie, um die Fußplatte wieder in die Ausgangsposition abzusenken.",
-      "Wiederholen Sie dies für die gewünschte Anzahl an Wiederholungen."
-    ],
-    "difficulty": "beginner",
-    "instructions_en": [
-      "Adjust the seat of the sled machine so that your knees are at a 90-degree angle when your feet are on the footplate.",
-      "Sit on the sled machine with your back flat against the backrest and your feet shoulder-width apart on the footplate.",
-      "Grip the handles on the sides of the seat for stability.",
-      "Push against the footplate to extend your legs, straightening them completely.",
-      "Pause for a moment at the top, then slowly bend your knees to lower the footplate back to the starting position.",
-      "Repeat for the desired number of repetitions."
-    ],
-    "aiMetadata": {
-      "exerciseType": "compound",
-      "primaryPhase": "main",
-      "minDifficulty": "beginner",
-      "disallowedGoals": [],
-      "allowedEquipmentModes": [
-        "gym_only",
-        "gym_plus_bodyweight"
-      ]
-    }
+    "aliases": [
+      "sled 45° leg press (back pov)",
+      "Schlitten 45° Beinpresse (Rückenperspektive)",
+      "sled 45° leg press (side pov)",
+      "Schlitten 45° Beinpresse (Seitenperspektive)"
+    ]
   },
   {
     "_id": "ex_0740",
@@ -58056,57 +57799,14 @@
         "gym_plus_bodyweight",
         "bodyweight_only"
       ]
-    }
-  },
-  {
-    "_id": "ex_2801",
-    "id": "2801",
-    "name": "verdrehtes Beinheben (weiblich)",
-    "name_en": "twisted leg raise (female)",
-    "category": "Core",
-    "category_raw": "strength",
-    "muscleGroup": "Bauch",
-    "muscleGroup_en": "abs",
-    "equipment": "Körpergewicht",
-    "equipment_en": "body weight",
-    "description": "Das verdrehte Beinheben (weiblich) ist eine Bauchübung, die auf die Bauchmuskeln, die schrägen Bauchmuskeln und die Hüftbeuger abzielt. Dabei liegt man auf dem Rücken, hebt die Beine an und dreht die Hüften, um die Rumpfmuskulatur dynamischer zu beanspruchen.",
-    "description_en": "The twisted leg raise (female) is an abdominal exercise that targets the abs, obliques, and hip flexors. It involves lying on your back, lifting your legs, and twisting your hips to engage the core muscles more dynamically.",
-    "imageUrl": "/exercises/360/2801.gif",
-    "thumbnailUrl": "/exercises/180/2801.gif",
-    "bodyPart": "waist",
-    "target": "abs",
-    "secondaryMuscles": [
-      "obliques",
-      "hip flexors"
+    },
+    "aliasIds": [
+      "2801"
     ],
-    "instructions": [
-      "Legen Sie sich flach auf den Rücken, die Beine ausgestreckt und die Arme an den Seiten.",
-      "Beugen Sie die Knie, heben Sie die Beine vom Boden ab und bringen Sie sie in Richtung Brust.",
-      "Wenn Sie Ihre Beine anheben, drehen Sie Ihre Hüften zur Seite und bringen Sie Ihre Knie zur gegenüberliegenden Schulter.",
-      "Halten Sie oben kurz inne und senken Sie dann Ihre Beine langsam wieder in die Ausgangsposition ab.",
-      "Wiederholen Sie die Bewegung und drehen Sie dieses Mal Ihre Hüften auf die andere Seite.",
-      "Fahren Sie abwechselnd mit den Seiten fort, bis die gewünschte Anzahl an Wiederholungen erreicht ist."
-    ],
-    "difficulty": "intermediate",
-    "instructions_en": [
-      "Lie flat on your back with your legs extended and your arms by your sides.",
-      "Bend your knees and lift your legs off the ground, bringing them towards your chest.",
-      "As you lift your legs, twist your hips to one side, bringing your knees towards your opposite shoulder.",
-      "Pause for a moment at the top, then slowly lower your legs back down to the starting position.",
-      "Repeat the movement, this time twisting your hips to the other side.",
-      "Continue alternating sides for the desired number of repetitions."
-    ],
-    "aiMetadata": {
-      "exerciseType": "core",
-      "primaryPhase": "core",
-      "minDifficulty": "intermediate",
-      "disallowedGoals": [],
-      "allowedEquipmentModes": [
-        "gym_only",
-        "gym_plus_bodyweight",
-        "bodyweight_only"
-      ]
-    }
+    "aliases": [
+      "twisted leg raise (female)",
+      "verdrehtes Beinheben (weiblich)"
+    ]
   },
   {
     "_id": "ex_3420",
