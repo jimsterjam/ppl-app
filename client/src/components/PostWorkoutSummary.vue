@@ -35,7 +35,18 @@
          KI-Analyse gespeichert (Nutzer wollte erst in Ruhe Notizen ergänzen, siehe
          WorkoutDetailView.vue). Kein Lade-Spinner, da hier gar nichts lädt/läuft - das würde
          etwas vortäuschen, das nicht passiert. -->
-    <div v-if="deferredConfirmation" class="summary-content fallback">
+    <!-- Gespeichertes Workout angepasst: keine automatische KI-Anfrage; Neu-Auswertung nur auf Wunsch, mit Kostenhinweis. -->
+    <div v-if="deferredConfirmation && edited" class="summary-content fallback">
+      <p>{{ t('postWorkout.editedSaved') }}</p>
+      <p class="deferred-hint">{{ t('postWorkout.editedNoAi') }}</p>
+      <p v-if="costHint" class="quota-hint" role="status">{{ costHint }}</p>
+      <div class="summary-actions">
+        <button class="primary" type="button" @click="dismissSummary">{{ t('common.continue') }}</button>
+        <button class="secondary" type="button" :disabled="quotaExhausted" @click="regenerate">{{ t('postWorkout.regenerate') }}</button>
+      </div>
+    </div>
+
+    <div v-else-if="deferredConfirmation" class="summary-content fallback">
       <p>{{ t('postWorkout.deferredSaved') }}</p>
       <p class="deferred-hint">{{ t('postWorkout.deferredHint') }}</p>
       <div class="summary-actions">
@@ -173,6 +184,7 @@ import AiFeedbackRatingWidget from '@/components/AiFeedbackRatingWidget.vue'
 import OneTimeHint from '@/components/OneTimeHint.vue'
 import AppFeedbackDialog from '@/components/AppFeedbackDialog.vue'
 import { useUserStore } from '@/stores/userStore'
+import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 import { getNotDoneExercises } from '@/utils/notDoneExercises'
 
@@ -190,6 +202,11 @@ const props = defineProps({
   deferred: {
     type: Boolean,
     default: false
+  },
+  // Ein bereits gespeichertes Workout wurde nur angepasst (Absprache Paul 24.10.): zusammen mit deferred.
+  edited: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -198,6 +215,7 @@ const emit = defineEmits(['close'])
 const { t } = useI18n()
 const { getTranslatedExerciseName } = useExerciseTranslation()
 const userStore = useUserStore()
+const subscriptionStore = useSubscriptionStore()
 const router = useRouter()
 const { getIdToken } = useFirebaseAuth()
 
@@ -297,7 +315,24 @@ async function resolveWorkoutIdForAnalysis(rawId) {
 /**
  * Lade AI-Feedback nach Workout-Speicherung
  */
-async function loadAIFeedback() {
+// KI-Kontingent (Gratis-Tarif): Hinweis auf die Kosten einer Neu-Auswertung.
+const quotaExhausted = computed(() => Number.isFinite(subscriptionStore.aiRequestsRemaining) && subscriptionStore.aiRequestsRemaining <= 0)
+const costHint = computed(() => {
+  if (!Number.isFinite(subscriptionStore.aiRequestsLimit)) return ''
+  if (quotaExhausted.value) return t('quota.exhausted')
+  return t('quota.costHint', { remaining: subscriptionStore.aiRequestsRemaining, limit: subscriptionStore.aiRequestsLimit })
+})
+
+function regenerate() {
+  if (quotaExhausted.value) return
+  deferredConfirmation.value = false
+  loading.value = true
+  loadAIFeedback({ refresh: true })
+}
+
+onMounted(() => { subscriptionStore.checkSubscription?.().catch?.(() => {}) })
+
+async function loadAIFeedback({ refresh = false } = {}) {
   // DIAGNOSE (User-Report "Feedback hat nicht beim ersten Mal funktioniert"): bisher gab es
   // für diesen kompletten Ablauf keine Einträge im (kopierbaren) Diagnose-Log, nur normale
   // logger.debug()-Aufrufe. Jeder Aufruf (auch Remounts/erneute Versuche) wird jetzt geloggt.
@@ -366,6 +401,7 @@ async function loadAIFeedback() {
       { language: getAppLanguage() },
       {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
+        ...(refresh ? { params: { refresh: '1' } } : {}),
         // Server macht jetzt einen schnellen Erreichbarkeits-Check (max. 3s) vor dem
         // eigentlichen Generierungs-Aufruf und antwortet bei nicht erreichbarem Provider
         // sofort mit feedback_status: 'network_unavailable' statt lange zu hängen — der
@@ -373,6 +409,9 @@ async function loadAIFeedback() {
         timeout: REQUEST_TIMEOUT_MS
       }
     )
+
+    // Verbrauchtes Kontingent sofort übernehmen (Anzeige „noch X übrig“).
+    if (response.data?.aiUsage) subscriptionStore.applyAiUsageSnapshot(response.data.aiUsage)
 
     if (response.data?.ai_feedback) {
       untrackFeedback(resolvedWorkoutId)
@@ -683,6 +722,14 @@ onBeforeUnmount(() => {
   color: var(--muted);
 }
 
+.quota-hint {
+  margin: 0 0 0.75rem;
+  padding: 0.6rem 0.8rem;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
 .deferred-hint {
   font-size: 0.85rem;
 }

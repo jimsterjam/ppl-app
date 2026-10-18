@@ -3186,7 +3186,7 @@ function scrollToExercises() {
   } catch {}
 }
 
-function goToPostWorkoutSummary(workoutId, { deferred = false } = {}) {
+function goToPostWorkoutSummary(workoutId, { deferred = false, edited = false } = {}) {
   const id = String(workoutId || '').trim()
   logger.info('[WorkoutDetail] goToPostWorkoutSummary called', { workoutId, id, deferred })
   // DIAGNOSE: einziger Punkt, an dem alle Erfolgs-Zweige von performSaveWorkout() zusammen-
@@ -3205,7 +3205,8 @@ function goToPostWorkoutSummary(workoutId, { deferred = false } = {}) {
       workoutId: id,
       // Feature "Feedback später bewerten": PostWorkoutSummary.vue soll die KI-Analyse dann
       // NICHT automatisch anstoßen, sondern nur bestätigen, dass gespeichert wurde.
-      ...(deferred ? { deferred: '1' } : {})
+      ...(deferred ? { deferred: '1' } : {}),
+      ...(edited ? { edited: '1' } : {})
     }
   })
 }
@@ -3626,6 +3627,10 @@ async function performSaveWorkout(updateFavorite = false, { deferAiFeedback = fa
   suppressDraftPersistence.value = true
   // Vor jedem await festhalten: laufendes Workout (Abhaken aktiv)? Dann werden nicht abgehakte Sätze als "nicht gemacht" gespeichert.
   const trackingAtSave = setTrackingActive.value
+  // Gespeichertes Workout wird nur angepasst (Absprache Paul 24.10.): keine automatische KI-Anfrage, sie kostet Kontingent.
+  // Die Zusammenfassung bietet „KI-Auswertung neu erstellen“ mit Kostenhinweis an.
+  const editedSaved = workout.value?.completed === true
+  if (editedSaved) deferAiFeedback = true
 
   // Bildschirm bleibt an, bis Speichern + anschließende KI-Analyse abgeschlossen sind (User-
   // Wunsch: Standby darf diese Vorgänge nicht abbrechen). Bei Erfolg übernimmt
@@ -3679,7 +3684,7 @@ async function performSaveWorkout(updateFavorite = false, { deferAiFeedback = fa
     // "zurückgestellt" (siehe Workout.ai_feedback_status), damit die Feedback-Verlauf-Ansicht
     // es als ausstehend mit "Jetzt generieren"-Button zeigen kann, statt sofort unten
     // goToPostWorkoutSummary() die automatische KI-Analyse anzustoßen.
-    if (deferAiFeedback) {
+    if (deferAiFeedback && !editedSaved) {
       normalized.ai_feedback_status = 'deferred'
     }
 
@@ -3829,7 +3834,7 @@ async function performSaveWorkout(updateFavorite = false, { deferAiFeedback = fa
         focus.close()
         warmupTimer.cancel()
         bypassTimerLeaveGuard.value = true
-        goToPostWorkoutSummary(realId, { deferred: deferAiFeedback })
+        goToPostWorkoutSummary(realId, { deferred: deferAiFeedback, edited: editedSaved })
         return
       }
 
@@ -3891,7 +3896,7 @@ async function performSaveWorkout(updateFavorite = false, { deferAiFeedback = fa
       focus.close()
       warmupTimer.cancel()
       bypassTimerLeaveGuard.value = true
-      goToPostWorkoutSummary(savedWorkout?._id || id, { deferred: deferAiFeedback })
+      goToPostWorkoutSummary(savedWorkout?._id || id, { deferred: deferAiFeedback, edited: editedSaved })
       return
     }
 
@@ -3912,7 +3917,7 @@ async function performSaveWorkout(updateFavorite = false, { deferAiFeedback = fa
     focus.close()
     warmupTimer.cancel()
     bypassTimerLeaveGuard.value = true
-    goToPostWorkoutSummary(id, { deferred: deferAiFeedback })
+    goToPostWorkoutSummary(id, { deferred: deferAiFeedback, edited: editedSaved })
   } catch (e) {
     // workout.value.completed wurde vor dem ersten await auf true gesetzt.
     // Bei Fehler zurücksetzen, damit persistInProgressDraft() den Draft noch retten kann.

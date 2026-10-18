@@ -166,8 +166,8 @@ export const messages = {
   ,quickGenIntroText: 'Erstelle dir mit einem Klick ein neues Workout direkt vom Dashboard aus.\n\nDer Quick Workout Generator erstellt dir ein vollständiges Training basierend auf deinen aktuellen Einstellungen wie Ziel, Trainingsart und verfügbarem Equipment.\n\nIn der kostenlosen Version kannst du den Generator 1 Mal pro Woche nutzen.\n\nDer Quick Generator erstellt eigenständige Workouts ohne langfristige Analyse oder Anpassung an deinen Trainingsverlauf.\n\nMit einem Pro-Abo erhältst du Zugriff auf den vollständigen AI Coach. Dieser analysiert deine bisherigen Trainings, erkennt Muster, passt deine Progression an und erstellt personalisierte Empfehlungen.'
   ,quickGenLearnPro: 'Mehr über Pro erfahren'
   ,quickGenGenerateNow: 'Workout generieren'
-  ,quickGenLimitTitle: 'Wochenlimit erreicht'
-  ,quickGenLimitText: 'Du hast dein wöchentliches Kontingent für den Quick Workout Generator aufgebraucht.\n\nFreischaltung am: {date}.\n\nMit Pro erhältst du unbegrenzte Generierungen sowie personalisierte Trainingsanalyse und automatische Anpassungen.'
+  ,quickGenLimitTitle: 'Monatslimit erreicht'
+  ,quickGenLimitText: 'Du hast dein monatliches KI-Kontingent aufgebraucht.\n\nFreischaltung am: {date}.\n\nMit Pro erhältst du unbegrenzte Generierungen sowie personalisierte Trainingsanalyse und automatische Anpassungen.'
   ,quickGenLastHintTitle: 'Nur noch 1 freie Generierung'
   ,quickGenLastHintText: 'Du kannst den Quick Workout Generator nur noch einmal kostenlos diese Woche nutzen.\n\nFreischaltung am: {date}.\n\nMöchtest du lieber jetzt auf Pro upgraden?'
   ,quickGenContinueFree: 'Letzte freie Nutzung starten'
@@ -941,6 +941,9 @@ export const messages = {
       seeDetails: 'Details anschauen',
       saved: 'Dein Workout wurde gespeichert!',
       deferredSaved: 'Workout gespeichert - ohne KI-Feedback.',
+      editedSaved: 'Änderungen gespeichert.',
+      editedNoAi: 'Es wurde keine neue KI-Auswertung angefordert. Möchtest du dein Training nach den Änderungen neu auswerten lassen, geht das jetzt.',
+      regenerate: 'KI-Auswertung neu erstellen',
       deferredHint: 'Sobald du dein Feedback zu den Übungen ergänzt hast, kannst du die KI-Auswertung im Feedback-Verlauf nachträglich anfordern.',
       goToFeedbackHistory: 'Zum Feedback-Verlauf',
       error: 'Feedback konnte nicht geladen werden',
@@ -1111,7 +1114,7 @@ export const messages = {
       restPauses: 'Pause zwischen den Sätzen – wie lange?',
       restPausesText: "Wenn du einen Satz abhakst, startet die Pause automatisch und erscheint groß in der Mitte. Mit „Verkleinern“ wird daraus eine Leiste unten – die Pause läuft weiter. Ist sie vorbei, geht es automatisch mit dem nächsten Satz weiter. Kommt als Nächstes eine Übung auf Zeit, startet deren Timer von selbst; kurz davor gibt es einen Ton bei 10 Sekunden und bei 3, 2, 1.\n\nDie Länge passt die App an: 3 Min. bei schweren Grundübungen im Kraft-Training, 2 Min. bei Grundübungen im Muskelaufbau, bei Zusatzübungen im Kraft-Training und bei explosiven Übungen, 1:30 Min. bei Zusatzübungen im Muskelaufbau. Mit − / + änderst du die Pause in 15-Sekunden-Schritten und kannst die neue Dauer für diese Übung merken.\n\nWarum unterschiedlich lang? Kurze Pausen (ca. 60–90 Sekunden) fördern eher den Muskelaufbau. Längere Pausen (ca. 2–5 Minuten) geben dem Körper mehr Zeit zum Erholen und eignen sich besser für Maximalkraft, vor allem bei schweren Grundübungen mit wenigen Wiederholungen.\n\nIm Pausenbild kannst du den nächsten Satz noch anpassen. „Überspringen“ beendet die Pause früher.",
       aiCoach: 'Was macht der KI-Coach?',
-      aiCoachText: "Nach einem Workout erstellt die App automatisch eine kurze, sachliche Einordnung deines Trainingsverlaufs im Vergleich zu früheren Sessions – anhand der erfassten Zahlen, nicht anhand von Vermutungen über Technik, Tagesform oder Ausführung, die die App gar nicht erfassen kann.\n\nDu kannst jedes Feedback mit Daumen hoch oder runter bewerten und optional einen Grund oder eine kurze Korrektur angeben – das hilft dabei, künftige Analysen passender zu machen. Diese Bewertung ist rein persönlich und freiwillig, sie beeinflusst nicht, ob du Feedback bekommst.\n\nWann gibt es Feedback? Ein wertendes Feedback braucht Vergleichsdaten: nach 8 gleichen Workouts oder 4 Wochen. Bis dahin zeigt dir die App, wie viele noch fehlen. Das Feedback findest du in den Stats.\n\nWas sieht die KI? Nur, was du einträgst: Übungen, Sätze, Gewichte, Wiederholungen und deine Notizen. Diese Trainingsdaten werden an den KI-Dienst OpenAI gesendet. Dein Name und deine E-Mail-Adresse werden nicht mitgesendet.\n\nKontingent: Im kostenlosen Tarif sind 60 KI-Auswertungen pro Monat enthalten. Für den KI-Workout-Generator gibt es ein wöchentliches Kontingent. Mit Pro entfallen diese Grenzen.\n\nLöschst du ein Workout wieder, wird das dazugehörige Feedback ebenfalls entfernt, und spätere Analysen greifen nicht mehr auf die gelöschten Werte zurück.",
+      aiCoachText: "Nach einem Workout erstellt die App automatisch eine kurze, sachliche Einordnung deines Trainingsverlaufs im Vergleich zu früheren Sessions – anhand der erfassten Zahlen, nicht anhand von Vermutungen über Technik, Tagesform oder Ausführung, die die App gar nicht erfassen kann.\n\nDu kannst jedes Feedback mit Daumen hoch oder runter bewerten und optional einen Grund oder eine kurze Korrektur angeben – das hilft dabei, künftige Analysen passender zu machen. Diese Bewertung ist rein persönlich und freiwillig, sie beeinflusst nicht, ob du Feedback bekommst.\n\nWann gibt es Feedback? Ein wertendes Feedback braucht Vergleichsdaten: nach 8 gleichen Workouts oder 4 Wochen. Bis dahin zeigt dir die App, wie viele noch fehlen. Das Feedback findest du in den Stats.\n\nWas sieht die KI? Nur, was du einträgst: Übungen, Sätze, Gewichte, Wiederholungen und deine Notizen. Diese Trainingsdaten werden an den KI-Dienst OpenAI gesendet. Dein Name und deine E-Mail-Adresse werden nicht mitgesendet.\n\nKontingent: Im kostenlosen Tarif sind 60 KI-Anfragen pro Monat enthalten. KI-Feedback und KI-Workout-Generator teilen sich dieses Kontingent. Eine Neu-Auswertung nach einer Änderung verbraucht ebenfalls eine Anfrage. Mit Pro entfallen diese Grenzen.\n\nLöschst du ein Workout wieder, wird das dazugehörige Feedback ebenfalls entfernt, und spätere Analysen greifen nicht mehr auf die gelöschten Werte zurück.",
       focusMode: "Fokus-Modus (Großansicht)",
       focusModeText: "Der Fokus-Modus führt dich Satz für Satz durch das Workout – mit großen Zahlen und Knöpfen, damit du im Training nicht suchen oder scrollen musst.\n\nSo startest du: Tippe unten auf „Satz 1 starten“. Du siehst die Übung, „Satz 2 von 3“ und große Felder für Wiederholungen und Gewicht. „Satz geschafft“ hakt ab und startet die Pause (groß). Ist sie vorbei, folgt automatisch der nächste Satz.\n\nZurück zur Übersicht: Tippe oben auf „Übersicht“, um z. B. Übungen zu ändern. Pause und Satz laufen weiter; unten bringt dich eine Leiste mit „Öffnen“ zurück. Nach dem letzten Satz schließt sich die Großansicht von selbst, und du kannst speichern.",
       timedExercises: "Übungen auf Zeit",
@@ -1218,7 +1221,7 @@ export const messages = {
       step5Title: "Notizen geben Kontext",
       step5Text: "Schreib bei einer Übung eine Notiz, wenn du etwas bewusst anders machst – z. B. weniger Gewicht, um den Muskel besser zu spüren, oder ein Technikziel. Der KI-Coach liest die Notiz mit und bewertet dich dann fair.",
       step6Title: "So arbeitet der KI-Coach",
-      step6Text: "Nach dem Speichern bekommst du eine kurze Einordnung deines Trainings. Sinnvoll ist das erst, wenn die App dich mit früheren Einheiten vergleichen kann – das erste Feedback kommt deshalb nach 8 gleichen Workouts oder 4 Wochen. Die KI wertet nur aus, was du einträgst (Übungen, Sätze, Gewichte, Notizen) und erfindet nichts dazu. Dafür werden diese Trainingsdaten an den KI-Dienst OpenAI gesendet; dein Name und deine E-Mail-Adresse gehören nicht dazu. Im kostenlosen Tarif sind 60 KI-Auswertungen pro Monat enthalten, für den KI-Workout-Generator gibt es ein wöchentliches Kontingent.",
+      step6Text: "Nach dem Speichern bekommst du eine kurze Einordnung deines Trainings. Sinnvoll ist das erst, wenn die App dich mit früheren Einheiten vergleichen kann – das erste Feedback kommt deshalb nach 8 gleichen Workouts oder 4 Wochen. Die KI wertet nur aus, was du einträgst (Übungen, Sätze, Gewichte, Notizen) und erfindet nichts dazu. Dafür werden diese Trainingsdaten an den KI-Dienst OpenAI gesendet; dein Name und deine E-Mail-Adresse gehören nicht dazu. Im kostenlosen Tarif sind 60 KI-Anfragen pro Monat enthalten – KI-Feedback und KI-Workout-Generator teilen sich dieses Kontingent.",
       step7Title: "Du gestaltest PPL mit",
       step7Text: "PPL Fundamentals befindet sich in der Testphase. Wenn dir etwas unklar ist, etwas fehlt oder nicht richtig funktioniert, sende uns direkt Feedback. Jede Rückmeldung hilft, die App gezielt zu verbessern.",
       finish: 'PPL entdecken',
@@ -1296,6 +1299,10 @@ export const messages = {
       miniRest: 'Pause',
       miniHold: 'Satz läuft',
       miniSet: 'Als Nächstes: Satz {n}'
+    },
+    quota: {
+      costHint: 'Verbraucht 1 KI-Anfrage – noch {remaining} von {limit} in diesem Monat.',
+      exhausted: 'Dein KI-Kontingent für diesen Monat ist aufgebraucht.'
     },
     setDoneBar: {
       label: 'Abhaken',
@@ -1564,8 +1571,8 @@ export const messages = {
   ,quickGenIntroText: 'Create a new workout with one click directly from the dashboard.\n\nThe Quick Workout Generator builds a complete session based on your current settings like goal, workout mode and available equipment.\n\nIn the free version you can use the generator once per week.\n\nThe Quick Generator creates standalone workouts without long-term analysis or adaptation to your training history.\n\nWith Pro you get access to the full AI Coach. It analyzes your previous sessions, detects patterns, adjusts progression and creates personalized recommendations.'
   ,quickGenLearnPro: 'Learn more about Pro'
   ,quickGenGenerateNow: 'Generate workout'
-  ,quickGenLimitTitle: 'Weekly limit reached'
-  ,quickGenLimitText: 'You have used up your weekly quota for the Quick Workout Generator.\n\nUnlocked again on: {date}.\n\nWith Pro you get unlimited generations plus personalized training analysis and automatic adjustments.'
+  ,quickGenLimitTitle: 'Monthly limit reached'
+  ,quickGenLimitText: 'You have used up your monthly AI allowance.\n\nUnlocked again on: {date}.\n\nWith Pro you get unlimited generations plus personalized training analysis and automatic adjustments.'
   ,quickGenLastHintTitle: 'Only 1 free generation left'
   ,quickGenLastHintText: 'You can use the Quick Workout Generator only one more time for free this week.\n\nUnlocked again on: {date}.\n\nWould you rather upgrade to Pro now?'
   ,quickGenContinueFree: 'Use last free generation'
@@ -2331,6 +2338,9 @@ export const messages = {
       seeDetails: 'See details',
       saved: 'Your workout has been saved!',
       deferredSaved: 'Workout saved - without AI feedback.',
+      editedSaved: 'Changes saved.',
+      editedNoAi: 'No new AI analysis was requested. If you want your workout re-analysed after the changes, you can do it now.',
+      regenerate: 'Re-run AI analysis',
       deferredHint: 'Once you\'ve added your feedback on the exercises, you can request the AI analysis later from the feedback history.',
       goToFeedbackHistory: 'Go to feedback history',
       error: 'Could not load feedback',
@@ -2489,7 +2499,7 @@ export const messages = {
       restPauses: 'Rest between sets – how long?',
       restPausesText: "When you check off a set, your rest starts automatically and appears large in the middle of the screen. “Minimize” turns it into a bar at the bottom – the rest keeps running. When it's over, the next set follows automatically. If a timed exercise comes next, its timer starts by itself; shortly before, you hear a tone at 10 seconds and at 3, 2, 1.\n\nThe app adjusts the length: 3 min for heavy compound lifts in strength training, 2 min for compound lifts in muscle building, for accessory exercises in strength training and for explosive exercises, 1:30 min for accessory exercises in muscle building. Use − / + to change the rest in 15-second steps and remember the new length for that exercise.\n\nWhy different lengths? Short rests (about 60–90 seconds) tend to favor muscle building. Longer rests (about 2–5 minutes) give your body more time to recover and suit maximum strength better, especially for heavy compound lifts with few reps.\n\nIn the rest view you can still adjust the next set. “Skip” ends the rest early.",
       aiCoach: 'What does the AI Coach do?',
-      aiCoachText: "After a workout, the app automatically creates a short, factual summary of your training compared to earlier sessions — based on the recorded numbers, not on guesses about technique, form, or how you felt that day, none of which the app can actually measure.\n\nYou can rate each piece of feedback with a thumbs up or down and optionally add a reason or a short correction — this helps make future analyses more relevant to you. This rating is purely personal and optional; it does not affect whether you receive feedback.\n\nWhen do you get feedback? An evaluation needs comparison data: after 8 identical workouts or 4 weeks. Until then the app shows how many are still missing. You'll find the feedback in Stats.\n\nWhat does the AI see? Only what you log: exercises, sets, weights, reps and your notes. This training data is sent to the AI service OpenAI. Your name and email address are not sent.\n\nAllowance: The free plan includes 60 AI analyses per month. The AI workout generator has a weekly allowance. With Pro these limits are removed.\n\nIf you delete a workout, its feedback is removed along with it, and later analyses no longer draw on the deleted values.",
+      aiCoachText: "After a workout, the app automatically creates a short, factual summary of your training compared to earlier sessions — based on the recorded numbers, not on guesses about technique, form, or how you felt that day, none of which the app can actually measure.\n\nYou can rate each piece of feedback with a thumbs up or down and optionally add a reason or a short correction — this helps make future analyses more relevant to you. This rating is purely personal and optional; it does not affect whether you receive feedback.\n\nWhen do you get feedback? An evaluation needs comparison data: after 8 identical workouts or 4 weeks. Until then the app shows how many are still missing. You'll find the feedback in Stats.\n\nWhat does the AI see? Only what you log: exercises, sets, weights, reps and your notes. This training data is sent to the AI service OpenAI. Your name and email address are not sent.\n\nAllowance: The free plan includes 60 AI requests per month. AI feedback and the AI workout generator share this allowance. Re-analysing after a change also uses one request. With Pro these limits are removed.\n\nIf you delete a workout, its feedback is removed along with it, and later analyses no longer draw on the deleted values.",
       focusMode: "Focus mode (full view)",
       focusModeText: "Focus mode guides you through the workout set by set – with big numbers and buttons so you don't have to search or scroll during training.\n\nHow to start: tap “Start set 1” at the bottom. You see the exercise, “Set 2 of 3” and large fields for reps and weight. “Set done” checks it off and starts the rest (large). When it's over, the next set follows automatically.\n\nBack to the overview: tap “Overview” at the top, e.g. to change exercises. Rest and set keep running; a bar with “Open” at the bottom takes you back. After the last set the full view closes by itself and you can save.",
       timedExercises: "Timed exercises",
@@ -2596,7 +2606,7 @@ export const messages = {
       step5Title: "Notes add context",
       step5Text: "Add a note to an exercise when you do something on purpose – e.g. less weight to feel the muscle better, or a technique goal. The AI coach reads the note and judges you fairly.",
       step6Title: "How the AI coach works",
-      step6Text: "After saving you get a short assessment of your training. It only makes sense once the app can compare with earlier sessions – so your first feedback arrives after 8 identical workouts or 4 weeks. The AI only evaluates what you log (exercises, sets, weights, notes) and invents nothing. This training data is sent to the AI service OpenAI for that; your name and email address are not part of it. The free plan includes 60 AI analyses per month, and there is a weekly allowance for the AI workout generator.",
+      step6Text: "After saving you get a short assessment of your training. It only makes sense once the app can compare with earlier sessions – so your first feedback arrives after 8 identical workouts or 4 weeks. The AI only evaluates what you log (exercises, sets, weights, notes) and invents nothing. This training data is sent to the AI service OpenAI for that; your name and email address are not part of it. The free plan includes 60 AI requests per month – AI feedback and the AI workout generator share this allowance.",
       step7Title: "You help shape PPL",
       step7Text: "PPL Fundamentals is in its test phase. If anything is unclear, missing, or not working correctly, send us feedback directly. Every message helps improve the app.",
       finish: 'Explore PPL',
@@ -2674,6 +2684,10 @@ export const messages = {
       miniRest: 'Rest',
       miniHold: 'Set running',
       miniSet: 'Next: set {n}'
+    },
+    quota: {
+      costHint: 'Uses 1 AI request – {remaining} of {limit} left this month.',
+      exhausted: 'Your AI allowance for this month is used up.'
     },
     setDoneBar: {
       label: 'Check off',

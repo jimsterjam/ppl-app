@@ -403,6 +403,14 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0))
   })
 
+  // Verbleibende KI-Anfragen dieses Monats (Generator und Feedback teilen sich ein Kontingent); Infinity = unbegrenzt.
+  const aiRequestsRemaining = quickGenerationsRemaining
+  const aiRequestsLimit = computed(() => {
+    if (subscription.value.plan !== 'free') return Infinity
+    const limit = Number(usage.value.aiMonthlyLimit)
+    return !Number.isFinite(limit) || limit < 0 ? Infinity : limit
+  })
+
   const quickGenerationsUsedThisMonth = computed(() => {
     return Number(usage.value.aiMonthlyCount) || 0
   })
@@ -469,6 +477,8 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     workoutsRemaining,
     canUseQuickGenerator,
     quickGenerationsRemaining,
+    aiRequestsRemaining,
+    aiRequestsLimit,
     quickGeneratorResetDate,
     quickGenerationsUsedThisMonth,
     shouldShowUpgrade,
