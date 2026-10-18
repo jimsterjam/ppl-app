@@ -150,6 +150,8 @@ export function searchAndRankExercises(items, query, options = {}) {
       if (primary === queryNormalized) score += 1200
       else if (primary.startsWith(queryNormalized)) score += 850
       else if (primary.includes(queryNormalized)) score += 620
+      // Wortreihenfolge egal: "leg curl lying" findet dasselbe wie "lying leg curl".
+      else if (baseTokens.length > 1 && baseTokens.every((token) => hasWord(primary, token))) score += 620
 
       // Prioritize literal search intent: exact leading word beats fuzzy/alias matches.
       if (startsWithWholeWord(primary, queryNormalized)) {

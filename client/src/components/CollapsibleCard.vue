@@ -41,9 +41,17 @@ const bodyId = `cc-body-${Math.random().toString(36).slice(2, 9)}`
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-.cc-title { margin: 0; color: inherit; }
-.danger-zone .cc-title { color: var(--danger); }
-.dev-tools .cc-title { color: #22c55e; }
+.cc-title {
+  margin: 0;
+  padding-left: 10px;
+  border-left: 3px solid var(--accent);
+  color: var(--fg);
+  font-size: 1.12rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.danger-zone .cc-title { color: var(--danger); border-left-color: var(--danger); }
+.dev-tools .cc-title { color: #22c55e; border-left-color: #22c55e; }
 .cc-chevron {
   flex: 0 0 auto;
   width: 9px;
