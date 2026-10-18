@@ -45,6 +45,7 @@
             <span class="warmup-time" :class="{ paused: timerPaused(row.step) }">{{ formatRest(timeShown(row.step)) }}</span>
             <button type="button" class="warmup-adjust" :aria-label="t('warmup.minusAria')" :disabled="!canAdjust(row.step, -WARMUP_ADJUST_SECONDS)" @click="warmupTimer.adjust(row.step, -WARMUP_ADJUST_SECONDS)">{{ t('restTimer.minusLabel') }}</button>
             <button type="button" class="warmup-adjust" :aria-label="t('warmup.plusAria')" :disabled="!canAdjust(row.step, WARMUP_ADJUST_SECONDS)" @click="warmupTimer.adjust(row.step, WARMUP_ADJUST_SECONDS)">{{ t('restTimer.plusLabel') }}</button>
+            <button v-if="ownTimer(row.step) && warmupTimer.isActive" type="button" class="warmup-adjust" :aria-label="t('warmup.expandAria')" @click="overlayOpen = true">⤢</button>
             <button v-if="timerRunning(row.step)" type="button" class="warmup-btn ghost" @click="warmupTimer.pause()">{{ t('warmup.pause') }}</button>
             <button v-else-if="timerPaused(row.step)" type="button" class="warmup-btn" @click="warmupTimer.resume()">{{ t('warmup.resume') }}</button>
             <button v-else type="button" class="warmup-btn" @click="startTimer(row.step)">{{ t('warmup.start') }}</button>
@@ -57,17 +58,71 @@
       </li>
     </ul>
     </template>
+
+    <!-- Große Anzeige wie beim Pausentimer (Absprache Paul 24.10.): öffnet beim Start eines Timer-Schritts, zeigt danach den
+         nächsten Schritt (Cardio/Gelenke mit einstellbarer Zeit, Standard 2 Min. für Gelenke; gemerkt) bzw. die Empfehlung für
+         die einfache Übung. "Verkleinern" bringt zurück zur Karte. -->
+    <Teleport to="body">
+      <div v-if="overlayOpen" class="wu-overlay" role="dialog" aria-modal="true" :aria-label="t('warmup.overlayAria')">
+        <div class="wu-inner">
+          <p class="wu-label">{{ t('warmup.title') }}</p>
+
+          <template v-if="overlayMode === 'timer' || overlayMode === 'timedNext'">
+            <h2 class="wu-step">{{ overlayRow.title }}</h2>
+            <div class="wu-ring" role="timer" aria-live="off">
+              <svg viewBox="0 0 100 100" aria-hidden="true">
+                <circle class="wu-ring-track" cx="50" cy="50" r="46" />
+                <circle class="wu-ring-progress" cx="50" cy="50" r="46" :stroke-dasharray="RING_LENGTH" :stroke-dashoffset="ringOffset" />
+              </svg>
+              <span class="wu-time">{{ formatRest(timeShown(overlayStep)) }}</span>
+            </div>
+            <p class="wu-hint">{{ overlayRow.hint }}</p>
+            <div class="wu-actions">
+              <button type="button" class="wu-btn" :aria-label="t('warmup.minusAria')" :disabled="!canAdjust(overlayStep, -WARMUP_ADJUST_SECONDS)" @click="warmupTimer.adjust(overlayStep, -WARMUP_ADJUST_SECONDS)">{{ t('restTimer.minusLabel') }}</button>
+              <button type="button" class="wu-btn" :aria-label="t('warmup.plusAria')" :disabled="!canAdjust(overlayStep, WARMUP_ADJUST_SECONDS)" @click="warmupTimer.adjust(overlayStep, WARMUP_ADJUST_SECONDS)">{{ t('restTimer.plusLabel') }}</button>
+            </div>
+            <template v-if="overlayMode === 'timer'">
+              <button v-if="timerRunning(overlayStep)" type="button" class="wu-btn" @click="warmupTimer.pause()">{{ t('warmup.pause') }}</button>
+              <button v-else type="button" class="wu-btn wu-primary" @click="warmupTimer.resume()">{{ t('warmup.resume') }}</button>
+              <button type="button" class="wu-link" @click="finishNow(overlayStep)">{{ t('warmup.finishNow') }}</button>
+            </template>
+            <template v-else>
+              <button type="button" class="wu-btn wu-primary" @click="startTimer(overlayStep)">{{ t('warmup.start') }}</button>
+              <button type="button" class="wu-link" @click="skipStep(overlayStep)">{{ t('warmup.skip') }}</button>
+            </template>
+          </template>
+
+          <template v-else-if="overlayMode === 'specific'">
+            <p class="wu-kicker">{{ t('warmup.recommendation') }}</p>
+            <h2 class="wu-step">{{ overlayRow.title }}</h2>
+            <p class="wu-hint">{{ overlayRow.hint }}</p>
+            <button v-if="specific" type="button" class="wu-btn" @click="$emit('open-media', specific.entry)">{{ t('warmup.watchVideo') }}</button>
+            <button type="button" class="wu-btn wu-primary" @click="finishNow('specific')">{{ t('warmup.doneStep') }}</button>
+            <button type="button" class="wu-link" @click="skipStep('specific')">{{ t('warmup.skip') }}</button>
+          </template>
+
+          <template v-else>
+            <h2 class="wu-step">{{ t('warmup.allDoneTitle') }}</h2>
+            <p class="wu-hint">{{ t('warmup.allDoneText') }}</p>
+            <button type="button" class="wu-btn wu-primary" @click="closeOverlay(true)">{{ t('warmup.toWorkout') }}</button>
+          </template>
+
+          <button v-if="overlayMode !== 'done'" type="button" class="wu-link wu-minimize" @click="closeOverlay(false)">{{ t('restTimer.minimize') }}</button>
+        </div>
+      </div>
+    </Teleport>
   </section>
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import NotificationHint from '@/components/NotificationHint.vue'
 import { ensureNotificationPermission } from '@/utils/notificationPermission'
 import { useWarmupTimerStore } from '@/stores/warmupTimerStore'
 import { useSessionStopwatchStore } from '@/stores/sessionStopwatch'
 import { formatRest } from '@/utils/restTimerRules'
+import { useScrollLock } from '@/composables/useScrollLock'
 import {
   WARMUP_ADJUST_SECONDS, WARMUP_MAX_SECONDS, WARMUP_MIN_SECONDS, WARMUP_STEPS, WARMUP_TIMER_SECONDS,
   currentWarmupStep, emptyWarmup, jointsTypeFor, nextWarmupStep, sanitizeWarmup
@@ -85,13 +140,17 @@ const props = defineProps({
   // Einfache Übung zur ersten Hauptübung: { name, entry } mit Katalogeintrag für Bild/Video, oder null
   specific: { type: Object, default: null }
 })
-const emit = defineEmits(['update:warmup', 'open-media'])
+const emit = defineEmits(['update:warmup', 'open-media', 'start-training'])
 
 const { t } = useI18n()
 const warmupTimer = useWarmupTimerStore()
 const sessionStopwatch = useSessionStopwatchStore()
 const banner = ref('')
 const open = ref(true)
+// Große Anzeige (Overlay) und Schritte, die im Overlay übersprungen wurden (nicht abgehakt).
+const overlayOpen = ref(false)
+const skipped = ref([])
+const RING_LENGTH = 2 * Math.PI * 46
 
 const state = computed(() => sanitizeWarmup(props.warmup) || emptyWarmup())
 const current = computed(() => currentWarmupStep(state.value))
@@ -151,6 +210,8 @@ async function startTimer(step) {
   // Beim ersten Start zuerst die Mitteilungs-Erlaubnis erfragen (iOS fragt nur einmal; ohne Frage fehlt die App
   // später unter Einstellungen > Mitteilungen). Wirft nie.
   await ensureNotificationPermission()
+  skipped.value = skipped.value.filter((s) => s !== step)
+  overlayOpen.value = true
   // Mit dem Warm-up beginnt das Training: Gesamttimer (Gym-Zeit) mitstarten, falls er noch nicht benutzt wurde.
   sessionStopwatch.startIfIdle()
   const next = nextWarmupStep(state.value, step)
@@ -166,6 +227,44 @@ async function startTimer(step) {
 function setStep(step, value) {
   emit('update:warmup', { ...state.value, [step]: value })
 }
+
+// --- Große Anzeige ---------------------------------------------------------------------------------
+const overlayStep = computed(() => {
+  if (warmupTimer.isActive && ownTimer(warmupTimer.step)) return warmupTimer.step
+  return WARMUP_STEPS.find((s) => !state.value[s] && !skipped.value.includes(s)) || null
+})
+const overlayMode = computed(() => {
+  if (warmupTimer.isActive && ownTimer(warmupTimer.step)) return 'timer'
+  const s = overlayStep.value
+  if (!s) return 'done'
+  return WARMUP_TIMER_SECONDS[s] ? 'timedNext' : 'specific'
+})
+const overlayRow = computed(() => rows.value.find((r) => r.step === overlayStep.value) || { title: '', hint: '' })
+const ringOffset = computed(() => {
+  const s = overlayStep.value
+  if (!s || !(ownTimer(s) && warmupTimer.isActive)) return 0
+  const total = (totalSeconds(s) || 1) * 1000
+  return RING_LENGTH * Math.min(1, Math.max(0, timeShown(s) / total))
+})
+
+function finishNow(step) {
+  // Vorzeitig fertig: wie von Hand abgehakt (laufender Timer endet mit).
+  if (ownTimer(step) && warmupTimer.isActive) warmupTimer.cancel()
+  setStep(step, true)
+}
+
+function skipStep(step) {
+  if (!skipped.value.includes(step)) skipped.value = [...skipped.value, step]
+}
+
+function closeOverlay(startTraining) {
+  overlayOpen.value = false
+  if (startTraining) emit('start-training')
+}
+
+const { lock, unlock } = useScrollLock()
+watch(overlayOpen, (open) => (open ? lock() : unlock()), { immediate: true })
+onBeforeUnmount(unlock)
 
 function toggle(step) {
   banner.value = ''
@@ -319,4 +418,48 @@ onMounted(() => {
 .warmup-progress { height: 6px; border-radius: 99px; background: var(--card-soft); margin-top: 8px; overflow: hidden; }
 .warmup-progress i { display: block; height: 100%; background: var(--accent-text); border-radius: 99px; }
 .warmup-note { display: block; margin-top: 6px; color: var(--muted); font-size: 0.74rem; }
+
+/* --- Große Anzeige (wie der Pausentimer) ----------------------------------------------------------- */
+.wu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1290;
+  display: flex;
+  align-items: safe center;
+  justify-content: center;
+  overflow-y: auto;
+  padding: calc(env(safe-area-inset-top, 0px) + 16px) 20px calc(env(safe-area-inset-bottom, 0px) + 16px);
+  background: var(--bg, #08090b);
+  color: var(--fg);
+}
+.wu-inner { width: 100%; max-width: 420px; display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; }
+.wu-label { margin: 0; font-size: 1.3rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.wu-kicker { margin: 0; color: var(--accent-text, var(--fg)); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.wu-step { margin: 0; font-size: 1.6rem; line-height: 1.2; }
+.wu-hint { margin: 0; color: var(--muted); font-size: 1.02rem; line-height: 1.4; }
+.wu-ring { position: relative; width: min(66vw, 280px); aspect-ratio: 1; display: flex; align-items: center; justify-content: center; }
+.wu-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.wu-ring-track { fill: none; stroke: var(--card-border, rgba(255, 255, 255, 0.12)); stroke-width: 4; }
+.wu-ring-progress { fill: none; stroke: var(--accent); stroke-width: 4; stroke-linecap: round; transition: stroke-dashoffset 0.25s linear; }
+.wu-time { position: relative; font-size: clamp(64px, 22vw, 100px); font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; color: var(--accent-text, var(--fg)); }
+.wu-actions { display: flex; gap: 12px; width: 100%; }
+.wu-actions .wu-btn { flex: 1; }
+.wu-btn {
+  min-width: 0;
+  min-height: 58px;
+  width: 100%;
+  padding: 0 16px;
+  border-radius: 16px;
+  border: 1px solid var(--card-border);
+  background: var(--surface);
+  color: var(--fg);
+  font: inherit;
+  font-size: 1.25rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+.wu-btn:disabled { opacity: 0.4; }
+.wu-primary { border-color: transparent; background: linear-gradient(120deg, var(--accent), var(--accent-strong)); color: var(--accent-contrast, #060606); }
+.wu-link { min-width: 0; min-height: 44px; padding: 0 12px; border: none; background: transparent; color: var(--accent-text, var(--fg)); font: inherit; font-size: 1rem; font-weight: 600; cursor: pointer; }
+.wu-minimize { color: var(--muted); }
 </style>

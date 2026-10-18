@@ -111,6 +111,7 @@
             :first-exercise-name="warmupFirstExerciseName"
             :specific="warmupSpecific"
             @update:warmup="onWarmupUpdate"
+            @start-training="doneBarCurrent && startFocus()"
             @open-media="openExerciseMedia"
           />
 
