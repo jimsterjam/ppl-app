@@ -2,47 +2,43 @@
   <div class="faqs-view">
     <HeaderBar :title="$t('faqs.title')" />
 
-    <div class="content">
-      <section class="faq-list glass" :aria-label="$t('nav.faqs')">
-        <h3>{{ $t('faqs.title') }}</h3>
-        <template v-for="group in groups" :key="group.titleKey">
-          <h4 class="faq-group-title">{{ $t(`faqs.${group.titleKey}`) }}</h4>
-          <div
-            v-for="key in group.keys"
-            :key="key"
-            class="faq-item"
-          >
-            <button
-              type="button"
-              class="faq-trigger"
-              @click="openFaq(key)"
-            >
-              <span class="title">{{ $t(`faqs.${key}`) }}</span>
-              <span class="chevron" aria-hidden="true">▸</span>
-            </button>
-          </div>
-        </template>
-      </section>
+    <div class="content" :aria-label="$t('nav.faqs')">
+      <!-- Gleiche Gestaltung wie die Einstellungen: Gruppenüberschrift + je Eintrag eine Karte mit Titel und Pfeil. -->
+      <template v-for="group in groups" :key="group.titleKey">
+        <h2 class="section-title">{{ $t(`faqs.${group.titleKey}`) }}</h2>
+        <button
+          v-for="key in group.keys"
+          :key="key"
+          type="button"
+          class="card faq-card"
+          @click="openFaq(key)"
+        >
+          <span class="card-title">{{ $t(`faqs.${key}`) }}</span>
+          <span class="faq-chevron" aria-hidden="true"></span>
+        </button>
+      </template>
 
       <!-- FAQ Modal/Overlay -->
-      <Transition name="modal" appear>
-        <div v-if="selectedFaqKey" class="modal-overlay" @click="closeFaq">
-          <div class="modal-content" @click.stop>
-            <div class="modal-header">
-              <h4>{{ $t(`faqs.${selectedFaqKey}`) }}</h4>
-              <button class="close-btn" :aria-label="$t('common.close')" @click="closeFaq">
-                <span>×</span>
-              </button>
-            </div>
-            <div class="modal-body">
-              <p v-for="(p, pi) in splitParagraphs($t(`faqs.${selectedFaqKey}Text`))" :key="pi">{{ p }}</p>
+      <Teleport to="body">
+        <Transition name="modal" appear>
+          <div v-if="selectedFaqKey" class="modal-overlay" @click="closeFaq">
+            <div class="modal-content" role="dialog" aria-modal="true" @click.stop>
+              <div class="modal-header">
+                <h4>{{ $t(`faqs.${selectedFaqKey}`) }}</h4>
+                <button class="close-btn" :aria-label="$t('common.close')" @click="closeFaq">
+                  <span>×</span>
+                </button>
+              </div>
+              <div class="modal-body">
+                <p v-for="(p, pi) in splitParagraphs($t(`faqs.${selectedFaqKey}Text`))" :key="pi">{{ p }}</p>
+              </div>
             </div>
           </div>
-        </div>
-      </Transition>
+        </Transition>
+      </Teleport>
 
-      <section class="card glass about">
-        <h3>{{ $t('faqs.about') }}</h3>
+      <h2 class="section-title">{{ $t('faqs.about') }}</h2>
+      <section class="card about">
         <p>
           {{ $t('faqs.version') }}: <strong>{{ version }}</strong>
         </p>
@@ -53,15 +49,19 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import HeaderBar from '@/components/HeaderBar.vue'
+import { useScrollLock } from '@/composables/useScrollLock'
 import pkg from '../../package.json'
 
 const version = computed(() => pkg?.version || '0.0.0')
 
 // FAQ modal state
 const selectedFaqKey = ref('')
+const { lock: lockBodyScroll, unlock: unlockBodyScroll } = useScrollLock()
+watch(selectedFaqKey, (key) => (key ? lockBodyScroll() : unlockBodyScroll()), { immediate: true })
+onBeforeUnmount(unlockBodyScroll)
 const baseKeys = ['gettingStarted', 'pushPullLegs', 'navigation', 'workoutFlow', 'focusMode', 'symbols', 'restPauses', 'timedExercises', 'warmup', 'progressRules', 'progression', 'weightSuggestion', 'statsReading', 'aiCoach', 'workouts', 'uploads', 'privacy']
 // Gruppierte Anzeige (Absprache Paul 22.10.): jeder Eintrag steht in genau einer Gruppe.
 const groups = [
@@ -96,86 +96,42 @@ function splitParagraphs(text) {
 
 <style scoped>
 .faqs-view { min-height: 100vh; background: var(--bg); color: var(--fg); padding-bottom: 70px; }
-.content { padding: 16px; display: grid; gap: 16px; }
-
-/* FAQ List */
-.faq-list { 
-  padding: 16px; 
-  border-radius: 12px; 
-  border: 1px solid transparent; 
+/* Gleiche Maße wie die Einstellungen (.settings-content) */
+.content {
+  padding: 20px;
+  padding-bottom: 90px; /* Platz für BottomNav */
+  max-width: 920px;
+  margin: 0 auto;
+  display: grid;
+  gap: 14px;
 }
 
-.faq-list h3 {
-  margin: 0 0 16px 0; 
-  color: var(--fg); 
-  font-size: 1.1rem; 
-  font-weight: 600;
-}
-
-.faq-group-title {
-  margin: 18px 0 4px;
-  padding: 0 12px;
-  font-size: 0.8rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.faq-group-title:first-of-type { margin-top: 4px; }
-
-.faq-item + .faq-item { 
-  border-top: 1px solid var(--card-border, rgba(125,125,125,0.25)); 
-}
-
-.faq-trigger {
-  width: 100%;
-  text-align: left;
-  padding: 16px 12px;
-  background: transparent;
-  border: none;
-  color: var(--fg);
+.faq-card {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 60px; /* gleiche Höhe wie eine zugeklappte Einstellungs-Karte */
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
   cursor: pointer;
-  position: relative;
-  transition: all 0.2s ease;
-  border-radius: 10px;
+  -webkit-tap-highlight-color: transparent;
+}
+.faq-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Pfeil wie bei den Einstellungen, nach rechts weisend (öffnet ein Fenster) */
+.faq-chevron {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid var(--muted);
+  border-bottom: 2px solid var(--muted);
+  transform: rotate(-45deg);
 }
 
-.faq-trigger::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: color-mix(in oklab, var(--fg) 4%, transparent);
-  border-radius: 10px;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  pointer-events: none;
-}
-
-.faq-trigger:hover::before,
-.faq-trigger:active::before {
-  opacity: 1;
-}
-
-.faq-trigger:focus { 
-  outline: 2px solid var(--accent-color); 
-  outline-offset: 2px; 
-}
-
-.faq-trigger .title { 
-  font-weight: 600; 
-  font-size: 1rem; 
-}
-
-.chevron { 
-  transition: transform 0.2s ease; 
-  color: var(--muted);
-  font-size: 18px;
-}
+.about p { margin: 0; }
 
 /* Modal/Overlay */
 .modal-overlay {
@@ -274,9 +230,6 @@ function splitParagraphs(text) {
   transform: scale(0.9) translateY(20px);
 }
 
-.card { padding: 16px; border-radius: 12px; border: 1px solid transparent; }
-.about h3 { margin: 0 0 8px 0; font-size: 1.1rem; color: var(--fg); }
-.about p { margin: 0; color: var(--fg); }
 
 @media (max-width: 480px) {
   .modal-overlay {
@@ -300,13 +253,6 @@ function splitParagraphs(text) {
     padding: 0 16px 16px 16px;
   }
   
-  .faq-trigger {
-    padding: 14px 12px;
-  }
-  
-  .faq-trigger .title {
-    font-size: 0.95rem;
-  }
 }
 
 @media (min-width: 768px) {

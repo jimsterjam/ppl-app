@@ -1,7 +1,7 @@
 <template>
   <section class="card collapsible" :class="{ open }">
     <button type="button" class="cc-head" :aria-expanded="open" :aria-controls="bodyId" @click="open = !open">
-      <h3 class="cc-title">{{ title }}</h3>
+      <h3 class="cc-title card-title">{{ title }}</h3>
       <span class="cc-chevron" aria-hidden="true"></span>
     </button>
     <div v-if="open" :id="bodyId" class="cc-body">
@@ -40,15 +40,6 @@ const bodyId = `cc-body-${Math.random().toString(36).slice(2, 9)}`
   text-align: left;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-}
-.cc-title {
-  margin: 0;
-  padding-left: 10px;
-  border-left: 3px solid var(--accent);
-  color: var(--fg);
-  font-size: 1.12rem;
-  font-weight: 700;
-  letter-spacing: 0.01em;
 }
 .danger-zone .cc-title { color: var(--danger); border-left-color: var(--danger); }
 .dev-tools .cc-title { color: #22c55e; border-left-color: #22c55e; }

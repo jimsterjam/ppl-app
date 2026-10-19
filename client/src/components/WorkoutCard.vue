@@ -23,9 +23,9 @@ const onInfo = () => emit('info', props.label)
 .workout-card {
   width: 100%;
   aspect-ratio: 1 / 1;
-  border-radius: calc(var(--panel-radius) - 16px);
-  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--line-strong));
-  background: var(--bg-panel);
+  border-radius: var(--card-radius);
+  border: 1px solid color-mix(in srgb, var(--accent) 25%, var(--card-border));
+  background: var(--card-bg);
   box-shadow: var(--shadow-soft);
   color: var(--fg-strong);
   font-family: "Sora", "Space Grotesk", "SF Pro Display", sans-serif;

@@ -899,21 +899,6 @@ async function confirmDeleteAccount() {
   gap: 14px;
 }
 
-.section-title {
-  margin: 14px 2px 0;
-  font-size: 0.85rem;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: color-mix(in srgb, var(--fg) 86%, var(--muted));
-}
-
-.card {
-  background: var(--card-bg);
-  border: 1px solid var(--card-border);
-  border-radius: 12px;
-  padding: 16px;
-}
-
 .spinner {
   width: 16px;
   height: 16px;
