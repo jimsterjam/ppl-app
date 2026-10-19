@@ -298,8 +298,8 @@ onMounted(() => {
 <style scoped>
 .warmup-card {
   border: 1.5px solid color-mix(in srgb, var(--accent) 55%, transparent);
-  background: var(--bg-panel);
-  border-radius: 18px;
+  background: var(--card-bg);
+  border-radius: var(--card-radius);
   padding: 6px 14px 8px;
   margin: 0 0 12px;
 }

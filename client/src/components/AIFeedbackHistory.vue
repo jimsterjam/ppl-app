@@ -508,8 +508,8 @@ onBeforeUnmount(() => {
   color: var(--muted);
 }
 .ai-feedback-history {
-  padding: 1.25rem;
-  border-radius: 1rem;
+  padding: 16px;
+  border-radius: var(--card-radius);
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -588,7 +588,7 @@ onBeforeUnmount(() => {
 }
 
 .feedback-item {
-  border-radius: 0.75rem;
+  border-radius: var(--card-radius);
   background: var(--surface);
   padding: 0.85rem 1rem;
   cursor: pointer;

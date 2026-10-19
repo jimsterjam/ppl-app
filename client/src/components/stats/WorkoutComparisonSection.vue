@@ -212,8 +212,8 @@ function directionArrow(direction) {
 
 <style scoped>
 .workout-compare {
-  padding: 18px;
-  border-radius: 18px;
+  padding: 16px;
+  border-radius: var(--card-radius);
 }
 
 .section-head {

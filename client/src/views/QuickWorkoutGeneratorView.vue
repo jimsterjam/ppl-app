@@ -433,8 +433,8 @@ function confirmPreview() {
 }
 
 .form {
-  padding: 1.25rem;
-  border-radius: 1rem;
+  padding: 16px;
+  border-radius: var(--card-radius);
   display: flex;
   flex-direction: column;
   gap: 1.25rem;

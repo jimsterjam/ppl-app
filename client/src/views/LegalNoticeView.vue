@@ -107,10 +107,9 @@ function goBack() {
   margin: 0 auto;
   margin-top: clamp(8px, 3vw, 32px);
   background: var(--card-bg);
-  border: 1px solid color-mix(in srgb, var(--card-border) 60%, transparent);
-  border-radius: 24px;
+  border: 1px solid var(--card-border);
+  border-radius: var(--card-radius);
   padding: clamp(20px, 4vw, 48px);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
 }
 
 .legal-header {
