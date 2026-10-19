@@ -1249,7 +1249,7 @@ function formatNumber(value, digits = 0) {
 
 .day-overlay-workout {
   background: rgba(255, 255, 255, 0.05);
-  border-radius: 18px;
+  border-radius: var(--card-radius);
   padding: 20px 22px;
   border: 1px solid rgba(255, 255, 255, 0.07);
 }
@@ -1446,8 +1446,8 @@ function formatNumber(value, digits = 0) {
   justify-content: space-between;
   gap: 16px;
   padding: 18px 20px;
-  border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--card-radius);
+  border: 1px solid var(--card-border);
   background: linear-gradient(120deg, rgba(61, 142, 230, 0.22), rgba(255, 164, 89, 0.18));
 }
 
@@ -1515,11 +1515,10 @@ function formatNumber(value, digits = 0) {
 }
 
 .panel {
-  border-radius: var(--panel-radius);
-  border: 1px solid var(--line-soft);
-  background: var(--bg-panel);
-  box-shadow: var(--shadow-soft);
-  padding: clamp(18px, 3vw, 24px);
+  border-radius: var(--card-radius);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  padding: 16px;
 }
 
 .calendar-head-right {
@@ -1572,10 +1571,9 @@ function formatNumber(value, digits = 0) {
 }
 
 .loading-section {
-  border-radius: var(--panel-radius);
-  border: 1px solid var(--line-soft);
-  background: var(--bg-panel);
-  box-shadow: var(--shadow-soft);
+  border-radius: var(--card-radius);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
   padding: 2.25rem 1.5rem;
   text-align: center;
   display: flex;

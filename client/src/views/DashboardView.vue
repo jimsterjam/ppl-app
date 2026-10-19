@@ -1613,10 +1613,9 @@ onActivated(async () => {
 }
 .loading-section,
 .success-message {
-  border-radius: var(--panel-radius);
-  border: 1px solid var(--line-soft);
-  background: var(--bg-panel);
-  box-shadow: var(--shadow-soft);
+  border-radius: var(--card-radius);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
   padding: 2.25rem 1.5rem;
   text-align: center;
 }

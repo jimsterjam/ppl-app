@@ -560,11 +560,10 @@ function deleteWorkoutItem(workout) {
 <style scoped>
 .recent-workouts {
   background: var(--card-bg);
-  border-radius: var(--panel-radius);
-  padding: clamp(18px, 3vw, 26px);
+  border-radius: var(--card-radius);
+  padding: 16px;
   margin: 0;
   border: 1px solid var(--card-border);
-  box-shadow: var(--shadow-soft);
 }
 
 .header {
@@ -589,13 +588,13 @@ function deleteWorkoutItem(workout) {
   padding: 32px 16px;
   color: var(--muted);
   border: 1px dashed var(--card-border);
-  border-radius: 18px;
+  border-radius: var(--card-radius);
 }
 
 .workouts-list { display: flex; flex-direction: column; gap: 12px; }
 
 .workout-card {
-  border-radius: 22px;
+  border-radius: var(--card-radius);
   padding: 16px;
   border: 1px solid var(--card-border);
   cursor: pointer;
@@ -716,7 +715,7 @@ function deleteWorkoutItem(workout) {
   gap: 12px;
 }
 
-.exercise-detailed { background: rgba(255, 255, 255, 0.01); border-radius: 16px; padding: 14px; border: 1px solid var(--card-border); }
+.exercise-detailed { background: rgba(255, 255, 255, 0.01); border-radius: var(--card-radius); padding: 14px; border: 1px solid var(--card-border); }
 
 .exercise-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--divider); }
 

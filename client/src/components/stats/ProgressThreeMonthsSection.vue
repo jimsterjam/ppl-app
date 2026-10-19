@@ -149,8 +149,8 @@ function formatCompactNumber(value) {
 
 <style scoped>
 .progress-3m-section {
-  padding: 18px;
-  border-radius: 18px;
+  padding: 16px;
+  border-radius: var(--card-radius);
 }
 
 .section-head {

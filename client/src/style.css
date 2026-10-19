@@ -331,21 +331,12 @@ img, canvas, svg { max-width: 100%; display: inline-block; }
    Panels & Cards
 --------------------------------------------------------------------------- */
 .glass {
-  background: var(--bg-panel);
-  border-radius: var(--panel-radius);
-  border: 1px solid var(--line-soft);
-  box-shadow: var(--shadow-hard);
+  /* Einheitliche Karte (siehe .card weiter unten): gleicher Rahmen/Radius wie die Einstellungen. */
+  background: var(--card-bg);
+  border-radius: var(--card-radius);
+  border: 1px solid var(--card-border);
   position: relative;
   overflow: hidden;
-}
-
-.glass::after {
-  content: '';
-  position: absolute;
-  inset: 14px;
-  border-radius: calc(var(--panel-radius) - 14px);
-  border: 1px solid rgba(255, 255, 255, 0.03);
-  pointer-events: none;
 }
 
 .glass-soft {
@@ -591,10 +582,9 @@ select:focus {
 .loading,
 .empty-state,
 .empty-panel {
-  border-radius: var(--panel-radius);
-  border: 1px solid var(--line-soft);
-  background: var(--bg-panel);
-  box-shadow: var(--shadow-soft);
+  border-radius: var(--card-radius);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
   padding: 2rem 1.5rem;
   text-align: center;
   color: var(--muted);
