@@ -2242,20 +2242,20 @@ const hasBottomBar = computed(() => showFocusStart.value || restTimer.isVisible 
 const showFocusStart = computed(() => !!doneBarCurrent.value && !focus.active && !restTimer.isVisible && !warmupTimer.isActive)
 
 // Aufwärmsätze in der Großansicht (Absprache Paul 19.10.): vor dem ersten Arbeitssatz jeder Übung, ohne Timer -
-// abhaken oder überspringen. Nur solange in dieser Übung noch kein Arbeitssatz abgehakt ist. Die erledigten
-// Aufwärmsätze merkt sich nur die Ansicht (nicht im Workout gespeichert).
-const handledWarmups = ref(new Set())
+// abhaken oder überspringen. Nur solange in dieser Übung noch kein Arbeitssatz abgehakt ist. Erledigte Aufwärmsätze
+// stehen als `warmupHandled` im Entwurf (bleibt nach App-Neustart), beim finalen Speichern wird das Feld entfernt.
 
 const focusWarmupPending = computed(() => {
   const cur = doneBarCurrent.value
   if (!cur) return null
   const ex = workout.value?.exercises?.[cur.exIndex]
-  return findPendingWarmup({ exercise: ex, exIndex: cur.exIndex, handled: handledWarmups.value, weightMode: showsWeight(ex?.measureMode) })
+  return findPendingWarmup({ exercise: ex, exIndex: cur.exIndex, weightMode: showsWeight(ex?.measureMode) })
 })
 
 function finishFocusWarmup(cur) {
-  if (!cur?.isWarmup) return
-  handledWarmups.value = new Set(handledWarmups.value).add(`${cur.exIndex}:${cur.rowIndex}`)
+  if (!cur?.isWarmup || !cur.row) return
+  cur.row.warmupHandled = true
+  try { triggerAutoSave() } catch {}
 }
 
 function onFocusSkip() {
