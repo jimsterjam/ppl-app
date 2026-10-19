@@ -915,9 +915,9 @@
       @adjust-next="onNextSetAdjust"
       @spin-next="onNextSetSpin"
     />
-    <FocusMode :current="focusCurrent" @done="onFocusDone" @adjust="onFocusAdjust" @spin="onFocusSpin" @open="openFocus" />
+    <FocusMode :current="focusCurrent" @done="onFocusDone" @skip="onFocusSkip" @adjust="onFocusAdjust" @spin="onFocusSpin" @open="openFocus" />
     <button v-if="showFocusStart" type="button" class="focus-start-btn" @click="startFocus">
-      {{ t('focus.startSet', { n: doneBarCurrent.setNumber }) }}
+      {{ focusWarmupPending ? t('focus.startWarmupSet', { n: focusWarmupPending.number }) : t('focus.startSet', { n: doneBarCurrent.setNumber }) }}
     </button>
 
     <!-- Speichern-Overlay -->
@@ -1029,6 +1029,7 @@ import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
 import { getRepTarget, getProgressionStatus, isNoLoadExercise, resolveExerciseGoal, sanitizeExerciseTrainingType, classifyExercise, compatibleSessions, splitMainAndBackoffSets, getWorkingSets } from '@/utils/weightSuggestion'
 import { prepareHistoryCandidates, findRecentSessionExercises } from '@/utils/lastSessionLookup'
 import { sanitizeWorkoutGoal } from '@/utils/workoutGoal'
+import { findPendingWarmup } from '@/utils/focusWarmup'
 import WorkoutGoalPicker from '@/components/WorkoutGoalPicker.vue'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { resolveExerciseMedia, buildExerciseMediaUrl } from '@/utils/assetResolver'
@@ -2240,6 +2241,27 @@ const focus = useFocusModeStore()
 const hasBottomBar = computed(() => showFocusStart.value || restTimer.isVisible || (focus.active && focus.minimized))
 const showFocusStart = computed(() => !!doneBarCurrent.value && !focus.active && !restTimer.isVisible && !warmupTimer.isActive)
 
+// Aufwärmsätze in der Großansicht (Absprache Paul 19.10.): vor dem ersten Arbeitssatz jeder Übung, ohne Timer -
+// abhaken oder überspringen. Nur solange in dieser Übung noch kein Arbeitssatz abgehakt ist. Die erledigten
+// Aufwärmsätze merkt sich nur die Ansicht (nicht im Workout gespeichert).
+const handledWarmups = ref(new Set())
+
+const focusWarmupPending = computed(() => {
+  const cur = doneBarCurrent.value
+  if (!cur) return null
+  const ex = workout.value?.exercises?.[cur.exIndex]
+  return findPendingWarmup({ exercise: ex, exIndex: cur.exIndex, handled: handledWarmups.value, weightMode: showsWeight(ex?.measureMode) })
+})
+
+function finishFocusWarmup(cur) {
+  if (!cur?.isWarmup) return
+  handledWarmups.value = new Set(handledWarmups.value).add(`${cur.exIndex}:${cur.rowIndex}`)
+}
+
+function onFocusSkip() {
+  finishFocusWarmup(focusCurrent.value)
+}
+
 const focusCurrent = computed(() => {
   const cur = doneBarCurrent.value
   if (!cur) return null
@@ -2247,6 +2269,23 @@ const focusCurrent = computed(() => {
   const ex = exercises[cur.exIndex]
   const row = ex?.setDetails?.[cur.rowIndex]
   if (!ex || !row) return null
+  const warm = focusWarmupPending.value
+  if (warm) {
+    return {
+      key: `w:${warm.exIndex}:${warm.rowIndex}`,
+      exIndex: warm.exIndex,
+      rowIndex: warm.rowIndex,
+      exPos: cur.exIndex + 1,
+      exCount: exercises.length,
+      name: cur.name,
+      setNumber: warm.number,
+      setTotal: warm.total,
+      mode: 'weight',
+      row: ex.setDetails[warm.rowIndex],
+      targetText: '',
+      isWarmup: true
+    }
+  }
   const target = repTargetsByIndex.value[cur.exIndex]
   let targetText = ''
   if (target) targetText = target.mode === 'fixed' ? String(target.target || target.max || '') : `${target.min}–${target.max}`
@@ -2354,6 +2393,11 @@ function completeFocusSet(cur, seconds = 0) {
 function onFocusDone({ early } = {}) {
   const cur = focusCurrent.value
   if (!cur) return
+  if (cur.isWarmup) {
+    finishFocusWarmup(cur)
+    try { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(30) } catch {}
+    return
+  }
   let seconds = 0
   if (early && cur.mode === 'time' && focus.timerKey === cur.key && focus.timerStarted) {
     seconds = Math.round(focus.durationSec - focus.remainingMs / 1000)
