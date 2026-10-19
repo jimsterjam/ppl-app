@@ -8,6 +8,8 @@ describe('sanitizeWorkoutGoal', () => {
     expect(sanitizeWorkoutGoal('strength')).toBe('strength')
     expect(sanitizeWorkoutGoal(' Hypertrophy ')).toBe('hypertrophy')
     expect(sanitizeWorkoutGoal('muscle_building')).toBeNull()
+    expect(sanitizeWorkoutGoal('explosive')).toBe('explosive')
+    expect(sanitizeWorkoutGoal('technique')).toBe('technique')
     expect(sanitizeWorkoutGoal(undefined)).toBeNull()
   })
 })

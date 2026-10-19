@@ -1283,7 +1283,11 @@ export const messages = {
       question: 'Dein Ziel für dieses Workout',
       required: 'Bitte zuerst ein Ziel wählen.',
       rangeHypertrophy: 'meist 8–12 Wdh.',
-      rangeStrength: 'meist 1–6 Wdh.'
+      rangeStrength: 'meist 1–6 Wdh.',
+      explosive: 'Explosiv',
+      technique: 'Technik',
+      rangeExplosive: 'schnell bewegen, meist 1–5 Wdh.',
+      rangeTechnique: 'saubere Ausführung, leichtes Gewicht'
     },
     focus: {
       startSet: 'Satz {n} starten',
@@ -2694,7 +2698,11 @@ export const messages = {
       question: 'Your goal for this workout',
       required: 'Choose a goal first.',
       rangeHypertrophy: 'mostly 8–12 reps',
-      rangeStrength: 'mostly 1–6 reps'
+      rangeStrength: 'mostly 1–6 reps',
+      explosive: 'Explosive',
+      technique: 'Technique',
+      rangeExplosive: 'move fast, mostly 1–5 reps',
+      rangeTechnique: 'clean form, light weight'
     },
     focus: {
       startSet: 'Start set {n}',

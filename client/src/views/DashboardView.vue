@@ -166,7 +166,7 @@
       @confirm="confirmGoalModal"
       @cancel="closeGoalModal"
     >
-      <WorkoutGoalPicker v-model="goalModalChoice" :show-error="goalModalError" hide-question />
+      <WorkoutGoalPicker v-model="goalModalChoice" :goals="goalModalGoals" :show-error="goalModalError" hide-question />
     </AppModal>
 
     <!-- "⋯"-Menü eines Favoriten: Anpassen, Namen ändern (im Fenster), Löschen. -->
@@ -272,7 +272,7 @@ import MonthlyReportRow from '@/components/MonthlyReportRow.vue'
 import AvatarEditor from '@/components/AvatarEditor.vue'
 import NameEditModal from '@/components/NameEditModal.vue'
 import WorkoutGoalPicker from '@/components/WorkoutGoalPicker.vue'
-import { sanitizeWorkoutGoal } from '@/utils/workoutGoal'
+import { sanitizeWorkoutGoal, WORKOUT_GOALS, GENERATOR_GOALS, WORKOUT_GOAL_LABEL_KEYS } from '@/utils/workoutGoal'
 
 
 const store = useUserStore()
@@ -719,9 +719,14 @@ watch(goalModalChoice, (goal) => {
   if (goal) goalModalError.value = false
 })
 
+// Der Generator kennt nur Muskelaufbau/Kraft (Absprache Paul 19.10.); sonst alle vier Ziele.
+const goalModalGoals = computed(() => (goalModalContext.value?.path === 'generate' ? GENERATOR_GOALS : WORKOUT_GOALS))
+
 function openGoalModal(context) {
   goalModalContext.value = context
-  goalModalChoice.value = sanitizeWorkoutGoal(settings.lastWorkoutGoal) || ''
+  const last = sanitizeWorkoutGoal(settings.lastWorkoutGoal) || ''
+  const allowed = context?.path === 'generate' ? GENERATOR_GOALS : WORKOUT_GOALS
+  goalModalChoice.value = allowed.includes(last) ? last : ''
   goalModalError.value = false
   showGoalModal.value = true
 }
@@ -842,7 +847,7 @@ function favoriteGoalOf(favorite) {
 function favoriteGoalLabel(favorite) {
   const goal = favoriteGoalOf(favorite)
   if (!goal) return ''
-  return goal === 'strength' ? $t('quickGenerator.goalStrength') : $t('quickGenerator.goalHypertrophy')
+  return $t(WORKOUT_GOAL_LABEL_KEYS[goal])
 }
 
 function favoriteMetaLine(favorite) {

@@ -38,3 +38,21 @@ describe('Trainingsart Technik', () => {
     expect(restSecondsFor('technique', 'compound')).toBe(120)
   })
 })
+
+// Absprache Paul 19.10.: Explosiv und Technik sind auch als Workout-Ziel wählbar (Voreinstellung für alle Übungen).
+describe('Workout-Ziel Explosiv/Technik', () => {
+  const jump = { name: 'Jump Squat', name_en: 'jump squat', category: 'Legs', equipment: 'body weight', equipment_en: 'body weight' }
+
+  it('gilt für alle Übungen, eigene Wahl pro Übung bleibt stärker', () => {
+    expect(resolveExerciseGoal(info, 'explosive')).toBe('explosive')
+    expect(resolveExerciseGoal(info, 'technique')).toBe('technique')
+    expect(resolveExerciseGoal(info, 'technique', 'strength')).toBe('strength')
+    expect(resolveExerciseGoal(jump, 'technique')).toBe('technique')
+    expect(resolveExerciseGoal(jump, 'strength')).toBe('explosive')
+  })
+
+  it('Technik behält die Standardpause (wie Muskelaufbau), Explosiv 120 s', () => {
+    expect(restSecondsFor('technique', 'compound')).toBe(restSecondsFor('hypertrophy', 'compound'))
+    expect(restSecondsFor('explosive', 'compound')).toBe(120)
+  })
+})
