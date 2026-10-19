@@ -26,10 +26,13 @@
 <script setup>
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { WORKOUT_GOALS, WORKOUT_GOAL_LABEL_KEYS } from '@/utils/workoutGoal'
 
-defineProps({
+const props = defineProps({
   modelValue: { type: String, default: '' },
   showError: { type: Boolean, default: false },
+  // Welche Ziele angeboten werden (Generator: nur Muskelaufbau/Kraft).
+  goals: { type: Array, default: () => [...WORKOUT_GOALS] },
   // Im Fenster steht die Frage bereits als Titel.
   hideQuestion: { type: Boolean, default: false }
 })
@@ -37,10 +40,16 @@ defineEmits(['update:modelValue'])
 
 const { t } = useI18n()
 
-const options = computed(() => [
-  { value: 'hypertrophy', label: t('quickGenerator.goalHypertrophy'), range: t('workoutGoal.rangeHypertrophy') },
-  { value: 'strength', label: t('quickGenerator.goalStrength'), range: t('workoutGoal.rangeStrength') }
-])
+const RANGE_KEYS = {
+  hypertrophy: 'workoutGoal.rangeHypertrophy',
+  strength: 'workoutGoal.rangeStrength',
+  explosive: 'workoutGoal.rangeExplosive',
+  technique: 'workoutGoal.rangeTechnique'
+}
+
+const options = computed(() => props.goals
+  .filter((goal) => WORKOUT_GOALS.includes(goal))
+  .map((goal) => ({ value: goal, label: t(WORKOUT_GOAL_LABEL_KEYS[goal]), range: t(RANGE_KEYS[goal]) })))
 </script>
 
 <style scoped>
@@ -90,6 +99,7 @@ const options = computed(() => [
 }
 
 .goal-picker-range {
+  text-align: center;
   font-size: 0.75rem;
   color: var(--muted);
 }

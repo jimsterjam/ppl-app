@@ -215,7 +215,7 @@ import { saveWorkoutBuilderPrefill, buildWorkoutBuilderRoute, normalizeBuilderWo
 import { logger } from '@/utils/logger'
 import { useScrollLock } from '@/composables/useScrollLock'
 import { useSettingsStore } from '@/stores/settingsStore'
-import { sanitizeWorkoutGoal } from '@/utils/workoutGoal'
+import { sanitizeWorkoutGoal, GENERATOR_GOALS } from '@/utils/workoutGoal'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -247,7 +247,7 @@ let pendingBuilderPrefill = null
 const settingsStore = useSettingsStore()
 
 const form = reactive({
-  goal: sanitizeWorkoutGoal(route.query?.goal) || settingsStore.lastWorkoutGoal || 'hypertrophy',
+  goal: [route.query?.goal, settingsStore.lastWorkoutGoal].map(sanitizeWorkoutGoal).find((g) => GENERATOR_GOALS.includes(g)) || 'hypertrophy',
   level: 'beginner',
   requestedType: normalizeBuilderWorkoutType(route.query?.type || 'fullbody'),
   equipmentMode: 'gym_plus_bodyweight',

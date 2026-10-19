@@ -12,6 +12,8 @@ describe('Workout.goal', () => {
   test('gültige Ziele werden gespeichert', () => {
     assert.equal(new Workout({ userId: 'u', goal: 'strength' }).goal, 'strength')
     assert.equal(new Workout({ userId: 'u', goal: 'hypertrophy' }).goal, 'hypertrophy')
+    assert.equal(new Workout({ userId: 'u', goal: 'explosive' }).goal, 'explosive')
+    assert.equal(new Workout({ userId: 'u', goal: 'technique' }).goal, 'technique')
   })
 
   test('fehlend oder ungültig -> null', () => {

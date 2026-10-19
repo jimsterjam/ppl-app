@@ -23,7 +23,9 @@ const NO_LOAD_EQUIPMENT = new Set(['körpergewicht', 'bodyweight', 'body weight'
 const SMALL_STEP_EQUIPMENT = new Set(['kurzhanteln', 'kurzhantel', 'dumbbell', 'dumbbells', 'kettlebell'])
 
 export function normalizeTrainingGoal(goal) {
-  return String(goal || '').toLowerCase().includes('strength') ? 'strength' : DEFAULT_TRAINING_GOAL
+  const value = String(goal || '').toLowerCase()
+  if (value === 'explosive' || value === 'technique') return value
+  return value.includes('strength') ? 'strength' : DEFAULT_TRAINING_GOAL
 }
 
 // --- Trainingsart pro Übung ---------------------------------------------------------------
@@ -55,8 +57,11 @@ export function sanitizeExerciseTrainingType(value) {
 export function resolveExerciseGoal(info = {}, workoutGoal = DEFAULT_TRAINING_GOAL, override = null) {
   const own = sanitizeExerciseTrainingType(override)
   if (own) return own
+  // Explosiv/Technik als Workout-Ziel gilt für alle Übungen (auch Sprünge im Technik-Workout).
+  const base = normalizeTrainingGoal(workoutGoal)
+  if (base === 'explosive' || base === 'technique') return base
   if (isExplosiveExercise(info)) return 'explosive'
-  return normalizeTrainingGoal(workoutGoal)
+  return base
 }
 
 function lower(value) {
