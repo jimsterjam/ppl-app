@@ -26,6 +26,16 @@ export function resolveFinalDurationMinutes({ workout, sessionStopwatchStore }) 
   return timerDurationMinutes > 0 ? timerDurationMinutes : existingDuration
 }
 
+// Nur im Entwurf gebrauchte Felder an Sätzen (z. B. erledigter Aufwärmsatz in der Großansicht) gehören nicht
+// ins gespeicherte Workout.
+export function stripDraftFlags(setDetails) {
+  return (Array.isArray(setDetails) ? setDetails : []).map((row) => {
+    if (!row || typeof row !== 'object' || !('warmupHandled' in row)) return row
+    const { warmupHandled: _warmupHandled, ...rest } = row
+    return rest
+  })
+}
+
 export function normalizeWorkoutForSave({ workout, exerciseNotes, sessionStopwatchStore, userId, trackingActive = false }) {
   const w = workout || {}
   const exercises = (w.exercises || []).map((ex, idx) => {
@@ -37,7 +47,7 @@ export function normalizeWorkoutForSave({ workout, exerciseNotes, sessionStopwat
       reps: firstWorkingSet?.reps ?? ex.reps ?? 10,
       weight: firstWorkingSet?.weight ?? ex.weight ?? 0,
       // Laufendes Workout: nicht abgehakte Arbeitssätze werden als "nicht gemacht" (done:false) gespeichert.
-      setDetails: trackingActive ? markOpenSetsNotDone(ex.setDetails) : (ex.setDetails || []),
+      setDetails: stripDraftFlags(trackingActive ? markOpenSetsNotDone(ex.setDetails) : (ex.setDetails || [])),
       ...measureModeField(ex.measureMode),
       // Eigene Trainingsart der Übung (siehe weightSuggestion.js resolveExerciseGoal) - nur wenn gewählt.
       ...(sanitizeExerciseTrainingType(ex.trainingType) ? { trainingType: ex.trainingType } : {}),

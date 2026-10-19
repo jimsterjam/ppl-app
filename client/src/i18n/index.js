@@ -1318,7 +1318,13 @@ export const messages = {
       openAria: 'Training in Großansicht öffnen',
       miniRest: 'Pause',
       miniHold: 'Satz läuft',
-      miniSet: 'Als Nächstes: Satz {n}'
+      miniSet: 'Als Nächstes: Satz {n}',
+      startWarmupSet: 'Aufwärmsatz {n} starten',
+      warmupSetOf: 'Aufwärmsatz {n} von {total}',
+      warmupNote: 'Zum Aufwärmen mit leichterem Gewicht, ohne Timer. Zählt nicht als Arbeitssatz.',
+      warmupDone: 'Abgehakt',
+      warmupSkip: 'Überspringen',
+      miniWarmup: 'Als Nächstes: Aufwärmsatz {n}'
     },
     quota: {
       costHint: 'Verbraucht 1 KI-Anfrage – noch {remaining} von {limit} in diesem Monat.',
@@ -2733,7 +2739,13 @@ export const messages = {
       openAria: 'Open workout in full view',
       miniRest: 'Rest',
       miniHold: 'Set running',
-      miniSet: 'Next: set {n}'
+      miniSet: 'Next: set {n}',
+      startWarmupSet: 'Start warm-up set {n}',
+      warmupSetOf: 'Warm-up set {n} of {total}',
+      warmupNote: 'To warm up with lighter weight, no timer. Does not count as a working set.',
+      warmupDone: 'Done',
+      warmupSkip: 'Skip',
+      miniWarmup: 'Next: warm-up set {n}'
     },
     quota: {
       costHint: 'Uses 1 AI request – {remaining} of {limit} left this month.',

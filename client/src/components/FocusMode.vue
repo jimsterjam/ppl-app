@@ -16,7 +16,11 @@
         <div class="fm-dots" aria-hidden="true">
           <i v-for="n in current.setTotal" :key="n" :class="{ done: n < current.setNumber, cur: n === current.setNumber }"></i>
         </div>
-        <p class="fm-hint">{{ t('focus.setOf', { n: current.setNumber, total: current.setTotal }) }}<template v-if="hintText"> · {{ hintText }}</template></p>
+        <p class="fm-hint">
+          <template v-if="current.isWarmup">{{ t('focus.warmupSetOf', { n: current.setNumber, total: current.setTotal }) }}</template>
+          <template v-else>{{ t('focus.setOf', { n: current.setNumber, total: current.setTotal }) }}<template v-if="hintText"> · {{ hintText }}</template></template>
+        </p>
+        <p v-if="current.isWarmup" class="fm-warm-note">{{ t('focus.warmupNote') }}</p>
 
         <!-- Zeit halten / Wiederholungen in fester Zeit: Satz-Timer -->
         <template v-if="current.mode !== 'weight'">
@@ -57,7 +61,14 @@
         </div>
       </div>
 
-      <div class="fm-actions">
+      <!-- Aufwärmsatz: kein Timer - abhaken oder überspringen. -->
+      <div v-if="current.isWarmup" class="fm-actions">
+        <button type="button" class="fm-cta" @click="emit('done', {})">
+          <span aria-hidden="true">✓</span> {{ t('focus.warmupDone') }}
+        </button>
+        <button type="button" class="fm-btn fm-btn-wide" @click="emit('skip')">{{ t('focus.warmupSkip') }}</button>
+      </div>
+      <div v-else class="fm-actions">
         <button v-if="current.mode !== 'weight' && !timerStarted" type="button" class="fm-cta" @click="startTimer">
           {{ t('focus.start') }}
         </button>
@@ -100,11 +111,12 @@ import { Maximize2 } from 'lucide-vue-next'
 import { formatRest } from '@/utils/restTimerRules'
 import { useScrollLock } from '@/composables/useScrollLock'
 
-// current: { key, exPos, exCount, name, setNumber, setTotal, mode, row, targetText, durationTarget } oder null
+// current: { key, exPos, exCount, name, setNumber, setTotal, mode, row, targetText, durationTarget, isWarmup } oder null
+// (isWarmup: Aufwärmsatz - Nummer/Anzahl zählen nur Aufwärmsätze, kein Timer)
 const props = defineProps({
   current: { type: Object, default: null }
 })
-const emit = defineEmits(['done', 'adjust', 'spin', 'open'])
+const emit = defineEmits(['done', 'skip', 'adjust', 'spin', 'open'])
 const { t } = useI18n()
 const focus = useFocusModeStore()
 const rest = useRestTimerStore()
@@ -192,6 +204,7 @@ const miniTime = computed(() => {
 const miniTitle = computed(() => {
   if (rest.isVisible) return rest.showFinished ? t('restTimer.finished') : t('focus.miniRest')
   if (timerStarted.value) return t('focus.miniHold')
+  if (props.current?.isWarmup) return t('focus.miniWarmup', { n: props.current.setNumber })
   return t('focus.miniSet', { n: props.current?.setNumber || 1 })
 })
 const miniSub = computed(() => props.current?.name || '')
@@ -237,6 +250,7 @@ onBeforeUnmount(unlock)
 .fm-dots i.done { background: var(--accent); }
 .fm-dots i.cur { background: color-mix(in srgb, var(--accent) 45%, transparent); outline: 2px solid var(--accent); }
 .fm-hint { margin: 2px 0 8px; color: var(--muted); font-size: 1.02rem; }
+.fm-warm-note { margin: 0 0 6px; color: var(--muted); font-size: 0.9rem; }
 
 .fm-step { margin-top: 10px; padding: 12px; border-radius: 22px; border: 1px solid var(--card-border); background: var(--bg-panel, var(--surface)); }
 .fm-step-label { margin: 0 0 6px; text-align: center; color: var(--muted); font-size: 0.9rem; }
