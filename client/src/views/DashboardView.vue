@@ -1214,10 +1214,9 @@ onActivated(async () => {
   flex-shrink: 0;
   gap: 10px;
   padding: 10px 12px;
-  border-radius: calc(var(--panel-radius) - 12px);
-  border: 1px solid var(--line-strong);
-  background: var(--bg-panel);
-  box-shadow: var(--shadow-soft);
+  border-radius: var(--card-radius);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
 }
 
 .dashboard-content.has-draft .hero {
@@ -1279,8 +1278,8 @@ onActivated(async () => {
 
 .quick-fav-shortcut {
   border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line-strong));
-  border-radius: calc(var(--panel-radius) - 16px);
-  background: color-mix(in srgb, var(--accent) 6%, var(--bg-panel));
+  border-radius: var(--card-radius);
+  background: color-mix(in srgb, var(--accent) 6%, var(--card-bg));
   color: var(--fg-strong);
   font-family: "Sora", "Space Grotesk", "SF Pro Display", sans-serif;
   font-weight: 700;
@@ -1303,8 +1302,8 @@ onActivated(async () => {
 
 .quick-timer-btn {
   border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line-strong));
-  border-radius: calc(var(--panel-radius) - 16px);
-  background: color-mix(in srgb, var(--accent) 6%, var(--bg-panel));
+  border-radius: var(--card-radius);
+  background: color-mix(in srgb, var(--accent) 6%, var(--card-bg));
   color: var(--fg-strong);
   font-family: "Sora", "Space Grotesk", "SF Pro Display", sans-serif;
   font-weight: 700;
@@ -1329,11 +1328,10 @@ onActivated(async () => {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 10px;
-  border-radius: var(--panel-radius);
-  border: 1px solid var(--line-strong);
-  background: var(--bg-panel);
-  box-shadow: var(--shadow-soft);
+  padding: 16px;
+  border-radius: var(--card-radius);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
 }
 
 /* Doppelte Klasse: muss die spätere Grundregel .favorite-item (flex-direction: column) schlagen -
@@ -1436,9 +1434,9 @@ onActivated(async () => {
 
 .quick-mode-btn {
   width: 100%;
-  border: 1px solid var(--line-strong);
-  border-radius: var(--panel-radius);
-  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--card-radius);
+  background: var(--card-soft);
   color: var(--fg-strong);
   font-weight: 800;
   padding: 24px 14px;
@@ -1484,16 +1482,16 @@ onActivated(async () => {
 }
 
 .favorite-empty {
-  border: 1px dashed var(--line-soft);
-  border-radius: var(--panel-radius);
+  border: 1px dashed var(--card-border);
+  border-radius: var(--card-radius);
   padding: 10px;
   color: var(--muted);
   font-size: 0.85rem;
 }
 
 .favorite-item {
-  border: 1px solid var(--line-soft);
-  border-radius: var(--panel-radius);
+  border: 1px solid var(--card-border);
+  border-radius: var(--card-radius);
   background: var(--card-soft);
   padding: 10px;
   display: flex;
@@ -1563,8 +1561,8 @@ onActivated(async () => {
   justify-content: space-between;
   gap: 10px;
   padding: 8px 10px;
-  border-radius: var(--panel-radius);
-  border: 1px solid var(--line-strong);
+  border-radius: var(--card-radius);
+  border: 1px solid var(--card-border);
   background: var(--card-soft);
   font-size: 0.85rem;
   flex-wrap: wrap;

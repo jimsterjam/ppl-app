@@ -96,14 +96,14 @@ watch(() => authStore.uid, () => { store.reset(); refresh(true) })
   width: 100%;
   min-height: 0;
   padding: 8px 12px;
-  border-radius: calc(var(--panel-radius) - 12px);
-  border: 1px solid var(--line-strong);
-  background: var(--bg-panel);
+  border-radius: var(--card-radius);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
   color: var(--fg);
   text-align: left;
   cursor: pointer;
 }
-.report-row.attention { border-color: color-mix(in srgb, var(--accent) 55%, var(--line-strong)); }
+.report-row.attention { border-color: color-mix(in srgb, var(--accent) 55%, var(--card-border)); }
 .report-row-icon { width: 20px; height: 20px; flex: 0 0 auto; color: var(--accent-text); }
 .report-row-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
 .report-row-title { font-weight: 700; font-size: 0.9rem; }
