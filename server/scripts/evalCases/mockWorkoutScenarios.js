@@ -13,7 +13,9 @@
  * ("Kniebeugen: 1kg mehr" statt satzgenau 2,5kg nur in den ersten beiden Sätzen).
  */
 
-export const mockWorkoutScenarios = [
+import { extraScenarios } from './mockWorkoutScenariosExtra.js';
+
+const baseScenarios = [
   {
     name: 'Gleichmäßiger Fortschritt (alle Sätze gleich gesteigert)',
     structuredAnalysis: {
@@ -671,5 +673,8 @@ export const mockWorkoutScenarios = [
     }
   }
 ];
+
+// Handgeschriebene Szenarien oben + aus Rohdaten erzeugte (mockWorkoutScenariosExtra.js).
+export const mockWorkoutScenarios = [...baseScenarios, ...extraScenarios];
 
 export default mockWorkoutScenarios;
