@@ -40,7 +40,12 @@ export const feedbackQualityCases = [
           sets_change: 0,
           volume_change_kg: 60,
           volume_change_percent: 3.1
-        }
+        },
+        sets_comparison: [
+          { set_number: 1, current_weight: 82.5, current_reps: 8, previous_weight: 80, previous_reps: 8, weight_change_kg: 2.5, reps_change: 0 },
+          { set_number: 2, current_weight: 82.5, current_reps: 8, previous_weight: 80, previous_reps: 8, weight_change_kg: 2.5, reps_change: 0 },
+          { set_number: 3, current_weight: 82.5, current_reps: 8, previous_weight: 80, previous_reps: 8, weight_change_kg: 2.5, reps_change: 0 }
+        ]
       }],
       top_improvements: [],
       top_declines: []
@@ -137,6 +142,8 @@ was du in dieser Phase brauchst, um dranzubleiben und langfristig weiterzukommen
     structuredAnalysis: {
       total_exercises_analyzed: 1,
       athlete_bodyweight_kg: 80,
+      // Echte Struktur (resolveBodyweightCorrelation): Körpergewichts-Zahlen stehen hier, nicht als Übung.
+      bodyweight_correlation: { current_bodyweight_kg: 78.6, previous_bodyweight_kg: 80, bodyweight_change_kg: -1.4, period_days: 14 },
       exercises: [{
         exercise: 'Körpergewicht',
         current_weight: 78.6,
@@ -178,7 +185,12 @@ verloren bei einem Ausgangsgewicht von 80kg - dein Trainingsplan zahlt sich aus!
         previous_volume: 540,
         period_days: 7,
         period_description: '1 Woche',
-        changes: { weight_change_kg: -2.5, reps_change: 0, sets_change: 0, volume_change_kg: -60, volume_change_percent: -11.1 }
+        changes: { weight_change_kg: -2.5, reps_change: 0, sets_change: 0, volume_change_kg: -60, volume_change_percent: -11.1 },
+        sets_comparison: [
+          { set_number: 1, current_weight: 20, current_reps: 8, previous_weight: 22.5, previous_reps: 8, weight_change_kg: -2.5, reps_change: 0 },
+          { set_number: 2, current_weight: 20, current_reps: 8, previous_weight: 22.5, previous_reps: 8, weight_change_kg: -2.5, reps_change: 0 },
+          { set_number: 3, current_weight: 20, current_reps: 8, previous_weight: 22.5, previous_reps: 8, weight_change_kg: -2.5, reps_change: 0 }
+        ]
       }],
       top_improvements: [],
       top_declines: []
