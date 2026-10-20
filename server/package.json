@@ -12,7 +12,8 @@
     "eval": "node scripts/evalRunner.js",
     "eval:ai": "node scripts/evalRunner.js --with-ai",
     "quality-loop": "node scripts/qualityLoopRunner.js",
-    "quality-loop:report": "node scripts/qualityLoopReport.js"
+    "quality-loop:report": "node scripts/qualityLoopReport.js",
+    "eval:compare": "node scripts/evalCompare.js"
   },
   "keywords": [],
   "author": "",
