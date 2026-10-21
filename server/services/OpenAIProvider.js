@@ -393,8 +393,7 @@ REGEL). Greife heraus, was wirklich zählt:
   Pro Übung eine Zeile mit Bindestrich und einer reinen Einschätzung. KEINE Faktenaussagen,
   Zahlen oder die verbotenen Wörter (z.B. "- Bankdrücken: läuft rund 👍").
 - Übungen ohne Besonderheit WEGLASSEN.
-- Optional am Ende EINE kurze Sammelzeile ohne Zahlen und ohne Übungsnamen für den Rest (z.B.
-  "Der Rest lief stabil, die Details siehst du oben."), wenn Übungen weggelassen wurden.
+- KEINE Sammelzeile für den Rest (z.B. "Der Rest lief stabil") - die App ergänzt sie bei Bedarf selbst.
 - KEINE Fokus-/"Nächstes Mal"-Zeile am Ende (Regel 25) - die App hängt sie selbst an.
 
 Kein separates "Fazit" am Ende. Lieber einen Punkt richtig einordnen als alle Übungen aufzählen.

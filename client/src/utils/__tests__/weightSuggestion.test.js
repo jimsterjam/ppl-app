@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   classifyExercise,
   getRepTarget,
-  getWeightSuggestion,
+  getWeightSuggestion as rawGetWeightSuggestion,
   getSuggestionForSet,
   getProgressionStatus,
   normalizeTrainingGoal,
@@ -13,6 +13,11 @@ import {
 const squat = { name: 'Kniebeugen mit der Langhantel', name_en: 'barbell high bar squat', category: 'Legs', equipment: 'Langhantel', aiMetadata: { exerciseType: 'compound' } }
 const lateralRaise = { name: 'Seitheben Kurzhanteln', name_en: 'dumbbell lateral raise', category: 'Push', equipment: 'Kurzhanteln', aiMetadata: { exerciseType: 'compound' } }
 const crunch = { name: 'Crunch', name_en: 'crunch', category: 'Core', equipment: 'Körpergewicht', aiMetadata: { exerciseType: 'core' } }
+
+// Feste Kraft-Schemata: Steigern erst nach zweimal Schaffen (Absprache Paul 21.10.). Diese Tests prüfen die Vorschlags-Berechnung und
+// simulieren deshalb eine bereits bestätigte Vorsession; die Bestätigungs-Regel selbst steht in 'Bestätigen vor dem Steigern'.
+const getWeightSuggestion = (info, last, goal, options = {}) =>
+  rawGetWeightSuggestion(info, last, goal, { previousSessions: [last], ...options })
 
 function session(sets) {
   return { name: squat.name, setDetails: sets }
@@ -129,7 +134,7 @@ describe('getProgressionStatus', () => {
   const at100 = (reps) => session(reps.map((r) => ({ reps: r, weight: 100 })))
 
   it('5/5/5/5/5 -> Steigern mit Vorschlag', () => {
-    const s = getProgressionStatus(squat, at100([5, 5, 5, 5, 5]), 'strength')
+    const s = getProgressionStatus(squat, at100([5, 5, 5, 5, 5]), 'strength', { previousSessions: [at100([5, 5, 5, 5, 5])] })
     expect(s).toMatchObject({ state: 'increase', weight: 100, targetReps: 5, sets: 5 })
     expect(s.suggestion.suggestedWeights[0]).toBe(102.5)
   })
@@ -233,7 +238,7 @@ describe('Schema statt fester Zahl', () => {
   })
 
   it('Kraft 4x5 geschafft -> mehr Gewicht, 5/5/5/4/3 -> Halten', () => {
-    expect(getProgressionStatus(squat, sets([5, 5, 5, 5]), 'strength').state).toBe('increase')
+    expect(getProgressionStatus(squat, sets([5, 5, 5, 5]), 'strength', { previousSessions: [sets([5, 5, 5, 5])] }).state).toBe('increase')
     expect(getProgressionStatus(squat, sets([5, 5, 5, 4, 3]), 'strength').state).toBe('hold')
   })
 
@@ -243,7 +248,7 @@ describe('Schema statt fester Zahl', () => {
     expect(getProgressionStatus(squat, singles, 'strength', { previousSessions: [sets([1, 1, 1, 1, 1, 1], 140)] }).state).toBe('increase')
     expect(getProgressionStatus(squat, singles, 'strength', { previousSessions: [sets([1, 1, 1, 1, 1, 1], 137.5)] }).state).toBe('confirm')
     // 5x5 braucht keine Bestätigung
-    expect(getProgressionStatus(squat, sets([5, 5, 5, 5, 5]), 'strength').state).toBe('increase')
+    expect(getProgressionStatus(squat, sets([5, 5, 5, 5, 5]), 'strength', { previousSessions: [sets([5, 5, 5, 5, 5])] }).state).toBe('increase')
   })
 
   it('Muskelaufbau 8-12: klettern, erst bei 12 überall mehr Gewicht', () => {
@@ -279,11 +284,40 @@ describe('Trainingsart-passende Historie und 7er-Übergang', () => {
   it('Kraft: 7+ in allen Hauptsätzen -> mehr Gewicht, deutlich über dem Schema', () => {
     const s = getProgressionStatus(squat, sets([7, 7, 8]), 'strength', { previousSessions: [sets([5, 5, 5])] })
     expect(s).toMatchObject({ state: 'increase', aboveScheme: true })
-    expect(getProgressionStatus(squat, sets([5, 5, 5]), 'strength').aboveScheme).toBe(false)
+    expect(getProgressionStatus(squat, sets([5, 5, 5]), 'strength', { previousSessions: [sets([5, 5, 5])] }).aboveScheme).toBe(false)
   })
 
   it('Muskelaufbau unter 8 -> klettern mit Hinweis "unter dem Zielbereich"', () => {
     expect(getProgressionStatus(squat, sets([7, 7, 7], 60), 'hypertrophy')).toMatchObject({ state: 'climb', nextReps: 8, belowRange: true })
     expect(getProgressionStatus(squat, sets([9, 9, 9], 60), 'hypertrophy').belowRange).toBe(false)
+  })
+})
+
+describe('Bestätigen vor dem Steigern (Absprache Paul 21.10.)', () => {
+  const at = (reps, weight = 100) => session(reps.map((r) => ({ reps: r, weight })))
+
+  it('5x5 zum ersten Mal geschafft -> festigen, kein Gewichtsvorschlag', () => {
+    const s = rawGetWeightSuggestion(squat, at([5, 5, 5, 5, 5]), 'strength')
+    expect(s).toBeNull()
+    expect(getProgressionStatus(squat, at([5, 5, 5, 5, 5]), 'strength')).toMatchObject({ state: 'confirm', weight: 100, sets: 5, targetReps: 5, suggestion: null })
+  })
+
+  it('5x5 mit demselben Gewicht schon in der Session davor geschafft -> Steigern', () => {
+    const s = getProgressionStatus(squat, at([5, 5, 5, 5, 5]), 'strength', { previousSessions: [at([5, 5, 5, 5, 5])] })
+    expect(s).toMatchObject({ state: 'increase' })
+    expect(s.suggestion.suggestedWeights[0]).toBe(102.5)
+  })
+
+  it('Vorsession mit anderem Gewicht oder nicht geschafft zählt nicht als Bestätigung', () => {
+    expect(getProgressionStatus(squat, at([5, 5, 5, 5, 5]), 'strength', { previousSessions: [at([5, 5, 5, 5, 5], 97.5)] }).state).toBe('confirm')
+    expect(getProgressionStatus(squat, at([5, 5, 5, 5, 5]), 'strength', { previousSessions: [at([5, 5, 5, 5, 4])] }).state).toBe('confirm')
+  })
+
+  it('deutlich über dem Schema (7+ Wdh. in allen Sätzen) -> sofort steigern, Gewicht war zu leicht', () => {
+    expect(getProgressionStatus(squat, at([7, 7, 8]), 'strength').state).toBe('increase')
+  })
+
+  it('Muskelaufbau (8-12) bleibt unverändert: alle Sätze 12 -> Steigern', () => {
+    expect(getProgressionStatus(squat, at([12, 12, 12], 60), 'hypertrophy').state).toBe('increase')
   })
 })

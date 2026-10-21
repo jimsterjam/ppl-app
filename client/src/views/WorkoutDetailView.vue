@@ -617,14 +617,6 @@
                     <StickyNote class="btn-icon btn-icon--inline" aria-hidden="true" />
                     {{ t('workoutDetail.noteShort') }}<span v-if="getNote(i)" class="note-check" aria-hidden="true"> ✓</span>
                   </button>
-                  <button
-                    v-if="getNote(i)"
-                    class="link danger"
-                    :aria-label="t('workoutDetail.deleteNoteConfirmTitle')"
-                    @click="askDeleteNote(i)"
-                  >
-                    <Trash2 class="btn-icon btn-icon--inline" aria-hidden="true" />
-                  </button>
                 </span>
               </div>
               <div v-if="showNote && showNote[i]" class="ex-note-field">
@@ -634,6 +626,13 @@
                   :text="t('onboarding.hintFirstNoteText')"
                 />
                 <textarea :value="getNote(i)" rows="2" maxlength="500" style="width:100%;resize:vertical" :placeholder="t('workoutDetail.notePlaceholder')" @input="setNote(i, $event.target.value)"></textarea>
+                <!-- Löschen unter der Notiz statt in der (schon vollen) Aktionsreihe. -->
+                <div v-if="getNote(i)" class="ex-note-delete-row">
+                  <button class="link danger ex-note-delete" type="button" :aria-label="t('workoutDetail.deleteNoteConfirmTitle')" @click="askDeleteNote(i)">
+                    <Trash2 class="btn-icon btn-icon--inline" aria-hidden="true" />
+                    {{ t('workoutDetail.noteDelete') }}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -5051,6 +5050,8 @@ onBeforeUnmount(() => {
 .ex-note-actions .has-note { color: var(--fg); }
 .note-check { color: var(--accent-text); }
 .ex-note-field { margin-top: 4px; }
+.ex-note-delete-row { display: flex; justify-content: flex-end; margin-top: 6px; }
+.ex-note-delete { min-height: 44px; padding: 0 14px; border-radius: 12px; display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem; font-weight: 600; }
 .exercise-menu-actions { display: flex; flex-direction: column; gap: 8px; }
 .exercise-menu-btn {
   min-height: 44px;

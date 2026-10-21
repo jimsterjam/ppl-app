@@ -20,7 +20,10 @@ test('Fortschrittszustand: 4×5 + 4 mit mehr Gewicht ist "almost_there"', () => 
 })
 
 test('Alle Sätze geschafft = ready_to_increase, deutlich verfehlt = hold_weight', () => {
-  assert.equal(buildProgressionStates({ workout: session(62.5, [5, 5, 5, 5, 5], '2026-10-14T10:00:00Z', 'w2'), history: [last] }).get('bench press'), 'ready_to_increase')
+  const firstTime = session(62.5, [5, 5, 5, 5, 5], '2026-10-14T10:00:00Z', 'w2')
+  assert.equal(buildProgressionStates({ workout: firstTime, history: [last] }).get('bench press'), 'confirm_once_more')
+  const earlier = session(62.5, [5, 5, 5, 5, 5], '2026-10-07T10:00:00Z', 'w0b')
+  assert.equal(buildProgressionStates({ workout: firstTime, history: [earlier] }).get('bench press'), 'ready_to_increase')
   assert.equal(buildProgressionStates({ workout: session(62.5, [5, 5, 3, 3, 3], '2026-10-14T10:00:00Z', 'w3'), history: [last] }).get('bench press'), 'hold_weight')
 })
 

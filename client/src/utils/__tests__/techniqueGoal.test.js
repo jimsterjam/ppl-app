@@ -19,7 +19,7 @@ describe('Trainingsart Technik', () => {
     expect(progressionModeFor(info, 'technique')).toBeNull()
     const last = { name: 'Barbell High Bar Squat', setDetails: sets([5, 5, 5, 5, 5]) }
     expect(getProgressionStatus(info, last, 'technique')).toBeNull()
-    expect(getProgressionStatus(info, last, 'strength')?.state).toBe('increase')
+    expect(getProgressionStatus(info, last, 'strength', { previousSessions: [last] })?.state).toBe('increase')
   })
 
   it('Kurz prüfen: bei Technik keine Wiederholungs-/Gewichtswarnung', () => {
