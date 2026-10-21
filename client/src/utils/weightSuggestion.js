@@ -89,8 +89,8 @@ export function classifyExercise(info = {}) {
 // --- Fortschrittslogik: Schema statt fester Zahl (Absprache Paul) ---------------------------
 // Kraft (Grundübungen): festes Schema im Bereich 1-6 Wdh. (5x5, 6x1, 4x5 ...). Die Ziel-
 //   Wiederholungen liest die App aus den letzten Sessions (häufigste Wdh.-Zahl der Hauptsätze);
-//   ohne Verlauf 5. Mehr Gewicht, wenn alle Hauptsätze das Schema schaffen. Bei 1-3 Wdh.
-//   (Singles/Doubles/Triples) erst, wenn das zweimal hintereinander mit demselben Gewicht klappt.
+//   ohne Verlauf 5. Mehr Gewicht erst, wenn alle Hauptsätze das Schema zweimal hintereinander mit demselben
+//   Gewicht schaffen (beim ersten Mal: festigen).
 // Muskelaufbau (und Zubehör-/Isolationsübungen im Kraft-Workout): Bereich 8-12, Wiederholungen
 //   klettern (3x10 -> 3x11 -> 3x12), mehr Gewicht erst bei 12 in allen Hauptsätzen.
 // Die Satzanzahl gibt die App nie vor.
@@ -99,8 +99,6 @@ export const PROGRESSION_RANGES = Object.freeze({
   hypertrophy: Object.freeze({ min: 8, max: 12 })
 })
 export const DEFAULT_STRENGTH_REPS = 5
-// Bis zu dieser Wdh.-Zahl muss das Schema zweimal hintereinander geschafft werden.
-export const CONFIRM_REPS_MAX = 3
 
 // Übergangswert zwischen Kraft (1-6) und Muskelaufbau (8-12), Absprache Paul: schafft jemand bei
 // Kraft 7+ in allen Hauptsätzen, ist das Gewicht zu leicht; bei Muskelaufbau unter 8 eher zu schwer.
@@ -254,14 +252,14 @@ function schemeAchieved(sessionExercise, weight, reps) {
 /**
  * Einschätzung der letzten Session für Hinweis, Vorschlag und "Nächstes Mal":
  *   'increase' - alle Hauptsätze am Ziel -> mehr Gewicht (suggestion gesetzt)
- *   'confirm'  - Kraft-Schema mit 1-3 Wdh. geschafft, aber erst einmal -> nochmal bestätigen
+ *   'confirm'  - festes Kraft-Schema geschafft, aber erst einmal -> nochmal bestätigen
  *   'climb'    - Bereich 8-12: noch nicht überall 12 -> nächstes Mal eine Wdh. mehr (nextReps)
  *   'close'    - festes Schema, knapp dran: genau ein Satz 1 Wdh. zu wenig -> gleiches Gewicht
  *   'hold'     - festes Schema, sonst -> gleiches Gewicht
  * null = keine Einschätzung (keine Historie, Körpergewicht, Pyramide, ...). Nie Senkungen.
  * @param {object} [options]
  * @param {Array} [options.previousSessions] - dieselbe Übung aus den Sessions VOR der letzten,
- *   neueste zuerst (für Schema-Erkennung und die Bestätigungs-Regel bei 1-3 Wdh.)
+ *   neueste zuerst (für Schema-Erkennung und die Bestätigungs-Regel bei festen Kraft-Schemata)
  */
 export function getProgressionStatus(info = {}, lastSessionExerciseRaw = null, goal = DEFAULT_TRAINING_GOAL, { previousSessions: previousRaw = [] } = {}) {
   if (!lastSessionExerciseRaw || isNoLoadExercise(info)) return null
@@ -298,8 +296,9 @@ export function getProgressionStatus(info = {}, lastSessionExerciseRaw = null, g
   }
 
   if (!below.length) {
-    // Singles/Doubles/Triples: erst nach zweimal Schaffen steigern (Maximalversuche).
-    if (target.mode === 'fixed' && target.target <= CONFIRM_REPS_MAX &&
+    // Festes Kraft-Schema (5x5, 6x1, ...): erst nach zweimal Schaffen mit demselben Gewicht steigern (Absprache Paul
+    // 21.10.) - beim ersten Mal festigen. Ausnahme: 7+ Wdh. in allen Hauptsätzen = Gewicht war klar zu leicht.
+    if (target.mode === 'fixed' && minReps < TRANSITION_REPS &&
       !schemeAchieved(previousSessions[0], split.weight, target.target)) {
       return { ...base, state: 'confirm', suggestion: null }
     }

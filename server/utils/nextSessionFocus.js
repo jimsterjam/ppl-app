@@ -101,7 +101,7 @@ function formatKg(value, language) {
 
 const TEXTS = {
   de: {
-    increase: (n, p) => `Nächstes Mal – ${n}: ${p.weight} kg probieren. Schaffst du nicht alle Wiederholungen, bleib dabei, bis es klappt.`,
+    increase: (n, p) => `Nächstes Mal – ${n}: ${p.weight} kg probieren.`,
     speed: (n) => `Nächstes Mal – ${n}: Bleibt jede Wiederholung schnell, nimm etwas mehr Gewicht. Wirst du in den letzten Wiederholungen deutlich langsamer, bleib beim Gewicht.`,
     close: (n, p) => `Nächstes Mal – ${n}: gleiches Gewicht (${p.weight} kg), diesmal fehlte nur 1 Wiederholung. Ziel: ${p.reps} Wdh. in jedem Satz – schaffst du das, ist danach mehr Gewicht dran.`,
     hold: (n, p) => `Nächstes Mal – ${n}: gleiches Gewicht (${p.weight} kg). Ziel: ${p.reps} Wdh. in jedem Satz.`,
@@ -111,7 +111,7 @@ const TEXTS = {
     below: (n, p) => `Hinweis – ${n}: unter ${p.min} Wdh. ist ${p.weight} kg für Muskelaufbau eher zu schwer. Etwas weniger Gewicht kann besser passen.`
   },
   en: {
-    increase: (n, p) => `Next time – ${n}: try ${p.weight} kg. If you don't hit all reps, stay there until you do.`,
+    increase: (n, p) => `Next time – ${n}: try ${p.weight} kg.`,
     speed: (n) => `Next time – ${n}: if every rep stays fast, add a little weight. If you slow down noticeably on the last reps, keep the weight.`,
     close: (n, p) => `Next time – ${n}: same weight (${p.weight} kg), only 1 rep was missing this time. Goal: ${p.reps} reps in every set – once you hit that, more weight is next.`,
     hold: (n, p) => `Next time – ${n}: same weight (${p.weight} kg). Goal: ${p.reps} reps in every set.`,

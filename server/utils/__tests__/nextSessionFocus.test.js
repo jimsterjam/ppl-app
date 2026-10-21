@@ -20,10 +20,21 @@ describe('buildNextSessionFocus', () => {
           { name: 'Kniebeugen mit der Langhantel', setDetails: sets([5, 5, 5, 5, 5], 100) }
         ]
       },
-      language: 'de'
+      language: 'de',
+      // Dasselbe Schema mit demselben Gewicht schon in der Session davor geschafft -> jetzt steigern.
+      history: [{ goal: 'strength', exercises: [{ name: 'Kniebeugen mit der Langhantel', setDetails: sets([5, 5, 5, 5, 5], 100) }] }]
     })
     assert.equal(focus.kind, 'increase')
-    assert.equal(focus.text, 'Nächstes Mal – Barbell High Bar Squat: 102,5 kg probieren. Schaffst du nicht alle Wiederholungen, bleib dabei, bis es klappt.')
+    assert.equal(focus.text, 'Nächstes Mal – Barbell High Bar Squat: 102,5 kg probieren.')
+  })
+
+  test('Kraft-Schema zum ersten Mal geschafft: festigen statt steigern (DE/EN)', () => {
+    const workout = { goal: 'strength', exercises: [{ name: 'Kniebeugen mit der Langhantel', setDetails: sets([5, 5, 5, 5, 5], 100) }] }
+    const de = buildNextSessionFocus({ workout, language: 'de' })
+    assert.equal(de.kind, 'confirm')
+    assert.equal(de.text, 'Nächstes Mal – Barbell High Bar Squat: 5×5 mit 100 kg noch einmal bestätigen, dann mehr Gewicht.')
+    const en = buildNextSessionFocus({ workout, language: 'en' })
+    assert.equal(en.text, 'Next time – Barbell High Bar Squat: confirm 5×5 at 100 kg once more, then add weight.')
   })
 
   test('ohne Steigerung: Speed-Übung mit Gewicht -> Tempo als Maßstab (EN)', () => {

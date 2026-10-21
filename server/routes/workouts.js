@@ -48,6 +48,7 @@ import { decideExerciseMatch } from '../utils/exerciseMatching.js';
 import { getMaxExerciseCount } from '../utils/exerciseCountTarget.js';
 import { applyGeneratorRule } from '../utils/repTargets.js';
 import { buildNextSessionFocus, buildProgressionStates, applyNextSessionFocus } from '../utils/nextSessionFocus.js';
+import { applyRestLine } from '../utils/restLine.js';
 import { sanitizeCoachText, buildBodyweightFactLine } from '../utils/feedbackFactGuard.js';
 import { resolveListFeedbackStatus, FEEDBACK_PENDING_FAILED_AFTER_MS } from '../utils/feedbackStatus.js';
 import { findCatalogEntryForName, catalogReference } from '../utils/catalogMatch.js';
@@ -2420,7 +2421,8 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
           requestId, workoutId, droppedLines: coachText.droppedLines, reasons: coachText.reasons, allDropped: coachText.allDropped
         });
       }
-      aiResult.feedback = coachText.text;
+      // Sammelzeile "Der Rest lief stabil": von der App, nur wenn es wirklich weitere stabile Übungen gibt (utils/restLine.js).
+      aiResult.feedback = coachText.allDropped ? coachText.text : applyRestLine(coachText.text, { exerciseAnalyses, language: feedbackLanguage });
       // Körpergewicht-Gegenüberstellung als feste Zeile (früher schrieb sie die KI).
       const bodyweightLine = buildBodyweightFactLine(bodyweightCorrelation, feedbackLanguage);
       if (bodyweightLine) aiResult.feedback = `${aiResult.feedback}\n\n${bodyweightLine}`;
