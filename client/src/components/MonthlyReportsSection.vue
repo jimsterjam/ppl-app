@@ -1,6 +1,6 @@
 <template>
   <!-- Statistik-Seite: alle Monatsberichte (Pro) bzw. der Beispielbericht, solange es keinen echten gibt. -->
-  <section class="reports-section">
+  <section v-if="rows.length || PRO_PURCHASE_ENABLED || subscriptionStore.isPremium" class="reports-section">
     <h3 class="reports-title">{{ t('monthlyReport.sectionTitle') }}</h3>
 
     <ul v-if="rows.length" class="reports-list">
@@ -27,6 +27,7 @@
   />
 
   <UpgradeModal
+    v-if="PRO_PURCHASE_ENABLED"
     :show="showUpgrade"
     limit-type="general"
     @close="showUpgrade = false"
@@ -41,6 +42,7 @@ import { useI18n } from 'vue-i18n'
 import { ChevronRight } from 'lucide-vue-next'
 import MonthlyReportModal from '@/components/MonthlyReportModal.vue'
 import UpgradeModal from '@/components/UpgradeModal.vue'
+import { PRO_PURCHASE_ENABLED } from '@/config/features'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useMonthlyReportStore } from '@/stores/monthlyReportStore'
 import { formatReportPeriod, isUnseen } from '@/utils/monthlyReportView'
@@ -53,7 +55,7 @@ const showReport = ref(false)
 const showUpgrade = ref(false)
 const selectedId = ref('')
 
-const showsExample = computed(() => !subscriptionStore.isPremium || (store.loaded && !store.hasRealReport))
+const showsExample = computed(() => (!subscriptionStore.isPremium && PRO_PURCHASE_ENABLED) || (subscriptionStore.isPremium && store.loaded && !store.hasRealReport))
 
 const rows = computed(() => {
   if (subscriptionStore.isPremium && store.hasRealReport) {

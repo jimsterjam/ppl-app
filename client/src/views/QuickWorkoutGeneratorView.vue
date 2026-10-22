@@ -129,7 +129,7 @@
 
         <div v-if="quotaBlocked" class="quota-blocked">
           <p>{{ t('aiQuota.generatorBlocked', { date: quota.resetDateLabel.value }) }}</p>
-          <button class="secondary" type="button" @click="showUpgrade = true">{{ t('aiQuota.proButton') }}</button>
+          <button v-if="PRO_PURCHASE_ENABLED" class="secondary" type="button" @click="showUpgrade = true">{{ t('aiQuota.proButton') }}</button>
         </div>
 
         <button class="primary generate-btn" type="button" :disabled="loading || quotaBlocked" @click="generate">
@@ -194,7 +194,7 @@
       </div>
     </main>
 
-    <UpgradeModal :show="showUpgrade" limit-type="general" @close="showUpgrade = false" @continue-free="showUpgrade = false" @upgraded="showUpgrade = false; quota.reload()" />
+    <UpgradeModal v-if="PRO_PURCHASE_ENABLED" :show="showUpgrade" limit-type="general" @close="showUpgrade = false" @continue-free="showUpgrade = false" @upgraded="showUpgrade = false; quota.reload()" />
   </div>
 </template>
 
@@ -215,6 +215,7 @@ import { saveWorkoutBuilderPrefill, buildWorkoutBuilderRoute, normalizeBuilderWo
 import { logger } from '@/utils/logger'
 import { useScrollLock } from '@/composables/useScrollLock'
 import { useSettingsStore } from '@/stores/settingsStore'
+import { PRO_PURCHASE_ENABLED } from '@/config/features'
 import { sanitizeWorkoutGoal, GENERATOR_GOALS } from '@/utils/workoutGoal'
 
 const { t } = useI18n()

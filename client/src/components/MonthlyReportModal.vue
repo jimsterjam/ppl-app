@@ -83,6 +83,7 @@ import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 import { compareWithPrevious, conclusionKey, formatNumber, formatReportPeriod } from '@/utils/monthlyReportView'
 import { buildMonthlyReportPdf, reportPdfFileName } from '@/utils/monthlyReportPdf'
 import { savePdf } from '@/utils/savePdf'
+import { PRO_PURCHASE_ENABLED } from '@/config/features'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -99,7 +100,7 @@ const { getTranslatedExerciseName } = useExerciseTranslation()
 const state = ref('idle') // idle | loading | ok | error
 const report = ref(null)
 
-const showUpgradeButton = computed(() => !!report.value?.isExample && !props.isPro)
+const showUpgradeButton = computed(() => PRO_PURCHASE_ENABLED && !!report.value?.isExample && !props.isPro)
 const facts = computed(() => report.value?.facts || {})
 const period = computed(() => (report.value ? formatReportPeriod(report.value.periodStart, report.value.periodEnd, locale.value) : ''))
 const conclusion = computed(() => conclusionKey(facts.value.conclusion))

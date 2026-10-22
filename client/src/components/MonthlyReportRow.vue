@@ -21,6 +21,7 @@
   />
 
   <UpgradeModal
+    v-if="PRO_PURCHASE_ENABLED"
     :show="showUpgrade"
     limit-type="general"
     @close="showUpgrade = false"
@@ -35,6 +36,7 @@ import { useI18n } from 'vue-i18n'
 import { FileBarChart, ChevronRight } from 'lucide-vue-next'
 import MonthlyReportModal from '@/components/MonthlyReportModal.vue'
 import UpgradeModal from '@/components/UpgradeModal.vue'
+import { PRO_PURCHASE_ENABLED } from '@/config/features'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useMonthlyReportStore } from '@/stores/monthlyReportStore'
@@ -53,7 +55,7 @@ const unseen = computed(() => (subscriptionStore.isPremium ? store.unseen : null
 // 'new': echter, noch nicht geöffneter Bericht · 'example': noch kein echter Bericht · null: nichts
 const mode = computed(() => {
   if (unseen.value) return 'new'
-  if (!subscriptionStore.isPremium) return 'example'
+  if (!subscriptionStore.isPremium) return PRO_PURCHASE_ENABLED ? 'example' : null
   // Pro: erst zeigen, wenn die Liste geladen ist - sonst blitzt kurz das Beispiel auf.
   return store.loaded && !store.hasRealReport ? 'example' : null
 })

@@ -19,8 +19,10 @@
       <p v-if="level === 'empty'" class="quota-alert">{{ t('aiQuota.emptyText', { date: resetDateLabel }) }}</p>
       <p v-else-if="level === 'low'" class="quota-warn">{{ t('aiQuota.lowText') }}</p>
       <p class="quota-hint">{{ t('aiQuota.costRule') }}</p>
-      <button type="button" class="quota-pro" @click="showUpgrade = true">{{ t('aiQuota.proButton') }}</button>
-      <UpgradeModal :show="showUpgrade" limit-type="general" @close="showUpgrade = false" @continue-free="showUpgrade = false" @upgraded="onUpgraded" />
+      <template v-if="PRO_PURCHASE_ENABLED">
+        <button type="button" class="quota-pro" @click="showUpgrade = true">{{ t('aiQuota.proButton') }}</button>
+        <UpgradeModal :show="showUpgrade" limit-type="general" @close="showUpgrade = false" @continue-free="showUpgrade = false" @upgraded="onUpgraded" />
+      </template>
     </template>
     <p v-else class="quota-main">{{ t('aiQuota.unlimited') }}</p>
   </div>
@@ -31,6 +33,7 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import UpgradeModal from '@/components/UpgradeModal.vue'
 import { useAiQuota } from '@/composables/useAiQuota'
+import { PRO_PURCHASE_ENABLED } from '@/config/features'
 
 const { t } = useI18n()
 const { isFree, limit, used, remaining, percentLeft, level, resetDateLabel, reload } = useAiQuota()

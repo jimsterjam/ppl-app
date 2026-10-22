@@ -23,6 +23,7 @@
 import express from 'express'
 import { firebaseAuthMiddleware } from '../middleware/firebaseAuth.js';
 import UserProfile from '../models/UserProfile.js'
+import { isMockUpgradeAllowed } from '../utils/mockUpgradeGate.js'
 import Workout from '../models/Workout.js'
 import { startOfMonth } from '../utils/workoutMetrics.js'
 
@@ -167,6 +168,9 @@ router.get('/status', firebaseAuthMiddleware, async (req, res) => {
 
 // Upgrade zu Pro/Elite
 router.post('/upgrade', firebaseAuthMiddleware, async (req, res) => {
+  if (!isMockUpgradeAllowed()) {
+    return res.status(403).json({ error: 'Upgrades are not available' })
+  }
   try {
     const userId = req.auth?.userId
     const { plan, cycle } = req.body
