@@ -36,6 +36,7 @@ import { ref, computed } from 'vue'
 import { logger } from '@/utils/logger'
 import { getAuthToken } from '@/utils/authToken'
 import { fetchSubscriptionStatus, upgradeSubscriptionRequest } from '@/api/subscription'
+import { PRO_PURCHASE_ENABLED } from '@/config/features'
 // Avoid calling useClerk/useAuth here: Pinia stores run outside a component setup
 // context and calling useClerk() may throw. We will rely on getAuthToken()
 // which falls back to window.Clerk or cached tokens.
@@ -273,6 +274,9 @@ export const useSubscriptionStore = defineStore('subscription', () => {
   
   // Upgrade zu Pro/Elite
   const upgradeSubscription = async (planType, paymentMethod) => {
+    if (!PRO_PURCHASE_ENABLED) {
+      throw new Error('Pro purchase is disabled')
+    }
     const cycle = paymentMethod?.cycle === 'yearly' ? 'yearly' : 'monthly'
     const token = await getAuthToken()
 
