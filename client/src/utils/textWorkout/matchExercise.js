@@ -156,9 +156,7 @@ export function createExerciseMatcher({ catalog = [], customExercises = [] } = {
       }
     }
     const [chosen] = remaining
-    // alternatives: die übrigen Varianten, damit die Oberfläche "Variante angenommen" per Tap ändern lassen kann.
-    const alternatives = remaining.slice(1, MAX_CANDIDATES + 1).map((target) => describe(target.entry, target.tags))
-    return { status: 'matched', via, query, ...describe(chosen.entry, chosen.tags), assumed: ['variant'], candidates: [], alternatives }
+    return { status: 'matched', via, query, ...describe(chosen.entry, chosen.tags), assumed: ['variant'], candidates: [] }
   }
 
   function conceptByFuzzy(phrase) {
