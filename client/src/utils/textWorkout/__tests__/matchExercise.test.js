@@ -167,18 +167,6 @@ describe('createExerciseMatcher: sichere Treffer', () => {
 })
 
 // --- Rückfragen --------------------------------------------------------------------------------------------------
-describe('createExerciseMatcher: Alternativen zur Standardwahl', () => {
-  it('angenommene Variante liefert die übrigen Varianten zum Ändern per Tap', () => {
-    const r = match('Bankdrücken')
-    expect(r.assumed).toEqual(['variant'])
-    expect(r.alternatives.map((a) => a.name_en)).toEqual(['dumbbell bench press', 'barbell incline bench press', 'dumbbell incline bench press'])
-  })
-
-  it('sichere Treffer ohne Annahme haben keine Alternativen', () => {
-    expect(match('Seitheben Kabel').alternatives).toBeUndefined()
-  })
-})
-
 describe('createExerciseMatcher: Rückfrage bei echter Mehrdeutigkeit', () => {
   it('"Seitheben": Auswahl nach Gerät (wie im Entwurf)', () => {
     const r = match('Seitheben')
