@@ -15,6 +15,7 @@ import AppFeedback from '../models/AppFeedback.js';
 import UserProfile from '../models/UserProfile.js';
 import { firebaseAuthMiddleware } from '../middleware/firebaseAuth.js';
 import { requireAdminKey } from '../middleware/adminAuth.js';
+import { summarizeAiConsent, parseConsentInput, buildConsentUpdate } from '../utils/aiConsent.js';
 import multer from 'multer';
 import sharp from 'sharp';
 
@@ -368,7 +369,8 @@ router.get('/profile', firebaseAuthMiddleware, async (req, res) => {
       avatarUrl: profile.avatarUrl || '',
       // Additiv: bestehende Konsumenten von GET /profile (settingsStore.js) lesen nur
       // username/avatarUrl und ignorieren unbekannte Felder - kein Breaking Change.
-      onboarding: summarizeOnboarding(profile)
+      onboarding: summarizeOnboarding(profile),
+      aiConsent: summarizeAiConsent(profile)
     });
   } catch (e) {
     res.status(500).json({ error: 'Failed to load profile', message: e?.message || String(e) });
@@ -381,6 +383,37 @@ router.get('/profile', firebaseAuthMiddleware, async (req, res) => {
 // Getrennt von /profile (PUT), da hier ausschließlich der Onboarding-Teilbaum geschrieben wird -
 // vermeidet versehentliches Überschreiben von username/avatarUrl durch einen unvollständigen
 // Onboarding-Request und umgekehrt.
+
+// ---------------------------
+// KI-Einwilligung
+// ---------------------------
+router.get('/ai-consent', firebaseAuthMiddleware, async (req, res) => {
+  try {
+    const uid = req.auth?.userId;
+    if (!uid) return res.status(401).json({ error: 'Unauthenticated' });
+    const profile = await UserProfile.findOne({ uid }).select('aiConsent').lean();
+    res.json({ aiConsent: summarizeAiConsent(profile) });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to load AI consent' });
+  }
+});
+
+router.put('/ai-consent', firebaseAuthMiddleware, async (req, res) => {
+  try {
+    const uid = req.auth?.userId;
+    if (!uid) return res.status(401).json({ error: 'Unauthenticated' });
+    const input = parseConsentInput(req.body);
+    if (!input) return res.status(400).json({ error: 'granted must be a boolean' });
+    const updated = await UserProfile.findOneAndUpdate(
+      { uid },
+      { $set: buildConsentUpdate(input.granted) },
+      { upsert: true, new: true }
+    ).lean();
+    res.json({ aiConsent: summarizeAiConsent(updated) });
+  } catch (e) {
+    res.status(500).json({ error: 'Failed to save AI consent' });
+  }
+});
 
 router.post('/onboarding/complete', firebaseAuthMiddleware, async (req, res) => {
   try {

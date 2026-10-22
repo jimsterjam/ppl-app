@@ -11,6 +11,7 @@ import { useAuthStore } from './stores/authStore'
 import { useUserStore } from './stores/userStore'
 import { useSettingsStore } from './stores/settingsStore'
 import { useOnboardingStore } from './stores/onboardingStore'
+import { useAiConsentStore } from './stores/aiConsentStore'
 import { useTimerStore } from './stores/timerStore'
 import { initFirebaseAuth, useFirebaseAuth, isEffectivelyEmailVerified } from './utils/firebaseAuth'
 import { getActiveDraft, runningWorkoutPath } from './utils/activeWorkoutDraft'
@@ -242,6 +243,7 @@ async function bootstrapAuth() {
   const userStore = useUserStore(pinia)
   const settingsStore = useSettingsStore(pinia)
   const onboardingStore = useOnboardingStore(pinia)
+  const aiConsentStore = useAiConsentStore(pinia)
   let lastUid = authStore.uid || null
 
   logger.debug('[main] Initializing auth listener, store auth state:', authStore.isAuthenticated)
@@ -268,6 +270,7 @@ async function bootstrapAuth() {
       // Onboarding-Status (5-seitiger Einführungsflow) - lädt zunächst den lokalen Cache für
       // diese UID, siehe onboardingStore.js.
       onboardingStore.switchUser(user.uid)
+      aiConsentStore.switchUser(user.uid)
       const token = await getIdToken().catch((err) => {
         logger.warn('[main] Failed to fetch ID token:', err)
         return null
@@ -333,6 +336,7 @@ async function bootstrapAuth() {
           onboardingStore.syncFromServer(token).catch((error) => {
             logger.warn('[main] onboardingStore.syncFromServer fehlgeschlagen:', error)
           })
+          aiConsentStore.syncFromServer(token)
         }
       } else {
         logger.warn('[main] No token after auth state change, starte trotzdem Sync-Versuch', {
@@ -376,6 +380,7 @@ async function bootstrapAuth() {
       lastUid = null
       settingsStore.switchUser(null)
       onboardingStore.switchUser(null)
+      aiConsentStore.switchUser(null)
       authStore.clearUser()
       userStore.$reset()
       clearResumeSnapshot()

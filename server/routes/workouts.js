@@ -12,6 +12,7 @@ import FeedbackQualitySignal from '../models/FeedbackQualitySignal.js';
 import { logger } from '../utils/logger.js';
 import { isWorkoutEditWindowExpired } from '../utils/workoutEditWindow.js';
 import { getAIService } from '../services/aiService.js';
+import { requireAiConsent } from '../middleware/requireAiConsent.js';
 import { runVerificationLoop, getVerifierMode } from '../services/feedbackVerificationService.js';
 import {
   analyzeWorkoutProgression,
@@ -900,7 +901,7 @@ router.get("/stats/progress", firebaseAuthMiddleware, async (req, res) => {
   }
 });
 
-router.post('/quick-generator', aiAuthMiddleware, async (req, res) => {
+router.post('/quick-generator', aiAuthMiddleware, requireAiConsent, async (req, res) => {
   const requestId = `quick_gen_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
   try {
     const userId = req.auth?.userId || 'test_user';
@@ -1768,7 +1769,7 @@ router.post("/ai-demo", async (req, res) => {
 });
 
 // 🤖 AI WORKOUT SUGGESTION (Feature-Flag gesteuert)
-router.post("/ai-suggestion", aiAuthMiddleware, async (req, res) => {
+router.post("/ai-suggestion", aiAuthMiddleware, requireAiConsent, async (req, res) => {
   const requestId = `ai_req_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`;
   res.set('X-AI-Request-Id', requestId);
 
@@ -1983,7 +1984,7 @@ router.post("/ai-feedback", firebaseAuthMiddleware, async (req, res) => {
 // Wird via import genutzt
 
 // 🔍 WORKOUT ANALYZER: Trainingsanalyse mit strukturiertem AI-Feedback
-router.post("/:id/ai-analysis", firebaseAuthMiddleware, async (req, res) => {
+router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async (req, res) => {
   const requestId = `analysis_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
   try {
@@ -2809,7 +2810,7 @@ router.post("/ai-progress-feedback-test", (req, res, next) => {
 });
 
 // 🚀 SIMPLE PROGRESS FEEDBACK: Einfaches Feedback zu einzelner Übung
-router.post("/ai-progress-feedback", firebaseAuthMiddleware, async (req, res) => {
+router.post("/ai-progress-feedback", firebaseAuthMiddleware, requireAiConsent, async (req, res) => {
   const requestId = `progress_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
   try {

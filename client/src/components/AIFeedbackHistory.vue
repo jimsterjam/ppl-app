@@ -144,6 +144,7 @@ import { isValidObjectId } from '@/utils/workoutHelpers'
 import { logger } from '@/utils/logger'
 import { getMetadata, setMetadata, AI_FEEDBACK_UPDATED_EVENT, WORKOUT_DELETED_EVENT } from '@/utils/offlineStorage'
 import { useToastStore } from '@/stores/toastStore'
+import { useAiConsentStore } from '@/stores/aiConsentStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { logDiagnostic } from '@/utils/diagnosticsLog'
 
@@ -162,6 +163,7 @@ const props = defineProps({
 const { t, locale } = useI18n()
 const { getIdToken, getCurrentUser } = useFirebaseAuth()
 const toast = useToastStore()
+const aiConsent = useAiConsentStore()
 const subscriptionStore = useSubscriptionStore()
 
 // Gratis-Tarif: eine (Neu-)Auswertung kostet 1 KI-Anfrage (Absprache Paul 24.10.).
@@ -224,6 +226,7 @@ async function generateNow(item) {
     generateError.value = item.workoutId
     return
   }
+  if (!(await aiConsent.request())) return
   generatingId.value = item.workoutId
   generateError.value = null
   try {
@@ -258,6 +261,7 @@ async function generateNow(item) {
     }
   } catch (err) {
     logger.warn('[AIFeedbackHistory] generateNow failed', err?.message)
+    if (err?.response?.data?.code === 'AI_CONSENT_REQUIRED') aiConsent.noteServerRefusal()
     markCreating(item)
     logDiagnostic('feedback-history-generate-now', { workoutId: item.workoutId, outcome: 'error', message: err?.message })
   } finally {
