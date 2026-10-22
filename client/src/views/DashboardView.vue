@@ -26,6 +26,9 @@
 
       <MonthlyReportRow />
 
+      <!-- Freitext-Einstieg (Schritt 3, noch ohne Start): nur für Admin-Konten (config/admin.js). -->
+      <TextWorkoutStart v-if="textStartEnabled && !showStartOptions" />
+
       <section class="quick-start">
         <div v-if="!showStartOptions" class="quick-grid">
           <WorkoutCard
@@ -272,6 +275,8 @@ import MonthlyReportRow from '@/components/MonthlyReportRow.vue'
 import AvatarEditor from '@/components/AvatarEditor.vue'
 import NameEditModal from '@/components/NameEditModal.vue'
 import WorkoutGoalPicker from '@/components/WorkoutGoalPicker.vue'
+import TextWorkoutStart from '@/components/TextWorkoutStart.vue'
+import { isAdminUid } from '@/config/admin'
 import { sanitizeWorkoutGoal, WORKOUT_GOALS, GENERATOR_GOALS, WORKOUT_GOAL_LABEL_KEYS } from '@/utils/workoutGoal'
 
 
@@ -359,6 +364,9 @@ const pendingWorkoutTypeLabel = computed(() => {
   if (type === 'fullbody') return $t('dashboard.fullBodyLabel')
   return type.charAt(0).toUpperCase() + type.slice(1)
 })
+
+// Freitext-Einstieg nur für Admin-Konten sichtbar (Schritt 3 von 6, Absprache Paul).
+const textStartEnabled = computed(() => isAdminUid(String(authStore.user?.uid || authStore.uid || getCurrentUser?.()?.uid || '')))
 
 function getCurrentFavoritesUserId() {
   return String(getCurrentUser?.()?.uid || authStore.user?.uid || authStore.uid || 'guest')
