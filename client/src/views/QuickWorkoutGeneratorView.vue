@@ -216,6 +216,7 @@ import { logger } from '@/utils/logger'
 import { useScrollLock } from '@/composables/useScrollLock'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { PRO_PURCHASE_ENABLED } from '@/config/features'
+import { useAiConsentStore } from '@/stores/aiConsentStore'
 import { sanitizeWorkoutGoal, GENERATOR_GOALS } from '@/utils/workoutGoal'
 
 const { t } = useI18n()
@@ -225,6 +226,7 @@ const { getIdToken } = useFirebaseAuth()
 
 const quota = useAiQuota()
 const subscriptionStore = useSubscriptionStore()
+const aiConsent = useAiConsentStore()
 const showUpgrade = ref(false)
 const quotaBlocked = computed(() => quota.isFree.value && quota.level.value === 'empty')
 const loading = ref(false)
@@ -328,6 +330,8 @@ function findCatalogMatch(catalog, name) {
 }
 
 async function generate() {
+  // Ohne Einwilligung zur KI-Weitergabe nichts senden (Fenster öffnet sich bei Bedarf).
+  if (!(await aiConsent.request())) return
   loading.value = true
   error.value = null
 
@@ -410,6 +414,7 @@ async function generate() {
     }
   } catch (err) {
     logger.error('[QuickWorkoutGenerator] generate failed', err?.message)
+    if (err?.response?.data?.code === 'AI_CONSENT_REQUIRED') aiConsent.noteServerRefusal()
     error.value = t('quickGenerator.error')
   } finally {
     loading.value = false

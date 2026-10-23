@@ -72,6 +72,12 @@
     </div>
 
     <!-- Feedback kommt später (Anfrage gescheitert oder zu lange) - kein Fehlertext. -->
+    <div v-else-if="consentDeclined" class="summary-content fallback">
+      <p>{{ t('aiConsent.declinedText') }}</p>
+      <button class="primary" type="button" @click="retryAfterConsent">{{ t('aiConsent.declinedAllow') }}</button>
+      <button class="secondary" type="button" @click="dismissSummary">{{ t('postWorkout.gotIt') }}</button>
+    </div>
+
     <div v-else-if="pendingLater" class="summary-content fallback">
       <p>{{ t('postWorkout.feedbackDelayed') }}</p>
       <button class="primary" type="button" @click="dismissSummary">{{ t('postWorkout.gotIt') }}</button>
@@ -185,6 +191,7 @@ import OneTimeHint from '@/components/OneTimeHint.vue'
 import AppFeedbackDialog from '@/components/AppFeedbackDialog.vue'
 import { useUserStore } from '@/stores/userStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
+import { useAiConsentStore } from '@/stores/aiConsentStore'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 import { getNotDoneExercises } from '@/utils/notDoneExercises'
 
@@ -244,6 +251,9 @@ const syncPending = ref(false)
 const SLOW_NOTICE_MS = 15000
 const slowNotice = ref(false)
 const pendingLater = ref(false)
+// Nutzer hat der KI-Weitergabe nicht zugestimmt: Hinweis + Möglichkeit, es nachzuholen.
+const consentDeclined = ref(false)
+const aiConsent = useAiConsentStore()
 let slowTimer = null
 let currentResolvedId = ''
 
@@ -323,6 +333,12 @@ const costHint = computed(() => {
   return t('quota.costHint', { remaining: subscriptionStore.aiRequestsRemaining, limit: subscriptionStore.aiRequestsLimit })
 })
 
+function retryAfterConsent() {
+  consentDeclined.value = false
+  loading.value = true
+  loadAIFeedback()
+}
+
 function regenerate() {
   if (quotaExhausted.value) return
   deferredConfirmation.value = false
@@ -340,6 +356,14 @@ async function loadAIFeedback({ refresh = false } = {}) {
 
   if (!props.workoutId) {
     logger.warn('[PostWorkoutSummary] No workoutId provided')
+    loading.value = false
+    return
+  }
+
+  // Einwilligung zur KI-Weitergabe (App-Store-Regel 5.1.2): erst fragen, dann senden.
+  consentDeclined.value = false
+  if (!(await aiConsent.request())) {
+    consentDeclined.value = true
     loading.value = false
     return
   }
@@ -464,6 +488,11 @@ async function loadAIFeedback({ refresh = false } = {}) {
     }
 
   } catch (err) {
+    if (err?.response?.data?.code === 'AI_CONSENT_REQUIRED') {
+      aiConsent.noteServerRefusal()
+      consentDeclined.value = true
+      return
+    }
     logger.error('[PostWorkoutSummary] Error loading feedback', {
       workoutId: props.workoutId,
       error: err.message

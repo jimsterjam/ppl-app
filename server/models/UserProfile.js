@@ -91,6 +91,14 @@ const userProfileSchema = new mongoose.Schema({
   // Nutzer den Flow bewusst durchlaufen oder übersprungen hat, ohne das Kern-Verhalten
   // ("nicht erneut automatisch zeigen") zu verkomplizieren - beide zählen gleichwertig als
   // "erledigt" (siehe hasCompletedOnboarding in routes/account.js).
+  // Einwilligung zur Weitergabe von Trainingsdaten an den KI-Dienst (OpenAI), siehe
+  // utils/aiConsent.js. Ohne granted=true (und aktuelle version) lehnen die KI-Routen ab.
+  aiConsent: {
+    granted: { type: Boolean, default: false },
+    version: { type: Number, default: 0 },
+    grantedAt: { type: Date, default: null },
+    revokedAt: { type: Date, default: null }
+  },
   onboarding: {
     completedAt: {
       type: Date,

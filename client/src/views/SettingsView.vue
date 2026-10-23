@@ -17,6 +17,14 @@
         <AiQuotaCard />
       </CollapsibleCard>
 
+      <CollapsibleCard class="card" :title="$t('aiConsent.settingsTitle')">
+        <p class="hint">{{ $t('aiConsent.settingsHint') }}</p>
+        <label class="opt">
+          <input type="checkbox" :checked="aiConsent.granted" @change="toggleAiConsent($event)" />
+          <span>{{ $t('aiConsent.settingsToggle') }}</span>
+        </label>
+      </CollapsibleCard>
+
       <CollapsibleCard class="card" :title="$t('settings.progressRulesTitle')">
         <p class="hint">{{ $t('settings.progressRulesSubtitle') }}</p>
         <button class="legal-btn" @click="$router.push({ name: 'faqs', query: { open: 'progressRules' } })">
@@ -365,6 +373,7 @@ import { useUserStore } from '@/stores/userStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useOnboardingStore } from '@/stores/onboardingStore'
 import { useToastStore } from '@/stores/toastStore'
+import { useAiConsentStore } from '@/stores/aiConsentStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useI18n } from 'vue-i18n'
 import { computed, ref, watch, onBeforeUnmount } from 'vue'
@@ -477,6 +486,20 @@ const planLabels = {
 const router = useRouter()
 const route = useRoute()
 const toast = useToastStore()
+const aiConsent = useAiConsentStore()
+
+async function toggleAiConsent(event) {
+  const input = event.target
+  if (input.checked) {
+    // Fenster mit dem Einwilligungstext; bei "Nicht jetzt" bleibt der Schalter aus.
+    await aiConsent.request()
+    input.checked = aiConsent.granted
+    return
+  }
+  const ok = await aiConsent.revoke()
+  input.checked = aiConsent.granted
+  toast.show(ok ? $t('aiConsent.settingsRevoked') : $t('aiConsent.settingsError'), { type: ok ? 'info' : 'error' })
+}
 const userStore = useUserStore()
 
 const readDevToolsFlag = () => {

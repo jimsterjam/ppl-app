@@ -133,3 +133,22 @@ export async function exportAccountData(token) {
   }
 }
 
+
+// KI-Einwilligung (Server: routes/account.js, utils/aiConsent.js)
+export async function fetchAiConsent(token) {
+  try {
+    const res = await api.get('/ai-consent', authConfig(token))
+    return res.data?.aiConsent || null
+  } catch (error) {
+    throw handleAPIError(error, 'KI-Einwilligung laden', { showToast: false })
+  }
+}
+
+export async function saveAiConsent(token, granted) {
+  try {
+    const res = await api.put('/ai-consent', { granted: granted === true }, authConfig(token))
+    return res.data?.aiConsent || null
+  } catch (error) {
+    throw handleAPIError(error, 'KI-Einwilligung speichern', { showToast: false })
+  }
+}
