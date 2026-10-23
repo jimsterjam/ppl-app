@@ -518,6 +518,12 @@ export const messages = {
         'Rudern': 'Rows'
       }
     },
+    transition: {
+      label: 'Übergang zur nächsten Übung',
+      overlayAria: 'Übergang zur nächsten Übung',
+      expandAria: 'Übergang groß anzeigen',
+      start: 'Übung starten'
+    },
     restTimer: {
       label: 'Pause',
       finished: 'Pause vorbei – nächster Satz',
@@ -1951,6 +1957,12 @@ export const messages = {
         'Trizepsdrücken': 'Triceps Extension',
         'Rudern': 'Rows'
       }
+    },
+    transition: {
+      label: 'Moving to the next exercise',
+      overlayAria: 'Moving to the next exercise',
+      expandAria: 'Show transition full screen',
+      start: 'Start exercise'
     },
     restTimer: {
       label: 'Rest',
