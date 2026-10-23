@@ -424,7 +424,9 @@ const weeklyProgressLabel = computed(() => $t('dashboard.weeklyProgress', { done
 
 // Erstnutzung (Absprache Paul 22.10.): noch kein abgeschlossenes Workout und kein Entwurf -> kurze Erklärung unter den
 // Kacheln, die Gym-Zeit-Karte erscheint erst, wenn sie gebraucht wird (laufende Zeit oder vorhandene Workouts).
-const isFirstUse = computed(() => !hasDraft.value && !(store.workouts || []).some(w => w?.completed === true))
+// Erst nach dem Laden der Workouts entscheiden: davor ist die Liste leer, und der Hinweis blitzte bei jedem App-Start
+// kurz auf, bis die Workouts da waren (User-Report 24.10.).
+const isFirstUse = computed(() => store.workoutsLoaded && !hasDraft.value && !(store.workouts || []).some(w => w?.completed === true))
 const showStopwatchCard = computed(() => !isFirstUse.value || sessionStopwatchStore.elapsedMs > 0)
 
 const lastWorkoutType = computed(() => {
