@@ -914,6 +914,16 @@
       @adjust-next="onNextSetAdjust"
       @spin-next="onNextSetSpin"
     />
+    <!-- Übergangs-Stoppuhr nach der letzten Übung (startet in toggleRowDone, endet mit "Übung starten"). -->
+    <TransitionTimer
+      :next-set="transitionNextSet"
+      :force-full="focus.visible"
+      :hide-minimized="focus.active"
+      @start="onTransitionStart"
+      @minimize="focus.minimize()"
+      @adjust-next="onNextSetAdjust"
+      @spin-next="onNextSetSpin"
+    />
     <FocusMode :current="focusCurrent" @done="onFocusDone" @skip="onFocusSkip" @adjust="onFocusAdjust" @spin="onFocusSpin" @open="openFocus" />
     <button v-if="showFocusStart" type="button" class="focus-start-btn" @click="startFocus">
       {{ focusWarmupPending ? t('focus.startWarmupSet', { n: focusWarmupPending.number }) : t('focus.startSet', { n: doneBarCurrent.setNumber }) }}
@@ -1082,11 +1092,13 @@ import { normalizeWorkoutForSave } from '@/utils/workoutDetailSaveFlow'
 import { startAiWarmup } from '@/utils/aiWarmup'
 import { buildCatalogIndex, findCatalogEntry } from '@/utils/exerciseMatch'
 import { useRestTimerStore } from '@/stores/restTimerStore'
+import { useTransitionTimerStore } from '@/stores/transitionTimerStore'
 import { useWarmupTimerStore } from '@/stores/warmupTimerStore'
 import WarmupCard from '@/components/WarmupCard.vue'
 import { emptyWarmup, pickWarmupExercise, sanitizeWarmup } from '@/utils/warmupPlan'
 import { restSecondsFor, sanitizeCustomRest, formatRest } from '@/utils/restTimerRules'
 import RestTimerBar from '@/components/timer/RestTimerBar.vue'
+import TransitionTimer from '@/components/timer/TransitionTimer.vue'
 import FocusMode from '@/components/FocusMode.vue'
 import { useFocusModeStore } from '@/stores/focusModeStore'
 import { buildSaveReview, markAllSetsDone } from '@/utils/saveReview'
@@ -2069,9 +2081,13 @@ function toggleRowDone(row, exIndex = -1, rowIndex = -1) {
     // Letzter Arbeitssatz dieser Übung (Absprache Paul 24.10.): keine Pause, es folgt direkt die nächste Übung.
     const exercise = workout.value?.exercises?.[exIndex]
     const isLastSetOfExercise = !!exercise && (exercise.setDetails || []).every((r) => !r || r.isWarmup || r === row || r.done === true)
+    // Ein neuer abgehakter Satz beendet einen noch laufenden Übergang (Übung wurde ohne "Übung starten" begonnen).
+    transition.clear()
     if (isLastSetOfExercise) {
       if (warmupTimer.isActive) warmupTimer.cancel()
       restTimer.stopFor(exIndex, rowIndex)
+      // Letzter Satz der Übung (Absprache Paul 24.10.): keine Pause, sondern die Übergangs-Stoppuhr - falls noch eine Übung folgt.
+      if (nextOpenSetFrom(exIndex + 1)) transition.start(exIndex)
     } else if (restTimer.autoStart) {
       const name = getTranslatedExerciseName(workout.value?.exercises?.[exIndex]?.name || '')
       // Das Training hat begonnen: ein noch laufender Warm-up-Timer wäre jetzt nur störend (und seine Mitteilung
@@ -2089,12 +2105,14 @@ function toggleRowDone(row, exIndex = -1, rowIndex = -1) {
     }
   } else if (!row.done) {
     restTimer.stopFor(exIndex, rowIndex)
+    transition.clear()
   }
   try { triggerAutoSave() } catch {}
 }
 
 // --- Pausentimer -----------------------------------------------------------------------------
 const restTimer = useRestTimerStore()
+const transition = useTransitionTimerStore()
 const warmupTimer = useWarmupTimerStore()
 
 // --- Warm-up-Karte -----------------------------------------------------------------------------
@@ -2238,7 +2256,9 @@ const focus = useFocusModeStore()
 
 // Der Knopf erscheint, sobald das Warm-up nicht (mehr) läuft - Warm-up überspringen oder beenden (Absprache Paul 20.10.).
 const hasBottomBar = computed(() => showFocusStart.value || restTimer.isVisible || (focus.active && focus.minimized))
-const showFocusStart = computed(() => !!doneBarCurrent.value && !focus.active && !restTimer.isVisible && !warmupTimer.isActive)
+// Nur zu Beginn einer Übung (Absprache Paul 24.10.): ab Satz 2 führt die Pause bzw. die Großansicht direkt weiter.
+const showFocusStart = computed(() => !!doneBarCurrent.value && !focus.active && !restTimer.isVisible && !transition.isActive && !warmupTimer.isActive
+  && (doneBarCurrent.value.setNumber <= 1 || !!focusWarmupPending.value))
 
 // Aufwärmsätze in der Großansicht (Absprache Paul 19.10.): vor dem ersten Arbeitssatz jeder Übung, ohne Timer -
 // abhaken oder überspringen. Nur solange in dieser Übung noch kein Arbeitssatz abgehakt ist. Erledigte Aufwärmsätze
@@ -2310,9 +2330,17 @@ function startFocus() {
   focus.open()
 }
 
+// "Übung starten": Übergang beenden, Großansicht mit dem ersten Satz (bzw. Aufwärmsatz) der nächsten Übung.
+function onTransitionStart() {
+  transition.clear()
+  if (focus.active) focus.expand()
+  else startFocus()
+}
+
 function openFocus() {
   focus.expand()
   restTimer.expand()
+  transition.expand()
   if (restTimer.showFinished) restTimer.clear()
 }
 
@@ -2363,7 +2391,7 @@ function onFocusSpin(field, direction, active) {
 
 // Pausen-Ansicht: nächsten Satz vor dem Start noch anpassen (gleiche Schritte wie in der Großansicht).
 function onNextSetSpin(field, direction, active) {
-  const next = restNextSet.value
+  const next = restNextSet.value || transitionNextSet.value
   const row = next ? workout.value?.exercises?.[next.exIndex]?.setDetails?.[next.rowIndex] : null
   if (!row) return
   if (!active) { stopSpin(row, field); return }
@@ -2377,7 +2405,7 @@ function onNextSetSpin(field, direction, active) {
 
 // Pausen-Ansicht: nächsten Satz vor dem Start noch anpassen.
 function onNextSetAdjust(field, direction) {
-  const next = restNextSet.value
+  const next = restNextSet.value || transitionNextSet.value
   if (next) adjustSetField(next.exIndex, next.rowIndex, field, direction)
 }
 
@@ -2422,7 +2450,13 @@ watch([() => restTimer.isRunning, focusCurrent, () => focus.active], () => {
 // Pause vorbei: im Fokus-Modus sofort mit dem nächsten Satz weiter (ohne "Weiter"-Knopf). Ist der nächste Satz eine
 // Zeitübung, läuft deren Timer jetzt automatisch los (Pause regulär abgelaufen; "Überspringen" startet nicht).
 watch(() => restTimer.showFinished, (finished) => {
-  if (!finished || !focus.active) return
+  if (!finished) return
+  // Pause in der Übersicht vorbei (Absprache Paul 24.10.): direkt mit dem nächsten Satz in die Großansicht, ohne "Weiter".
+  if (!focus.active) {
+    if (!doneBarCurrent.value) return
+    restTimer.clear()
+    startFocus()
+  }
   const cur = focusCurrent.value
   if (!cur || cur.mode === 'weight') {
     if (focus.visible) restTimer.clear()
@@ -2437,6 +2471,7 @@ watch(() => restTimer.showFinished, (finished) => {
 // Kein offener Satz mehr: Fokus-Modus beenden (zurück zur Übersicht mit Speichern).
 watch(doneBarCurrent, (cur) => {
   if (!cur && focus.active) focus.close()
+  if (!cur) transition.clear()
 })
 
 // Zurück in die Übersicht: zum aktuellen Satz scrollen.
@@ -2450,10 +2485,9 @@ onBeforeUnmount(() => focus.close())
 
 // Pausentimer-Vollbild: nächster offener Arbeitssatz ab der Übung der laufenden Pause (diese
 // Übung zuerst, sonst die folgenden). Satznummer zählt nur Arbeitssätze, wie in der Tabelle.
-const restNextSet = computed(() => {
-  if (!restTimer.isVisible || restTimer.exIndex < 0) return null
+function nextOpenSetFrom(startIndex) {
   const exercises = workout.value?.exercises || []
-  for (let i = restTimer.exIndex; i < exercises.length; i++) {
+  for (let i = Math.max(0, startIndex); i < exercises.length; i++) {
     let setNumber = 0
     for (const row of exercises[i]?.setDetails || []) {
       if (!row || row.isWarmup) continue
@@ -2474,6 +2508,17 @@ const restNextSet = computed(() => {
     }
   }
   return null
+}
+
+const restNextSet = computed(() => {
+  if (!restTimer.isVisible || restTimer.exIndex < 0) return null
+  return nextOpenSetFrom(restTimer.exIndex)
+})
+
+// Übergang: erster offener Arbeitssatz ab der Übung nach der gerade beendeten.
+const transitionNextSet = computed(() => {
+  if (!transition.isActive || transition.exIndex < 0) return null
+  return nextOpenSetFrom(transition.exIndex + 1)
 })
 
 // Aktueller Satz (Absprache Paul 13.10.): der erste noch nicht abgehakte Arbeitssatz im Workout leuchtet
@@ -2488,6 +2533,7 @@ const nextSetHighlight = computed(() => {
   return { exIndex: -1, rowIndex: -1 }
 })
 restTimer.restore()
+transition.restore()
 
 async function loadProgressionData() {
   const currentId = String(workout.value?._id || workout.value?.id || '')
@@ -3267,6 +3313,7 @@ async function discardDraftAndLeave() {
   // Ebenso Gesamtzeit und laufende Pause: sonst läuft die Stoppuhr nach dem Abbruch weiter.
   sessionStopwatchStore.reset()
   restTimer.clear()
+  transition.clear()
   focus.close()
   await discardDraftAndLeaveFlow({
     route,
@@ -3875,6 +3922,7 @@ async function performSaveWorkout(updateFavorite = false, { deferAiFeedback = fa
         timerStore.reset()
         sessionStopwatchStore.reset()
         restTimer.clear()
+        transition.clear()
         focus.close()
         warmupTimer.cancel()
         bypassTimerLeaveGuard.value = true
@@ -3937,6 +3985,7 @@ async function performSaveWorkout(updateFavorite = false, { deferAiFeedback = fa
       timerStore.reset()
       sessionStopwatchStore.reset()
       restTimer.clear()
+      transition.clear()
       focus.close()
       warmupTimer.cancel()
       bypassTimerLeaveGuard.value = true
@@ -3958,6 +4007,7 @@ async function performSaveWorkout(updateFavorite = false, { deferAiFeedback = fa
     timerStore.reset()
     sessionStopwatchStore.reset()
     restTimer.clear()
+    transition.clear()
     focus.close()
     warmupTimer.cancel()
     bypassTimerLeaveGuard.value = true

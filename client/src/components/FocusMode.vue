@@ -22,9 +22,19 @@
         </p>
         <p v-if="current.isWarmup" class="fm-warm-note">{{ t('focus.warmupNote') }}</p>
 
+        <!-- Wiederholungen (Kraft und Wiederholungen in fester Zeit) - bei fester Zeit VOR dem Ring, damit sie sichtbar und änderbar bleiben -->
+        <div v-if="current.mode !== 'time'" class="fm-step">
+          <p class="fm-step-label">{{ t('focus.reps') }}</p>
+          <div class="fm-step-row">
+            <button type="button" class="fm-step-btn" :aria-label="t('focus.repsMinusAria')" v-bind="spinBind('reps', -1)">−</button>
+            <span class="fm-step-value">{{ repsText }}</span>
+            <button type="button" class="fm-step-btn" :aria-label="t('focus.repsPlusAria')" v-bind="spinBind('reps', 1)">+</button>
+          </div>
+        </div>
+
         <!-- Zeit halten / Wiederholungen in fester Zeit: Satz-Timer -->
         <template v-if="current.mode !== 'weight'">
-          <div class="fm-ring" role="timer" aria-live="off">
+          <div class="fm-ring" :class="{ 'fm-ring--compact': current.mode === 'repsTime' }" role="timer" aria-live="off">
             <svg viewBox="0 0 100 100" aria-hidden="true">
               <circle class="fm-ring-track" cx="50" cy="50" r="46" />
               <circle class="fm-ring-progress" cx="50" cy="50" r="46" :stroke-dasharray="RING_LENGTH" :stroke-dashoffset="ringOffset" />
@@ -39,16 +49,6 @@
             <button type="button" class="fm-btn" :aria-label="t('focus.plusSecAria')" @click="adjustSeconds(15)">{{ t('restTimer.plusLabel') }}</button>
           </div>
         </template>
-
-        <!-- Wiederholungen (Kraft und Wiederholungen in fester Zeit) -->
-        <div v-if="current.mode !== 'time'" class="fm-step">
-          <p class="fm-step-label">{{ t('focus.reps') }}</p>
-          <div class="fm-step-row">
-            <button type="button" class="fm-step-btn" :aria-label="t('focus.repsMinusAria')" v-bind="spinBind('reps', -1)">−</button>
-            <span class="fm-step-value">{{ repsText }}</span>
-            <button type="button" class="fm-step-btn" :aria-label="t('focus.repsPlusAria')" v-bind="spinBind('reps', 1)">+</button>
-          </div>
-        </div>
 
         <!-- Gewicht (nur Messart Kraft) -->
         <div v-if="current.mode === 'weight'" class="fm-step">
@@ -69,10 +69,11 @@
         <button type="button" class="fm-btn fm-btn-wide" @click="emit('skip')">{{ t('focus.warmupSkip') }}</button>
       </div>
       <div v-else class="fm-actions">
-        <button v-if="current.mode !== 'weight' && !timerStarted" type="button" class="fm-cta" @click="startTimer">
+        <!-- "Start" nur beim ersten Satz einer Übung; ab Satz 2 läuft der Timer von selbst los (siehe Watcher). -->
+        <button v-if="current.mode !== 'weight' && !timerStarted && current.setNumber <= 1" type="button" class="fm-cta" @click="startTimer">
           {{ t('focus.start') }}
         </button>
-        <template v-else-if="current.mode !== 'weight'">
+        <template v-else-if="current.mode !== 'weight' && timerStarted">
           <button type="button" class="fm-btn fm-btn-wide" @click="toggleTimer">
             {{ focus.timerRunning ? t('focus.pause') : t('focus.resumeTimer') }}
           </button>
@@ -106,6 +107,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useFocusModeStore } from '@/stores/focusModeStore'
 import { useRestTimerStore } from '@/stores/restTimerStore'
+import { useTransitionTimerStore } from '@/stores/transitionTimerStore'
 import { useSessionStopwatchStore } from '@/stores/sessionStopwatch'
 import { Maximize2 } from 'lucide-vue-next'
 import { formatRest } from '@/utils/restTimerRules'
@@ -120,6 +122,7 @@ const emit = defineEmits(['done', 'skip', 'adjust', 'spin', 'open'])
 const { t } = useI18n()
 const focus = useFocusModeStore()
 const rest = useRestTimerStore()
+const transition = useTransitionTimerStore()
 const stopwatch = useSessionStopwatchStore()
 
 const RING_LENGTH = 2 * Math.PI * 46
@@ -195,13 +198,28 @@ function adjustSeconds(delta) {
   }
 }
 
+// Ab Satz 2 einer Zeitübung startet der Satz-Timer sofort, sobald die Ansicht sichtbar ist und keine Pause bzw. kein
+// Übergang mehr läuft (auch wenn die Pause übersprungen wurde). Pro Satz nur einmal, damit ein abgelaufener
+// Timer (Wiederholungen in fester Zeit) nicht von selbst neu startet.
+let autoStartedKey = ''
+watch([() => props.current?.key, () => focus.visible, () => rest.isVisible, () => transition.isActive], () => {
+  const cur = props.current
+  if (!cur || cur.isWarmup || cur.mode === 'weight' || cur.setNumber <= 1) return
+  if (!focus.visible || rest.isVisible || transition.isActive) return
+  if (autoStartedKey === cur.key || isOwnTimer.value) return
+  autoStartedKey = cur.key
+  startTimer()
+}, { immediate: true })
+
 // Minimierte Leiste: Pause hat Vorrang, dann der Satz-Timer, sonst der aktuelle Satz.
 const miniTime = computed(() => {
+  if (transition.isActive) return formatRest(Math.floor(transition.elapsedMs / 1000) * 1000)
   if (rest.isVisible) return rest.showFinished ? '0:00' : formatRest(rest.remainingMs)
   if (timerStarted.value) return timerText.value
   return props.current ? `${props.current.setNumber}/${props.current.setTotal}` : ''
 })
 const miniTitle = computed(() => {
+  if (transition.isActive) return t('transition.label')
   if (rest.isVisible) return rest.showFinished ? t('restTimer.finished') : t('focus.miniRest')
   if (timerStarted.value) return t('focus.miniHold')
   if (props.current?.isWarmup) return t('focus.miniWarmup', { n: props.current.setNumber })
@@ -242,7 +260,9 @@ onBeforeUnmount(unlock)
   font-weight: 600;
   cursor: pointer;
 }
-.fm-body { flex: 1 1 auto; display: flex; flex-direction: column; gap: 4px; min-height: 0; }
+/* Body scrollt selbst: bei kleinen Displays läuft der Inhalt nicht mehr über die Knöpfe unten (Wiederholungen bei fester Zeit). */
+.fm-body { flex: 1 1 auto; display: flex; flex-direction: column; gap: 4px; min-height: 0; overflow-y: auto; }
+.fm-actions { flex: 0 0 auto; }
 .fm-kicker { margin: 4px 0 0; color: var(--muted); font-size: 0.85rem; letter-spacing: 0.08em; text-transform: uppercase; }
 .fm-name { margin: 2px 0 6px; font-size: 1.9rem; line-height: 1.12; font-weight: 800; overflow-wrap: anywhere; }
 .fm-dots { display: flex; gap: 8px; margin: 6px 0 4px; }
@@ -274,6 +294,8 @@ onBeforeUnmount(unlock)
 .fm-step-btn:active { background: color-mix(in srgb, var(--accent) 22%, var(--surface)); }
 
 .fm-ring { position: relative; width: min(64vw, 260px); aspect-ratio: 1; margin: 10px auto 8px; }
+.fm-ring--compact { width: min(44vw, 180px); margin-top: 6px; }
+.fm-ring--compact .fm-ring-time { font-size: 2.6rem; }
 .fm-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
 .fm-ring-track { fill: none; stroke: var(--line-strong, rgba(128, 128, 128, 0.3)); stroke-width: 6; }
 .fm-ring-progress { fill: none; stroke: var(--accent); stroke-width: 6; stroke-linecap: round; transition: stroke-dashoffset 0.25s linear; }
