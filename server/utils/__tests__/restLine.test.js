@@ -17,7 +17,7 @@ describe('Sammelzeile "Der Rest lief stabil"', () => {
   })
 
   test('weitere stabile Übungen ohne Erwähnung: App hängt die Zeile an (DE/EN)', () => {
-    const analyses = [ex('Bench Press', 'positive'), ex('Barbell Row', 'stable'), ex('Biceps Curl', 'positive')]
+    const analyses = [ex('Bench Press', 'positive'), ex('Barbell Row', 'stable'), ex('Biceps Curl', 'stable')]
     const text = 'Starke Einheit 💪\n- Bench Press: läuft rund'
     assert.equal(applyRestLine(text, { exerciseAnalyses: analyses }), `${text}\n\n${REST}`)
     assert.equal(applyRestLine(text, { exerciseAnalyses: analyses, language: 'en' }), `${text}\n\nThe rest stayed steady, the details are above.`)
@@ -29,6 +29,12 @@ describe('Sammelzeile "Der Rest lief stabil"', () => {
     const result = applyRestLine(text, { exerciseAnalyses: analyses })
     assert.equal(result.split('\n').filter((l) => /Rest/.test(l)).length, 1)
     assert.ok(result.endsWith(REST))
+  })
+
+  test('unerwähnte VERBESSERTE Übung: keine Zeile (war "stabil" fälschlich, User-Report 24.10.)', () => {
+    const analyses = [ex('Bench Press', 'positive'), ex('Barbell Row', 'stable'), ex('Biceps Curl', 'positive')]
+    assert.equal(buildRestLine('- Bench Press: läuft rund', analyses), null)
+    assert.equal(applyRestLine('- Bench Press: läuft rund', { exerciseAnalyses: analyses }), '- Bench Press: läuft rund')
   })
 
   test('unerwähnter Rückgang: lieber keine Zeile als eine falsche Behauptung', () => {

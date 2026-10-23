@@ -2,7 +2,7 @@
 //
 // User-Report (21.10.): Die KI hängte die Zeile fast immer an, auch wenn es gar keinen "Rest" gab (z. B. nur eine
 // Übung im Workout). Jetzt schreibt die KI sie nicht mehr (Prompt), die App ergänzt sie nur, wenn es wirklich
-// weitere Übungen mit Vorher-Vergleich gibt, die im Text nicht vorkamen UND alle davon stabil oder besser waren.
+// weitere Übungen mit Vorher-Vergleich gibt, die im Text nicht vorkamen UND alle davon unverändert (stable) waren.
 // Gab es unerwähnte Rückgänge, steht lieber keine Zeile da als eine falsche Behauptung.
 
 const AI_REST_LINE = /^\s*(?:[-•*]\s*)?(?:\*\*)?\s*(?:der rest\b|der übrige\b|die übrigen\b|die restlichen\b|alles andere\b|the rest\b|everything else\b|the remaining\b|all other\b)/i;
@@ -43,7 +43,10 @@ export function buildRestLine(text, exerciseAnalyses, language = 'de') {
     .filter((ex) => ex?.previous && ex.progression !== 'first_session')
     .filter((ex) => !isMentioned(text, ex));
   if (!unmentioned.length) return null;
-  if (unmentioned.some((ex) => ex.progression !== 'stable' && ex.progression !== 'positive')) return null;
+  // Nur wenn ALLE unerwähnten Übungen wirklich unverändert waren (User-Report 24.10.: "Der Rest lief stabil" stand
+  // unter fast jedem Feedback). Verbesserte Übungen (positive) als "stabil" zu bezeichnen ist falsch, und der
+  // Vergleich jeder Übung steht ohnehin oben in der Delta-Liste - die Zeile ist nur für unauffällige Übungen da.
+  if (unmentioned.some((ex) => ex.progression !== 'stable')) return null;
   return TEXTS[language === 'en' ? 'en' : 'de'];
 }
 
