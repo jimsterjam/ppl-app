@@ -5,7 +5,7 @@ export const LEGAL_OWNER = {
   street: '[Straße und Hausnummer eintragen]',
   city: '[PLZ und Ort eintragen]',
   country: 'Deutschland',
-  email: 'kontakt@bro-split-app.de'
+  email: 'admin@push-pull-legs.de'
 }
 
 export function legalAddressLines(owner = LEGAL_OWNER) {

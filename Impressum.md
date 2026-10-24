@@ -7,7 +7,7 @@ Musterstraße 1
 12345 Musterstadt
 Deutschland
 
-E-Mail: kontakt@bro-split-app.de
+E-Mail: admin@push-pull-legs.de
 
 Verantwortlich für den Inhalt nach § 55 Abs. 2 RStV:
 Max Mustermann
@@ -59,7 +59,7 @@ Verantwortlich für die Datenverarbeitung im Sinne der DSGVO ist:
 Max Mustermann
 Musterstraße 1
 12345 Musterstadt
-E-Mail: kontakt@bro-split-app.de
+E-Mail: admin@push-pull-legs.de
 
 2. Art, Umfang und Zweck der Datenverarbeitung
 
@@ -103,7 +103,7 @@ Recht auf Datenübertragbarkeit
 
 Recht auf Widerspruch gegen die Verarbeitung
 
-Anfragen können jederzeit per E-Mail an kontakt@bro-split-app.de
+Anfragen können jederzeit per E-Mail an admin@push-pull-legs.de
  gestellt werden.
 
 5. Änderungen der Datenschutzerklärung
