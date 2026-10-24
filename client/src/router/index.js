@@ -18,6 +18,7 @@ const WorkoutDetailView = () => import('../views/WorkoutDetailView.vue')
 const FaqsView = () => import('../views/FaqsView.vue')
 const FeaturesTestView = () => import('../views/FeaturesTestView.vue')
 const LegalNoticeView = () => import('../views/LegalNoticeView.vue')
+const PrivacyView = () => import('../views/PrivacyView.vue')
 const AdminFeedbackView = () => import('../views/AdminFeedbackView.vue')
 
 const routes = [
@@ -58,6 +59,12 @@ const routes = [
     path: '/legal',
     name: 'legal',
     component: LegalNoticeView,
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/privacy',
+    name: 'privacy',
+    component: PrivacyView,
     meta: { requiresAuth: false }
   },
   {

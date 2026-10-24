@@ -15,11 +15,11 @@
       <div class="legal-content">
         <section class="legal-section">
           <p class="section-title">{{ $t('legal.section1Title') }}</p>
-          <p class="multiline">{{ $t('legal.section1Address') }}</p>
+          <p class="multiline">{{ legalAddress }}</p>
           <p>{{ $t('legal.section1Mail', { email: legalEmail }) }}</p>
           <p class="section-subtitle">
             {{ $t('legal.section1ResponsibleTitle') }}<br />
-            <span class="multiline">{{ $t('legal.section1Responsible') }}</span>
+            <span class="multiline">{{ legalResponsible }}</span>
           </p>
         </section>
 
@@ -46,27 +46,7 @@
         </section>
 
         <section class="legal-section">
-          <h2>{{ $t('legal.privacyTitle') }}</h2>
-          <div class="privacy-block">
-            <strong>{{ $t('legal.privacy1') }}</strong>
-            <p class="multiline">{{ $t('legal.privacy1Text', { email: legalEmail }) }}</p>
-          </div>
-          <div class="privacy-block">
-            <strong>{{ $t('legal.privacy2') }}</strong>
-            <p>{{ $t('legal.privacy2Text') }}</p>
-          </div>
-          <div class="privacy-block">
-            <strong>{{ $t('legal.privacy3') }}</strong>
-            <p>{{ $t('legal.privacy3Text') }}</p>
-          </div>
-          <div class="privacy-block">
-            <strong>{{ $t('legal.privacy4') }}</strong>
-            <p>{{ $t('legal.privacy4Text', { email: legalEmail }) }}</p>
-          </div>
-          <div class="privacy-block">
-            <strong>{{ $t('legal.privacy5') }}</strong>
-            <p>{{ $t('legal.privacy5Text') }}</p>
-          </div>
+          <router-link class="privacy-link" :to="{ name: 'privacy' }">{{ $t('legal.privacyLink') }}</router-link>
         </section>
       </div>
     </div>
@@ -78,10 +58,14 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
+import { LEGAL_OWNER, legalAddressLines } from '@/config/legalOwner'
 
 const authStore = useAuthStore()
 const router = useRouter()
-const legalEmail = 'kontakt@bro-split-app.de'
+const legalEmail = LEGAL_OWNER.email
+// Name, Anschrift und E-Mail kommen aus config/legalOwner.js (eine Stelle für Impressum und Datenschutz).
+const legalAddress = legalAddressLines().join('\n')
+const legalResponsible = legalAddressLines().slice(0, 3).join('\n')
 const fallbackRoute = computed(() => authStore.isAuthenticated ? { name: 'settings' } : { name: 'welcome' })
 
 function goBack() {
@@ -189,6 +173,8 @@ function goBack() {
   margin-top: 0.75rem;
   font-weight: 600;
 }
+
+.privacy-link { color: var(--accent-text, var(--accent)); font-weight: 600; }
 
 .legal-section ul {
   margin: 0.5rem 0 0.5rem 1.2rem;

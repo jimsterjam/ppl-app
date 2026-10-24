@@ -200,6 +200,10 @@
           <span>ℹ️</span>
           <span>{{ $t('settings.legalLink') }}</span>
         </button>
+        <button class="legal-btn" @click="$router.push('/privacy')">
+          <span>🔒</span>
+          <span>{{ $t('settings.privacyLink') }}</span>
+        </button>
       </CollapsibleCard>
 
       <CollapsibleCard class="card" :title="$t('settings.exportDataTitle')">
