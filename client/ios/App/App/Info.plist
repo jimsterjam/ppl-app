@@ -2,83 +2,45 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-
-    <key>CFBundleDevelopmentRegion</key>
-    <string>en</string>
-
-    <key>CFBundleDisplayName</key>
-    <string>pushpulllegs</string>
-
-    <key>CFBundleExecutable</key>
-    <string>$(EXECUTABLE_NAME)</string>
-
-    <key>CFBundleIdentifier</key>
-    <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-
-    <key>CFBundleInfoDictionaryVersion</key>
-    <string>6.0</string>
-
-    <key>CFBundleName</key>
-    <string>$(PRODUCT_NAME)</string>
-
-    <key>CFBundlePackageType</key>
-    <string>APPL</string>
-
-    <key>CFBundleShortVersionString</key>
-    <string>$(MARKETING_VERSION)</string>
-
-    <key>CFBundleVersion</key>
-    <string>$(CURRENT_PROJECT_VERSION)</string>
-
-    <!-- App nutzt ausschließlich Standard-HTTPS (kein eigenes/proprietäres Verschlüsselungsverfahren) -
-         damit fragt App Store Connect nicht mehr bei jedem Upload nach der Export-Compliance-Angabe. -->
-    <key>ITSAppUsesNonExemptEncryption</key>
-    <false/>
-
-    <key>LSRequiresIPhoneOS</key>
-    <true/>
-
-    <key>UILaunchStoryboardName</key>
-    <string>LaunchScreen</string>
-
-    <key>UIRequiredDeviceCapabilities</key>
-    <array>
-        <string>armv7</string>
-    </array>
-
-    <key>UISupportedInterfaceOrientations</key>
-    <array>
-        <string>UIInterfaceOrientationPortrait</string>
-        <string>UIInterfaceOrientationLandscapeLeft</string>
-        <string>UIInterfaceOrientationLandscapeRight</string>
-    </array>
-
-    <key>UISupportedInterfaceOrientations~ipad</key>
-    <array>
-        <string>UIInterfaceOrientationPortrait</string>
-        <string>UIInterfaceOrientationPortraitUpsideDown</string>
-        <string>UIInterfaceOrientationLandscapeLeft</string>
-        <string>UIInterfaceOrientationLandscapeRight</string>
-    </array>
-
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleDisplayName</key>
+	<string>pushpulllegs</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleURLTypes</key>
 	<array>
-	<dict>
-		<key>CFBundleURLSchemes</key>
-		<array>
-		<string>com.googleusercontent.apps.440924652132-h60bcdrh3nu22nf72pagohfgg7cslq8r</string>
-		</array>
-	</dict>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.440924652132-h60bcdrh3nu22nf72pagohfgg7cslq8r</string>
+			</array>
+		</dict>
 	</array>
-
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Diese App benötigt Zugriff auf deine Fotobibliothek, um ein Profilbild auszuwählen.</string>
-	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>Diese App möchte Fotos in deiner Bibliothek speichern.</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
 	<key>NSAlarmKitUsageDescription</key>
 	<string>Die App klingelt am Ende deiner Satzpause wie ein Wecker - auch wenn der Stumm-Schalter an oder der Bildschirm gesperrt ist.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Diese App benötigt Zugriff auf die Kamera, um ein Profilfoto aufzunehmen.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Diese App möchte Fotos in deiner Bibliothek speichern.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Diese App benötigt Zugriff auf deine Fotobibliothek, um ein Profilbild auszuwählen.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -96,6 +58,15 @@
 			</array>
 		</dict>
 	</dict>
-
+	<key>UILaunchStoryboardName</key>
+	<string>LaunchScreen</string>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>armv7</string>
+	</array>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
 </dict>
 </plist>
