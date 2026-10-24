@@ -18,6 +18,7 @@
           <img v-if="imagePreviewUrl" :src="imagePreviewUrl" class="image-preview" alt="" />
           <span v-else class="image-placeholder">+ {{ t('exercises.imageAdd') }}</span>
         </div>
+        <small class="image-hint">{{ t('exercises.imageRuleHint') }}</small>
         <small v-if="isEditMode && !canUploadImage" class="image-hint">
           {{ t('exercises.imageSyncHint') }}
         </small>
