@@ -30,7 +30,7 @@ export function reportPdfFileName(report) {
  */
 export function buildMonthlyReportPdf(report, { t, locale, translateName = (n) => n, now = new Date() }) {
   const facts = report?.facts || {}
-  const pdf = createPdf({ title: t('monthlyReport.modalTitle'), author: 'PPL Fundamentals' })
+  const pdf = createPdf({ title: t('monthlyReport.modalTitle'), author: 'FBE' })
   let page = pdf.addPage()
   let y = MARGIN
 
@@ -60,7 +60,7 @@ export function buildMonthlyReportPdf(report, { t, locale, translateName = (n) =
   }
 
   // Kopf
-  page.text(MARGIN, y + 8, 'PPL Fundamentals', { size: 9, bold: true, color: ACCENT })
+  page.text(MARGIN, y + 8, 'FBE', { size: 9, bold: true, color: ACCENT })
   page.text(PAGE_A4.width - MARGIN, y + 8, t('monthlyReport.pdfCreated', { date: formatDate(now, locale) }), { size: 8, color: MUTED, align: 'right' })
   y += 22
   page.text(MARGIN, y + 20, t('monthlyReport.modalTitle'), { size: 22, bold: true })
@@ -171,7 +171,7 @@ export function buildMonthlyReportPdf(report, { t, locale, translateName = (n) =
   for (let n = 0; n < total; n += 1) {
     const footer = pdf.getPage(n)
     footer.line(MARGIN, FOOTER_Y - 10, PAGE_A4.width - MARGIN, FOOTER_Y - 10, { color: LINE, width: 0.6 })
-    footer.text(MARGIN, FOOTER_Y, `PPL Fundamentals · ${t('monthlyReport.modalTitle')} ${formatReportPeriod(report.periodStart, report.periodEnd, locale)}`, { size: 7.5, color: MUTED })
+    footer.text(MARGIN, FOOTER_Y, `FBE · ${t('monthlyReport.modalTitle')} ${formatReportPeriod(report.periodStart, report.periodEnd, locale)}`, { size: 7.5, color: MUTED })
     footer.text(PAGE_A4.width - MARGIN, FOOTER_Y, t('monthlyReport.pdfPage', { n: n + 1, total }), { size: 7.5, color: MUTED, align: 'right' })
   }
   return pdf.toBytes()
