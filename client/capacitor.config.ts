@@ -6,7 +6,7 @@ dotenv.config({ path: './.env' })
 
 const config: CapacitorConfig = {
   appId: 'com.pushpulllegs.com',
-  appName: 'pushpulllegs',
+  appName: 'FBE',
   webDir: 'dist',
   // server: {
   //   url: 'http://localhost:3001',

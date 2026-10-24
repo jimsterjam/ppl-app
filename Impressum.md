@@ -18,7 +18,7 @@ Musterstraße 1
 
 Urheberrecht / Copyright
 
-© 2025 Bro Split App. Alle Rechte vorbehalten.
+© 2026 FBE. Alle Rechte vorbehalten.
 
 Alle Inhalte dieser App – einschließlich Texte, Grafiken, Pläne, Videos, Logos und sonstiger digitaler Werke – unterliegen dem deutschen Urheberrecht und anderen Schutzrechten.
 Jede Vervielfältigung, Bearbeitung, Verbreitung, öffentliche Wiedergabe oder sonstige Nutzung außerhalb der gesetzlich zulässigen Grenzen bedarf der vorherigen schriftlichen Zustimmung des jeweiligen Rechteinhabers.
