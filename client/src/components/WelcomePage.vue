@@ -422,6 +422,11 @@ watch(() => route.query?.emailVerified, (val) => {
                     Apple
                 </button>
             </div>
+            <p class="legal-links">
+                <a href="#" @click.prevent="router.push({ name: 'privacy' })">{{ t('legal.privacyShort') }}</a>
+                ·
+                <a href="#" @click.prevent="router.push({ name: 'legal' })">{{ t('legal.imprintShort') }}</a>
+            </p>
         </div>
 
         <!-- Eingeloggt -->
@@ -606,6 +611,18 @@ watch(() => route.query?.emailVerified, (val) => {
     .auth-btn:disabled {
         opacity: 0.6;
         cursor: not-allowed;
+    }
+
+    .legal-links {
+        margin: 16px 0 0;
+        text-align: center;
+        font-size: 0.85rem;
+        color: var(--muted);
+    }
+
+    .legal-links a {
+        color: inherit;
+        text-decoration: underline;
     }
 
     .auth-links {
