@@ -3,16 +3,20 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 // Tester-Meldung 09.10.: Der Pausentimer-Gong blieb stumm, nachdem man die App verlassen hatte und
 // zurückkam. Ursache: iOS setzt den AudioContext im Hintergrund auf 'interrupted'; der Code
 // startete ihn nur bei 'suspended' neu. Diese Tests bilden die Zustände mit einem Fake nach.
-function installFakeAudioContext({ resumeBehavior = 'running' } = {}) {
+// rebuiltState: Zustand jedes ab dem zweiten Kontext (ein neu gebauter Kontext startet normalerweise sofort).
+function installFakeAudioContext({ resumeBehavior = 'running', rebuiltState = 'running' } = {}) {
   const log = { contexts: [], resumeCalls: 0, oscStarts: 0 }
   class FakeContext {
     constructor() {
-      this.state = 'running'
+      this.state = log.contexts.length === 0 ? 'running' : rebuiltState
+      this.starts = 0
+      this.closed = false
       this.currentTime = 0
       this.destination = {}
       this.listeners = {}
       log.contexts.push(this)
     }
+    close() { this.closed = true; this.state = 'closed'; return Promise.resolve() }
     addEventListener(name, fn) { (this.listeners[name] ||= []).push(fn) }
     setState(state) { this.state = state; (this.listeners.statechange || []).forEach((fn) => fn()) }
     resume() {
@@ -23,7 +27,7 @@ function installFakeAudioContext({ resumeBehavior = 'running' } = {}) {
     }
     createGain() { return { gain: { value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {}, linearRampToValueAtTime() {} }, connect() {} } }
     createOscillator() {
-      return { type: '', frequency: { value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {}, linearRampToValueAtTime() {} }, connect() {}, start: () => { log.oscStarts += 1 }, stop() {} }
+      return { type: '', frequency: { value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {}, linearRampToValueAtTime() {} }, connect() {}, start: () => { log.oscStarts += 1; this.starts += 1 }, stop() {} }
     }
     createBiquadFilter() { return { type: '', frequency: { value: 0 }, Q: { value: 0 }, connect() {} } }
     createDynamicsCompressor() { return { threshold: {}, knee: {}, ratio: {}, attack: {}, release: {}, connect() {} } }
@@ -87,17 +91,78 @@ describe('timerAudio: Zustand des AudioContext', () => {
 
   it('resume() antwortet nie (iOS ohne Geste): Gong wird nach kurzer Wartezeit trotzdem angestoßen, Geste armiert', async () => {
     vi.useFakeTimers()
-    const log = installFakeAudioContext({ resumeBehavior: 'never' })
+    const log = installFakeAudioContext({ resumeBehavior: 'never', rebuiltState: 'interrupted' })
     const audio = await freshAudio()
     audio.getAudioContext().state = 'interrupted'
     audio.emitTimerSignal({ eventKey: 'c', soundEnabled: true, kind: 'round-start' })
     expect(log.oscStarts).toBe(0)
-    await vi.advanceTimersByTimeAsync(700)
+    // 2 x Wartezeit: erster Startversuch, Neuaufbau, zweiter Startversuch
+    await vi.advanceTimersByTimeAsync(1500)
     expect(log.oscStarts).toBeGreaterThan(0)
     // Nächstes Antippen weckt den Kontext
     log.resumeCalls = 0
     document.dispatchEvent(new Event('touchend', { bubbles: true }))
     expect(log.resumeCalls).toBeGreaterThan(0)
+  })
+
+  it('hängender Kontext (resume() ohne Antwort): Pausenende baut einen neuen auf und klingt dort - Ursache "Ton nach anderer App weg"', async () => {
+    vi.useFakeTimers()
+    const log = installFakeAudioContext({ resumeBehavior: 'never', rebuiltState: 'running' })
+    const audio = await freshAudio()
+    const stuck = audio.getAudioContext()
+    stuck.state = 'interrupted'
+    audio.emitTimerSignal({ eventKey: 'stuck1', soundEnabled: true, kind: 'rest-end' })
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(log.contexts.length).toBe(2)
+    expect(stuck.closed).toBe(true)
+    expect(log.contexts[1].starts).toBeGreaterThan(0)
+    // Pfeifton = 4 Oszillatoren, alle auf dem neuen Kontext (auf dem hängenden höchstens der stumme Entsperr-Ton)
+    expect(log.contexts[1].starts).toBeGreaterThanOrEqual(4)
+    // Der nächste Gong läuft ohne Wartezeit auf dem neuen Kontext
+    const before = log.contexts[1].starts
+    audio.emitTimerSignal({ eventKey: 'stuck2', soundEnabled: true, kind: 'rest-end' })
+    expect(log.contexts[1].starts).toBeGreaterThan(before)
+    expect(log.contexts.length).toBe(2)
+  })
+
+  it('rearmAudio mit hängendem Kontext: wird schon beim Zurückkehren ersetzt, nicht erst beim Pausenende', async () => {
+    vi.useFakeTimers()
+    const log = installFakeAudioContext({ resumeBehavior: 'never', rebuiltState: 'running' })
+    const audio = await freshAudio()
+    audio.getAudioContext().state = 'interrupted'
+    audio.rearmAudio()
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(log.contexts.length).toBe(2)
+    expect(log.contexts[1].state).toBe('running')
+    audio.emitTimerSignal({ eventKey: 'r1', soundEnabled: true, kind: 'rest-end' })
+    expect(log.contexts[1].starts).toBeGreaterThan(0)
+  })
+
+  it('im Hintergrund wird nichts umgebaut (iOS erlaubt dort keinen Ton); die nächste Geste ersetzt den hängenden Kontext', async () => {
+    vi.useFakeTimers()
+    const log = installFakeAudioContext({ resumeBehavior: 'never', rebuiltState: 'running' })
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true })
+    const audio = await freshAudio()
+    audio.getAudioContext().state = 'interrupted'
+    audio.emitTimerSignal({ eventKey: 'h1', soundEnabled: true, kind: 'rest-end' })
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(log.contexts.length).toBe(1)
+    // Zurück in der App: Antippen baut innerhalb der Geste (synchron) einen neuen Kontext
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
+    document.dispatchEvent(new Event('touchend', { bubbles: true }))
+    expect(log.contexts.length).toBe(2)
+    expect(log.contexts[0].closed).toBe(true)
+    expect(log.contexts[1].state).toBe('running')
+    delete document.visibilityState
+  })
+
+  it('läuft ein Kontext normal wieder an, wird nichts neu gebaut', async () => {
+    const log = installFakeAudioContext({ resumeBehavior: 'running' })
+    const audio = await freshAudio()
+    audio.getAudioContext().state = 'interrupted'
+    audio.emitTimerSignal({ eventKey: 'n1', soundEnabled: true, kind: 'rest-end' })
+    await vi.waitFor(() => expect(log.oscStarts).toBeGreaterThan(0))
+    expect(log.contexts.length).toBe(1)
   })
 
   it('rearmAudio (App kommt zurück) startet einen stehenden Kontext und wartet auf die nächste Geste', async () => {
