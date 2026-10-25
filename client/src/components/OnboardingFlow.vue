@@ -35,6 +35,7 @@
       <div class="onboarding-content">
         <Transition name="onboarding-fade" mode="out-in">
           <div :key="step" class="onboarding-step">
+            <BrandLockup v-if="step === 0" class="onboarding-brand" />
             <h1 class="onboarding-title">{{ t(`onboarding.step${step + 1}Title`) }}</h1>
             <p class="onboarding-text">{{ t(`onboarding.step${step + 1}Text`) }}</p>
             <ul v-if="isRulesStep" class="onboarding-rules-list">
@@ -54,6 +55,7 @@
 </template>
 
 <script setup>
+import BrandLockup from '@/components/BrandLockup.vue'
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -205,6 +207,8 @@ function handleSkip() {
 .onboarding-lang-btn:active {
   opacity: 0.85;
 }
+
+.onboarding-brand { margin: 0 0 1.4rem; }
 
 .onboarding-title {
   font-size: clamp(1.6rem, 6vw, 2.1rem);

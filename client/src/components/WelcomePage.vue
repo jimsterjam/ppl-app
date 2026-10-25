@@ -6,6 +6,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Capacitor } from '@capacitor/core'
 import { logger } from '@/utils/logger'
+import BrandLockup from '@/components/BrandLockup.vue'
 
 // Optionaler Callback vom Wrapper (aktuell nicht genutzt, behalten für Abwärtskompat.)
 defineProps({
@@ -330,7 +331,7 @@ watch(() => route.query?.emailVerified, (val) => {
             <div v-if="offlineExpired" class="info-banner">
                 <p>{{ t('auth.offlineExpired') }}</p>
             </div>
-            <h2>{{ t('welcome.title') }}</h2>
+            <BrandLockup class="welcome-brand" />
             <p class="welcome-tagline">{{ t('welcome.tagline') }}</p>
             <div class="mode-badge" :class="isSignUp ? 'mode-signup' : 'mode-signin'">
                 {{ isSignUp ? t('auth.modeSignUp') : t('auth.modeSignIn') }}
@@ -778,7 +779,8 @@ watch(() => route.query?.emailVerified, (val) => {
         background-clip: text;
     }
 
-    .welcome-tagline { margin: -0.4rem 0 1rem; text-align: center; }
+    .welcome-brand { margin: 0.4rem 0 0.8rem; }
+    .welcome-tagline { margin: 0 0 1rem; text-align: center; }
 
     p {
         line-height: 1.6;
