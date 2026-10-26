@@ -275,6 +275,7 @@ export const messages = {
       legalHint: 'Impressum, Datenschutz, Nutzungsbedingungen',
       legalLink: 'Rechtliche Hinweise',
       privacyLink: 'Datenschutzerklärung',
+      versionLine: 'Version {version}',
       dangerZone: 'Gefahrenzone',
       dangerZoneHint: 'Diese Aktion ist unwiderruflich und löscht alle deine Workout-Daten, Einstellungen und Drafts.',
       deleteAllData: 'Alle Daten löschen',
@@ -519,6 +520,9 @@ export const messages = {
         'Trizepsdrücken': 'Triceps Extension',
         'Rudern': 'Rows'
       }
+    },
+    brand: {
+      slogan: 'Form Beats Ego'
     },
     transition: {
       label: 'Übergang zur nächsten Übung',
@@ -1105,8 +1109,7 @@ export const messages = {
       error: 'Workout konnte nicht generiert werden. Versuch es noch einmal.'
     },
     welcome: {
-      title: "FBE",
-      tagline: "Form Beats Ego – dein Trainingstagebuch mit KI-Coach.",
+      tagline: "Dein Trainingstagebuch mit KI-Coach.",
       signInPrompt: 'Bitte melde dich an, um fortzufahren.',
       redirectingTitle: 'Weiterleitung...',
       redirectingMsg: 'Du wirst zum Dashboard weitergeleitet.',
@@ -1223,7 +1226,7 @@ export const messages = {
       s1Text: 'Verantwortlich für die Verarbeitung deiner Daten im Sinne der Datenschutz-Grundverordnung (DSGVO) ist:',
       s1Mail: 'E-Mail: {email}',
       s2Title: '2. Das Wichtigste in Kürze',
-      s2Text: 'FBE speichert deine Trainingsdaten, damit du sie in der App siehst und auf anderen Geräten wiederfindest. Es gibt keine Werbung, keine Analyse- oder Tracking-Dienste und keinen Verkauf von Daten. Daten an einen KI-Dienst senden wir nur, wenn du ausdrücklich zugestimmt hast.',
+      s2Text: 'fbe speichert deine Trainingsdaten, damit du sie in der App siehst und auf anderen Geräten wiederfindest. Es gibt keine Werbung, keine Analyse- oder Tracking-Dienste und keinen Verkauf von Daten. Daten an einen KI-Dienst senden wir nur, wenn du ausdrücklich zugestimmt hast.',
       s3Title: '3. Konto und Anmeldung',
       s3Text: 'Für die Anmeldung verarbeiten wir deine E-Mail-Adresse, eine Nutzerkennung und die Anmeldeart (E-Mail und Passwort, Google oder Apple). Bei „Mit Apple anmelden“ kannst du deine E-Mail-Adresse bei Apple verbergen. Die Anmeldung läuft über Google Firebase Authentication. Rechtsgrundlage ist die Bereitstellung der App (Art. 6 Abs. 1 lit. b DSGVO).',
       s4Title: '4. Trainingsdaten',
@@ -1255,7 +1258,7 @@ export const messages = {
       section1Mail: 'E-Mail: {email}',
       section1ResponsibleTitle: 'Verantwortlich für den Inhalt nach § 55 Abs. 2 RStV:',
       copyrightTitle: 'Urheberrecht / Copyright',
-      copyrightNotice: '© 2026 FBE. Alle Rechte vorbehalten.',
+      copyrightNotice: '© 2026 fbe. Alle Rechte vorbehalten.',
       copyrightLaw: 'Die Inhalte und Werke in dieser App unterliegen dem deutschen Urheberrecht. Vervielfältigung, Bearbeitung, Verbreitung und jede Art der Verwertung außerhalb der Grenzen des Urheberrechtes bedürfen der schriftlichen Zustimmung des jeweiligen Autors bzw. Erstellers.',
       disclaimerTitle: 'Haftungsausschluss',
       disclaimer1: 'Die Nutzung dieser App erfolgt auf eigene Gefahr. Die bereitgestellten Trainingspläne, Übungen und Empfehlungen dienen ausschließlich allgemeinen Fitness- und Informationszwecken und ersetzen keine ärztliche Untersuchung, Diagnose oder Behandlung.',
@@ -1273,8 +1276,8 @@ export const messages = {
     onboarding: {
       skip: 'Überspringen',
       next: 'Weiter',
-      step1Title: "Willkommen bei FBE",
-      step1Text: "Dein Trainingstagebuch mit KI-Coach. Du trainierst nach dem Push/Pull/Legs-Prinzip: Push = Drückübungen (Brust, Schultern, Trizeps), Pull = Zugübungen (Rücken, Bizeps), Legs = Beine. Du trägst ein, was du schaffst – die App zeigt dir, wann du dich steigern kannst.",
+      step1Title: "Willkommen",
+      step1Text: "fbe steht für Form Beats Ego: Saubere Ausführung schlägt das Ego. Wer sauber trainiert und konsequent dokumentiert, kommt langfristig weiter als mit zu schweren Gewichten. Dein Trainingstagebuch mit KI-Coach. Du trainierst nach dem Push/Pull/Legs-Prinzip: Push = Drückübungen (Brust, Schultern, Trizeps), Pull = Zugübungen (Rücken, Bizeps), Legs = Beine. Du trägst ein, was du schaffst – die App zeigt dir, wann du dich steigern kannst.",
       step2Title: 'So machst du wirklich Fortschritte',
       step2Text: 'Die meisten Trainierenden kommen nicht wegen falscher Übungen nicht voran, sondern weil sie zu oft wechseln und zu wenig dokumentieren. Fünf einfache Regeln helfen dir dabei:',
       rulesItem1: 'Bleib mindestens 6-8 Wochen bei den gleichen Übungen.',
@@ -1290,9 +1293,9 @@ export const messages = {
       step5Text: "Schreib bei einer Übung eine Notiz, wenn du etwas bewusst anders machst – z. B. weniger Gewicht, um den Muskel besser zu spüren, oder ein Technikziel. Der KI-Coach liest die Notiz mit und bewertet dich dann fair.",
       step6Title: "So arbeitet der KI-Coach",
       step6Text: "Nach dem Speichern bekommst du eine kurze Einordnung deines Trainings. Sinnvoll ist das erst, wenn die App dich mit früheren Einheiten vergleichen kann – das erste Feedback kommt deshalb nach 8 gleichen Workouts oder 4 Wochen. Die KI wertet nur aus, was du einträgst (Übungen, Sätze, Gewichte, Notizen) und erfindet nichts dazu. Dafür werden diese Trainingsdaten an den KI-Dienst OpenAI gesendet; dein Name und deine E-Mail-Adresse gehören nicht dazu. Im kostenlosen Tarif sind 60 KI-Anfragen pro Monat enthalten – KI-Feedback und KI-Workout-Generator teilen sich dieses Kontingent.",
-      step7Title: "Du gestaltest FBE mit",
-      step7Text: "FBE befindet sich in der Testphase. Wenn dir etwas unklar ist, etwas fehlt oder nicht richtig funktioniert, sende uns direkt Feedback. Jede Rückmeldung hilft, die App gezielt zu verbessern.",
-      finish: 'FBE entdecken',
+      step7Title: "Du gestaltest fbe mit",
+      step7Text: "fbe befindet sich in der Testphase. Wenn dir etwas unklar ist, etwas fehlt oder nicht richtig funktioniert, sende uns direkt Feedback. Jede Rückmeldung hilft, die App gezielt zu verbessern.",
+      finish: 'fbe entdecken',
       progressLabel: 'Seite {current} von {total}',
       restartTitle: 'Einführungsguide erneut starten',
       restartSubtitle: "Zeigt die 7-seitige Einführung noch einmal an",
@@ -1301,7 +1304,7 @@ export const messages = {
       hintFirstNoteTitle: 'Dein Feedback gibt Kontext',
       hintFirstNoteText: 'Schreib Besonderheiten auf, z. B. Technikziel, Wiederholungsbereich oder bewusst reduzierte Last. Diese Hinweise helfen bei der späteren KI-Auswertung.',
       hintFirstSaveTitle: 'Dein erstes Workout ist gespeichert',
-      hintFirstSaveText: 'War der Ablauf verständlich? Dein Feedback hilft uns, FBE vor dem nächsten Update gezielt zu verbessern.',
+      hintFirstSaveText: 'War der Ablauf verständlich? Dein Feedback hilft uns, fbe vor dem nächsten Update gezielt zu verbessern.',
       hintFavoritesTitle: 'Was ist ein Favorit?',
       hintFavoritesText: 'Favoriten sind gespeicherte Workout-Vorlagen: Sie merken sich Übungen, Reihenfolge und Zielwerte, damit du ein wiederkehrendes Training nicht jedes Mal neu zusammenstellen musst.',
       hintAiRatingTitle: 'Wie hilfreich war dieses Feedback?',
@@ -1768,6 +1771,7 @@ export const messages = {
       legalHint: 'Imprint, privacy policy, terms',
       legalLink: 'Open legal notice',
       privacyLink: 'Privacy policy',
+      versionLine: 'Version {version}',
       dangerZone: 'Danger Zone',
       dangerZoneHint: 'This action is irreversible and will delete all your workout data, settings and drafts.',
       deleteAllData: 'Delete all data',
@@ -2005,6 +2009,9 @@ export const messages = {
         'Trizepsdrücken': 'Triceps Extension',
         'Rudern': 'Rows'
       }
+    },
+    brand: {
+      slogan: 'Form Beats Ego'
     },
     transition: {
       label: 'Moving to the next exercise',
@@ -2578,8 +2585,7 @@ export const messages = {
       error: 'Workout could not be generated. Please try again.'
     },
     welcome: {
-      title: "FBE",
-      tagline: "Form Beats Ego – your training log with an AI coach.",
+      tagline: "Your training log with an AI coach.",
       signInPrompt: 'Please sign in to continue.',
       redirectingTitle: 'Redirecting...',
       redirectingMsg: 'You will be redirected to the dashboard.',
@@ -2696,7 +2702,7 @@ export const messages = {
       s1Text: 'The controller for processing your data within the meaning of the General Data Protection Regulation (GDPR) is:',
       s1Mail: 'Email: {email}',
       s2Title: '2. In short',
-      s2Text: 'FBE stores your training data so you can see it in the app and find it on other devices. There is no advertising, no analytics or tracking service and no sale of data. We only send data to an AI service if you have explicitly agreed.',
+      s2Text: 'fbe stores your training data so you can see it in the app and find it on other devices. There is no advertising, no analytics or tracking service and no sale of data. We only send data to an AI service if you have explicitly agreed.',
       s3Title: '3. Account and sign-in',
       s3Text: 'For sign-in we process your email address, a user ID and the sign-in method (email and password, Google or Apple). With “Sign in with Apple” you can hide your email address from us. Sign-in runs via Google Firebase Authentication. The legal basis is providing the app (Art. 6(1)(b) GDPR).',
       s4Title: '4. Training data',
@@ -2728,7 +2734,7 @@ export const messages = {
       section1Mail: 'E-mail: {email}',
       section1ResponsibleTitle: 'Responsible for content according to § 55 Abs. 2 RStV:',
       copyrightTitle: 'Copyright',
-      copyrightNotice: '© 2026 FBE. All rights reserved.',
+      copyrightNotice: '© 2026 fbe. All rights reserved.',
       copyrightLaw: 'The content and works in this app are subject to German copyright law. Duplication, processing, distribution and any kind of exploitation outside the limits of copyright require the written consent of the respective author or creator.',
       disclaimerTitle: 'Disclaimer',
       disclaimer1: 'Use of this app is at your own risk. The provided training plans, exercises and recommendations are for general fitness and informational purposes only and do not replace medical examination, diagnosis or treatment.',
@@ -2746,8 +2752,8 @@ export const messages = {
     onboarding: {
       skip: 'Skip',
       next: 'Next',
-      step1Title: "Welcome to FBE",
-      step1Text: "Your training log with an AI coach. You train by the push/pull/legs principle: push = pressing exercises (chest, shoulders, triceps), pull = pulling exercises (back, biceps), legs = legs. You log what you manage – the app shows you when to step it up.",
+      step1Title: "Welcome",
+      step1Text: "fbe stands for Form Beats Ego: clean execution beats ego. Training cleanly and tracking consistently takes you further than lifting too heavy. Your training log with an AI coach. You train by the push/pull/legs principle: push = pressing exercises (chest, shoulders, triceps), pull = pulling exercises (back, biceps), legs = legs. You log what you manage – the app shows you when to step it up.",
       step2Title: 'How you actually make progress',
       step2Text: "Most people don't stall because of the wrong exercises - they stall because they switch too often and log too little. Five simple rules help with that:",
       rulesItem1: 'Stick with the same exercises for at least 6-8 weeks.',
@@ -2763,9 +2769,9 @@ export const messages = {
       step5Text: "Add a note to an exercise when you do something on purpose – e.g. less weight to feel the muscle better, or a technique goal. The AI coach reads the note and judges you fairly.",
       step6Title: "How the AI coach works",
       step6Text: "After saving you get a short assessment of your training. It only makes sense once the app can compare with earlier sessions – so your first feedback arrives after 8 identical workouts or 4 weeks. The AI only evaluates what you log (exercises, sets, weights, notes) and invents nothing. This training data is sent to the AI service OpenAI for that; your name and email address are not part of it. The free plan includes 60 AI requests per month – AI feedback and the AI workout generator share this allowance.",
-      step7Title: "You help shape FBE",
-      step7Text: "FBE is in its test phase. If anything is unclear, missing, or not working correctly, send us feedback directly. Every message helps improve the app.",
-      finish: 'Explore FBE',
+      step7Title: "You help shape fbe",
+      step7Text: "fbe is in its test phase. If anything is unclear, missing, or not working correctly, send us feedback directly. Every message helps improve the app.",
+      finish: 'Explore fbe',
       progressLabel: 'Page {current} of {total}',
       restartTitle: 'Restart intro guide',
       restartSubtitle: "Shows the 7-page introduction again",
@@ -2774,7 +2780,7 @@ export const messages = {
       hintFirstNoteTitle: 'Your feedback adds context',
       hintFirstNoteText: 'Write down special details like a technique goal, rep range, or intentionally reduced load. These help with later AI analysis.',
       hintFirstSaveTitle: 'Your first workout is saved',
-      hintFirstSaveText: 'Was the process clear? Your feedback helps us improve FBE before the next update.',
+      hintFirstSaveText: 'Was the process clear? Your feedback helps us improve fbe before the next update.',
       hintFavoritesTitle: 'What is a favorite?',
       hintFavoritesText: 'Favorites are saved workout templates: they remember exercises, order, and target values so you don\'t have to rebuild a recurring workout from scratch every time.',
       hintAiRatingTitle: 'How helpful was this feedback?',

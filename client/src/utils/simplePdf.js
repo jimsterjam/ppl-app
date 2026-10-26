@@ -175,7 +175,7 @@ export function createPdf({ title = '', author = '', width = PAGE_A4.width, heig
       objects[2] = `<< /Type /Pages /Kids [${kids}] /Count ${pages.length} >>`
       objects[3] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>'
       objects[4] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>'
-      objects[5] = `<< /Title ${pdfString(encodeWinAnsi(title))} /Author ${pdfString(encodeWinAnsi(author))} /Producer (FBE) >>`
+      objects[5] = `<< /Title ${pdfString(encodeWinAnsi(title))} /Author ${pdfString(encodeWinAnsi(author))} /Producer (fbe) >>`
       pages.forEach((page, i) => {
         const content = page.ops.join('\n')
         objects[pageObj(i)] = `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${num(width)} ${num(height)}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${pageObj(i) + 1} 0 R >>`

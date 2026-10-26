@@ -233,6 +233,11 @@
         </button>
       </CollapsibleCard>
 
+      <div class="app-about">
+        <BrandLockup size="sm" />
+        <small v-if="appVersion">{{ $t('settings.versionLine', { version: appVersion }) }}</small>
+      </div>
+
       <!-- Nur für den Admin-Testaccount (client/src/config/admin.js). Nur Sichtbarkeit - die
            Daten gibt der Server ausschließlich mit Admin-Schlüssel + passender UID heraus.
            Bewusst nicht übersetzt (data-i18n-ignore), da nur Paul diesen Bereich sieht. -->
@@ -380,7 +385,7 @@ import { useToastStore } from '@/stores/toastStore'
 import { useAiConsentStore } from '@/stores/aiConsentStore'
 import { useAuthStore } from '@/stores/authStore'
 import { useI18n } from 'vue-i18n'
-import { computed, ref, watch, onBeforeUnmount } from 'vue'
+import { computed, ref, watch, onBeforeUnmount, onMounted } from 'vue'
 import { useScrollLock } from '@/composables/useScrollLock'
 import { useRouter, useRoute } from 'vue-router'
 import { initFirebaseAuth, useFirebaseAuth } from '@/utils/firebaseAuth'
@@ -390,6 +395,8 @@ import { isOnline, db } from '@/utils/offlineStorage'
 import { exportAccountData } from '@/api/account'
 import { isAdminUid } from '@/config/admin'
 import CollapsibleCard from '../components/CollapsibleCard.vue'
+import BrandLockup from '../components/BrandLockup.vue'
+import { App as CapacitorApp } from '@capacitor/app'
 import AiQuotaCard from '../components/AiQuotaCard.vue'
 import VerifierAuditPanel from '../components/VerifierAuditPanel.vue'
 
@@ -490,6 +497,15 @@ const planLabels = {
 const router = useRouter()
 const route = useRoute()
 const toast = useToastStore()
+
+// App-Version für die Fußzeile (nur in der nativen App verfügbar; im Browser bleibt sie leer).
+const appVersion = ref('')
+onMounted(async () => {
+  try {
+    const info = await CapacitorApp.getInfo()
+    appVersion.value = info?.version ? `${info.version}${info.build ? ` (${info.build})` : ''}` : ''
+  } catch { /* Web/Dev: nicht implementiert */ }
+})
 const aiConsent = useAiConsentStore()
 
 async function toggleAiConsent(event) {
@@ -911,6 +927,7 @@ async function confirmDeleteAccount() {
 </script>
 
 <style scoped>
+.app-about { display: flex; flex-direction: column; align-items: center; gap: 0.3rem; margin: 1.5rem 0 0.5rem; color: var(--muted); }
 .settings-view {
   min-height: 100vh;
   background: var(--bg);
