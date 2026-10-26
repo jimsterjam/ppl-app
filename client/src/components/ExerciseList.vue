@@ -2,46 +2,43 @@
   <div class="exercise-list-root">
     <h1 v-if="showTitle" class="text-3xl font-bold mb-6">{{ t('exercises.title') }}</h1>
 
-    <!-- Filter wie im WorkoutBuilder -->
-    <div v-if="showControls" class="filter-row">
-      <div class="equipment-filter-wrap">
-        <label for="type-filter-select" class="equipment-filter-label">
-          {{ t('exercises.filters.type') }}
-        </label>
-        <select id="type-filter-select" v-model="selectedCategory" class="equipment-filter-select" @change="setCategory($event.target.value)">
-          <option :value="''">{{ t('exercises.filters.all') }}</option>
-          <option v-for="cat in quickCategories" :key="cat.value" :value="cat.value">{{ cat.label }}</option>
-        </select>
-      </div>
-
-      <div class="equipment-filter-wrap">
-        <label for="equipment-filter-select" class="equipment-filter-label">
-          {{ t('builder.filterEquipment') }}
-        </label>
-        <select id="equipment-filter-select" v-model="selectedEquipment" class="equipment-filter-select" @change="setEquipment($event.target.value)">
-          <option :value="''">{{ t('exercises.filters.all') }}</option>
-          <option v-for="equip in allEquipmentTypes" :key="equip" :value="equip">{{ getTranslatedEquipment(equip) }}</option>
-        </select>
-      </div>
-
-      <div class="equipment-filter-wrap">
-        <label for="muscle-group-select" class="equipment-filter-label">{{ t('exercises.filters.muscleGroup') }}</label>
-        <select
-          id="muscle-group-select"
+    <!-- Filter im Karten-Look der FAQ (Absprache Paul 26.10.): Typ + Muskelgruppe nebeneinander, darunter Equipment + Zurücksetzen. -->
+    <div v-if="showControls" class="filter-grid">
+      <div class="filter-line">
+        <FilterDropdown
+          v-model="selectedCategory"
+          :label="t('exercises.filters.type')"
+          :all-label="t('exercises.filters.all')"
+          :options="quickCategories"
+          @change="setCategory"
+        />
+        <FilterDropdown
           v-model="selectedMuscleGroup"
-          class="equipment-filter-select"
+          :label="t('exercises.filters.muscleGroup')"
+          :all-label="t('exercises.filters.all')"
+          :options="muscleGroupOptions"
+          align="end"
           @change="loadExercises"
-        >
-          <option value="">{{ t('exercises.filters.all') }}</option>
-          <option v-for="group in muscleGroups" :key="group" :value="group">
-            {{ getTranslatedMuscleGroup(group) }}
-          </option>
-        </select>
+        />
       </div>
-
-      <button class="filter-btn ghost" @click="resetFilters">
-        {{ t('exercises.filters.reset') }}
-      </button>
+      <div class="filter-line filter-line--reset">
+        <FilterDropdown
+          v-model="selectedEquipment"
+          :label="t('builder.filterEquipment')"
+          :all-label="t('exercises.filters.all')"
+          :options="equipmentOptions"
+          @change="setEquipment"
+        />
+        <button
+          type="button"
+          class="card filter-reset"
+          :aria-label="t('exercises.filters.reset')"
+          :title="t('exercises.filters.reset')"
+          @click="resetFilters"
+        >
+          <RotateCcw class="filter-reset-icon" aria-hidden="true" />
+        </button>
+      </div>
     </div>
 
     <!-- Eigene Filter/Such-UI nur wenn showControls aktiv ist (verhindert doppelte Such-/
@@ -192,6 +189,8 @@ import { loadDefaultExercises, getCachedDefaultExercises } from '@/utils/default
 import { searchAndRankExercises } from '@/utils/exerciseSearch'
 import AddCustomExerciseModal from '@/components/AddCustomExerciseModal.vue'
 import AppModal from '@/components/AppModal.vue'
+import FilterDropdown from '@/components/FilterDropdown.vue'
+import { RotateCcw } from 'lucide-vue-next'
 import { deleteCustomExercise } from '@/api/customExercises'
 import { getAllCustomExercisesOffline, OFFLINE_WORKOUTS_UPDATED_EVENT } from '@/utils/offlineStorage'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
@@ -331,6 +330,9 @@ const muscleGroups = [
   'Quadrizeps',
   'Waden'
 ];
+
+const muscleGroupOptions = computed(() => muscleGroups.map((group) => ({ value: group, label: getTranslatedMuscleGroup(group) })))
+const equipmentOptions = computed(() => allEquipmentTypes.value.map((equip) => ({ value: equip, label: getTranslatedEquipment(equip) })))
 
 function normalizeSearchText(value) {
   return String(value || '')
@@ -618,6 +620,24 @@ function closeMedia() {
 </script>
 
 <style scoped>
+/* Filter im Karten-Look: Zeile 1 Typ + Muskelgruppe, Zeile 2 Equipment + Zurücksetzen (Symbol). */
+.filter-grid { display: grid; gap: 10px; margin-bottom: 14px; }
+.filter-line { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.filter-line--reset { grid-template-columns: 1fr 60px; }
+.filter-reset {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 60px;
+  min-height: 60px;
+  padding: 0;
+  color: var(--fg);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.filter-reset:active { transform: scale(0.97); }
+.filter-reset:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.filter-reset-icon { width: 24px; height: 24px; }
 /* Bewusst als gefüllter Akzent-Button statt (vorher) unauffälligem Outline-Button - Rückmeldung:
    Nutzer bemerken die Möglichkeit, eigene Übungen hinzuzufügen, sonst kaum. Style/Farbverlauf
    angelehnt an button.primary in style.css (App-weite CTA-Konvention). */

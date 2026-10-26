@@ -1091,9 +1091,7 @@ function formatNumber(value, digits = 0) {
 <style scoped>
 .stats-view {
   min-height: 100dvh;
-  background: radial-gradient(circle at 20% 20%, rgba(213, 255, 102, 0.18), transparent 35%),
-    radial-gradient(circle at 80% 0%, rgba(255, 163, 110, 0.22), transparent 40%),
-    var(--bg);
+  background: var(--bg);
   color: var(--fg);
   padding-bottom: 70px;
 }
@@ -1107,7 +1105,8 @@ function formatNumber(value, digits = 0) {
 }
 
 .range-pill.active {
-  background: linear-gradient(120deg, rgba(61, 142, 230, 0.75), rgba(255, 164, 89, 0.75));
+  background: var(--accent);
+  color: var(--accent-contrast, #060606);
 }
 
 .calendar-shell {
