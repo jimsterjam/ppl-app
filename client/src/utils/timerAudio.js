@@ -9,6 +9,11 @@
  * Meldung 09.10.). Jetzt gilt: alles außer 'running' wird neu gestartet, ein vom System
  * geschlossener Kontext ('closed') wird neu aufgebaut, und beim Zurückkehren in die App bzw. beim
  * nächsten Antippen wird der Kontext aktiv wieder aufgeweckt (iOS erlaubt das nur per Geste).
+ *
+ * Hängt der Kontext trotzdem (Meldung 25.10.: nach einer anderen App blieb der Timer-Ton ganz weg):
+ * iOS lässt einen Kontext nach einer Unterbrechung, z. B. durch Musik oder einen Anruf, teils dauerhaft
+ * auf 'interrupted' stehen; resume() antwortet dann nie. Ein solcher Kontext wird nicht mehr
+ * weiterverwendet, sondern verworfen und durch einen neuen ersetzt (rebuildAudioContext).
  */
 import { logDiagnostic } from '@/utils/diagnosticsLog'
 import { getRestMelody } from '@/utils/restMelodies'
@@ -18,6 +23,8 @@ let audioMasterNode = null
 let audioSubNode = null
 let audioUnlocked = false
 let gestureArmed = false
+// Der letzte Startversuch kam nicht durch (resume() blieb unbeantwortet): Kontext gilt als hängend.
+let resumeFailed = false
 const signalHistory = new Map()
 
 // iOS beantwortet resume() im Zustand 'interrupted' teils nie - nicht endlos darauf warten.
@@ -25,6 +32,7 @@ const RESUME_TIMEOUT_MS = 600
 const GESTURE_EVENTS = ['touchend', 'pointerup', 'click', 'keydown']
 
 function resetAudioGraph() {
+  resumeFailed = false
   audioContext = null
   audioMasterNode = null
   audioSubNode = null
@@ -35,7 +43,9 @@ function watchContextState(ctx) {
   try {
     ctx.addEventListener?.('statechange', () => {
       logDiagnostic('audio-state', { state: ctx.state })
-      if (ctx.state !== 'running') {
+      if (ctx.state === 'running') {
+        resumeFailed = false
+      } else {
         audioUnlocked = false
         armGestureResume()
       }
@@ -72,7 +82,36 @@ export function resumeAudio() {
   try { pending = ctx.resume() } catch {}
   const attempt = Promise.resolve(pending).catch(() => {})
   const timeout = new Promise((resolve) => setTimeout(resolve, RESUME_TIMEOUT_MS))
-  return Promise.race([attempt, timeout]).then(() => ctx.state === 'running')
+  return Promise.race([attempt, timeout]).then(() => {
+    const running = ctx.state === 'running'
+    // Nur den aktuellen Kontext bewerten (ein inzwischen ersetzter zählt nicht).
+    if (ctx === audioContext) resumeFailed = !running
+    return running
+  })
+}
+
+/**
+ * Verwirft einen hängenden Kontext und baut einen frischen auf (alte Töne und Knoten gehören zum alten
+ * Kontext und werden mit ihm geschlossen; Töne, die gespielt werden sollen, entstehen danach im neuen).
+ */
+export function rebuildAudioContext() {
+  const old = audioContext
+  logDiagnostic('audio-rebuild', { from: old?.state || null })
+  resetAudioGraph()
+  try { old?.close?.()?.catch?.(() => {}) } catch {}
+  return getAudioContext()
+}
+
+/**
+ * Startet den Kontext; hängt er trotz Versuch (resume() bleibt ohne Antwort), wird er durch einen neuen ersetzt
+ * und der Start einmal wiederholt. Im Hintergrund wird nichts umgebaut (iOS erlaubt dort ohnehin keinen Ton).
+ * @returns {Promise<boolean>} läuft ein Kontext jetzt?
+ */
+export async function ensureAudioRunning() {
+  if (await resumeAudio()) return true
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return false
+  rebuildAudioContext()
+  return resumeAudio()
 }
 
 /**
@@ -85,6 +124,9 @@ export function armGestureResume() {
   const handler = () => {
     GESTURE_EVENTS.forEach((name) => document.removeEventListener(name, handler, true))
     gestureArmed = false
+    // Ein hängender Kontext wird genau jetzt ersetzt: ein neuer Kontext, der innerhalb der Nutzer-Geste entsteht,
+    // darf auf iOS sicher starten.
+    if (resumeFailed) rebuildAudioContext()
     ensureAudioUnlocked()
     // Läuft er danach immer noch nicht, beim nächsten Antippen erneut versuchen.
     setTimeout(() => {
@@ -103,7 +145,10 @@ export function rearmAudio() {
   logDiagnostic('audio-rearm', { state: audioContext.state })
   if (audioContext.state === 'running') return
   armGestureResume()
-  ensureAudioUnlocked()
+  // Hängt der Kontext, wird er gleich hier ersetzt - nicht erst, wenn der Pausentimer schon klingeln soll.
+  ensureAudioRunning().then((running) => {
+    if (running) ensureAudioUnlocked()
+  }).catch(() => {})
 }
 
 export function getAudioMasterNode() {
@@ -142,17 +187,20 @@ export const ensureAudioUnlocked = () => {
       if (ctx.state !== 'running') {
         await resumeAudio()
       }
+      // Während des Wartens kann ein hängender Kontext ersetzt worden sein: mit dem aktuellen weiterarbeiten.
+      const live = getAudioContext()
+      if (!live) return false
       const master = getAudioMasterNode()
       if (!master) return false
       if (!audioUnlocked) {
-        const osc = ctx.createOscillator()
-        const gain = ctx.createGain()
+        const osc = live.createOscillator()
+        const gain = live.createGain()
         osc.type = 'sine'
         osc.frequency.value = 880
         gain.gain.value = 0.00001
         osc.connect(gain)
         gain.connect(master)
-        const now = ctx.currentTime
+        const now = live.currentTime
         osc.start(now)
         osc.stop(now + 0.01)
         audioUnlocked = true
@@ -554,8 +602,8 @@ export const emitTimerSignal = ({ eventKey, soundEnabled, soundType = 'box-gong'
       // Kontext steht (z.B. 'interrupted' nach dem Hintergrund): erst starten, dann spielen. Klappt der
       // Start nicht, trotzdem spielen - und beim nächsten Antippen erneut aufwecken.
       const before = ctx.state
-      resumeAudio().then((running) => {
-        logDiagnostic('audio-signal-resume', { kind, before, running, state: ctx.state })
+      ensureAudioRunning().then((running) => {
+        logDiagnostic('audio-signal-resume', { kind, before, running, state: getAudioContext()?.state })
         if (!running) armGestureResume()
         play()
       }, play)
