@@ -3,39 +3,38 @@
     <HeaderBar :title="$t('settings.title')" />
     
     <div class="settings-content">
-      <CollapsibleCard class="card" :title="$t('onboarding.restartTitle')">
+      <SettingsSectionCard class="card" :title="$t('onboarding.restartTitle')">
         <p class="hint">{{ $t('onboarding.restartSubtitle') }}</p>
         <button class="legal-btn" :disabled="restartingOnboarding" @click="handleRestartOnboarding">
           <span v-if="restartingOnboarding" class="spinner spin-indicator" aria-hidden="true"></span>
           <span v-else>🔄</span>
           <span>{{ $t('onboarding.restartTitle') }}</span>
         </button>
-      </CollapsibleCard>
+      </SettingsSectionCard>
 
       <!-- Nur für Gratis-Nutzer: verbleibende KI-Anfragen. Deep-Link ?open=aiQuota (Chip in Feedback/Generator). -->
-      <CollapsibleCard v-if="!subscriptionStore.isPremium" class="card" :initial-open="route.query.open === 'aiQuota'" :title="$t('aiQuota.title')">
+      <SettingsSectionCard v-if="!subscriptionStore.isPremium" class="card" :initial-open="route.query.open === 'aiQuota'" :title="$t('aiQuota.title')">
         <AiQuotaCard />
-      </CollapsibleCard>
+      </SettingsSectionCard>
 
-      <CollapsibleCard class="card" :title="$t('aiConsent.settingsTitle')">
+      <SettingsSectionCard class="card" :title="$t('aiConsent.settingsTitle')">
         <p class="hint">{{ $t('aiConsent.settingsHint') }}</p>
-        <label class="opt">
-          <input type="checkbox" :checked="aiConsent.granted" @change="toggleAiConsent($event)" />
-          <span>{{ $t('aiConsent.settingsToggle') }}</span>
-        </label>
-      </CollapsibleCard>
+        <ToggleSwitch :model-value="aiConsent.granted" @update:model-value="toggleAiConsent">
+          {{ $t('aiConsent.settingsToggle') }}
+        </ToggleSwitch>
+      </SettingsSectionCard>
 
-      <CollapsibleCard class="card" :title="$t('settings.progressRulesTitle')">
+      <SettingsSectionCard class="card" :title="$t('settings.progressRulesTitle')">
         <p class="hint">{{ $t('settings.progressRulesSubtitle') }}</p>
         <button class="legal-btn" @click="$router.push({ name: 'faqs', query: { open: 'progressRules' } })">
           <span>📈</span>
           <span>{{ $t('settings.progressRulesTitle') }}</span>
         </button>
-      </CollapsibleCard>
+      </SettingsSectionCard>
 
       <h2 class="section-title">{{ $t('settings.app') }}</h2>
 
-      <CollapsibleCard class="card card--app" :title="$t('settings.theme')">
+      <SettingsSectionCard class="card card--app" :title="$t('settings.theme')">
         <p class="hint">{{ $t('settings.themeHint') }}</p>
         <div class="theme-options">
           <label class="opt">
@@ -47,9 +46,9 @@
             <span>{{ $t('settings.dark') }}</span>
           </label>
         </div>
-      </CollapsibleCard>
+      </SettingsSectionCard>
 
-      <CollapsibleCard class="card card--app" :title="$t('settings.colorMode')">
+      <SettingsSectionCard class="card card--app" :title="$t('settings.colorMode')">
         <p class="hint">{{ $t('settings.colorModeHint') }}</p>
         <div class="theme-options">
           <label v-for="mode in colorModeOptions" :key="mode.value" class="opt">
@@ -63,9 +62,9 @@
             <span>{{ mode.label }}</span>
           </label>
         </div>
-      </CollapsibleCard>
+      </SettingsSectionCard>
 
-      <CollapsibleCard class="card card--app" :title="$t('settings.weeklyGoal')">
+      <SettingsSectionCard class="card card--app" :title="$t('settings.weeklyGoal')">
         <p class="hint">{{ $t('settings.weeklyGoalHint') }}</p>
         <div class="goal-row">
           <input
@@ -82,9 +81,9 @@
           </div>
           <span class="goal-badge">{{ weeklyGoal }} {{ $t('settings.perWeek') }}</span>
         </div>
-      </CollapsibleCard>
+      </SettingsSectionCard>
 
-      <CollapsibleCard class="card card--app" :title="$t('settings.language')">
+      <SettingsSectionCard class="card card--app" :title="$t('settings.language')">
         <div class="theme-options">
           <label class="opt">
             <input type="radio" name="lang" value="de" :checked="lang === 'de'" @change="setLang('de')" />
@@ -95,11 +94,11 @@
             <span>{{ $t('settings.english') }}</span>
           </label>
         </div>
-      </CollapsibleCard>
+      </SettingsSectionCard>
 
       <h2 class="section-title">{{ $t('settings.profileSection') }}</h2>
 
-      <CollapsibleCard v-if="accountEmail || accountProviderLabel" class="card card--profile account-info-card" :title="$t('settings.accountInfoTitle')">
+      <SettingsSectionCard v-if="accountEmail || accountProviderLabel" class="card card--profile account-info-card" :title="$t('settings.accountInfoTitle')">
         <p class="account-email">{{ accountEmail || '—' }}</p>
         <p v-if="accountProviderLabel" class="hint">{{ $t('settings.accountInfoProvider', { provider: accountProviderLabel }) }}</p>
         <p class="hint account-info-note">
@@ -109,7 +108,7 @@
           <code class="account-uid">{{ accountUid }}</code>
           <button type="button" class="uid-copy-btn" @click="copyAccountUid">{{ $t('common.copy') }}</button>
         </div>
-      </CollapsibleCard>
+      </SettingsSectionCard>
 
       <!-- Profilbild und Benutzername werden jetzt direkt im Dashboard bearbeitet (Klick auf
            Avatar bzw. Namen im Header, siehe AvatarEditor.vue/NameEditModal.vue in
@@ -124,7 +123,7 @@
            Build-Output entfernt statt nur "versteckt". -->
       <!-- data-i18n-ignore: Entwickler-Werkzeuge, nur in Dev-Builds enthalten (nicht TestFlight/App Store) -->
       <template v-if="isDevBuild">
-        <CollapsibleCard v-if="isDevelopment" class="card dev-tools" data-i18n-ignore title="🧪 Developer Tools">
+        <SettingsSectionCard v-if="isDevelopment" class="card dev-tools" data-i18n-ignore title="🧪 Developer Tools">
           <p class="hint">Features testing and debugging tools</p>
           <button class="dev-btn" @click="goToFeatureTest">
             🚀 Open Features Test Dashboard
@@ -173,28 +172,28 @@
             </div>
             <p class="hint tiny">Local-only override. Clear storage to reset.</p>
           </div>
-        </CollapsibleCard>
-        <CollapsibleCard v-else class="card dev-unlock" data-i18n-ignore title="🔒 Developer Tools">
+        </SettingsSectionCard>
+        <SettingsSectionCard v-else class="card dev-unlock" data-i18n-ignore title="🔒 Developer Tools">
           <p class="hint">Tap the badge below five times to unlock QA controls on this device.</p>
           <button class="dev-unlock-badge" @click="handleDevUnlockTap">
             <span v-if="devTapCount === 0">Tap 5x to unlock</span>
             <span v-else>{{ tapsRemaining }} more tap{{ tapsRemaining === 1 ? '' : 's' }}</span>
           </button>
           <p class="hint tiny">Unlock state lives in localStorage and never syncs to production users.</p>
-        </CollapsibleCard>
+        </SettingsSectionCard>
       </template>
 
       <h2 class="section-title">{{ $t('appFeedback.entryTitle') }}</h2>
 
-      <CollapsibleCard class="card" :title="$t('appFeedback.entryTitle')">
+      <SettingsSectionCard class="card" :title="$t('appFeedback.entryTitle')">
         <p class="hint">{{ $t('appFeedback.entrySubtitle') }}</p>
         <button class="legal-btn" @click="showFeedbackDialog = true">
           <span>💬</span>
           <span>{{ $t('appFeedback.entryTitle') }}</span>
         </button>
-      </CollapsibleCard>
+      </SettingsSectionCard>
 
-      <CollapsibleCard class="card" :title="$t('settings.legalTitle')">
+      <SettingsSectionCard class="card" :title="$t('settings.legalTitle')">
         <p class="hint">{{ $t('settings.legalHint') }}</p>
         <button class="legal-btn" @click="$router.push('/legal')">
           <span>ℹ️</span>
@@ -204,34 +203,34 @@
           <span>🔒</span>
           <span>{{ $t('settings.privacyLink') }}</span>
         </button>
-      </CollapsibleCard>
+      </SettingsSectionCard>
 
-      <CollapsibleCard class="card" :title="$t('settings.exportDataTitle')">
+      <SettingsSectionCard class="card" :title="$t('settings.exportDataTitle')">
         <p class="hint">{{ $t('settings.exportDataHint') }}</p>
         <button class="legal-btn" :disabled="isExporting" @click="handleExportData">
           <span v-if="isExporting" class="spinner spin-indicator" aria-hidden="true"></span>
           <span v-else>⬇️</span>
           <span>{{ isExporting ? $t('settings.exportDataInProgress') : $t('settings.exportDataTitle') }}</span>
         </button>
-      </CollapsibleCard>
+      </SettingsSectionCard>
 
-      <CollapsibleCard class="card danger-zone" :title="$t('settings.dangerZone')">
+      <SettingsSectionCard class="card danger-zone" :title="$t('settings.dangerZone')">
         <p class="hint">{{ $t('settings.dangerZoneHint') }}</p>
         <button class="danger-btn" :disabled="isDeleting" @click="showDeleteConfirm = true">
           <span v-if="isDeleting" class="spinner spin-indicator" aria-hidden="true"></span>
           <span v-else>🗑️</span>
           {{ isDeleting ? $t('settings.deleting') : $t('settings.deleteAllData') }}
         </button>
-      </CollapsibleCard>
+      </SettingsSectionCard>
 
-      <CollapsibleCard class="card danger-zone account-danger" :title="$t('settings.dangerZoneAccountTitle')">
+      <SettingsSectionCard class="card danger-zone account-danger" :title="$t('settings.dangerZoneAccountTitle')">
         <p class="hint">{{ $t('settings.dangerZoneHint') }}</p>
         <button class="danger-btn account-delete-btn" :disabled="isDeletingAccount" @click="showDeleteAccountConfirm = true">
           <span v-if="isDeletingAccount" class="spinner spin-indicator" aria-hidden="true"></span>
           <span v-else>🗑️</span>
           {{ isDeletingAccount ? $t('settings.deletingAccount') : $t('settings.deleteAccount') }}
         </button>
-      </CollapsibleCard>
+      </SettingsSectionCard>
 
       <div class="app-about">
         <BrandLockup size="sm" />
@@ -241,10 +240,10 @@
       <!-- Nur für den Admin-Testaccount (client/src/config/admin.js). Nur Sichtbarkeit - die
            Daten gibt der Server ausschließlich mit Admin-Schlüssel + passender UID heraus.
            Bewusst nicht übersetzt (data-i18n-ignore), da nur Paul diesen Bereich sieht. -->
-      <CollapsibleCard v-if="showVerifierAudit" class="card" data-i18n-ignore title="Verifier-Protokoll (Admin)">
+      <SettingsSectionCard v-if="showVerifierAudit" class="card" data-i18n-ignore title="Verifier-Protokoll (Admin)">
         <p class="hint">Ergebnisse der automatischen Prüfung des KI-Feedbacks (Zahlen und Regeln), letzte 30 Tage.</p>
         <VerifierAuditPanel />
-      </CollapsibleCard>
+      </SettingsSectionCard>
     </div>
 
     <!-- Bestätigungs-Dialog. Teleport + Scroll-Lock (Modal-Muster der App, siehe CLAUDE.md):
@@ -394,7 +393,8 @@ import { deleteAllWorkouts } from '@/api/workouts'
 import { isOnline, db } from '@/utils/offlineStorage'
 import { exportAccountData } from '@/api/account'
 import { isAdminUid } from '@/config/admin'
-import CollapsibleCard from '../components/CollapsibleCard.vue'
+import SettingsSectionCard from '../components/SettingsSectionCard.vue'
+import ToggleSwitch from '../components/ToggleSwitch.vue'
 import BrandLockup from '../components/BrandLockup.vue'
 import { App as CapacitorApp } from '@capacitor/app'
 import AiQuotaCard from '../components/AiQuotaCard.vue'
@@ -508,16 +508,13 @@ onMounted(async () => {
 })
 const aiConsent = useAiConsentStore()
 
-async function toggleAiConsent(event) {
-  const input = event.target
-  if (input.checked) {
-    // Fenster mit dem Einwilligungstext; bei "Nicht jetzt" bleibt der Schalter aus.
+async function toggleAiConsent(next) {
+  if (next) {
+    // Fenster mit dem Einwilligungstext; bei "Nicht jetzt" bleibt der Schalter aus (Zustand kommt aus dem Store).
     await aiConsent.request()
-    input.checked = aiConsent.granted
     return
   }
   const ok = await aiConsent.revoke()
-  input.checked = aiConsent.granted
   toast.show(ok ? $t('aiConsent.settingsRevoked') : $t('aiConsent.settingsError'), { type: ok ? 'info' : 'error' })
 }
 const userStore = useUserStore()
