@@ -114,7 +114,7 @@ Repository-Specific Configuration
 
 Maintain this section as the project evolves:
 
-● Runtime and versions: Node 24.20.0 (see `.node-version`). No TypeScript anywhere in the repo (no `tsconfig.json`) - client and server are plain JS/Vue.
+● Runtime and versions: Node 24.22.1 (see `.node-version`). No TypeScript anywhere in the repo (no `tsconfig.json`) - client and server are plain JS/Vue.
 
 ● Package manager: npm, with three separate `package.json`/`package-lock.json` (root, `client/`, `server/`). Root `package.json` has no `dependencies`, only `devDependencies` (eslint, prettier, nodemon, concurrently) and orchestration scripts that `cd` into `client/`/`server/`.
 
