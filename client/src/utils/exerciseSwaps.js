@@ -34,6 +34,16 @@ function findByName(catalog, name) {
   return (catalog || []).find((entry) => entryKey(entry) === key) || null
 }
 
+// Die Übung im Workout kann unter ihrer Katalog-ID, dem englischen oder (ältere Einträge) dem deutschen Namen gespeichert sein.
+function findOriginal(catalog, exercise) {
+  const id = String(exercise?.exerciseId || exercise?._id || '').trim()
+  const list = catalog || []
+  return (id && list.find((entry) => String(entry?._id || '') === id))
+    || findByName(list, exercise?.name)
+    || list.find((entry) => nameKey(entry?.name) === nameKey(exercise?.name))
+    || null
+}
+
 /**
  * @param {object} options
  * @param {{ name?: string, exerciseId?: string }} options.exercise - die zu ersetzende Übung (englischer Name wie im Workout)
@@ -43,8 +53,8 @@ function findByName(catalog, name) {
  * @returns {Array<{ entry: object, kind: string, curated: boolean }>}
  */
 export function getSwapSuggestions({ exercise, catalog, exclude = [], limit = SWAP_MAX_SUGGESTIONS } = {}) {
-  const original = findByName(catalog, exercise?.name)
-  const skip = new Set([nameKey(exercise?.name), ...exclude.map(nameKey)])
+  const original = findOriginal(catalog, exercise)
+  const skip = new Set([nameKey(exercise?.name), entryKey(original), ...exclude.map(nameKey)])
   const picked = []
   const add = (entry, curated) => {
     const key = entryKey(entry)
@@ -53,7 +63,7 @@ export function getSwapSuggestions({ exercise, catalog, exclude = [], limit = SW
     picked.push({ entry, kind: equipmentKind(entry), curated })
   }
 
-  for (const name of CURATED_SWAPS[nameKey(exercise?.name)] || []) add(findByName(catalog, name), true)
+  for (const name of CURATED_SWAPS[entryKey(original) || nameKey(exercise?.name)] || []) add(findByName(catalog, name), true)
   if (picked.length >= limit || !original?.target) return picked
 
   const originalKind = equipmentKind(original)

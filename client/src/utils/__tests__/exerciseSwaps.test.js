@@ -64,6 +64,15 @@ describe('getSwapSuggestions', () => {
     expect(ranks[0]).toBeLessThanOrEqual(1)
   })
 
+  it('Übung mit deutschem Namen oder nur mit Katalog-ID wird trotzdem gefunden (ältere Vorlagen-Favoriten)', () => {
+    const bench = catalog.find((e) => e.name_en.toLowerCase() === 'bench press barbell')
+    const byGerman = getSwapSuggestions({ exercise: { name: bench.name, exerciseId: undefined }, catalog })
+    const byId = getSwapSuggestions({ exercise: { name: 'irgendwas', exerciseId: bench._id }, catalog })
+    expect(byGerman[0].entry.name_en).toBe('lever chest press (weight stack)')
+    expect(byId[0].entry.name_en).toBe('lever chest press (weight stack)')
+    expect(byGerman.map((s) => s.entry.name_en)).not.toContain('bench press barbell')
+  })
+
   it('unbekannte Übung: leere Liste', () => {
     expect(getSwapSuggestions({ exercise: { name: 'gibt es nicht' }, catalog })).toEqual([])
   })
