@@ -5302,7 +5302,10 @@ onBeforeUnmount(() => {
 }
 /* Abhaken-Leiste unter dem aktuellen Satz: gehört optisch zur Zeile (Absprache Paul 18.10.). */
 .set-done-strip {
-  margin: -2px 6px 8px;
+  /* Abstand zur Satzzeile (vorher negativer Rand: Zeile und Knopf überlappten, Rückmeldung Paul 29.10.). */
+  position: relative;
+  z-index: 1;
+  margin: 10px 6px 12px;
   border-radius: 10px;
   background: color-mix(in srgb, var(--accent) 16%, transparent);
   color: var(--fg);

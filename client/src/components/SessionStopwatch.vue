@@ -41,8 +41,8 @@
         :aria-label="mainButtonLabel"
         @click="onMainButton"
       >
-        <svg v-if="isRunning" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/></svg>
-        <svg v-else viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor"/></svg>
+        <svg v-if="isRunning" class="sw-card-icon-svg" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/></svg>
+        <svg v-else class="sw-card-icon-svg" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor"/></svg>
       </button>
     </section>
 
@@ -371,6 +371,11 @@ onBeforeUnmount(() => {
   color: var(--accent-contrast, #060606);
   cursor: pointer;
   transition: transform 0.12s ease, opacity 0.12s ease;
+}
+
+.sw-card-icon-svg {
+  width: 32px;
+  height: 32px;
 }
 
 .sw-card-main-btn:active {

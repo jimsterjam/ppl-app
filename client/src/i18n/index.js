@@ -123,8 +123,8 @@ export const messages = {
       last: 'Zuletzt',
       start: 'Starten',
       continue: 'fortsetzen',
-      draftAvailable: 'Entwurf vorhanden',
-      deleteDraft: 'Entwurf löschen',
+      draftAvailable: 'Laufendes Workout',
+      deleteDraft: 'Workout verwerfen',
       startNew: 'Neu beginnen',
       welcome: 'Willkommen!',
   next: 'Nächstes',
@@ -153,8 +153,8 @@ export const messages = {
   ,favoriteDelete: 'Löschen'
   ,favoriteDeleteConfirmTitle: 'Favorit löschen?'
   ,favoriteDeleteConfirmMsg: 'Möchtest du diesen Favoriten wirklich löschen?'
-  ,discardDraftConfirmTitle: 'Entwurf verwerfen?'
-  ,discardDraftConfirmMsg: 'Dein aktueller Entwurf wird unwiderruflich gelöscht.'
+  ,discardDraftConfirmTitle: 'Laufendes Workout verwerfen?'
+  ,discardDraftConfirmMsg: 'Dein laufendes Workout wird unwiderruflich gelöscht.'
   ,favoriteNamePlaceholder: 'Nur Buchstaben und Zahlen'
   ,favoriteStartFailed: 'Favorit konnte nicht gestartet werden.'
   ,favoriteAdjustFailed: 'Favorit konnte nicht geöffnet werden.'
@@ -1787,8 +1787,8 @@ export const messages = {
       last: 'Last',
       start: 'Start',
       continue: 'continue',
-      draftAvailable: 'Draft available',
-      deleteDraft: 'Delete draft',
+      draftAvailable: 'Workout in progress',
+      deleteDraft: 'Discard workout',
       startNew: 'Start new',
       welcome: 'Welcome!',
   next: 'Next',
@@ -1817,8 +1817,8 @@ export const messages = {
   ,favoriteDelete: 'Delete'
   ,favoriteDeleteConfirmTitle: 'Delete favorite?'
   ,favoriteDeleteConfirmMsg: 'Do you really want to delete this favorite?'
-  ,discardDraftConfirmTitle: 'Discard draft?'
-  ,discardDraftConfirmMsg: 'Your current draft will be permanently deleted.'
+  ,discardDraftConfirmTitle: 'Discard workout in progress?'
+  ,discardDraftConfirmMsg: 'Your workout in progress will be permanently deleted.'
   ,favoriteNamePlaceholder: 'Letters and numbers only'
   ,favoriteStartFailed: 'Could not start favorite workout.'
   ,favoriteAdjustFailed: 'Could not open favorite workout.'
