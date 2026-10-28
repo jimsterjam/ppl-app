@@ -74,6 +74,14 @@ describe('createPlanFromTemplate', () => {
     })
   })
 
+  it('Übungsnamen in den Favoriten sind englisch (Katalog-name_en), nicht der deutsche Katalogname', () => {
+    createPlanFromTemplate(base())
+    const names = new Set(catalog.map((entry) => entry.name_en))
+    const stored = getFavoritesByType('u1', 'push')[0].workout.exercises.map((ex) => ex.name)
+    expect(stored.length).toBeGreaterThan(0)
+    stored.forEach((name) => expect(names.has(name)).toBe(true))
+  })
+
   it('legt Plan und je Tag einen Favoriten an (Ziel Muskelaufbau, Typ je Tag, Sätze wie in der Vorlage)', () => {
     const result = createPlanFromTemplate(base())
     expect(result.ok).toBe(true)
