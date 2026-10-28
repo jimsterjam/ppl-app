@@ -362,7 +362,6 @@ export const messages = {
     sessionStopwatch: {
       cardTitle: 'Gym-Zeit',
       paused: 'Pausiert',
-      hintIdle: 'Tippe auf Start, sobald du loslegst',
       runningSince: 'seit {time} Uhr',
       resetConfirm: 'Zeit zurücksetzen?',
       start: 'Start',
@@ -1966,7 +1965,6 @@ export const messages = {
     sessionStopwatch: {
       cardTitle: 'Gym time',
       paused: 'Paused',
-      hintIdle: 'Tap start as soon as you get going',
       runningSince: 'since {time}',
       resetConfirm: 'Reset time?',
       start: 'Start',

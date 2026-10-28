@@ -22,7 +22,6 @@
           class="sw-card-reset-link"
           @click="resetConfirmOpen = true"
         >↺ {{ t('sessionStopwatch.reset') }}</button>
-        <p v-else-if="!isPaused" class="sw-card-hint">{{ t('sessionStopwatch.hintIdle') }}</p>
       </div>
 
       <!-- Zurücksetzen nur im Pause-Zustand und nur nach Rückfrage direkt auf der Karte - vorher
