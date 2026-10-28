@@ -25,6 +25,12 @@ function randomPart() {
   return Math.random().toString(36).slice(2, 8)
 }
 
+/** Plan-/Tag-ID aus Route oder Workout: nur eine gültige ID (gleiche Regel wie am Server), sonst null. */
+export function sanitizePlanRef(value) {
+  const id = String(value ?? '').trim()
+  return id && id.length <= 64 && /^[A-Za-z0-9_.:-]+$/.test(id) ? id : null
+}
+
 export function makePlanId() {
   return `plan_${Date.now()}_${randomPart()}`
 }

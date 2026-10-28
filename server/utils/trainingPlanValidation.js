@@ -16,6 +16,11 @@ function cleanId(value) {
   return id && id.length <= PLAN_LIMITS.maxId && /^[A-Za-z0-9_.:-]+$/.test(id) ? id : '';
 }
 
+/** Plan-/Tag-Verweis am Workout: nur eine gültige ID, sonst null (Setter darf das Speichern nie scheitern lassen). */
+export function sanitizePlanRef(value) {
+  return cleanId(value) || null;
+}
+
 function cleanDate(value) {
   if (!value) return null;
   const time = new Date(value).getTime();

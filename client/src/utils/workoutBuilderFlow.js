@@ -1,4 +1,5 @@
 import { sanitizeWorkoutGoal } from './workoutGoal'
+import { sanitizePlanRef } from './trainingPlan'
 
 const VALID_WORKOUT_TYPES = new Set(['push', 'pull', 'legs', 'fullbody'])
 
@@ -39,6 +40,13 @@ export function buildWorkoutBuilderRoute(type, options = {}) {
   if (goal) {
     query.goal = goal
   }
+  // Trainingsplan, aus dem das Workout gestartet wird (Plan und Tag) - wird am Workout gespeichert.
+  const planId = sanitizePlanRef(options.planId)
+  const planDayId = sanitizePlanRef(options.planDayId)
+  if (planId && planDayId) {
+    query.planId = planId
+    query.planDayId = planDayId
+  }
 
   return {
     name: 'workout-builder',
@@ -73,6 +81,8 @@ export function readWorkoutBuilderRouteState(routeQuery = {}) {
     quick: String(routeQuery?.quick || '') === '1',
     favoriteStart: String(routeQuery?.favoriteStart || '') === '1',
     favoriteAdjust: String(routeQuery?.favoriteAdjust || '') === '1',
-    goal: sanitizeWorkoutGoal(routeQuery?.goal)
+    goal: sanitizeWorkoutGoal(routeQuery?.goal),
+    planId: sanitizePlanRef(routeQuery?.planId),
+    planDayId: sanitizePlanRef(routeQuery?.planDayId)
   }
 }
