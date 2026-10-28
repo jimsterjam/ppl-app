@@ -65,7 +65,7 @@ onBeforeUnmount(unlockBodyScroll)
 const baseKeys = ['gettingStarted', 'pushPullLegs', 'navigation', 'workoutFlow', 'focusMode', 'symbols', 'restPauses', 'timedExercises', 'warmup', 'progressRules', 'progression', 'weightSuggestion', 'statsReading', 'aiCoach', 'workouts', 'uploads', 'privacy']
 // Gruppierte Anzeige (Absprache Paul 22.10.): jeder Eintrag steht in genau einer Gruppe.
 const groups = [
-  { titleKey: 'groupStart', keys: ['gettingStarted', 'pushPullLegs', 'navigation'] },
+  { titleKey: 'groupStart', keys: ['gettingStarted', 'pushPullLegs', 'trainingPlans', 'navigation'] },
   { titleKey: 'groupWorkout', keys: ['workoutFlow', 'focusMode', 'symbols', 'restPauses', 'timedExercises', 'warmup'] },
   { titleKey: 'groupProgress', keys: ['progressRules', 'progression', 'weightSuggestion', 'statsReading'] },
   { titleKey: 'groupAi', keys: ['aiCoach'] },

@@ -139,6 +139,11 @@ function consumeQuickPrefill() {
 	}))
 }
 
+function planRefFromRoute() {
+	const { planId, planDayId } = readWorkoutBuilderRouteState(route.query)
+	return planId && planDayId ? { planId, planDayId } : {}
+}
+
 function buildFavoriteDetailQuery(base = {}) {
 	const query = { ...base }
 	const ctx = favoriteContext.value
@@ -374,7 +379,9 @@ async function createWorkout() {
 			date: new Date().toISOString(),
 			completed: false,
 			// Ziel des Workouts (im Dashboard abgefragt, siehe utils/workoutGoal.js) - danach fest.
-			goal: readWorkoutBuilderRouteState(route.query).goal
+			goal: readWorkoutBuilderRouteState(route.query).goal,
+			// Aus einem Trainingsplan gestartet: Plan und Tag mitspeichern (nur beide zusammen).
+			...planRefFromRoute()
 		};
 		const tempId = getDraftId();
 		const tempWorkout = {

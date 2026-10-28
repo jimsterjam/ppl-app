@@ -1089,6 +1089,7 @@ import {
   writeDetailViewState as writeDetailViewStateUtil
 } from '@/utils/workoutDetailPersistState'
 import { normalizeWorkoutForSave } from '@/utils/workoutDetailSaveFlow'
+import { advancePlanAfterWorkout } from '@/utils/planProgress'
 import { startAiWarmup } from '@/utils/aiWarmup'
 import { buildCatalogIndex, findCatalogEntry } from '@/utils/exerciseMatch'
 import { useRestTimerStore } from '@/stores/restTimerStore'
@@ -3890,6 +3891,16 @@ async function performSaveWorkout(updateFavorite = false, { deferAiFeedback = fa
         completed: true,
         _isDraft: false,
         isDraft: false
+      }
+    }
+
+    // Plan-Training gespeichert: Plan rückt zum nächsten Tag vor. Nur beim ersten Abschluss - spätere
+    // Anpassungen eines gespeicherten Workouts schalten den Plan nicht erneut weiter.
+    if (!editedSaved && normalized.planId && normalized.planDayId) {
+      try {
+        advancePlanAfterWorkout({ userId: getFavoriteUserId(), planId: normalized.planId, planDayId: normalized.planDayId, doneAt: normalized.date })
+      } catch (planErr) {
+        logger.warn('[WorkoutDetail] Plan weiterschalten fehlgeschlagen', planErr)
       }
     }
 

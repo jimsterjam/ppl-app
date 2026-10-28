@@ -16,6 +16,7 @@ import { useTimerStore } from './stores/timerStore'
 import { initFirebaseAuth, useFirebaseAuth, isEffectivelyEmailVerified } from './utils/firebaseAuth'
 import { getActiveDraft, runningWorkoutPath } from './utils/activeWorkoutDraft'
 import { reconcileFavoritesWithServer } from './utils/workoutFavorites'
+import { reconcileTrainingPlansWithServer } from './utils/trainingPlanStorage'
 import { syncCustomExercisesWithServer } from '@/api/customExercises'
 import { App as CapacitorApp } from '@capacitor/app'
 import { logger } from '@/utils/logger'
@@ -314,6 +315,14 @@ async function bootstrapAuth() {
             .catch((error) => {
               logger.warn('[main] Favoriten-Abgleich fehlgeschlagen:', error)
             })
+
+          // Trainingspläne: gleiche Idee wie bei den Favoriten (Restore nach Neuinstallation, Nachliefern bei Offline-Anlage).
+          reconcileTrainingPlansWithServer(user.uid, token)
+            .then((result) => {
+              logger.debug('[main] Trainingspläne abgeglichen', result)
+              if (result?.pulled) window.dispatchEvent(new Event('fbe:plans-changed'))
+            })
+            .catch((error) => logger.warn('[main] Plan-Abgleich fehlgeschlagen:', error))
 
           // Eigene Übungen: nach Neuinstallation/Gerätewechsel vom Server holen, offline angelegte nachliefern.
           syncCustomExercisesWithServer(token, user.uid)

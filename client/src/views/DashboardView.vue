@@ -26,6 +26,20 @@
 
       <MonthlyReportRow />
 
+      <section v-if="todayPlan && !showStartOptions && !hasDraft" class="today-card" aria-labelledby="today-plan-eyebrow">
+        <p id="today-plan-eyebrow" class="today-eyebrow">{{ $t('plans.today') }}</p>
+        <h3 class="today-title">{{ todayDayTitle }}</h3>
+        <p class="today-sub">{{ $t('plans.todayPlanLine', { plan: todayPlan.plan.name }) }}</p>
+        <p v-if="!todayPlan.favorite" class="today-warn">{{ $t('plans.todayFavoriteMissing') }}</p>
+        <button v-if="todayPlan.favorite" class="today-start" type="button" @click="startPlanDay(todayPlan.plan, todayPlan.day)">
+          {{ $t('plans.startTraining') }}
+        </button>
+        <button v-else class="today-start" type="button" @click="router.push({ name: 'plan-detail', params: { id: todayPlan.plan.id } })">
+          {{ $t('plans.openPlan') }}
+        </button>
+        <button class="today-other" type="button" @click="showPlanDayPicker = true">{{ $t('plans.chooseOtherDay') }}</button>
+      </section>
+
       <section class="quick-start">
         <div v-if="!showStartOptions" class="quick-grid">
           <WorkoutCard
@@ -211,6 +225,31 @@
     />
 
     <AppModal
+      v-model="showPlanDayPicker"
+      :title="$t('plans.pickDayTitle')"
+      :confirm-text="$t('common.close')"
+      :show-cancel="false"
+      type="info"
+    >
+      <p class="plan-pick-hint">{{ $t('plans.pickDayHint') }}</p>
+      <div v-if="todayPlan" class="plan-pick-list">
+        <button
+          v-for="(day, index) in todayPlan.plan.days"
+          :key="day.id"
+          type="button"
+          class="plan-pick-btn"
+          :class="{ 'is-next': index === todayPlan.plan.activeDayIndex }"
+          :disabled="!planDayFavorite(day)"
+          @click="pickPlanDay(day)"
+        >
+          <span>{{ planDayTitle(day) }}</span>
+          <small v-if="index === todayPlan.plan.activeDayIndex">{{ $t('plans.nextDay') }}</small>
+          <small v-else-if="!planDayFavorite(day)">{{ $t('plans.favoriteMissing') }}</small>
+        </button>
+      </div>
+    </AppModal>
+
+    <AppModal
       v-model="showFavoriteDeleteConfirm"
       :title="$t('dashboard.favoriteDeleteConfirmTitle')"
       :message="favoriteDeleteMessage"
@@ -276,6 +315,8 @@ import AvatarEditor from '@/components/AvatarEditor.vue'
 import NameEditModal from '@/components/NameEditModal.vue'
 import WorkoutGoalPicker from '@/components/WorkoutGoalPicker.vue'
 import { getTrainingPlans, updateTrainingPlan } from '@/utils/trainingPlanStorage'
+import { getTodayPlanInfo } from '@/utils/planProgress'
+import { getAllFavorites } from '@/utils/planFromTemplate'
 import { findPlansUsingFavorite, removeFavoriteFromPlan } from '@/utils/trainingPlan'
 import { sanitizeWorkoutGoal, WORKOUT_GOALS, GENERATOR_GOALS, WORKOUT_GOAL_LABEL_KEYS } from '@/utils/workoutGoal'
 
@@ -757,7 +798,7 @@ function confirmGoalModal() {
   const context = goalModalContext.value
   closeGoalModal()
   if (context?.kind === 'favorite') {
-    startFavoriteWithNewGoal(context.favorite, goal)
+    startFavoriteWithNewGoal(context.favorite, goal, context.planRef || null)
     return
   }
   const type = pendingWorkoutType.value
@@ -800,7 +841,7 @@ function closeAllFavoritesPanel() {
   favoriteRenameInput.value = ''
 }
 
-function openFavoriteInBuilder(favorite, { autoStart = false, goal = null } = {}) {
+function openFavoriteInBuilder(favorite, { autoStart = false, goal = null, planRef = null } = {}) {
   const fav = favorite?.workout || {}
   const type = normalizeBuilderWorkoutType(favorite?.type || pendingWorkoutType.value)
   const exercises = Array.isArray(fav.exercises) ? fav.exercises : []
@@ -816,7 +857,14 @@ function openFavoriteInBuilder(favorite, { autoStart = false, goal = null } = {}
   }
   saveWorkoutBuilderPrefill(prefill)
   closeStartModePanel()
-  router.push(buildWorkoutBuilderRoute(type, { quick: true, favoriteStart: autoStart, favoriteAdjust: !autoStart, goal }))
+  router.push(buildWorkoutBuilderRoute(type, {
+    quick: true,
+    favoriteStart: autoStart,
+    favoriteAdjust: !autoStart,
+    goal,
+    planId: planRef?.planId,
+    planDayId: planRef?.planDayId
+  }))
 }
 
 async function openFavoriteAdjustInDetail(favorite) {
@@ -863,7 +911,7 @@ function favoriteMetaLine(favorite) {
     .join(' · ')
 }
 
-function startFavoriteWithNewGoal(favorite, goal) {
+function startFavoriteWithNewGoal(favorite, goal, planRef = null) {
   const result = updateFavoriteWorkout({
     userId: getCurrentFavoritesUserId(),
     type: favorite?.type,
@@ -879,10 +927,55 @@ function startFavoriteWithNewGoal(favorite, goal) {
   loadAllFavoriteWorkouts()
   const updated = result?.success && result.favorite ? result.favorite : { ...favorite, workout: { ...(favorite?.workout || {}), goal } }
   try {
-    openFavoriteInBuilder(updated, { autoStart: true, goal })
+    openFavoriteInBuilder(updated, { autoStart: true, goal, planRef })
   } catch {
     favoriteInfoText.value = $t('dashboard.favoriteStartFailed')
   }
+}
+
+// --- Trainingsplan: „Heute“-Karte -------------------------------------------------------------
+const todayPlan = ref(null)
+const showPlanDayPicker = ref(false)
+
+function refreshTodayPlan() {
+  try {
+    todayPlan.value = getTodayPlanInfo(getCurrentFavoritesUserId())
+  } catch (err) {
+    logger.warn('[Dashboard] Trainingsplan konnte nicht gelesen werden', err?.message)
+    todayPlan.value = null
+  }
+}
+
+function planDayFavorite(day) {
+  return getAllFavorites(getCurrentFavoritesUserId()).find((fav) => fav.id === day?.favoriteId) || null
+}
+
+function planDayTitle(day) {
+  return day?.label || planDayFavorite(day)?.name || $t('plans.favoriteMissing')
+}
+
+const todayDayTitle = computed(() => planDayTitle(todayPlan.value?.day))
+
+// Tag des Plans starten: wie ein Favorit (inkl. Zielabfrage bei alten Favoriten), plus Plan/Tag zum Speichern am Workout.
+function startPlanDay(plan, day) {
+  const favorite = planDayFavorite(day)
+  if (!favorite) return
+  const planRef = { planId: plan.id, planDayId: day.id }
+  const goal = favoriteGoalOf(favorite)
+  if (!goal) {
+    openGoalModal({ kind: 'favorite', favorite, planRef })
+    return
+  }
+  try {
+    openFavoriteInBuilder(favorite, { autoStart: true, goal, planRef })
+  } catch {
+    favoriteInfoText.value = $t('dashboard.favoriteStartFailed')
+  }
+}
+
+function pickPlanDay(day) {
+  showPlanDayPicker.value = false
+  if (todayPlan.value) startPlanDay(todayPlan.value.plan, day)
 }
 
 // --- "⋯"-Menü eines Favoriten -------------------------------------------------------------
@@ -1131,6 +1224,8 @@ onUnmounted(stopAiWarmup)
 
 onMounted(() => {
   draftSourceLogged.value = false
+  refreshTodayPlan()
+  window.addEventListener('fbe:plans-changed', refreshTodayPlan)
   window.addEventListener('online', onOnlineStatus)
   window.addEventListener('offline', onOfflineStatus)
   readDetailDraft()
@@ -1176,6 +1271,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('online', onOnlineStatus)
+  window.removeEventListener('fbe:plans-changed', refreshTodayPlan)
   window.removeEventListener('offline', onOfflineStatus)
   // remove window listener
   window.removeEventListener('focus', onWindowFocus)
@@ -1189,6 +1285,7 @@ onUnmounted(() => {
 
 onActivated(async () => {
   draftSourceLogged.value = false
+  refreshTodayPlan()
   await readDetailDraft()
   if (isSignedIn.value || (!isOnline() && authStore.isOfflineSessionValid)) {
     logger.debug('📥 DashboardView - Route aktiviert, lade Workouts neu')
@@ -1261,6 +1358,104 @@ onActivated(async () => {
   color: var(--muted);
   font-size: 0.9rem;
   text-align: center;
+}
+
+.today-card {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 10px;
+  padding: 14px 16px;
+  border-radius: var(--card-radius);
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 7%, var(--card-bg));
+}
+
+.today-eyebrow {
+  margin: 0;
+  color: var(--accent);
+  font-family: "Sora", "Space Grotesk", "SF Pro Display", sans-serif;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.today-title {
+  margin: 0;
+  font-family: "Sora", "Space Grotesk", "SF Pro Display", sans-serif;
+  font-size: 1.3rem;
+  overflow-wrap: anywhere;
+}
+
+.today-sub,
+.today-warn {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.today-warn {
+  color: var(--danger);
+}
+
+.today-start {
+  margin-top: 8px;
+  min-height: 48px;
+  border: none;
+  border-radius: 14px;
+  background: var(--accent);
+  color: var(--accent-contrast, #060606);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.today-other {
+  min-height: 40px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 0.85rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.plan-pick-hint {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.plan-pick-list {
+  display: grid;
+  gap: 8px;
+}
+
+.plan-pick-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 14px;
+  border-radius: 12px;
+  border: 1px solid var(--card-border);
+  background: var(--surface);
+  color: var(--fg);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.plan-pick-btn.is-next {
+  border-color: var(--accent);
+}
+
+.plan-pick-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .quick-start {

@@ -1,5 +1,6 @@
 import { TEXT_LIMITS, textSetter } from '../utils/textLimits.js';
 import { sanitizeWarmup } from '../utils/workoutWarmup.js';
+import { sanitizePlanRef } from '../utils/trainingPlanValidation.js';
 import mongoose from "mongoose";
 
 // Hilfsfunktion zur Kanonisierung des Workout-Typs
@@ -136,6 +137,12 @@ const workoutSchema = new mongoose.Schema({
     default: null,
     set: (v) => (['hypertrophy', 'strength', 'explosive', 'technique'].includes(v) ? v : null)
   },
+
+  // Trainingsplan, aus dem dieses Workout gestartet wurde (Plan-ID und Tag-ID, siehe
+  // client/src/utils/trainingPlan.js). Optional: null bei Workouts ohne Plan. Setter statt Validator,
+  // damit eine ungültige ID zu null wird, statt das Speichern scheitern zu lassen.
+  planId: { type: String, default: null, set: sanitizePlanRef },
+  planDayId: { type: String, default: null, set: sanitizePlanRef },
 
   // Warm-up-Karte (Cardio, Gelenke, übungsspezifisch): je Schritt abgehakt oder nicht. null = Workout
   // von vor dieser Funktion (unbekannt). Der Setter lässt nur die drei Booleans durch - kein Freitext

@@ -5,6 +5,7 @@ import { sanitizeCustomRest } from './restTimerRules'
 import { sanitizeWarmup } from './warmupPlan'
 import { markOpenSetsNotDone } from './saveReview'
 import { measureModeField } from './measureMode'
+import { sanitizePlanRef } from './trainingPlan'
 
 export function getExercisesMissingNotes(exercises = [], getNote) {
   const missing = []
@@ -78,6 +79,9 @@ export function normalizeWorkoutForSave({ workout, exerciseNotes, sessionStopwat
     // Ziel des Workouts (beim Erstellen abgefragt, siehe utils/workoutGoal.js) - null bei alten
     // Workouts ohne Ziel.
     goal: sanitizeWorkoutGoal(w.goal),
+    // Trainingsplan, aus dem das Workout gestartet wurde (nur beide zusammen) - null bei Workouts ohne Plan.
+    planId: sanitizePlanRef(w.planId) && sanitizePlanRef(w.planDayId) ? sanitizePlanRef(w.planId) : null,
+    planDayId: sanitizePlanRef(w.planId) && sanitizePlanRef(w.planDayId) ? sanitizePlanRef(w.planDayId) : null,
     // Warm-up-Karte: je Schritt abgehakt oder nicht (siehe utils/warmupPlan.js) - null bei Workouts ohne Karte.
     warmup: sanitizeWarmup(w.warmup)
   }
