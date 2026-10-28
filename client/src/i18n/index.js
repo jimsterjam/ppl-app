@@ -672,6 +672,26 @@ export const messages = {
       replacedFrom: 'statt {name}',
       preview: 'Bild oder Video ansehen: {name}'
     },
+    coach: {
+      ok: 'Verstanden',
+      done: 'Fertig',
+      step: '{n} von {total}',
+      weekTitle: 'Deine Woche',
+      weekText: 'Ein Haken zeigt, an welchen Tagen du trainiert hast. Der heutige Tag ist hervorgehoben.',
+      todayTitle: 'Heute dran',
+      todayText: 'Tippe auf Starten. Nach dem Speichern rückt der Plan automatisch zum nächsten Tag vor.',
+      swapTitle: 'Übung zu schwer?',
+      swapText: 'Mit ⇄ tauschst du sie gegen eine leichtere, zum Beispiel eine Maschine. Die App zeigt dir Vorschläge mit Bild.',
+      reorderTitle: 'Reihenfolge ändern',
+      reorderText: 'Mit ⇅ verschiebst du Übungen. Danach tippst du auf „Fertig“, das Workout läuft weiter.',
+      timerTitle: 'Pausen und Zeit',
+      timerText: 'Hier stellst du die Pause zwischen den Sätzen und den Workout-Timer ein. Beides läuft auch, wenn du die App kurz verlässt.',
+      settingsTitle: 'Hinweise',
+      settingsHint: 'Kurze Sprechblasen erklären beim ersten Besuch, wofür ein Symbol oder Bereich da ist (Wochenstreifen, Heute, Übung wechseln, Reihenfolge, Timer). „Erneut anzeigen“ zeigt sie beim nächsten Besuch der jeweiligen Seite noch einmal.',
+      settingsToggle: 'Hinweise anzeigen',
+      settingsReset: 'Hinweise erneut anzeigen',
+      resetDone: 'Die Hinweise werden erneut angezeigt.'
+    },
     brand: {
       slogan: 'Form Beats Ego'
     },
@@ -2318,6 +2338,26 @@ export const messages = {
       replacedChip: 'Replaced',
       replacedFrom: 'instead of {name}',
       preview: 'View picture or video: {name}'
+    },
+    coach: {
+      ok: 'Got it',
+      done: 'Done',
+      step: '{n} of {total}',
+      weekTitle: 'Your week',
+      weekText: 'A check mark shows the days you trained. Today is highlighted.',
+      todayTitle: 'Today',
+      todayText: 'Tap Start. After you save, the plan moves on to the next day automatically.',
+      swapTitle: 'Exercise too hard?',
+      swapText: 'Use ⇄ to swap it for an easier one, for example a machine. The app shows suggestions with pictures.',
+      reorderTitle: 'Change the order',
+      reorderText: 'Use ⇅ to move exercises. Then tap “Done” and your workout carries on.',
+      timerTitle: 'Rest and time',
+      timerText: 'Set the rest between sets and the workout timer here. Both keep running if you leave the app briefly.',
+      settingsTitle: 'Hints',
+      settingsHint: 'Short speech bubbles explain what an icon or area is for on your first visit (week strip, Today, swap exercise, order, timer). “Show again” shows them once more the next time you visit the page.',
+      settingsToggle: 'Show hints',
+      settingsReset: 'Show hints again',
+      resetDone: 'The hints will be shown again.'
     },
     brand: {
       slogan: 'Form Beats Ego'

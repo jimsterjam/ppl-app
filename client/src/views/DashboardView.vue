@@ -15,6 +15,7 @@
     <NameEditModal v-model="showNameModal" />
 
     <main class="dashboard-content" :class="{ 'has-draft': hasDraft }">
+      <CoachMarks :marks="coachMarks" :active="coachActive" />
       <WeekStrip class="dashboard-week" :workouts="store.workouts || []" :caption="weeklyProgressLabel" />
 
       <SessionStopwatch v-if="showStopwatchCard" @session-time="onSessionTime" />
@@ -322,6 +323,7 @@ import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 import { migrateTemplateFavoritesToPlans, removeOrphanTemplateFavorites } from '@/utils/planMigration'
 import { messages } from '@/i18n'
 import WeekStrip from '@/components/WeekStrip.vue'
+import CoachMarks from '@/components/CoachMarks.vue'
 import { countWeekWorkouts } from '@/utils/weekStrip'
 import { ArrowUpRight, ArrowDownLeft, ChevronsDown, Target, Star, ClipboardList, Timer, Info } from 'lucide-vue-next'
 import { findPlansUsingFavorite, removeFavoriteFromPlan } from '@/utils/trainingPlan'
@@ -474,6 +476,16 @@ const weeklyGoal = computed(() => Number(settings.weeklyGoal) || 4)
 const weeklyCount = computed(() => countWeekWorkouts({ workouts: store.workouts || [] }))
 
 // Kacheln „Selbst zusammenstellen“: Icon, Name und die trainierten Muskeln (erklärt Einsteigern, was dahintersteckt).
+// Sprechblasen auf dem Dashboard (Absprache Paul 29.10.): Wochenstreifen und, mit aktivem Plan, „Heute“.
+const coachMarks = computed(() => [
+  { id: 'coach-week', selector: '.dashboard-week', title: $t('coach.weekTitle'), text: $t('coach.weekText') },
+  { id: 'coach-today', selector: '.today-card', title: $t('coach.todayTitle'), text: $t('coach.todayText') }
+])
+// Nicht über Fenstern und nicht, solange der Start-Ablauf (Favoriten, Ziel ...) offen ist.
+const coachActive = computed(() => isSignedIn.value && !showStartOptions.value && !showNameModal.value && !showGoalModal.value
+  && !showTimerMenu.value && !showFavoriteMenu.value && !showPlanDayPicker.value && !showRemovePlan.value && !showInfoModal.value
+  && !showDiscardDraftConfirm.value && !showFavoriteDeleteConfirm.value)
+
 const typeTiles = computed(() => [
   { type: 'push', label: 'Push', icon: ArrowUpRight, muscles: $t('dashboard.pushMuscles') },
   { type: 'pull', label: 'Pull', icon: ArrowDownLeft, muscles: $t('dashboard.pullMuscles') },
@@ -1394,6 +1406,59 @@ onActivated(async () => {
 
 .dashboard-content > .quick-start {
   flex-shrink: 0;
+}
+
+/* Gym-Zeit-Karte im Dashboard kleiner (Wunsch Paul 29.10.): weniger Höhe, damit alles ohne Scrollen passt. */
+.dashboard-content :deep(.sw-card) {
+  gap: 10px;
+  padding: 8px 12px;
+}
+
+.dashboard-content :deep(.sw-card-time) {
+  margin-top: 0;
+  font-size: 1.45rem;
+}
+
+.dashboard-content :deep(.sw-card-hint) {
+  display: none;
+}
+
+.dashboard-content :deep(.sw-card-main-btn) {
+  width: 44px;
+  height: 44px;
+}
+
+/* Mit Entwurf-Hinweis: Kacheln und Wochenstreifen enger, damit alles auf den Bildschirm passt. */
+.dashboard-content.has-draft .quick-section-label,
+.dashboard-content.has-draft .type-text small {
+  display: none;
+}
+
+.dashboard-content.has-draft .type-grid {
+  grid-template-rows: repeat(2, minmax(44px, 64px));
+  gap: 8px;
+}
+
+.dashboard-content.has-draft .type-tile {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 6px 10px;
+}
+
+.dashboard-content.has-draft .type-info {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.dashboard-content.has-draft .quick-bar-btn {
+  min-height: 44px;
+}
+
+.dashboard-content.has-draft .week-strip {
+  padding: 6px 8px 4px;
+  gap: 4px;
 }
 
 .dashboard-content.has-draft {

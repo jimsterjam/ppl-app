@@ -1,5 +1,6 @@
 <template>
     <div class="workout-detail" :class="{ 'has-bottom-bar': hasBottomBar }">
+      <CoachMarks :marks="coachMarks" :active="coachActive" />
       <HeaderBar title="Workout">
         <!-- Gesamtzeit (SessionStopwatch) hier statt weiter unten in der Übungsliste (siehe
              ex-list-header) platziert - Header ist sticky (siehe HeaderBar.vue), bleibt also
@@ -1080,6 +1081,7 @@ import OneTimeHint from '@/components/OneTimeHint.vue'
 import AppModal from '@/components/AppModal.vue'
 import ExerciseList from '@/components/ExerciseList.vue'
 import ExerciseSwapModal from '@/components/ExerciseSwapModal.vue'
+import CoachMarks from '@/components/CoachMarks.vue'
 import { buildSwappedExercise, canSwapExercise, replaceExerciseInPlanDay } from '@/utils/exerciseSwapApply'
 import { getPlanDayInfo, planDayTitle } from '@/utils/planProgress'
 import WorkoutTimerConfig from '@/components/timer/WorkoutTimerConfig.vue'
@@ -2720,6 +2722,18 @@ function isWarmupOpen(index) {
 function toggleWarmups(index) {
   warmupOpenOverride.value = { ...warmupOpenOverride.value, [index]: !isWarmupOpen(index) }
 }
+
+// --- Sprechblasen (Absprache Paul 29.10.): Übung wechseln, Reihenfolge, Timer -----------------------------
+const coachMarks = computed(() => [
+  { id: 'coach-swap', selector: '.ex-swap-btn', title: t('coach.swapTitle'), text: t('coach.swapText') },
+  { id: 'coach-reorder', selector: '.reorder-toggle', title: t('coach.reorderTitle'), text: t('coach.reorderText') },
+  { id: 'coach-timer', selector: '.timer-config-btn', title: t('coach.timerTitle'), text: t('coach.timerText') }
+])
+// Nur im normalen Workout-Bild: nicht im Fokus-Modus, beim Sortieren, über Fenstern oder bei laufender Pause/Aufwärmen.
+const coachActive = computed(() => Boolean(workout.value) && !loading.value && !focus.active && !isReordering.value && !isFavoriteAdjustMode.value
+  && !showAddExerciseModal.value && !showTimerConfig.value && !showExerciseMenu.value && !showSwapModal.value && !showLeaveModal.value
+  && !showSaveReviewModal.value && !showRemoveExerciseModal.value && !showTrainingTypeModal.value && !showWeightSuggestionInfo.value
+  && !showTimerActionModal.value && !showDeleteNoteModal.value && !showFavoriteNameModal.value && !restTimer.isVisible)
 
 // --- Übung wechseln (⇄) -------------------------------------------------------------------
 const showSwapModal = ref(false)

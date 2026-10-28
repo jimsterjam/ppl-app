@@ -12,6 +12,17 @@
         </button>
       </SettingsSectionCard>
 
+      <SettingsSectionCard class="card" :title="$t('coach.settingsTitle')">
+        <p class="hint">{{ $t('coach.settingsHint') }}</p>
+        <ToggleSwitch :model-value="coachMarks.enabled" @update:model-value="coachMarks.setEnabled">
+          {{ $t('coach.settingsToggle') }}
+        </ToggleSwitch>
+        <button class="legal-btn" type="button" @click="resetCoachMarks">
+          <span>💬</span>
+          <span>{{ $t('coach.settingsReset') }}</span>
+        </button>
+      </SettingsSectionCard>
+
       <!-- Nur für Gratis-Nutzer: verbleibende KI-Anfragen. Deep-Link ?open=aiQuota (Chip in Feedback/Generator). -->
       <SettingsSectionCard v-if="!subscriptionStore.isPremium" class="card" :initial-open="route.query.open === 'aiQuota'" :title="$t('aiQuota.title')">
         <AiQuotaCard />
@@ -380,6 +391,7 @@ import { useSettingsStore } from '@/stores/settingsStore'
 import { useUserStore } from '@/stores/userStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useOnboardingStore } from '@/stores/onboardingStore'
+import { useCoachMarkStore } from '@/stores/coachMarkStore'
 import { useToastStore } from '@/stores/toastStore'
 import { useAiConsentStore } from '@/stores/aiConsentStore'
 import { useAuthStore } from '@/stores/authStore'
@@ -430,6 +442,12 @@ const accountProviderLabel = computed(() => {
 // Allgemeiner Feedback-Bereich (siehe AppFeedbackDialog.vue) + "Einführungsguide erneut
 // starten" (setzt nur completedAt/skippedAt zurück, siehe onboardingStore.js/restartFlow).
 const onboardingStore = useOnboardingStore()
+// Sprechblasen (Hinweise): ein-/ausschalten und erneut anzeigen.
+const coachMarks = useCoachMarkStore()
+function resetCoachMarks() {
+  coachMarks.resetAll()
+  toast.show($t('coach.resetDone'), { type: 'success', duration: 2200 })
+}
 const showFeedbackDialog = ref(false)
 const restartingOnboarding = ref(false)
 
