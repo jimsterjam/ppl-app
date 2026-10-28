@@ -24,6 +24,7 @@
         <span class="chevron" aria-hidden="true"></span>
       </button>
       <p class="muted small">{{ t('plans.templateDisclaimer') }}</p>
+      <p class="muted small">{{ t('plans.abExplain') }}</p>
 
       <h2 class="section-title">{{ t('plans.customSection') }}</h2>
       <button type="button" class="card template-card" :disabled="busy" @click="openCustom">

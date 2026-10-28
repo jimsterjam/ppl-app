@@ -108,3 +108,23 @@ describe('planProgress', () => {
     expect(getTrainingPlans('u1')[0].activeDayIndex).toBe(0)
   })
 })
+
+import { getDayMuscleGroups } from '../planProgress.js'
+
+describe('getDayMuscleGroups', () => {
+  const fav = (groups) => ({ workout: { exercises: groups.map((muscleGroup) => ({ muscleGroup })) } })
+
+  it('häufigste Muskelgruppen zuerst, höchstens drei, ohne Doppelte', () => {
+    expect(getDayMuscleGroups(fav(['Brust', 'Brust', 'Brust', 'Schultern', 'Schultern', 'Trizeps', 'Bizeps']))).toEqual(['Brust', 'Schultern', 'Trizeps'])
+  })
+
+  it('bei Gleichstand bleibt die Reihenfolge der Übungen', () => {
+    expect(getDayMuscleGroups(fav(['Rücken', 'Bizeps']))).toEqual(['Rücken', 'Bizeps'])
+  })
+
+  it('ohne Übungen oder Favorit: leere Liste', () => {
+    expect(getDayMuscleGroups(fav([]))).toEqual([])
+    expect(getDayMuscleGroups(null)).toEqual([])
+    expect(getDayMuscleGroups({ workout: { exercises: [{}] } })).toEqual([])
+  })
+})
