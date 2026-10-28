@@ -17,7 +17,7 @@ import { createTrainingPlan, getTrainingPlans } from '../trainingPlanStorage.js'
 import { saveFavoriteWorkout, getFavoritesByType } from '../workoutFavorites.js'
 import { getTodayPlanInfo, getPlanDayInfo, buildDayStartFavorite, planDayTitle } from '../planProgress.js'
 import { replaceExerciseInPlanDay } from '../exerciseSwapApply.js'
-import { migrateTemplateFavoritesToPlans } from '../planMigration.js'
+import { migrateTemplateFavoritesToPlans, removeOrphanTemplateFavorites } from '../planMigration.js'
 
 const ex = (n, extra = {}) => ({ exerciseId: `ex_${n}`, name: `exercise ${n}`, muscleGroup: 'Brust', sets: 3, ...extra })
 const ownDay = (label, exercises = [ex(1), ex(2)]) => ({ label, type: 'push', goal: 'hypertrophy', exercises })
@@ -175,5 +175,32 @@ describe('Umstellung alter Vorlagen-Pläne', () => {
     createTrainingPlan({ userId: 'u1', name: 'P', days: [{ favoriteId: fav.id }] })
     expect(migrateTemplateFavoritesToPlans({ userId: 'u1', catalog })).toEqual({ plans: 0, favoritesRemoved: 0 })
     expect(getFavoritesByType('u1', 'fullbody')).toHaveLength(1)
+  })
+})
+
+describe('Übrig gebliebene Vorlagen-Favoriten', () => {
+  const fav = (name, type = 'push') => saveFavoriteWorkout({ userId: 'u1', type, name, workout: { name, type, exercises: [{ exerciseId: 'ex_1', name: 'x', sets: 3 }] } }).favorite
+  const labels = ['Push A', 'Pull A', 'Ganzkörper A', 'Full body A']
+
+  it('entfernt Vorlagen-Favoriten ohne Plan, lässt eigene und genutzte unberührt', () => {
+    fav('PPL 3 Tage Push A')
+    fav('Ganzkörper Ganzkörper A', 'fullbody')
+    fav('Full body Full body A', 'fullbody')
+    fav('Mein Push')
+    fav('PPL 3 Tage Push A extra')
+    const used = fav('PPL 6 Tage Pull A', 'pull')
+    createTrainingPlan({ userId: 'u1', name: 'P', days: [{ favoriteId: used.id, label: 'Pull A' }] })
+
+    expect(removeOrphanTemplateFavorites({ userId: 'u1', dayLabels: [...labels, 'Ganzkörper A', 'Full body A'] })).toBe(3)
+    expect(getFavoritesByType('u1', 'push').map((f) => f.name).sort()).toEqual(['Mein Push', 'PPL 3 Tage Push A extra'])
+    expect(getFavoritesByType('u1', 'fullbody')).toHaveLength(0)
+    expect(getFavoritesByType('u1', 'pull').map((f) => f.name)).toEqual(['PPL 6 Tage Pull A'])
+  })
+
+  it('ohne Tagbezeichnungen oder ohne Favoriten passiert nichts', () => {
+    fav('PPL 3 Tage Push A')
+    expect(removeOrphanTemplateFavorites({ userId: 'u1', dayLabels: [] })).toBe(0)
+    expect(removeOrphanTemplateFavorites({ userId: 'u2', dayLabels: labels })).toBe(0)
+    expect(getFavoritesByType('u1', 'push')).toHaveLength(1)
   })
 })
