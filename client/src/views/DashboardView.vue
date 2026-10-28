@@ -15,72 +15,55 @@
     <NameEditModal v-model="showNameModal" />
 
     <main class="dashboard-content" :class="{ 'has-draft': hasDraft }">
-      <section class="hero">
-        <div>
-          <h4 class="hero-title">{{ $t('dashboard.heroTitle') }}</h4>
-          <p class="hero-sub">{{ weeklyProgressLabel }}</p>
-        </div>
-      </section>
+      <WeekStrip class="dashboard-week" :workouts="store.workouts || []" :caption="weeklyProgressLabel" />
 
       <SessionStopwatch v-if="showStopwatchCard" @session-time="onSessionTime" />
 
       <MonthlyReportRow />
 
       <section v-if="todayPlan && !showStartOptions && !hasDraft" class="today-card" aria-labelledby="today-plan-eyebrow">
-        <h3 class="today-head">
-          <span id="today-plan-eyebrow" class="today-eyebrow">{{ $t('plans.today') }}</span>
-          <span class="today-title">{{ todayDayTitle }}</span>
-          <button class="today-remove" type="button" :aria-label="$t('plans.removeAria')" :title="$t('plans.remove')" @click="showRemovePlan = true">✕</button>
-        </h3>
-        <p class="today-sub">{{ todaySubline }}</p>
-        <p v-if="!todayPlan.hasWorkout" class="today-warn">{{ $t('plans.todayFavoriteMissing') }}</p>
-        <div class="today-actions">
-          <button v-if="todayPlan.hasWorkout" class="today-start" type="button" @click="startPlanDay(todayPlan.plan, todayPlan.day)">
-            {{ $t('plans.startTraining') }}
-          </button>
-          <button v-else class="today-start" type="button" @click="router.push({ name: 'plan-detail', params: { id: todayPlan.plan.id } })">
-            {{ $t('plans.openPlan') }}
-          </button>
+        <div class="today-text">
+          <p id="today-plan-eyebrow" class="today-eyebrow">{{ $t('plans.today') }}</p>
+          <h3 class="today-title">{{ todayDayTitle }}</h3>
+          <p class="today-sub">{{ todaySubline }}</p>
+          <p v-if="!todayPlan.hasWorkout" class="today-warn">{{ $t('plans.todayFavoriteMissing') }}</p>
           <button class="today-other" type="button" @click="showPlanDayPicker = true">{{ $t('plans.chooseOtherDay') }}</button>
         </div>
+        <button v-if="todayPlan.hasWorkout" class="today-start" type="button" @click="startPlanDay(todayPlan.plan, todayPlan.day)">
+          {{ $t('plans.startShort') }}
+        </button>
+        <button v-else class="today-start" type="button" @click="router.push({ name: 'plan-detail', params: { id: todayPlan.plan.id } })">
+          {{ $t('plans.openPlan') }}
+        </button>
+        <button class="today-remove" type="button" :aria-label="$t('plans.removeAria')" :title="$t('plans.remove')" @click="showRemovePlan = true">✕</button>
       </section>
 
       <section class="quick-start">
-        <div v-if="!showStartOptions" class="quick-grid">
-          <WorkoutCard
-            label="Push"
-            :info-label="$t('dashboard.workoutTypeInfo')"
-            @click="openStartMode('push')"
-            @info="openWorkoutInfo('push')"
-          />
-          <WorkoutCard
-            label="Pull"
-            :info-label="$t('dashboard.workoutTypeInfo')"
-            @click="openStartMode('pull')"
-            @info="openWorkoutInfo('pull')"
-          />
-          <WorkoutCard
-            label="Legs"
-            :info-label="$t('dashboard.workoutTypeInfo')"
-            @click="openStartMode('legs')"
-            @info="openWorkoutInfo('legs')"
-          />
-          <WorkoutCard
-            :label="$t('dashboard.fullBodyLabel')"
-            :info-label="$t('dashboard.workoutTypeInfo')"
-            @click="openStartMode('fullbody')"
-            @info="openWorkoutInfo('fullbody')"
-          />
-          <button class="quick-fav-shortcut" type="button" @click="openAllFavorites">
-            ★ {{ $t('dashboard.allFavorites') }}
-          </button>
-          <button class="quick-timer-btn" type="button" @click="showTimerMenu = true">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true" style="vertical-align:-2px;margin-right:5px"><circle cx="12" cy="13" r="8"/><polyline points="12 9 12 13 15 13"/><path d="M9 2h6M12 2v3"/></svg>
-            Timer
-          </button>
-          <button class="quick-plans-btn" type="button" @click="router.push({ name: 'plans' })">
-            {{ $t('dashboard.plansButton') }}
-          </button>
+        <div v-if="!showStartOptions" class="quick-area">
+          <p class="quick-section-label">{{ $t('dashboard.freeTrainingTitle') }}</p>
+          <div class="type-grid">
+            <button v-for="tile in typeTiles" :key="tile.type" class="type-tile" type="button" @click="openStartMode(tile.type)">
+              <span class="type-icon" aria-hidden="true"><component :is="tile.icon" :size="16" :stroke-width="2.4" /></span>
+              <span class="type-text">
+                <strong>{{ tile.label }}</strong>
+                <small>{{ tile.muscles }}</small>
+              </span>
+              <span class="type-info" role="button" tabindex="0" :aria-label="$t('dashboard.workoutTypeInfo')" @click.stop="openWorkoutInfo(tile.type)" @keydown.enter.stop="openWorkoutInfo(tile.type)">
+                <Info :size="15" aria-hidden="true" />
+              </span>
+            </button>
+          </div>
+          <div class="quick-bar">
+            <button class="quick-bar-btn" type="button" :aria-label="$t('dashboard.allFavorites')" @click="openAllFavorites">
+              <Star :size="17" aria-hidden="true" /><span>{{ $t('dashboard.shortFavorites') }}</span>
+            </button>
+            <button class="quick-bar-btn" type="button" :aria-label="$t('dashboard.plansButton')" @click="router.push({ name: 'plans' })">
+              <ClipboardList :size="17" aria-hidden="true" /><span>{{ $t('dashboard.shortPlans') }}</span>
+            </button>
+            <button class="quick-bar-btn" type="button" @click="showTimerMenu = true">
+              <Timer :size="17" aria-hidden="true" /><span>Timer</span>
+            </button>
+          </div>
           <p v-if="isFirstUse" class="quick-first-hint">{{ $t('dashboard.firstHint') }}</p>
           <TimerMenu v-if="showTimerMenu" @close="showTimerMenu = false" @select="onTimerMenuSelect" />
           <RestTimerSettings v-if="showRestSettings" @close="showRestSettings = false" />
@@ -320,7 +303,6 @@ import {
 } from '@/utils/workoutFavorites'
 
 import HeaderBar from "../components/HeaderBar.vue";
-import WorkoutCard from "../components/WorkoutCard.vue";
 import AppModal from "../components/AppModal.vue";
 import WorkoutTimerConfig from '@/components/timer/WorkoutTimerConfig.vue'
 import TimerMenu from '@/components/timer/TimerMenu.vue'
@@ -338,6 +320,9 @@ import { getTodayPlanInfo, getPlanDayInfo, getDayMuscleGroups, buildDayStartFavo
 import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 import { migrateTemplateFavoritesToPlans } from '@/utils/planMigration'
+import WeekStrip from '@/components/WeekStrip.vue'
+import { countWeekWorkouts } from '@/utils/weekStrip'
+import { ArrowUpRight, ArrowDownLeft, ChevronsDown, Target, Star, ClipboardList, Timer, Info } from 'lucide-vue-next'
 import { findPlansUsingFavorite, removeFavoriteFromPlan } from '@/utils/trainingPlan'
 import { sanitizeWorkoutGoal, WORKOUT_GOALS, GENERATOR_GOALS, WORKOUT_GOAL_LABEL_KEYS } from '@/utils/workoutGoal'
 
@@ -484,10 +469,16 @@ function onSessionTime({ totalMs, formattedTime }) {
 }
 
 const weeklyGoal = computed(() => Number(settings.weeklyGoal) || 4)
-const weeklyCount = computed(() => {
-  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000
-  return (store.workouts || []).filter(w => !(w?.isDraft || w?._isDraft) && new Date(w.date || w.updatedAt || 0).getTime() >= cutoff).length
-})
+// Diese Woche = Montag bis Sonntag (passend zum Wochenstreifen), nicht mehr „die letzten 7 Tage“.
+const weeklyCount = computed(() => countWeekWorkouts({ workouts: store.workouts || [] }))
+
+// Kacheln „Selbst zusammenstellen“: Icon, Name und die trainierten Muskeln (erklärt Einsteigern, was dahintersteckt).
+const typeTiles = computed(() => [
+  { type: 'push', label: 'Push', icon: ArrowUpRight, muscles: $t('dashboard.pushMuscles') },
+  { type: 'pull', label: 'Pull', icon: ArrowDownLeft, muscles: $t('dashboard.pullMuscles') },
+  { type: 'legs', label: 'Legs', icon: ChevronsDown, muscles: $t('dashboard.legsMuscles') },
+  { type: 'fullbody', label: $t('dashboard.fullBodyLabel'), icon: Target, muscles: $t('dashboard.fullBodyMuscles') }
+])
 const weeklyProgressLabel = computed(() => $t('dashboard.weeklyProgress', { done: weeklyCount.value, goal: weeklyGoal.value }))
 
 // Erstnutzung (Absprache Paul 22.10.): noch kein abgeschlossenes Workout und kein Entwurf -> kurze Erklärung unter den
@@ -1395,84 +1386,60 @@ onActivated(async () => {
   padding-top: 10px;
 }
 
-.hero {
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: var(--card-radius);
-  border: 1px solid var(--card-border);
-  background: var(--card-bg);
-}
-
-.dashboard-content.has-draft .hero {
-  gap: 6px;
-  padding: 8px 10px;
-}
-
-.hero-title {
-  margin: 6px 0 0;
-  /* font-size: clamp(1.9rem, 3.6vw, 2.5rem); */
-  font-weight: 900;
-  color: var(--fg-strong);
-  text-align: center;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  text-shadow: 0 0 18px color-mix(in srgb, var(--accent) 40%, transparent);
-}
-
-.hero-sub {
-  color: var(--muted);
-  font-size: 0.9rem;
-  text-align: center;
+.dashboard-week {
+  /* Mehr Luft zwischen Kopfzeile und Wochenstreifen (Wunsch Paul 29.10.). */
+  margin-top: 14px;
 }
 
 .today-card {
-  display: grid;
-  gap: 2px;
-  margin: 0 0 8px;
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
   padding: 10px 14px;
   border-radius: var(--card-radius);
-  border: 1px solid var(--accent);
+  border: 1.5px solid color-mix(in srgb, var(--accent) 55%, transparent);
   background: color-mix(in srgb, var(--accent) 7%, var(--card-bg));
 }
 
-.today-head {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin: 0;
+.today-text {
+  flex: 1 1 auto;
   min-width: 0;
+  display: grid;
+  gap: 1px;
 }
 
 .today-eyebrow {
-  flex: 0 0 auto;
+  margin: 0;
   color: var(--accent);
   font-family: "Sora", "Space Grotesk", "SF Pro Display", sans-serif;
-  font-size: 1.05rem;
+  font-size: 0.72rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
+.today-title {
+  margin: 0;
+  font-family: "Sora", "Space Grotesk", "SF Pro Display", sans-serif;
+  font-size: 1.25rem;
+  overflow-wrap: anywhere;
+}
+
 .today-remove {
-  flex: 0 0 auto;
-  margin-left: auto;
-  min-width: 36px;
-  min-height: 36px;
+  position: absolute;
+  top: 0;
+  right: 2px;
+  min-width: 32px;
+  min-height: 32px;
   border: none;
   background: transparent;
   color: var(--muted);
   font: inherit;
-  font-size: 1rem;
+  font-size: 0.85rem;
   cursor: pointer;
-}
-
-.today-title {
-  font-family: "Sora", "Space Grotesk", "SF Pro Display", sans-serif;
-  font-size: 1.15rem;
-  overflow-wrap: anywhere;
 }
 
 .today-sub,
@@ -1486,18 +1453,13 @@ onActivated(async () => {
   color: var(--danger);
 }
 
-.today-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 6px;
-}
-
 .today-start {
-  flex: 1 1 auto;
-  min-height: 42px;
+  flex: 0 0 auto;
+  align-self: center;
+  min-height: 44px;
+  padding: 0 18px;
   border: none;
-  border-radius: 12px;
+  border-radius: 999px;
   background: var(--accent);
   color: var(--accent-contrast, #060606);
   font: inherit;
@@ -1506,14 +1468,14 @@ onActivated(async () => {
 }
 
 .today-other {
-  flex: 0 0 auto;
-  min-height: 42px;
-  padding: 0 4px;
+  justify-self: start;
+  min-height: 32px;
+  padding: 0;
   border: none;
   background: transparent;
   color: var(--muted);
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   text-decoration: underline;
   cursor: pointer;
 }
@@ -1575,85 +1537,136 @@ onActivated(async () => {
 }
 
 
-.quick-grid {
+.quick-area {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+  gap: 8px;
+}
+
+.quick-section-label {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* Zwei Kachel-Reihen teilen sich den verfügbaren Platz (mind. 64px, höchstens 120px): so scrollt das Dashboard nicht. */
+.type-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  /* Zwei Kachel-Reihen teilen sich den verfügbaren Platz (mind. 64px, höchstens 170px, etwa so
-     groß wie die bisherigen Kacheln auf dem iPhone), darunter die Reihe Favoriten/Timer. */
-  grid-template-rows: repeat(2, minmax(64px, 170px)) auto;
-  align-content: start;
-  gap: 8px;
+  grid-template-rows: repeat(2, minmax(64px, 120px));
+  gap: 10px;
   flex: 1 1 0;
   min-height: 0;
 }
 
-.quick-grid :deep(.workout-card) {
-  aspect-ratio: unset;
-  height: 100%;
+.type-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 6px;
   min-height: 0;
+  padding: 12px 12px 10px;
+  border-radius: var(--card-radius);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--fg);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.type-tile:hover,
+.type-tile:active {
+  border-color: var(--accent);
+}
+
+.type-icon {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+}
+
+.type-text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.type-text strong {
+  font-family: "Sora", "Space Grotesk", "SF Pro Display", sans-serif;
+  font-size: 1.1rem;
+}
+
+.type-text small {
+  color: var(--muted);
+  font-size: 0.7rem;
+  line-height: 1.3;
+}
+
+.type-info {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  border-radius: 50%;
+}
+
+.quick-bar {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.quick-bar-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 52px;
+  padding: 6px 4px;
+  border-radius: var(--card-radius);
+  border: 1px solid var(--card-border);
+  background: var(--card-bg);
+  color: var(--fg);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.quick-bar-btn svg {
+  color: var(--accent);
+}
+
+.quick-bar-btn:hover,
+.quick-bar-btn:active {
+  border-color: var(--accent);
 }
 
 .quick-first-hint {
-  grid-column: 1 / -1;
   margin: 2px 4px 0;
   color: var(--muted);
   font-size: 0.85rem;
   line-height: 1.4;
-}
-
-.quick-fav-shortcut {
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line-strong));
-  border-radius: var(--card-radius);
-  background: color-mix(in srgb, var(--accent) 6%, var(--card-bg));
-  color: var(--fg-strong);
-  font-family: "Sora", "Space Grotesk", "SF Pro Display", sans-serif;
-  font-weight: 700;
-  font-size: 1.1rem;
-  letter-spacing: 0.05em;
-  padding: 14px 12px;
-  cursor: pointer;
-  text-align: center;
-  transition: background 120ms ease, border-color 120ms ease;
-}
-
-.quick-fav-shortcut:hover {
-  background: color-mix(in srgb, var(--accent) 12%, var(--bg-panel));
-  border-color: var(--accent);
-}
-
-.quick-fav-shortcut:active {
-  opacity: 0.8;
-}
-
-.quick-timer-btn,
-.quick-plans-btn {
-  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line-strong));
-  border-radius: var(--card-radius);
-  background: color-mix(in srgb, var(--accent) 6%, var(--card-bg));
-  color: var(--fg-strong);
-  font-family: "Sora", "Space Grotesk", "SF Pro Display", sans-serif;
-  font-weight: 700;
-  font-size: 1.1rem;
-  letter-spacing: 0.05em;
-  padding: 14px 12px;
-  cursor: pointer;
-  text-align: center;
-  transition: background 120ms ease, border-color 120ms ease;
-}
-
-.quick-timer-btn:hover,
-.quick-plans-btn:hover {
-  background: color-mix(in srgb, var(--accent) 12%, var(--bg-panel));
-  border-color: var(--accent);
-}
-
-.quick-plans-btn {
-  grid-column: 1 / -1;
-}
-
-.quick-timer-btn:active,
-.quick-plans-btn:active {
-  opacity: 0.8;
 }
 
 .quick-mode-panel {

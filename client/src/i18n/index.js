@@ -147,6 +147,13 @@ export const messages = {
   ,allFavorites: 'Favoriten'
   ,allFavoritesEmpty: 'Noch keine Favoriten gespeichert.'
   ,plansButton: 'Trainingspläne'
+  ,freeTrainingTitle: 'Selbst zusammenstellen'
+  ,pushMuscles: 'Brust · Schultern · Trizeps'
+  ,pullMuscles: 'Rücken · Bizeps'
+  ,legsMuscles: 'Beine · Gesäß · Waden'
+  ,fullBodyMuscles: 'Ganzer Körper'
+  ,shortFavorites: 'Favoriten'
+  ,shortPlans: 'Pläne'
   ,favoritesHint: 'Wähle einen Favoriten, um direkt zu starten oder anzupassen.'
   ,favoritesEmpty: 'Noch keine Favoriten für diesen Typ gespeichert.'
   ,favoritesLimitHint: 'Du kannst pro Typ maximal {count} Favoriten speichern.'
@@ -596,6 +603,7 @@ export const messages = {
       favoriteInPlans: 'Dieser Favorit ist Teil von: {plans}. Beim Löschen verschwindet der Tag aus dem Plan.',
       today: 'Heute',
       startTraining: 'Training starten',
+      startShort: 'Starten',
       chooseOtherDay: 'Anderen Tag wählen',
       pickDayTitle: 'Welchen Tag trainierst du?',
       pickDayHint: 'Danach geht es im Plan mit dem Tag danach weiter.',
@@ -1793,6 +1801,13 @@ export const messages = {
   ,allFavorites: 'Favorites'
   ,allFavoritesEmpty: 'No favorites saved yet.'
   ,plansButton: 'Training plans'
+  ,freeTrainingTitle: 'Build your own'
+  ,pushMuscles: 'Chest · Shoulders · Triceps'
+  ,pullMuscles: 'Back · Biceps'
+  ,legsMuscles: 'Legs · Glutes · Calves'
+  ,fullBodyMuscles: 'Whole body'
+  ,shortFavorites: 'Favorites'
+  ,shortPlans: 'Plans'
   ,favoritesHint: 'Select a favorite to start immediately or adjust it.'
   ,favoritesEmpty: 'No favorites saved for this type yet.'
   ,favoritesLimitHint: 'You can save up to {count} favorites per type.'
@@ -2235,6 +2250,7 @@ export const messages = {
       favoriteInPlans: 'This favorite is part of: {plans}. Deleting it removes the day from the plan.',
       today: 'Today',
       startTraining: 'Start workout',
+      startShort: 'Start',
       chooseOtherDay: 'Choose another day',
       pickDayTitle: 'Which day are you training?',
       pickDayHint: 'Afterwards the plan continues with the following day.',
