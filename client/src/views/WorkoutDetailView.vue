@@ -119,10 +119,10 @@
 
           <div class="ex-list-header">
             <div class="ex-list-actions">
-              <button class="primary add-exercise-btn" type="button" :aria-label="t('workoutDetail.addExercise')" :title="t('workoutDetail.addExercise')" @click="showAddExerciseModal = true">
+              <button v-if="!isReordering" class="primary add-exercise-btn" type="button" :aria-label="t('workoutDetail.addExercise')" :title="t('workoutDetail.addExercise')" @click="showAddExerciseModal = true">
                 <Plus class="btn-icon" aria-hidden="true" /> {{ t('workoutDetail.addExerciseShort') }}
               </button>
-              <button v-if="!isFavoriteAdjustMode" class="secondary timer-config-btn" type="button" @click="showTimerConfig = true">
+              <button v-if="!isFavoriteAdjustMode && !isReordering" class="secondary timer-config-btn" type="button" @click="showTimerConfig = true">
                 <Clock class="btn-icon" aria-hidden="true" /> Timer
               </button>
               <!-- Reihenfolge: als Symbol (kompakt), im Bearbeiten-Modus "Fertig". -->
@@ -671,7 +671,8 @@
           </div>
         </div>
 
-        <div class="actions">
+        <!-- Beim Reihenfolge-Bearbeiten nur „Fertig“: „Abbrechen“ würde das ganze Workout verwerfen. -->
+        <div v-if="!isReordering" class="actions">
           <button class="primary cancel-btn" @click="goDashboard">{{ t('workoutDetail.cancel') }}</button>
         </div>
       </div>
@@ -4600,6 +4601,7 @@ onBeforeUnmount(() => {
 .ex-list-actions .timer-config-btn { flex: 1 1 0; }
 .ex-list-actions .reorder-toggle { flex: 0 0 auto; min-width: 48px; padding-left: 12px; padding-right: 12px; }
 .ex-list-actions .reorder-toggle--icon { width: 48px; padding: 0; }
+.ex-list-actions .reorder-toggle:not(.reorder-toggle--icon) { flex: 1 1 auto; }
 .ex-list-header h3 { margin: 0; font-size: 1.1rem; }
 /* Timer/Reihenfolge sind Werkzeuge, kein Haupt-Call-to-Action wie "Übung hinzufügen" -
    nebeneinander statt gestapelt und in der neutralen .secondary-Optik (siehe unten), damit sie
