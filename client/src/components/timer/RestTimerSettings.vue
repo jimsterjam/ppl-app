@@ -106,7 +106,7 @@ function preview(id) {
   position: fixed;
   inset: 0;
   background: color-mix(in srgb, var(--bg) 55%, black 45%);
-  z-index: 1200;
+  z-index: 3600;
   display: flex;
   align-items: center;
   justify-content: center;

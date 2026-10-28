@@ -123,7 +123,7 @@
               <button v-if="!isReordering" class="primary add-exercise-btn" type="button" :aria-label="t('workoutDetail.addExercise')" :title="t('workoutDetail.addExercise')" @click="showAddExerciseModal = true">
                 <Plus class="btn-icon" aria-hidden="true" /> {{ t('workoutDetail.addExerciseShort') }}
               </button>
-              <button v-if="!isFavoriteAdjustMode && !isReordering" class="secondary timer-config-btn" type="button" @click="showTimerConfig = true">
+              <button v-if="!isFavoriteAdjustMode && !isReordering" class="secondary timer-config-btn" type="button" @click="showTimerMenu = true">
                 <Clock class="btn-icon" aria-hidden="true" /> Timer
               </button>
               <!-- Reihenfolge: als Symbol (kompakt), im Bearbeiten-Modus "Fertig". -->
@@ -929,7 +929,12 @@
       @confirm="confirmDeleteNote"
     />
 
-    <WorkoutTimerConfig v-if="showTimerConfig" @close="showTimerConfig = false" />
+    <!-- Timer-Knopf: erst fragen, was eingestellt werden soll (Pausentimer oder Workout-Timer mit Intervall/Stoppuhr). -->
+    <TimerMenu v-if="showTimerMenu" @close="showTimerMenu = false" @select="onTimerMenuSelect" />
+    <Teleport to="body">
+      <RestTimerSettings v-if="showRestSettings" @close="showRestSettings = false" />
+      <WorkoutTimerConfig v-if="showTimerConfig" @close="showTimerConfig = false" />
+    </Teleport>
     <!-- Pausentimer zwischen Sätzen (startet beim Abhaken, siehe toggleRowDone). -->
     <RestTimerBar
       :next-set="restNextSet"
@@ -1085,6 +1090,8 @@ import CoachMarks from '@/components/CoachMarks.vue'
 import { buildSwappedExercise, canSwapExercise, replaceExerciseInPlanDay } from '@/utils/exerciseSwapApply'
 import { getPlanDayInfo, planDayTitle } from '@/utils/planProgress'
 import WorkoutTimerConfig from '@/components/timer/WorkoutTimerConfig.vue'
+import TimerMenu from '@/components/timer/TimerMenu.vue'
+import RestTimerSettings from '@/components/timer/RestTimerSettings.vue'
 import SessionStopwatch from '@/components/SessionStopwatch.vue'
 // Einheitliches Icon-Set statt Emoji/ASCII-Mix (🗑️/📝/⋮⋮/▲▼/＋/−) - wie im Rest der App
 // (siehe z.B. BottomNav.vue, AiFeedbackRatingWidget.vue) bereits lucide-vue-next genutzt.
@@ -1283,6 +1290,15 @@ const didAutoScroll = ref(false)
 let initialSnapshot = ''
 const showLeaveModal = ref(false)
 const showTimerConfig = ref(false)
+const showTimerMenu = ref(false)
+const showRestSettings = ref(false)
+// Solange ein Timer-Fenster offen ist, bleiben der Satz-Start-Knopf und die Sprechblasen aus (Absprache Paul 29.10.).
+const timerOverlayOpen = computed(() => showTimerMenu.value || showRestSettings.value || showTimerConfig.value)
+function onTimerMenuSelect(target) {
+  showTimerMenu.value = false
+  if (target === 'rest') showRestSettings.value = true
+  else showTimerConfig.value = true
+}
 const sessionStopwatchStore = useSessionStopwatchStore()
 
 // Notiz-Logik
@@ -2288,7 +2304,7 @@ const focus = useFocusModeStore()
 // Der Knopf erscheint, sobald das Warm-up nicht (mehr) läuft - Warm-up überspringen oder beenden (Absprache Paul 20.10.).
 const hasBottomBar = computed(() => showFocusStart.value || restTimer.isVisible || (focus.active && focus.minimized))
 // Nur zu Beginn einer Übung (Absprache Paul 24.10.): ab Satz 2 führt die Pause bzw. die Großansicht direkt weiter.
-const showFocusStart = computed(() => !!doneBarCurrent.value && !focus.active && !restTimer.isVisible && !transition.isActive && !warmupTimer.isActive
+const showFocusStart = computed(() => !!doneBarCurrent.value && !focus.active && !timerOverlayOpen.value && !restTimer.isVisible && !transition.isActive && !warmupTimer.isActive
   && (doneBarCurrent.value.setNumber <= 1 || !!focusWarmupPending.value))
 
 // Aufwärmsätze in der Großansicht (Absprache Paul 19.10.): vor dem ersten Arbeitssatz jeder Übung, ohne Timer -
@@ -2731,7 +2747,7 @@ const coachMarks = computed(() => [
 ])
 // Nur im normalen Workout-Bild: nicht im Fokus-Modus, beim Sortieren, über Fenstern oder bei laufender Pause/Aufwärmen.
 const coachActive = computed(() => Boolean(workout.value) && !loading.value && !focus.active && !isReordering.value && !isFavoriteAdjustMode.value
-  && !showAddExerciseModal.value && !showTimerConfig.value && !showExerciseMenu.value && !showSwapModal.value && !showLeaveModal.value
+  && !showAddExerciseModal.value && !timerOverlayOpen.value && !showExerciseMenu.value && !showSwapModal.value && !showLeaveModal.value
   && !showSaveReviewModal.value && !showRemoveExerciseModal.value && !showTrainingTypeModal.value && !showWeightSuggestionInfo.value
   && !showTimerActionModal.value && !showDeleteNoteModal.value && !showFavoriteNameModal.value && !restTimer.isVisible)
 

@@ -466,7 +466,7 @@ onMounted(() => {
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  z-index: 2000;
+  z-index: 3700;
 }
 .picker-sheet {
   width: 100%;
