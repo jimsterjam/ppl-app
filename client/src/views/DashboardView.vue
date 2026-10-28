@@ -30,6 +30,7 @@
         <h3 class="today-head">
           <span id="today-plan-eyebrow" class="today-eyebrow">{{ $t('plans.today') }}</span>
           <span class="today-title">{{ todayDayTitle }}</span>
+          <button class="today-remove" type="button" :aria-label="$t('plans.removeAria')" :title="$t('plans.remove')" @click="showRemovePlan = true">✕</button>
         </h3>
         <p class="today-sub">{{ todaySubline }}</p>
         <p v-if="!todayPlan.favorite" class="today-warn">{{ $t('plans.todayFavoriteMissing') }}</p>
@@ -229,6 +230,16 @@
     />
 
     <AppModal
+      v-model="showRemovePlan"
+      :title="$t('plans.removeTitle')"
+      :message="$t('plans.removeMessage', { name: todayPlan?.plan?.name || '' })"
+      :confirm-text="$t('plans.remove')"
+      :cancel-text="$t('common.cancel')"
+      type="warning"
+      @confirm="removeTodayPlan"
+    />
+
+    <AppModal
       v-model="showPlanDayPicker"
       :title="$t('plans.pickDayTitle')"
       :confirm-text="$t('common.close')"
@@ -321,7 +332,8 @@ import MonthlyReportRow from '@/components/MonthlyReportRow.vue'
 import AvatarEditor from '@/components/AvatarEditor.vue'
 import NameEditModal from '@/components/NameEditModal.vue'
 import WorkoutGoalPicker from '@/components/WorkoutGoalPicker.vue'
-import { getTrainingPlans, updateTrainingPlan } from '@/utils/trainingPlanStorage'
+import { getTrainingPlans, updateTrainingPlan, deleteTrainingPlan } from '@/utils/trainingPlanStorage'
+import { useToastStore } from '@/stores/toastStore'
 import { getTodayPlanInfo, getDayMuscleGroups } from '@/utils/planProgress'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 import { getAllFavorites } from '@/utils/planFromTemplate'
@@ -333,6 +345,7 @@ const store = useUserStore()
 const settings = useSettingsStore()
 const { t: $t, locale } = useI18n()
 const router = useRouter()
+const toast = useToastStore()
 const { getIdToken, onAuthStateChanged, getCurrentUser } = useFirebaseAuth()
 const authStore = useAuthStore()
 const sessionStopwatchStore = useSessionStopwatchStore()
@@ -944,6 +957,16 @@ function startFavoriteWithNewGoal(favorite, goal, planRef = null) {
 // --- Trainingsplan: „Heute“-Karte -------------------------------------------------------------
 const todayPlan = ref(null)
 const showPlanDayPicker = ref(false)
+const showRemovePlan = ref(false)
+
+// Plan vom Dashboard entfernen: der Plan wird gelöscht (Favoriten und Workouts bleiben). Gibt es weitere Pläne, wird einer davon aktiv.
+function removeTodayPlan() {
+  const plan = todayPlan.value?.plan
+  if (!plan) return
+  const result = deleteTrainingPlan({ userId: getCurrentFavoritesUserId(), planId: plan.id })
+  refreshTodayPlan()
+  if (result.ok) toast.show($t('plans.removed', { name: plan.name }), { type: 'success' })
+}
 
 function refreshTodayPlan() {
   try {
@@ -1408,6 +1431,19 @@ onActivated(async () => {
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.today-remove {
+  flex: 0 0 auto;
+  margin-left: auto;
+  min-width: 36px;
+  min-height: 36px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 1rem;
+  cursor: pointer;
 }
 
 .today-title {
