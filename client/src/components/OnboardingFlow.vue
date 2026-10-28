@@ -65,9 +65,9 @@ import { useSettingsStore } from '@/stores/settingsStore'
 // Router-Guards/Resume-Snapshot/Auth-Redirect in main.js überschnitten. Als reines Overlay über
 // der aktuellen Seite blockiert es keine bestehende Navigation.
 // Schritt 2 ("So machst du wirklich Fortschritte") ist die einzige Seite mit einer Liste statt
-// Fließtext - daher totalSteps (jetzt 7, Absprache Paul 22.10.) und ein eigenes Flag, das im Template die Regel-Liste
+// Fließtext - daher totalSteps (jetzt 8, Absprache Paul 22.10. und 29.10.: Seite „Trainingspläne“) und ein eigenes Flag, das im Template die Regel-Liste
 // zusätzlich zum normalen step2Text rendert (siehe onboarding.rulesItem1-5 in i18n/index.js).
-const totalSteps = 7
+const totalSteps = 8
 const RULES_STEP_INDEX = 1
 
 const emit = defineEmits(['complete', 'skip'])
@@ -224,6 +224,8 @@ function handleSkip() {
   line-height: 1.55;
   color: var(--muted);
   margin: 0;
+  /* Absätze (\n\n) in den Texten, z. B. Seite „Trainingspläne“. */
+  white-space: pre-line;
 }
 
 .onboarding-rules-list {
