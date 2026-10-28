@@ -26,17 +26,21 @@
       <p class="muted small">{{ t('plans.templateDisclaimer') }}</p>
       <p class="muted small">{{ t('plans.abExplain') }}</p>
 
-      <h2 class="section-title">{{ t('plans.customSection') }}</h2>
-      <button type="button" class="card template-card" :disabled="busy" @click="openCustom">
-        <span class="card-title">{{ t('plans.startEmpty') }}</span>
-        <span class="chevron" aria-hidden="true"></span>
-      </button>
+      <!-- „Eigenen Plan zusammenstellen“ vorerst ausgeblendet (Absprache Paul 28.10.): die Vorlagen reichen. -->
+      <template v-if="SHOW_CUSTOM_PLAN">
+        <h2 class="section-title">{{ t('plans.customSection') }}</h2>
+        <button type="button" class="card template-card" :disabled="busy" @click="openCustom">
+          <span class="card-title">{{ t('plans.startEmpty') }}</span>
+          <span class="chevron" aria-hidden="true"></span>
+        </button>
+      </template>
 
       <p v-if="busy" class="muted" role="status">{{ t('plans.creating') }}</p>
       <p v-if="errorText" class="error" role="alert">{{ errorText }}</p>
     </div>
 
     <AppModal
+      v-if="SHOW_CUSTOM_PLAN"
       v-model="showCustom"
       :title="t('plans.customTitle')"
       :confirm-text="t('plans.createConfirm')"
@@ -81,6 +85,9 @@ const { t } = useI18n()
 const router = useRouter()
 const toast = useToastStore()
 const userId = usePlanUserId()
+
+// Vorerst aus: leerer Plan aus eigenen Favoriten (Funktionen unten bleiben für später erhalten).
+const SHOW_CUSTOM_PLAN = false
 
 const templates = PLAN_TEMPLATE_IDS.map((id) => PLAN_TEMPLATES[id])
 const busy = ref(false)
