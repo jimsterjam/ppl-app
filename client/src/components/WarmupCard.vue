@@ -45,7 +45,7 @@
             <span class="warmup-time" :class="{ paused: timerPaused(row.step) }">{{ formatRest(timeShown(row.step)) }}</span>
             <button type="button" class="warmup-adjust" :aria-label="t('warmup.minusAria')" :disabled="!canAdjust(row.step, -WARMUP_ADJUST_SECONDS)" @click="warmupTimer.adjust(row.step, -WARMUP_ADJUST_SECONDS)">{{ t('restTimer.minusLabel') }}</button>
             <button type="button" class="warmup-adjust" :aria-label="t('warmup.plusAria')" :disabled="!canAdjust(row.step, WARMUP_ADJUST_SECONDS)" @click="warmupTimer.adjust(row.step, WARMUP_ADJUST_SECONDS)">{{ t('restTimer.plusLabel') }}</button>
-            <button v-if="ownTimer(row.step) && warmupTimer.isActive" type="button" class="warmup-adjust" :aria-label="t('warmup.expandAria')" @click="overlayOpen = true">⤢</button>
+            <button v-if="ownTimer(row.step) && warmupTimer.isActive" type="button" class="warmup-adjust warmup-expand" :aria-label="t('warmup.expandAria')" @click="overlayOpen = true"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg></button>
             <button v-if="timerRunning(row.step)" type="button" class="warmup-btn ghost" @click="warmupTimer.pause()">{{ t('warmup.pause') }}</button>
             <button v-else-if="timerPaused(row.step)" type="button" class="warmup-btn" @click="warmupTimer.resume()">{{ t('warmup.resume') }}</button>
             <button v-else type="button" class="warmup-btn" @click="startTimer(row.step)">{{ t('warmup.start') }}</button>
@@ -335,18 +335,20 @@ onMounted(() => {
 .warmup-optional { margin-left: 6px; font-size: 0.78rem; font-weight: 600; color: var(--muted); }
 .warmup-optional-hint { margin: 0 0 6px; color: var(--muted); font-size: 0.78rem; line-height: 1.35; }
 .warmup-adjust {
-  min-height: 0;
+  min-height: 40px;
   min-width: 44px;
-  padding: 6px 8px;
+  padding: 6px 12px;
   border-radius: 999px;
   border: 1px solid var(--line-strong);
   background: transparent;
   color: var(--fg);
-  font-size: 0.8rem;
+  font-size: 1rem;
   font-weight: 700;
   cursor: pointer;
 }
 .warmup-adjust { white-space: nowrap; }
+/* Vergrößern-Symbol ⤢ war kaum zu erkennen. */
+.warmup-expand { display: inline-flex; align-items: center; justify-content: center; padding: 0 12px; min-width: 48px; }
 .warmup-adjust:disabled { opacity: 0.4; cursor: default; }
 .warmup-banner {
   margin: 6px 0 4px;
