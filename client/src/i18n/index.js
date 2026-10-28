@@ -573,7 +573,7 @@ export const messages = {
       errorDays: 'Wähle mindestens einen Favoriten.',
       daysSection: 'Trainingstage',
       explain: 'Der Plan richtet sich nach deinen Trainings, nicht nach dem Kalender. Nach dem Speichern rückt er zum nächsten Tag vor.',
-      abExplain: 'A und B sind zwei verschiedene Tage derselben Art (z. B. Push A und Push B): gleiche Muskeln, aber andere Übungen. So bleibt das Training abwechslungsreich.',
+      abExplain: 'A und B sind zwei verschiedene Trainingstage derselben Art, zum Beispiel Push A und Push B. Du trainierst beide jede Woche im Wechsel. Die Übungen jedes Tages bleiben über mehrere Wochen gleich, damit du Fortschritte sehen kannst. Wenn du nur eine Variante willst, nimm den 3-Tage-Plan.',
       setActive: 'Als aktiven Plan festlegen',
       addDay: '+ Tag hinzufügen',
       addDayTitle: 'Tag hinzufügen',
@@ -621,24 +621,24 @@ export const messages = {
           name: 'Push/Pull/Legs · 6 Tage',
           desc: 'Sechs Trainingstage: zwei Durchgänge Drücken, Ziehen, Beine pro Woche.',
           explain: {
-            beginner: 'Sechs Trainingstage: Push, Pull und Legs je zweimal (A und B mit unterschiedlichen Übungen). Das ist viel Training – als Einsteiger starte lieber mit dem 3-Tage-Plan.\n\nDie Anfänger-Stufe nutzt geführte Maschinen mit 2–3 Sätzen pro Übung. Der Plan folgt deinen Trainings, nicht dem Kalender: Lässt du einen Tag aus, geht es einfach mit dem nächsten weiter.',
-            advanced: 'Sechs Trainingstage: Push, Pull und Legs je zweimal. A und B trainieren dieselben Muskeln mit unterschiedlichen Übungen.\n\nDie Fortgeschritten-Stufe nutzt freie Gewichte und Kabelzug mit 3–4 Sätzen pro Übung. Sie passt, wenn du sicher trainierst, gut regenerierst und viel Zeit hast.'
+            beginner: 'Sechs Trainingstage: Push, Pull und Legs je zweimal (A und B mit unterschiedlichen Übungen). Das ist viel Training – als Einsteiger starte lieber mit dem 3-Tage-Plan.\n\nDie Anfänger-Stufe nutzt geführte Maschinen mit 2–3 Sätzen pro Übung. Der Plan folgt deinen Trainings, nicht dem Kalender: Lässt du einen Tag aus, geht es einfach mit dem nächsten weiter.\n\nJede Woche trainierst du A und B. Wechsle die Übungen erst nach 6–8 Wochen.',
+            advanced: 'Sechs Trainingstage: Push, Pull und Legs je zweimal. A und B trainieren dieselben Muskeln mit unterschiedlichen Übungen.\n\nDie Fortgeschritten-Stufe nutzt freie Gewichte und Kabelzug mit 3–4 Sätzen pro Übung. Sie passt, wenn du sicher trainierst, gut regenerierst und viel Zeit hast.\n\nJede Woche trainierst du A und B. Wechsle die Übungen erst nach 6–8 Wochen.'
           }
         },
         ul4: {
           name: 'Ober-/Unterkörper · 4 Tage',
           desc: 'Vier Trainingstage: zweimal Oberkörper, zweimal Unterkörper.',
           explain: {
-            beginner: 'Vier Trainingstage: zweimal Oberkörper (Brust, Rücken, Schultern, Arme) und zweimal Unterkörper (Beine, Gesäß, Waden, Bauch). A und B haben verschiedene Übungen.\n\nDie Anfänger-Stufe nutzt geführte Maschinen mit 2–3 Sätzen pro Übung. Jede Muskelgruppe kommt zweimal pro Woche dran – ein guter Rhythmus zum Lernen und Wachsen.',
-            advanced: 'Vier Trainingstage: zweimal Oberkörper, zweimal Unterkörper. A und B haben verschiedene Übungen.\n\nDie Fortgeschritten-Stufe nutzt freie Gewichte mit 3–4 Sätzen pro Übung. Jede Muskelgruppe kommt zweimal pro Woche dran, mit genug Pause dazwischen.'
+            beginner: 'Vier Trainingstage: zweimal Oberkörper (Brust, Rücken, Schultern, Arme) und zweimal Unterkörper (Beine, Gesäß, Waden, Bauch). A und B haben verschiedene Übungen.\n\nDie Anfänger-Stufe nutzt geführte Maschinen mit 2–3 Sätzen pro Übung. Jede Muskelgruppe kommt zweimal pro Woche dran – ein guter Rhythmus zum Lernen und Wachsen.\n\nDu trainierst A und B im Wechsel. Die Übungen bleiben 6–8 Wochen gleich.',
+            advanced: 'Vier Trainingstage: zweimal Oberkörper, zweimal Unterkörper. A und B haben verschiedene Übungen.\n\nDie Fortgeschritten-Stufe nutzt freie Gewichte mit 3–4 Sätzen pro Übung. Jede Muskelgruppe kommt zweimal pro Woche dran, mit genug Pause dazwischen.\n\nDu trainierst A und B im Wechsel. Die Übungen bleiben 6–8 Wochen gleich.'
           }
         },
         fb3: {
           name: 'Ganzkörper · 3 Tage',
           desc: 'Drei Trainingstage, jedes Mal der ganze Körper.',
           explain: {
-            beginner: 'Drei Trainingstage, an jedem trainierst du den ganzen Körper: Beine, Brust, Rücken, Schultern und Bauch. Zwischen den Trainings liegt ein Ruhetag. A, B und C haben verschiedene Übungen.\n\nDie Anfänger-Stufe nutzt geführte Maschinen mit 2–3 Sätzen pro Übung. Das ist der klassische Einstieg: wenig Aufwand, jede Muskelgruppe öfter pro Woche.',
-            advanced: 'Drei Trainingstage, an jedem trainierst du den ganzen Körper. A, B und C haben verschiedene Übungen.\n\nDie Fortgeschritten-Stufe nutzt freie Gewichte mit 2–3 Sätzen pro Übung. Gut, wenn du wenig Zeit hast und trotzdem jede Muskelgruppe mehrmals pro Woche trainieren willst.'
+            beginner: 'Drei Trainingstage, an jedem trainierst du den ganzen Körper: Beine, Brust, Rücken, Schultern und Bauch. Zwischen den Trainings liegt ein Ruhetag. A, B und C haben verschiedene Übungen.\n\nDie Anfänger-Stufe nutzt geführte Maschinen mit 2–3 Sätzen pro Übung. Das ist der klassische Einstieg: wenig Aufwand, jede Muskelgruppe öfter pro Woche.\n\nDu trainierst A, B und C im Wechsel. Die Übungen bleiben 6–8 Wochen gleich.',
+            advanced: 'Drei Trainingstage, an jedem trainierst du den ganzen Körper. A, B und C haben verschiedene Übungen.\n\nDie Fortgeschritten-Stufe nutzt freie Gewichte mit 2–3 Sätzen pro Übung. Gut, wenn du wenig Zeit hast und trotzdem jede Muskelgruppe mehrmals pro Woche trainieren willst.\n\nDu trainierst A, B und C im Wechsel. Die Übungen bleiben 6–8 Wochen gleich.'
           }
         }
       }
@@ -2212,7 +2212,7 @@ export const messages = {
       errorDays: 'Choose at least one favorite.',
       daysSection: 'Training days',
       explain: 'The plan follows your workouts, not the calendar. After saving a workout it moves on to the next day.',
-      abExplain: 'A and B are two different days of the same kind (e.g. Push A and Push B): same muscles, but different exercises. This keeps training varied.',
+      abExplain: 'A and B are two different training days of the same kind, for example Push A and Push B. You train both every week in rotation. The exercises of each day stay the same for several weeks, so you can see progress. If you only want one variant, take the 3-day plan.',
       setActive: 'Make active plan',
       addDay: '+ Add day',
       addDayTitle: 'Add day',
@@ -2260,24 +2260,24 @@ export const messages = {
           name: 'Push/Pull/Legs · 6 days',
           desc: 'Six training days: two rounds of push, pull, legs per week.',
           explain: {
-            beginner: 'Six training days: push, pull and legs twice each (A and B with different exercises). That is a lot of training – as a beginner, start with the 3-day plan.\n\nThe beginner level uses guided machines with 2–3 sets per exercise. The plan follows your workouts, not the calendar: if you skip a day, it simply continues with the next one.',
-            advanced: 'Six training days: push, pull and legs twice each. A and B train the same muscles with different exercises.\n\nThe advanced level uses free weights and cables with 3–4 sets per exercise. It fits if you train safely, recover well and have plenty of time.'
+            beginner: 'Six training days: push, pull and legs twice each (A and B with different exercises). That is a lot of training – as a beginner, start with the 3-day plan.\n\nThe beginner level uses guided machines with 2–3 sets per exercise. The plan follows your workouts, not the calendar: if you skip a day, it simply continues with the next one.\n\nEvery week you train A and B. Only change the exercises after 6–8 weeks.',
+            advanced: 'Six training days: push, pull and legs twice each. A and B train the same muscles with different exercises.\n\nThe advanced level uses free weights and cables with 3–4 sets per exercise. It fits if you train safely, recover well and have plenty of time.\n\nEvery week you train A and B. Only change the exercises after 6–8 weeks.'
           }
         },
         ul4: {
           name: 'Upper/Lower · 4 days',
           desc: 'Four training days: two upper-body, two lower-body.',
           explain: {
-            beginner: 'Four training days: upper body twice (chest, back, shoulders, arms) and lower body twice (legs, glutes, calves, abs). A and B have different exercises.\n\nThe beginner level uses guided machines with 2–3 sets per exercise. Every muscle group is trained twice a week – a good rhythm for learning and growing.',
-            advanced: 'Four training days: upper body twice, lower body twice. A and B have different exercises.\n\nThe advanced level uses free weights with 3–4 sets per exercise. Every muscle group is trained twice a week with enough rest in between.'
+            beginner: 'Four training days: upper body twice (chest, back, shoulders, arms) and lower body twice (legs, glutes, calves, abs). A and B have different exercises.\n\nThe beginner level uses guided machines with 2–3 sets per exercise. Every muscle group is trained twice a week – a good rhythm for learning and growing.\n\nYou train A and B in rotation. The exercises stay the same for 6–8 weeks.',
+            advanced: 'Four training days: upper body twice, lower body twice. A and B have different exercises.\n\nThe advanced level uses free weights with 3–4 sets per exercise. Every muscle group is trained twice a week with enough rest in between.\n\nYou train A and B in rotation. The exercises stay the same for 6–8 weeks.'
           }
         },
         fb3: {
           name: 'Full body · 3 days',
           desc: 'Three training days, the whole body every time.',
           explain: {
-            beginner: 'Three training days, each one trains the whole body: legs, chest, back, shoulders and abs. There is a rest day between workouts. A, B and C have different exercises.\n\nThe beginner level uses guided machines with 2–3 sets per exercise. This is the classic start: little effort, every muscle group several times a week.',
-            advanced: 'Three training days, each one trains the whole body. A, B and C have different exercises.\n\nThe advanced level uses free weights with 2–3 sets per exercise. Good if you have little time but want to train every muscle group several times a week.'
+            beginner: 'Three training days, each one trains the whole body: legs, chest, back, shoulders and abs. There is a rest day between workouts. A, B and C have different exercises.\n\nThe beginner level uses guided machines with 2–3 sets per exercise. This is the classic start: little effort, every muscle group several times a week.\n\nYou train A, B and C in rotation. The exercises stay the same for 6–8 weeks.',
+            advanced: 'Three training days, each one trains the whole body. A, B and C have different exercises.\n\nThe advanced level uses free weights with 2–3 sets per exercise. Good if you have little time but want to train every muscle group several times a week.\n\nYou train A, B and C in rotation. The exercises stay the same for 6–8 weeks.'
           }
         }
       }
