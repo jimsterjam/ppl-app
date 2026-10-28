@@ -623,7 +623,8 @@ export const messages = {
       planUpdated: 'Auch im Plan-Tag geändert',
       planUpdateFailed: 'Im Plan-Tag konnte die Übung nicht geändert werden. Für heute ist sie ersetzt.',
       replacedChip: 'Ersetzt',
-      replacedFrom: 'statt {name}'
+      replacedFrom: 'statt {name}',
+      preview: 'Bild oder Video ansehen: {name}'
     },
     brand: {
       slogan: 'Form Beats Ego'
@@ -2223,7 +2224,8 @@ export const messages = {
       planUpdated: 'Also changed in the plan day',
       planUpdateFailed: 'The exercise could not be changed in the plan day. It is replaced for today.',
       replacedChip: 'Replaced',
-      replacedFrom: 'instead of {name}'
+      replacedFrom: 'instead of {name}',
+      preview: 'View picture or video: {name}'
     },
     brand: {
       slogan: 'Form Beats Ego'
