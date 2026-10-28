@@ -8,6 +8,7 @@ import Workout from '../models/Workout.js';
 import Exercise from '../models/Exercise.js';
 import CustomExercise from '../models/CustomExercise.js';
 import FavoriteWorkout from '../models/FavoriteWorkout.js';
+import TrainingPlan from '../models/TrainingPlan.js';
 import FeedbackRating from '../models/FeedbackRating.js';
 import UserExerciseNote from '../models/UserExerciseNote.js';
 import MonthlyReport from '../models/MonthlyReport.js';
@@ -61,7 +62,7 @@ async function getOrCreateProfile(uid) {
 // Liefert alle personenbezogenen Daten des angemeldeten Nutzers als herunterladbare JSON-Datei
 // - maschinenlesbar, deckt Art. 20 direkt mit ab. Umfasst bewusst genau die Collections, die
 // tatsächlich eine userId/uid-Bindung an diesen Nutzer haben:
-//   UserProfile (uid), Workout, Exercise (eigene Übungen), CustomExercise, FavoriteWorkout,
+//   UserProfile (uid), Workout, Exercise (eigene Übungen), CustomExercise, FavoriteWorkout, TrainingPlan,
 //   FeedbackRating, UserExerciseNote, AppFeedback, MonthlyReport.
 // Bewusst NICHT enthalten: FeedbackQualitySignal (laut eigenem Modell-Kommentar absichtlich
 // nicht mit einer userId verknüpfbar/anonymisiert) und PromptImprovementProposal (aggregierter
@@ -79,6 +80,7 @@ router.get('/export', firebaseAuthMiddleware, async (req, res) => {
       exercises,
       customExercises,
       favoriteWorkouts,
+      trainingPlans,
       feedbackRatings,
       exerciseNotes,
       appFeedback,
@@ -89,6 +91,7 @@ router.get('/export', firebaseAuthMiddleware, async (req, res) => {
       Exercise.find({ userId: tokenUid }).lean(),
       CustomExercise.find({ userId: tokenUid }).lean(),
       FavoriteWorkout.find({ userId: tokenUid }).lean(),
+      TrainingPlan.find({ userId: tokenUid }).lean(),
       FeedbackRating.find({ userId: tokenUid }).lean(),
       UserExerciseNote.find({ userId: tokenUid }).lean(),
       AppFeedback.find({ userId: tokenUid }).lean(),
@@ -102,6 +105,7 @@ router.get('/export', firebaseAuthMiddleware, async (req, res) => {
       workouts,
       customExercises: [...exercises, ...customExercises],
       favoriteWorkouts,
+      trainingPlans,
       feedbackRatings,
       exerciseNotes,
       appFeedback,
@@ -289,6 +293,12 @@ router.post('/delete', firebaseAuthMiddleware, async (req, res) => {
       report.dbDeleted.favoriteWorkouts = favoriteWorkoutDeleteResult.deletedCount || 0;
     } catch (e) {
       report.errors.push(`FavoriteWorkout delete failed: ${e?.message || e}`);
+    }
+    try {
+      const trainingPlanDeleteResult = await TrainingPlan.deleteMany({ userId: tokenUid });
+      report.dbDeleted.trainingPlans = trainingPlanDeleteResult.deletedCount || 0;
+    } catch (e) {
+      report.errors.push(`TrainingPlan delete failed: ${e?.message || e}`);
     }
     try {
       const feedbackRatingDeleteResult = await FeedbackRating.deleteMany({ userId: tokenUid });
