@@ -44,14 +44,7 @@
           <p class="quick-section-label">{{ $t('dashboard.freeTrainingTitle') }}</p>
           <div class="type-grid">
             <button v-for="tile in typeTiles" :key="tile.type" class="type-tile" type="button" @click="openStartMode(tile.type)">
-              <span class="type-icon" aria-hidden="true"><component :is="tile.icon" :size="16" :stroke-width="2.4" /></span>
-              <span class="type-text">
-                <strong>{{ tile.label }}</strong>
-                <small>{{ tile.muscles }}</small>
-              </span>
-              <span class="type-info" role="button" tabindex="0" :aria-label="$t('dashboard.workoutTypeInfo')" @click.stop="openWorkoutInfo(tile.type)" @keydown.enter.stop="openWorkoutInfo(tile.type)">
-                <Info :size="15" aria-hidden="true" />
-              </span>
+              {{ tile.label }}
             </button>
           </div>
           <div class="quick-bar">
@@ -205,15 +198,6 @@
     </AppModal>
 
     <AppModal
-      v-model="showInfoModal"
-      :title="$t('dashboard.workoutTypeInfoTitle')"
-      :message="infoMessage"
-      :show-cancel="false"
-      :confirm-text="$t('common.confirm')"
-      type="info"
-    />
-
-    <AppModal
       v-model="showRemovePlan"
       :title="$t('plans.removeTitle')"
       :message="$t('plans.removeMessage', { name: todayPlan?.plan?.name || '' })"
@@ -325,7 +309,7 @@ import { messages } from '@/i18n'
 import WeekStrip from '@/components/WeekStrip.vue'
 import CoachMarks from '@/components/CoachMarks.vue'
 import { countWeekWorkouts } from '@/utils/weekStrip'
-import { ArrowUpRight, ArrowDownLeft, ChevronsDown, Target, Star, ClipboardList, Timer, Info } from 'lucide-vue-next'
+import { Star, ClipboardList, Timer } from 'lucide-vue-next'
 import { findPlansUsingFavorite, removeFavoriteFromPlan } from '@/utils/trainingPlan'
 import { sanitizeWorkoutGoal, WORKOUT_GOALS, GENERATOR_GOALS, WORKOUT_GOAL_LABEL_KEYS } from '@/utils/workoutGoal'
 
@@ -359,8 +343,6 @@ function onTimerMenuSelect(target) {
   else showTimerConfig.value = true
 }
 const detailDraft = ref(null)
-const showInfoModal = ref(false)
-const infoMessage = ref('')
 // Name-Bearbeiten direkt im Dashboard (Klick auf den Titel/Namen im Header) statt Umleitung zu
 // den Settings - siehe HeaderBar.vue titleClickable/@title-click und NameEditModal.vue.
 const showNameModal = ref(false)
@@ -475,7 +457,14 @@ const weeklyGoal = computed(() => Number(settings.weeklyGoal) || 4)
 // Diese Woche = Montag bis Sonntag (passend zum Wochenstreifen), nicht mehr „die letzten 7 Tage“.
 const weeklyCount = computed(() => countWeekWorkouts({ workouts: store.workouts || [] }))
 
-// Kacheln „Selbst zusammenstellen“: Icon, Name und die trainierten Muskeln (erklärt Einsteigern, was dahintersteckt).
+// Kacheln „Selbst zusammenstellen“: nur der Name (der Begriff erklärt sich selbst, Absprache Paul 29.10.).
+const typeTiles = computed(() => [
+  { type: 'push', label: 'Push' },
+  { type: 'pull', label: 'Pull' },
+  { type: 'legs', label: 'Legs' },
+  { type: 'fullbody', label: $t('dashboard.fullBodyLabel') }
+])
+
 // Sprechblasen auf dem Dashboard (Absprache Paul 29.10.): Wochenstreifen und, mit aktivem Plan, „Heute“.
 const coachMarks = computed(() => [
   { id: 'coach-week', selector: '.dashboard-week', title: $t('coach.weekTitle'), text: $t('coach.weekText') },
@@ -483,15 +472,9 @@ const coachMarks = computed(() => [
 ])
 // Nicht über Fenstern und nicht, solange der Start-Ablauf (Favoriten, Ziel ...) offen ist.
 const coachActive = computed(() => isSignedIn.value && !showStartOptions.value && !showNameModal.value && !showGoalModal.value
-  && !showTimerMenu.value && !showFavoriteMenu.value && !showPlanDayPicker.value && !showRemovePlan.value && !showInfoModal.value
+  && !showTimerMenu.value && !showFavoriteMenu.value && !showPlanDayPicker.value && !showRemovePlan.value
   && !showDiscardDraftConfirm.value && !showFavoriteDeleteConfirm.value)
 
-const typeTiles = computed(() => [
-  { type: 'push', label: 'Push', icon: ArrowUpRight, muscles: $t('dashboard.pushMuscles') },
-  { type: 'pull', label: 'Pull', icon: ArrowDownLeft, muscles: $t('dashboard.pullMuscles') },
-  { type: 'legs', label: 'Legs', icon: ChevronsDown, muscles: $t('dashboard.legsMuscles') },
-  { type: 'fullbody', label: $t('dashboard.fullBodyLabel'), icon: Target, muscles: $t('dashboard.fullBodyMuscles') }
-])
 const weeklyProgressLabel = computed(() => $t('dashboard.weeklyProgress', { done: weeklyCount.value, goal: weeklyGoal.value }))
 
 // Erstnutzung (Absprache Paul 22.10.): noch kein abgeschlossenes Workout und kein Entwurf -> kurze Erklärung unter den
@@ -1202,15 +1185,6 @@ function removeFavorite(favorite) {
 
 // Quick Generator entfernt (AI-Feature, für spätere Reaktivierung erhalten)
 
-function openWorkoutInfo(type) {
-  if (type === 'push') infoMessage.value = $t('dashboard.pushInfo')
-  else if (type === 'pull') infoMessage.value = $t('dashboard.pullInfo')
-  else if (type === 'legs') infoMessage.value = $t('dashboard.legsInfo')
-  else if (type === 'freestyle' || type === 'fullbody') infoMessage.value = $t('dashboard.freestyleInfo')
-  else infoMessage.value = ''
-  showInfoModal.value = true
-}
-
 async function discardDraft() {
   showDiscardDraftConfirm.value = false
   // Abgebrochenes Workout: Gesamtzeit, Pause und Warm-up-Timer enden mit.
@@ -1429,8 +1403,7 @@ onActivated(async () => {
 }
 
 /* Mit Entwurf-Hinweis: Kacheln und Wochenstreifen enger, damit alles auf den Bildschirm passt. */
-.dashboard-content.has-draft .quick-section-label,
-.dashboard-content.has-draft .type-text small {
+.dashboard-content.has-draft .quick-section-label {
   display: none;
 }
 
@@ -1440,16 +1413,8 @@ onActivated(async () => {
 }
 
 .dashboard-content.has-draft .type-tile {
-  flex-direction: row;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 10px;
-  padding: 6px 10px;
-}
-
-.dashboard-content.has-draft .type-info {
-  top: 50%;
-  transform: translateY(-50%);
+  padding: 4px 8px;
+  font-size: 1.1rem;
 }
 
 .dashboard-content.has-draft .quick-bar-btn {
@@ -1647,20 +1612,19 @@ onActivated(async () => {
 }
 
 .type-tile {
-  position: relative;
   display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 6px;
+  align-items: center;
+  justify-content: center;
   min-height: 0;
-  padding: 12px 12px 10px;
+  padding: 8px;
   border-radius: var(--card-radius);
   border: 1px solid var(--card-border);
   background: var(--card-bg);
   color: var(--fg);
-  font: inherit;
-  text-align: left;
+  font-family: "Sora", "Space Grotesk", "SF Pro Display", sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  text-align: center;
   cursor: pointer;
   transition: border-color 120ms ease, background 120ms ease;
 }
@@ -1668,48 +1632,6 @@ onActivated(async () => {
 .type-tile:hover,
 .type-tile:active {
   border-color: var(--accent);
-}
-
-.type-icon {
-  width: 30px;
-  height: 30px;
-  flex: 0 0 auto;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: color-mix(in srgb, var(--accent) 16%, transparent);
-  color: var(--accent);
-}
-
-.type-text {
-  display: grid;
-  gap: 1px;
-  min-width: 0;
-}
-
-.type-text strong {
-  font-family: "Sora", "Space Grotesk", "SF Pro Display", sans-serif;
-  font-size: 1.1rem;
-}
-
-.type-text small {
-  color: var(--muted);
-  font-size: 0.7rem;
-  line-height: 1.3;
-}
-
-.type-info {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--muted);
-  border-radius: 50%;
 }
 
 .quick-bar {
