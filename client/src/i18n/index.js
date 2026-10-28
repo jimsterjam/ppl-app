@@ -146,6 +146,7 @@ export const messages = {
   ,startModeTypeTitle: '{type} auswählen'
   ,allFavorites: 'Favoriten'
   ,allFavoritesEmpty: 'Noch keine Favoriten gespeichert.'
+  ,plansButton: 'Trainingspläne'
   ,favoritesHint: 'Wähle einen Favoriten, um direkt zu starten oder anzupassen.'
   ,favoritesEmpty: 'Noch keine Favoriten für diesen Typ gespeichert.'
   ,favoritesLimitHint: 'Du kannst pro Typ maximal {count} Favoriten speichern.'
@@ -519,6 +520,73 @@ export const messages = {
         'Bizeps Curls': 'Biceps Curls',
         'Trizepsdrücken': 'Triceps Extension',
         'Rudern': 'Rows'
+      }
+    },
+    plans: {
+      title: 'Trainingspläne',
+      activeSection: 'Aktiver Plan',
+      otherSection: 'Weitere Pläne',
+      emptyTitle: 'Noch kein Plan',
+      emptyText: 'Lege fest, was an welchem Tag dran ist. Die App zeigt dir immer das nächste Training.',
+      create: 'Plan anlegen',
+      limitHint: 'Du kannst bis zu 3 Pläne speichern. Lösche einen Plan, um einen neuen anzulegen.',
+      activeBadge: 'Aktiv',
+      activate: 'Aktivieren',
+      daysCount: '{count} Tag | {count} Tage',
+      lastTrained: 'Zuletzt trainiert: {date}',
+      neverTrained: 'Noch nicht trainiert',
+      lastShort: 'zuletzt {date}',
+      nextDay: 'Nächster Tag',
+      newTitle: 'Plan anlegen',
+      templatesSection: 'Mit Vorlage starten',
+      templateDisclaimer: 'Vorlagen sind Vorschläge für den Einstieg und ersetzen keine individuelle Beratung. Aus jedem Trainingstag entsteht ein Favorit, den du ändern kannst.',
+      customSection: 'Oder selbst',
+      startEmpty: 'Leer anfangen',
+      customTitle: 'Eigenen Plan anlegen',
+      nameLabel: 'Name des Plans',
+      namePlaceholder: 'z. B. Mein Plan',
+      pickFavoritesLabel: 'Trainingstage aus deinen Favoriten',
+      noFavorites: 'Du hast noch keine Favoriten. Starte mit einer Vorlage oder speichere nach einem Workout einen Favoriten.',
+      createConfirm: 'Anlegen',
+      creating: 'Wird angelegt …',
+      created: 'Plan „{name}“ angelegt.',
+      errorLimit: 'Du hast schon 3 Pläne. Lösche zuerst einen Plan.',
+      errorFavoriteLimit: 'Bei den Favoriten ist nicht genug Platz für diese Vorlage (höchstens 10 je Art). Lösche zuerst einen Favoriten.',
+      errorGeneric: 'Der Plan konnte nicht angelegt werden. Bitte versuche es erneut.',
+      errorName: 'Bitte gib einen Namen ein.',
+      errorDays: 'Wähle mindestens einen Favoriten.',
+      daysSection: 'Trainingstage',
+      explain: 'Der Plan richtet sich nach deinen Trainings, nicht nach dem Kalender. Nach dem Speichern rückt er zum nächsten Tag vor.',
+      setActive: 'Als aktiven Plan festlegen',
+      addDay: '+ Tag hinzufügen',
+      addDayTitle: 'Tag hinzufügen',
+      addDayHint: 'Wähle einen Favoriten als Trainingstag.',
+      maxDays: 'Ein Plan hat höchstens 7 Tage.',
+      rename: 'Plan umbenennen',
+      renameTitle: 'Plan umbenennen',
+      delete: 'Plan löschen',
+      deleteConfirmTitle: 'Plan löschen?',
+      deleteConfirmMsg: 'Der Plan „{name}“ wird gelöscht. Deine Favoriten bleiben erhalten.',
+      dayMenuSetNext: 'Als nächsten Tag festlegen',
+      dayMenuRename: 'Bezeichnung ändern',
+      dayMenuRemove: 'Aus Plan entfernen',
+      dayLabelLabel: 'Bezeichnung',
+      dayLabelPlaceholder: 'z. B. Push A',
+      lastDayHint: 'Ein Plan braucht mindestens einen Tag. Lösche stattdessen den Plan.',
+      moveUp: 'Nach oben',
+      moveDown: 'Nach unten',
+      favoriteMissing: 'Favorit nicht mehr vorhanden',
+      favoriteInPlans: 'Dieser Favorit ist Teil von: {plans}. Beim Löschen verschwindet der Tag aus dem Plan.',
+      dayLabel: {
+        pushA: 'Push A', pullA: 'Pull A', legsA: 'Legs A', pushB: 'Push B', pullB: 'Pull B', legsB: 'Legs B',
+        upperA: 'Oberkörper A', lowerA: 'Unterkörper A', upperB: 'Oberkörper B', lowerB: 'Unterkörper B',
+        fullA: 'Ganzkörper A', fullB: 'Ganzkörper B', fullC: 'Ganzkörper C'
+      },
+      templates: {
+        ppl3: { name: 'Push/Pull/Legs · 3 Tage', desc: 'Ein Durchgang pro Woche. Gut für den Einstieg.', favPrefix: 'PPL 3 Tage' },
+        ppl6: { name: 'Push/Pull/Legs · 6 Tage', desc: 'Zwei Durchgänge pro Woche.', favPrefix: 'PPL 6 Tage' },
+        ul4: { name: 'Ober-/Unterkörper · 4 Tage', desc: 'Zwei Mal Oberkörper, zwei Mal Unterkörper.', favPrefix: 'Ober Unterkörper' },
+        fb3: { name: 'Ganzkörper · 3 Tage', desc: 'Jedes Mal der ganze Körper.', favPrefix: 'Ganzkörper' }
       }
     },
     brand: {
@@ -1642,6 +1710,7 @@ export const messages = {
   ,startModeTypeTitle: 'Choose {type}'
   ,allFavorites: 'Favorites'
   ,allFavoritesEmpty: 'No favorites saved yet.'
+  ,plansButton: 'Training plans'
   ,favoritesHint: 'Select a favorite to start immediately or adjust it.'
   ,favoritesEmpty: 'No favorites saved for this type yet.'
   ,favoritesLimitHint: 'You can save up to {count} favorites per type.'
@@ -2008,6 +2077,73 @@ export const messages = {
         'Bizeps Curls': 'Biceps Curls',
         'Trizepsdrücken': 'Triceps Extension',
         'Rudern': 'Rows'
+      }
+    },
+    plans: {
+      title: 'Training plans',
+      activeSection: 'Active plan',
+      otherSection: 'Other plans',
+      emptyTitle: 'No plan yet',
+      emptyText: 'Decide what is on which day. The app always shows you your next workout.',
+      create: 'Create plan',
+      limitHint: 'You can save up to 3 plans. Delete a plan to create a new one.',
+      activeBadge: 'Active',
+      activate: 'Activate',
+      daysCount: '{count} day | {count} days',
+      lastTrained: 'Last trained: {date}',
+      neverTrained: 'Not trained yet',
+      lastShort: 'last {date}',
+      nextDay: 'Next day',
+      newTitle: 'Create plan',
+      templatesSection: 'Start with a template',
+      templateDisclaimer: 'Templates are suggestions to get started and do not replace individual advice. Each training day becomes a favorite that you can change.',
+      customSection: 'Or your own',
+      startEmpty: 'Start empty',
+      customTitle: 'Create your own plan',
+      nameLabel: 'Plan name',
+      namePlaceholder: 'e.g. My plan',
+      pickFavoritesLabel: 'Training days from your favorites',
+      noFavorites: 'You have no favorites yet. Start with a template or save a favorite after a workout.',
+      createConfirm: 'Create',
+      creating: 'Creating …',
+      created: 'Plan “{name}” created.',
+      errorLimit: 'You already have 3 plans. Delete a plan first.',
+      errorFavoriteLimit: 'There is not enough room in your favorites for this template (at most 10 per type). Delete a favorite first.',
+      errorGeneric: 'The plan could not be created. Please try again.',
+      errorName: 'Please enter a name.',
+      errorDays: 'Choose at least one favorite.',
+      daysSection: 'Training days',
+      explain: 'The plan follows your workouts, not the calendar. After saving a workout it moves on to the next day.',
+      setActive: 'Make active plan',
+      addDay: '+ Add day',
+      addDayTitle: 'Add day',
+      addDayHint: 'Choose a favorite as a training day.',
+      maxDays: 'A plan has at most 7 days.',
+      rename: 'Rename plan',
+      renameTitle: 'Rename plan',
+      delete: 'Delete plan',
+      deleteConfirmTitle: 'Delete plan?',
+      deleteConfirmMsg: 'The plan “{name}” will be deleted. Your favorites are kept.',
+      dayMenuSetNext: 'Set as next day',
+      dayMenuRename: 'Change label',
+      dayMenuRemove: 'Remove from plan',
+      dayLabelLabel: 'Label',
+      dayLabelPlaceholder: 'e.g. Push A',
+      lastDayHint: 'A plan needs at least one day. Delete the plan instead.',
+      moveUp: 'Move up',
+      moveDown: 'Move down',
+      favoriteMissing: 'Favorite no longer exists',
+      favoriteInPlans: 'This favorite is part of: {plans}. Deleting it removes the day from the plan.',
+      dayLabel: {
+        pushA: 'Push A', pullA: 'Pull A', legsA: 'Legs A', pushB: 'Push B', pullB: 'Pull B', legsB: 'Legs B',
+        upperA: 'Upper A', lowerA: 'Lower A', upperB: 'Upper B', lowerB: 'Lower B',
+        fullA: 'Full body A', fullB: 'Full body B', fullC: 'Full body C'
+      },
+      templates: {
+        ppl3: { name: 'Push/Pull/Legs · 3 days', desc: 'One round per week. Good for getting started.', favPrefix: 'PPL 3 days' },
+        ppl6: { name: 'Push/Pull/Legs · 6 days', desc: 'Two rounds per week.', favPrefix: 'PPL 6 days' },
+        ul4: { name: 'Upper/Lower · 4 days', desc: 'Two upper-body days, two lower-body days.', favPrefix: 'Upper Lower' },
+        fb3: { name: 'Full body · 3 days', desc: 'The whole body every time.', favPrefix: 'Full body' }
       }
     },
     brand: {

@@ -59,6 +59,9 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" aria-hidden="true" style="vertical-align:-2px;margin-right:5px"><circle cx="12" cy="13" r="8"/><polyline points="12 9 12 13 15 13"/><path d="M9 2h6M12 2v3"/></svg>
             Timer
           </button>
+          <button class="quick-plans-btn" type="button" @click="router.push({ name: 'plans' })">
+            {{ $t('dashboard.plansButton') }}
+          </button>
           <p v-if="isFirstUse" class="quick-first-hint">{{ $t('dashboard.firstHint') }}</p>
           <TimerMenu v-if="showTimerMenu" @close="showTimerMenu = false" @select="onTimerMenuSelect" />
           <RestTimerSettings v-if="showRestSettings" @close="showRestSettings = false" />
@@ -210,7 +213,7 @@
     <AppModal
       v-model="showFavoriteDeleteConfirm"
       :title="$t('dashboard.favoriteDeleteConfirmTitle')"
-      :message="$t('dashboard.favoriteDeleteConfirmMsg')"
+      :message="favoriteDeleteMessage"
       :confirm-text="$t('dashboard.favoriteDelete')"
       :cancel-text="$t('common.cancel')"
       type="warning"
@@ -272,6 +275,8 @@ import MonthlyReportRow from '@/components/MonthlyReportRow.vue'
 import AvatarEditor from '@/components/AvatarEditor.vue'
 import NameEditModal from '@/components/NameEditModal.vue'
 import WorkoutGoalPicker from '@/components/WorkoutGoalPicker.vue'
+import { getTrainingPlans, updateTrainingPlan } from '@/utils/trainingPlanStorage'
+import { findPlansUsingFavorite, removeFavoriteFromPlan } from '@/utils/trainingPlan'
 import { sanitizeWorkoutGoal, WORKOUT_GOALS, GENERATOR_GOALS, WORKOUT_GOAL_LABEL_KEYS } from '@/utils/workoutGoal'
 
 
@@ -986,8 +991,18 @@ function confirmRenameFavorite(favorite) {
   else loadFavoriteWorkoutsForCurrentType()
 }
 
+const favoriteDeleteMessage = ref('')
+
+function plansUsingFavorite(favorite) {
+  return findPlansUsingFavorite(getTrainingPlans(getCurrentFavoritesUserId()), favorite?.id)
+}
+
 function askRemoveFavorite(favorite) {
   pendingFavoriteToDelete.value = favorite
+  const plans = plansUsingFavorite(favorite)
+  favoriteDeleteMessage.value = plans.length
+    ? `${$t('dashboard.favoriteDeleteConfirmMsg')} ${$t('plans.favoriteInPlans', { plans: plans.map((plan) => plan.name).join(', ') })}`
+    : $t('dashboard.favoriteDeleteConfirmMsg')
   showFavoriteDeleteConfirm.value = true
 }
 
@@ -1007,6 +1022,11 @@ function removeFavorite(favorite) {
     return
   }
   favoriteInfoText.value = ''
+  // Tage, die auf den gelöschten Favoriten zeigen, aus den Plänen nehmen (leere Pläne entfallen).
+  const planUserId = getCurrentFavoritesUserId()
+  plansUsingFavorite(favorite).forEach((plan) => {
+    updateTrainingPlan({ userId: planUserId, planId: plan.id, updater: (p) => removeFavoriteFromPlan(p, favorite.id) })
+  })
   if (startFlowStep.value === 'all-favorites') loadAllFavoriteWorkouts()
   else loadFavoriteWorkoutsForCurrentType()
 }
@@ -1302,7 +1322,8 @@ onActivated(async () => {
   opacity: 0.8;
 }
 
-.quick-timer-btn {
+.quick-timer-btn,
+.quick-plans-btn {
   border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line-strong));
   border-radius: var(--card-radius);
   background: color-mix(in srgb, var(--accent) 6%, var(--card-bg));
@@ -1317,12 +1338,18 @@ onActivated(async () => {
   transition: background 120ms ease, border-color 120ms ease;
 }
 
-.quick-timer-btn:hover {
+.quick-timer-btn:hover,
+.quick-plans-btn:hover {
   background: color-mix(in srgb, var(--accent) 12%, var(--bg-panel));
   border-color: var(--accent);
 }
 
-.quick-timer-btn:active {
+.quick-plans-btn {
+  grid-column: 1 / -1;
+}
+
+.quick-timer-btn:active,
+.quick-plans-btn:active {
   opacity: 0.8;
 }
 

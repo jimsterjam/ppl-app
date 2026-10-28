@@ -19,6 +19,9 @@ const FaqsView = () => import('../views/FaqsView.vue')
 const FeaturesTestView = () => import('../views/FeaturesTestView.vue')
 const LegalNoticeView = () => import('../views/LegalNoticeView.vue')
 const PrivacyView = () => import('../views/PrivacyView.vue')
+const PlansView = () => import('../views/PlansView.vue')
+const PlanNewView = () => import('../views/PlanNewView.vue')
+const PlanDetailView = () => import('../views/PlanDetailView.vue')
 const AdminFeedbackView = () => import('../views/AdminFeedbackView.vue')
 
 const routes = [
@@ -47,6 +50,9 @@ const routes = [
       { path: 'workout-builder', name: 'workout-builder', component: WorkoutBuilder },
       { path: 'quick-workout-generator', name: 'quick-workout-generator', component: QuickWorkoutGeneratorView },
       { path: 'faqs', name: 'faqs', component: FaqsView },
+      { path: 'plans', name: 'plans', component: PlansView },
+      { path: 'plans/new', name: 'plan-new', component: PlanNewView },
+      { path: 'plans/:id', name: 'plan-detail', component: PlanDetailView },
       { path: 'features-test', name: 'features-test', component: FeaturesTestView },
       { path: 'workouts/:id', name: 'workout-detail', component: WorkoutDetailView }
     ]
