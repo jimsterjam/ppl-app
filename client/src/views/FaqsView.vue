@@ -66,7 +66,7 @@ const baseKeys = ['gettingStarted', 'pushPullLegs', 'navigation', 'workoutFlow',
 // Gruppierte Anzeige (Absprache Paul 22.10.): jeder Eintrag steht in genau einer Gruppe.
 const groups = [
   { titleKey: 'groupStart', keys: ['gettingStarted', 'pushPullLegs', 'trainingPlans', 'navigation'] },
-  { titleKey: 'groupWorkout', keys: ['workoutFlow', 'focusMode', 'symbols', 'restPauses', 'timedExercises', 'warmup'] },
+  { titleKey: 'groupWorkout', keys: ['workoutFlow', 'swapExercise', 'focusMode', 'symbols', 'restPauses', 'timedExercises', 'warmup'] },
   { titleKey: 'groupProgress', keys: ['progressRules', 'progression', 'weightSuggestion', 'statsReading'] },
   { titleKey: 'groupAi', keys: ['aiCoach'] },
   { titleKey: 'groupAccount', keys: ['workouts', 'uploads', 'privacy'] }

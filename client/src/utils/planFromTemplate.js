@@ -19,6 +19,8 @@ export function buildTemplateExercise(entry, sets) {
   const count = Math.max(1, Number(sets) || 3)
   return {
     ...entry,
+    // Übungsnamen werden immer englisch gespeichert (Katalogfeld `name` ist deutsch).
+    name: entry.name_en || entry.name,
     exerciseId: entry._id,
     sets: count,
     reps: 10,

@@ -211,6 +211,14 @@
                     <strong>{{ getTranslatedExerciseName(ex.name) }}</strong>
                     <div class="ex-title-actions">
                       <button
+                        v-if="canShowSwap(ex)"
+                        type="button"
+                        class="ex-more-btn ex-swap-btn"
+                        :aria-label="t('swap.aria', { name: getTranslatedExerciseName(ex.name) })"
+                        :title="t('swap.button')"
+                        @click="openSwap(i)"
+                      ><ArrowLeftRight class="ex-more-icon" aria-hidden="true" /></button>
+                      <button
                         type="button"
                         class="ex-more-btn"
                         :aria-label="t('workoutDetail.exerciseMenuAria', { name: getTranslatedExerciseName(ex.name) })"
@@ -230,6 +238,10 @@
                       @click="openTrainingTypeModal(i)"
                     >{{ trainingTypeChipText(i) }}</button>
                   </div>
+                  <p v-if="ex.replacedFrom" class="ex-replaced">
+                    <span class="ex-replaced-chip">{{ t('swap.replacedChip') }}</span>
+                    {{ t('swap.replacedFrom', { name: getTranslatedExerciseName(ex.replacedFrom) }) }}
+                  </p>
                   <p v-if="ex.description" class="ex-description">{{ ex.description }}</p>
 
                   <div v-if="showOneRepMax && showOneRepMax[i]" class="one-rep-max-field" style="margin-top: 4px;">
@@ -810,6 +822,18 @@
       >{{ paragraph }}</p>
     </AppModal>
 
+    <!-- Übung wechseln (⇄): Vorschläge, Suche, bei Plan-Training „nur heute / auch im Plan-Tag“. -->
+    <ExerciseSwapModal
+      v-model="showSwapModal"
+      :exercise="swapExercise"
+      :exclude-names="swapExcludeNames"
+      :all-exercises="allExercises"
+      :user-id="resolveActiveWorkoutUserId()"
+      :plan-day-label="swapPlanDayLabel"
+      @swap="onSwapExercise"
+      @custom-added="loadAllExercises"
+    />
+
     <!-- "⋮"-Menü einer Übung: Nebenaktionen (Bild/Video, 1RM, Übung entfernen). -->
     <AppModal
       v-model="showExerciseMenu"
@@ -1055,11 +1079,14 @@ import HeaderBar from '@/components/HeaderBar.vue'
 import OneTimeHint from '@/components/OneTimeHint.vue'
 import AppModal from '@/components/AppModal.vue'
 import ExerciseList from '@/components/ExerciseList.vue'
+import ExerciseSwapModal from '@/components/ExerciseSwapModal.vue'
+import { buildSwappedExercise, canSwapExercise, replaceExerciseInFavorite } from '@/utils/exerciseSwapApply'
+import { getPlanDayInfo } from '@/utils/planProgress'
 import WorkoutTimerConfig from '@/components/timer/WorkoutTimerConfig.vue'
 import SessionStopwatch from '@/components/SessionStopwatch.vue'
 // Einheitliches Icon-Set statt Emoji/ASCII-Mix (🗑️/📝/⋮⋮/▲▼/＋/−) - wie im Rest der App
 // (siehe z.B. BottomNav.vue, AiFeedbackRatingWidget.vue) bereits lucide-vue-next genutzt.
-import { Clock, ArrowUpDown, Trash2, StickyNote, GripVertical, Plus, Minus, Info, Weight, ChevronDown, MoreVertical, Check } from 'lucide-vue-next'
+import { Clock, ArrowUpDown, ArrowLeftRight, Trash2, StickyNote, GripVertical, Plus, Minus, Info, Weight, ChevronDown, MoreVertical, Check } from 'lucide-vue-next'
 import { useToastStore } from '@/stores/toastStore'
 import { useTimerStore } from '@/stores/timerStore'
 import { useI18n } from 'vue-i18n'
@@ -2692,6 +2719,49 @@ function isWarmupOpen(index) {
 
 function toggleWarmups(index) {
   warmupOpenOverride.value = { ...warmupOpenOverride.value, [index]: !isWarmupOpen(index) }
+}
+
+// --- Übung wechseln (⇄) -------------------------------------------------------------------
+const showSwapModal = ref(false)
+const swapIndex = ref(-1)
+const swapPlanDayLabel = ref('')
+const swapExercise = computed(() => workout.value?.exercises?.[swapIndex.value] || null)
+const swapExcludeNames = computed(() => (workout.value?.exercises || []).map((ex) => ex?.name).filter(Boolean))
+
+// Nur im laufenden/neuen Workout und solange in der Übung nichts abgehakt ist (sonst ginge Eingetragenes verloren).
+function canShowSwap(ex) {
+  return !isReordering.value && workout.value?.completed !== true && canSwapExercise(ex)
+}
+
+function openSwap(index) {
+  swapIndex.value = index
+  // Plan-Training: nach „nur heute / auch im Plan-Tag“ fragen, mit dem Namen des Tages.
+  const { planId, planDayId } = workout.value || {}
+  const info = planId && planDayId ? getPlanDayInfo(getFavoriteUserId(), planId, planDayId) : null
+  swapPlanDayLabel.value = info?.favorite ? (info.day.label || info.favorite.name) : ''
+  showSwapModal.value = true
+}
+
+function onSwapExercise({ entry, scope }) {
+  const index = swapIndex.value
+  const old = workout.value?.exercises?.[index]
+  if (!old || !entry) return
+  workout.value.exercises.splice(index, 1, buildSwappedExercise(old, entry))
+  if (Array.isArray(exerciseNotes.value)) exerciseNotes.value[index] = ''
+  ensureSetDetailsStructure()
+  if (!isFavoriteAdjustMode.value) {
+    try { triggerAutoSave() } catch {}
+  }
+  loadOneRepMaxData()
+  toast.show(t('swap.done'), { type: 'success', duration: 1500 })
+  if (scope === 'plan') {
+    const { planId, planDayId } = workout.value || {}
+    const info = planId && planDayId ? getPlanDayInfo(getFavoriteUserId(), planId, planDayId) : null
+    const result = info?.favorite
+      ? replaceExerciseInFavorite({ userId: getFavoriteUserId(), favoriteId: info.favorite.id, oldExercise: old, entry })
+      : { ok: false }
+    toast.show(result.ok ? t('swap.planUpdated') : t('swap.planUpdateFailed'), { type: result.ok ? 'success' : 'warning', duration: 3000 })
+  }
 }
 
 // --- "⋮"-Menü einer Übung -----------------------------------------------------------------
@@ -5033,6 +5103,8 @@ onBeforeUnmount(() => {
   white-space: nowrap;
   cursor: pointer;
 }
+.ex-replaced { margin: 4px 0 0; color: var(--muted); font-size: 0.8rem; }
+.ex-replaced-chip { display: inline-block; margin-right: 6px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent); font-weight: 700; font-size: 0.72rem; }
 .ex-title-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 .ex-more-btn {
   /* Deutlich größer und als Knopf erkennbar (Absprache Paul 16.10.): 44x44 Tippfläche, sichtbarer Rand. */

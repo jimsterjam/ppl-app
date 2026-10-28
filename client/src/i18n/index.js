@@ -599,6 +599,26 @@ export const messages = {
         fb3: { name: 'Ganzkörper · 3 Tage', desc: 'Jedes Mal der ganze Körper.', favPrefix: 'Ganzkörper' }
       }
     },
+    swap: {
+      button: 'Übung wechseln',
+      aria: 'Übung wechseln: {name}',
+      title: 'Ersetzen durch',
+      hint: 'Geführte Maschinen sind für Einsteiger oft leichter: Sie geben die Bewegung vor, du musst nichts ausbalancieren.',
+      search: 'Andere Übung suchen …',
+      searchTitle: 'Übung suchen',
+      searchConfirm: 'Ersetzen',
+      empty: 'Keine Vorschläge gefunden. Suche selbst eine Übung.',
+      kind: { machine: 'Maschine', cable: 'Kabel', smith: 'Smith-Maschine', barbell: 'Langhantel', dumbbell: 'Kurzhantel', bodyweight: 'Körpergewicht', other: 'Sonstiges' },
+      scopeTitle: 'Übung ersetzt',
+      scopeMessage: '„{old}“ wird durch „{new}“ ersetzt. Die Sätze bleiben, Gewicht und Wiederholungen trägst du neu ein.',
+      scopeToday: 'Nur heute',
+      scopePlan: 'Auch im Plan-Tag „{day}“ ändern',
+      done: 'Übung ersetzt',
+      planUpdated: 'Auch im Plan-Tag geändert',
+      planUpdateFailed: 'Im Plan-Tag konnte die Übung nicht geändert werden. Für heute ist sie ersetzt.',
+      replacedChip: 'Ersetzt',
+      replacedFrom: 'statt {name}'
+    },
     brand: {
       slogan: 'Form Beats Ego'
     },
@@ -1238,6 +1258,8 @@ export const messages = {
       uploadsText: 'Tippe auf ein Übungsbild, um eine Vorschau zu sehen oder ein eigenes Bild hochzuladen.\n\nBilder werden automatisch verkleinert, damit sie schnell laden und wenig Speicher brauchen.',
       privacy: 'Datenschutz',
       privacyText: "Für die Nutzung der App ist ein Konto erforderlich (E-Mail, Google oder Apple). Deine Trainingsdaten sind an dieses Konto gebunden und werden automatisch zwischen deinen Geräten synchronisiert; ohne Anmeldung sind die geschützten Bereiche der App nicht nutzbar.\n\nEinmal angemeldet, funktionieren bereits geladene Inhalte auch offline weiter – Änderungen werden synchronisiert, sobald wieder eine Verbindung besteht.\n\nFür das KI-Feedback und den KI-Workout-Generator werden deine Trainingsdaten (Übungen, Sätze, Gewichte, Wiederholungen, Notizen) und deine Angaben im Generator an den KI-Dienst OpenAI gesendet. Name und E-Mail-Adresse werden nicht mitgesendet.\n\nHinweis: Thumbnails und hochgeladene Bilder werden nur zur Darstellung deiner Übungen verwendet.",
+      swapExercise: 'Übung wechseln (⇄)',
+      swapExerciseText: 'Kommst du mit einer Übung nicht klar – zum Beispiel weil dir Langhantel-Bankdrücken noch zu schwer ist –, tippst du bei der Übung auf das Symbol ⇄. Die App schlägt dir Ersatz vor, der dieselben Muskeln trainiert. Bei Übungen mit freien Gewichten stehen geführte Maschinen vorn: Sie geben die Bewegung vor, du musst nichts ausbalancieren.\n\nDer Wechsel ist möglich, solange du in der Übung noch keinen Satz abgehakt hast. Die Sätze bleiben, Gewicht und Wiederholungen trägst du neu ein, denn für die neue Übung gibt es noch keinen Vergleich zu früher.\n\nGehört das Workout zu einem Trainingsplan, fragt die App, ob der Wechsel nur heute gilt oder auch im Plan-Tag. Mit „Andere Übung suchen …“ wählst du jede Übung aus dem Katalog.',
       startWeight: 'Wie viel Gewicht nehme ich am Anfang?',
       startWeightText: 'Bei einer Übung, die du noch nie in der App gemacht hast, kennt die App dein Gewicht noch nicht. Starte leicht: Nimm ein Gewicht, mit dem du alle Wiederholungen sauber und ohne Schwung schaffst und am Ende noch 2–3 Wiederholungen übrig hättest.\n\nIm ersten Satz darfst du ruhig vorsichtig sein – du kannst das Gewicht von Satz zu Satz anpassen. Trage ein, was du wirklich geschafft hast. Beim nächsten Mal schlägt dir die App das Gewicht vor und steigert es, sobald du das Ziel in allen Sätzen schaffst.\n\nAls Anfänger sind Maschinen oft leichter zu lernen als freie Gewichte: Die Maschine führt die Bewegung, du musst nichts ausbalancieren.',
       weightSuggestion: 'Gewichtsvorschlag: Wie funktioniert der Hinweis?',
@@ -2171,6 +2193,26 @@ export const messages = {
         fb3: { name: 'Full body · 3 days', desc: 'The whole body every time.', favPrefix: 'Full body' }
       }
     },
+    swap: {
+      button: 'Swap exercise',
+      aria: 'Swap exercise: {name}',
+      title: 'Replace with',
+      hint: 'Guided machines are often easier for beginners: they set the movement path, so you do not have to balance anything.',
+      search: 'Find another exercise …',
+      searchTitle: 'Find exercise',
+      searchConfirm: 'Replace',
+      empty: 'No suggestions found. Search for an exercise yourself.',
+      kind: { machine: 'Machine', cable: 'Cable', smith: 'Smith machine', barbell: 'Barbell', dumbbell: 'Dumbbell', bodyweight: 'Bodyweight', other: 'Other' },
+      scopeTitle: 'Exercise replaced',
+      scopeMessage: '“{old}” is replaced by “{new}”. The sets stay, you enter weight and reps anew.',
+      scopeToday: 'Today only',
+      scopePlan: 'Also change in plan day “{day}”',
+      done: 'Exercise replaced',
+      planUpdated: 'Also changed in the plan day',
+      planUpdateFailed: 'The exercise could not be changed in the plan day. It is replaced for today.',
+      replacedChip: 'Replaced',
+      replacedFrom: 'instead of {name}'
+    },
     brand: {
       slogan: 'Form Beats Ego'
     },
@@ -2797,6 +2839,8 @@ export const messages = {
       uploadsText: 'Tap an exercise image to preview it or upload your own.\n\nImages are resized automatically for fast loading and smaller storage use.',
       privacy: 'Privacy',
       privacyText: "Using the app requires an account (email, Google, or Apple). Your training data is tied to that account and syncs automatically across your devices; the protected areas of the app aren't usable without signing in.\n\nOnce signed in, content you've already loaded keeps working offline — changes sync again once you're back online.\n\nFor AI feedback and the AI workout generator, your training data (exercises, sets, weights, reps, notes) and your answers in the generator are sent to the AI service OpenAI. Name and email address are not sent.\n\nNote: Thumbnails and uploaded images are only used to display your exercises.",
+      swapExercise: 'Swap an exercise (⇄)',
+      swapExerciseText: 'If you cannot manage an exercise – for example because barbell bench press is still too hard – tap the ⇄ icon next to it. The app suggests replacements that train the same muscles. For free-weight exercises, guided machines come first: they set the movement path, so you do not have to balance anything.\n\nYou can swap as long as you have not ticked off a set in that exercise. The sets stay, you enter weight and reps anew, because there is no comparison to earlier sessions for the new exercise.\n\nIf the workout belongs to a training plan, the app asks whether the swap applies only today or also to the plan day. With “Find another exercise …” you can pick any exercise from the catalog.',
       startWeight: 'How much weight should I start with?',
       startWeightText: 'For an exercise you have never done in the app, the app does not know your weight yet. Start light: pick a weight where you complete every rep with good form and no swinging, and could still do 2–3 more reps at the end.\n\nYou can be careful in the first set – adjust the weight from set to set. Enter what you actually managed. Next time the app suggests the weight and raises it as soon as you hit the goal in every set.\n\nAs a beginner, machines are often easier to learn than free weights: the machine guides the movement, you do not have to balance anything.',
       weightSuggestion: 'Weight suggestion: how does the hint work?',
