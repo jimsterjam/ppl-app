@@ -494,7 +494,8 @@ const weeklyProgressLabel = computed(() => $t('dashboard.weeklyProgress', { done
 // Erst nach dem Laden der Workouts entscheiden: davor ist die Liste leer, und der Hinweis blitzte bei jedem App-Start
 // kurz auf, bis die Workouts da waren (User-Report 24.10.).
 const isFirstUse = computed(() => store.workoutsLoaded && !hasDraft.value && !(store.workouts || []).some(w => w?.completed === true))
-const showStopwatchCard = computed(() => !isFirstUse.value || sessionStopwatchStore.elapsedMs > 0)
+// Gym-Zeit erst zeigen, wenn sie läuft oder pausiert ist (Absprache Paul 28.10.): sie startet mit Workout/Warm-up.
+const showStopwatchCard = computed(() => Boolean(sessionStopwatchStore.startedAt))
 
 const lastWorkoutType = computed(() => {
   const last = store.lastSavedWorkout
