@@ -8,18 +8,18 @@
       </button>
 
       <h2 class="section-title">{{ t('plans.templatesSection') }}</h2>
+      <p class="muted small">{{ t('plans.templatesIntro') }}</p>
       <button
         v-for="template in templates"
         :key="template.id"
         type="button"
         class="card template-card"
-        :disabled="busy"
-        @click="createFromTemplate(template)"
+        @click="openTemplate(template)"
       >
         <span class="template-main">
           <span class="card-title">{{ t(`plans.templates.${template.id}.name`) }}</span>
           <span class="muted">{{ t(`plans.templates.${template.id}.desc`) }}</span>
-          <span class="muted days-line">{{ dayLine(template) }}</span>
+          <span class="muted days-line">{{ t('plans.daysShort', { count: template.days.length }) }} · {{ dayLine(template) }}</span>
         </span>
         <span class="chevron" aria-hidden="true"></span>
       </button>
@@ -35,8 +35,6 @@
         </button>
       </template>
 
-      <p v-if="busy" class="muted" role="status">{{ t('plans.creating') }}</p>
-      <p v-if="errorText" class="error" role="alert">{{ errorText }}</p>
     </div>
 
     <AppModal
@@ -77,9 +75,8 @@ import AppModal from '@/components/AppModal.vue'
 import { useToastStore } from '@/stores/toastStore'
 import { usePlanUserId } from '@/composables/usePlanUserId'
 import { PLAN_TEMPLATES, PLAN_TEMPLATE_IDS } from '@/utils/planTemplates'
-import { createPlanFromTemplate, getAllFavorites } from '@/utils/planFromTemplate'
+import { getAllFavorites } from '@/utils/planFromTemplate'
 import { createTrainingPlan } from '@/utils/trainingPlanStorage'
-import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -91,7 +88,6 @@ const SHOW_CUSTOM_PLAN = false
 
 const templates = PLAN_TEMPLATE_IDS.map((id) => PLAN_TEMPLATES[id])
 const busy = ref(false)
-const errorText = ref('')
 
 function dayLine(template) {
   return template.days.map((day) => t(`plans.dayLabel.${day.labelKey}`)).join(' · ')
@@ -103,31 +99,8 @@ function errorMessage(code) {
   return t('plans.errorGeneric')
 }
 
-async function createFromTemplate(template) {
-  if (busy.value) return
-  busy.value = true
-  errorText.value = ''
-  try {
-    const catalog = await loadDefaultExercises()
-    const result = createPlanFromTemplate({
-      userId: userId.value,
-      templateId: template.id,
-      planName: t(`plans.templates.${template.id}.name`),
-      favoritePrefix: t(`plans.templates.${template.id}.favPrefix`),
-      labelFor: (key) => t(`plans.dayLabel.${key}`),
-      catalog
-    })
-    if (!result.ok) {
-      errorText.value = errorMessage(result.error)
-      return
-    }
-    toast.show(t('plans.created', { name: result.plan.name }), { type: 'success' })
-    goAfterCreate(result.plan)
-  } catch {
-    errorText.value = t('plans.errorGeneric')
-  } finally {
-    busy.value = false
-  }
+function openTemplate(template) {
+  router.push({ name: 'plan-template', params: { templateId: template.id } })
 }
 
 // Der erste Plan ist sofort aktiv: dann direkt zum Dashboard („Heute“), sonst zur Plan-Seite.

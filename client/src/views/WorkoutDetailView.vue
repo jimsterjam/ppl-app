@@ -1080,8 +1080,8 @@ import OneTimeHint from '@/components/OneTimeHint.vue'
 import AppModal from '@/components/AppModal.vue'
 import ExerciseList from '@/components/ExerciseList.vue'
 import ExerciseSwapModal from '@/components/ExerciseSwapModal.vue'
-import { buildSwappedExercise, canSwapExercise, replaceExerciseInFavorite } from '@/utils/exerciseSwapApply'
-import { getPlanDayInfo } from '@/utils/planProgress'
+import { buildSwappedExercise, canSwapExercise, replaceExerciseInPlanDay } from '@/utils/exerciseSwapApply'
+import { getPlanDayInfo, planDayTitle } from '@/utils/planProgress'
 import WorkoutTimerConfig from '@/components/timer/WorkoutTimerConfig.vue'
 import SessionStopwatch from '@/components/SessionStopwatch.vue'
 // Einheitliches Icon-Set statt Emoji/ASCII-Mix (🗑️/📝/⋮⋮/▲▼/＋/−) - wie im Rest der App
@@ -2738,7 +2738,7 @@ function openSwap(index) {
   // Plan-Training: nach „nur heute / auch im Plan-Tag“ fragen, mit dem Namen des Tages.
   const { planId, planDayId } = workout.value || {}
   const info = planId && planDayId ? getPlanDayInfo(getFavoriteUserId(), planId, planDayId) : null
-  swapPlanDayLabel.value = info?.favorite ? (info.day.label || info.favorite.name) : ''
+  swapPlanDayLabel.value = info?.hasWorkout ? planDayTitle(info) : ''
   showSwapModal.value = true
 }
 
@@ -2757,8 +2757,8 @@ function onSwapExercise({ entry, scope }) {
   if (scope === 'plan') {
     const { planId, planDayId } = workout.value || {}
     const info = planId && planDayId ? getPlanDayInfo(getFavoriteUserId(), planId, planDayId) : null
-    const result = info?.favorite
-      ? replaceExerciseInFavorite({ userId: getFavoriteUserId(), favoriteId: info.favorite.id, oldExercise: old, entry })
+    const result = info?.hasWorkout
+      ? replaceExerciseInPlanDay({ userId: getFavoriteUserId(), planId, dayId: planDayId, oldExercise: old, entry })
       : { ok: false }
     toast.show(result.ok ? t('swap.planUpdated') : t('swap.planUpdateFailed'), { type: result.ok ? 'success' : 'warning', duration: 3000 })
   }

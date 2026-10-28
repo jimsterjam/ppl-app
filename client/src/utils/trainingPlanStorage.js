@@ -88,10 +88,10 @@ function saveAll(userId, plans) {
  * Neuen Plan anlegen (der erste Plan wird automatisch aktiv, sonst nur mit `makeActive`).
  * @returns {{ ok: boolean, plan?: object, error?: 'limit'|'invalid'|'storage' }}
  */
-export function createTrainingPlan({ userId = 'guest', name, days, makeActive = false } = {}) {
+export function createTrainingPlan({ userId = 'guest', name, days, makeActive = false, level, templateId } = {}) {
   const plans = getTrainingPlans(userId)
   if (!canCreatePlan(plans)) return { ok: false, error: 'limit' }
-  const plan = createPlan({ name, days, active: makeActive || plans.length === 0 })
+  const plan = createPlan({ name, days, active: makeActive || plans.length === 0, level, templateId })
   if (!plan) return { ok: false, error: 'invalid' }
   let next = [...plans, plan]
   if (plan.active) next = setActivePlan(next.map((entry) => (entry.id === plan.id ? entry : { ...entry, active: false })), plan.id)

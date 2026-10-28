@@ -71,3 +71,47 @@ describe('isPlanLimitExceeded', () => {
     assert.equal(isPlanLimitExceeded(3), true)
   })
 })
+
+describe('Plan-Tage mit eigenen Übungen und Stufe', () => {
+  const ex = (n, extra = {}) => ({ exerciseId: `ex_${n}`, name: `Übung ${n}`, muscleGroup: 'Brust', sets: 3, ...extra })
+  const ownDay = (n, exercises) => ({ id: `day_${n}`, label: `Tag ${n}`, type: 'push', goal: 'hypertrophy', exercises })
+
+  test('Tag mit Übungen braucht keinen Favoriten', () => {
+    const { value, error } = sanitizePlanPayload(body({ level: 'advanced', templateId: 'ppl3', days: [ownDay(1, [ex(1), ex(2)])] }))
+    assert.equal(error, undefined)
+    assert.equal(value.days[0].favoriteId, '')
+    assert.equal(value.days[0].type, 'push')
+    assert.deepEqual(value.days[0].exercises.map((e) => e.exerciseId), ['ex_1', 'ex_2'])
+    assert.equal(value.level, 'advanced')
+    assert.equal(value.templateId, 'ppl3')
+  })
+
+  test('Stufe: unbekannt oder fehlend -> beginner', () => {
+    assert.equal(sanitizePlanPayload(body()).value.level, 'beginner')
+    assert.equal(sanitizePlanPayload(body({ level: 'pro' })).value.level, 'beginner')
+    assert.equal(sanitizePlanPayload(body({ level: { $ne: 1 } })).value.level, 'beginner')
+  })
+
+  test('Übungen: nur bekannte Felder, Sätze 1-10, höchstens 12, Ungültiges fällt weg, Texte bereinigt', () => {
+    const many = Array.from({ length: 20 }, (_, i) => ex(i + 1))
+    assert.equal(sanitizePlanPayload(body({ days: [ownDay(1, many)] })).value.days[0].exercises.length, PLAN_LIMITS.maxExercises)
+    const { value } = sanitizePlanPayload(body({ days: [ownDay(1, [
+      ex(1, { sets: 99, extra: 'x' }), ex(2, { sets: 0 }), ex(3, { sets: 'abc' }), { name: 'ohne id' }, ex(4, { name: '<b>Fett</b>\u0007' }), 'text'
+    ])] }))
+    const list = value.days[0].exercises
+    assert.deepEqual(list.map((e) => e.sets), [10, 1, 3, 3])
+    assert.equal('extra' in list[0], false)
+    assert.equal(list[3].name, 'bFett/b')
+  })
+
+  test('Tag ohne Übungen und ohne Favorit ist ungültig', () => {
+    assert.ok(sanitizePlanPayload(body({ days: [ownDay(1, [])] })).error)
+    assert.ok(sanitizePlanPayload(body({ days: [ownDay(1, [{ name: 'x' }])] })).error)
+  })
+
+  test('Typ und Ziel: unbekannte Werte werden zu fullbody / hypertrophy', () => {
+    const { value } = sanitizePlanPayload(body({ days: [{ ...ownDay(1, [ex(1)]), type: 'cardio', goal: 'x' }] }))
+    assert.equal(value.days[0].type, 'fullbody')
+    assert.equal(value.days[0].goal, 'hypertrophy')
+  })
+})

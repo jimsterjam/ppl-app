@@ -1,5 +1,7 @@
 import { buildTemplateExercise, getAllFavorites } from './planFromTemplate'
 import { updateFavoriteWorkout } from './workoutFavorites'
+import { getTrainingPlans, updateTrainingPlan } from './trainingPlanStorage'
+import { replaceDayExercise } from './trainingPlan'
 
 // Übung wechseln: die neue Übung übernimmt die Satzanzahl der alten, alles andere (Wiederholungen, Gewicht, Notiz,
 // Pause, Trainingsart, Aufwärmsätze) gehört zur alten Übung und wird nicht mitgenommen.
@@ -32,7 +34,23 @@ export function canSwapExercise(exercise) {
 }
 
 /**
- * Plan-Tag dauerhaft ändern: die Übung im Favoriten des Tages ersetzen.
+ * Plan-Tag dauerhaft ändern: die Übung im Tag ersetzen (Übungen im Plan) oder, bei älteren Tagen, im Favoriten des Tages.
+ * @returns {{ ok: true } | { ok: false, error: 'dayNotFound'|'favoriteNotFound'|'exerciseNotFound'|'storage' }}
+ */
+export function replaceExerciseInPlanDay({ userId, planId, dayId, oldExercise, entry }) {
+  const plan = getTrainingPlans(userId).find((p) => p.id === planId)
+  const day = plan?.days.find((d) => d.id === dayId)
+  if (!day) return { ok: false, error: 'dayNotFound' }
+  if (!day.exercises?.length) return replaceExerciseInFavorite({ userId, favoriteId: day.favoriteId, oldExercise, entry })
+  const next = { exerciseId: entry._id || entry.id, name: entry.name_en || entry.name, muscleGroup: entry.muscleGroup || '' }
+  const result = updateTrainingPlan({ userId, planId, updater: (p) => replaceDayExercise(p, dayId, oldExercise, next) })
+  if (!result.ok) return { ok: false, error: 'storage' }
+  const changed = result.plan.days.find((d) => d.id === dayId)?.exercises.some((ex) => ex.exerciseId === next.exerciseId)
+  return changed ? { ok: true } : { ok: false, error: 'exerciseNotFound' }
+}
+
+/**
+ * Favorit ändern: die Übung im Favoriten ersetzen.
  * @returns {{ ok: true } | { ok: false, error: 'favoriteNotFound'|'exerciseNotFound'|'storage' }}
  */
 export function replaceExerciseInFavorite({ userId, favoriteId, oldExercise, entry }) {

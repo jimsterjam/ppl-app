@@ -1,11 +1,10 @@
-import { PLAN_TEMPLATES, PLAN_TEMPLATE_GOAL } from './planTemplates'
-import { saveFavoriteWorkout, deleteFavoriteWorkout, getFavoritesByType } from './workoutFavorites'
+import { PLAN_TEMPLATES, PLAN_TEMPLATE_GOAL, PLAN_TEMPLATE_LEVELS, DEFAULT_PLAN_LEVEL } from './planTemplates'
+import { getFavoritesByType } from './workoutFavorites'
 import { createTrainingPlan, getTrainingPlans } from './trainingPlanStorage'
-import { canCreatePlan } from './trainingPlan'
+import { canCreatePlan, normalizePlanLevel } from './trainingPlan'
 
-// Plan aus einer Vorlage anlegen (Absprache Paul 28.10.): aus jedem Trainingstag entsteht ein Favorit (Ziel Muskelaufbau),
-// der Plan verweist darauf. Klappt ein Schritt nicht, werden die schon angelegten Favoriten wieder entfernt - es bleibt
-// nie ein halber Plan zurück.
+// Plan aus einer Vorlage anlegen (Absprache Paul 28.10.): die Übungen jedes Trainingstages werden direkt im Plan
+// gespeichert, es entstehen keine Favoriten (der Favoritenbereich bleibt das, was der Nutzer selbst ablegt).
 
 const FAVORITE_TYPES = ['push', 'pull', 'legs', 'fullbody']
 
@@ -30,60 +29,55 @@ export function buildTemplateExercise(entry, sets) {
   }
 }
 
+/** Übungen einer Vorlage in einer Stufe, aufgelöst gegen den Katalog. `missing` nennt IDs, die der Katalog nicht kennt. */
+export function resolveTemplateDays({ templateId, level, catalog, labelFor = (key) => key }) {
+  const template = PLAN_TEMPLATES[templateId]
+  if (!template) return null
+  const stage = PLAN_TEMPLATE_LEVELS.includes(level) ? level : DEFAULT_PLAN_LEVEL
+  const byId = new Map((Array.isArray(catalog) ? catalog : []).map((entry) => [entry._id, entry]))
+  const missing = []
+  const days = template.days.map((day) => ({
+    labelKey: day.labelKey,
+    label: labelFor(day.labelKey),
+    type: day.type,
+    goal: PLAN_TEMPLATE_GOAL,
+    exercises: day.levels[stage].map((item) => {
+      const entry = byId.get(item.id)
+      if (!entry) { missing.push(item.id); return null }
+      return { exerciseId: entry._id, name: entry.name_en || entry.name, muscleGroup: entry.muscleGroup || '', sets: item.sets, entry }
+    }).filter(Boolean)
+  }))
+  return { days, missing }
+}
+
 /**
  * @param {object} options
  * @param {string} options.userId
  * @param {string} options.templateId - Schlüssel in PLAN_TEMPLATES
+ * @param {'beginner'|'advanced'} [options.level] - Standard: Anfänger
  * @param {string} options.planName - Name des Plans (App-Sprache)
- * @param {string} options.favoritePrefix - Präfix für die Favoriten-Namen (nur Buchstaben, Zahlen, Leerzeichen)
  * @param {(labelKey: string) => string} options.labelFor - Tagbezeichnung in der App-Sprache
  * @param {Array} options.catalog - normalisierter Übungskatalog (loadDefaultExercises)
- * @returns {{ ok: true, plan: object, favorites: object[] } | { ok: false, error: string, detail?: string }}
+ * @returns {{ ok: true, plan: object } | { ok: false, error: 'unknown'|'limit'|'missingExercise'|'storage', detail?: string }}
  */
-export function createPlanFromTemplate({ userId, templateId, planName, favoritePrefix, labelFor, catalog }) {
-  const template = PLAN_TEMPLATES[templateId]
-  if (!template) return { ok: false, error: 'unknown' }
+export function createPlanFromTemplate({ userId, templateId, level = DEFAULT_PLAN_LEVEL, planName, labelFor, catalog }) {
+  if (!PLAN_TEMPLATES[templateId]) return { ok: false, error: 'unknown' }
   if (!canCreatePlan(getTrainingPlans(userId))) return { ok: false, error: 'limit' }
+  const resolved = resolveTemplateDays({ templateId, level, catalog, labelFor })
+  if (resolved.missing.length) return { ok: false, error: 'missingExercise', detail: resolved.missing[0] }
 
-  const byId = new Map((Array.isArray(catalog) ? catalog : []).map((entry) => [entry._id, entry]))
-  // Erst alle Übungen auflösen, dann etwas anlegen.
-  const prepared = []
-  for (const day of template.days) {
-    const exercises = []
-    for (const item of day.exercises) {
-      const entry = byId.get(item.id)
-      if (!entry) return { ok: false, error: 'missingExercise', detail: item.id }
-      exercises.push(buildTemplateExercise(entry, item.sets))
-    }
-    prepared.push({ day, label: labelFor(day.labelKey), exercises })
-  }
-
-  const created = []
-  const rollback = () => created.forEach((fav) => deleteFavoriteWorkout({ userId, type: fav.type, id: fav.id }))
-
-  for (const { day, label, exercises } of prepared) {
-    const name = `${favoritePrefix} ${label}`.replace(/\s+/g, ' ').trim()
-    const result = saveFavoriteWorkout({
-      userId,
-      type: day.type,
-      name,
-      workout: { name, type: day.type, goal: PLAN_TEMPLATE_GOAL, notes: '', exercises }
-    })
-    if (!result.success) {
-      rollback()
-      return { ok: false, error: result.code === 'LIMIT_REACHED' ? 'favoriteLimit' : 'storage', detail: result.code }
-    }
-    created.push(result.favorite)
-  }
-
-  const planResult = createTrainingPlan({
+  const result = createTrainingPlan({
     userId,
     name: planName,
-    days: created.map((fav, i) => ({ favoriteId: fav.id, label: prepared[i].label }))
+    level: normalizePlanLevel(level),
+    templateId,
+    days: resolved.days.map(({ label, type, goal, exercises }) => ({
+      label,
+      type,
+      goal,
+      exercises: exercises.map(({ exerciseId, name, muscleGroup, sets }) => ({ exerciseId, name, muscleGroup, sets }))
+    }))
   })
-  if (!planResult.ok) {
-    rollback()
-    return { ok: false, error: planResult.error === 'limit' ? 'limit' : 'storage', detail: planResult.error }
-  }
-  return { ok: true, plan: planResult.plan, favorites: created }
+  if (!result.ok) return { ok: false, error: result.error === 'limit' ? 'limit' : 'storage', detail: result.error }
+  return { ok: true, plan: result.plan }
 }
