@@ -3,7 +3,14 @@ import { clampText } from './textLimits.js';
 // Prüfung und Bereinigung von Trainingsplänen (client/src/utils/trainingPlan.js ist das Gegenstück). Bewusst als
 // reine Funktionen ohne Express/MongoDB, damit sie ohne Server testbar sind. Es werden nur bekannte Felder
 // übernommen - nie der Request-Body ungeprüft (siehe CLAUDE.md, "Regeln für Texteingaben").
-export const PLAN_LIMITS = Object.freeze({ maxPlans: 3, maxDays: 7, maxName: 40, maxLabel: 24, maxId: 64 });
+export const PLAN_LIMITS = Object.freeze({
+  maxPlans: 3, maxDays: 7, maxName: 40, maxLabel: 24, maxId: 64,
+  // Übungen direkt im Plan-Tag (Vorlagen-Pläne verweisen nicht mehr auf Favoriten)
+  maxExercises: 12, maxSets: 10, maxExerciseName: 80, maxMuscleGroup: 40
+});
+export const PLAN_LEVELS = Object.freeze(['beginner', 'advanced']);
+export const PLAN_DAY_TYPES = Object.freeze(['push', 'pull', 'legs', 'fullbody']);
+export const PLAN_GOALS = Object.freeze(['hypertrophy', 'strength']);
 
 function cleanLine(value, max) {
   // Erst Steuerzeichen/Leerraum bereinigen, dann kürzen - sonst zählen führende Leerzeichen gegen die Länge.
@@ -19,6 +26,30 @@ function cleanId(value) {
 /** Plan-/Tag-Verweis am Workout: nur eine gültige ID, sonst null (Setter darf das Speichern nie scheitern lassen). */
 export function sanitizePlanRef(value) {
   return cleanId(value) || null;
+}
+
+/** Übungen eines Plan-Tages: nur bekannte Felder, Sätze als ganze Zahl 1-10, höchstens 12 Übungen. */
+export function sanitizePlanExercises(value) {
+  const list = Array.isArray(value) ? value : [];
+  const out = [];
+  for (const raw of list.slice(0, PLAN_LIMITS.maxExercises)) {
+    if (!raw || typeof raw !== 'object') continue;
+    const name = cleanLine(raw.name, PLAN_LIMITS.maxExerciseName);
+    const exerciseId = cleanId(raw.exerciseId);
+    if (!name || !exerciseId) continue;
+    const sets = Number.parseInt(raw.sets, 10);
+    out.push({
+      exerciseId,
+      name,
+      muscleGroup: cleanLine(raw.muscleGroup, PLAN_LIMITS.maxMuscleGroup),
+      sets: Number.isInteger(sets) ? Math.min(PLAN_LIMITS.maxSets, Math.max(1, sets)) : 3
+    });
+  }
+  return out;
+}
+
+export function sanitizePlanLevel(value) {
+  return PLAN_LEVELS.includes(value) ? value : 'beginner';
 }
 
 function cleanDate(value) {
@@ -45,9 +76,19 @@ export function sanitizePlanPayload(body) {
     if (!raw || typeof raw !== 'object') continue;
     const id = cleanId(raw.id);
     const favoriteId = cleanId(raw.favoriteId);
-    if (!id || !favoriteId || seen.has(id)) continue;
+    const exercises = sanitizePlanExercises(raw.exercises);
+    // Ein Tag braucht Übungen im Plan oder (ältere Pläne) einen Favoriten.
+    if (!id || (!favoriteId && !exercises.length) || seen.has(id)) continue;
     seen.add(id);
-    days.push({ id, label: cleanLine(raw.label, PLAN_LIMITS.maxLabel), favoriteId, lastDoneAt: cleanDate(raw.lastDoneAt) });
+    days.push({
+      id,
+      label: cleanLine(raw.label, PLAN_LIMITS.maxLabel),
+      favoriteId,
+      type: PLAN_DAY_TYPES.includes(raw.type) ? raw.type : 'fullbody',
+      goal: PLAN_GOALS.includes(raw.goal) ? raw.goal : 'hypertrophy',
+      exercises,
+      lastDoneAt: cleanDate(raw.lastDoneAt)
+    });
   }
   if (!days.length) return { error: 'days enthält keinen gültigen Tag' };
 
@@ -57,6 +98,8 @@ export function sanitizePlanPayload(body) {
       clientId,
       name,
       days,
+      level: sanitizePlanLevel(body.level),
+      templateId: cleanId(body.templateId).slice(0, 24),
       activeDayIndex: Number.isInteger(index) && index >= 0 && index < days.length ? index : 0,
       active: body.active === true
     }

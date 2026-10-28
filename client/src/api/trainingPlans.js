@@ -25,6 +25,8 @@ export async function pushTrainingPlanRemote(plan, token) {
     const res = await api.post('', {
       clientId: plan.id,
       name: plan.name,
+      level: plan.level,
+      templateId: plan.templateId,
       days: plan.days,
       activeDayIndex: plan.activeDayIndex,
       active: plan.active

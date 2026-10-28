@@ -8,6 +8,7 @@
       </button>
 
       <div class="status-row">
+        <span class="pill pill--level">{{ t(`plans.level.${plan.level || 'beginner'}`) }}</span>
         <span v-if="plan.active" class="pill">{{ t('plans.activeBadge') }}</span>
         <button v-else type="button" class="btn-secondary" @click="activate">{{ t('plans.setActive') }}</button>
       </div>
@@ -123,6 +124,12 @@ onMounted(reload)
 
 const favoriteById = computed(() => new Map(favorites.value.map((fav) => [fav.id, fav])))
 
+// Übungen eines Tages: im Plan-Tag selbst, sonst (ältere Pläne, selbst hinzugefügte Tage) im verknüpften Favoriten.
+function dayExercises(day) {
+  if (day.exercises?.length) return day.exercises
+  return favoriteById.value.get(day.favoriteId)?.workout?.exercises || []
+}
+
 function dayTitle(day) {
   return day.label || favoriteById.value.get(day.favoriteId)?.name || t('plans.favoriteMissing')
 }
@@ -130,10 +137,10 @@ function dayTitle(day) {
 function daySub(day, index) {
   const parts = []
   if (index === plan.value.activeDayIndex) parts.push(t('plans.nextDay'))
-  const fav = favoriteById.value.get(day.favoriteId)
-  if (!fav) parts.push(t('plans.favoriteMissing'))
+  const exercises = dayExercises(day)
+  if (!exercises.length) parts.push(t('plans.favoriteMissing'))
   else {
-    const muscles = [...new Set(getDayMuscleGroups(fav).map((group) => getTranslatedMuscleGroup(group)).filter(Boolean))].join(', ')
+    const muscles = [...new Set(getDayMuscleGroups(exercises).map((group) => getTranslatedMuscleGroup(group)).filter(Boolean))].join(', ')
     if (muscles) parts.push(muscles)
   }
   parts.push(day.lastDoneAt ? t('plans.lastShort', { date: formatPlanDate(day.lastDoneAt, locale.value) }) : t('plans.neverTrained'))
@@ -237,7 +244,9 @@ function deletePlan() {
 .small { font-size: 0.8rem; line-height: 1.5; }
 .notice { color: var(--warning-text, var(--muted)); }
 .status-row { display: flex; align-items: center; }
+.status-row { gap: 8px; flex-wrap: wrap; }
 .pill { font-size: 0.72rem; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent); font-weight: 700; }
+.pill--level { border-color: var(--card-border); color: var(--muted); }
 .day { display: flex; align-items: center; gap: 8px; border: 1px solid var(--card-border); background: var(--card-bg); border-radius: var(--card-radius); padding: 6px 8px 6px 6px; }
 .day.now { border-color: var(--accent); }
 .day-main { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; min-height: 56px; padding: 0 6px; border: none; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }

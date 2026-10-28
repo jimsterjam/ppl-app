@@ -1,11 +1,18 @@
-// Trainingsplan (Absprache Paul 28.10.): geordnete Reihe von Trainingstagen, jeder Tag verweist auf einen Favoriten
-// (utils/workoutFavorites.js). Der Plan richtet sich nach den Trainings, nicht nach dem Kalender ("Rotation"):
+// Trainingsplan (Absprache Paul 28.10.): geordnete Reihe von Trainingstagen. Ein Tag enthält seine Übungen selbst
+// (Pläne aus Vorlagen, getrennt von den Favoriten); ältere Pläne und Tage, die Paul selbst aus Favoriten hinzufügt,
+// verweisen stattdessen auf einen Favoriten (utils/workoutFavorites.js). Der Plan richtet sich nach den Trainings, nicht nach dem Kalender ("Rotation"):
 // Nach dem Speichern eines Plan-Trainings rückt er zum Tag NACH dem trainierten vor, nach dem letzten Tag wieder zum
 // ersten. Reine Funktionen ohne Speicher/Netz - Speicherung und Server-Abgleich: utils/trainingPlanStorage.js.
 //
-// Plan: { id, name, days: [{ id, label, favoriteId, lastDoneAt }], activeDayIndex, active, createdAt, updatedAt }
+// Plan: { id, name, level, templateId, days: [{ id, label, type, goal, exercises: [{ exerciseId, name, muscleGroup, sets }],
+//         favoriteId, lastDoneAt }], activeDayIndex, active, createdAt, updatedAt }
 
-export const PLAN_LIMITS = Object.freeze({ maxPlans: 3, maxDays: 7, maxName: 40, maxLabel: 24 })
+export const PLAN_LIMITS = Object.freeze({
+  maxPlans: 3, maxDays: 7, maxName: 40, maxLabel: 24, maxExercises: 12, maxSets: 10, maxExerciseName: 80, maxMuscleGroup: 40
+})
+export const PLAN_LEVELS = Object.freeze(['beginner', 'advanced'])
+const DAY_TYPES = ['push', 'pull', 'legs', 'fullbody']
+const GOALS = ['hypertrophy', 'strength']
 
 // eslint-disable-next-line no-control-regex -- Steuerzeichen werden hier bewusst entfernt.
 const CONTROL_CHARS = new RegExp('[\\u0000-\\u001f\\u007f\\u2028\\u2029]+', 'g')
@@ -45,14 +52,42 @@ function cleanDate(value) {
   return Number.isFinite(time) ? new Date(time).toISOString() : null
 }
 
+export function normalizePlanLevel(value) {
+  return PLAN_LEVELS.includes(value) ? value : 'beginner'
+}
+
+/** Übungen eines Plan-Tages: nur bekannte Felder, Sätze 1-10, höchstens 12 Übungen. */
+export function normalizePlanExercises(value) {
+  const out = []
+  for (const raw of (Array.isArray(value) ? value : []).slice(0, PLAN_LIMITS.maxExercises)) {
+    if (!raw || typeof raw !== 'object') continue
+    const name = cleanPlanText(raw.name, PLAN_LIMITS.maxExerciseName)
+    const exerciseId = sanitizePlanRef(raw.exerciseId)
+    if (!name || !exerciseId) continue
+    const sets = Number.parseInt(raw.sets, 10)
+    out.push({
+      exerciseId,
+      name,
+      muscleGroup: cleanPlanText(raw.muscleGroup, PLAN_LIMITS.maxMuscleGroup),
+      sets: Number.isInteger(sets) ? Math.min(PLAN_LIMITS.maxSets, Math.max(1, sets)) : 3
+    })
+  }
+  return out
+}
+
 function normalizeDay(raw) {
   if (!raw || typeof raw !== 'object') return null
   const favoriteId = String(raw.favoriteId ?? '').trim()
-  if (!favoriteId) return null
+  const exercises = normalizePlanExercises(raw.exercises)
+  // Ein Tag braucht Übungen im Plan oder (ältere Pläne) einen Favoriten.
+  if (!favoriteId && !exercises.length) return null
   return {
     id: String(raw.id || '').trim() || makeDayId(),
     label: cleanPlanText(raw.label, PLAN_LIMITS.maxLabel),
     favoriteId,
+    type: DAY_TYPES.includes(raw.type) ? raw.type : 'fullbody',
+    goal: GOALS.includes(raw.goal) ? raw.goal : 'hypertrophy',
+    exercises,
     lastDoneAt: cleanDate(raw.lastDoneAt)
   }
 }
@@ -76,6 +111,8 @@ export function normalizePlan(raw, now = nowIso()) {
   return {
     id: String(raw.id || '').trim() || makePlanId(),
     name,
+    level: normalizePlanLevel(raw.level),
+    templateId: sanitizePlanRef(raw.templateId)?.slice(0, 24) || '',
     days,
     activeDayIndex: Number.isInteger(index) && index >= 0 && index < days.length ? index : 0,
     active: raw.active === true,
@@ -84,9 +121,23 @@ export function normalizePlan(raw, now = nowIso()) {
   }
 }
 
-/** Neuer Plan; `days` = [{ favoriteId, label? }]. */
-export function createPlan({ name, days, active = false } = {}, now = nowIso()) {
-  return normalizePlan({ name, days, active, createdAt: now, updatedAt: now }, now)
+/** Neuer Plan; `days` = [{ exercises, type, goal, label? }] oder [{ favoriteId, label? }]. */
+export function createPlan({ name, days, active = false, level, templateId } = {}, now = nowIso()) {
+  return normalizePlan({ name, days, active, level, templateId, createdAt: now, updatedAt: now }, now)
+}
+
+/** Übung in einem Plan-Tag ersetzen (Übung wechseln, „auch im Plan-Tag ändern“). Die Satzanzahl bleibt. */
+export function replaceDayExercise(plan, dayId, oldExercise, newExercise, now = nowIso()) {
+  const index = getDayIndex(plan, dayId)
+  if (index < 0) return plan
+  const day = plan.days[index]
+  const position = day.exercises.findIndex((ex) => (oldExercise?.exerciseId && ex.exerciseId === String(oldExercise.exerciseId))
+    || ex.name.toLowerCase() === String(oldExercise?.name || '').trim().toLowerCase())
+  if (position < 0) return plan
+  const next = normalizePlanExercises([{ ...newExercise, sets: day.exercises[position].sets }])
+  if (!next.length) return plan
+  const exercises = day.exercises.map((ex, i) => (i === position ? next[0] : ex))
+  return touch(plan, { days: plan.days.map((d, i) => (i === index ? { ...d, exercises } : d)) }, now)
 }
 
 function touch(plan, changes, now) {
@@ -124,9 +175,9 @@ export function completeDay(plan, dayId, doneAt = nowIso(), now = nowIso()) {
 }
 
 /** Tag anhängen; `null`, wenn das Tageslimit erreicht oder der Favorit fehlt. */
-export function addDay(plan, { favoriteId, label = '' } = {}, now = nowIso()) {
+export function addDay(plan, { favoriteId, label = '', ...rest } = {}, now = nowIso()) {
   if (plan.days.length >= PLAN_LIMITS.maxDays) return null
-  const day = normalizeDay({ favoriteId, label })
+  const day = normalizeDay({ ...rest, favoriteId, label })
   if (!day) return null
   return touch(plan, { days: [...plan.days, day] }, now)
 }

@@ -537,8 +537,19 @@ export const messages = {
       lastShort: 'zuletzt {date}',
       nextDay: 'Nächster Tag',
       newTitle: 'Plan anlegen',
+      level: { beginner: 'Anfänger', advanced: 'Fortgeschritten' },
+      levelTitle: 'Für wen ist der Plan?',
+      levelBeginnerHint: 'Geführte Maschinen, weniger Übungen und Sätze. Ideal, wenn du neu im Gym bist.',
+      levelAdvancedHint: 'Freie Gewichte und mehr Umfang. Für alle mit sicherer Technik.',
+      templatesIntro: 'Such dir eine Vorlage aus. Du siehst vorher, was drinsteckt, und entscheidest dann, ob du sie wählst.',
+      explainTitle: 'Das steckt drin',
+      previewDays: 'Trainingstage',
+      exerciseSets: '{count} Sätze',
+      choosePlan: 'Diesen Plan wählen',
+      choosePlanHint: 'Du kannst Übungen später mit ⇄ ersetzen. Der Plan erscheint danach im Startbereich als „Heute“.',
+      daysShort: '{count} Tage',
       templatesSection: 'Mit Vorlage starten',
-      templateDisclaimer: 'Vorlagen sind Vorschläge für den Einstieg und ersetzen keine individuelle Beratung. Aus jedem Trainingstag entsteht ein Favorit, den du ändern kannst.',
+      templateDisclaimer: 'Vorlagen sind Vorschläge für den Einstieg und ersetzen keine individuelle Beratung. Einzelne Übungen kannst du später mit ⇄ ersetzen.',
       customSection: 'Oder selbst',
       startEmpty: 'Leer anfangen',
       customTitle: 'Eigenen Plan anlegen',
@@ -598,10 +609,38 @@ export const messages = {
         fullA: 'Ganzkörper A', fullB: 'Ganzkörper B', fullC: 'Ganzkörper C'
       },
       templates: {
-        ppl3: { name: 'Push/Pull/Legs · 3 Tage', desc: 'Ein Durchgang pro Woche. Gut für den Einstieg.', favPrefix: 'PPL 3 Tage' },
-        ppl6: { name: 'Push/Pull/Legs · 6 Tage', desc: 'Zwei Durchgänge pro Woche.', favPrefix: 'PPL 6 Tage' },
-        ul4: { name: 'Ober-/Unterkörper · 4 Tage', desc: 'Zwei Mal Oberkörper, zwei Mal Unterkörper.', favPrefix: 'Ober Unterkörper' },
-        fb3: { name: 'Ganzkörper · 3 Tage', desc: 'Jedes Mal der ganze Körper.', favPrefix: 'Ganzkörper' }
+        ppl3: {
+          name: 'Push/Pull/Legs · 3 Tage',
+          desc: 'Drei Trainingstage: Drücken, Ziehen, Beine. Ein Durchgang pro Woche.',
+          explain: {
+            beginner: 'Drei Trainingstage pro Woche: Push (Brust, Schultern, Trizeps), Pull (Rücken, Bizeps) und Legs (Beine). Dazwischen ruhst du dich aus.\n\nDie Anfänger-Stufe nutzt vor allem geführte Maschinen: Sie geben die Bewegung vor, du musst nichts ausbalancieren und kannst dich auf saubere Technik konzentrieren. Pro Tag sind es 5 Übungen mit 2–3 Sätzen.\n\nStarte jedes Mal mit einem leichten Gewicht. Die App schlägt dir später vor, wann du steigern kannst.',
+            advanced: 'Drei Trainingstage pro Woche: Push (Brust, Schultern, Trizeps), Pull (Rücken, Bizeps) und Legs (Beine).\n\nDie Fortgeschritten-Stufe nutzt freie Gewichte (Langhantel, Kurzhanteln) und Kabelzug, pro Tag 5 Übungen mit 3–4 Sätzen. Du solltest Kniebeuge, Bankdrücken und Rudern sicher beherrschen.\n\nFreie Gewichte setzen den stärkeren Reiz, verlangen aber mehr Technik und Körperspannung.'
+          }
+        },
+        ppl6: {
+          name: 'Push/Pull/Legs · 6 Tage',
+          desc: 'Sechs Trainingstage: zwei Durchgänge Drücken, Ziehen, Beine pro Woche.',
+          explain: {
+            beginner: 'Sechs Trainingstage: Push, Pull und Legs je zweimal (A und B mit unterschiedlichen Übungen). Das ist viel Training – als Einsteiger starte lieber mit dem 3-Tage-Plan.\n\nDie Anfänger-Stufe nutzt geführte Maschinen mit 2–3 Sätzen pro Übung. Der Plan folgt deinen Trainings, nicht dem Kalender: Lässt du einen Tag aus, geht es einfach mit dem nächsten weiter.',
+            advanced: 'Sechs Trainingstage: Push, Pull und Legs je zweimal. A und B trainieren dieselben Muskeln mit unterschiedlichen Übungen.\n\nDie Fortgeschritten-Stufe nutzt freie Gewichte und Kabelzug mit 3–4 Sätzen pro Übung. Sie passt, wenn du sicher trainierst, gut regenerierst und viel Zeit hast.'
+          }
+        },
+        ul4: {
+          name: 'Ober-/Unterkörper · 4 Tage',
+          desc: 'Vier Trainingstage: zweimal Oberkörper, zweimal Unterkörper.',
+          explain: {
+            beginner: 'Vier Trainingstage: zweimal Oberkörper (Brust, Rücken, Schultern, Arme) und zweimal Unterkörper (Beine, Gesäß, Waden, Bauch). A und B haben verschiedene Übungen.\n\nDie Anfänger-Stufe nutzt geführte Maschinen mit 2–3 Sätzen pro Übung. Jede Muskelgruppe kommt zweimal pro Woche dran – ein guter Rhythmus zum Lernen und Wachsen.',
+            advanced: 'Vier Trainingstage: zweimal Oberkörper, zweimal Unterkörper. A und B haben verschiedene Übungen.\n\nDie Fortgeschritten-Stufe nutzt freie Gewichte mit 3–4 Sätzen pro Übung. Jede Muskelgruppe kommt zweimal pro Woche dran, mit genug Pause dazwischen.'
+          }
+        },
+        fb3: {
+          name: 'Ganzkörper · 3 Tage',
+          desc: 'Drei Trainingstage, jedes Mal der ganze Körper.',
+          explain: {
+            beginner: 'Drei Trainingstage, an jedem trainierst du den ganzen Körper: Beine, Brust, Rücken, Schultern und Bauch. Zwischen den Trainings liegt ein Ruhetag. A, B und C haben verschiedene Übungen.\n\nDie Anfänger-Stufe nutzt geführte Maschinen mit 2–3 Sätzen pro Übung. Das ist der klassische Einstieg: wenig Aufwand, jede Muskelgruppe öfter pro Woche.',
+            advanced: 'Drei Trainingstage, an jedem trainierst du den ganzen Körper. A, B und C haben verschiedene Übungen.\n\nDie Fortgeschritten-Stufe nutzt freie Gewichte mit 2–3 Sätzen pro Übung. Gut, wenn du wenig Zeit hast und trotzdem jede Muskelgruppe mehrmals pro Woche trainieren willst.'
+          }
+        }
       }
     },
     swap: {
@@ -2137,8 +2176,19 @@ export const messages = {
       lastShort: 'last {date}',
       nextDay: 'Next day',
       newTitle: 'Create plan',
+      level: { beginner: 'Beginner', advanced: 'Advanced' },
+      levelTitle: 'Who is the plan for?',
+      levelBeginnerHint: 'Guided machines, fewer exercises and sets. Ideal if you are new to the gym.',
+      levelAdvancedHint: 'Free weights and more volume. For anyone with solid technique.',
+      templatesIntro: 'Pick a template. You see what is in it first and then decide whether to choose it.',
+      explainTitle: 'What is in it',
+      previewDays: 'Training days',
+      exerciseSets: '{count} sets',
+      choosePlan: 'Choose this plan',
+      choosePlanHint: 'You can replace exercises later with ⇄. The plan then shows up on the start screen as “Today”.',
+      daysShort: '{count} days',
       templatesSection: 'Start with a template',
-      templateDisclaimer: 'Templates are suggestions to get started and do not replace individual advice. Each training day becomes a favorite that you can change.',
+      templateDisclaimer: 'Templates are suggestions to get started and do not replace individual advice. You can replace single exercises later with ⇄.',
       customSection: 'Or your own',
       startEmpty: 'Start empty',
       customTitle: 'Create your own plan',
@@ -2198,10 +2248,38 @@ export const messages = {
         fullA: 'Full body A', fullB: 'Full body B', fullC: 'Full body C'
       },
       templates: {
-        ppl3: { name: 'Push/Pull/Legs · 3 days', desc: 'One round per week. Good for getting started.', favPrefix: 'PPL 3 days' },
-        ppl6: { name: 'Push/Pull/Legs · 6 days', desc: 'Two rounds per week.', favPrefix: 'PPL 6 days' },
-        ul4: { name: 'Upper/Lower · 4 days', desc: 'Two upper-body days, two lower-body days.', favPrefix: 'Upper Lower' },
-        fb3: { name: 'Full body · 3 days', desc: 'The whole body every time.', favPrefix: 'Full body' }
+        ppl3: {
+          name: 'Push/Pull/Legs · 3 days',
+          desc: 'Three training days: push, pull, legs. One round per week.',
+          explain: {
+            beginner: 'Three training days per week: push (chest, shoulders, triceps), pull (back, biceps) and legs. You rest in between.\n\nThe beginner level mostly uses guided machines: they set the movement path, so you do not have to balance anything and can focus on clean technique. Each day has 5 exercises with 2–3 sets.\n\nStart each time with a light weight. The app will tell you later when to go heavier.',
+            advanced: 'Three training days per week: push (chest, shoulders, triceps), pull (back, biceps) and legs.\n\nThe advanced level uses free weights (barbell, dumbbells) and cables, 5 exercises per day with 3–4 sets. You should be confident with squats, bench press and rows.\n\nFree weights give the stronger stimulus but need more technique and body tension.'
+          }
+        },
+        ppl6: {
+          name: 'Push/Pull/Legs · 6 days',
+          desc: 'Six training days: two rounds of push, pull, legs per week.',
+          explain: {
+            beginner: 'Six training days: push, pull and legs twice each (A and B with different exercises). That is a lot of training – as a beginner, start with the 3-day plan.\n\nThe beginner level uses guided machines with 2–3 sets per exercise. The plan follows your workouts, not the calendar: if you skip a day, it simply continues with the next one.',
+            advanced: 'Six training days: push, pull and legs twice each. A and B train the same muscles with different exercises.\n\nThe advanced level uses free weights and cables with 3–4 sets per exercise. It fits if you train safely, recover well and have plenty of time.'
+          }
+        },
+        ul4: {
+          name: 'Upper/Lower · 4 days',
+          desc: 'Four training days: two upper-body, two lower-body.',
+          explain: {
+            beginner: 'Four training days: upper body twice (chest, back, shoulders, arms) and lower body twice (legs, glutes, calves, abs). A and B have different exercises.\n\nThe beginner level uses guided machines with 2–3 sets per exercise. Every muscle group is trained twice a week – a good rhythm for learning and growing.',
+            advanced: 'Four training days: upper body twice, lower body twice. A and B have different exercises.\n\nThe advanced level uses free weights with 3–4 sets per exercise. Every muscle group is trained twice a week with enough rest in between.'
+          }
+        },
+        fb3: {
+          name: 'Full body · 3 days',
+          desc: 'Three training days, the whole body every time.',
+          explain: {
+            beginner: 'Three training days, each one trains the whole body: legs, chest, back, shoulders and abs. There is a rest day between workouts. A, B and C have different exercises.\n\nThe beginner level uses guided machines with 2–3 sets per exercise. This is the classic start: little effort, every muscle group several times a week.',
+            advanced: 'Three training days, each one trains the whole body. A, B and C have different exercises.\n\nThe advanced level uses free weights with 2–3 sets per exercise. Good if you have little time but want to train every muscle group several times a week.'
+          }
+        }
       }
     },
     swap: {

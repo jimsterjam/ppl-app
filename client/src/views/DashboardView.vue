@@ -33,9 +33,9 @@
           <button class="today-remove" type="button" :aria-label="$t('plans.removeAria')" :title="$t('plans.remove')" @click="showRemovePlan = true">✕</button>
         </h3>
         <p class="today-sub">{{ todaySubline }}</p>
-        <p v-if="!todayPlan.favorite" class="today-warn">{{ $t('plans.todayFavoriteMissing') }}</p>
+        <p v-if="!todayPlan.hasWorkout" class="today-warn">{{ $t('plans.todayFavoriteMissing') }}</p>
         <div class="today-actions">
-          <button v-if="todayPlan.favorite" class="today-start" type="button" @click="startPlanDay(todayPlan.plan, todayPlan.day)">
+          <button v-if="todayPlan.hasWorkout" class="today-start" type="button" @click="startPlanDay(todayPlan.plan, todayPlan.day)">
             {{ $t('plans.startTraining') }}
           </button>
           <button v-else class="today-start" type="button" @click="router.push({ name: 'plan-detail', params: { id: todayPlan.plan.id } })">
@@ -254,15 +254,15 @@
           type="button"
           class="plan-pick-btn"
           :class="{ 'is-next': index === todayPlan.plan.activeDayIndex }"
-          :disabled="!planDayFavorite(day)"
+          :disabled="!planDayInfo(day)?.hasWorkout"
           @click="pickPlanDay(day)"
         >
           <span class="plan-pick-text">
-            <span>{{ planDayTitle(day) }}</span>
+            <span>{{ planDayLabel(day) }}</span>
             <small v-if="planDayMuscles(day)">{{ planDayMuscles(day) }}</small>
           </span>
           <small v-if="index === todayPlan.plan.activeDayIndex">{{ $t('plans.nextDay') }}</small>
-          <small v-else-if="!planDayFavorite(day)">{{ $t('plans.favoriteMissing') }}</small>
+          <small v-else-if="!planDayInfo(day)?.hasWorkout">{{ $t('plans.favoriteMissing') }}</small>
         </button>
       </div>
     </AppModal>
@@ -334,9 +334,10 @@ import NameEditModal from '@/components/NameEditModal.vue'
 import WorkoutGoalPicker from '@/components/WorkoutGoalPicker.vue'
 import { getTrainingPlans, updateTrainingPlan, deleteTrainingPlan } from '@/utils/trainingPlanStorage'
 import { useToastStore } from '@/stores/toastStore'
-import { getTodayPlanInfo, getDayMuscleGroups } from '@/utils/planProgress'
+import { getTodayPlanInfo, getPlanDayInfo, getDayMuscleGroups, buildDayStartFavorite, planDayTitle as planDayTitleOf } from '@/utils/planProgress'
+import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
-import { getAllFavorites } from '@/utils/planFromTemplate'
+import { migrateTemplateFavoritesToPlans } from '@/utils/planMigration'
 import { findPlansUsingFavorite, removeFavoriteFromPlan } from '@/utils/trainingPlan'
 import { sanitizeWorkoutGoal, WORKOUT_GOALS, GENERATOR_GOALS, WORKOUT_GOAL_LABEL_KEYS } from '@/utils/workoutGoal'
 
@@ -969,6 +970,22 @@ function removeTodayPlan() {
   if (result.ok) toast.show($t('plans.removed', { name: plan.name }), { type: 'success' })
 }
 
+// Einmalige Umstellung: Vorlagen-Pläne der ersten Fassung hatten je Tag einen Favoriten angelegt (siehe utils/planMigration.js).
+async function migrateLegacyPlans() {
+  try {
+    const userId = getCurrentFavoritesUserId()
+    if (!getTrainingPlans(userId).some((plan) => plan.days.some((day) => day.favoriteId && !day.exercises?.length))) return
+    const catalog = await loadDefaultExercises().catch(() => [])
+    const result = migrateTemplateFavoritesToPlans({ userId, catalog })
+    if (result.plans) {
+      refreshTodayPlan()
+      if (startFlowStep.value === 'all-favorites') loadAllFavoriteWorkouts()
+    }
+  } catch (err) {
+    logger.warn('[Dashboard] Plan-Umstellung fehlgeschlagen', err?.message)
+  }
+}
+
 function refreshTodayPlan() {
   try {
     todayPlan.value = getTodayPlanInfo(getCurrentFavoritesUserId())
@@ -978,21 +995,22 @@ function refreshTodayPlan() {
   }
 }
 
-function planDayFavorite(day) {
-  return getAllFavorites(getCurrentFavoritesUserId()).find((fav) => fav.id === day?.favoriteId) || null
+// Tag samt Übungen (im Plan-Tag selbst oder im verknüpften Favoriten), siehe utils/planProgress.js.
+function planDayInfo(day) {
+  return todayPlan.value && day ? getPlanDayInfo(getCurrentFavoritesUserId(), todayPlan.value.plan.id, day.id) : null
 }
 
-function planDayTitle(day) {
-  return day?.label || planDayFavorite(day)?.name || $t('plans.favoriteMissing')
+function planDayLabel(day) {
+  return planDayTitleOf(planDayInfo(day)) || $t('plans.favoriteMissing')
 }
 
-const todayDayTitle = computed(() => planDayTitle(todayPlan.value?.day))
+const todayDayTitle = computed(() => planDayTitleOf(todayPlan.value) || $t('plans.favoriteMissing'))
 
 const { getTranslatedMuscleGroup } = useExerciseTranslation()
 
 // Muskeln eines Plan-Tages in der App-Sprache („Brust, Schultern, Trizeps“) - erklärt, was hinter „Push A“ steckt.
 function planDayMuscles(day) {
-  const labels = getDayMuscleGroups(planDayFavorite(day)).map((group) => getTranslatedMuscleGroup(group))
+  const labels = getDayMuscleGroups(planDayInfo(day)?.exercises).map((group) => getTranslatedMuscleGroup(group))
   return [...new Set(labels.filter(Boolean))].join(', ')
 }
 
@@ -1003,8 +1021,11 @@ const todaySubline = computed(() => {
 })
 
 // Tag des Plans starten: wie ein Favorit (inkl. Zielabfrage bei alten Favoriten), plus Plan/Tag zum Speichern am Workout.
-function startPlanDay(plan, day) {
-  const favorite = planDayFavorite(day)
+async function startPlanDay(plan, day) {
+  const info = getPlanDayInfo(getCurrentFavoritesUserId(), plan.id, day.id)
+  let catalog = []
+  try { catalog = await loadDefaultExercises() } catch { catalog = [] }
+  const favorite = buildDayStartFavorite(info, catalog)
   if (!favorite) return
   const planRef = { planId: plan.id, planDayId: day.id }
   const goal = favoriteGoalOf(favorite)
@@ -1271,6 +1292,7 @@ onUnmounted(stopAiWarmup)
 onMounted(() => {
   draftSourceLogged.value = false
   refreshTodayPlan()
+  migrateLegacyPlans()
   window.addEventListener('fbe:plans-changed', refreshTodayPlan)
   window.addEventListener('online', onOnlineStatus)
   window.addEventListener('offline', onOfflineStatus)
