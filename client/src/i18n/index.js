@@ -132,11 +132,6 @@ export const messages = {
   lastSaved: 'Zuletzt gespeichert',
   resumeDraft: 'Letztes Workout fortsetzen?',
   fullBodyLabel: 'Full Body',
-  workoutTypeInfoTitle: 'Workout-Typ erklärt',
-  workoutTypeInfo: 'Info zu diesem Workout-Typ',
-  pushInfo: 'Push trainiert Brust, Schultern und Trizeps.',
-  pullInfo: 'Pull trainiert Rücken und Bizeps.',
-  legsInfo: 'Legs trainiert Beine und Gesäß.',
   freestyleInfo: 'Full Body trainiert den ganzen Körper in einer Einheit.'
   ,startModeTitle: 'Workout starten'
   ,startModeText: 'Möchtest du dein Workout selbst zusammenstellen oder generieren lassen?'
@@ -148,10 +143,6 @@ export const messages = {
   ,allFavoritesEmpty: 'Noch keine Favoriten gespeichert.'
   ,plansButton: 'Trainingspläne'
   ,freeTrainingTitle: 'Selbst zusammenstellen'
-  ,pushMuscles: 'Brust · Schultern · Trizeps'
-  ,pullMuscles: 'Rücken · Bizeps'
-  ,legsMuscles: 'Beine · Gesäß · Waden'
-  ,fullBodyMuscles: 'Ganzer Körper'
   ,shortFavorites: 'Favoriten'
   ,favoritesHint: 'Wähle einen Favoriten, um direkt zu starten oder anzupassen.'
   ,favoritesEmpty: 'Noch keine Favoriten für diesen Typ gespeichert.'
@@ -1805,11 +1796,6 @@ export const messages = {
   lastSaved: 'Last saved',
   resumeDraft: 'Resume last workout?',
   fullBodyLabel: 'Full body',
-  workoutTypeInfoTitle: 'Workout type explained',
-  workoutTypeInfo: 'Info about this workout type',
-  pushInfo: 'Push targets chest, shoulders, and triceps.',
-  pullInfo: 'Pull targets back and biceps.',
-  legsInfo: 'Legs targets lower body and glutes.',
   freestyleInfo: 'Full body trains the entire body in one session.'
   ,startModeTitle: 'Start workout'
   ,startModeText: 'Do you want to build your workout manually or generate one?'
@@ -1821,10 +1807,6 @@ export const messages = {
   ,allFavoritesEmpty: 'No favorites saved yet.'
   ,plansButton: 'Training plans'
   ,freeTrainingTitle: 'Build your own'
-  ,pushMuscles: 'Chest · Shoulders · Triceps'
-  ,pullMuscles: 'Back · Biceps'
-  ,legsMuscles: 'Legs · Glutes · Calves'
-  ,fullBodyMuscles: 'Whole body'
   ,shortFavorites: 'Favorites'
   ,favoritesHint: 'Select a favorite to start immediately or adjust it.'
   ,favoritesEmpty: 'No favorites saved for this type yet.'
