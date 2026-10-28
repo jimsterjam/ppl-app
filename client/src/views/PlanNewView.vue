@@ -115,12 +115,18 @@ async function createFromTemplate(template) {
       return
     }
     toast.show(t('plans.created', { name: result.plan.name }), { type: 'success' })
-    router.replace({ name: 'plan-detail', params: { id: result.plan.id } })
+    goAfterCreate(result.plan)
   } catch {
     errorText.value = t('plans.errorGeneric')
   } finally {
     busy.value = false
   }
+}
+
+// Der erste Plan ist sofort aktiv: dann direkt zum Dashboard („Heute“), sonst zur Plan-Seite.
+function goAfterCreate(plan) {
+  if (plan.active) router.replace({ name: 'dashboard' })
+  else router.replace({ name: 'plan-detail', params: { id: plan.id } })
 }
 
 // Leerer Plan: Name + Tage aus vorhandenen Favoriten.
@@ -146,7 +152,7 @@ function createCustom() {
   if (!result.ok) { customError.value = errorMessage(result.error); return }
   showCustom.value = false
   toast.show(t('plans.created', { name: result.plan.name }), { type: 'success' })
-  router.replace({ name: 'plan-detail', params: { id: result.plan.id } })
+  goAfterCreate(result.plan)
 }
 </script>
 

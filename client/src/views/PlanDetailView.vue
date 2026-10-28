@@ -96,6 +96,7 @@ import { useI18n } from 'vue-i18n'
 import HeaderBar from '@/components/HeaderBar.vue'
 import AppModal from '@/components/AppModal.vue'
 import { usePlanUserId, formatPlanDate } from '@/composables/usePlanUserId'
+import { useToastStore } from '@/stores/toastStore'
 import { activateTrainingPlan, deleteTrainingPlan, getTrainingPlans, updateTrainingPlan } from '@/utils/trainingPlanStorage'
 import { addDay as addPlanDay, moveDay, removeDay, renameDay, renamePlan, selectDay, PLAN_LIMITS } from '@/utils/trainingPlan'
 import { getAllFavorites } from '@/utils/planFromTemplate'
@@ -106,6 +107,7 @@ const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const userId = usePlanUserId()
+const toast = useToastStore()
 const { getTranslatedMuscleGroup } = useExerciseTranslation()
 
 const plan = ref(null)
@@ -146,8 +148,13 @@ function apply(updater) {
 }
 
 function activate() {
-  activateTrainingPlan({ userId: userId.value, planId: plan.value.id })
+  const name = plan.value.name
+  const result = activateTrainingPlan({ userId: userId.value, planId: plan.value.id })
   reload()
+  if (!result.ok) return
+  // Aktiver Plan festgelegt: direkt zum Dashboard, dort steht „Heute“.
+  toast.show(t('plans.activated', { name }), { type: 'success' })
+  router.push({ name: 'dashboard' })
 }
 
 function move(day, direction) {

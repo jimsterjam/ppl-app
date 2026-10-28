@@ -51,11 +51,13 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import HeaderBar from '@/components/HeaderBar.vue'
 import { usePlanUserId, formatPlanDate } from '@/composables/usePlanUserId'
+import { useToastStore } from '@/stores/toastStore'
 import { activateTrainingPlan, getTrainingPlans } from '@/utils/trainingPlanStorage'
 import { canCreatePlan, getActivePlan } from '@/utils/trainingPlan'
 
 const { t, locale } = useI18n()
 const router = useRouter()
+const toast = useToastStore()
 const userId = usePlanUserId()
 const plans = ref([])
 
@@ -80,8 +82,12 @@ function openPlan(plan) {
 }
 
 function activate(plan) {
-  activateTrainingPlan({ userId: userId.value, planId: plan.id })
+  const result = activateTrainingPlan({ userId: userId.value, planId: plan.id })
   reload()
+  if (!result.ok) return
+  // Aktiver Plan festgelegt: direkt zum Dashboard, dort steht „Heute“.
+  toast.show(t('plans.activated', { name: plan.name }), { type: 'success' })
+  router.push({ name: 'dashboard' })
 }
 </script>
 
