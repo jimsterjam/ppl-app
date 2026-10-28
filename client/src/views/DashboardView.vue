@@ -58,11 +58,11 @@
             <button class="quick-bar-btn" type="button" :aria-label="$t('dashboard.allFavorites')" @click="openAllFavorites">
               <Star :size="17" aria-hidden="true" /><span>{{ $t('dashboard.shortFavorites') }}</span>
             </button>
-            <button class="quick-bar-btn" type="button" :aria-label="$t('dashboard.plansButton')" @click="router.push({ name: 'plans' })">
-              <ClipboardList :size="17" aria-hidden="true" /><span>{{ $t('dashboard.shortPlans') }}</span>
-            </button>
             <button class="quick-bar-btn" type="button" @click="showTimerMenu = true">
               <Timer :size="17" aria-hidden="true" /><span>Timer</span>
+            </button>
+            <button class="quick-bar-btn quick-bar-btn--wide" type="button" @click="router.push({ name: 'plans' })">
+              <ClipboardList :size="17" aria-hidden="true" /><span>{{ $t('dashboard.plansButton') }}</span>
             </button>
           </div>
           <p v-if="isFirstUse" class="quick-first-hint">{{ $t('dashboard.firstHint') }}</p>
@@ -1453,7 +1453,7 @@ onActivated(async () => {
 }
 
 .dashboard-content.has-draft .quick-bar-btn {
-  min-height: 44px;
+  min-height: 40px;
 }
 
 .dashboard-content.has-draft .week-strip {
@@ -1714,24 +1714,29 @@ onActivated(async () => {
 
 .quick-bar {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+/* Trainingspläne darunter über die ganze Breite (Wunsch Paul 29.10.). */
+.quick-bar-btn--wide {
+  grid-column: 1 / -1;
 }
 
 .quick-bar-btn {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 3px;
-  min-height: 52px;
-  padding: 6px 4px;
+  gap: 8px;
+  min-height: 44px;
+  padding: 6px 10px;
   border-radius: var(--card-radius);
   border: 1px solid var(--card-border);
   background: var(--card-bg);
   color: var(--fg);
   font: inherit;
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   cursor: pointer;
 }
 
