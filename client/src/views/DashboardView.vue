@@ -27,17 +27,21 @@
       <MonthlyReportRow />
 
       <section v-if="todayPlan && !showStartOptions && !hasDraft" class="today-card" aria-labelledby="today-plan-eyebrow">
-        <p id="today-plan-eyebrow" class="today-eyebrow">{{ $t('plans.today') }}</p>
-        <h3 class="today-title">{{ todayDayTitle }}</h3>
-        <p class="today-sub">{{ $t('plans.todayPlanLine', { plan: todayPlan.plan.name }) }}</p>
+        <h3 class="today-head">
+          <span id="today-plan-eyebrow" class="today-eyebrow">{{ $t('plans.today') }}</span>
+          <span class="today-title">{{ todayDayTitle }}</span>
+        </h3>
+        <p class="today-sub">{{ todaySubline }}</p>
         <p v-if="!todayPlan.favorite" class="today-warn">{{ $t('plans.todayFavoriteMissing') }}</p>
-        <button v-if="todayPlan.favorite" class="today-start" type="button" @click="startPlanDay(todayPlan.plan, todayPlan.day)">
-          {{ $t('plans.startTraining') }}
-        </button>
-        <button v-else class="today-start" type="button" @click="router.push({ name: 'plan-detail', params: { id: todayPlan.plan.id } })">
-          {{ $t('plans.openPlan') }}
-        </button>
-        <button class="today-other" type="button" @click="showPlanDayPicker = true">{{ $t('plans.chooseOtherDay') }}</button>
+        <div class="today-actions">
+          <button v-if="todayPlan.favorite" class="today-start" type="button" @click="startPlanDay(todayPlan.plan, todayPlan.day)">
+            {{ $t('plans.startTraining') }}
+          </button>
+          <button v-else class="today-start" type="button" @click="router.push({ name: 'plan-detail', params: { id: todayPlan.plan.id } })">
+            {{ $t('plans.openPlan') }}
+          </button>
+          <button class="today-other" type="button" @click="showPlanDayPicker = true">{{ $t('plans.chooseOtherDay') }}</button>
+        </div>
       </section>
 
       <section class="quick-start">
@@ -242,7 +246,10 @@
           :disabled="!planDayFavorite(day)"
           @click="pickPlanDay(day)"
         >
-          <span>{{ planDayTitle(day) }}</span>
+          <span class="plan-pick-text">
+            <span>{{ planDayTitle(day) }}</span>
+            <small v-if="planDayMuscles(day)">{{ planDayMuscles(day) }}</small>
+          </span>
           <small v-if="index === todayPlan.plan.activeDayIndex">{{ $t('plans.nextDay') }}</small>
           <small v-else-if="!planDayFavorite(day)">{{ $t('plans.favoriteMissing') }}</small>
         </button>
@@ -315,7 +322,8 @@ import AvatarEditor from '@/components/AvatarEditor.vue'
 import NameEditModal from '@/components/NameEditModal.vue'
 import WorkoutGoalPicker from '@/components/WorkoutGoalPicker.vue'
 import { getTrainingPlans, updateTrainingPlan } from '@/utils/trainingPlanStorage'
-import { getTodayPlanInfo } from '@/utils/planProgress'
+import { getTodayPlanInfo, getDayMuscleGroups } from '@/utils/planProgress'
+import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 import { getAllFavorites } from '@/utils/planFromTemplate'
 import { findPlansUsingFavorite, removeFavoriteFromPlan } from '@/utils/trainingPlan'
 import { sanitizeWorkoutGoal, WORKOUT_GOALS, GENERATOR_GOALS, WORKOUT_GOAL_LABEL_KEYS } from '@/utils/workoutGoal'
@@ -956,6 +964,20 @@ function planDayTitle(day) {
 
 const todayDayTitle = computed(() => planDayTitle(todayPlan.value?.day))
 
+const { getTranslatedMuscleGroup } = useExerciseTranslation()
+
+// Muskeln eines Plan-Tages in der App-Sprache („Brust, Schultern, Trizeps“) - erklärt, was hinter „Push A“ steckt.
+function planDayMuscles(day) {
+  const labels = getDayMuscleGroups(planDayFavorite(day)).map((group) => getTranslatedMuscleGroup(group))
+  return [...new Set(labels.filter(Boolean))].join(', ')
+}
+
+const todaySubline = computed(() => {
+  const muscles = planDayMuscles(todayPlan.value?.day)
+  const plan = todayPlan.value?.plan?.name || ''
+  return muscles ? $t('plans.todayPlanLine', { plan, muscles }) : $t('plans.todayPlanOnly', { plan })
+})
+
 // Tag des Plans starten: wie ein Favorit (inkl. Zielabfrage bei alten Favoriten), plus Plan/Tag zum Speichern am Workout.
 function startPlanDay(plan, day) {
   const favorite = planDayFavorite(day)
@@ -1362,16 +1384,24 @@ onActivated(async () => {
 
 .today-card {
   display: grid;
-  gap: 4px;
-  margin: 0 0 10px;
-  padding: 14px 16px;
+  gap: 2px;
+  margin: 0 0 8px;
+  padding: 10px 14px;
   border-radius: var(--card-radius);
   border: 1px solid var(--accent);
   background: color-mix(in srgb, var(--accent) 7%, var(--card-bg));
 }
 
-.today-eyebrow {
+.today-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
   margin: 0;
+  min-width: 0;
+}
+
+.today-eyebrow {
+  flex: 0 0 auto;
   color: var(--accent);
   font-family: "Sora", "Space Grotesk", "SF Pro Display", sans-serif;
   font-size: 1.05rem;
@@ -1381,9 +1411,8 @@ onActivated(async () => {
 }
 
 .today-title {
-  margin: 0;
   font-family: "Sora", "Space Grotesk", "SF Pro Display", sans-serif;
-  font-size: 1.3rem;
+  font-size: 1.15rem;
   overflow-wrap: anywhere;
 }
 
@@ -1391,18 +1420,25 @@ onActivated(async () => {
 .today-warn {
   margin: 0;
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
 }
 
 .today-warn {
   color: var(--danger);
 }
 
+.today-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 6px;
+}
+
 .today-start {
-  margin-top: 8px;
-  min-height: 48px;
+  flex: 1 1 auto;
+  min-height: 42px;
   border: none;
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--accent);
   color: var(--accent-contrast, #060606);
   font: inherit;
@@ -1411,12 +1447,14 @@ onActivated(async () => {
 }
 
 .today-other {
-  min-height: 40px;
+  flex: 0 0 auto;
+  min-height: 42px;
+  padding: 0 4px;
   border: none;
   background: transparent;
   color: var(--muted);
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 0.8rem;
   text-decoration: underline;
   cursor: pointer;
 }
@@ -1447,6 +1485,17 @@ onActivated(async () => {
   font-weight: 600;
   text-align: left;
   cursor: pointer;
+}
+
+.plan-pick-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.plan-pick-text small {
+  color: var(--muted);
+  font-weight: 400;
 }
 
 .plan-pick-btn.is-next {

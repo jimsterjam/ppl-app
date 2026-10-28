@@ -35,3 +35,20 @@ export function advancePlanAfterWorkout({ userId, planId, planDayId, doneAt } = 
   const result = updateTrainingPlan({ userId, planId, updater: (p) => completeDay(p, planDayId, doneAt) })
   return result.ok ? result.plan : null
 }
+
+/**
+ * Trainierte Muskelgruppen eines Plan-Tages (häufigste zuerst, höchstens `limit`), aus den Übungen des Favoriten.
+ * Rohwerte wie im Katalog (z. B. „Brust“); die Anzeige übersetzt sie in die App-Sprache.
+ */
+export function getDayMuscleGroups(favorite, limit = 3) {
+  const counts = new Map()
+  const exercises = Array.isArray(favorite?.workout?.exercises) ? favorite.workout.exercises : []
+  exercises.forEach((exercise) => {
+    const group = String(exercise?.muscleGroup || '').trim()
+    if (group) counts.set(group, (counts.get(group) || 0) + 1)
+  })
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([group]) => group)
+}

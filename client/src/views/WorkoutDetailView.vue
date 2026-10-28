@@ -2795,8 +2795,11 @@ function progressionHintText(index) {
   if (goalByIndex.value[index] === 'explosive') return t('workoutDetail.explosiveExplain')
   if (goalByIndex.value[index] === 'technique') return t('workoutDetail.techniqueHint')
   const target = repTargetsByIndex.value[index]
-  if (target?.mode === 'range') return t('workoutDetail.repRangeExplain', { min: target.min, max: target.max })
-  return t('workoutDetail.repTargetExplain', { reps: target?.target })
+  const base = target?.mode === 'range'
+    ? t('workoutDetail.repRangeExplain', { min: target.min, max: target.max })
+    : t('workoutDetail.repTargetExplain', { reps: target?.target })
+  // Übung ohne Verlauf (z. B. neu aus einer Plan-Vorlage): erklären, womit man startet.
+  return lastSessionByIndex.value[index] ? base : `${base} ${t('workoutDetail.startWeightHint')}`
 }
 
 function formatKg(value) {

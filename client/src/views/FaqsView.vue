@@ -62,7 +62,7 @@ const selectedFaqKey = ref('')
 const { lock: lockBodyScroll, unlock: unlockBodyScroll } = useScrollLock()
 watch(selectedFaqKey, (key) => (key ? lockBodyScroll() : unlockBodyScroll()), { immediate: true })
 onBeforeUnmount(unlockBodyScroll)
-const baseKeys = ['gettingStarted', 'pushPullLegs', 'navigation', 'workoutFlow', 'focusMode', 'symbols', 'restPauses', 'timedExercises', 'warmup', 'progressRules', 'progression', 'weightSuggestion', 'statsReading', 'aiCoach', 'workouts', 'uploads', 'privacy']
+const baseKeys = ['gettingStarted', 'pushPullLegs', 'navigation', 'workoutFlow', 'focusMode', 'symbols', 'restPauses', 'timedExercises', 'warmup', 'progressRules', 'progression', 'weightSuggestion', 'startWeight', 'statsReading', 'aiCoach', 'workouts', 'uploads', 'privacy']
 // Gruppierte Anzeige (Absprache Paul 22.10.): jeder Eintrag steht in genau einer Gruppe.
 const groups = [
   { titleKey: 'groupStart', keys: ['gettingStarted', 'pushPullLegs', 'trainingPlans', 'navigation'] },

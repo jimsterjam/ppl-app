@@ -30,6 +30,7 @@
       <button type="button" class="btn-secondary" @click="openAddDay">{{ t('plans.addDay') }}</button>
       <p v-if="notice" class="muted notice" role="status">{{ notice }}</p>
       <p class="muted small">{{ t('plans.explain') }}</p>
+      <p class="muted small">{{ t('plans.abExplain') }}</p>
 
       <button type="button" class="btn-secondary" @click="openRename">{{ t('plans.rename') }}</button>
       <button type="button" class="btn-secondary danger" @click="showDelete = true">{{ t('plans.delete') }}</button>
@@ -98,11 +99,14 @@ import { usePlanUserId, formatPlanDate } from '@/composables/usePlanUserId'
 import { activateTrainingPlan, deleteTrainingPlan, getTrainingPlans, updateTrainingPlan } from '@/utils/trainingPlanStorage'
 import { addDay as addPlanDay, moveDay, removeDay, renameDay, renamePlan, selectDay, PLAN_LIMITS } from '@/utils/trainingPlan'
 import { getAllFavorites } from '@/utils/planFromTemplate'
+import { getDayMuscleGroups } from '@/utils/planProgress'
+import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 
 const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const userId = usePlanUserId()
+const { getTranslatedMuscleGroup } = useExerciseTranslation()
 
 const plan = ref(null)
 const favorites = ref([])
@@ -126,7 +130,10 @@ function daySub(day, index) {
   if (index === plan.value.activeDayIndex) parts.push(t('plans.nextDay'))
   const fav = favoriteById.value.get(day.favoriteId)
   if (!fav) parts.push(t('plans.favoriteMissing'))
-  else if (day.label && fav.name !== day.label) parts.push(fav.name)
+  else {
+    const muscles = [...new Set(getDayMuscleGroups(fav).map((group) => getTranslatedMuscleGroup(group)).filter(Boolean))].join(', ')
+    if (muscles) parts.push(muscles)
+  }
   parts.push(day.lastDoneAt ? t('plans.lastShort', { date: formatPlanDate(day.lastDoneAt, locale.value) }) : t('plans.neverTrained'))
   return parts.join(' · ')
 }
