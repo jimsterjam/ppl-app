@@ -49,13 +49,13 @@
           </div>
           <div class="quick-bar">
             <button class="quick-bar-btn" type="button" :aria-label="$t('dashboard.allFavorites')" @click="openAllFavorites">
-              <Star :size="17" aria-hidden="true" /><span>{{ $t('dashboard.shortFavorites') }}</span>
+              <Star :size="21" aria-hidden="true" /><span>{{ $t('dashboard.shortFavorites') }}</span>
             </button>
             <button class="quick-bar-btn" type="button" @click="showTimerMenu = true">
-              <Timer :size="17" aria-hidden="true" /><span>Timer</span>
+              <Timer :size="21" aria-hidden="true" /><span>Timer</span>
             </button>
             <button class="quick-bar-btn quick-bar-btn--wide" type="button" @click="router.push({ name: 'plans' })">
-              <ClipboardList :size="17" aria-hidden="true" /><span>{{ $t('dashboard.plansButton') }}</span>
+              <ClipboardList :size="21" aria-hidden="true" /><span>{{ $t('dashboard.plansButton') }}</span>
             </button>
           </div>
           <p v-if="isFirstUse" class="quick-first-hint">{{ $t('dashboard.firstHint') }}</p>
@@ -1414,11 +1414,11 @@ onActivated(async () => {
 
 .dashboard-content.has-draft .type-tile {
   padding: 4px 8px;
-  font-size: 1.1rem;
+  font-size: 1.65rem;
 }
 
 .dashboard-content.has-draft .quick-bar-btn {
-  min-height: 40px;
+  min-height: 46px;
 }
 
 .dashboard-content.has-draft .week-strip {
@@ -1622,7 +1622,7 @@ onActivated(async () => {
   background: var(--card-bg);
   color: var(--fg);
   font-family: "Sora", "Space Grotesk", "SF Pro Display", sans-serif;
-  font-size: 1.2rem;
+  font-size: 1.8rem;
   font-weight: 700;
   text-align: center;
   cursor: pointer;
@@ -1650,19 +1650,22 @@ onActivated(async () => {
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  min-height: 44px;
+  gap: 10px;
+  min-height: 52px;
   padding: 6px 10px;
   border-radius: var(--card-radius);
   border: 1px solid var(--card-border);
   background: var(--card-bg);
   color: var(--fg);
   font: inherit;
-  font-size: 0.85rem;
+  font-size: 1.05rem;
+  font-weight: 600;
   cursor: pointer;
 }
 
 .quick-bar-btn svg {
+  width: 21px;
+  height: 21px;
   color: var(--accent);
 }
 
