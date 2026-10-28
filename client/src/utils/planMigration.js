@@ -24,6 +24,26 @@ function legacyTemplateOf(favoriteName, dayLabel) {
 }
 
 /**
+ * Übrig gebliebene Vorlagen-Favoriten entfernen: Wurde ein Plan der ersten Fassung gelöscht (oder die Vorlage nur
+ * ausprobiert), blieben seine Favoriten zurück und tauchten unter „Alle Favoriten“ auf. Gelöscht wird nur, was genau
+ * „<Vorlagen-Präfix> <Tagbezeichnung>“ heißt und von keinem Plan-Tag mehr genutzt wird.
+ * @param {string[]} options.dayLabels - alle Tagbezeichnungen der Vorlagen (beide Sprachen), z. B. „Push A“
+ * @returns {number} Anzahl entfernter Favoriten
+ */
+export function removeOrphanTemplateFavorites({ userId, dayLabels = [] } = {}) {
+  const labels = [...new Set(dayLabels.map(squash).filter(Boolean))]
+  if (!labels.length) return 0
+  const names = new Set(Object.keys(LEGACY_PREFIXES).flatMap((prefix) => labels.map((label) => `${prefix} ${label}`)))
+  const used = new Set(getTrainingPlans(userId).flatMap((plan) => plan.days.map((day) => day.favoriteId)).filter(Boolean))
+  let removed = 0
+  for (const favorite of getAllFavorites(userId)) {
+    if (!names.has(squash(favorite.name)) || used.has(favorite.id)) continue
+    if (deleteFavoriteWorkout({ userId, type: favorite.type, id: favorite.id }).success) removed += 1
+  }
+  return removed
+}
+
+/**
  * @param {object} options
  * @param {string} options.userId
  * @param {Array} [options.catalog] - Übungskatalog, um englische Namen sicherzustellen (alte Einträge haben deutsche)

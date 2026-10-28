@@ -319,7 +319,8 @@ import { useToastStore } from '@/stores/toastStore'
 import { getTodayPlanInfo, getPlanDayInfo, getDayMuscleGroups, buildDayStartFavorite, planDayTitle as planDayTitleOf } from '@/utils/planProgress'
 import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
-import { migrateTemplateFavoritesToPlans } from '@/utils/planMigration'
+import { migrateTemplateFavoritesToPlans, removeOrphanTemplateFavorites } from '@/utils/planMigration'
+import { messages } from '@/i18n'
 import WeekStrip from '@/components/WeekStrip.vue'
 import { countWeekWorkouts } from '@/utils/weekStrip'
 import { ArrowUpRight, ArrowDownLeft, ChevronsDown, Target, Star, ClipboardList, Timer, Info } from 'lucide-vue-next'
@@ -965,10 +966,15 @@ function removeTodayPlan() {
 async function migrateLegacyPlans() {
   try {
     const userId = getCurrentFavoritesUserId()
-    if (!getTrainingPlans(userId).some((plan) => plan.days.some((day) => day.favoriteId && !day.exercises?.length))) return
-    const catalog = await loadDefaultExercises().catch(() => [])
-    const result = migrateTemplateFavoritesToPlans({ userId, catalog })
-    if (result.plans) {
+    let changed = false
+    if (getTrainingPlans(userId).some((plan) => plan.days.some((day) => day.favoriteId && !day.exercises?.length))) {
+      const catalog = await loadDefaultExercises().catch(() => [])
+      changed = migrateTemplateFavoritesToPlans({ userId, catalog }).plans > 0
+    }
+    // Vorlagen-Favoriten gelöschter oder ausprobierter Pläne (beide Sprachen) aufräumen.
+    const dayLabels = ['de', 'en'].flatMap((lang) => Object.values(messages[lang]?.plans?.dayLabel || {}))
+    if (removeOrphanTemplateFavorites({ userId, dayLabels }) > 0) changed = true
+    if (changed) {
       refreshTodayPlan()
       if (startFlowStep.value === 'all-favorites') loadAllFavoriteWorkouts()
     }
@@ -1381,6 +1387,15 @@ onActivated(async () => {
   font-family: "Sora", "Space Grotesk", "SF Pro Display", sans-serif;
 }
 
+/* Kein Block schrumpft unter seine Höhe (sonst überlappen sie sich, z. B. bei laufender Gym-Zeit); Platzmangel -> scrollen. */
+.dashboard-content > * {
+  flex-shrink: 0;
+}
+
+.dashboard-content > .quick-start {
+  flex-shrink: 0;
+}
+
 .dashboard-content.has-draft {
   gap: 8px;
   padding-top: 10px;
@@ -1531,7 +1546,9 @@ onActivated(async () => {
 .quick-start {
   display: flex;
   flex-direction: column;
-  flex: 1 1 0;
+  /* Nicht unter die Mindesthöhe der Kacheln schrumpfen: sonst ragt der Inhalt über die Nachbarn (laufende Gym-Zeit,
+     Entwurfs-Hinweis). Reicht der Platz nicht, scrollt der Bereich. */
+  flex: 1 0 auto;
   min-height: 0;
   gap: 10px;
 }
@@ -1540,7 +1557,7 @@ onActivated(async () => {
 .quick-area {
   display: flex;
   flex-direction: column;
-  flex: 1 1 0;
+  flex: 1 0 auto;
   min-height: 0;
   gap: 8px;
 }
@@ -1560,7 +1577,7 @@ onActivated(async () => {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-template-rows: repeat(2, minmax(64px, 120px));
   gap: 10px;
-  flex: 1 1 0;
+  flex: 1 0 auto;
   min-height: 0;
 }
 
