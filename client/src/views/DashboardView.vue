@@ -16,7 +16,7 @@
 
     <main class="dashboard-content" :class="{ 'has-draft': hasDraft }">
       <CoachMarks :marks="coachMarks" :active="coachActive" />
-      <WeekStrip class="dashboard-week" :workouts="store.workouts || []" :caption="weeklyProgressLabel" />
+      <WeekStrip class="dashboard-week" :workouts="store.workouts || []" :caption="weeklyProgressLabel" :streak="weekStreak" />
 
       <SessionStopwatch v-if="showStopwatchCard" @session-time="onSessionTime" />
 
@@ -308,7 +308,7 @@ import { migrateTemplateFavoritesToPlans, removeOrphanTemplateFavorites } from '
 import { messages } from '@/i18n'
 import WeekStrip from '@/components/WeekStrip.vue'
 import CoachMarks from '@/components/CoachMarks.vue'
-import { countWeekWorkouts } from '@/utils/weekStrip'
+import { countWeekWorkouts, countWeekStreak } from '@/utils/weekStrip'
 import { Star, ClipboardList, Timer } from 'lucide-vue-next'
 import { findPlansUsingFavorite, removeFavoriteFromPlan } from '@/utils/trainingPlan'
 import { sanitizeWorkoutGoal, WORKOUT_GOALS, GENERATOR_GOALS, WORKOUT_GOAL_LABEL_KEYS } from '@/utils/workoutGoal'
@@ -456,6 +456,8 @@ function onSessionTime({ totalMs, formattedTime }) {
 const weeklyGoal = computed(() => Number(settings.weeklyGoal) || 4)
 // Diese Woche = Montag bis Sonntag (passend zum Wochenstreifen), nicht mehr „die letzten 7 Tage“.
 const weeklyCount = computed(() => countWeekWorkouts({ workouts: store.workouts || [] }))
+// Wochenserie: Wochen in Folge mit erreichtem Wochenziel (Absprache Paul 29.10.).
+const weekStreak = computed(() => countWeekStreak({ workouts: store.workouts || [], goal: weeklyGoal.value }))
 
 // Kacheln „Selbst zusammenstellen“: nur der Name (der Begriff erklärt sich selbst, Absprache Paul 29.10.).
 const typeTiles = computed(() => [
@@ -1419,6 +1421,11 @@ onActivated(async () => {
 
 .dashboard-content.has-draft .quick-bar-btn {
   min-height: 46px;
+}
+
+/* Mit laufendem Workout ist wenig Platz: die Wochenserie wartet bis zum nächsten Öffnen. */
+.dashboard-content.has-draft :deep(.week-streak) {
+  display: none;
 }
 
 .dashboard-content.has-draft .week-strip {

@@ -7,6 +7,7 @@
       </div>
     </div>
     <p class="week-caption">{{ caption }}</p>
+    <p v-if="streak > 0" class="week-streak">{{ t('dashboard.weekStreak', { count: streak }, streak) }}</p>
   </section>
 </template>
 
@@ -18,10 +19,12 @@ import { buildWeekDays } from '@/utils/weekStrip'
 // Die Woche (Montag bis Sonntag) auf einen Blick: Haken an Tagen, an denen trainiert wurde, heute hervorgehoben.
 const props = defineProps({
   workouts: { type: Array, default: () => [] },
-  caption: { type: String, default: '' }
+  caption: { type: String, default: '' },
+  // Wochen in Folge mit erreichtem Wochenziel (0 = nichts anzeigen)
+  streak: { type: Number, default: 0 }
 })
 
-const { locale } = useI18n()
+const { t, locale } = useI18n()
 const days = computed(() => buildWeekDays({ workouts: props.workouts, locale: String(locale.value || 'de') }))
 </script>
 
@@ -54,4 +57,5 @@ const days = computed(() => buildWeekDays({ workouts: props.workouts, locale: St
 .week-day.today .week-dot { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 16%, transparent); }
 .week-day.today.done .week-dot { color: var(--accent-contrast, #060606); }
 .week-caption { margin: 0; text-align: center; color: var(--muted); font-size: 0.8rem; }
+.week-streak { margin: -4px 0 0; text-align: center; color: var(--accent); font-size: 0.8rem; font-weight: 700; }
 </style>

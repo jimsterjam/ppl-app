@@ -54,3 +54,30 @@ export function countWeekWorkouts({ workouts = [], now = new Date() } = {}) {
     return time >= start && time < end
   }).length
 }
+
+/**
+ * Wochenserie (Absprache Paul 29.10.): wie viele Wochen (Montag bis Sonntag) in Folge das Wochenziel erreicht wurde.
+ * Die laufende Woche zählt mit, sobald das Ziel erreicht ist; solange sie noch läuft, bricht sie die Serie nicht.
+ * Entwürfe zählen nicht.
+ * @returns {number} Wochen in Folge (0 = keine Serie)
+ */
+export function countWeekStreak({ workouts = [], goal = 4, now = new Date() } = {}) {
+  const target = Math.max(1, Math.floor(Number(goal)) || 1)
+  const perWeek = new Map()
+  for (const w of workouts || []) {
+    if (!w || w.isDraft || w._isDraft || !(w.date || w.updatedAt)) continue
+    const time = new Date(w.date || w.updatedAt).getTime()
+    if (!Number.isFinite(time)) continue
+    const key = localDayKey(startOfWeek(new Date(time)))
+    perWeek.set(key, (perWeek.get(key) || 0) + 1)
+  }
+  const weekStart = startOfWeek(now)
+  const reached = (offset) => (perWeek.get(localDayKey(new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() - offset * 7))) || 0) >= target
+  let offset = reached(0) ? 0 : 1
+  let streak = 0
+  while (offset < 520 && reached(offset)) {
+    streak += 1
+    offset += 1
+  }
+  return streak
+}
