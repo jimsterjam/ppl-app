@@ -22,6 +22,8 @@ const PrivacyView = () => import('../views/PrivacyView.vue')
 const PlansView = () => import('../views/PlansView.vue')
 const PlanNewView = () => import('../views/PlanNewView.vue')
 const PlanTemplateView = () => import('../views/PlanTemplateView.vue')
+const PlanCustomInfoView = () => import('../views/PlanCustomInfoView.vue')
+const PlanBuilderView = () => import('../views/PlanBuilderView.vue')
 const PlanDetailView = () => import('../views/PlanDetailView.vue')
 const AdminFeedbackView = () => import('../views/AdminFeedbackView.vue')
 
@@ -53,7 +55,10 @@ const routes = [
       { path: 'faqs', name: 'faqs', component: FaqsView },
       { path: 'plans', name: 'plans', component: PlansView },
       { path: 'plans/new', name: 'plan-new', component: PlanNewView },
+      { path: 'plans/new/custom', name: 'plan-custom-info', component: PlanCustomInfoView },
+      { path: 'plans/new/custom/build', name: 'plan-builder', component: PlanBuilderView },
       { path: 'plans/new/:templateId', name: 'plan-template', component: PlanTemplateView },
+      { path: 'plans/:id/edit', name: 'plan-edit', component: PlanBuilderView },
       { path: 'plans/:id', name: 'plan-detail', component: PlanDetailView },
       { path: 'features-test', name: 'features-test', component: FeaturesTestView },
       { path: 'workouts/:id', name: 'workout-detail', component: WorkoutDetailView }

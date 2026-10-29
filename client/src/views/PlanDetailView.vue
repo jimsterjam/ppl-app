@@ -8,7 +8,7 @@
       </button>
 
       <div class="status-row">
-        <span class="pill pill--level">{{ t(`plans.level.${plan.level || 'beginner'}`) }}</span>
+        <span v-if="plan.templateId" class="pill pill--level">{{ t(`plans.level.${plan.level || 'beginner'}`) }}</span>
         <span v-if="plan.active" class="pill">{{ t('plans.activeBadge') }}</span>
         <button v-else type="button" class="btn-secondary" @click="activate">{{ t('plans.setActive') }}</button>
       </div>
@@ -28,7 +28,8 @@
         </span>
       </div>
 
-      <button type="button" class="btn-secondary" @click="openAddDay">{{ t('plans.addDay') }}</button>
+      <!-- Eigene Pläne (ohne Vorlage) frei bearbeiten: Tage und Übungen (Absprache Paul 29.10.). -->
+      <button v-if="!plan.templateId" type="button" class="btn-secondary" @click="router.push({ name: 'plan-edit', params: { id: plan.id } })">{{ t('plans.custom.edit') }}</button>
       <p v-if="notice" class="muted notice" role="status">{{ notice }}</p>
       <p class="muted small">{{ t('plans.explain') }}</p>
       <p class="muted small">{{ t('plans.abExplain') }}</p>
@@ -48,19 +49,6 @@
         <button type="button" class="menu-btn" @click="setNextDay">{{ t('plans.dayMenuSetNext') }}</button>
         <button type="button" class="menu-btn" @click="openRenameDay">{{ t('plans.dayMenuRename') }}</button>
         <button type="button" class="menu-btn menu-btn--danger" @click="removeDayAction">{{ t('plans.dayMenuRemove') }}</button>
-      </div>
-    </AppModal>
-
-    <AppModal
-      v-model="showAddDay"
-      :title="t('plans.addDayTitle')"
-      :confirm-text="t('common.close')"
-      :show-cancel="false"
-      type="info"
-    >
-      <p class="muted">{{ favorites.length ? t('plans.addDayHint') : t('plans.noFavorites') }}</p>
-      <div class="menu-actions">
-        <button v-for="fav in favorites" :key="fav.id" type="button" class="menu-btn" @click="addDay(fav)">{{ fav.name }}</button>
       </div>
     </AppModal>
 
@@ -99,7 +87,7 @@ import AppModal from '@/components/AppModal.vue'
 import { usePlanUserId, formatPlanDate } from '@/composables/usePlanUserId'
 import { useToastStore } from '@/stores/toastStore'
 import { activateTrainingPlan, deleteTrainingPlan, getTrainingPlans, updateTrainingPlan } from '@/utils/trainingPlanStorage'
-import { addDay as addPlanDay, moveDay, removeDay, renameDay, renamePlan, selectDay, PLAN_LIMITS } from '@/utils/trainingPlan'
+import { moveDay, removeDay, renameDay, renamePlan, selectDay } from '@/utils/trainingPlan'
 import { getAllFavorites } from '@/utils/planFromTemplate'
 import { getDayMuscleGroups } from '@/utils/planProgress'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
@@ -186,19 +174,6 @@ function removeDayAction() {
   if (!day) return
   if (plan.value.days.length <= 1) { notice.value = t('plans.lastDayHint'); return }
   apply((p) => removeDay(p, day.id))
-}
-
-// Tag hinzufügen
-const showAddDay = ref(false)
-function openAddDay() {
-  notice.value = ''
-  if (plan.value.days.length >= PLAN_LIMITS.maxDays) { notice.value = t('plans.maxDays'); return }
-  favorites.value = getAllFavorites(userId.value)
-  showAddDay.value = true
-}
-function addDay(fav) {
-  showAddDay.value = false
-  apply((p) => addPlanDay(p, { favoriteId: fav.id }) || p)
 }
 
 // Umbenennen (Plan oder Tag)
