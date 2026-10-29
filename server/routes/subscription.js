@@ -33,7 +33,7 @@ const router = express.Router()
 // Begründung/Kostenkalkulation) - beide Dateien lesen/schreiben dasselbe UserProfile.aiUsage-Feld,
 // haben aber historisch eigene Konstanten (keine gemeinsame Datei dafür, um den Umbau klein zu
 // halten).
-const FREE_AI_MONTHLY_LIMIT = 60
+const FREE_AI_MONTHLY_LIMIT = 30
 const SUBSCRIPTION_FORCE_PLAN = String(process.env.SUBSCRIPTION_FORCE_PLAN || '').trim().toLowerCase()
 const SUBSCRIPTION_FORCE_SCOPE = String(process.env.SUBSCRIPTION_FORCE_SCOPE || 'all').trim().toLowerCase()
 const SUBSCRIPTION_FORCE_ALLOWLIST = String(process.env.SUBSCRIPTION_FORCE_ALLOWLIST || '')

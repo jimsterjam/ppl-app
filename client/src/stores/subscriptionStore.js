@@ -75,9 +75,9 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     lastWorkoutDate: null,
     // Umgestellt von wöchentlichem auf monatliches Kontingent (server-seitig FREE_AI_MONTHLY_LIMIT,
     // siehe server/routes/workouts.js) - Default-Limit hier nur ein Platzhalter bis zur ersten
-    // echten Server-Antwort (checkSubscription), aktueller Server-Wert ist 60.
+    // echten Server-Antwort (checkSubscription), aktueller Server-Wert ist 30.
     aiMonthlyCount: 0,
-    aiMonthlyLimit: 60,
+    aiMonthlyLimit: 30,
     aiMonthWindowStart: null,
     quickGenerationsThisMonth: 0,
     quickGenerationMonth: null

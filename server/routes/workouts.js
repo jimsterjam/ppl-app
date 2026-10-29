@@ -266,7 +266,7 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 // pro Call liegen die Kosten bei ca. $0.05-0.08 pro User und Monat selbst bei voller Ausschöpfung
 // - das alte Wochenlimit von 1 war primär Missbrauchsschutz, kein echtes Kostenproblem. 60/Monat
 // deckt selbst tägliches Training (max. ~30 Workouts/Monat) komfortabel ab.
-const FREE_AI_MONTHLY_LIMIT = 60;
+const FREE_AI_MONTHLY_LIMIT = 30;
 const SUBSCRIPTION_FORCE_PLAN = String(process.env.SUBSCRIPTION_FORCE_PLAN || '').trim().toLowerCase();
 const SUBSCRIPTION_FORCE_SCOPE = String(process.env.SUBSCRIPTION_FORCE_SCOPE || 'all').trim().toLowerCase();
 const SUBSCRIPTION_FORCE_ALLOWLIST = String(process.env.SUBSCRIPTION_FORCE_ALLOWLIST || '')
