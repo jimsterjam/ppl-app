@@ -4,6 +4,7 @@ import { setActivePinia, createPinia } from 'pinia'
 const api = vi.hoisted(() => ({
   checkMonthlyReport: vi.fn(),
   listMonthlyReports: vi.fn(),
+  fetchMonthlyReport: vi.fn(),
   markMonthlyReportSeen: vi.fn()
 }))
 vi.mock('@/api/reports', () => api)
@@ -94,5 +95,30 @@ describe('monthlyReportStore', () => {
     store.reset()
     expect(store.reports).toEqual([])
     expect(store.loaded).toBe(false)
+  })
+
+  it('Liste kommt vor der Fälligkeitsprüfung; erzeugter Bericht lädt die Liste neu', async () => {
+    const order = []
+    api.listMonthlyReports
+      .mockImplementationOnce(async () => { order.push('list'); return { status: 'ok', data: { reports: [] } } })
+      .mockImplementationOnce(async () => { order.push('list2'); return { status: 'ok', data: { reports: [report('new')] } } })
+    api.checkMonthlyReport.mockImplementation(async () => { order.push('check'); return { status: 'ok', data: { created: true } } })
+    const store = useMonthlyReportStore()
+    await store.refresh()
+    expect(order[0]).toBe('list')
+    await vi.waitFor(() => expect(store.reports).toHaveLength(1))
+    expect(order).toEqual(['list', 'check', 'list2'])
+  })
+
+  it('loadDetail: zweites Öffnen holt nichts mehr vom Server', async () => {
+    api.fetchMonthlyReport.mockResolvedValue({ status: 'ok', data: { id: 'a', facts: {} } })
+    const store = useMonthlyReportStore()
+    await store.loadDetail('a')
+    const res = await store.loadDetail('a')
+    expect(res.status).toBe('ok')
+    expect(api.fetchMonthlyReport).toHaveBeenCalledTimes(1)
+    store.reset()
+    await store.loadDetail('a')
+    expect(api.fetchMonthlyReport).toHaveBeenCalledTimes(2)
   })
 })

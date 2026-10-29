@@ -75,8 +75,7 @@ import { useI18n } from 'vue-i18n'
 import AppModal from '@/components/AppModal.vue'
 import ReportWeeksChart from '@/components/ReportWeeksChart.vue'
 import ReportWeightChart from '@/components/ReportWeightChart.vue'
-import { fetchMonthlyReport } from '@/api/reports'
-import { getAuthToken } from '@/utils/authToken'
+import { useMonthlyReportStore } from '@/stores/monthlyReportStore'
 import { buildSampleReport } from '@/utils/sampleMonthlyReport'
 import { diagnosisTextKeys } from '@/utils/coachDiagnosisText'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
@@ -97,6 +96,7 @@ defineEmits(['update:modelValue', 'upgrade'])
 const { t, locale } = useI18n()
 const { getTranslatedExerciseName } = useExerciseTranslation()
 
+const store = useMonthlyReportStore()
 const state = ref('idle') // idle | loading | ok | error
 const report = ref(null)
 
@@ -163,8 +163,7 @@ async function load() {
   }
   state.value = 'loading'
   report.value = null
-  const token = await getAuthToken().catch(() => null)
-  const res = await fetchMonthlyReport(token, props.reportId)
+  const res = await store.loadDetail(props.reportId)
   if (res.status === 'ok') {
     report.value = res.data
     state.value = 'ok'
