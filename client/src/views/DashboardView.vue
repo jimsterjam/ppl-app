@@ -47,6 +47,7 @@
               {{ tile.label }}
             </button>
           </div>
+          <p v-if="lastTypeHint" class="type-hint">{{ lastTypeHint }}</p>
           <div class="quick-bar">
             <button class="quick-bar-btn" type="button" :aria-label="$t('dashboard.allFavorites')" @click="openAllFavorites">
               <Star :size="21" aria-hidden="true" /><span>{{ $t('dashboard.shortFavorites') }}</span>
@@ -275,7 +276,7 @@ import { useWarmupTimerStore } from '@/stores/warmupTimerStore'
 import { isOnline, getWorkoutOffline, saveWorkoutOffline } from '@/utils/offlineStorage'
 import { isDraftDeleted } from '@/utils/draftTombstones'
 import { deleteWorkout } from '@/api/workouts'
-import { getNextWorkoutType } from '@/utils/nextWorkoutType'
+import { analyzeRecentTypes } from '@/utils/nextWorkoutType'
 import { buildWorkoutBuilderRoute, normalizeBuilderWorkoutType, saveWorkoutBuilderPrefill, getDetailDraftKey as buildDetailDraftKey } from '@/utils/workoutBuilderFlow'
 import { hasActiveDraft, getActiveDraft, clearActiveDraft } from '@/utils/activeWorkoutDraft'
 import {
@@ -488,16 +489,17 @@ const isFirstUse = computed(() => store.workoutsLoaded && !hasDraft.value && !(s
 // Gym-Zeit erst zeigen, wenn sie läuft oder pausiert ist (Absprache Paul 28.10.): sie startet mit Workout/Warm-up.
 const showStopwatchCard = computed(() => Boolean(sessionStopwatchStore.startedAt))
 
-const lastWorkoutType = computed(() => {
-  const last = store.lastSavedWorkout
-  const type = last?.type?.toString().trim().toLowerCase()
-  if (type === 'leg') return 'legs'
-  if (type === 'freestyle') return 'fullbody'
-  return type || null
-})
+const recentTypes = computed(() => analyzeRecentTypes(store.workouts))
 
-// Ohne aktiven Plan hebt das Dashboard die Kachel hervor, die als Nächstes dran ist; mit Plan keine.
-const nextType = computed(() => (todayPlan.value ? null : getNextWorkoutType(lastWorkoutType.value)))
+// Ohne aktiven Plan: Kachel nur hervorheben, wenn der Nutzer erkennbar im Push-Pull-Legs-Rhythmus trainiert
+// (sonst wäre es irreführend); mit Plan nie. Dazu der neutrale Hinweis "Zuletzt: ...".
+const nextType = computed(() => (todayPlan.value ? null : recentTypes.value.next))
+const lastTypeHint = computed(() => {
+  const last = recentTypes.value.last
+  if (todayPlan.value || !last) return ''
+  const label = typeTiles.value.find((tile) => tile.type === last)?.label || ''
+  return label ? $t('dashboard.lastTrainingHint', { type: label }) : ''
+})
 
 const userSubtitle = computed(() => {
   const preferred = (settings.username || '').trim()
@@ -1636,6 +1638,13 @@ onActivated(async () => {
   text-align: center;
   cursor: pointer;
   transition: border-color 120ms ease, background 120ms ease;
+}
+
+.type-hint {
+  margin: -2px 0 0;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--muted);
 }
 
 .type-tile.is-next {
