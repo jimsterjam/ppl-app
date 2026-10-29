@@ -182,6 +182,13 @@ const workoutSchema = new mongoose.Schema({
     default: 'none'
   },
   ai_pending_since: { type: Date },
+  // Art des Feedbacks: 'first_look' = Erste Einordnung (weniger als 4 gleiche Workouts, ohne Vergleich), 'comparison' =
+  // vergleichendes Feedback. null = älteres Feedback. Setter statt Enum, damit ein unbekannter Wert nie das Speichern stoppt.
+  ai_feedback_kind: {
+    type: String,
+    default: null,
+    set: (v) => (['first_look', 'comparison'].includes(v) ? v : null)
+  },
   // Kompakte, strukturierte Delta-Zusammenfassung je Übung (Sätze/Wdh./Gewicht mehr bzw.
   // weniger als die vorherige Session) - wird zusammen mit ai_feedback einmalig berechnet und
   // gespeichert, damit die UI (PostWorkoutSummary/AIFeedbackHistory) eine übersichtliche,
