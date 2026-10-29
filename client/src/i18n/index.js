@@ -1190,6 +1190,8 @@ export const messages = {
       deltaSuffixOnlyRepsUnchanged: 'bei gleicher Wiederholungszahl',
       deltaSuffixOnlySetsUnchanged: 'bei gleicher Satzzahl',
       deltaImprovement: 'eine klare Steigerung',
+      // Mehr Gewicht, leicht weniger Wiederholungen: ein normaler Schritt nach vorn (siehe utils/deltaSentence.js).
+      deltaNormalDrop: 'bei mehr Gewicht ganz normal',
       deltaAnd: 'und',
       ratingQuestion: 'War dieses Feedback hilfreich?',
       ratingHelpful: 'Hilfreich',
@@ -2837,6 +2839,7 @@ export const messages = {
       deltaSuffixOnlyRepsUnchanged: 'with the same number of reps',
       deltaSuffixOnlySetsUnchanged: 'with the same number of sets',
       deltaImprovement: 'a clear improvement',
+      deltaNormalDrop: 'completely normal with more weight',
       deltaAnd: 'and',
       ratingQuestion: 'Was this feedback helpful?',
       ratingHelpful: 'Helpful',
