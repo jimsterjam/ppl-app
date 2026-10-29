@@ -43,7 +43,7 @@
         <div v-if="!showStartOptions" class="quick-area">
           <p class="quick-section-label">{{ $t('dashboard.freeTrainingTitle') }}</p>
           <div class="type-grid">
-            <button v-for="tile in typeTiles" :key="tile.type" class="type-tile" type="button" @click="openStartMode(tile.type)">
+            <button v-for="tile in typeTiles" :key="tile.type" class="type-tile" :class="{ 'is-next': tile.type === nextType }" type="button" @click="openStartMode(tile.type)">
               {{ tile.label }}
             </button>
           </div>
@@ -275,6 +275,7 @@ import { useWarmupTimerStore } from '@/stores/warmupTimerStore'
 import { isOnline, getWorkoutOffline, saveWorkoutOffline } from '@/utils/offlineStorage'
 import { isDraftDeleted } from '@/utils/draftTombstones'
 import { deleteWorkout } from '@/api/workouts'
+import { getNextWorkoutType } from '@/utils/nextWorkoutType'
 import { buildWorkoutBuilderRoute, normalizeBuilderWorkoutType, saveWorkoutBuilderPrefill, getDetailDraftKey as buildDetailDraftKey } from '@/utils/workoutBuilderFlow'
 import { hasActiveDraft, getActiveDraft, clearActiveDraft } from '@/utils/activeWorkoutDraft'
 import {
@@ -495,7 +496,8 @@ const lastWorkoutType = computed(() => {
   return type || null
 })
 
-const nextType = computed(() => store.nextWorkoutType || 'push')
+// Ohne aktiven Plan hebt das Dashboard die Kachel hervor, die als Nächstes dran ist; mit Plan keine.
+const nextType = computed(() => (todayPlan.value ? null : getNextWorkoutType(lastWorkoutType.value)))
 
 const userSubtitle = computed(() => {
   const preferred = (settings.username || '').trim()
@@ -1636,9 +1638,16 @@ onActivated(async () => {
   transition: border-color 120ms ease, background 120ms ease;
 }
 
-.type-tile:hover,
-.type-tile:active {
+.type-tile.is-next {
   border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--card-bg));
+}
+
+/* Hover nur mit Maus: auf dem iPhone bliebe die Kachel nach dem Tippen sonst „hängen“ (wirkt wie ausgewählt). */
+@media (hover: hover) {
+  .type-tile:hover {
+    border-color: var(--accent);
+  }
 }
 
 .quick-bar {
