@@ -25,3 +25,15 @@ test('Prüf-KI: bestätigte bewusste Entscheidung ist kein Verstoß, nicht alle 
   assert.match(checklist, /BEWUSSTE Entscheidung/)
   assert.match(checklist, /NICHT alle Übungen vorkommen/)
 })
+
+// Absprache Paul 29.10.: mehr Gewicht bei leicht weniger Wiederholungen ist ein normaler Schritt nach vorn und wird
+// nie als Defizit gerahmt (Rückmeldung zum Beispiel-Feedback: "Luft nach oben", "weniger Gewicht bewegt").
+test('Coach-Prompt: Regel 32 - mehr Gewicht, leicht weniger Wiederholungen ist normal, keine Defizit-Rahmung', () => {
+  const prompt = getCoachSystemPromptText()
+  assert.match(prompt, /32\. MEHR GEWICHT, LEICHT WENIGER WIEDERHOLUNGEN/)
+  assert.match(prompt, /normaler Schritt nach vorn/)
+  assert.match(prompt, /Luft\s+nach oben/)
+  assert.match(prompt, /NIE mit Defizit-Wörtern rahmen/)
+  // Regel steht vor dem Output-Format
+  assert.ok(prompt.indexOf('32. MEHR GEWICHT') < prompt.indexOf('OUTPUT-FORMAT'))
+})

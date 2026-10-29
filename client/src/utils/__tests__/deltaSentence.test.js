@@ -29,6 +29,7 @@ const DE = {
   deltaSuffixOnlyRepsUnchanged: 'bei gleicher Wiederholungszahl',
   deltaSuffixOnlySetsUnchanged: 'bei gleicher Satzzahl',
   deltaImprovement: 'eine klare Steigerung',
+  deltaNormalDrop: 'bei mehr Gewicht ganz normal',
   deltaAnd: 'und'
 }
 const t = (key, params = {}) => DE[key.replace('feedbackHistory.', '')].replace(/\{(\w+)\}/g, (_, k) => params[k])
@@ -126,5 +127,45 @@ describe('buildDeltaSentence: Wiederholungen je Satz', () => {
   it('zusätzlicher Satz verändert nur die Summe -> Gesamt-Differenz und Satzzahl bleiben sichtbar', () => {
     const item = { weight_change_scope: 'none', reps_change: 5, sets_change: 1, reps_set_changes: [] }
     expect(buildDeltaSentence(item, t, fmt)).toBe('5 Wiederholungen mehr geschafft und 1 Sätze mehr gemacht, bei gleichem Gewicht – eine klare Steigerung.')
+  })
+
+  describe('mehr Gewicht, leicht weniger Wiederholungen (Absprache Paul 29.10.)', () => {
+    it('Weighted Pull-Up aus dem Feedback: Steigerung vorn, kein „weniger Gewicht bewegt“, „ganz normal“', () => {
+      const item = {
+        weight_change_scope: 'mixed', top_weight_kg: 35, top_weight_change_kg: 2.5, volume_change_percent: -3.5,
+        reps_change: -1, reps_set_changes: [{ set_number: 6, change: -1 }, { set_number: 7, change: -1 }], sets_change: 0
+      }
+      const text = buildDeltaSentence(item, t, fmt)
+      expect(text).toBe('schwerster Satz 2,5 kg schwerer (35 kg) und 1 Wdh. weniger (Satz 6 und 7), bei gleicher Satzzahl – bei mehr Gewicht ganz normal.')
+      expect(text).not.toMatch(/weniger Gewicht bewegt/)
+    })
+
+    it('Reverse Fly: mehr Gewicht, 2 Wdh. weniger in einem Satz -> ganz normal', () => {
+      const item = { weight_change_scope: 'uniform', weight_change_kg: 2.25, reps_change: -2, reps_set_changes: [{ set_number: 3, change: -2 }], sets_change: 0 }
+      expect(buildDeltaSentence(item, t, fmt)).toBe('2,3 kg mehr gestemmt und 2 Wdh. weniger (Satz 3), bei gleicher Satzzahl – bei mehr Gewicht ganz normal.')
+    })
+
+    it('ohne Satzdaten (ältere Einträge): bis 3 Wdh. insgesamt gelten als leicht', () => {
+      expect(buildDeltaSentence({ weight_change_scope: 'uniform', weight_change_kg: 5, reps_change: -3, sets_change: 0 }, t, fmt)).toMatch(/ganz normal\.$/)
+      expect(buildDeltaSentence({ weight_change_scope: 'uniform', weight_change_kg: 5, reps_change: -4, sets_change: 0 }, t, fmt)).not.toMatch(/ganz normal/)
+    })
+
+    it('starker Rückgang (mehr als 2 Wdh. in einem Satz) oder weniger Sätze: bleibt neutral', () => {
+      const strong = { weight_change_scope: 'uniform', weight_change_kg: 2.5, reps_set_changes: [{ set_number: 1, change: -3 }], sets_change: 0 }
+      expect(buildDeltaSentence(strong, t, fmt)).not.toMatch(/ganz normal/)
+      const fewerSets = { weight_change_scope: 'uniform', weight_change_kg: 2.5, reps_set_changes: [{ set_number: 1, change: -1 }], sets_change: -1 }
+      expect(buildDeltaSentence(fewerSets, t, fmt)).not.toMatch(/ganz normal/)
+    })
+
+    it('Gewicht gleich oder gesunken: keine „ganz normal“-Aussage', () => {
+      expect(buildDeltaSentence({ weight_change_scope: 'decreased', weight_change_min_kg: 2.5, weight_change_max_kg: 2.5, reps_set_changes: [{ set_number: 1, change: -1 }], sets_change: 0 }, t, fmt)).not.toMatch(/ganz normal/)
+      expect(buildDeltaSentence({ weight_change_scope: 'uniform', weight_change_kg: 0, reps_set_changes: [{ set_number: 1, change: -1 }], sets_change: 0 }, t, fmt)).not.toMatch(/ganz normal/)
+    })
+
+    it('mehr Gewicht und mehr Wiederholungen: weiter „klare Steigerung“; Volumenminus bleibt sonst sichtbar (Spitze gleich)', () => {
+      expect(buildDeltaSentence({ weight_change_scope: 'uniform', weight_change_kg: 2.5, reps_set_changes: [{ set_number: 1, change: 1 }], sets_change: 0 }, t, fmt)).toMatch(/eine klare Steigerung\.$/)
+      const sameTop = { weight_change_scope: 'mixed', top_weight_kg: 100, top_weight_change_kg: 0, volume_change_percent: -4 }
+      expect(buildDeltaSentence(sameTop, t, fmt)).toContain('weniger Gewicht bewegt')
+    })
   })
 })

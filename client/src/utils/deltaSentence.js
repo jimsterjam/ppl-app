@@ -15,6 +15,15 @@
 //   server/utils/feedbackFactGuard.js).
 //
 // "eine klare Steigerung" nur, wenn mindestens ein Wert gestiegen und keiner gesunken ist.
+//
+// Mehr Gewicht, leicht weniger Wiederholungen (Absprache Paul 29.10.): Das ist ein normaler Schritt nach vorn, kein
+// Minus. Dann bleibt die Steigerung vorn, ein „insgesamt x % weniger Gewicht bewegt“ entfällt (es ist nur die Folge),
+// und der Satz schließt mit „bei mehr Gewicht ganz normal“. „Leicht“ = höchstens 2 Wdh. je Satz bzw. 3 insgesamt (ohne
+// Satzdaten) und nicht weniger Sätze.
+
+// Höchstens so viele Wiederholungen weniger zählen als „leicht“ (je Satz / insgesamt ohne Satzdaten).
+const SMALL_REPS_DROP_PER_SET = 2
+const SMALL_REPS_DROP_TOTAL = 3
 
 // Gesamtbilanz erst ab dieser Änderung (in %) erwähnen/werten.
 export const VOLUME_MENTION_MIN_PERCENT = 1
@@ -39,6 +48,13 @@ export function buildDeltaSentence(item = {}, t, fmt) {
     ? item.reps_set_changes.filter((c) => c && Number(c.change) !== 0 && Number.isFinite(Number(c.change)))
     : null
 
+  // Gewicht gestiegen (nirgends gesunken) und Wiederholungen nur leicht gesunken, Sätze nicht weniger -> normaler Schritt.
+  const weightUp = scope === 'mixed' ? hasTop && topChange > 0 : scope === 'increased' || (scope !== 'decreased' && weightChangeKg > 0)
+  const repsDownSmall = repsSetChanges
+    ? repsSetChanges.some((c) => Number(c.change) < 0) && repsSetChanges.every((c) => Number(c.change) >= -SMALL_REPS_DROP_PER_SET)
+    : repsChange < 0 && repsChange >= -SMALL_REPS_DROP_TOTAL
+  const normalDrop = weightUp && repsDownSmall && setsChange >= 0
+
   const weightClauses = []
   // Werte für die Steigerungs-Wertung (Vorzeichen zählt).
   const signals = []
@@ -51,7 +67,8 @@ export function buildDeltaSentence(item = {}, t, fmt) {
     } else {
       weightClauses.push(t('feedbackHistory.deltaWeightMixed'))
     }
-    if (Math.abs(volumePct) >= VOLUME_MENTION_MIN_PERCENT) {
+    // Bei „mehr Gewicht, leicht weniger Wdh.“ ist das Gesamtvolumen nur die Folge und wird nicht als Minus genannt.
+    if (Math.abs(volumePct) >= VOLUME_MENTION_MIN_PERCENT && !(normalDrop && volumePct < 0)) {
       weightClauses.push(t(volumePct > 0 ? 'feedbackHistory.deltaVolumeUp' : 'feedbackHistory.deltaVolumeDown', { pct: fmt(volumePct) }))
       signals.push(volumePct)
     }
@@ -123,7 +140,9 @@ export function buildDeltaSentence(item = {}, t, fmt) {
   const isImprovement = signals.length > 0 && signals.every((v) => v > 0)
   let sentence = parts.join(` ${t('feedbackHistory.deltaAnd')} `)
   if (suffix) sentence += `, ${suffix}`
-  sentence += isImprovement ? ` – ${t('feedbackHistory.deltaImprovement')}.` : '.'
+  if (isImprovement) sentence += ` – ${t('feedbackHistory.deltaImprovement')}.`
+  else if (normalDrop) sentence += ` – ${t('feedbackHistory.deltaNormalDrop')}.`
+  else sentence += '.'
   return sentence
 }
 
