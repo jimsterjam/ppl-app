@@ -17,7 +17,7 @@ import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useAiQuota } from '@/composables/useAiQuota'
 
-// Kleine Zeile "Noch X von 60 KI-Anfragen" - Tippen öffnet die Kontingent-Karte in den Einstellungen.
+// Kleine Zeile "Noch X von 30 KI-Anfragen" - Tippen öffnet die Kontingent-Karte in den Einstellungen.
 const { t } = useI18n()
 const router = useRouter()
 const { isFree, limit, remaining, level, resetDateLabel } = useAiQuota()
