@@ -8,7 +8,6 @@ import { useI18n } from 'vue-i18n';
 import { useUserStore } from '@/stores/userStore';
 import { useAuthStore } from '@/stores/authStore'
 import { useFirebaseAuth } from '@/utils/firebaseAuth';
-import { useSubscriptionStore } from '@/stores/subscriptionStore';
 import { useToastStore } from '@/stores/toastStore';
 import StepIndicator from '@/components/StepIndicator.vue';
 import BottomNav from '@/components/BottomNav.vue';
@@ -37,7 +36,6 @@ onAuthStateChanged((user) => {
     loadExercises()
   }
 })
-const subscriptionStore = useSubscriptionStore()
 const toast = useToastStore()
 const { t, locale } = useI18n()
 const { getTranslatedExerciseName } = useExerciseTranslation()
@@ -353,10 +351,6 @@ async function createWorkout() {
 		errorMsg.value = t('builder.signInFirst');
 		return;
 	}
-  if (!subscriptionStore.canCreateWorkout) {
-    errorMsg.value = t('builder.createFailed');
-    return;
-  }
   creating.value = true;
 	try {
 		const workoutData = {

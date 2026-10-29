@@ -3,8 +3,8 @@
  * 
  * @description
  * Verwaltet Subscription-Status und Feature-Limits:
- * - Free Plan: 3 Workouts/Woche, 6 Übungen/Workout
- * - Pro Plan: Unlimited Workouts, AI Coach, Advanced Stats
+ * - Free Plan: Tracking ohne Limits, KI-Kontingent pro Monat (Server: FREE_AI_MONTHLY_LIMIT)
+ * - Pro Plan (aktuell nicht kaufbar): kein KI-Limit, AI Coach, Advanced Stats
  * - Elite Plan: Alles + Personal Coaching, Priority Support
  * 
  * @features
@@ -19,8 +19,8 @@
  * 
  * const subscription = useSubscriptionStore()
  * 
- * // Check if user can create workout
- * if (!subscription.canCreateWorkout) {
+ * // Check feature flags
+ * if (!subscription.hasFeature('hasAICoach')) {
  *   // Show upgrade modal
  * }
  * 
@@ -85,8 +85,6 @@ export const useSubscriptionStore = defineStore('subscription', () => {
   
   const limits = ref({
     free: {
-      maxWorkoutsPerWeek: 3,
-      maxExercisesPerWorkout: 6,
       maxQuickGenerationsPerMonth: 3,
       maxFriends: 5,
       hasAICoach: false,
@@ -95,8 +93,6 @@ export const useSubscriptionStore = defineStore('subscription', () => {
       hasCustomTemplates: false
     },
     pro: {
-      maxWorkoutsPerWeek: -1, // unlimited
-      maxExercisesPerWorkout: -1,
       maxQuickGenerationsPerMonth: -1,
       maxFriends: 50,
       hasAICoach: true,
@@ -105,8 +101,6 @@ export const useSubscriptionStore = defineStore('subscription', () => {
       hasCustomTemplates: true
     },
     elite: {
-      maxWorkoutsPerWeek: -1,
-      maxExercisesPerWorkout: -1,
       maxQuickGenerationsPerMonth: -1,
       maxFriends: -1, // unlimited
       hasAICoach: true,
@@ -348,17 +342,7 @@ export const useSubscriptionStore = defineStore('subscription', () => {
   }
   
   // Feature-Checks
-  const canCreateWorkout = computed(() => {
-    const currentLimits = limits.value[subscription.value.plan]
-    if (currentLimits.maxWorkoutsPerWeek === -1) return true
-    return usage.value.workoutsThisWeek < currentLimits.maxWorkoutsPerWeek
-  })
   
-  const canAddExercise = computed(() => (currentExerciseCount) => {
-    const currentLimits = limits.value[subscription.value.plan]
-    if (currentLimits.maxExercisesPerWorkout === -1) return true
-    return currentExerciseCount < currentLimits.maxExercisesPerWorkout
-  })
   
   const hasFeature = computed(() => (featureName) => {
     const currentLimits = limits.value[subscription.value.plan]
@@ -373,11 +357,6 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     return subscription.value.plan === 'elite'
   })
   
-  const workoutsRemaining = computed(() => {
-    const currentLimits = limits.value[subscription.value.plan]
-    if (currentLimits.maxWorkoutsPerWeek === -1) return Infinity
-    return Math.max(0, currentLimits.maxWorkoutsPerWeek - usage.value.workoutsThisWeek)
-  })
 
   const canUseQuickGenerator = computed(() => {
     if (subscription.value.plan !== 'free') return true
@@ -419,10 +398,6 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     return Number(usage.value.aiMonthlyCount) || 0
   })
   
-  const shouldShowUpgrade = computed(() => {
-    if (subscription.value.plan !== 'free') return false
-    return usage.value.workoutsThisWeek >= limits.value.free.maxWorkoutsPerWeek - 1
-  })
 
   const hasDevOverride = computed(() => !!devPlanOverride.value)
   
@@ -473,19 +448,15 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     clearDevPlanOverride,
     
     // Computed
-    canCreateWorkout,
-    canAddExercise,
     hasFeature,
     isPremium,
     isElite,
-    workoutsRemaining,
     canUseQuickGenerator,
     quickGenerationsRemaining,
     aiRequestsRemaining,
     aiRequestsLimit,
     quickGeneratorResetDate,
     quickGenerationsUsedThisMonth,
-    shouldShowUpgrade,
     hasDevOverride
   }
 })
