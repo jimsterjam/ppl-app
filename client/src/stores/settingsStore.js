@@ -123,9 +123,13 @@ export const useSettingsStore = defineStore('settings', {
       }
 
       profileLoadPromiseToken = tokenKey
+      const uidAtStart = this._uid
       profileLoadPromise = (async () => {
         try {
           const profile = await fetchAccountProfile(token)
+          // Kontowechsel während der Anfrage (langsamer Server): Antwort gehört zum alten Konto und
+          // darf weder Name/Bild des neuen Kontos überschreiben noch in dessen Slot gespeichert werden.
+          if (this._uid !== uidAtStart) return profile
           const username = String(profile?.username ?? '').trim().slice(0, 24)
           const avatarUrl = String(profile?.avatarUrl ?? '').trim()
           this.username = username
@@ -135,6 +139,7 @@ export const useSettingsStore = defineStore('settings', {
           lsSet(this._uid, 'app-avatar-url', avatarUrl)
           return profile
         } catch (error) {
+          if (this._uid !== uidAtStart) return { username: '', avatarUrl: '' }
           if (isTransientRequestError(error)) {
             profileCooldownUntil = Date.now() + PROFILE_REQUEST_COOLDOWN_MS
           }
