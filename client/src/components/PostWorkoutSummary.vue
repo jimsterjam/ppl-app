@@ -86,7 +86,7 @@
     <!-- Success State -->
     <div v-else-if="feedback" class="summary-content success">
       <div class="feedback-section">
-        <h3>{{ t('postWorkout.feedback') }}</h3>
+        <h3>{{ feedbackKind === 'first_look' ? t('postWorkout.feedbackFirstLook') : t('postWorkout.feedback') }}</h3>
         <AiFeedbackDeltaSummary v-if="analysisSnapshot.length > 0" :snapshot="analysisSnapshot" />
         <div class="feedback-text">{{ feedback }}</div>
         <!-- Erklärt NUR, wofür die Bewertung da ist - rührt AiFeedbackRatingWidget selbst nicht
@@ -237,6 +237,8 @@ const showSummary = ref(true)
 const deferredConfirmation = ref(props.deferred)
 const loading = ref(!props.deferred)
 const feedback = ref(null)
+// 'first_look' = Erste Einordnung (ohne Vergleich), sonst vergleichendes Feedback.
+const feedbackKind = ref(null)
 const analysisSnapshot = ref([])
 // Die tatsächlich aufgelöste, echte Workout-ID (nicht die evtl. temporäre offline_/draft-ID
 // aus props.workoutId) - die Bewertungs-Route hängt am echten Workout-Dokument.
@@ -445,6 +447,7 @@ async function loadAIFeedback({ refresh = false } = {}) {
         window.dispatchEvent(new CustomEvent(FEEDBACK_READY_EVENT, { detail: { workoutId: resolvedWorkoutId } }))
       }
       feedback.value = response.data.ai_feedback
+      feedbackKind.value = response.data.feedback_kind || null
       analysisSnapshot.value = Array.isArray(response.data?.ai_analysis_snapshot)
         ? response.data.ai_analysis_snapshot
         : []

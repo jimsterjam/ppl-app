@@ -20,6 +20,26 @@ import { languageDirective, EXERCISE_ORDER_DIRECTIVE, reorderBulletLinesByExerci
 // exakt gleichen, produktionskritischen Prompt-Text lesen können, ohne eine OpenAIProvider-
 // Instanz zu erzeugen (die einen konfigurierten API-Key voraussetzt) und ohne den Text zu
 // duplizieren (Duplizierung würde unweigerlich auseinanderlaufen). Inhaltlich unverändert.
+// Erste Einordnung (Absprache Paul 29.10.): weniger als 4 gleiche Workouts, keine Vergleichsbasis. Wird bei
+// feedback_mode "first_look" an den System-Prompt gehängt und hat Vorrang vor OUTPUT-FORMAT und Regel 25. Den Ausblick
+// (Empfehlungen der App, Eigenverantwortung bei der Ausführung) hängt die App selbst an - die KI formuliert ihn NICHT.
+export function getFirstLookDirectiveText() {
+  return `
+
+ERSTE EINORDNUNG (feedback_mode: "first_look") - DIESE REGELN HABEN VORRANG VOR DEM OUTPUT-FORMAT:
+Zu dieser Einheit gibt es noch nicht genug gleiche Workouts für einen Vergleich. Gib eine kurze, warme, ehrliche
+ERSTE EINORDNUNG genau dieser einen Einheit (ca. 30-60 Wörter).
+- KEINE Vergleiche mit früheren Einheiten, KEINE Trends, KEIN "Fortschritt" und KEIN "Rückschritt", keine Aussage zur
+  Entwicklung von Gewicht, Wiederholungen oder Sätzen - auch wenn zu einzelnen Übungen Vorwerte geliefert werden.
+- Zeile 1: kurzer Einstieg (gern ein Emoji), der die Einheit würdigt (Struktur, Umfang, dass der Nutzer sie geschafft
+  hat). KEINE Übung und KEINE Zahl in dieser Zeile.
+- Danach HÖCHSTENS 2 Zeilen mit Bindestrich zu Übungen mit Besonderheit (Notiz bzw. bewusste Entscheidung des Nutzers,
+  Regel 12), ohne Zahlen. Ohne Notiz reicht der Einstieg allein.
+- KEINE Empfehlung zu Gewicht oder Wiederholungen und KEINE Aussage, was die App künftig vorschlägt - den Ausblick hängt
+  die App selbst an (Regel 25 gilt weiter). KEINE Aussage zur Ausführung/Technik (Regel 4).
+- Niemals Defizit-Wörter ("leider", "noch nicht", "nur").`;
+}
+
 export function getCoachSystemPromptText() {
   return `Du bist ein Fitness-Coach, der seinem Klienten direkt nach dem Training kurz
 per Chat schreibt - so wie ein guter Coach, der sich wirklich mit den Zahlen befasst hat und
@@ -497,7 +517,9 @@ export class OpenAIProvider extends AIProvider {
         messages: [
           {
             role: 'system',
-            content: (systemPrompt || this.getSystemPrompt()) + EXERCISE_ORDER_DIRECTIVE + languageDirective(language)
+            content: (systemPrompt || this.getSystemPrompt())
+              + (trainingAnalysis?.feedback_mode === 'first_look' ? getFirstLookDirectiveText() : '')
+              + EXERCISE_ORDER_DIRECTIVE + languageDirective(language)
           },
           {
             role: 'user',

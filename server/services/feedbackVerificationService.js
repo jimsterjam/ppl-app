@@ -543,6 +543,11 @@ Entwurfstext. Du generierst KEIN neues Feedback, du prüfst nur.
 25. Technik-Übungen (training_type "technique"): keine Bewertung von Gewicht, Wiederholungen oder Fortschritt und keine
     Empfehlung, wann der Nutzer steigern soll - er entscheidet selbst. Eine bloße Notiz-Bestätigung oder ein
     neutraler Halbsatz ist erlaubt.
+26. ERSTE EINORDNUNG (feedback_mode "first_look", falls im Datensatz vorhanden): Es fehlt die Vergleichsbasis. Verstoß ist
+    JEDE Aussage über einen Vergleich mit früheren Einheiten, eine Entwicklung/einen Trend, Fortschritt oder Rückschritt
+    sowie jede Empfehlung zu Gewicht oder Wiederholungen (die hängt die App selbst an). ERLAUBT sind eine würdigende
+    Einordnung dieser einen Einheit ohne Zahlen (Struktur, Umfang, Notiz bzw. bewusste Entscheidung des Nutzers) und
+    ein kurzer, motivierender Satz. Ein kurzer Text (ca. 30-60 Wörter) ist hier gewollt, Regel 17 gilt entsprechend.
 
 Antworte AUSSCHLIESSLICH als valides JSON-Objekt, keine Erklärung davor/danach:
 {

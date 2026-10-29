@@ -35,6 +35,9 @@
             <span class="feedback-name">{{ stripWorkoutNameDate(item.name) || 'Workout' }}</span>
             <span class="feedback-date">
               {{ formatDate(item.ai_generated_at || item.date) }}
+              <span v-if="item.ai_feedback_kind === 'first_look' && item.ai_feedback" class="pending-badge">
+                {{ t('feedbackHistory.firstLookBadge') }}
+              </span>
               <span v-if="item.ai_feedback_status === 'deferred'" class="pending-badge">
                 {{ t('feedbackHistory.pendingBadge') }}
               </span>

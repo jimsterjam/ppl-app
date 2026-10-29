@@ -49,6 +49,7 @@ import { decideExerciseMatch } from '../utils/exerciseMatching.js';
 import { getMaxExerciseCount } from '../utils/exerciseCountTarget.js';
 import { applyGeneratorRule } from '../utils/repTargets.js';
 import { buildNextSessionFocus, buildProgressionStates, applyNextSessionFocus } from '../utils/nextSessionFocus.js';
+import { FIRST_LOOK_COMPARISON_MIN, applyFirstLookOutlook } from '../utils/firstLookOutlook.js';
 import { applyRestLine } from '../utils/restLine.js';
 import { sanitizeCoachText, buildBodyweightFactLine } from '../utils/feedbackFactGuard.js';
 import { resolveListFeedbackStatus, FEEDBACK_PENDING_FAILED_AFTER_MS } from '../utils/feedbackStatus.js';
@@ -90,8 +91,9 @@ const exerciseCatalog = Array.isArray(exercises) ? exercises : [];
 // - Alternative zum reinen Wiederholungs-Zähler: liegt die erste identische Session bereits
 //   mindestens 4 Wochen zurück, ist genug Trainingszeitraum vergangen, auch ohne 8 identische
 //   Workouts.
-const AI_FEEDBACK_MIN_REPETITIONS = Number.parseInt(process.env.AI_FEEDBACK_MIN_REPETITIONS, 10) || 1; // Prod-Default: 8
-const AI_FEEDBACK_MIN_HISTORY_DAYS = Number.parseInt(process.env.AI_FEEDBACK_MIN_HISTORY_DAYS, 10) || 1; // Prod-Default: 28
+// Neu (Absprache Paul 29.10.): Unter dieser Anzahl gleicher Workouts gibt es eine "Erste Einordnung" (ohne Vergleich), ab
+// ihr das vergleichende Feedback. Standard 4 (= ab dem 4. gleichen Workout); die frühere Zeit-Alternative (Tage) entfällt.
+const AI_FEEDBACK_MIN_REPETITIONS = Number.parseInt(process.env.AI_FEEDBACK_MIN_REPETITIONS, 10) || FIRST_LOOK_COMPARISON_MIN;
 
 // Kanonischer Fingerprint der Übungsliste eines Workouts (Namen, sortiert, normalisiert).
 // Zwei Workouts gelten als "gleiches Workout", wenn dieser Fingerprint exakt übereinstimmt.
@@ -105,7 +107,7 @@ function exerciseSetFingerprint(workout) {
 // Ermittelt Anzahl identischer abgeschlossener Workouts (inkl. currentWorkout) sowie den
 // zeitlichen Abstand zwischen der frühesten identischen Session und currentWorkout - beide
 // Werte werden gebraucht, um zu entscheiden, ob eine wertende Analyse möglich ist (siehe
-// AI_FEEDBACK_MIN_REPETITIONS / AI_FEEDBACK_MIN_HISTORY_DAYS).
+// AI_FEEDBACK_MIN_REPETITIONS; Erste Einordnung darunter).
 function analyzeMatchingCompletedWorkouts(currentWorkout, allWorkouts) {
   const targetFingerprint = exerciseSetFingerprint(currentWorkout);
   if (!targetFingerprint) {
@@ -1124,7 +1126,7 @@ router.get("/feedbacks", firebaseAuthMiddleware, async (req, res) => {
         { $project: {
           name: 1, type: 1, date: 1, completed: 1,
           ai_feedback: 1, ai_generated_at: 1, ai_metadata: 1, ai_analysis_snapshot: 1,
-          ai_feedback_status: 1, ai_pending_since: 1
+          ai_feedback_status: 1, ai_pending_since: 1, ai_feedback_kind: 1
         } }
       ]),
       Workout.countDocuments(query)
@@ -1148,7 +1150,9 @@ router.get("/feedbacks", firebaseAuthMiddleware, async (req, res) => {
         // UI ein "ausstehend"-Badge + "Jetzt generieren"-Button statt des Feedback-Texts).
         // 'pending' = wird noch erstellt (Client lädt automatisch nach); nach
         // FEEDBACK_PENDING_FAILED_AFTER_MS ohne Ergebnis als 'failed' ("Erneut versuchen").
-        ai_feedback_status: resolveListFeedbackStatus(w)
+        ai_feedback_status: resolveListFeedbackStatus(w),
+        // 'first_look' = Erste Einordnung (ohne Vergleich), 'comparison' = vergleichend, null = älteres Feedback.
+        ai_feedback_kind: w.ai_feedback_kind || null
       })),
       page,
       limit,
@@ -2028,6 +2032,7 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
         ai_feedback: currentWorkout.ai_feedback,
         ai_metadata: currentWorkout.ai_metadata,
         ai_analysis_snapshot: currentWorkout.ai_analysis_snapshot || [],
+        feedback_kind: currentWorkout.ai_feedback_kind || null,
         cached: true,
         metadata: {
           requestId,
@@ -2072,37 +2077,12 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
     // 2b. Genug Wiederholungen desselben Workouts? Ohne Vergleichsbasis über mehrere
     // identische Sessions ist AI-Feedback nicht aussagekräftig – kein AI-Call, kein
     // Kontingent-Verbrauch, stattdessen ein "noch X Workouts"-Hinweis.
-    const { matchingCount, spanDays } = analyzeMatchingCompletedWorkouts(currentWorkout, allWorkouts);
-    // Wertende (vergleichende) Analyse erst zulassen, wenn EINES der beiden Kriterien erfüllt
-    // ist: genug identische Sessions (>= AI_FEEDBACK_MIN_REPETITIONS) ODER genug verstrichene
-    // Zeit seit der ersten identischen Session (>= AI_FEEDBACK_MIN_HISTORY_DAYS). Reines
-    // Session-Zählen allein war zu früh aussagekräftig (z.B. 3x in einer Woche trainiert).
-    const hasEnoughRepetitions = matchingCount >= AI_FEEDBACK_MIN_REPETITIONS;
-    const hasEnoughHistorySpan = spanDays >= AI_FEEDBACK_MIN_HISTORY_DAYS;
-    if (!hasEnoughRepetitions && !hasEnoughHistorySpan) {
-      const remaining = Math.max(0, AI_FEEDBACK_MIN_REPETITIONS - matchingCount);
-      const remainingDays = Math.max(0, AI_FEEDBACK_MIN_HISTORY_DAYS - spanDays);
-      logger.info('⏳ Workout analysis: zu wenig Wiederholungen/Zeitraum für wertendes Feedback', {
-        requestId, workoutId, matchingCount, remaining, spanDays, remainingDays
-      });
-      return res.json({
-        success: true,
-        workoutId: currentWorkout._id,
-        workoutDate: currentWorkout.date,
-        feedback_status: 'insufficient_history',
-        matching_count: matchingCount,
-        required_count: AI_FEEDBACK_MIN_REPETITIONS,
-        remaining,
-        span_days: spanDays,
-        required_days: AI_FEEDBACK_MIN_HISTORY_DAYS,
-        remaining_days: remainingDays,
-        metadata: {
-          requestId,
-          timestamp: new Date().toISOString(),
-          aiAvailable: false
-        }
-      });
-    }
+    const { matchingCount } = analyzeMatchingCompletedWorkouts(currentWorkout, allWorkouts);
+    // Erste Einordnung statt Wartezeit (Absprache Paul 29.10.): Gibt es weniger als AI_FEEDBACK_MIN_REPETITIONS gleiche
+    // Workouts (Standard 4), fehlt die Vergleichsbasis - die KI ordnet dann nur diese eine Einheit ein (ohne Vergleiche,
+    // ohne Empfehlungen; den Ausblick hängt die App selbst an). Ab dem 4. gleichen Workout folgt das vergleichende Feedback.
+    // Auch ein ganz neues Workout bekommt so eine Erste Einordnung.
+    const isFirstLookFeedback = matchingCount < AI_FEEDBACK_MIN_REPETITIONS;
 
     // 2b'. Ab hier wird wirklich generiert: als "wird erstellt" markieren, damit der
     // Feedback-Verlauf das Workout auch dann zeigt, wenn diese Anfrage scheitert (z.B.
@@ -2267,6 +2247,7 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
     // `x-app-language` oder Accept-Language). Wird vom Coach-, Prüf- und Korrektur-Prompt gelesen.
     if (structuredAnalysis) {
       structuredAnalysis.response_language = resolveFeedbackLanguage(req);
+      structuredAnalysis.feedback_mode = isFirstLookFeedback ? 'first_look' : 'comparison';
     }
 
     // 5. Rufe AI-Service auf (OpenAI oder Ollama, abhängig von Konfiguration)
@@ -2448,6 +2429,8 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
       } catch (e) {
         logger.warn('⚠️ Fokus-Zeile konnte nicht gebaut werden', { requestId, error: e.message });
       }
+      // Erste Einordnung: fester Ausblick der App (Empfehlungen kommen künftig von der App, Ausführung in Eigenverantwortung).
+      if (isFirstLookFeedback) aiResult.feedback = applyFirstLookOutlook(aiResult.feedback, feedbackLanguage);
 
       // Kontingent erst bei tatsächlich erfolgreicher Generierung verbrauchen (nicht bei
       // Health-Check-Fehlschlag/network_unavailable oben oder einem AI-Fehler unten) - konsistent
@@ -2466,6 +2449,7 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
               ...(verifierMetadata || {})
             },
             ai_analysis_snapshot: analysisSnapshot,
+            ai_feedback_kind: isFirstLookFeedback ? 'first_look' : 'comparison',
             // War das Workout zuvor "zurückgestellt" (Feature "Feedback später bewerten"),
             // ist es jetzt final generiert - Feedback-Verlauf soll dann kein "ausstehend"-
             // Badge mehr zeigen (siehe GET /feedbacks oben).
@@ -2521,7 +2505,8 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
       // AI-Feedback (Interpretation)
       ...(aiResult ? {
         ai_feedback: aiResult.feedback,
-        ai_metadata: aiResult.metadata
+        ai_metadata: aiResult.metadata,
+        feedback_kind: isFirstLookFeedback ? 'first_look' : 'comparison'
       } : {}),
 
       metadata: {
