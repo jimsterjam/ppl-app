@@ -5,7 +5,6 @@ import ToastHost from './components/ToastHost.vue'
 import TimerPortal from './components/timer/TimerPortal.vue'
 import OnboardingFlow from './components/OnboardingFlow.vue'
 import AiConsentModal from './components/AiConsentModal.vue'
-import StartAnimation from './components/StartAnimation.vue'
 import { initializeDefaultExercises } from './utils/offlineStorage'
 import { logger } from './utils/logger'
 import { useAuthStore } from '@/stores/authStore'
@@ -68,7 +67,6 @@ async function handleOnboardingSkip() {
     <TimerPortal />
     <ToastHost />
     <AiConsentModal />
-    <StartAnimation />
     <OnboardingFlow
       v-if="showOnboarding"
       @complete="handleOnboardingComplete"
