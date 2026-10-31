@@ -29,7 +29,12 @@ const MODE_STORAGE_KEY = 'keep-awake-mode'
 const ALWAYS_TAGS = new Set(['workout-save', 'ai-feedback'])
 const WORKOUT_ONLY_TAGS = new Set(['session-stopwatch'])
 
+// Gewählter Modus zusätzlich im Speicher: schlägt das Schreiben in localStorage fehl (Speicher voll,
+// privater Modus), gilt die Wahl trotzdem bis zum Beenden der App.
+let currentMode = null
+
 export function getKeepAwakeMode() {
+  if (currentMode) return currentMode
   try {
     const stored = localStorage.getItem(MODE_STORAGE_KEY)
     return KEEP_AWAKE_MODES.includes(stored) ? stored : DEFAULT_KEEP_AWAKE_MODE
@@ -40,6 +45,7 @@ export function getKeepAwakeMode() {
 
 export async function setKeepAwakeMode(mode) {
   if (!KEEP_AWAKE_MODES.includes(mode)) return
+  currentMode = mode
   try { localStorage.setItem(MODE_STORAGE_KEY, mode) } catch {}
   await applyKeepAwake('mode-changed')
 }
@@ -56,10 +62,14 @@ function effectiveTags() {
 
 let awake = false
 
-// Bei JEDEM Aufruf setzen (auch wenn schon an): der Aufruf ist auf iOS idempotent
-// (isIdleTimerDisabled = true), und ein einmal fehlgeschlagener Aufruf wird so beim nächsten
-// acquire nachgeholt statt dauerhaft verloren zu sein.
-async function applyKeepAwake(reason) {
+// Plugin-Aufrufe laufen nacheinander, und der gewünschte Zustand wird erst dann bestimmt, wenn der Aufruf
+// an der Reihe ist: sonst könnte ein noch ausstehendes keepAwake() nach einem schon erledigten Freigeben
+// (awake war noch false -> allowSleep übersprungen) das Display dauerhaft wach lassen.
+// Bei JEDEM Aufruf wird gesetzt (auch wenn schon an): keepAwake() ist auf iOS idempotent, und ein einmal
+// fehlgeschlagener Aufruf wird so beim nächsten acquire nachgeholt statt dauerhaft verloren zu sein.
+let queue = Promise.resolve()
+
+async function runApply(reason) {
   const tags = effectiveTags()
   try {
     if (tags.length > 0) {
@@ -74,6 +84,11 @@ async function applyKeepAwake(reason) {
   } catch (err) {
     logger.warn('[keepAwakeGuard] Keep-Awake-Umschaltung fehlgeschlagen:', err?.message)
   }
+}
+
+function applyKeepAwake(reason) {
+  queue = queue.then(() => runApply(reason))
+  return queue
 }
 
 export async function acquireKeepAwake(tag) {
