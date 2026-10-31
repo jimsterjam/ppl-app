@@ -16,6 +16,7 @@ describe('keepAwakeGuard: Einstellung "Display im Training"', () => {
       removeItem: (k) => mem.delete(k)
     })
     vi.stubGlobal('window', {})
+    await setKeepAwakeMode('workout')
     for (const tag of getActiveKeepAwakeTags()) await releaseKeepAwake(tag)
     plugin.keepAwake.mockClear()
     plugin.allowSleep.mockClear()
@@ -66,5 +67,39 @@ describe('keepAwakeGuard: Einstellung "Display im Training"', () => {
   it('ungültiger Modus wird ignoriert', async () => {
     await setKeepAwakeMode('quatsch')
     expect(getKeepAwakeMode()).toBe('workout')
+  })
+
+  it('Freigabe während ein keepAwake()-Aufruf noch aussteht: Display darf danach wieder schlafen', async () => {
+    let finish
+    plugin.keepAwake.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
+    const acquiring = acquireKeepAwake('rest-timer')
+    await vi.waitFor(() => expect(finish).toBeTypeOf('function'))
+    const releasing = releaseKeepAwake('rest-timer')
+    finish()
+    await Promise.all([acquiring, releasing])
+    expect(plugin.allowSleep).toHaveBeenCalledTimes(1)
+  })
+
+  it('Moduswechsel auf "off" während keepAwake() aussteht: danach allowSleep', async () => {
+    let finish
+    plugin.keepAwake.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
+    const acquiring = acquireKeepAwake('session-stopwatch')
+    await vi.waitFor(() => expect(finish).toBeTypeOf('function'))
+    const switching = setKeepAwakeMode('off')
+    finish()
+    await Promise.all([acquiring, switching])
+    expect(plugin.allowSleep).toHaveBeenCalledTimes(1)
+  })
+
+  it('localStorage nicht beschreibbar: gewählter Modus gilt trotzdem', async () => {
+    vi.stubGlobal('localStorage', {
+      getItem: () => null,
+      setItem: () => { throw new Error('QuotaExceededError') },
+      removeItem: () => {}
+    })
+    await setKeepAwakeMode('off')
+    expect(getKeepAwakeMode()).toBe('off')
+    await acquireKeepAwake('session-stopwatch')
+    expect(plugin.keepAwake).not.toHaveBeenCalled()
   })
 })
