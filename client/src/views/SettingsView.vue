@@ -94,6 +94,16 @@
         </div>
       </SettingsSectionCard>
 
+      <SettingsSectionCard class="card card--app" :title="$t('settings.keepAwakeTitle')">
+        <p class="hint">{{ $t('settings.keepAwakeHint') }}</p>
+        <div class="theme-options">
+          <label v-for="mode in KEEP_AWAKE_MODES" :key="mode" class="opt">
+            <input type="radio" name="keep-awake" :value="mode" :checked="keepAwakeMode === mode" @change="chooseKeepAwakeMode(mode)" />
+            <span>{{ $t(`settings.keepAwake_${mode}`) }}</span>
+          </label>
+        </div>
+      </SettingsSectionCard>
+
       <SettingsSectionCard class="card card--app" :title="$t('settings.language')">
         <div class="theme-options">
           <label class="opt">
@@ -411,6 +421,7 @@ import BrandLockup from '../components/BrandLockup.vue'
 import { App as CapacitorApp } from '@capacitor/app'
 import AiQuotaCard from '../components/AiQuotaCard.vue'
 import VerifierAuditPanel from '../components/VerifierAuditPanel.vue'
+import { KEEP_AWAKE_MODES, getKeepAwakeMode, setKeepAwakeMode } from '../utils/keepAwakeGuard'
 
 const themeStore = useThemeStore()
 const { theme, colorMode } = storeToRefs(themeStore)
@@ -493,6 +504,13 @@ function onInput(e) { setGoal(e.target.value) }
 function onRange(e) { setGoal(e.target.value) }
 function inc() { setGoal((weeklyGoal.value || 4) + 1) }
 function dec() { setGoal((weeklyGoal.value || 4) - 1) }
+
+// Display im Training (Akku)
+const keepAwakeMode = ref(getKeepAwakeMode())
+function chooseKeepAwakeMode(mode) {
+  keepAwakeMode.value = mode
+  setKeepAwakeMode(mode)
+}
 
 // Sprache
 const { locale, t: $t } = useI18n()
