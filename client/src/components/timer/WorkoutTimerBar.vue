@@ -210,18 +210,16 @@ const progressWidth = computed(() => {
   return `${percent.toFixed(2)}%`
 })
 
+// 4 Aktualisierungen pro Sekunde statt requestAnimationFrame (bis 120/s auf ProMotion): spart Akku.
 const startRaf = () => {
   if (rafId) return
-  const loop = () => {
-    rafNow.value = Date.now()
-    rafId = requestAnimationFrame(loop)
-  }
-  rafId = requestAnimationFrame(loop)
+  rafNow.value = Date.now()
+  rafId = setInterval(() => { rafNow.value = Date.now() }, 250)
 }
 
 const stopRaf = () => {
   if (!rafId) return
-  cancelAnimationFrame(rafId)
+  clearInterval(rafId)
   rafId = null
 }
 

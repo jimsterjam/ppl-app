@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { acquireKeepAwake, releaseKeepAwake } from '@/utils/keepAwakeGuard'
 
 const KEEP_AWAKE_TAG = 'session-stopwatch'
+const TICK_MS = 250
 
 const STORAGE_KEY = 'bro_split_session_stopwatch_v1'
 
@@ -39,7 +40,7 @@ export const useSessionStopwatchStore = defineStore('sessionStopwatch', () => {
   const isRunning = ref(persisted?.isRunning ?? false)
   const nowMs = ref(Date.now())
 
-  let rafId = null
+  let tickId = null
 
   function persistNow() {
     if (!startedAt.value) {
@@ -54,25 +55,24 @@ export const useSessionStopwatchStore = defineStore('sessionStopwatch', () => {
     })
   }
 
-  function startRaf() {
-    if (rafId) return
-    const loop = () => {
-      nowMs.value = Date.now()
-      rafId = requestAnimationFrame(loop)
-    }
-    rafId = requestAnimationFrame(loop)
+  // Sekundenanzeige: 4 Aktualisierungen pro Sekunde reichen. requestAnimationFrame zeichnete auf
+  // ProMotion-iPhones bis zu 120-mal pro Sekunde neu und kostete unnötig Akku.
+  function startTick() {
+    if (tickId) return
+    nowMs.value = Date.now()
+    tickId = setInterval(() => { nowMs.value = Date.now() }, TICK_MS)
   }
 
-  function stopRaf() {
-    if (!rafId) return
-    cancelAnimationFrame(rafId)
-    rafId = null
+  function stopTick() {
+    if (!tickId) return
+    clearInterval(tickId)
+    tickId = null
   }
 
   // Falls beim Neustart ein laufender Zustand wiederhergestellt wurde,
   // muss der rAF-Loop wieder anlaufen, sonst bleibt die Anzeige stehen.
   if (isRunning.value && startedAt.value) {
-    startRaf()
+    startTick()
     acquireKeepAwake(KEEP_AWAKE_TAG)
   }
 
@@ -94,7 +94,7 @@ export const useSessionStopwatchStore = defineStore('sessionStopwatch', () => {
     pausedAt.value = null
     pausedTotalMs.value = 0
     isRunning.value = true
-    startRaf()
+    startTick()
     acquireKeepAwake(KEEP_AWAKE_TAG)
     persistNow()
   }
@@ -103,7 +103,7 @@ export const useSessionStopwatchStore = defineStore('sessionStopwatch', () => {
     if (!isRunning.value) return
     pausedAt.value = Date.now()
     isRunning.value = false
-    stopRaf()
+    stopTick()
     releaseKeepAwake(KEEP_AWAKE_TAG)
     persistNow()
   }
@@ -113,13 +113,13 @@ export const useSessionStopwatchStore = defineStore('sessionStopwatch', () => {
     pausedTotalMs.value += Date.now() - pausedAt.value
     pausedAt.value = null
     isRunning.value = true
-    startRaf()
+    startTick()
     acquireKeepAwake(KEEP_AWAKE_TAG)
     persistNow()
   }
 
   function reset() {
-    stopRaf()
+    stopTick()
     releaseKeepAwake(KEEP_AWAKE_TAG)
     startedAt.value = null
     pausedAt.value = null
