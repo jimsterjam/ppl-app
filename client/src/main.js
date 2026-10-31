@@ -30,6 +30,7 @@ import { processPendingAiFeedback } from '@/utils/pendingAiFeedback'
 import { startFeedbackTracker, FEEDBACK_READY_EVENT } from '@/utils/feedbackTracker'
 import { useToastStore } from '@/stores/toastStore'
 import { stripWorkoutNameDate } from '@/utils/workoutName'
+import { dismissStartSplash } from '@/utils/startSplash'
 import { reapplyKeepAwake } from '@/utils/keepAwakeGuard'
 import { rearmAudio } from '@/utils/timerAudio'
 // Bewusst NICHT statisch importiert (siehe warmupExercisesArea unten): defaultExercisesLoader.js
@@ -523,3 +524,4 @@ router.isReady().then(() => {
 })
 
 app.mount('#app')
+dismissStartSplash()
