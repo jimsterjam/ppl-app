@@ -90,8 +90,9 @@
       </div>
     </div>
 
-    <!-- Minimiert: große, gut lesbare Leiste (ersetzt die kleine Pausen-Leiste), Tippen öffnet die Großansicht. -->
-    <button v-if="focus.active && focus.minimized" type="button" class="fm-mini" :aria-label="t('focus.openAria')" @click="emit('open')">
+    <!-- Minimiert: große, gut lesbare Leiste, Tippen öffnet die Großansicht. Läuft eine Pause, zeigt die App
+         stattdessen immer die Pausen-Leiste (RestTimerBar.vue, mit −15/+15/Überspringen), damit sie überall gleich aussieht. -->
+    <button v-if="focus.active && focus.minimized && !rest.isVisible" type="button" class="fm-mini" :aria-label="t('focus.openAria')" @click="emit('open')">
       <span class="fm-mini-time">{{ miniTime }}</span>
       <span class="fm-mini-text">
         <b>{{ miniTitle }}</b>
@@ -214,13 +215,11 @@ watch([() => props.current?.key, () => focus.visible, () => rest.isVisible, () =
 // Minimierte Leiste: Pause hat Vorrang, dann der Satz-Timer, sonst der aktuelle Satz.
 const miniTime = computed(() => {
   if (transition.isActive) return formatRest(Math.floor(transition.elapsedMs / 1000) * 1000)
-  if (rest.isVisible) return rest.showFinished ? '0:00' : formatRest(rest.remainingMs)
   if (timerStarted.value) return timerText.value
   return props.current ? `${props.current.setNumber}/${props.current.setTotal}` : ''
 })
 const miniTitle = computed(() => {
   if (transition.isActive) return t('transition.label')
-  if (rest.isVisible) return rest.showFinished ? t('restTimer.finished') : t('focus.miniRest')
   if (timerStarted.value) return t('focus.miniHold')
   if (props.current?.isWarmup) return t('focus.miniWarmup', { n: props.current.setNumber })
   return t('focus.miniSet', { n: props.current?.setNumber || 1 })
