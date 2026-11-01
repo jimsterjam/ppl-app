@@ -6,9 +6,10 @@ import { fileURLToPath } from 'node:url'
 const html = readFileSync(fileURLToPath(new URL('../../../index.html', import.meta.url)), 'utf8')
 const script = html.match(/<script>\s*\(function \(\) \{[\s\S]*?\}\)\(\);\s*<\/script>/)[0].replace(/<\/?script>/g, '')
 
-function run({ lastAlive = null } = {}) {
+function run({ lastAlive = null, launchId = '', lastLaunchId = '' } = {}) {
   const store = new Map()
   if (lastAlive !== null) store.set('fbe_last_alive', String(lastAlive))
+  if (lastLaunchId) store.set('fbe_launch_id', lastLaunchId)
   const el = { classList: { add: vi.fn() }, parentNode: { removeChild: vi.fn() } }
   const listeners = {}
   const doc = {
@@ -17,7 +18,7 @@ function run({ lastAlive = null } = {}) {
     addEventListener: (name, fn) => { listeners[`doc:${name}`] = fn },
     fonts: { load: () => new Promise(() => {}) }
   }
-  const win = { addEventListener: (name, fn) => { listeners[`win:${name}`] = fn } }
+  const win = { __fbeLaunchId: launchId, addEventListener: (name, fn) => { listeners[`win:${name}`] = fn } }
   const ls = { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)) }
   new Function('document', 'window', 'localStorage', 'setTimeout', 'clearTimeout', script)(doc, win, ls, setTimeout, clearTimeout)
   return { el, store, listeners, doc }
@@ -55,5 +56,26 @@ describe('Startanimation: nur beim App-Start', () => {
     store.set('fbe_last_alive', '1')
     listeners['win:pagehide']()
     expect(Number(store.get('fbe_last_alive'))).toBeGreaterThan(1)
+  })
+
+  it('App komplett geschlossen und neu geöffnet (neue Kennung): Animation, auch nach 2 Minuten', () => {
+    const { el, store } = run({ lastAlive: Date.now() - 2 * 60 * 1000, launchId: 'neu', lastLaunchId: 'alt' })
+    expect(el.parentNode.removeChild).not.toHaveBeenCalled()
+    expect(store.get('fbe_launch_id')).toBe('neu')
+  })
+
+  it('nur neu geladen (gleiche Kennung, kurz her): keine Animation', () => {
+    const { el } = run({ lastAlive: Date.now() - 2 * 60 * 1000, launchId: 'gleich', lastLaunchId: 'gleich' })
+    expect(el.parentNode.removeChild).toHaveBeenCalledWith(el)
+  })
+
+  it('gleiche Kennung, aber über 30 Minuten her: Animation', () => {
+    const { el } = run({ lastAlive: Date.now() - 40 * 60 * 1000, launchId: 'gleich', lastLaunchId: 'gleich' })
+    expect(el.parentNode.removeChild).not.toHaveBeenCalled()
+  })
+
+  it('erster Start überhaupt mit Kennung: Animation', () => {
+    const { el } = run({ launchId: 'neu' })
+    expect(el.parentNode.removeChild).not.toHaveBeenCalled()
   })
 })
