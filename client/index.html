@@ -39,14 +39,20 @@
   var el = document.getElementById('start-splash');
   if (!el) return;
   // Nur beim echten App-Start zeigen, nicht bei jeder Rückkehr aus dem Hintergrund: iOS beendet die
-  // Web-Ansicht im Hintergrund gelegentlich und lädt die Seite danach neu. Merker: letzte Aktivität.
-  var KEY = 'fbe_last_alive', RESUME_MS = 30 * 60 * 1000, last = 0;
-  try { last = Number(localStorage.getItem(KEY)) || 0; } catch (e) {}
-  function touch() { try { localStorage.setItem(KEY, String(Date.now())); } catch (e) {} }
+  // Web-Ansicht im Hintergrund gelegentlich und lädt die Seite danach neu. Die iOS-App gibt jedem App-Prozess
+  // eine Kennung (window.__fbeLaunchId, MainViewController.swift): neue Kennung = App wurde komplett
+  // geschlossen und neu geöffnet -> Animation. Gleiche Kennung = nur neu geladen -> keine Animation, solange
+  // die letzte Aktivität weniger als 30 Minuten zurückliegt. Ohne Kennung (z. B. Browser) gilt nur die Zeit.
+  var KEY = 'fbe_last_alive', ID_KEY = 'fbe_launch_id', RESUME_MS = 30 * 60 * 1000, last = 0, lastId = '';
+  var launchId = String(window.__fbeLaunchId || '');
+  try { last = Number(localStorage.getItem(KEY)) || 0; lastId = localStorage.getItem(ID_KEY) || ''; } catch (e) {}
+  function touch() { try { localStorage.setItem(KEY, String(Date.now())); if (launchId) localStorage.setItem(ID_KEY, launchId); } catch (e) {} }
   touch();
   document.addEventListener('visibilitychange', function () { if (document.hidden) touch(); });
   window.addEventListener('pagehide', touch);
-  if (last && Date.now() - last >= 0 && Date.now() - last < RESUME_MS) {
+  var newAppRun = !!launchId && launchId !== lastId;
+  var recent = last > 0 && Date.now() - last >= 0 && Date.now() - last < RESUME_MS;
+  if (!newAppRun && recent) {
     el.parentNode.removeChild(el);
     return;
   }
