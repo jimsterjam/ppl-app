@@ -38,6 +38,18 @@
 (function () {
   var el = document.getElementById('start-splash');
   if (!el) return;
+  // Nur beim echten App-Start zeigen, nicht bei jeder Rückkehr aus dem Hintergrund: iOS beendet die
+  // Web-Ansicht im Hintergrund gelegentlich und lädt die Seite danach neu. Merker: letzte Aktivität.
+  var KEY = 'fbe_last_alive', RESUME_MS = 30 * 60 * 1000, last = 0;
+  try { last = Number(localStorage.getItem(KEY)) || 0; } catch (e) {}
+  function touch() { try { localStorage.setItem(KEY, String(Date.now())); } catch (e) {} }
+  touch();
+  document.addEventListener('visibilitychange', function () { if (document.hidden) touch(); });
+  window.addEventListener('pagehide', touch);
+  if (last && Date.now() - last >= 0 && Date.now() - last < RESUME_MS) {
+    el.parentNode.removeChild(el);
+    return;
+  }
   window.__splashStart = Date.now();
   function go() { el.classList.add('go'); }
   // Erst starten, wenn die Schrift da ist (sonst blitzt kurz eine Ersatzschrift auf); nach 600 ms trotzdem.

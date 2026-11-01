@@ -411,8 +411,10 @@ onBeforeUnmount(unlock)
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
 }
-.rest-actions { display: flex; gap: 6px; }
+.rest-actions { display: flex; flex-shrink: 0; gap: 6px; }
 .rest-btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
   min-width: 0;
   min-height: 40px;
   padding: 0 12px;
