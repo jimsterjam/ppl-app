@@ -280,6 +280,7 @@ export const messages = {
       legalHint: 'Impressum, Datenschutz, Nutzungsbedingungen',
       legalLink: 'Rechtliche Hinweise',
       privacyLink: 'Datenschutzerklärung',
+      notesPrivacyHint: 'Tipp: Schreibe keine sensiblen Gesundheitsangaben (z. B. Diagnosen oder Medikamente) in deine Notizen. Für das Training sind sie nicht nötig.',
       versionLine: 'Version {version}',
       dangerZone: 'Gefahrenzone',
       dangerZoneHint: 'Diese Aktion ist unwiderruflich und löscht alle deine Workout-Daten, Einstellungen und Drafts.',
@@ -1430,7 +1431,7 @@ export const messages = {
     },
     privacy: {
       title: 'Datenschutzerklärung',
-      lastUpdate: 'Stand: 24. Oktober 2026',
+      lastUpdate: 'Stand: 1. November 2026',
       s1Title: '1. Verantwortlicher',
       s1Text: 'Verantwortlich für die Verarbeitung deiner Daten im Sinne der Datenschutz-Grundverordnung (DSGVO) ist:',
       s1Mail: 'E-Mail: {email}',
@@ -1439,7 +1440,7 @@ export const messages = {
       s3Title: '3. Konto und Anmeldung',
       s3Text: 'Für die Anmeldung verarbeiten wir deine E-Mail-Adresse, eine Nutzerkennung und die Anmeldeart (E-Mail und Passwort, Google oder Apple). Bei „Mit Apple anmelden“ kannst du deine E-Mail-Adresse bei Apple verbergen. Die Anmeldung läuft über Google Firebase Authentication. Rechtsgrundlage ist die Bereitstellung der App (Art. 6 Abs. 1 lit. b DSGVO).',
       s4Title: '4. Trainingsdaten',
-      s4Text: 'Workouts, Übungen, Sätze, Wiederholungen, Gewichte, Notizen, Favoriten, Ziele und Berichte werden auf deinem Gerät (für die Nutzung ohne Netz) und auf unserem Server gespeichert, damit sie geräteübergreifend verfügbar sind. Trainingsdaten können Rückschlüsse auf deine Fitness und Gesundheit zulassen. Wir verwenden sie nur, um dir die Funktionen der App bereitzustellen (Art. 6 Abs. 1 lit. b DSGVO).',
+      s4Text: 'Workouts, Übungen, Sätze, Wiederholungen, Gewichte, Notizen, Favoriten, Ziele und Berichte werden auf deinem Gerät (für die Nutzung ohne Netz) und auf unserem Server gespeichert, damit sie geräteübergreifend verfügbar sind. Bitte schreibe keine sensiblen Gesundheitsangaben (z. B. Diagnosen oder Medikamente) in Notizfelder. Wir verwenden sie nur, um dir die Funktionen der App bereitzustellen (Art. 6 Abs. 1 lit. b DSGVO).',
       s5Title: '5. Profilbild und Name (optional)',
       s5Text: 'Wenn du ein Profilbild festlegst, greift die App nach deiner Erlaubnis auf Kamera oder Fotos zu. Das Bild wird verkleinert (256 × 256 Pixel) und mit deinem Profil gespeichert. Auch der Anzeigename ist freiwillig. Beides wird mit deinem Konto gelöscht.',
       s6Title: '6. KI-Auswertung (nur mit deiner Einwilligung)',
@@ -1463,9 +1464,9 @@ export const messages = {
     },
     legal: {
       title: 'Impressum',
-      section1Title: 'Angaben gemäß § 5 TMG:',
+      section1Title: 'Angaben gemäß § 5 DDG:',
       section1Mail: 'E-Mail: {email}',
-      section1ResponsibleTitle: 'Verantwortlich für den Inhalt nach § 55 Abs. 2 RStV:',
+      section1ResponsibleTitle: 'Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV:',
       copyrightTitle: 'Urheberrecht / Copyright',
       copyrightNotice: '© 2026 fbe. Alle Rechte vorbehalten.',
       copyrightLaw: 'Die Inhalte und Werke in dieser App unterliegen dem deutschen Urheberrecht. Vervielfältigung, Bearbeitung, Verbreitung und jede Art der Verwertung außerhalb der Grenzen des Urheberrechtes bedürfen der schriftlichen Zustimmung des jeweiligen Autors bzw. Erstellers.',
@@ -1480,7 +1481,7 @@ export const messages = {
       privacyLink: 'Datenschutzerklärung lesen',
       privacyShort: 'Datenschutz',
       imprintShort: 'Impressum',
-      lastUpdate: 'Letzte Aktualisierung: 11. November 2025'
+      lastUpdate: 'Letzte Aktualisierung: 1. November 2026'
     },
     onboarding: {
       skip: 'Überspringen',
@@ -1987,6 +1988,7 @@ export const messages = {
       legalHint: 'Imprint, privacy policy, terms',
       legalLink: 'Open legal notice',
       privacyLink: 'Privacy policy',
+      notesPrivacyHint: 'Tip: Please do not write sensitive health information (e.g. diagnoses or medication) in your notes. You do not need it for training.',
       versionLine: 'Version {version}',
       dangerZone: 'Danger Zone',
       dangerZoneHint: 'This action is irreversible and will delete all your workout data, settings and drafts.',
@@ -3116,7 +3118,7 @@ export const messages = {
     },
     privacy: {
       title: 'Privacy Policy',
-      lastUpdate: 'Last updated: 24 October 2026',
+      lastUpdate: 'Last updated: 1 November 2026',
       s1Title: '1. Controller',
       s1Text: 'The controller for processing your data within the meaning of the General Data Protection Regulation (GDPR) is:',
       s1Mail: 'Email: {email}',
@@ -3125,7 +3127,7 @@ export const messages = {
       s3Title: '3. Account and sign-in',
       s3Text: 'For sign-in we process your email address, a user ID and the sign-in method (email and password, Google or Apple). With “Sign in with Apple” you can hide your email address from us. Sign-in runs via Google Firebase Authentication. The legal basis is providing the app (Art. 6(1)(b) GDPR).',
       s4Title: '4. Training data',
-      s4Text: 'Workouts, exercises, sets, reps, weights, notes, favorites, goals and reports are stored on your device (to use the app without a connection) and on our server so they are available across devices. Training data can allow conclusions about your fitness and health. We only use it to provide the app’s features (Art. 6(1)(b) GDPR).',
+      s4Text: 'Workouts, exercises, sets, reps, weights, notes, favorites, goals and reports are stored on your device (to use the app without a connection) and on our server so they are available across devices. Please do not write sensitive health information (e.g. diagnoses or medication) in note fields. We only use it to provide the app’s features (Art. 6(1)(b) GDPR).',
       s5Title: '5. Profile picture and name (optional)',
       s5Text: 'If you set a profile picture, the app accesses your camera or photos after you allow it. The image is resized (256 × 256 pixels) and stored with your profile. Your display name is optional too. Both are deleted with your account.',
       s6Title: '6. AI analysis (only with your consent)',
@@ -3149,9 +3151,9 @@ export const messages = {
     },
     legal: {
       title: 'Legal Notice',
-      section1Title: 'Information according to § 5 TMG:',
+      section1Title: 'Information according to § 5 DDG:',
       section1Mail: 'E-mail: {email}',
-      section1ResponsibleTitle: 'Responsible for content according to § 55 Abs. 2 RStV:',
+      section1ResponsibleTitle: 'Responsible for content according to § 18 (2) MStV:',
       copyrightTitle: 'Copyright',
       copyrightNotice: '© 2026 fbe. All rights reserved.',
       copyrightLaw: 'The content and works in this app are subject to German copyright law. Duplication, processing, distribution and any kind of exploitation outside the limits of copyright require the written consent of the respective author or creator.',
@@ -3166,7 +3168,7 @@ export const messages = {
       privacyLink: 'Read the privacy policy',
       privacyShort: 'Privacy',
       imprintShort: 'Legal notice',
-      lastUpdate: 'Last update: 11 November 2025'
+      lastUpdate: 'Last update: 1 November 2026'
     },
     onboarding: {
       skip: 'Skip',
