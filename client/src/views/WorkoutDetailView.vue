@@ -2132,7 +2132,9 @@ function toggleRowDone(row, exIndex = -1, rowIndex = -1) {
     transition.clear()
     if (isLastSetOfExercise) {
       if (warmupTimer.isActive) warmupTimer.cancel()
-      restTimer.stopFor(exIndex, rowIndex)
+      // clear() statt stopFor(): läuft noch die Pause des vorherigen Satzes, gehört sie nicht zu dieser Zeile
+      // und bliebe sonst stehen - die kleine Ansicht zeigte dann die alte Pause statt der Übergangs-Stoppuhr.
+      restTimer.clear()
       // Letzter Satz der Übung (Absprache Paul 24.10.): keine Pause, sondern die Übergangs-Stoppuhr - falls noch eine Übung folgt.
       if (nextOpenSetFrom(exIndex + 1)) transition.start(exIndex)
     } else if (restTimer.autoStart) {
