@@ -40,22 +40,31 @@
   if (!el) return;
   // Nur beim echten App-Start zeigen, nicht bei jeder Rückkehr aus dem Hintergrund: iOS beendet die
   // Web-Ansicht im Hintergrund gelegentlich und lädt die Seite danach neu. Die iOS-App gibt jedem App-Prozess
-  // eine Kennung (window.__fbeLaunchId, MainViewController.swift): neue Kennung = App wurde komplett
-  // geschlossen und neu geöffnet -> Animation. Gleiche Kennung = nur neu geladen -> keine Animation, solange
-  // die letzte Aktivität weniger als 30 Minuten zurückliegt. Ohne Kennung (z. B. Browser) gilt nur die Zeit.
-  var KEY = 'fbe_last_alive', ID_KEY = 'fbe_launch_id', RESUME_MS = 30 * 60 * 1000, last = 0, lastId = '';
+  // eine Kennung (window.__fbeLaunchId, MainViewController.swift). Übersprungen wird NUR bei positivem Beleg
+  // für "gleicher App-Lauf": gleiche Kennung wie beim letzten Mal UND letzte Aktivität < 30 Minuten UND die
+  // Animation lief nicht gerade eben erst an (zweites Laden direkt beim Start). In allen anderen Fällen
+  // (neue Kennung = App komplett geschlossen, keine Kennung, nichts gemerkt, Fehler) läuft die Animation.
+  var KEY = 'fbe_last_alive', ID_KEY = 'fbe_launch_id', SHOWN_KEY = 'fbe_splash_at';
+  var RESUME_MS = 30 * 60 * 1000, JUST_SHOWN_MS = 4000, last = 0, lastId = '', shownAt = 0;
   var launchId = String(window.__fbeLaunchId || '');
-  try { last = Number(localStorage.getItem(KEY)) || 0; lastId = localStorage.getItem(ID_KEY) || ''; } catch (e) {}
+  try {
+    last = Number(localStorage.getItem(KEY)) || 0;
+    lastId = localStorage.getItem(ID_KEY) || '';
+    shownAt = Number(localStorage.getItem(SHOWN_KEY)) || 0;
+  } catch (e) {}
   function touch() { try { localStorage.setItem(KEY, String(Date.now())); if (launchId) localStorage.setItem(ID_KEY, launchId); } catch (e) {} }
   touch();
   document.addEventListener('visibilitychange', function () { if (document.hidden) touch(); });
   window.addEventListener('pagehide', touch);
-  var newAppRun = !!launchId && launchId !== lastId;
-  var recent = last > 0 && Date.now() - last >= 0 && Date.now() - last < RESUME_MS;
-  if (!newAppRun && recent) {
+  var now = Date.now();
+  var sameRun = !!launchId && launchId === lastId;
+  var recent = last > 0 && now - last >= 0 && now - last < RESUME_MS;
+  var justShown = shownAt > 0 && now - shownAt >= 0 && now - shownAt < JUST_SHOWN_MS;
+  if (sameRun && recent && !justShown) {
     el.parentNode.removeChild(el);
     return;
   }
+  try { localStorage.setItem(SHOWN_KEY, String(now)); } catch (e) {}
   window.__splashStart = Date.now();
   function go() { el.classList.add('go'); }
   // Erst starten, wenn die Schrift da ist (sonst blitzt kurz eine Ersatzschrift auf); nach 600 ms trotzdem.
