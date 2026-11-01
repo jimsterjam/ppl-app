@@ -411,7 +411,8 @@ onBeforeUnmount(unlock)
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
 }
-.rest-actions { display: flex; flex-shrink: 0; gap: 6px; }
+/* Button-Reihe darf in sich umbrechen und nie breiter als die Leiste werden (schmale Displays, deutsche Beschriftung). */
+.rest-actions { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; max-width: 100%; }
 .rest-btn {
   flex: 0 0 auto;
   white-space: nowrap;
