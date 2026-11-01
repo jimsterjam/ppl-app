@@ -6,10 +6,11 @@ import { fileURLToPath } from 'node:url'
 const html = readFileSync(fileURLToPath(new URL('../../../index.html', import.meta.url)), 'utf8')
 const script = html.match(/<script>\s*\(function \(\) \{[\s\S]*?\}\)\(\);\s*<\/script>/)[0].replace(/<\/?script>/g, '')
 
-function run({ lastAlive = null, launchId = '', lastLaunchId = '' } = {}) {
+function run({ lastAlive = null, launchId = '', lastLaunchId = '', shownAt = null } = {}) {
   const store = new Map()
   if (lastAlive !== null) store.set('fbe_last_alive', String(lastAlive))
   if (lastLaunchId) store.set('fbe_launch_id', lastLaunchId)
+  if (shownAt !== null) store.set('fbe_splash_at', String(shownAt))
   const el = { classList: { add: vi.fn() }, parentNode: { removeChild: vi.fn() } }
   const listeners = {}
   const doc = {
@@ -35,14 +36,14 @@ describe('Startanimation: nur beim App-Start', () => {
     expect(el.classList.add).toHaveBeenCalledWith('go')
   })
 
-  it('Rückkehr nach kurzer Zeit (Seite wurde neu geladen): keine Animation', () => {
+  it('ohne Kennung von iOS (z. B. Einspielen fehlgeschlagen): Animation läuft, nie stillschweigend aus', () => {
     const { el } = run({ lastAlive: Date.now() - 5 * 60 * 1000 })
-    expect(el.parentNode.removeChild).toHaveBeenCalledWith(el)
-    vi.advanceTimersByTime(1000)
-    expect(el.classList.add).not.toHaveBeenCalled()
+    expect(el.parentNode.removeChild).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(700)
+    expect(el.classList.add).toHaveBeenCalledWith('go')
   })
 
-  it('lange nicht benutzt (über 30 Minuten): Animation wieder', () => {
+  it('ohne Kennung, lange nicht benutzt: Animation', () => {
     const { el } = run({ lastAlive: Date.now() - 31 * 60 * 1000 })
     expect(el.parentNode.removeChild).not.toHaveBeenCalled()
   })
@@ -77,5 +78,15 @@ describe('Startanimation: nur beim App-Start', () => {
   it('erster Start überhaupt mit Kennung: Animation', () => {
     const { el } = run({ launchId: 'neu' })
     expect(el.parentNode.removeChild).not.toHaveBeenCalled()
+  })
+
+  it('zweites Laden direkt nach dem Start (gleiche Kennung, Animation lief gerade an): Animation läuft weiter', () => {
+    const { el } = run({ lastAlive: Date.now() - 500, launchId: 'gleich', lastLaunchId: 'gleich', shownAt: Date.now() - 500 })
+    expect(el.parentNode.removeChild).not.toHaveBeenCalled()
+  })
+
+  it('Rückkehr aus dem Hintergrund (gleiche Kennung, Animation lief vor Minuten): keine Animation', () => {
+    const { el } = run({ lastAlive: Date.now() - 60 * 1000, launchId: 'gleich', lastLaunchId: 'gleich', shownAt: Date.now() - 10 * 60 * 1000 })
+    expect(el.parentNode.removeChild).toHaveBeenCalledWith(el)
   })
 })
