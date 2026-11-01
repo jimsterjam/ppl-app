@@ -939,7 +939,7 @@
     <RestTimerBar
       :next-set="restNextSet"
       :force-full="focus.visible"
-      :hide-minimized="focus.active"
+      :hide-minimized="focus.visible"
       @remember="rememberRestForExercise"
       @minimize="focus.minimize()"
       @adjust-next="onNextSetAdjust"
