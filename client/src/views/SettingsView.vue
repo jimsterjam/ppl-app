@@ -216,6 +216,7 @@
 
       <SettingsSectionCard class="card" :title="$t('settings.legalTitle')">
         <p class="hint">{{ $t('settings.legalHint') }}</p>
+        <p class="hint">{{ $t('settings.notesPrivacyHint') }}</p>
         <button class="legal-btn" @click="$router.push('/legal')">
           <span>ℹ️</span>
           <span>{{ $t('settings.legalLink') }}</span>
