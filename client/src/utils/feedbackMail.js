@@ -1,7 +1,6 @@
 // Feedback per E-Mail (Absprache Paul 02.11.): statt eines Formulars öffnet die App eine vorbereitete Mail an die
 // Kontaktadresse aus dem Impressum. Technische Angaben stehen sichtbar im Mailtext, der Nutzer kann sie löschen.
 // Nie Trainingsdaten, Notizen oder KI-Texte.
-import { Capacitor } from '@capacitor/core'
 import { App as CapacitorApp } from '@capacitor/app'
 import { LEGAL_OWNER } from '@/config/legalOwner'
 import { logger } from '@/utils/logger'
@@ -36,32 +35,25 @@ export async function collectFeedbackDetails() {
   return result
 }
 
-async function copyText(text) {
-  try {
-    await navigator.clipboard.writeText(text)
-    return true
-  } catch {
-    return false
-  }
+/**
+ * Öffnet die URL über die Web-Ansicht: Eine Navigation auf eine fremde URL (mailto:) übergibt Capacitor auf iOS
+ * an das System (WebViewDelegationHandler: UIApplication.open, die Seite bleibt stehen). @capacitor/app 7 hat keine
+ * openUrl-Methode, ein eigenes Plugin ist dafür nicht nötig.
+ */
+function openViaWebView(url) {
+  window.location.href = url
+  return true
 }
 
 /**
- * Mail-Programm mit vorbereiteter Mail öffnen. Klappt das nicht (kein Mail-Konto eingerichtet), wird die Adresse
- * kopiert und eine Meldung gezeigt.
+ * Mail-Programm mit vorbereiteter Mail öffnen. Ob ein Mail-Konto eingerichtet ist, lässt sich so nicht prüfen;
+ * iOS meldet das selbst. Schlägt das Öffnen sofort fehl, zeigt die App die Adresse zum Abtippen.
  * @param {{ t: Function, toast: { show: Function }, deps?: object }} ctx - deps nur für Tests
- * @returns {Promise<'opened'|'fallback'>}
+ * @returns {Promise<'opened'|'failed'>}
  */
 export async function sendFeedbackMail({ t, toast, deps = {} }) {
   const collect = deps.collectDetails || collectFeedbackDetails
-  const open = deps.openUrl || (async (url) => {
-    if (Capacitor.isNativePlatform()) {
-      const res = await CapacitorApp.openUrl({ url })
-      return res?.completed !== false
-    }
-    window.location.href = url
-    return true
-  })
-  const copy = deps.copy || copyText
+  const open = deps.openUrl || openViaWebView
 
   const d = await collect()
   const url = buildFeedbackMailto({
@@ -82,7 +74,6 @@ export async function sendFeedbackMail({ t, toast, deps = {} }) {
   } catch (error) {
     logger.warn('[feedbackMail] Mail-Programm konnte nicht geöffnet werden:', error?.message || error)
   }
-  await copy(FEEDBACK_EMAIL)
-  toast.show(t('appFeedback.noMailApp', { email: FEEDBACK_EMAIL }), { type: 'info', duration: 5000 })
-  return 'fallback'
+  toast.show(t('appFeedback.mailFailed', { email: FEEDBACK_EMAIL }), { type: 'info', duration: 6000 })
+  return 'failed'
 }

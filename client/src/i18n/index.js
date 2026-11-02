@@ -1526,7 +1526,7 @@ export const messages = {
     },
     appFeedback: {
       entryTitle: 'Feedback geben',
-      entrySubtitle: 'Fehler melden, Ideen vorschlagen oder Unklarheiten mitteilen. Das geht per E-Mail.',
+      entrySubtitle: 'Fehler melden, Ideen vorschlagen oder Unklarheiten mitteilen. Schreib uns per E-Mail an {email}.',
       mailButton: 'E-Mail schreiben',
       mailSubject: 'FBE Feedback',
       mailIntro: 'Hallo,\n\nmein Feedback zu FBE:',
@@ -1534,7 +1534,7 @@ export const messages = {
       mailAppVersion: 'App-Version',
       mailOs: 'iOS',
       mailDevice: 'Gerät',
-      noMailApp: 'Kein Mail-Programm gefunden. Schreib uns an {email}. Die Adresse wurde kopiert.'
+      mailFailed: 'Die Mail konnte nicht geöffnet werden. Schreib uns an {email}.'
     },
     getTheApp: {
       title: 'Lade die App herunter',
@@ -3208,7 +3208,7 @@ export const messages = {
     },
     appFeedback: {
       entryTitle: 'Give feedback',
-      entrySubtitle: 'Report a bug, suggest an idea or tell us what was unclear. Just send us an email.',
+      entrySubtitle: 'Report a bug, suggest an idea or tell us what was unclear. Write to us by email at {email}.',
       mailButton: 'Write an email',
       mailSubject: 'FBE Feedback',
       mailIntro: 'Hi,\n\nmy feedback about FBE:',
@@ -3216,7 +3216,7 @@ export const messages = {
       mailAppVersion: 'App version',
       mailOs: 'iOS',
       mailDevice: 'Device',
-      noMailApp: 'No mail app found. Write to us at {email}. The address was copied.'
+      mailFailed: 'The email could not be opened. Write to us at {email}.'
     },
     getTheApp: {
       title: 'Download the app',

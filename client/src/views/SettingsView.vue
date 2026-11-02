@@ -207,7 +207,7 @@
       <h2 class="section-title">{{ $t('appFeedback.entryTitle') }}</h2>
 
       <SettingsSectionCard class="card" :title="$t('appFeedback.entryTitle')">
-        <p class="hint">{{ $t('appFeedback.entrySubtitle') }}</p>
+        <p class="hint">{{ $t('appFeedback.entrySubtitle', { email: FEEDBACK_EMAIL }) }}</p>
         <button class="legal-btn" @click="writeFeedbackMail">
           <span>✉️</span>
           <span>{{ $t('appFeedback.mailButton') }}</span>
@@ -394,7 +394,7 @@
 
 <script setup>
 import HeaderBar from '../components/HeaderBar.vue'
-import { sendFeedbackMail } from '../utils/feedbackMail'
+import { sendFeedbackMail, FEEDBACK_EMAIL } from '../utils/feedbackMail'
 import { storeToRefs } from 'pinia'
 import { useThemeStore } from '@/stores/themeStore'
 import { useSettingsStore } from '@/stores/settingsStore'
