@@ -54,3 +54,43 @@ describe('Pausentimer: Töne vor dem Ende', () => {
     expect(rest.cues).toBe(false)
   })
 })
+
+// Pausenende-Gong darf nicht verloren gehen, wenn die App im Hintergrund war (Timer liefen nicht): beim Zurückkehren
+// kommt genau ein Gong, danach nichts mehr.
+describe('Pausentimer: Gong nach Hintergrund', () => {
+  let rest
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-10-20T10:00:00Z'))
+    setActivePinia(createPinia())
+    rest = useRestTimerStore()
+    signal.mockClear()
+  })
+  afterEach(() => {
+    rest.clear()
+    vi.useRealTimers()
+  })
+
+  it('Zeit lief weiter, Ticks blieben aus: der erste Tick danach löst genau einen Gong aus', () => {
+    rest.start({ seconds: 30 })
+    // Hintergrund: Uhr läuft, aber kein Timer feuert (Systemzeit springt, Timer werden nicht abgearbeitet).
+    vi.setSystemTime(new Date('2026-10-20T10:02:00Z'))
+    vi.advanceTimersByTime(300)
+    vi.advanceTimersByTime(5_000)
+    const ends = signal.mock.calls.filter((c) => c[0].kind === 'rest-end')
+    expect(ends).toHaveLength(1)
+    expect(ends[0][0].soundEnabled).toBe(true)
+  })
+
+  it('jede neue Pause bekommt einen eigenen Gong (eindeutiger Schlüssel, nicht vom Dedup geschluckt)', () => {
+    rest.start({ seconds: 30 })
+    vi.advanceTimersByTime(31_000)
+    rest.clear()
+    vi.advanceTimersByTime(400)
+    rest.start({ seconds: 30 })
+    vi.advanceTimersByTime(31_000)
+    const keys = signal.mock.calls.filter((c) => c[0].kind === 'rest-end').map((c) => c[0].eventKey)
+    expect(keys).toHaveLength(2)
+    expect(new Set(keys).size).toBe(2)
+  })
+})

@@ -10,18 +10,16 @@ class MainViewController: CAPBridgeViewController {
     /// window.__fbeLaunchId (siehe Start-Skript in index.html: Startanimation nur beim echten App-Start).
     private static let processLaunchId = UUID().uuidString
 
-    override open func webViewConfiguration(for instanceConfiguration: InstanceConfiguration) -> WKWebViewConfiguration {
-        let configuration = super.webViewConfiguration(for: instanceConfiguration)
+    override open func capacitorDidLoad() {
+        bridge?.registerPluginInstance(RestAlarmPlugin())
+        // Hier einspielen, nicht in webViewConfiguration(for:): Capacitor ersetzt danach den userContentController
+        // der Konfiguration (CAPBridgeViewController.prepareWebView), dort hinzugefügte Skripte gingen verloren.
+        // capacitorDidLoad() läuft in loadView(), also vor dem ersten Laden der Seite (viewDidLoad -> loadWebView).
         let script = WKUserScript(
             source: "window.__fbeLaunchId = '\(MainViewController.processLaunchId)';",
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true
         )
-        configuration.userContentController.addUserScript(script)
-        return configuration
-    }
-
-    override open func capacitorDidLoad() {
-        bridge?.registerPluginInstance(RestAlarmPlugin())
+        webView?.configuration.userContentController.addUserScript(script)
     }
 }

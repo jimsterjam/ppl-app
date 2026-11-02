@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
 const html = readFileSync(fileURLToPath(new URL('../../../index.html', import.meta.url)), 'utf8')
 const script = html.match(/<script>\s*\(function \(\) \{[\s\S]*?\}\)\(\);\s*<\/script>/)[0].replace(/<\/?script>/g, '')
 
-function run({ lastAlive = null, launchId = '', lastLaunchId = '', shownAt = null } = {}) {
+function run({ lastAlive = null, launchId = '', lastLaunchId = '', shownAt = null, navType = 'navigate' } = {}) {
   const store = new Map()
   if (lastAlive !== null) store.set('fbe_last_alive', String(lastAlive))
   if (lastLaunchId) store.set('fbe_launch_id', lastLaunchId)
@@ -21,7 +21,8 @@ function run({ lastAlive = null, launchId = '', lastLaunchId = '', shownAt = nul
   }
   const win = { __fbeLaunchId: launchId, addEventListener: (name, fn) => { listeners[`win:${name}`] = fn } }
   const ls = { getItem: (k) => (store.has(k) ? store.get(k) : null), setItem: (k, v) => store.set(k, String(v)) }
-  new Function('document', 'window', 'localStorage', 'setTimeout', 'clearTimeout', script)(doc, win, ls, setTimeout, clearTimeout)
+  const perf = { getEntriesByType: () => [{ type: navType }] }
+  new Function('document', 'window', 'localStorage', 'setTimeout', 'clearTimeout', 'performance', script)(doc, win, ls, setTimeout, clearTimeout, perf)
   return { el, store, listeners, doc }
 }
 
@@ -88,5 +89,20 @@ describe('Startanimation: nur beim App-Start', () => {
   it('Rückkehr aus dem Hintergrund (gleiche Kennung, Animation lief vor Minuten): keine Animation', () => {
     const { el } = run({ lastAlive: Date.now() - 60 * 1000, launchId: 'gleich', lastLaunchId: 'gleich', shownAt: Date.now() - 10 * 60 * 1000 })
     expect(el.parentNode.removeChild).toHaveBeenCalledWith(el)
+  })
+
+  it('ohne Kennung, aber Seite wurde neu geladen (Navigationstyp reload, kurz her): keine Animation', () => {
+    const { el } = run({ lastAlive: Date.now() - 60 * 1000, navType: 'reload' })
+    expect(el.parentNode.removeChild).toHaveBeenCalledWith(el)
+  })
+
+  it('ohne Kennung, normales Laden (App-Start): Animation', () => {
+    const { el } = run({ lastAlive: Date.now() - 60 * 1000, navType: 'navigate' })
+    expect(el.parentNode.removeChild).not.toHaveBeenCalled()
+  })
+
+  it('mit Kennung entscheidet nur die Kennung, nicht der Navigationstyp', () => {
+    const { el } = run({ lastAlive: Date.now() - 60 * 1000, launchId: 'neu', lastLaunchId: 'alt', navType: 'reload' })
+    expect(el.parentNode.removeChild).not.toHaveBeenCalled()
   })
 })
