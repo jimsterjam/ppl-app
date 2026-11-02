@@ -47,6 +47,7 @@ import {
 } from '../utils/workoutSanitizer.js';
 import { decideExerciseMatch } from '../utils/exerciseMatching.js';
 import { getMaxExerciseCount } from '../utils/exerciseCountTarget.js';
+import { selectExercisesForTotalTime, BUFFER_SECONDS, WARMUP_SECONDS, sanitizeCalibration } from '../utils/workoutTimeModel.js';
 import { applyGeneratorRule } from '../utils/repTargets.js';
 import { buildNextSessionFocus, buildProgressionStates, applyNextSessionFocus } from '../utils/nextSessionFocus.js';
 import { FIRST_LOOK_COMPARISON_MIN, applyFirstLookOutlook } from '../utils/firstLookOutlook.js';
@@ -3639,170 +3640,10 @@ function normalizeExercise(exercise, fallbackType) {
 // getTimeAdjustedExerciseTarget()/getMaxExerciseCount() liegen jetzt in
 // utils/exerciseCountTarget.js (testbar, und vom Prompt UND der harten Obergrenze gemeinsam
 // genutzt). Hintergrund der Obergrenze (User-Report "Workouts zu lang"): das Zeitmodell
-// (selectExercisesWithinTimeBudget) darf weiterhin FRÜHER abbrechen, aber nie mehr Übungen
+// (selectExercisesForTotalTime) darf weiterhin FRÜHER abbrechen, aber nie mehr Übungen
 // zulassen als die Ziel/Dauer-Tabelle bzw. der manuelle Override (2-8) vorgibt.
 
-// ── Zeitmodell (Konzept-Papier Abschnitt 17.3/17.4) ─────────────────────────
-// Ersetzt die reine "Minuten → feste Übungszahl"-Tabelle oben durch eine echte
-// Dauer-Schätzung: Satzdauer + Pausen + Aufbau-/Wechselzeit + Warm-up + Reserve.
-// Werte sind konservative Startschätzungen (noch keine persönliche Kalibrierung
-// aus echten Timer-Daten, siehe Papier 17.3 "Persönliche Kalibrierung").
-const EXERCISE_TIME_METADATA = {
-  'Barbell Bench Press': { estimatedSetSeconds: 35, setupSeconds: 90, transitionSeconds: 60 },
-  'Barbell Seated Overhead Press': { estimatedSetSeconds: 30, setupSeconds: 60, transitionSeconds: 45 },
-  'Barbell Incline Bench Press': { estimatedSetSeconds: 35, setupSeconds: 90, transitionSeconds: 60 },
-  'Chest Dip': { estimatedSetSeconds: 30, setupSeconds: 30, transitionSeconds: 45 },
-  'Dumbbell Lateral Raise': { estimatedSetSeconds: 25, setupSeconds: 20, transitionSeconds: 30 },
-  'Dumbbell Standing Overhead Press': { estimatedSetSeconds: 30, setupSeconds: 45, transitionSeconds: 45 },
-  'Dumbbell Fly': { estimatedSetSeconds: 25, setupSeconds: 30, transitionSeconds: 30 },
-  'Barbell Bent Over Row': { estimatedSetSeconds: 35, setupSeconds: 60, transitionSeconds: 60 },
-  'Chin-Up': { estimatedSetSeconds: 25, setupSeconds: 15, transitionSeconds: 30 },
-  'Lat Pulldown Wide Grip': { estimatedSetSeconds: 30, setupSeconds: 45, transitionSeconds: 45 },
-  'Barbell Curl': { estimatedSetSeconds: 25, setupSeconds: 30, transitionSeconds: 30 },
-  'Cable Hammer Curl (With Rope)': { estimatedSetSeconds: 25, setupSeconds: 45, transitionSeconds: 30 },
-  'Dumbbell Bent Over Row': { estimatedSetSeconds: 30, setupSeconds: 20, transitionSeconds: 30 },
-  'Dumbbell Hammer Curl': { estimatedSetSeconds: 25, setupSeconds: 20, transitionSeconds: 30 },
-  'Dumbbell Shrug': { estimatedSetSeconds: 20, setupSeconds: 20, transitionSeconds: 30 },
-  'Barbell Front Squat': { estimatedSetSeconds: 40, setupSeconds: 90, transitionSeconds: 60 },
-  'Barbell Deadlift': { estimatedSetSeconds: 35, setupSeconds: 90, transitionSeconds: 75 },
-  'Barbell Lunge': { estimatedSetSeconds: 40, setupSeconds: 60, transitionSeconds: 45 },
-  'Leg Extension': { estimatedSetSeconds: 25, setupSeconds: 45, transitionSeconds: 30 },
-  'Leg Curl Lying': { estimatedSetSeconds: 25, setupSeconds: 45, transitionSeconds: 30 },
-  'Barbell Seated Calf Raise': { estimatedSetSeconds: 20, setupSeconds: 45, transitionSeconds: 30 },
-  'Dumbbell Romanian Deadlift': { estimatedSetSeconds: 35, setupSeconds: 45, transitionSeconds: 60 },
-  'Barbell Floor Calf Raise': { estimatedSetSeconds: 20, setupSeconds: 45, transitionSeconds: 30 }
-};
-
-const DEFAULT_REST_SECONDS = { strength: 150, hypertrophy: 90 };
-const DEFAULT_ISOLATION_REST_SECONDS = { strength: 90, hypertrophy: 60 };
-
-// Allgemeines Warm-up (AHA: ~5-10 min), analog Papier 17.3/17.4. Steht im Standardmodus
-// "training_only" (Papier 18.1) außerhalb des Zeitbudgets aus den User-Minuten und wird
-// obendrauf gerechnet statt es abzuziehen.
-const GENERAL_WARMUP_SECONDS = 300;
-// Fester Puffer statt 10%-Reserve (Papier 18.2: 60-120s bzw. max 5% der reinen
-// Trainingszeit) — vermeidet, dass lange Workouts überproportional viel "Luft" bekommen.
-const TIME_BUFFER_SECONDS = 90;
-
-function getExerciseTimeMeta(exercise, goal) {
-  const name = String(exercise?.name || '').trim();
-  const meta = EXERCISE_TIME_METADATA[name];
-  const isolation = Boolean(exercise?.isIsolation);
-  const restSeconds = isolation
-    ? (DEFAULT_ISOLATION_REST_SECONDS[goal] || DEFAULT_ISOLATION_REST_SECONDS.hypertrophy)
-    : (DEFAULT_REST_SECONDS[goal] || DEFAULT_REST_SECONDS.hypertrophy);
-
-  if (meta) {
-    return { ...meta, restSeconds };
-  }
-  // Fallback für Übungen ohne hinterlegte Metadaten (z.B. bodyweight_only)
-  return {
-    estimatedSetSeconds: isolation ? 25 : 35,
-    setupSeconds: isolation ? 20 : 45,
-    transitionSeconds: 30,
-    restSeconds
-  };
-}
-
-/**
- * Schätzt die reine Trainingszeit (ohne allgemeines Warm-up) in Sekunden.
- * Formel (Papier 17.3, korrigiert per 18.2): spezifische Aufwärmsätze + Ausführungszeit +
- * Satzpausen + Aufbau-/Wechselzeit + fester Puffer.
- * Die erste, nicht-isolierte Übung bekommt zusätzlich 2 spezifische Aufwärmsätze.
- *
- * Zwei Doppelzähl-Bugs aus der Vorversion sind hier behoben (Papier 18.2):
- * - setupSeconds und transitionSeconds wurden pro Übung addiert, obwohl beide dieselbe
- *   "Wechsel zur nächsten Übung"-Zeit beschreiben. Jetzt: der größere der beiden Werte zählt.
- * - Nach dem letzten Satz der letzten Übung wurde trotzdem eine Pause eingerechnet, obwohl
- *   danach nichts mehr folgt. Jetzt: die letzte Pause der letzten Übung wird abgezogen.
- */
-function estimateTrainingSeconds(exercises = [], goal = 'hypertrophy') {
-  let total = 0;
-  let firstCompoundSeen = false;
-
-  exercises.forEach((exercise) => {
-    const meta = getExerciseTimeMeta(exercise, goal);
-    const sets = Math.max(1, Number(exercise?.sets) || 3);
-
-    // setupSeconds (Gewicht/Gerät einstellen) und transitionSeconds (Weg zur nächsten
-    // Station) überlappen sich in der Praxis meist statt sich zu addieren.
-    total += Math.max(meta.setupSeconds, meta.transitionSeconds);
-
-    // Spezifische Aufwärmsätze (Papier 17.1/17.3): 2 leichtere, kürzere Sätze vor der
-    // ersten anspruchsvollen (nicht-isolierten) Übung.
-    if (!firstCompoundSeen && !exercise?.isIsolation) {
-      total += 2 * (meta.estimatedSetSeconds + 45);
-      firstCompoundSeen = true;
-    }
-
-    total += sets * (meta.estimatedSetSeconds + meta.restSeconds);
-  });
-
-  if (exercises.length > 0) {
-    // Keine Pause nach dem allerletzten Satz des Workouts einrechnen (Papier 18.2, Z-08).
-    const lastMeta = getExerciseTimeMeta(exercises[exercises.length - 1], goal);
-    total -= lastMeta.restSeconds;
-  }
-
-  if (total > 0) {
-    total += TIME_BUFFER_SECONDS;
-  }
-
-  return Math.max(0, total);
-}
-
-/**
- * Gesamtdauer der Session inkl. allgemeinem Warm-up (zur Anzeige an den User).
- * Im Standardmodus "training_only" (Papier 18.1) kommt das Warm-up obendrauf, statt vom
- * Zeitbudget der Übungsauswahl abgezogen zu werden.
- */
-function estimateWorkoutDurationSeconds(exercises = [], goal = 'hypertrophy') {
-  return estimateTrainingSeconds(exercises, goal) + GENERAL_WARMUP_SECONDS;
-}
-
-/**
- * Wählt aus einer bereits nach Priorität sortierten Übungsliste so viele Übungen,
- * wie ins Zeitbudget passen (Papier 17.7 Kürzungsregeln: niedrigste Priorität zuerst
- * entfernen — hier realisiert durch schrittweises Hinzufügen in Prioritätsreihenfolge,
- * Abbruch sobald das Budget überschritten würde).
- */
-function selectExercisesWithinTimeBudget(orderedExercises = [], durationMinutes = 45, goal = 'hypertrophy', durationMode = 'training_only', maxExerciseCount = Infinity) {
-  const rawMinutes = Math.max(20, Number(durationMinutes) || 45);
-  // training_only (Default, Papier 18.1): die User-Minuten sind reine Trainingszeit, das
-  // Warm-up kommt obendrauf. total_session: das Warm-up wird von den User-Minuten abgezogen.
-  const budgetSeconds = durationMode === 'total_session'
-    ? Math.max(0, rawMinutes * 60 - GENERAL_WARMUP_SECONDS)
-    : rawMinutes * 60;
-  const minCount = Math.min(2, orderedExercises.length);
-  const hardCap = Number.isFinite(maxExerciseCount) && maxExerciseCount > 0
-    ? Math.floor(maxExerciseCount)
-    : Infinity;
-  const selected = [];
-
-  for (let i = 0; i < orderedExercises.length; i += 1) {
-    // Harte Obergrenze (siehe getMaxExerciseCount) hat Vorrang vor dem Zeitmodell - auch wenn
-    // zeitlich noch eine weitere Übung reinpassen würde, wird hier abgebrochen.
-    if (selected.length >= hardCap) break;
-    const candidate = [...selected, orderedExercises[i]];
-    const estimated = estimateTrainingSeconds(candidate, goal);
-    if (estimated <= budgetSeconds || candidate.length <= minCount) {
-      selected.push(orderedExercises[i]);
-    } else {
-      break;
-    }
-  }
-
-  const trainingSeconds = estimateTrainingSeconds(selected, goal);
-  return {
-    exercises: selected,
-    estimatedDurationSeconds: trainingSeconds + GENERAL_WARMUP_SECONDS,
-    trainingSeconds,
-    warmupSeconds: GENERAL_WARMUP_SECONDS,
-    timeBudgetSeconds: budgetSeconds,
-    durationMode,
-    trimmed: selected.length < orderedExercises.length
-  };
-}
+// Zeitmodell: siehe utils/workoutTimeModel.js (Gesamtzeit inkl. Warm-up: Wechselzeiten, Sätze, Pausen, Puffer).
 
 function isAssistedVariation(name = '') {
   const normalized = String(name).toLowerCase();
@@ -4153,13 +3994,17 @@ function enforceWorkoutProgrammingRules(payload, context = {}, options = {}) {
   const reordered = [...blueprintPerformanceFiltered, ...remainderOrdered];
   const goalRangedCandidates = applyGoalRanges(reordered, goal);
 
-  // Zeitmodell (Papier 17.1/17.3/17.7): aus der priorisierten Kandidatenliste so viele
-  // Übungen behalten, wie ins Zeitbudget passen. Die Reihenfolge oben stellt bereits sicher,
-  // dass Hauptübungen vorne stehen und niedriger priorisierte Ergänzungen/Isolationen zuerst
-  // wegfallen, wenn gekürzt werden muss (Kürzungsregel 1-3 aus Abschnitt 17.7).
-  const durationMode = context.durationMode === 'total_session' ? 'total_session' : 'training_only';
+  // Zeitmodell (utils/workoutTimeModel.js): aus der priorisierten Kandidatenliste so viele
+  // Übungen behalten, dass die GESAMTZEIT inkl. Warm-up zur Wunschzeit passt, und übrige Zeit mit
+  // zusätzlichen Sätzen der Grundübungen füllen. Die Reihenfolge oben stellt sicher, dass Hauptübungen
+  // vorne stehen und niedriger priorisierte Ergänzungen/Isolationen zuerst wegfallen.
+  const durationMode = context.durationMode === 'training_only' ? 'training_only' : 'total_session';
   const maxExerciseCount = getMaxExerciseCount(durationMinutes, goal, context.exerciseCountOverride);
-  const timeSelection = selectExercisesWithinTimeBudget(goalRangedCandidates, durationMinutes, goal, durationMode, maxExerciseCount);
+  const timeSelection = selectExercisesForTotalTime(goalRangedCandidates, durationMinutes, goal, {
+    durationMode,
+    maxExerciseCount,
+    calibration: sanitizeCalibration(context.timeCalibration)
+  });
 
   const goalAdjusted = timeSelection.exercises.map((exercise, index) => ({
     name: exercise.name,
@@ -4180,9 +4025,8 @@ function enforceWorkoutProgrammingRules(payload, context = {}, options = {}) {
   const fallbackName = requestedType === 'fullbody' ? 'Full Body Session' : `${requestedType.toUpperCase()} Session`;
   // Laienverständlicher Warm-up-Hinweis (User-Report: "Ramp-Up Sets" ist Fitness-Fachjargon,
   // nicht jeder Nutzer kennt den Begriff) - erklärt kurz, was gemeint ist, statt ihn
-  // vorauszusetzen. Zeitangabe jetzt fix "ca. 5 Minuten", passend zu GENERAL_WARMUP_SECONDS
-  // (vorher stand hier "5-8 min", was nie mit der tatsächlichen Berechnung übereinstimmte).
-  const warmupHint = 'Warm-up: ca. 5 Minuten leichtes Aufwärmen und ansteigende Gewichte vor der ersten Übung (Ramp-Up Sets).';
+  // vorauszusetzen. Zeitangabe passend zu WARMUP_SECONDS im Zeitmodell (Cardio, Gelenke, leichter Satz).
+  const warmupHint = `Warm-up: ca. ${Math.round(WARMUP_SECONDS / 60)} Minuten leichtes Aufwärmen und ansteigende Gewichte vor der ersten Übung (Ramp-Up Sets).`;
 
   return {
     workoutName: typeof payload?.workoutName === 'string' && payload.workoutName.trim()
@@ -4236,7 +4080,8 @@ function enforceWorkoutProgrammingRules(payload, context = {}, options = {}) {
         trainingSeconds: timeSelection.trainingSeconds,
         warmupSeconds: timeSelection.warmupSeconds,
         timeBudgetSeconds: timeSelection.timeBudgetSeconds,
-        bufferSeconds: TIME_BUFFER_SECONDS,
+        bufferSeconds: BUFFER_SECONDS,
+        calibration: timeSelection.calibration,
         trimmed: timeSelection.trimmed,
         candidatePoolSize: goalRangedCandidates.length
       }
