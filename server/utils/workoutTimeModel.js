@@ -9,7 +9,11 @@
 //   n_i  Arbeitssätze, s_i Dauer eines Satzes inklusive Einrichten                          ~ 40 s / 35 s
 //   r_i  Pause zwischen den Sätzen (Standard des Pausentimers bzw. Wert der Übung)
 //   P    Puffer: Trinken, Notizen, Handy                                                    ~ 3 min
+//   K    Cool-down am Ende (Vorschlag, 5-10 min): locker bewegen, dehnen, die Spannung wieder loslassen. Bekommt die
+//        Zeit, die nach den Übungen übrig bleibt, statt zusätzlicher Sätze (Absprache Paul 02.11.). Zählt zur Gesamtzeit,
+//        ist aber unabhängig vom persönlichen Faktor k.
 //
+// Zusätzliche Sätze gibt es nur für Grundübungen, und erst nachdem Platz für das Cool-down reserviert ist.
 // Nach dem letzten Satz einer Übung zählt keine Pause, sondern die Wechselzeit der nächsten.
 // Eichpunkt (Paul): 4 Kraftübungen (5 + 5 + 4 + 3 Sätze) inklusive Warm-up ~ 70 min; das Modell liefert ~ 65 min,
 // ein persönlicher Faktor k (aus echten Trainingsdauern, standardmäßig 1) gleicht den Rest aus.
@@ -25,6 +29,11 @@ export const SET_SECONDS = Object.freeze({ main: 40, accessory: 35 });
 export const CHANGEOVER_SECONDS = Object.freeze({ main: 150, accessory: 90 });
 // So weit darf das Ergebnis über der Wunschzeit liegen (ein Satz mehr ist besser als eine halbe Übung weniger).
 export const OVER_BUDGET_TOLERANCE = 0.05;
+export const COOLDOWN_MIN_SECONDS = 300;
+export const COOLDOWN_MAX_SECONDS = 600;
+// Ab dieser Wunschzeit gibt es ein Cool-down (und bleibt beim Auffüllen mit Sätzen Platz dafür); kürzere Einheiten
+// nutzen die ganze Zeit für Arbeitssätze.
+const COOLDOWN_RESERVE_FROM_MINUTES = 45;
 export const CALIBRATION_MIN = 0.8;
 export const CALIBRATION_MAX = 1.5;
 
@@ -132,32 +141,42 @@ export function selectExercisesForTotalTime(orderedExercises = [], totalMinutes 
     selected.push(cheapest);
   }
 
-  // Übrige Zeit: reihum ein Satz mehr, Grundübungen zuerst, bis Satzgrenze oder Zeit erreicht.
-  const order = selected
-    .map((exercise, index) => ({ exercise, index }))
-    .sort((a, b) => Number(isAccessoryExercise(a.exercise, goal)) - Number(isAccessoryExercise(b.exercise, goal)) || a.index - b.index)
-    .map((entry) => entry.exercise);
+  // Übrige Zeit: reihum ein Satz mehr, nur für Grundübungen (bis zur Satzgrenze der Generator-Regel). Ab 45 min bleibt
+  // Platz für das Cool-down: bei Kraft mindestens 5 min (mehr Sätze sind dort der natürliche Hebel), bei Muskelaufbau
+  // das volle Cool-down von bis zu 10 min - Sätze gibt es erst für Zeit darüber hinaus.
+  const reserve = goal && String(goal).toLowerCase().includes('strength') ? COOLDOWN_MIN_SECONDS : COOLDOWN_MAX_SECONDS;
+  const topUpLimit = wantedMinutes >= COOLDOWN_RESERVE_FROM_MINUTES ? budgetSeconds - reserve : limit;
+  const mains = selected.filter((exercise) => !isAccessoryExercise(exercise, goal));
   let added = true;
   while (added) {
     added = false;
-    for (const exercise of order) {
+    for (const exercise of mains) {
       if (exercise.sets >= maxSetsFor(exercise, goal)) continue;
       exercise.sets += 1;
-      if (estimate(selected) <= limit) added = true;
+      if (estimate(selected) <= topUpLimit) added = true;
       else exercise.sets -= 1;
     }
   }
 
-  const totalSeconds = estimate(selected);
+  const exercisesSeconds = estimate(selected);
+  // Cool-down: 5-10 Minuten (volle Minuten) aus der Zeit, die bis zur Wunschzeit übrig ist; sonst keins.
+  const leftover = budgetSeconds - exercisesSeconds;
+  // Gleiche Mindestdauer wie bei der Cool-down-Reserve: kurze Einheiten (< 45 min) bekommen keins, auch nicht,
+  // wenn zum Beispiel durch eine manuelle Obergrenze der Übungsanzahl Zeit übrig bleibt.
+  const cooldownSeconds = wantedMinutes >= COOLDOWN_RESERVE_FROM_MINUTES && leftover >= COOLDOWN_MIN_SECONDS
+    ? Math.min(COOLDOWN_MAX_SECONDS, Math.floor(leftover / 60) * 60)
+    : 0;
+  const totalSeconds = exercisesSeconds + cooldownSeconds;
   return {
     exercises: selected,
     estimatedDurationSeconds: totalSeconds,
     warmupSeconds: scaledWarmup,
-    trainingSeconds: Math.max(0, totalSeconds - scaledWarmup),
+    cooldownSeconds,
+    trainingSeconds: Math.max(0, exercisesSeconds - scaledWarmup),
     timeBudgetSeconds: budgetSeconds,
     durationMode,
     calibration,
-    overBudget: totalSeconds > limit,
+    overBudget: exercisesSeconds > limit,
     trimmed: selected.length < orderedExercises.length
   };
 }

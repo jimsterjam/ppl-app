@@ -4,7 +4,7 @@ import { applyGeneratorRule } from '../repTargets.js'
 import {
   estimateExerciseBlockSeconds, estimateSessionSeconds, selectExercisesForTotalTime, sanitizeCalibration,
   maxSetsFor, minSetsFor, warmupSecondsFor, resolveTimeSelectionOptions,
-  WARMUP_SECONDS, SHORT_WARMUP_SECONDS, BUFFER_SECONDS, OVER_BUDGET_TOLERANCE
+  WARMUP_SECONDS, SHORT_WARMUP_SECONDS, BUFFER_SECONDS, OVER_BUDGET_TOLERANCE, COOLDOWN_MIN_SECONDS, COOLDOWN_MAX_SECONDS
 } from '../workoutTimeModel.js'
 import { getMaxExerciseCount } from '../exerciseCountTarget.js'
 import { sanitizeQuickGeneratorRequest } from '../workoutSanitizer.js'
@@ -210,9 +210,9 @@ describe('Zeitmodell: Auswahl für die Wunschzeit (Gesamtzeit inkl. Warm-up)', (
     assert.ok(count(slow) < count(normal))
   })
 
-  test('Aufteilung: Warm-up und Training ergeben die Gesamtzeit', () => {
-    const result = run(strengthPool(), 'strength', 75)
-    assert.equal(result.warmupSeconds + result.trainingSeconds, result.estimatedDurationSeconds)
+  test('Aufteilung: Warm-up, Training und Cool-down ergeben die Gesamtzeit', () => {
+    const result = run(hypertrophyPool(), 'hypertrophy', 75)
+    assert.equal(result.warmupSeconds + result.trainingSeconds + result.cooldownSeconds, result.estimatedDurationSeconds)
   })
 
   test('Warm-up wird bei kurzen Einheiten kürzer: ≤ 30 min nur spezifisch (5 min), ab 45 min voll (9 min)', () => {
@@ -223,6 +223,66 @@ describe('Zeitmodell: Auswahl für die Wunschzeit (Gesamtzeit inkl. Warm-up)', (
     const mid = warmupSecondsFor(38)
     assert.ok(mid > SHORT_WARMUP_SECONDS && mid < WARMUP_SECONDS)
     assert.equal(warmupSecondsFor(undefined), WARMUP_SECONDS)
+  })
+
+  describe('Cool-down am Ende (Vorschlag, 5-10 min, Absprache Paul)', () => {
+    test('Muskelaufbau 75 min: Cool-down von 10 min, Gesamtzeit nahe der Wunschzeit', () => {
+      const result = run(hypertrophyPool(), 'hypertrophy', 75)
+      assert.equal(result.cooldownSeconds, COOLDOWN_MAX_SECONDS)
+      const total = minutes(result.estimatedDurationSeconds)
+      assert.ok(total >= 70 && total <= 75, `war ${total}`)
+    })
+
+    test('Kraft 75 min: mindestens 5 min Cool-down, Gesamtzeit nahe der Wunschzeit', () => {
+      const result = run(strengthPool(), 'strength', 75)
+      assert.ok(result.cooldownSeconds >= COOLDOWN_MIN_SECONDS && result.cooldownSeconds <= COOLDOWN_MAX_SECONDS)
+      const total = minutes(result.estimatedDurationSeconds)
+      assert.ok(total >= 70 && total <= 75, `war ${total}`)
+    })
+
+    test('Cool-down immer 5-10 min in vollen Minuten oder gar keins; nie über die Wunschzeit hinaus', () => {
+      for (const goal of ['strength', 'hypertrophy']) {
+        const pool = goal === 'strength' ? strengthPool : hypertrophyPool
+        for (const wanted of [20, 30, 45, 60, 75, 90, 120]) {
+          const result = run(pool(), goal, wanted)
+          const cd = result.cooldownSeconds
+          assert.ok(cd === 0 || (cd >= COOLDOWN_MIN_SECONDS && cd <= COOLDOWN_MAX_SECONDS && cd % 60 === 0), `${goal} ${wanted}: ${cd}`)
+          if (cd > 0) assert.ok(result.estimatedDurationSeconds <= wanted * 60 + 1, `${goal} ${wanted}: ${minutes(result.estimatedDurationSeconds)}`)
+        }
+      }
+    })
+
+    test('knappe Einheit (30 min Kraft): kein Cool-down, die Zeit gehört den Arbeitssätzen', () => {
+      assert.equal(run(strengthPool(), 'strength', 30).cooldownSeconds, 0)
+    })
+
+    test('Cool-down statt mehr Sätze: bei Muskelaufbau 60 min bleiben die Standard-Sätze (3)', () => {
+      const result = run(hypertrophyPool(), 'hypertrophy', 60)
+      assert.ok(result.exercises.every((e) => e.sets <= 3))
+    })
+
+    test('der persönliche Faktor skaliert das Cool-down nicht: konkret 600 s bei jedem Faktor, nur der Übungsteil skaliert', () => {
+      // Zwei Übungen bei 90 min: Zeit für das volle Cool-down bleibt für jeden Faktor übrig.
+      const pool = [main('Barbell Bench Press', 'hypertrophy'), main('Barbell Squat', 'hypertrophy')]
+      for (const k of [0.8, 1.2, 1.5]) {
+        const result = selectExercisesForTotalTime(pool, 90, 'hypertrophy', { maxExerciseCount: 2, calibration: k })
+        assert.equal(result.cooldownSeconds, COOLDOWN_MAX_SECONDS, `k=${k}`)
+        const exercisesOnly = estimateSessionSeconds(result.exercises, 'hypertrophy', { calibration: k })
+        assert.equal(result.estimatedDurationSeconds, exercisesOnly + COOLDOWN_MAX_SECONDS, `k=${k}`)
+      }
+    })
+
+    test('kurze Einheit (< 45 min) bekommt kein Cool-down, auch wenn durch eine manuelle Obergrenze Zeit übrig bleibt', () => {
+      const pool = [main('Barbell Bench Press', 'hypertrophy'), main('Barbell Squat', 'hypertrophy'), main('Row', 'hypertrophy')]
+      // 40 min, nur zwei Grundübungen erlaubt: es bleiben mehr als 5 min übrig, aber kein Cool-down.
+      const result = selectExercisesForTotalTime(pool, 40, 'hypertrophy', { maxExerciseCount: 2 })
+      assert.equal(result.exercises.length, 2)
+      assert.ok(result.timeBudgetSeconds - result.estimatedDurationSeconds >= COOLDOWN_MIN_SECONDS)
+      assert.equal(result.cooldownSeconds, 0)
+      // 44 min ebenso keins, ab 45 min mit derselben Auswahl schon.
+      assert.equal(selectExercisesForTotalTime(pool, 44, 'hypertrophy', { maxExerciseCount: 2 }).cooldownSeconds, 0)
+      assert.ok(selectExercisesForTotalTime(pool, 45, 'hypertrophy', { maxExerciseCount: 2 }).cooldownSeconds >= COOLDOWN_MIN_SECONDS)
+    })
   })
 })
 
