@@ -208,9 +208,9 @@
 
       <SettingsSectionCard class="card" :title="$t('appFeedback.entryTitle')">
         <p class="hint">{{ $t('appFeedback.entrySubtitle') }}</p>
-        <button class="legal-btn" @click="showFeedbackDialog = true">
-          <span>💬</span>
-          <span>{{ $t('appFeedback.entryTitle') }}</span>
+        <button class="legal-btn" @click="writeFeedbackMail">
+          <span>✉️</span>
+          <span>{{ $t('appFeedback.mailButton') }}</span>
         </button>
       </SettingsSectionCard>
 
@@ -389,13 +389,12 @@
     </div>
     </Teleport>
 
-    <AppFeedbackDialog v-if="showFeedbackDialog" @close="showFeedbackDialog = false" />
   </div>
 </template>
 
 <script setup>
 import HeaderBar from '../components/HeaderBar.vue'
-import AppFeedbackDialog from '../components/AppFeedbackDialog.vue'
+import { sendFeedbackMail } from '../utils/feedbackMail'
 import { storeToRefs } from 'pinia'
 import { useThemeStore } from '@/stores/themeStore'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -451,7 +450,7 @@ const accountProviderLabel = computed(() => {
   return ''
 })
 
-// Allgemeiner Feedback-Bereich (siehe AppFeedbackDialog.vue) + "Einführungsguide erneut
+// Allgemeiner Feedback-Bereich (per E-Mail, siehe utils/feedbackMail.js) + "Einführungsguide erneut
 // starten" (setzt nur completedAt/skippedAt zurück, siehe onboardingStore.js/restartFlow).
 const onboardingStore = useOnboardingStore()
 // Sprechblasen (Hinweise): ein-/ausschalten und erneut anzeigen.
@@ -460,7 +459,7 @@ function resetCoachMarks() {
   coachMarks.resetAll()
   toast.show($t('coach.resetDone'), { type: 'success', duration: 2200 })
 }
-const showFeedbackDialog = ref(false)
+function writeFeedbackMail() { sendFeedbackMail({ t: $t, toast }) }
 const restartingOnboarding = ref(false)
 
 async function handleRestartOnboarding() {

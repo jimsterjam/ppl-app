@@ -17,7 +17,7 @@
       :text="t('onboarding.hintFirstSaveText')"
       :primary-label="t('onboarding.hintGiveFeedback')"
       :secondary-label="t('onboarding.hintLater')"
-      @primary="showFeedbackDialog = true"
+      @primary="writeFeedbackMail"
     />
 
 
@@ -165,7 +165,6 @@
       </button>
     </div>
 
-    <AppFeedbackDialog v-if="showFeedbackDialog" @close="showFeedbackDialog = false" />
   </div>
 </template>
 
@@ -188,14 +187,16 @@ import { REQUEST_TIMEOUT_MS } from '@/utils/feedbackRetryRules'
 import AiFeedbackDeltaSummary from '@/components/AiFeedbackDeltaSummary.vue'
 import AiFeedbackRatingWidget from '@/components/AiFeedbackRatingWidget.vue'
 import OneTimeHint from '@/components/OneTimeHint.vue'
-import AppFeedbackDialog from '@/components/AppFeedbackDialog.vue'
+import { sendFeedbackMail } from '@/utils/feedbackMail'
+import { useToastStore } from '@/stores/toastStore'
 import { useUserStore } from '@/stores/userStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useAiConsentStore } from '@/stores/aiConsentStore'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 import { getNotDoneExercises } from '@/utils/notDoneExercises'
 
-const showFeedbackDialog = ref(false)
+const toast = useToastStore()
+function writeFeedbackMail() { sendFeedbackMail({ t, toast }) }
 
 const props = defineProps({
   workoutId: {
