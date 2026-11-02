@@ -1,6 +1,7 @@
 import { TEXT_LIMITS, textSetter } from '../utils/textLimits.js';
 import { sanitizeWarmup } from '../utils/workoutWarmup.js';
 import { sanitizePlanRef } from '../utils/trainingPlanValidation.js';
+import { sanitizeFeedbackLanguage } from '../utils/feedbackLanguage.js';
 import mongoose from "mongoose";
 
 // Hilfsfunktion zur Kanonisierung des Workout-Typs
@@ -188,6 +189,12 @@ const workoutSchema = new mongoose.Schema({
     type: String,
     default: null,
     set: (v) => (['first_look', 'comparison'].includes(v) ? v : null)
+  },
+  // Sprache des gespeicherten Feedback-Texts ('de' | 'en'), null = älteres Feedback ohne Angabe.
+  ai_feedback_language: {
+    type: String,
+    default: null,
+    set: sanitizeFeedbackLanguage
   },
   // Kompakte, strukturierte Delta-Zusammenfassung je Übung (Sätze/Wdh./Gewicht mehr bzw.
   // weniger als die vorherige Session) - wird zusammen mit ai_feedback einmalig berechnet und

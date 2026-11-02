@@ -87,7 +87,7 @@
     <div v-else-if="feedback" class="summary-content success">
       <div class="feedback-section">
         <h3>{{ feedbackKind === 'first_look' ? t('postWorkout.feedbackFirstLook') : t('postWorkout.feedback') }}</h3>
-        <AiFeedbackDeltaSummary v-if="analysisSnapshot.length > 0" :snapshot="analysisSnapshot" />
+        <AiFeedbackDeltaSummary v-if="analysisSnapshot.length > 0" :snapshot="analysisSnapshot" :language="feedbackLanguage" />
         <div class="feedback-text">{{ feedback }}</div>
         <!-- Erklärt NUR, wofür die Bewertung da ist - rührt AiFeedbackRatingWidget selbst nicht
              an (siehe Kommentar dort: vollständig implementiert, darf nicht verändert werden). -->
@@ -188,6 +188,7 @@ import AiFeedbackDeltaSummary from '@/components/AiFeedbackDeltaSummary.vue'
 import AiFeedbackRatingWidget from '@/components/AiFeedbackRatingWidget.vue'
 import OneTimeHint from '@/components/OneTimeHint.vue'
 import { sendFeedbackMail } from '@/utils/feedbackMail'
+import { resolveFeedbackLanguage } from '@/utils/feedbackLanguage'
 import { useToastStore } from '@/stores/toastStore'
 import { useUserStore } from '@/stores/userStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
@@ -220,7 +221,7 @@ const props = defineProps({
 
 const emit = defineEmits(['close'])
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const { getTranslatedExerciseName } = useExerciseTranslation()
 const userStore = useUserStore()
 const subscriptionStore = useSubscriptionStore()
@@ -240,6 +241,8 @@ const loading = ref(!props.deferred)
 const feedback = ref(null)
 // 'first_look' = Erste Einordnung (ohne Vergleich), sonst vergleichendes Feedback.
 const feedbackKind = ref(null)
+// Sprache, in der der Feedback-Text erzeugt wurde (Server) - sonst am Text erkannt.
+const feedbackLanguage = ref('')
 const analysisSnapshot = ref([])
 // Die tatsächlich aufgelöste, echte Workout-ID (nicht die evtl. temporäre offline_/draft-ID
 // aus props.workoutId) - die Bewertungs-Route hängt am echten Workout-Dokument.
@@ -449,6 +452,10 @@ async function loadAIFeedback({ refresh = false } = {}) {
       }
       feedback.value = response.data.ai_feedback
       feedbackKind.value = response.data.feedback_kind || null
+      feedbackLanguage.value = resolveFeedbackLanguage(
+        { ai_feedback_language: response.data.feedback_language, ai_feedback: response.data.ai_feedback },
+        locale.value
+      )
       analysisSnapshot.value = Array.isArray(response.data?.ai_analysis_snapshot)
         ? response.data.ai_analysis_snapshot
         : []

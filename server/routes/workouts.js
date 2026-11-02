@@ -1126,7 +1126,7 @@ router.get("/feedbacks", firebaseAuthMiddleware, async (req, res) => {
         { $project: {
           name: 1, type: 1, date: 1, completed: 1,
           ai_feedback: 1, ai_generated_at: 1, ai_metadata: 1, ai_analysis_snapshot: 1,
-          ai_feedback_status: 1, ai_pending_since: 1, ai_feedback_kind: 1
+          ai_feedback_status: 1, ai_pending_since: 1, ai_feedback_kind: 1, ai_feedback_language: 1
         } }
       ]),
       Workout.countDocuments(query)
@@ -1152,7 +1152,9 @@ router.get("/feedbacks", firebaseAuthMiddleware, async (req, res) => {
         // FEEDBACK_PENDING_FAILED_AFTER_MS ohne Ergebnis als 'failed' ("Erneut versuchen").
         ai_feedback_status: resolveListFeedbackStatus(w),
         // 'first_look' = Erste Einordnung (ohne Vergleich), 'comparison' = vergleichend, null = älteres Feedback.
-        ai_feedback_kind: w.ai_feedback_kind || null
+        ai_feedback_kind: w.ai_feedback_kind || null,
+        // Sprache, in der der Text erzeugt wurde ('de' | 'en'), null = älteres Feedback (Client erkennt sie am Text).
+        ai_feedback_language: w.ai_feedback_language || null
       })),
       page,
       limit,
@@ -2033,6 +2035,7 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
         ai_metadata: currentWorkout.ai_metadata,
         ai_analysis_snapshot: currentWorkout.ai_analysis_snapshot || [],
         feedback_kind: currentWorkout.ai_feedback_kind || null,
+        feedback_language: currentWorkout.ai_feedback_language || null,
         cached: true,
         metadata: {
           requestId,
@@ -2450,6 +2453,7 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
             },
             ai_analysis_snapshot: analysisSnapshot,
             ai_feedback_kind: isFirstLookFeedback ? 'first_look' : 'comparison',
+            ai_feedback_language: structuredAnalysis?.response_language === 'en' ? 'en' : 'de',
             // War das Workout zuvor "zurückgestellt" (Feature "Feedback später bewerten"),
             // ist es jetzt final generiert - Feedback-Verlauf soll dann kein "ausstehend"-
             // Badge mehr zeigen (siehe GET /feedbacks oben).
@@ -2506,7 +2510,8 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
       ...(aiResult ? {
         ai_feedback: aiResult.feedback,
         ai_metadata: aiResult.metadata,
-        feedback_kind: isFirstLookFeedback ? 'first_look' : 'comparison'
+        feedback_kind: isFirstLookFeedback ? 'first_look' : 'comparison',
+        feedback_language: structuredAnalysis?.response_language === 'en' ? 'en' : 'de'
       } : {}),
 
       metadata: {

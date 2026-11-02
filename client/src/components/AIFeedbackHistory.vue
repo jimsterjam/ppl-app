@@ -96,6 +96,7 @@
             v-if="item.ai_analysis_snapshot?.length > 0"
             class="feedback-delta-summary"
             :snapshot="item.ai_analysis_snapshot"
+            :language="resolveFeedbackLanguage(item, locale)"
           />
           {{ item.ai_feedback }}
 
@@ -140,6 +141,7 @@ import { trackPendingFeedback } from '@/utils/feedbackTracker'
 import { REQUEST_TIMEOUT_MS } from '@/utils/feedbackRetryRules'
 import AiQuotaChip from '@/components/AiQuotaChip.vue'
 import AiFeedbackDeltaSummary from '@/components/AiFeedbackDeltaSummary.vue'
+import { resolveFeedbackLanguage } from '@/utils/feedbackLanguage'
 import AiFeedbackRatingWidget from '@/components/AiFeedbackRatingWidget.vue'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { fetchWorkoutFeedbacks, requestAiAnalysis } from '@/api/workouts'
@@ -238,6 +240,7 @@ async function generateNow(item) {
     if (data?.aiUsage) subscriptionStore.applyAiUsageSnapshot(data.aiUsage)
     if (data?.ai_feedback) {
       item.ai_feedback = data.ai_feedback
+      item.ai_feedback_language = data.feedback_language || null
       item.ai_generated_at = new Date().toISOString()
       item.ai_metadata = data.ai_metadata
       item.ai_analysis_snapshot = data.ai_analysis_snapshot || []
