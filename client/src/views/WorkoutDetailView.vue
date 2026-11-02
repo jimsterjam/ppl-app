@@ -1139,7 +1139,7 @@ import RestTimerBar from '@/components/timer/RestTimerBar.vue'
 import TransitionTimer from '@/components/timer/TransitionTimer.vue'
 import FocusMode from '@/components/FocusMode.vue'
 import { useFocusModeStore } from '@/stores/focusModeStore'
-import { saveFocusState, readFocusState, applyFocusState } from '@/utils/focusStatePersistence'
+import { createFocusStateTracker, applyFocusState } from '@/utils/focusStatePersistence'
 import { buildSaveReview, markAllSetsDone } from '@/utils/saveReview'
 import { isExerciseNotDone } from '@/utils/notDoneExercises'
 import { showsReps, showsTime, showsWeight, sanitizeMeasureMode, DURATION_MAX_SECONDS, DURATION_STEP_SECONDS } from '@/utils/measureMode'
@@ -2520,14 +2520,14 @@ watch(() => restTimer.showFinished, (finished) => {
 
 // Großansicht über ein Neuladen der Seite hinweg merken (iOS beendet die Web-Ansicht im Hintergrund; die Pause läuft
 // weiter, die Großansicht war bisher weg und die App stand in der Übersicht). Siehe utils/focusStatePersistence.js.
+const focusStateTracker = createFocusStateTracker(localStorage)
 watch([() => focus.active, () => focus.minimized, () => getViewStateWorkoutId()], ([active, minimized, workoutId]) => {
-  saveFocusState(localStorage, { workoutId, active, minimized })
+  focusStateTracker.save({ workoutId, active, minimized })
 })
 
 async function restoreFocusAfterReload() {
-  if (focus.active) return
-  const saved = readFocusState(localStorage, getViewStateWorkoutId())
-  if (!saved) return
+  const saved = focusStateTracker.restore(getViewStateWorkoutId())
+  if (focus.active || !saved) return
   await nextTick()
   if (!setTrackingActive.value || !doneBarCurrent.value) return
   applyFocusState({ saved, focus, restTimer, transition })
@@ -2548,7 +2548,7 @@ watch(() => focus.minimized, (minimized) => {
 })
 onBeforeUnmount(() => {
   focus.close()
-  saveFocusState(localStorage, { workoutId: '', active: false, minimized: false })
+  focusStateTracker.clear()
 })
 
 // Pausentimer-Vollbild: nächster offener Arbeitssatz ab der Übung der laufenden Pause (diese

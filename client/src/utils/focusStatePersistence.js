@@ -41,3 +41,28 @@ export function applyFocusState({ saved, focus, restTimer, transition }) {
   if (restTimer?.isVisible) restTimer.minimize()
   if (transition?.isActive) transition.minimize()
 }
+
+/**
+ * Schutz gegen ein Überschreiben vor dem Wiederherstellen: Direkt nach dem Neuladen steht die Großansicht auf
+ * "aus"; ändert sich dabei die Workout-ID (Route -> geladenes Workout), würde ein Speichern den gemerkten Zustand
+ * löschen, bevor er gelesen wurde. Gespeichert wird deshalb erst, nachdem wiederhergestellt wurde.
+ */
+export function createFocusStateTracker(storage) {
+  let ready = false
+  return {
+    /** @returns {{ minimized: boolean } | null} - und gibt danach das Speichern frei */
+    restore(workoutId, now = Date.now()) {
+      const saved = readFocusState(storage, workoutId, now)
+      ready = true
+      return saved
+    },
+    save(state) {
+      if (!ready) return
+      saveFocusState(storage, state)
+    },
+    /** Beim Verlassen der Ansicht: Eintrag löschen (unabhängig vom Zustand). */
+    clear() {
+      saveFocusState(storage, { workoutId: '', active: false, minimized: false })
+    }
+  }
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { saveFocusState, readFocusState, applyFocusState, FOCUS_STATE_MAX_AGE_MS } from '../focusStatePersistence.js'
+import { saveFocusState, readFocusState, applyFocusState, createFocusStateTracker, FOCUS_STATE_MAX_AGE_MS } from '../focusStatePersistence.js'
 
 function memoryStorage() {
   const map = new Map()
@@ -82,6 +82,34 @@ describe('focusStatePersistence', () => {
       expect(st.focus.minimize).toHaveBeenCalled()
       expect(st.restTimer.minimize).not.toHaveBeenCalled()
       expect(st.transition.minimize).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('createFocusStateTracker', () => {
+    it('Speichern vor dem Wiederherstellen löscht den gemerkten Zustand nicht (Neuladen: Großansicht steht kurz auf "aus")', () => {
+      const s = memoryStorage()
+      saveFocusState(s, { workoutId: 'w1', active: true, minimized: false })
+      const tracker = createFocusStateTracker(s)
+      tracker.save({ workoutId: 'w1', active: false, minimized: false })
+      expect(tracker.restore('w1')).toEqual({ minimized: false })
+    })
+
+    it('nach dem Wiederherstellen wird wieder normal gespeichert und gelöscht', () => {
+      const s = memoryStorage()
+      saveFocusState(s, { workoutId: 'w1', active: true, minimized: true })
+      const tracker = createFocusStateTracker(s)
+      tracker.restore('w1')
+      tracker.save({ workoutId: 'w1', active: true, minimized: false })
+      expect(readFocusState(s, 'w1')).toEqual({ minimized: false })
+      tracker.save({ workoutId: 'w1', active: false, minimized: false })
+      expect(readFocusState(s, 'w1')).toBeNull()
+    })
+
+    it('clear() löscht auch ohne vorheriges Wiederherstellen (Verlassen der Ansicht)', () => {
+      const s = memoryStorage()
+      saveFocusState(s, { workoutId: 'w1', active: true, minimized: false })
+      createFocusStateTracker(s).clear()
+      expect(readFocusState(s, 'w1')).toBeNull()
     })
   })
 })
