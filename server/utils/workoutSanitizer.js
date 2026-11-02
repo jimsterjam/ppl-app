@@ -2,6 +2,7 @@
  * Eingabe-Sanitierung für Workout-Requests.
  * Keine Datenbank- oder externe Abhängigkeiten.
  */
+import { sanitizeCalibration } from './workoutTimeModel.js';
 
 export function sanitizeWorkoutRequest(body) {
   const toNumber = (value, fallback) => {
@@ -73,7 +74,11 @@ export function sanitizeQuickGeneratorRequest(body) {
     // User-Wunsch (mehr Kontrolle): optionale manuelle Übersteuerung der automatisch berechneten
     // Übungsanzahl (siehe getMaxExerciseCount() in routes/workouts.js) - null/undefined lässt die
     // automatische Ziel-/Dauer-basierte Obergrenze unverändert greifen.
-    exerciseCountOverride: normalizeOptionalNumber(body.exerciseCountOverride)
+    exerciseCountOverride: normalizeOptionalNumber(body.exerciseCountOverride),
+    // Zeitmodell (utils/workoutTimeModel.js): 'total_session' = Wunschzeit inkl. Warm-up (Standard), 'training_only' =
+    // Warm-up kommt obendrauf; persönlicher Faktor k (Verhältnis echte Dauer / Schätzung), auf 0,8-1,5 begrenzt.
+    durationMode: normalizeEnum(body.durationMode, ['total_session', 'training_only'], 'total_session'),
+    timeCalibration: sanitizeCalibration(body.timeCalibration)
   };
 }
 

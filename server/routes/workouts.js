@@ -47,7 +47,7 @@ import {
 } from '../utils/workoutSanitizer.js';
 import { decideExerciseMatch } from '../utils/exerciseMatching.js';
 import { getMaxExerciseCount } from '../utils/exerciseCountTarget.js';
-import { selectExercisesForTotalTime, BUFFER_SECONDS, WARMUP_SECONDS, sanitizeCalibration } from '../utils/workoutTimeModel.js';
+import { selectExercisesForTotalTime, resolveTimeSelectionOptions, BUFFER_SECONDS } from '../utils/workoutTimeModel.js';
 import { applyGeneratorRule } from '../utils/repTargets.js';
 import { buildNextSessionFocus, buildProgressionStates, applyNextSessionFocus } from '../utils/nextSessionFocus.js';
 import { FIRST_LOOK_COMPARISON_MIN, applyFirstLookOutlook } from '../utils/firstLookOutlook.js';
@@ -3998,13 +3998,9 @@ function enforceWorkoutProgrammingRules(payload, context = {}, options = {}) {
   // Übungen behalten, dass die GESAMTZEIT inkl. Warm-up zur Wunschzeit passt, und übrige Zeit mit
   // zusätzlichen Sätzen der Grundübungen füllen. Die Reihenfolge oben stellt sicher, dass Hauptübungen
   // vorne stehen und niedriger priorisierte Ergänzungen/Isolationen zuerst wegfallen.
-  const durationMode = context.durationMode === 'training_only' ? 'training_only' : 'total_session';
-  const maxExerciseCount = getMaxExerciseCount(durationMinutes, goal, context.exerciseCountOverride);
-  const timeSelection = selectExercisesForTotalTime(goalRangedCandidates, durationMinutes, goal, {
-    durationMode,
-    maxExerciseCount,
-    calibration: sanitizeCalibration(context.timeCalibration)
-  });
+  const timeOptions = resolveTimeSelectionOptions(context, durationMinutes, goal);
+  const durationMode = timeOptions.durationMode;
+  const timeSelection = selectExercisesForTotalTime(goalRangedCandidates, durationMinutes, goal, timeOptions);
 
   const goalAdjusted = timeSelection.exercises.map((exercise, index) => ({
     name: exercise.name,
@@ -4025,8 +4021,8 @@ function enforceWorkoutProgrammingRules(payload, context = {}, options = {}) {
   const fallbackName = requestedType === 'fullbody' ? 'Full Body Session' : `${requestedType.toUpperCase()} Session`;
   // Laienverständlicher Warm-up-Hinweis (User-Report: "Ramp-Up Sets" ist Fitness-Fachjargon,
   // nicht jeder Nutzer kennt den Begriff) - erklärt kurz, was gemeint ist, statt ihn
-  // vorauszusetzen. Zeitangabe passend zu WARMUP_SECONDS im Zeitmodell (Cardio, Gelenke, leichter Satz).
-  const warmupHint = `Warm-up: ca. ${Math.round(WARMUP_SECONDS / 60)} Minuten leichtes Aufwärmen und ansteigende Gewichte vor der ersten Übung (Ramp-Up Sets).`;
+  // vorauszusetzen. Zeitangabe passend zum Zeitmodell (9 min, bei kurzen Einheiten nur das spezifische Aufwärmen, siehe warmupSecondsFor).
+  const warmupHint = `Warm-up: ca. ${Math.max(1, Math.round(timeSelection.warmupSeconds / 60))} Minuten leichtes Aufwärmen und ansteigende Gewichte vor der ersten Übung (Ramp-Up Sets).`;
 
   return {
     workoutName: typeof payload?.workoutName === 'string' && payload.workoutName.trim()
