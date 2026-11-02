@@ -172,6 +172,9 @@
               {{ t('quickGenerator.previewTrainingTime', { minutes: preview.trainingDuration }) }}
             </p>
             <p class="hint preview-warmup">{{ preview.warmup }}</p>
+            <p v-if="preview.cooldownMinutes > 0" class="hint preview-warmup">
+              {{ t('quickGenerator.previewCooldown', { minutes: preview.cooldownMinutes }) }}
+            </p>
 
             <div class="preview-actions">
               <button class="secondary" type="button" @click="preview = null">
@@ -410,7 +413,9 @@ async function generate() {
       estimatedDuration: response.estimatedDuration ?? form.durationMinutes,
       trainingDuration: response.estimatedTrainingDuration ?? form.durationMinutes,
       exerciseCount: exercises.length,
-      warmup: response.warmup || ''
+      warmup: response.warmup || '',
+      // Vorschlag für das Ende (Minuten, 0 = keine Zeit übrig); in estimatedDuration enthalten.
+      cooldownMinutes: Number(response.estimatedCooldownDuration) || 0
     }
   } catch (err) {
     logger.error('[QuickWorkoutGenerator] generate failed', err?.message)

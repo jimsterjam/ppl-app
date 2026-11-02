@@ -4037,6 +4037,8 @@ function enforceWorkoutProgrammingRules(payload, context = {}, options = {}) {
     estimatedDuration: Math.round(timeSelection.estimatedDurationSeconds / 60),
     estimatedTrainingDuration: Math.round(timeSelection.trainingSeconds / 60),
     estimatedWarmupDuration: Math.round(timeSelection.warmupSeconds / 60),
+    // Vorschlag für das Ende der Einheit (0 = keine Zeit übrig); in estimatedDuration enthalten.
+    estimatedCooldownDuration: Math.round(timeSelection.cooldownSeconds / 60),
     difficulty: payload?.difficulty === 'advanced' ? 'advanced' : 'beginner',
     warmup: warmupHint,
     notes: [

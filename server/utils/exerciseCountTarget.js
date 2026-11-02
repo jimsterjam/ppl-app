@@ -15,17 +15,18 @@ function toGoalMode(goal) {
   return String(goal || '').toLowerCase().includes('strength') ? 'strength' : 'hypertrophy';
 }
 
-// Automatische Obergrenze Ziel x Dauer (User-Vorgabe: Kraft/60 min max. 4, Muskelaufbau 5-6). Ab 60 Minuten wächst sie
-// mit der Wunschzeit (vorher blieb sie bei 6 bzw. 4: 75 Minuten ergaben ein 49-Minuten-Workout). Die eigentliche Zahl
-// bestimmt das Zeitmodell (utils/workoutTimeModel.js); diese Tabelle ist nur die Sicherung nach oben.
+// Automatische Obergrenze Ziel x Dauer (User-Vorgabe: Kraft/60 min max. 4, Muskelaufbau 5-6). Über 75 Minuten wächst
+// sie noch einmal um eine Übung (vorher blieb sie ab 46 Minuten fest: 75 Minuten ergaben ein 49-Minuten-Workout). Mehr
+// als 6 bzw. 4 Übungen bis 75 Minuten sind unrealistisch (Wechselzeiten, Konzentration); die übrige Zeit füllt das
+// Cool-down. Die eigentliche Zahl bestimmt das Zeitmodell (utils/workoutTimeModel.js); diese Tabelle ist die Sicherung.
 export function getTimeAdjustedExerciseTarget(durationMinutes = 45, goal = 'hypertrophy') {
   const duration = Number(durationMinutes) || 45;
   const isStrength = toGoalMode(goal) === 'strength';
   if (duration <= 30) return isStrength ? 3 : 4;
   if (duration <= 45) return isStrength ? 4 : 5;
   if (duration <= 60) return isStrength ? 4 : 6;
-  if (duration <= 75) return isStrength ? 5 : 7;
-  return isStrength ? 6 : EXERCISE_COUNT_MAX;
+  if (duration <= 75) return isStrength ? 4 : 6;
+  return isStrength ? 5 : 7;
 }
 
 // Manueller Override des Nutzers hat Vorrang, bleibt aber in sinnvollen Grenzen (2-8).
