@@ -1139,6 +1139,7 @@ import RestTimerBar from '@/components/timer/RestTimerBar.vue'
 import TransitionTimer from '@/components/timer/TransitionTimer.vue'
 import FocusMode from '@/components/FocusMode.vue'
 import { useFocusModeStore } from '@/stores/focusModeStore'
+import { saveFocusState, readFocusState } from '@/utils/focusStatePersistence'
 import { buildSaveReview, markAllSetsDone } from '@/utils/saveReview'
 import { isExerciseNotDone } from '@/utils/notDoneExercises'
 import { showsReps, showsTime, showsWeight, sanitizeMeasureMode, DURATION_MAX_SECONDS, DURATION_STEP_SECONDS } from '@/utils/measureMode'
@@ -2517,6 +2518,22 @@ watch(() => restTimer.showFinished, (finished) => {
   focus.startTimer(cur.key, planned > 0 ? planned : 60)
 })
 
+// Großansicht über ein Neuladen der Seite hinweg merken (iOS beendet die Web-Ansicht im Hintergrund; die Pause läuft
+// weiter, die Großansicht war bisher weg und die App stand in der Übersicht). Siehe utils/focusStatePersistence.js.
+watch([() => focus.active, () => focus.minimized, () => getViewStateWorkoutId()], ([active, minimized, workoutId]) => {
+  saveFocusState(localStorage, { workoutId, active, minimized })
+})
+
+async function restoreFocusAfterReload() {
+  if (focus.active) return
+  const saved = readFocusState(localStorage, getViewStateWorkoutId())
+  if (!saved) return
+  await nextTick()
+  if (!setTrackingActive.value || !doneBarCurrent.value) return
+  focus.open()
+  if (saved.minimized) focus.minimize()
+}
+
 // Kein offener Satz mehr: Fokus-Modus beenden (zurück zur Übersicht mit Speichern).
 watch(doneBarCurrent, (cur) => {
   if (!cur && focus.active) focus.close()
@@ -2530,7 +2547,10 @@ watch(() => focus.minimized, (minimized) => {
     try { document.querySelector('.set-done-strip')?.scrollIntoView({ block: 'center', behavior: 'smooth' }) } catch {}
   })
 })
-onBeforeUnmount(() => focus.close())
+onBeforeUnmount(() => {
+  focus.close()
+  saveFocusState(localStorage, { workoutId: '', active: false, minimized: false })
+})
 
 // Pausentimer-Vollbild: nächster offener Arbeitssatz ab der Übung der laufenden Pause (diese
 // Übung zuerst, sonst die folgenden). Satznummer zählt nur Arbeitssätze, wie in der Tabelle.
@@ -4381,6 +4401,7 @@ onMounted(async () => {
   } catch {}
   loadDefaultExerciseMap().catch(() => {})
   await loadWorkout()
+  restoreFocusAfterReload()
   // Typ aus Query übernehmen, falls Draft geladen wird und Typ fehlt
   if (route.params.id === 'draft' && workout.value && !workout.value.type && route.query.type) {
     workout.value.type = route.query.type

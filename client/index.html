@@ -57,7 +57,11 @@
   document.addEventListener('visibilitychange', function () { if (document.hidden) touch(); });
   window.addEventListener('pagehide', touch);
   var now = Date.now();
-  var sameRun = !!launchId && launchId === lastId;
+  // Zusatzbeleg, falls die Kennung fehlt: iOS lädt eine beendete Web-Ansicht per reload() neu (Navigationstyp
+  // 'reload'); ein echter App-Start ist ein normales Laden ('navigate').
+  var navType = '';
+  try { navType = String(performance.getEntriesByType('navigation')[0].type || ''); } catch (e) {}
+  var sameRun = launchId ? launchId === lastId : navType === 'reload';
   var recent = last > 0 && now - last >= 0 && now - last < RESUME_MS;
   var justShown = shownAt > 0 && now - shownAt >= 0 && now - shownAt < JUST_SHOWN_MS;
   if (sameRun && recent && !justShown) {
