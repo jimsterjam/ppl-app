@@ -31,10 +31,20 @@ const props = defineProps({
   snapshot: {
     type: Array,
     default: () => []
+  },
+  // Sprache des zugehörigen Feedback-Texts ('de' | 'en'); leer = App-Sprache. Der Vergleichsteil erscheint in
+  // derselben Sprache wie der Coach-Text, auch nach einem Wechsel der App-Sprache.
+  language: {
+    type: String,
+    default: ''
   }
 })
 
-const { t, locale } = useI18n()
+const { t: tApp, locale: appLocale } = useI18n()
+const locale = computed(() => (props.language === 'de' || props.language === 'en' ? props.language : appLocale.value))
+const t = (key, params) => (props.language === 'de' || props.language === 'en'
+  ? tApp(key, params ?? {}, { locale: props.language })
+  : tApp(key, params ?? {}))
 const { getTranslatedExerciseName } = useExerciseTranslation()
 
 function formatNumber(value) {
