@@ -27,3 +27,17 @@ export function readFocusState(storage, workoutId, now = Date.now()) {
     return null
   }
 }
+
+/**
+ * Gemerkten Zustand anwenden: Großansicht öffnen und, falls sie minimiert war, auch die laufenden Timer minimieren.
+ * Pause und Übergangs-Stoppuhr steuern ihr Overlay über einen eigenen Minimierungszustand; ohne das erschiene eine
+ * zuvor minimierte Pause nach dem Neuladen wieder im Vollbild. (Die Pause vergrößert sich bei <= 10 s von selbst.)
+ * @param {{ saved: { minimized: boolean }, focus: object, restTimer: object, transition: object }} stores
+ */
+export function applyFocusState({ saved, focus, restTimer, transition }) {
+  focus.open()
+  if (!saved?.minimized) return
+  focus.minimize()
+  if (restTimer?.isVisible) restTimer.minimize()
+  if (transition?.isActive) transition.minimize()
+}

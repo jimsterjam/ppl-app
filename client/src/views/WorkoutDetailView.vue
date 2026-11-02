@@ -1139,7 +1139,7 @@ import RestTimerBar from '@/components/timer/RestTimerBar.vue'
 import TransitionTimer from '@/components/timer/TransitionTimer.vue'
 import FocusMode from '@/components/FocusMode.vue'
 import { useFocusModeStore } from '@/stores/focusModeStore'
-import { saveFocusState, readFocusState } from '@/utils/focusStatePersistence'
+import { saveFocusState, readFocusState, applyFocusState } from '@/utils/focusStatePersistence'
 import { buildSaveReview, markAllSetsDone } from '@/utils/saveReview'
 import { isExerciseNotDone } from '@/utils/notDoneExercises'
 import { showsReps, showsTime, showsWeight, sanitizeMeasureMode, DURATION_MAX_SECONDS, DURATION_STEP_SECONDS } from '@/utils/measureMode'
@@ -2530,8 +2530,7 @@ async function restoreFocusAfterReload() {
   if (!saved) return
   await nextTick()
   if (!setTrackingActive.value || !doneBarCurrent.value) return
-  focus.open()
-  if (saved.minimized) focus.minimize()
+  applyFocusState({ saved, focus, restTimer, transition })
 }
 
 // Kein offener Satz mehr: Fokus-Modus beenden (zurück zur Übersicht mit Speichern).
