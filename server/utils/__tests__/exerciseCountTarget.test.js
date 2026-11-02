@@ -22,6 +22,14 @@ describe('getTimeAdjustedExerciseTarget', () => {
     assert.equal(getTimeAdjustedExerciseTarget(45, 'hypertrophy'), 5)
   })
 
+  test('ab 60 Minuten wächst die Obergrenze mit der Wunschzeit (75 min ergab vorher dasselbe wie 60)', () => {
+    assert.equal(getTimeAdjustedExerciseTarget(75, 'hypertrophy'), 7)
+    assert.equal(getTimeAdjustedExerciseTarget(75, 'strength'), 5)
+    assert.equal(getTimeAdjustedExerciseTarget(90, 'hypertrophy'), 8)
+    assert.equal(getTimeAdjustedExerciseTarget(90, 'strength'), 6)
+    assert.ok(getTimeAdjustedExerciseTarget(75, 'hypertrophy') > getTimeAdjustedExerciseTarget(60, 'hypertrophy'))
+  })
+
   test('rohe Zielwerte aus dem Request werden korrekt zugeordnet', () => {
     assert.equal(getTimeAdjustedExerciseTarget(60, 'muscle_building'), 6)
     assert.equal(getTimeAdjustedExerciseTarget(60, 'max_strength'), 4)
