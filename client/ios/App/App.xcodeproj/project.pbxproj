@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		1A704AE52FFBE523008493A5 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A704AE42FFBE523008493A5 /* SceneDelegate.swift */; };
+		1ABDF1C1309776C600543A32 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 1ABDF1C0309776C600543A32 /* PrivacyInfo.xcprivacy */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
@@ -27,6 +28,7 @@
 
 /* Begin PBXFileReference section */
 		1A704AE42FFBE523008493A5 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
+		1ABDF1C0309776C600543A32 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -89,6 +91,7 @@
 		504EC3061FED79650016851F /* App */ = {
 			isa = PBXGroup;
 			children = (
+				1ABDF1C0309776C600543A32 /* PrivacyInfo.xcprivacy */,
 				1A704AE42FFBE523008493A5 /* SceneDelegate.swift */,
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
@@ -186,6 +189,7 @@
 				5E57E265A1B2C3D4E5F60718 /* rest-alarm-deep.wav in Resources */,
 				5E57E267A1B2C3D4E5F60718 /* rest-alarm-chimes.wav in Resources */,
 				5E57E269A1B2C3D4E5F60718 /* rest-alarm-marimba.wav in Resources */,
+				1ABDF1C1309776C600543A32 /* PrivacyInfo.xcprivacy in Resources */,
 				5E57E271A1B2C3D4E5F60718 /* rest-alarm-bright.wav in Resources */,
 				504EC30F1FED79650016851F /* Assets.xcassets in Resources */,
 				50379B232058CBB4000EE86E /* capacitor.config.json in Resources */,
