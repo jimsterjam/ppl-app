@@ -261,10 +261,27 @@ describe('Zeitmodell: Auswahl für die Wunschzeit (Gesamtzeit inkl. Warm-up)', (
       assert.ok(result.exercises.every((e) => e.sets <= 3))
     })
 
-    test('der persönliche Faktor skaliert das Cool-down nicht (es ist eine feste Empfehlung)', () => {
-      const slow = run(hypertrophyPool(), 'hypertrophy', 90, { calibration: 1.0 })
-      assert.equal(slow.cooldownSeconds % 60, 0)
-      assert.ok(slow.cooldownSeconds <= COOLDOWN_MAX_SECONDS)
+    test('der persönliche Faktor skaliert das Cool-down nicht: konkret 600 s bei jedem Faktor, nur der Übungsteil skaliert', () => {
+      // Zwei Übungen bei 90 min: Zeit für das volle Cool-down bleibt für jeden Faktor übrig.
+      const pool = [main('Barbell Bench Press', 'hypertrophy'), main('Barbell Squat', 'hypertrophy')]
+      for (const k of [0.8, 1.2, 1.5]) {
+        const result = selectExercisesForTotalTime(pool, 90, 'hypertrophy', { maxExerciseCount: 2, calibration: k })
+        assert.equal(result.cooldownSeconds, COOLDOWN_MAX_SECONDS, `k=${k}`)
+        const exercisesOnly = estimateSessionSeconds(result.exercises, 'hypertrophy', { calibration: k })
+        assert.equal(result.estimatedDurationSeconds, exercisesOnly + COOLDOWN_MAX_SECONDS, `k=${k}`)
+      }
+    })
+
+    test('kurze Einheit (< 45 min) bekommt kein Cool-down, auch wenn durch eine manuelle Obergrenze Zeit übrig bleibt', () => {
+      const pool = [main('Barbell Bench Press', 'hypertrophy'), main('Barbell Squat', 'hypertrophy'), main('Row', 'hypertrophy')]
+      // 40 min, nur zwei Grundübungen erlaubt: es bleiben mehr als 5 min übrig, aber kein Cool-down.
+      const result = selectExercisesForTotalTime(pool, 40, 'hypertrophy', { maxExerciseCount: 2 })
+      assert.equal(result.exercises.length, 2)
+      assert.ok(result.timeBudgetSeconds - result.estimatedDurationSeconds >= COOLDOWN_MIN_SECONDS)
+      assert.equal(result.cooldownSeconds, 0)
+      // 44 min ebenso keins, ab 45 min mit derselben Auswahl schon.
+      assert.equal(selectExercisesForTotalTime(pool, 44, 'hypertrophy', { maxExerciseCount: 2 }).cooldownSeconds, 0)
+      assert.ok(selectExercisesForTotalTime(pool, 45, 'hypertrophy', { maxExerciseCount: 2 }).cooldownSeconds >= COOLDOWN_MIN_SECONDS)
     })
   })
 })

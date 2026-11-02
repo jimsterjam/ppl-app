@@ -31,7 +31,8 @@ export const CHANGEOVER_SECONDS = Object.freeze({ main: 150, accessory: 90 });
 export const OVER_BUDGET_TOLERANCE = 0.05;
 export const COOLDOWN_MIN_SECONDS = 300;
 export const COOLDOWN_MAX_SECONDS = 600;
-// Ab dieser Wunschzeit bleibt beim Auffüllen mit Sätzen Platz für das Cool-down; kürzere Einheiten nutzen alles.
+// Ab dieser Wunschzeit gibt es ein Cool-down (und bleibt beim Auffüllen mit Sätzen Platz dafür); kürzere Einheiten
+// nutzen die ganze Zeit für Arbeitssätze.
 const COOLDOWN_RESERVE_FROM_MINUTES = 45;
 export const CALIBRATION_MIN = 0.8;
 export const CALIBRATION_MAX = 1.5;
@@ -160,7 +161,9 @@ export function selectExercisesForTotalTime(orderedExercises = [], totalMinutes 
   const exercisesSeconds = estimate(selected);
   // Cool-down: 5-10 Minuten (volle Minuten) aus der Zeit, die bis zur Wunschzeit übrig ist; sonst keins.
   const leftover = budgetSeconds - exercisesSeconds;
-  const cooldownSeconds = leftover >= COOLDOWN_MIN_SECONDS
+  // Gleiche Mindestdauer wie bei der Cool-down-Reserve: kurze Einheiten (< 45 min) bekommen keins, auch nicht,
+  // wenn zum Beispiel durch eine manuelle Obergrenze der Übungsanzahl Zeit übrig bleibt.
+  const cooldownSeconds = wantedMinutes >= COOLDOWN_RESERVE_FROM_MINUTES && leftover >= COOLDOWN_MIN_SECONDS
     ? Math.min(COOLDOWN_MAX_SECONDS, Math.floor(leftover / 60) * 60)
     : 0;
   const totalSeconds = exercisesSeconds + cooldownSeconds;
