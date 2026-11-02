@@ -3,9 +3,11 @@ import assert from 'node:assert/strict'
 import { applyGeneratorRule } from '../repTargets.js'
 import {
   estimateExerciseBlockSeconds, estimateSessionSeconds, selectExercisesForTotalTime, sanitizeCalibration,
-  maxSetsFor, WARMUP_SECONDS, BUFFER_SECONDS, OVER_BUDGET_TOLERANCE
+  maxSetsFor, minSetsFor, warmupSecondsFor, resolveTimeSelectionOptions,
+  WARMUP_SECONDS, SHORT_WARMUP_SECONDS, BUFFER_SECONDS, OVER_BUDGET_TOLERANCE
 } from '../workoutTimeModel.js'
 import { getMaxExerciseCount } from '../exerciseCountTarget.js'
+import { sanitizeQuickGeneratorRequest } from '../workoutSanitizer.js'
 
 const minutes = (seconds) => seconds / 60
 
@@ -137,9 +139,49 @@ describe('Zeitmodell: Auswahl für die Wunschzeit (Gesamtzeit inkl. Warm-up)', (
     assert.equal(pool[0].sets, 3)
   })
 
-  test('mindestens zwei Übungen, auch wenn die Zeit sehr knapp ist', () => {
+  test('Regression: 30 min Kraft mit den echten Generator-Standardwerten bleibt im Budget (vorher 40 min)', () => {
+    // Standard: Grundübung 4 Sätze à 180 s Pause. Zwei volle Grundübungen allein wären 40,3 min.
+    const result = run(strengthPool(), 'strength', 30)
+    const total = minutes(result.estimatedDurationSeconds)
+    assert.ok(total <= 30 * (1 + OVER_BUDGET_TOLERANCE), `war ${total}`)
+    assert.ok(total >= 24, `zu wenig genutzt: ${total}`)
+    assert.ok(result.exercises.some((e) => !e.isIsolation), 'mindestens eine Grundübung')
+    assert.equal(result.overBudget, false)
+    // 35 und 40 Minuten ebenso
+    for (const wanted of [35, 40]) {
+      const seconds = run(strengthPool(), 'strength', wanted).estimatedDurationSeconds
+      assert.ok(seconds <= wanted * 60 * (1 + OVER_BUDGET_TOLERANCE) + 1, `${wanted}: ${minutes(seconds)}`)
+    }
+  })
+
+  test('passt eine zweite Grundübung nur mit weniger Sätzen, werden Sätze bis zum Minimum gesenkt (nicht gestrichen)', () => {
+    const pool = [main('Barbell Bench Press', 'strength'), main('Barbell Squat', 'strength')]
+    const result = selectExercisesForTotalTime(pool, 36, 'strength', { maxExerciseCount: 4 })
+    assert.equal(result.exercises.length, 2)
+    assert.ok(result.exercises[1].sets < pool[1].sets)
+    assert.ok(result.exercises[1].sets >= minSetsFor(pool[1], 'strength'))
+    assert.ok(result.estimatedDurationSeconds <= 36 * 60 * (1 + OVER_BUDGET_TOLERANCE) + 1)
+  })
+
+  test('Pausen bleiben unverändert: zur Zeitersparnis werden nur Sätze und Übungen reduziert', () => {
+    const result = run(strengthPool(), 'strength', 30)
+    for (const exercise of result.exercises) {
+      assert.equal(exercise.rest, exercise.isIsolation ? 120 : 180)
+    }
+  })
+
+  test('sehr kurze Wunschzeit: es gibt keine feste Mindestzahl, aber mindestens eine Übung', () => {
     const result = selectExercisesForTotalTime(strengthPool(), 20, 'strength', { maxExerciseCount: 3 })
-    assert.ok(result.exercises.length >= 2)
+    assert.ok(result.exercises.length >= 1)
+    assert.ok(minutes(result.estimatedDurationSeconds) <= 20 * (1 + OVER_BUDGET_TOLERANCE))
+  })
+
+  test('passt gar nichts: kürzeste Übung mit Mindestsätzen, die Überschreitung wird gemeldet', () => {
+    const heavy = { ...main('Endlos-Pause', 'strength'), rest: 600 }
+    const result = selectExercisesForTotalTime([heavy], 20, 'strength', { maxExerciseCount: 3 })
+    assert.equal(result.exercises.length, 1)
+    assert.equal(result.exercises[0].sets, minSetsFor(heavy, 'strength'))
+    assert.equal(result.overBudget, true)
   })
 
   test('harte Obergrenze (manueller Override) bleibt gültig', () => {
@@ -171,5 +213,60 @@ describe('Zeitmodell: Auswahl für die Wunschzeit (Gesamtzeit inkl. Warm-up)', (
   test('Aufteilung: Warm-up und Training ergeben die Gesamtzeit', () => {
     const result = run(strengthPool(), 'strength', 75)
     assert.equal(result.warmupSeconds + result.trainingSeconds, result.estimatedDurationSeconds)
+  })
+
+  test('Warm-up wird bei kurzen Einheiten kürzer: ≤ 30 min nur spezifisch (5 min), ab 45 min voll (9 min)', () => {
+    assert.equal(warmupSecondsFor(20), SHORT_WARMUP_SECONDS)
+    assert.equal(warmupSecondsFor(30), SHORT_WARMUP_SECONDS)
+    assert.equal(warmupSecondsFor(45), WARMUP_SECONDS)
+    assert.equal(warmupSecondsFor(75), WARMUP_SECONDS)
+    const mid = warmupSecondsFor(38)
+    assert.ok(mid > SHORT_WARMUP_SECONDS && mid < WARMUP_SECONDS)
+    assert.equal(warmupSecondsFor(undefined), WARMUP_SECONDS)
+  })
+})
+
+describe('Zeitmodell: Durchfluss vom Request bis zur Auswahl', () => {
+  const body = (extra = {}) => ({ durationMinutes: 60, goal: 'strength', level: 'advanced', requestedType: 'fullbody', ...extra })
+  const selectFrom = (rawBody) => {
+    const context = sanitizeQuickGeneratorRequest(rawBody)
+    const options = resolveTimeSelectionOptions(context)
+    return { context, options, result: selectExercisesForTotalTime(strengthPool(), context.durationMinutes, context.goal, options) }
+  }
+
+  test('Request-Prüfung übernimmt durationMode und timeCalibration (geprüft/begrenzt)', () => {
+    const ctx = sanitizeQuickGeneratorRequest(body({ durationMode: 'training_only', timeCalibration: 1.3 }))
+    assert.equal(ctx.durationMode, 'training_only')
+    assert.equal(ctx.timeCalibration, 1.3)
+    assert.equal(sanitizeQuickGeneratorRequest(body({ timeCalibration: 9 })).timeCalibration, 1.5)
+    assert.equal(sanitizeQuickGeneratorRequest(body({ timeCalibration: 'x' })).timeCalibration, 1)
+    assert.equal(sanitizeQuickGeneratorRequest(body({ durationMode: 'quatsch' })).durationMode, 'total_session')
+    assert.equal(sanitizeQuickGeneratorRequest(body()).durationMode, 'total_session')
+  })
+
+  test('training_only und Faktor 1,3 erreichen das Zeitmodell (Modus und Faktor im Ergebnis)', () => {
+    const { options, result } = selectFrom(body({ durationMode: 'training_only', timeCalibration: 1.3 }))
+    assert.equal(options.durationMode, 'training_only')
+    assert.equal(options.calibration, 1.3)
+    assert.equal(result.durationMode, 'training_only')
+    assert.equal(result.calibration, 1.3)
+  })
+
+  test('ohne Angaben gilt Gesamtzeit mit Faktor 1', () => {
+    const { result } = selectFrom(body())
+    assert.equal(result.durationMode, 'total_session')
+    assert.equal(result.calibration, 1)
+  })
+
+  test('der Faktor verändert das Ergebnis: langsamere Nutzer bekommen weniger Sätze/Übungen', () => {
+    const normal = selectFrom(body({ durationMinutes: 75 })).result
+    const slow = selectFrom(body({ durationMinutes: 75, timeCalibration: 1.4 })).result
+    const sets = (r) => r.exercises.reduce((sum, e) => sum + e.sets, 0)
+    assert.ok(sets(slow) < sets(normal))
+  })
+
+  test('Obergrenze der Übungsanzahl kommt aus dem Request (manueller Override)', () => {
+    const { options } = selectFrom(body({ exerciseCountOverride: 3 }))
+    assert.equal(options.maxExerciseCount, 3)
   })
 })
