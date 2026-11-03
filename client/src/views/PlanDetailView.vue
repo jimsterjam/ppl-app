@@ -1,6 +1,6 @@
 <template>
   <div class="plan-detail-view">
-    <HeaderBar :title="plan?.name || t('plans.title')" />
+    <HeaderBar :title="planDisplayName(plan, t) || t('plans.title')" />
 
     <div v-if="plan" class="content">
       <button type="button" class="back-btn" @click="router.push({ name: 'plans' })">
@@ -69,7 +69,7 @@
     <AppModal
       v-model="showDelete"
       :title="t('plans.deleteConfirmTitle')"
-      :message="t('plans.deleteConfirmMsg', { name: plan?.name || '' })"
+      :message="t('plans.deleteConfirmMsg', { name: planDisplayName(plan, t) })"
       :confirm-text="t('plans.delete')"
       :cancel-text="t('common.cancel')"
       type="warning"
@@ -82,6 +82,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { planDisplayName } from '@/utils/planDisplayName'
 import HeaderBar from '@/components/HeaderBar.vue'
 import AppModal from '@/components/AppModal.vue'
 import { usePlanUserId, formatPlanDate } from '@/composables/usePlanUserId'
@@ -182,7 +183,7 @@ const renameInput = ref('')
 const renameDayId = ref('')
 function openRename() {
   renameDayId.value = ''
-  renameInput.value = plan.value.name
+  renameInput.value = planDisplayName(plan.value, t)
   showRename.value = true
 }
 function openRenameDay() {
