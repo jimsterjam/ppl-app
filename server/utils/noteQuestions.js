@@ -10,6 +10,7 @@
 export const MAX_NOTE_QUESTIONS = 2;
 export const MAX_QUESTION_LENGTH = 300;
 export const MAX_ANSWER_LENGTH = 700;
+export const MAX_NOTE_CONTEXT_LENGTH = 400;
 export const NOTE_ANSWER_KINDS = Object.freeze(['training', 'health', 'other']);
 
 const QUESTION_CUES = [
@@ -32,7 +33,7 @@ function isQuestionSentence(sentence) {
 /**
  * Fragen aus den Notizen DIESER Einheit (Session-/Satz-/Workout-Notizen, nicht die dauerhaften Übungsnotizen).
  * @param {{ exerciseNotes?: Array<{ exercise?: string, note?: string }>, workoutNote?: string }} source
- * @returns {Array<{ id: number, text: string, exercise: string|null, hasQuestionMark: boolean }>} höchstens MAX_NOTE_QUESTIONS, ohne Duplikate
+ * @returns {Array<{ id: number, text: string, exercise: string|null, hasQuestionMark: boolean, context: string }>} höchstens MAX_NOTE_QUESTIONS, ohne Duplikate
  */
 export function extractNoteQuestions({ exerciseNotes = [], workoutNote = '' } = {}) {
   const entries = [
@@ -52,7 +53,16 @@ export function extractNoteQuestions({ exerciseNotes = [], workoutNote = '' } = 
       const key = trimmed.toLowerCase();
       if (seen.has(key)) continue;
       seen.add(key);
-      questions.push({ id: questions.length + 1, text: trimmed, exercise: entry.exercise, hasQuestionMark: trimmed.includes('?') });
+      // Restlicher Notiztext (z. B. "Mein Knie tut weh. Soll ich ... steigern?") bleibt als begrenzter Kontext erhalten: Er
+      // entscheidet mit darüber, ob es eine Trainings- oder eine Gesundheitsfrage ist.
+      const wholeNote = cleanText(text).slice(0, MAX_NOTE_CONTEXT_LENGTH);
+      questions.push({
+        id: questions.length + 1,
+        text: trimmed,
+        exercise: entry.exercise,
+        hasQuestionMark: trimmed.includes('?'),
+        context: wholeNote.toLowerCase() === trimmed.toLowerCase() ? '' : wholeNote
+      });
       if (questions.length >= MAX_NOTE_QUESTIONS) return questions;
     }
   }
@@ -60,22 +70,19 @@ export function extractNoteQuestions({ exerciseNotes = [], workoutNote = '' } = 
 }
 
 // Antwort empfiehlt Ärzte/Therapeuten o. Ä.: nie ausgeben (Absprache Paul), stattdessen gilt die Frage als 'health'.
-const MEDICAL_REFERRAL = /(\barzt\b|\bärzt|\baerzt|\bdoktor|\bphysiotherap|\borthopäd|\borthopaed|\btherapeut|\bdoctor\b|\bphysician\b|\bphysio\b|\bgp\b|\bmedical (advice|professional))/i;
+const MEDICAL_REFERRAL = new RegExp(
+  '(?<![a-zäöüß])(?:' + [
+    'arzt', 'ärzt', 'aerzt', 'doktor', 'medizinisch', 'physiotherap', 'orthopäd', 'orthopaed', 'therapeut', 'heilprakt',
+    'doctor', 'physician', 'physio', 'therapist', 'medical', 'clinician', 'orthopedic', 'orthopaedic', 'chiropract'
+  ].join('|') + ')',
+  'i'
+);
 
 function numbersIn(text) {
   return String(text ?? '').match(/\d+(?:[.,]\d+)?/g) || [];
 }
 
 const normalizeNumber = (value) => String(value).replace(',', '.').replace(/\.0+$/, '');
-
-/** Zahlen, die in den Trainingsdaten vorkommen (als Text), für die Zahlenprüfung der Antworten. */
-export function collectAllowedNumbers(...sources) {
-  const allowed = new Set();
-  for (const source of sources) {
-    for (const n of numbersIn(typeof source === 'string' ? source : JSON.stringify(source ?? ''))) allowed.add(normalizeNumber(n));
-  }
-  return allowed;
-}
 
 /**
  * Antworten der KI prüfen und auf das Speicherformat bringen.

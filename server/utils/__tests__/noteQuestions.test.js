@@ -1,9 +1,10 @@
 import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  extractNoteQuestions, sanitizeNoteAnswers, sanitizeStoredNoteAnswers, collectAllowedNumbers,
-  MAX_NOTE_QUESTIONS, MAX_QUESTION_LENGTH
+  extractNoteQuestions, sanitizeNoteAnswers, sanitizeStoredNoteAnswers,
+  MAX_NOTE_QUESTIONS, MAX_QUESTION_LENGTH, MAX_NOTE_CONTEXT_LENGTH
 } from '../noteQuestions.js'
+import { collectNumericValues } from '../noteQuestionData.js'
 
 describe('extractNoteQuestions', () => {
   test('erkennt die Beispielfrage aus einer Übungsnotiz (mit Fragezeichen)', () => {
@@ -44,9 +45,25 @@ describe('extractNoteQuestions', () => {
   })
 })
 
+describe('extractNoteQuestions: Notizkontext', () => {
+  test('der restliche Notiztext bleibt als Kontext erhalten (Schmerz + Steigerungsfrage)', () => {
+    const q = extractNoteQuestions({ exerciseNotes: [{ exercise: 'Barbell Squat', note: 'Mein Knie tut weh. Soll ich bei Barbell Squat weiter steigern?' }] })
+    assert.equal(q.length, 1)
+    assert.equal(q[0].text, 'Soll ich bei Barbell Squat weiter steigern?')
+    assert.match(q[0].context, /Knie tut weh/)
+  })
+
+  test('Kontext ist begrenzt und ohne Tag-Zeichen; bei reiner Frage leer', () => {
+    const q = extractNoteQuestions({ workoutNote: `<b>Lange</b> Vorrede ${'y'.repeat(900)}. Warum stagniere ich?` })
+    assert.ok(q[0].context.length <= MAX_NOTE_CONTEXT_LENGTH)
+    assert.ok(!/[<>]/.test(q[0].context))
+    assert.equal(extractNoteQuestions({ workoutNote: 'Warum stagniere ich?' })[0].context, '')
+  })
+})
+
 describe('sanitizeNoteAnswers', () => {
   const questions = [{ id: 1, text: 'Kann es sein, dass die Übung davor ermüdet?', hasQuestionMark: true }, { id: 2, text: 'Wie wird das Wetter?', hasQuestionMark: true }]
-  const ctx = { exerciseNames: ['Barbell Squat', 'Bench Press'], allowedNumbers: collectAllowedNumbers({ sets: 4, weight: 90, reps: 5 }) }
+  const ctx = { exerciseNames: ['Barbell Squat', 'Bench Press'], allowedNumbers: collectNumericValues({ sets: 4, weight: 90, reps: 5 }) }
 
   test('Trainingsantwort mit Bezug zu einer Übung wird übernommen', () => {
     const out = sanitizeNoteAnswers([{ id: 1, kind: 'training', answer: 'Das ist möglich: Barbell Squat kommt vor Bench Press und ermüdet. Teste nächstes Mal die andere Reihenfolge.' }], questions, ctx)
@@ -75,6 +92,35 @@ describe('sanitizeNoteAnswers', () => {
       const out = sanitizeNoteAnswers([{ id: 1, kind: 'training', answer }], questions, ctx)
       assert.deepEqual(out, [{ kind: 'health', text: '' }], answer)
     }
+  })
+
+  test('Regression: ärztlicher Rat und Therapeut (mit Umlaut bzw. englisch) zählen als Gesundheitsfrage', () => {
+    for (const answer of [
+      'Bench Press: Hole dir ärztlichen Rat.',
+      'Bench Press: Consult a physical therapist.',
+      'Barbell Squat: Eine Ärztin kann das beurteilen.',
+      'Barbell Squat: Ein Orthopäde sollte draufschauen.',
+      'Bench Press: Ask your physiotherapist or a medical professional.',
+      'Bench Press: Lass das ärztlich abklären.'
+    ]) {
+      assert.deepEqual(sanitizeNoteAnswers([{ id: 1, kind: 'training', answer }], questions, ctx), [{ kind: 'health', text: '' }], answer)
+    }
+  })
+
+  test('harmlose Trainingswörter lösen die Arzt-Prüfung nicht aus', () => {
+    const out = sanitizeNoteAnswers([{ id: 1, kind: 'training', answer: 'Barbell Squat kommt vor Bench Press, das könnte der Therapieplan der Woche verschieben.' }], questions, ctx)
+    // "Therapie" allein ist keine Empfehlung an eine Person; zur Sicherheit zählt trotzdem nur therapeut/therapist/Arzt usw.
+    assert.equal(out[0].kind, 'training')
+  })
+
+  test('Jahreszahlen und Zeitstempel sind keine erlaubten Trainingswerte', () => {
+    const data = { analysis_date: '2026-11-03T10:00:00Z', exercises: [{ name: 'Bench Press 2026', weight_kg: 90, sets: 4 }] }
+    const allowed = collectNumericValues(data)
+    assert.equal(allowed.has('2026'), false)
+    const bad = sanitizeNoteAnswers([{ id: 1, kind: 'training', answer: 'Bench Press mit 2026 kg.' }], questions, { exerciseNames: ['Bench Press'], allowedNumbers: allowed })
+    assert.deepEqual(bad, [])
+    const good = sanitizeNoteAnswers([{ id: 1, kind: 'training', answer: 'Bench Press mit 90 kg in 4 Sätzen.' }], questions, { exerciseNames: ['Bench Press'], allowedNumbers: allowed })
+    assert.equal(good.length, 1)
   })
 
   test('Gesundheits- und Sonstiges-Fragen haben nie einen KI-Text', () => {
