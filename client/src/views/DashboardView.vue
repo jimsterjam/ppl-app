@@ -201,7 +201,7 @@
     <AppModal
       v-model="showRemovePlan"
       :title="$t('plans.removeTitle')"
-      :message="$t('plans.removeMessage', { name: todayPlan?.plan?.name || '' })"
+      :message="$t('plans.removeMessage', { name: planDisplayName(todayPlan?.plan, $t) })"
       :confirm-text="$t('plans.remove')"
       :cancel-text="$t('common.cancel')"
       type="warning"
@@ -265,6 +265,7 @@
 import { ref, computed, onMounted, onActivated, onUnmounted, watch } from 'vue'
 import { startAiWarmup } from '@/utils/aiWarmup'
 import { useI18n } from 'vue-i18n'
+import { planDisplayName } from '@/utils/planDisplayName'
 import { useRouter } from 'vue-router'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
 import { useUserStore } from "../stores/userStore";
@@ -960,7 +961,7 @@ function removeTodayPlan() {
   if (!plan) return
   const result = deleteTrainingPlan({ userId: getCurrentFavoritesUserId(), planId: plan.id })
   refreshTodayPlan()
-  if (result.ok) toast.show($t('plans.removed', { name: plan.name }), { type: 'success' })
+  if (result.ok) toast.show($t('plans.removed', { name: planDisplayName(plan, $t) }), { type: 'success' })
 }
 
 // Einmalige Umstellung: Vorlagen-Pläne der ersten Fassung hatten je Tag einen Favoriten angelegt (siehe utils/planMigration.js).
@@ -1014,7 +1015,7 @@ function planDayMuscles(day) {
 
 const todaySubline = computed(() => {
   const muscles = planDayMuscles(todayPlan.value?.day)
-  const plan = todayPlan.value?.plan?.name || ''
+  const plan = planDisplayName(todayPlan.value?.plan, $t)
   return muscles ? $t('plans.todayPlanLine', { plan, muscles }) : $t('plans.todayPlanOnly', { plan })
 })
 
@@ -1159,7 +1160,7 @@ function askRemoveFavorite(favorite) {
   pendingFavoriteToDelete.value = favorite
   const plans = plansUsingFavorite(favorite)
   favoriteDeleteMessage.value = plans.length
-    ? `${$t('dashboard.favoriteDeleteConfirmMsg')} ${$t('plans.favoriteInPlans', { plans: plans.map((plan) => plan.name).join(', ') })}`
+    ? `${$t('dashboard.favoriteDeleteConfirmMsg')} ${$t('plans.favoriteInPlans', { plans: plans.map((plan) => planDisplayName(plan, $t)).join(', ') })}`
     : $t('dashboard.favoriteDeleteConfirmMsg')
   showFavoriteDeleteConfirm.value = true
 }

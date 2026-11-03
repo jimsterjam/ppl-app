@@ -29,7 +29,7 @@
           <h2 class="section-title">{{ t('plans.otherSection') }}</h2>
           <div v-for="plan in otherPlans" :key="plan.id" class="card plan-card plan-card--row">
             <button type="button" class="plan-open" @click="openPlan(plan)">
-              <span class="card-title">{{ plan.name }}</span>
+              <span class="card-title">{{ planDisplayName(plan, t) }}</span>
               <span class="muted">{{ summary(plan) }}</span>
             </button>
             <button type="button" class="activate-btn" @click="activate(plan)">{{ t('plans.activate') }}</button>
@@ -49,6 +49,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { planDisplayName } from '@/utils/planDisplayName'
 import HeaderBar from '@/components/HeaderBar.vue'
 import { usePlanUserId, formatPlanDate } from '@/composables/usePlanUserId'
 import { useToastStore } from '@/stores/toastStore'
@@ -86,7 +87,7 @@ function activate(plan) {
   reload()
   if (!result.ok) return
   // Aktiver Plan festgelegt: direkt zum Dashboard, dort steht „Heute“.
-  toast.show(t('plans.activated', { name: plan.name }), { type: 'success' })
+  toast.show(t('plans.activated', { name: planDisplayName(plan, t) }), { type: 'success' })
   router.push({ name: 'dashboard' })
 }
 </script>
