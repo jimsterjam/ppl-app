@@ -2,6 +2,7 @@ import { TEXT_LIMITS, textSetter } from '../utils/textLimits.js';
 import { sanitizeWarmup } from '../utils/workoutWarmup.js';
 import { sanitizePlanRef } from '../utils/trainingPlanValidation.js';
 import { sanitizeFeedbackLanguage } from '../utils/feedbackLanguage.js';
+import { sanitizeStoredNoteAnswers } from '../utils/noteQuestions.js';
 import mongoose from "mongoose";
 
 // Hilfsfunktion zur Kanonisierung des Workout-Typs
@@ -195,6 +196,16 @@ const workoutSchema = new mongoose.Schema({
     type: String,
     default: null,
     set: sanitizeFeedbackLanguage
+  },
+  // Antworten auf Fragen in den Notizen dieser Einheit ("Deine Frage", siehe utils/noteQuestions.js): kind = 'training' (mit
+  // Antworttext) | 'health' | 'other' (ohne Text, die App zeigt feste Hinweise). Leer = keine Frage gestellt.
+  ai_note_answers: {
+    type: [new mongoose.Schema({
+      kind: { type: String, enum: ['training', 'health', 'other'], required: true },
+      text: { type: String, default: '' }
+    }, { _id: false })],
+    default: [],
+    set: sanitizeStoredNoteAnswers
   },
   // Kompakte, strukturierte Delta-Zusammenfassung je Übung (Sätze/Wdh./Gewicht mehr bzw.
   // weniger als die vorherige Session) - wird zusammen mit ai_feedback einmalig berechnet und

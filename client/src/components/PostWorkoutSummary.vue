@@ -89,6 +89,7 @@
         <h3>{{ feedbackKind === 'first_look' ? t('postWorkout.feedbackFirstLook') : t('postWorkout.feedback') }}</h3>
         <AiFeedbackDeltaSummary v-if="analysisSnapshot.length > 0" :snapshot="analysisSnapshot" :language="feedbackLanguage" />
         <div class="feedback-text">{{ feedback }}</div>
+        <AiNoteAnswers v-if="noteAnswers.length > 0" :answers="noteAnswers" :language="feedbackLanguage" />
         <!-- Erklärt NUR, wofür die Bewertung da ist - rührt AiFeedbackRatingWidget selbst nicht
              an (siehe Kommentar dort: vollständig implementiert, darf nicht verändert werden). -->
         <OneTimeHint
@@ -185,6 +186,7 @@ import { queuePendingAiFeedback, clearPendingAiFeedback } from '@/utils/pendingA
 import { trackPendingFeedback, untrackFeedback, FEEDBACK_READY_EVENT } from '@/utils/feedbackTracker'
 import { REQUEST_TIMEOUT_MS } from '@/utils/feedbackRetryRules'
 import AiFeedbackDeltaSummary from '@/components/AiFeedbackDeltaSummary.vue'
+import AiNoteAnswers from '@/components/AiNoteAnswers.vue'
 import AiFeedbackRatingWidget from '@/components/AiFeedbackRatingWidget.vue'
 import OneTimeHint from '@/components/OneTimeHint.vue'
 import { sendFeedbackMail } from '@/utils/feedbackMail'
@@ -243,6 +245,8 @@ const feedback = ref(null)
 const feedbackKind = ref(null)
 // Sprache, in der der Feedback-Text erzeugt wurde (Server) - sonst am Text erkannt.
 const feedbackLanguage = ref('')
+// Antworten auf Fragen in den Notizen ([{ kind, text }]).
+const noteAnswers = ref([])
 const analysisSnapshot = ref([])
 // Die tatsächlich aufgelöste, echte Workout-ID (nicht die evtl. temporäre offline_/draft-ID
 // aus props.workoutId) - die Bewertungs-Route hängt am echten Workout-Dokument.
@@ -452,6 +456,7 @@ async function loadAIFeedback({ refresh = false } = {}) {
       }
       feedback.value = response.data.ai_feedback
       feedbackKind.value = response.data.feedback_kind || null
+      noteAnswers.value = Array.isArray(response.data.note_answers) ? response.data.note_answers : []
       feedbackLanguage.value = resolveFeedbackLanguage(
         { ai_feedback_language: response.data.feedback_language, ai_feedback: response.data.ai_feedback },
         locale.value

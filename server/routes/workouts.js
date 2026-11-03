@@ -47,6 +47,8 @@ import {
 } from '../utils/workoutSanitizer.js';
 import { decideExerciseMatch } from '../utils/exerciseMatching.js';
 import { getMaxExerciseCount } from '../utils/exerciseCountTarget.js';
+import { extractNoteQuestions } from '../utils/noteQuestions.js';
+import { answerNoteQuestions } from '../services/noteQuestionService.js';
 import { selectExercisesForTotalTime, resolveTimeSelectionOptions, BUFFER_SECONDS } from '../utils/workoutTimeModel.js';
 import { applyGeneratorRule } from '../utils/repTargets.js';
 import { buildNextSessionFocus, buildProgressionStates, applyNextSessionFocus } from '../utils/nextSessionFocus.js';
@@ -1127,7 +1129,7 @@ router.get("/feedbacks", firebaseAuthMiddleware, async (req, res) => {
         { $project: {
           name: 1, type: 1, date: 1, completed: 1,
           ai_feedback: 1, ai_generated_at: 1, ai_metadata: 1, ai_analysis_snapshot: 1,
-          ai_feedback_status: 1, ai_pending_since: 1, ai_feedback_kind: 1, ai_feedback_language: 1
+          ai_feedback_status: 1, ai_pending_since: 1, ai_feedback_kind: 1, ai_feedback_language: 1, ai_note_answers: 1
         } }
       ]),
       Workout.countDocuments(query)
@@ -1155,7 +1157,9 @@ router.get("/feedbacks", firebaseAuthMiddleware, async (req, res) => {
         // 'first_look' = Erste Einordnung (ohne Vergleich), 'comparison' = vergleichend, null = älteres Feedback.
         ai_feedback_kind: w.ai_feedback_kind || null,
         // Sprache, in der der Text erzeugt wurde ('de' | 'en'), null = älteres Feedback (Client erkennt sie am Text).
-        ai_feedback_language: w.ai_feedback_language || null
+        ai_feedback_language: w.ai_feedback_language || null,
+        // Antworten auf Fragen in den Notizen ([{ kind, text }], leer = keine Frage).
+        ai_note_answers: w.ai_note_answers || []
       })),
       page,
       limit,
@@ -2037,6 +2041,7 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
         ai_analysis_snapshot: currentWorkout.ai_analysis_snapshot || [],
         feedback_kind: currentWorkout.ai_feedback_kind || null,
         feedback_language: currentWorkout.ai_feedback_language || null,
+        note_answers: currentWorkout.ai_note_answers || [],
         cached: true,
         metadata: {
           requestId,
@@ -2258,6 +2263,8 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
     const aiService = getAIService();
     let aiResult = null;
     let aiError = null;
+    // Antworten auf Fragen in den Notizen (siehe unten); bleibt leer, wenn keine Frage gestellt wurde.
+    let noteAnswers = [];
 
     // Schneller Erreichbarkeits-Check vor dem eigentlichen (bis zu 120s dauernden) Generierungs-
     // Aufruf - ursprünglich (User-Report "Speichern dauert sehr lange") NUR für Ollama gedacht:
@@ -2436,6 +2443,23 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
       // Erste Einordnung: fester Ausblick der App (Empfehlungen kommen künftig von der App, Ausführung in Eigenverantwortung).
       if (isFirstLookFeedback) aiResult.feedback = applyFirstLookOutlook(aiResult.feedback, feedbackLanguage);
 
+      // Fragen in den Notizen dieser Einheit beantworten (eigener Abschnitt "Deine Frage"). Nur wenn eine Frage erkannt
+      // wurde; jeder Fehler lässt das Feedback unberührt (leere Liste).
+      const noteQuestions = extractNoteQuestions({
+        exerciseNotes: (currentWorkout.exercises || []).flatMap((ex) => [
+          { exercise: ex?.name, note: typeof ex?.note === 'string' ? ex.note : '' },
+          ...((ex?.setDetails || []).map((set) => ({ exercise: ex?.name, note: typeof set?.notes === 'string' ? set.notes : '' })))
+        ]),
+        workoutNote: typeof currentWorkout.notes === 'string' ? currentWorkout.notes : ''
+      });
+      noteAnswers = await answerNoteQuestions({
+        questions: noteQuestions,
+        structuredAnalysis,
+        exerciseNames: [...exerciseAnalyses, ...notDoneExercises].flatMap((ex) => [ex.exercise, ex.exerciseNameForAI]).filter(Boolean),
+        language: feedbackLanguage,
+        requestId
+      });
+
       // Kontingent erst bei tatsächlich erfolgreicher Generierung verbrauchen (nicht bei
       // Health-Check-Fehlschlag/network_unavailable oben oder einem AI-Fehler unten) - konsistent
       // mit /quick-generator und /ai-suggestion, die ebenfalls nur bei echtem Erfolg zählen.
@@ -2455,6 +2479,7 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
             ai_analysis_snapshot: analysisSnapshot,
             ai_feedback_kind: isFirstLookFeedback ? 'first_look' : 'comparison',
             ai_feedback_language: structuredAnalysis?.response_language === 'en' ? 'en' : 'de',
+            ai_note_answers: noteAnswers,
             // War das Workout zuvor "zurückgestellt" (Feature "Feedback später bewerten"),
             // ist es jetzt final generiert - Feedback-Verlauf soll dann kein "ausstehend"-
             // Badge mehr zeigen (siehe GET /feedbacks oben).
@@ -2512,7 +2537,8 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
         ai_feedback: aiResult.feedback,
         ai_metadata: aiResult.metadata,
         feedback_kind: isFirstLookFeedback ? 'first_look' : 'comparison',
-        feedback_language: structuredAnalysis?.response_language === 'en' ? 'en' : 'de'
+        feedback_language: structuredAnalysis?.response_language === 'en' ? 'en' : 'de',
+        note_answers: noteAnswers
       } : {}),
 
       metadata: {
