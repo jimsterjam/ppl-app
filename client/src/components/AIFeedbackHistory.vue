@@ -100,6 +100,12 @@
           />
           {{ item.ai_feedback }}
 
+          <AiNoteAnswers
+            v-if="item.ai_note_answers?.length > 0"
+            :answers="item.ai_note_answers"
+            :language="resolveFeedbackLanguage(item, locale)"
+          />
+
           <AiFeedbackRatingWidget
             :workout-id="String(item.workoutId)"
             :exercise-names="(item.ai_analysis_snapshot || []).map(e => e.exercise)"
@@ -141,6 +147,7 @@ import { trackPendingFeedback } from '@/utils/feedbackTracker'
 import { REQUEST_TIMEOUT_MS } from '@/utils/feedbackRetryRules'
 import AiQuotaChip from '@/components/AiQuotaChip.vue'
 import AiFeedbackDeltaSummary from '@/components/AiFeedbackDeltaSummary.vue'
+import AiNoteAnswers from '@/components/AiNoteAnswers.vue'
 import { resolveFeedbackLanguage } from '@/utils/feedbackLanguage'
 import AiFeedbackRatingWidget from '@/components/AiFeedbackRatingWidget.vue'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
@@ -241,6 +248,7 @@ async function generateNow(item) {
     if (data?.ai_feedback) {
       item.ai_feedback = data.ai_feedback
       item.ai_feedback_language = data.feedback_language || null
+      item.ai_note_answers = Array.isArray(data.note_answers) ? data.note_answers : []
       item.ai_generated_at = new Date().toISOString()
       item.ai_metadata = data.ai_metadata
       item.ai_analysis_snapshot = data.ai_analysis_snapshot || []

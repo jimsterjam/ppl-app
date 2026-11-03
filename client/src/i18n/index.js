@@ -839,7 +839,7 @@ export const messages = {
       addSetShort: 'Satz',
       addWarmupShort: 'Aufwärmsatz',
       noteDelete: 'löschen',
-      notePlaceholder: 'Wie lief die Übung? Dein KI-Coach liest mit…',
+      notePlaceholder: 'Notiz oder Frage zur Übung hinterlassen. Dein KI-Coach liest mit…',
       trackOneRepMax: 'Maximalkraft für diese Übung verfolgen',
       oneRepMaxEdit: 'ändern',
       oneRepMaxValue: '1RM: {value}kg',
@@ -1536,6 +1536,11 @@ export const messages = {
       mailOs: 'iOS',
       mailDevice: 'Gerät',
       mailFailed: 'Die Mail konnte nicht geöffnet werden. Schreib uns an {email}.'
+    },
+    noteQuestion: {
+      title: 'Deine Frage',
+      health: 'Zu gesundheitlichen Fragen kann ich keine qualifizierte Aussage treffen.',
+      other: 'Dazu kann ich hier nichts sagen. Ich beantworte nur Fragen zu deinem Training und dieser Einheit.'
     },
     getTheApp: {
       title: 'Lade die App herunter',
@@ -2535,7 +2540,7 @@ export const messages = {
       addSetShort: 'Set',
       addWarmupShort: 'Warm-up set',
       noteDelete: 'delete',
-      notePlaceholder: 'How did it go? Your AI coach reads this…',
+      notePlaceholder: 'Leave a note or question about the exercise. Your AI coach reads along…',
       trackOneRepMax: 'Track max strength for this exercise',
       oneRepMaxEdit: 'edit',
       oneRepMaxValue: '1RM: {value}kg',
@@ -3219,6 +3224,11 @@ export const messages = {
       mailOs: 'iOS',
       mailDevice: 'Device',
       mailFailed: 'The email could not be opened. Write to us at {email}.'
+    },
+    noteQuestion: {
+      title: 'Your question',
+      health: "I can't give a qualified answer to health questions.",
+      other: "I can't help with that here. I only answer questions about your training and this session."
     },
     getTheApp: {
       title: 'Download the app',
