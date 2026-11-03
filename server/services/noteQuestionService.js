@@ -22,7 +22,10 @@ ANTWORT (nur bei "training", sonst leerer Text):
 - 2 bis 4 Sätze, vorsichtig formuliert ("könnte", "möglich", "spricht dafür"), im warmen Coach-Ton.
 - Stütze dich ausschließlich auf die gelieferten Trainingsdaten und allgemeines Trainingswissen. Nenne die betroffenen Übungen beim Namen, exakt so wie in den Daten.
 - Verwende keine Zahlen, die nicht in den Daten stehen. Erfinde keine Werte.
-- Zeige, was die Daten dazu zeigen (z. B. die Reihenfolge der Übungen, die Zahl der Sätze) und was sie nicht zeigen. Schließe, wenn es passt, mit einem kleinen Test für das nächste Training (z. B. Reihenfolge tauschen und vergleichen).
+- Zeige, was die Daten dazu zeigen (z. B. die Reihenfolge der Übungen, die Zahl der Sätze) und was sie nicht zeigen. Schließe, wenn es passt, mit einem kleinen Test für das nächste Training, der die Reihenfolge der Übungen unverändert lässt.
+- Die Reihenfolge der Übungen ist eine bewusste Entscheidung des Nutzers (er priorisiert die ersten Übungen). Schlage NIEMALS vor, Übungen umzustellen, zu tauschen oder in eine andere Reihenfolge zu bringen, auch nicht testweise.
+- Fragt der Nutzer, ob eine vorherige Übung der Grund ist, dass er bei einer späteren nicht vorankommt: Beantworte zuerst die Frage selbst. Ja, das ist häufig und normal, wenn die vorherige Übung dieselbe Muskulatur belastet (z. B. Brust und Trizeps) und der Nutzer dort fleißig steigert; besonders nach einer schweren Übung mit Ziel "strength". Es ist die Folge der Priorisierung und kein Fehler. Nutze dafür "training_goal" (strength = Kraft, hypertrophy = Muskelaufbau, explosive = Explosivkraft, technique = Technik) und die Position der Übungen in den Daten.
+- Rate dann nur zu Dingen, die die Reihenfolge nicht berühren: erst das Wiederholungsziel halten und noch nicht das Gewicht steigern, die Pause vor dieser Übung etwas verlängern oder Fortschritt in dieser Übung über mehrere Einheiten betrachten.
 - Keine medizinischen Aussagen und niemals die Empfehlung, zu einem Arzt, Therapeuten oder Physiotherapeuten zu gehen.
 
 AUSGABE: Ausschließlich gültiges JSON: {"answers":[{"id":1,"kind":"training"|"health"|"other","answer":"..."}]}. Für jede Frage genau ein Eintrag mit der id aus der Eingabe.`;
@@ -43,14 +46,14 @@ export function buildNoteQuestionUserPrompt(data, questions) {
 }
 
 /**
- * @param {{ questions: Array, structuredAnalysis: object, exerciseNames: string[], exerciseAliases?: Array, language?: string, requestId?: string }} input
+ * @param {{ questions: Array, structuredAnalysis: object, exerciseNames: string[], exerciseAliases?: Array, exerciseGoals?: Array<{ exercise: string, goal?: string }>, workoutGoal?: string, language?: string, requestId?: string }} input
  * @returns {Promise<Array<{ kind: string, text: string }>>} geprüfte Antworten; bei jedem Fehler leer (Feedback bleibt unberührt)
  */
-export async function answerNoteQuestions({ questions, structuredAnalysis, exerciseNames = [], exerciseAliases = [], language = 'de', requestId = 'note_q', deps = {} }) {
+export async function answerNoteQuestions({ questions, structuredAnalysis, exerciseNames = [], exerciseAliases = [], exerciseGoals = [], workoutGoal, language = 'de', requestId = 'note_q', deps = {} }) {
   if (!Array.isArray(questions) || questions.length === 0) return [];
   try {
     // Begrenzter Datensatz aus Zahlenfeldern (keine Notizen, keine Freitexte außer gekürzten Übungsnamen).
-    const data = buildNoteQuestionData(structuredAnalysis, questions, exerciseAliases);
+    const data = buildNoteQuestionData(structuredAnalysis, questions, exerciseAliases, { exerciseGoals, workoutGoal });
     const client = deps.client || createOpenAIClient();
     const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
     if (!deps.client) await ensureRelayAwake();

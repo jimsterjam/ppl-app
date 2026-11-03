@@ -1,7 +1,7 @@
 import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { answerNoteQuestions, getNoteQuestionSystemPrompt, buildNoteQuestionUserPrompt } from '../../services/noteQuestionService.js'
-import { extractNoteQuestions } from '../noteQuestions.js'
+import { extractNoteQuestions, hasReorderAdvice } from '../noteQuestions.js'
 import { buildNoteQuestionData } from '../noteQuestionData.js'
 
 // Form wie structuredAnalysis (trainingAnalysisService.js): Zahlenfelder, aber auch Notizen und Zeitstempel.
@@ -37,7 +37,7 @@ function fakeClient(answers, { fail = false } = {}) {
 describe('Fragen in Notizen: ganzer Weg mit gespielter KI', () => {
   test('Trainingsfrage (Beispiel von Paul) bekommt eine geprüfte Antwort', async () => {
     const questions = extractNoteQuestions({ exerciseNotes: [{ exercise: 'Bench Press', note: 'Kann es sein, dass die Übung davor mich so ermüdet, dass ich hier nicht steigere?' }] })
-    const client = fakeClient([{ id: 1, kind: 'training', answer: 'Das ist möglich: Barbell Squat kommt vor Bench Press. Teste nächstes Mal die umgekehrte Reihenfolge.' }])
+    const client = fakeClient([{ id: 1, kind: 'training', answer: 'Das ist möglich: Barbell Squat kommt vor Bench Press. Halte nächstes Mal das Wiederholungsziel, bevor du steigerst.' }])
     const out = await answerNoteQuestions({ questions, structuredAnalysis: analysis, exerciseNames, deps: { client } })
     assert.equal(out.length, 1)
     assert.equal(out[0].kind, 'training')
@@ -182,5 +182,91 @@ describe('Prompt für Fragen in Notizen', () => {
     const questions = extractNoteQuestions({ workoutNote: 'Warum stagniere ich?' })
     const client = fakeClient([{ id: 1, kind: 'training', answer: 'Bench Press mit 2026 kg.' }])
     assert.deepEqual(await answerNoteQuestions({ questions, structuredAnalysis: analysis, exerciseNames, deps: { client } }), [])
+  })
+})
+
+describe('Fragen in Notizen: Reihenfolge ist bewusst gewählt', () => {
+  const questions = extractNoteQuestions({ exerciseNotes: [{ exercise: 'Bench Press', note: 'Liegt es an der Übung davor, dass ich hier nicht steige?' }] })
+
+  test('Prompt verbietet Umstellen und erklärt training_goal', () => {
+    const prompt = getNoteQuestionSystemPrompt()
+    assert.match(prompt, /NIEMALS vor, Übungen umzustellen/)
+    assert.match(prompt, /training_goal/)
+    assert.doesNotMatch(prompt, /Reihenfolge tauschen und vergleichen/)
+  })
+
+  test('Datensatz trägt das Ziel je Übung (Übung vor Workout-Ziel, deutscher Name zugeordnet)', () => {
+    const data = buildNoteQuestionData(analysis, questions,
+      [{ exercise: 'Kniebeuge', exerciseNameForAI: 'Barbell Squat' }],
+      { exerciseGoals: [{ exercise: 'Kniebeuge', goal: 'strength' }, { exercise: 'Bench Press', goal: 'unsinn' }], workoutGoal: 'hypertrophy' })
+    assert.equal(data.exercises[0].training_goal, 'strength')
+    assert.equal(data.exercises[1].training_goal, 'hypertrophy')
+  })
+
+  test('ohne Ziele fehlt das Feld, ungültiges Workout-Ziel wird ignoriert', () => {
+    const data = buildNoteQuestionData(analysis, questions, [], { workoutGoal: '<script>' })
+    assert.equal('training_goal' in data.exercises[0], false)
+  })
+
+  test('Antworten mit Rat zum Umstellen der Reihenfolge werden verworfen', async () => {
+    for (const answer of [
+      'Barbell Squat kommt vor Bench Press. Tausche die Reihenfolge der Übungen und vergleiche.',
+      'Barbell Squat ermüdet. Stelle Bench Press an eine frühere Stelle.',
+      'Bench Press leidet. Du könntest die Reihenfolge ändern.',
+      'Bench Press follows Barbell Squat. Try to swap the two exercises.',
+      'Bench Press follows Barbell Squat. Test changing the order next time.'
+    ]) {
+      const client = fakeClient([{ id: 1, kind: 'training', answer }])
+      const result = await answerNoteQuestions({ questions, structuredAnalysis: analysis, exerciseNames, deps: { client } })
+      assert.deepEqual(result, [], answer)
+    }
+  })
+
+  test('Erklärung der Priorisierung bleibt erlaubt, auch wenn das Wort Reihenfolge vorkommt', async () => {
+    const answer = 'Das ist häufig normal: Barbell Squat belastet vorher dieselbe Muskulatur wie Bench Press. Das ist die Folge deiner Reihenfolge und Priorisierung, kein Fehler. Halte erst das Wiederholungsziel und verlängere die Pause.'
+    const client = fakeClient([{ id: 1, kind: 'training', answer }])
+    const result = await answerNoteQuestions({ questions, structuredAnalysis: analysis, exerciseNames, deps: { client } })
+    assert.equal(result.length, 1)
+  })
+
+  test('Ziele erreichen den Prompt', async () => {
+    const client = fakeClient([])
+    await answerNoteQuestions({ questions, structuredAnalysis: analysis, exerciseNames,
+      exerciseGoals: [{ exercise: 'Barbell Squat', goal: 'strength' }], workoutGoal: 'hypertrophy', deps: { client } })
+    const data = trainingDataOf(client.calls[0].messages[1].content)
+    assert.equal(data.exercises[0].training_goal, 'strength')
+    assert.equal(data.exercises[1].training_goal, 'hypertrophy')
+  })
+})
+
+describe('Umstell-Prüfung: nur echte Empfehlungen', () => {
+  test('erlaubte Antworten (Satzgrenze, Verneinung, Erklärung) werden nicht erkannt', () => {
+    for (const text of [
+      'Bench Press folgt auf Barbell Squat. Die Reihenfolge ist bewusst gewählt. Teste eine längere Pause vor Bench Press.',
+      'Du musst die Reihenfolge nicht ändern.',
+      'There is no need to change the order of your exercises.',
+      'Bench Press comes earlier in your workout than Barbell Squat, so it stays fresh.',
+      'Switching your grip could change the feel of Bench Press.',
+      'Do not swap the exercises, just add rest.',
+      'Die Reihenfolge spricht für Fatigue. Halte das Wiederholungsziel.'
+    ]) assert.equal(hasReorderAdvice(text), false, text)
+  })
+
+  test('echte Empfehlungen werden erkannt', () => {
+    for (const text of [
+      'Tausche die Reihenfolge der Übungen.',
+      'Stelle Bench Press um.',
+      'Du könntest die Reihenfolge ändern.',
+      'Try to swap the two exercises.',
+      'Switch the exercises next time.',
+      'Move Bench Press earlier in your workout.',
+      'Test changing the order next time.'
+    ]) assert.equal(hasReorderAdvice(text), true, text)
+  })
+
+  test('nicht gemachte Übung mit deutschem Namen behält ihr Ziel', () => {
+    const data = buildNoteQuestionData(analysis, [], [{ exercise: 'Kniebeuge', exerciseNameForAI: 'Barbell Squat' }],
+      { exerciseGoals: [{ exercise: 'Kniebeuge', goal: 'strength' }], workoutGoal: 'hypertrophy' })
+    assert.equal(data.exercises[0].training_goal, 'strength')
   })
 })

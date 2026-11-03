@@ -9,6 +9,7 @@
 const MAX_NAME_LENGTH = 60;
 const MAX_SET_COMPARISON = 8;
 const PROGRESSIONS = new Set(['positive', 'negative', 'stable', 'first_session']);
+const TRAINING_GOALS = new Set(['strength', 'hypertrophy', 'explosive', 'technique']);
 
 export function safeExerciseName(name) {
   return String(name ?? '').replace(/[<>"]/g, '').replace(/\s+/g, ' ').trim().slice(0, MAX_NAME_LENGTH);
@@ -37,11 +38,22 @@ function numericOnly(value) {
  * @param {object} structuredAnalysis
  * @param {Array<{ exercise?: string|null }>} questions
  * @param {Array<{ exercise?: string, exerciseNameForAI?: string }>} [aliases] - Originalname -> Name in den Daten (englisch)
+ * @param {{ exerciseGoals?: Array<{ exercise?: string, goal?: string }>, workoutGoal?: string }} [goals] - Trainingsart je Übung
+ *   (Workout-Ziel als Rückfall); nur feste Werte aus TRAINING_GOALS, sonst fehlt das Ziel
  */
-export function buildNoteQuestionData(structuredAnalysis, questions = [], aliases = []) {
+export function buildNoteQuestionData(structuredAnalysis, questions = [], aliases = [], goals = {}) {
   const aliasByName = new Map(aliases
     .filter((entry) => entry?.exercise)
     .map((entry) => [String(entry.exercise).trim().toLowerCase(), safeExerciseName(entry.exerciseNameForAI || entry.exercise).toLowerCase()]));
+  const workoutGoal = TRAINING_GOALS.has(goals?.workoutGoal) ? goals.workoutGoal : undefined;
+  const goalByName = new Map();
+  for (const entry of Array.isArray(goals?.exerciseGoals) ? goals.exerciseGoals : []) {
+    const key = String(entry?.exercise ?? '').trim().toLowerCase();
+    const goal = TRAINING_GOALS.has(entry?.goal) ? entry.goal : workoutGoal;
+    if (!key || !goal) continue;
+    goalByName.set(key, goal);
+    if (aliasByName.has(key)) goalByName.set(aliasByName.get(key), goal);
+  }
   const asked = new Set(questions
     .map((q) => String(q?.exercise ?? '').trim().toLowerCase())
     .filter(Boolean)
@@ -54,6 +66,7 @@ export function buildNoteQuestionData(structuredAnalysis, questions = [], aliase
     const entry = {
       position: index + 1,
       name,
+      training_goal: goalByName.get(name.toLowerCase()) ?? workoutGoal,
       sets: num(ex?.current_sets),
       reps: num(ex?.current_reps),
       weight_kg: num(ex?.current_weight),

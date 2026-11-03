@@ -2456,7 +2456,9 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
         questions: noteQuestions,
         structuredAnalysis,
         exerciseNames: [...exerciseAnalyses, ...notDoneExercises].flatMap((ex) => [ex.exercise, ex.exerciseNameForAI]).filter(Boolean),
-        exerciseAliases: exerciseAnalyses,
+        exerciseAliases: [...exerciseAnalyses, ...notDoneExercises],
+        exerciseGoals: (currentWorkout.exercises || []).map((ex) => ({ exercise: ex?.name, goal: ex?.trainingType })),
+        workoutGoal: currentWorkout.goal,
         language: feedbackLanguage,
         requestId
       });
