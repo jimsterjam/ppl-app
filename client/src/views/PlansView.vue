@@ -17,7 +17,7 @@
         <button v-if="activePlan" type="button" class="card plan-card plan-card--active" @click="openPlan(activePlan)">
           <span class="plan-main">
             <span class="plan-name-row">
-              <span class="card-title">{{ activePlan.name }}</span>
+              <span class="card-title">{{ planDisplayName(activePlan, t) }}</span>
               <span class="pill">{{ t('plans.activeBadge') }}</span>
             </span>
             <span class="muted">{{ summary(activePlan) }}</span>
