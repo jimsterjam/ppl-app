@@ -78,6 +78,19 @@ const MEDICAL_REFERRAL = new RegExp(
   'i'
 );
 
+// Antwort rät zum Umstellen der Übungsreihenfolge: nie ausgeben (Absprache Paul: Reihenfolge ist bewusst gewählt, der
+// Tipp wäre keine Lösung). Die Antwort wird verworfen.
+const REORDER_ADVICE = new RegExp([
+  'umstell', 'vertausch', 'umsortier', 'umordn', 'umgestellt',
+  'reihenfolge(?:\\s+\\S+){0,5}?\\s+(?:änder|aender|tausch|wechsel|variier|anpass|verschieb|test|probier)',
+  '(?:änder|aender|tausch|wechsel|variier|anpass|verschieb|test|probier)\\S*(?:\\s+\\S+){0,5}?\\s+(?:die |deine |der )?reihenfolge',
+  '(?:an|auf)\\s+(?:eine?r?\\s+)?(?:früherer?|späterer?|anderer?|erster?|zweiter?)\\s+(?:stelle|position)',
+  '\\b(?:swap|switch|reorder|resequence|rearrange|reshuffle)',
+  '(?:change|alter|adjust|vary|test)\\S*(?:\\s+\\S+){0,5}?\\s+(?:the |your )?(?:exercise )?order',
+  'order of (?:the |your )?exercises(?:\\s+\\S+){0,5}?\\s+(?:change|swap|switch|vary|differ)',
+  '(?:earlier|later|first|sooner) in (?:the|your) (?:workout|session)'
+].join('|'), 'i');
+
 function numbersIn(text) {
   return String(text ?? '').match(/\d+(?:[.,]\d+)?/g) || [];
 }
@@ -106,6 +119,7 @@ export function sanitizeNoteAnswers(rawAnswers, questions, { exerciseNames = [],
     if (kind === 'other' && !question.hasQuestionMark) continue;
     if (kind === 'training') {
       if (MEDICAL_REFERRAL.test(text)) kind = 'health';
+      else if (REORDER_ADVICE.test(text)) continue;
       else {
         const lower = text.toLowerCase();
         const mentionsExercise = names.some((name) => lower.includes(name));

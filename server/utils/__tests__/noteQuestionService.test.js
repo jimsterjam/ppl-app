@@ -37,7 +37,7 @@ function fakeClient(answers, { fail = false } = {}) {
 describe('Fragen in Notizen: ganzer Weg mit gespielter KI', () => {
   test('Trainingsfrage (Beispiel von Paul) bekommt eine geprüfte Antwort', async () => {
     const questions = extractNoteQuestions({ exerciseNotes: [{ exercise: 'Bench Press', note: 'Kann es sein, dass die Übung davor mich so ermüdet, dass ich hier nicht steigere?' }] })
-    const client = fakeClient([{ id: 1, kind: 'training', answer: 'Das ist möglich: Barbell Squat kommt vor Bench Press. Teste nächstes Mal die umgekehrte Reihenfolge.' }])
+    const client = fakeClient([{ id: 1, kind: 'training', answer: 'Das ist möglich: Barbell Squat kommt vor Bench Press. Halte nächstes Mal das Wiederholungsziel, bevor du steigerst.' }])
     const out = await answerNoteQuestions({ questions, structuredAnalysis: analysis, exerciseNames, deps: { client } })
     assert.equal(out.length, 1)
     assert.equal(out[0].kind, 'training')
@@ -182,5 +182,59 @@ describe('Prompt für Fragen in Notizen', () => {
     const questions = extractNoteQuestions({ workoutNote: 'Warum stagniere ich?' })
     const client = fakeClient([{ id: 1, kind: 'training', answer: 'Bench Press mit 2026 kg.' }])
     assert.deepEqual(await answerNoteQuestions({ questions, structuredAnalysis: analysis, exerciseNames, deps: { client } }), [])
+  })
+})
+
+describe('Fragen in Notizen: Reihenfolge ist bewusst gewählt', () => {
+  const questions = extractNoteQuestions({ exerciseNotes: [{ exercise: 'Bench Press', note: 'Liegt es an der Übung davor, dass ich hier nicht steige?' }] })
+
+  test('Prompt verbietet Umstellen und erklärt training_goal', () => {
+    const prompt = getNoteQuestionSystemPrompt()
+    assert.match(prompt, /NIEMALS vor, Übungen umzustellen/)
+    assert.match(prompt, /training_goal/)
+    assert.doesNotMatch(prompt, /Reihenfolge tauschen und vergleichen/)
+  })
+
+  test('Datensatz trägt das Ziel je Übung (Übung vor Workout-Ziel, deutscher Name zugeordnet)', () => {
+    const data = buildNoteQuestionData(analysis, questions,
+      [{ exercise: 'Kniebeuge', exerciseNameForAI: 'Barbell Squat' }],
+      { exerciseGoals: [{ exercise: 'Kniebeuge', goal: 'strength' }, { exercise: 'Bench Press', goal: 'unsinn' }], workoutGoal: 'hypertrophy' })
+    assert.equal(data.exercises[0].training_goal, 'strength')
+    assert.equal(data.exercises[1].training_goal, 'hypertrophy')
+  })
+
+  test('ohne Ziele fehlt das Feld, ungültiges Workout-Ziel wird ignoriert', () => {
+    const data = buildNoteQuestionData(analysis, questions, [], { workoutGoal: '<script>' })
+    assert.equal('training_goal' in data.exercises[0], false)
+  })
+
+  test('Antworten mit Rat zum Umstellen der Reihenfolge werden verworfen', async () => {
+    for (const answer of [
+      'Barbell Squat kommt vor Bench Press. Tausche die Reihenfolge der Übungen und vergleiche.',
+      'Barbell Squat ermüdet. Stelle Bench Press an eine frühere Stelle.',
+      'Bench Press leidet. Du könntest die Reihenfolge ändern.',
+      'Bench Press follows Barbell Squat. Try to swap the two exercises.',
+      'Bench Press follows Barbell Squat. Test changing the order next time.'
+    ]) {
+      const client = fakeClient([{ id: 1, kind: 'training', answer }])
+      const result = await answerNoteQuestions({ questions, structuredAnalysis: analysis, exerciseNames, deps: { client } })
+      assert.deepEqual(result, [], answer)
+    }
+  })
+
+  test('Erklärung der Priorisierung bleibt erlaubt, auch wenn das Wort Reihenfolge vorkommt', async () => {
+    const answer = 'Das ist häufig normal: Barbell Squat belastet vorher dieselbe Muskulatur wie Bench Press. Das ist die Folge deiner Reihenfolge und Priorisierung, kein Fehler. Halte erst das Wiederholungsziel und verlängere die Pause.'
+    const client = fakeClient([{ id: 1, kind: 'training', answer }])
+    const result = await answerNoteQuestions({ questions, structuredAnalysis: analysis, exerciseNames, deps: { client } })
+    assert.equal(result.length, 1)
+  })
+
+  test('Ziele erreichen den Prompt', async () => {
+    const client = fakeClient([])
+    await answerNoteQuestions({ questions, structuredAnalysis: analysis, exerciseNames,
+      exerciseGoals: [{ exercise: 'Barbell Squat', goal: 'strength' }], workoutGoal: 'hypertrophy', deps: { client } })
+    const data = trainingDataOf(client.calls[0].messages[1].content)
+    assert.equal(data.exercises[0].training_goal, 'strength')
+    assert.equal(data.exercises[1].training_goal, 'hypertrophy')
   })
 })

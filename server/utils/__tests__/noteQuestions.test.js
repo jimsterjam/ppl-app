@@ -66,7 +66,7 @@ describe('sanitizeNoteAnswers', () => {
   const ctx = { exerciseNames: ['Barbell Squat', 'Bench Press'], allowedNumbers: collectNumericValues({ sets: 4, weight: 90, reps: 5 }) }
 
   test('Trainingsantwort mit Bezug zu einer Übung wird übernommen', () => {
-    const out = sanitizeNoteAnswers([{ id: 1, kind: 'training', answer: 'Das ist möglich: Barbell Squat kommt vor Bench Press und ermüdet. Teste nächstes Mal die andere Reihenfolge.' }], questions, ctx)
+    const out = sanitizeNoteAnswers([{ id: 1, kind: 'training', answer: 'Das ist möglich: Barbell Squat kommt vor Bench Press und ermüdet. Halte nächstes Mal das Wiederholungsziel.' }], questions, ctx)
     assert.equal(out.length, 1)
     assert.equal(out[0].kind, 'training')
     assert.match(out[0].text, /Barbell Squat/)
