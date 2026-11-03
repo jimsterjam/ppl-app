@@ -1,7 +1,7 @@
 import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { answerNoteQuestions, getNoteQuestionSystemPrompt, buildNoteQuestionUserPrompt } from '../../services/noteQuestionService.js'
-import { extractNoteQuestions } from '../noteQuestions.js'
+import { extractNoteQuestions, hasReorderAdvice } from '../noteQuestions.js'
 import { buildNoteQuestionData } from '../noteQuestionData.js'
 
 // Form wie structuredAnalysis (trainingAnalysisService.js): Zahlenfelder, aber auch Notizen und Zeitstempel.
@@ -236,5 +236,37 @@ describe('Fragen in Notizen: Reihenfolge ist bewusst gewählt', () => {
     const data = trainingDataOf(client.calls[0].messages[1].content)
     assert.equal(data.exercises[0].training_goal, 'strength')
     assert.equal(data.exercises[1].training_goal, 'hypertrophy')
+  })
+})
+
+describe('Umstell-Prüfung: nur echte Empfehlungen', () => {
+  test('erlaubte Antworten (Satzgrenze, Verneinung, Erklärung) werden nicht erkannt', () => {
+    for (const text of [
+      'Bench Press folgt auf Barbell Squat. Die Reihenfolge ist bewusst gewählt. Teste eine längere Pause vor Bench Press.',
+      'Du musst die Reihenfolge nicht ändern.',
+      'There is no need to change the order of your exercises.',
+      'Bench Press comes earlier in your workout than Barbell Squat, so it stays fresh.',
+      'Switching your grip could change the feel of Bench Press.',
+      'Do not swap the exercises, just add rest.',
+      'Die Reihenfolge spricht für Fatigue. Halte das Wiederholungsziel.'
+    ]) assert.equal(hasReorderAdvice(text), false, text)
+  })
+
+  test('echte Empfehlungen werden erkannt', () => {
+    for (const text of [
+      'Tausche die Reihenfolge der Übungen.',
+      'Stelle Bench Press um.',
+      'Du könntest die Reihenfolge ändern.',
+      'Try to swap the two exercises.',
+      'Switch the exercises next time.',
+      'Move Bench Press earlier in your workout.',
+      'Test changing the order next time.'
+    ]) assert.equal(hasReorderAdvice(text), true, text)
+  })
+
+  test('nicht gemachte Übung mit deutschem Namen behält ihr Ziel', () => {
+    const data = buildNoteQuestionData(analysis, [], [{ exercise: 'Kniebeuge', exerciseNameForAI: 'Barbell Squat' }],
+      { exerciseGoals: [{ exercise: 'Kniebeuge', goal: 'strength' }], workoutGoal: 'hypertrophy' })
+    assert.equal(data.exercises[0].training_goal, 'strength')
   })
 })

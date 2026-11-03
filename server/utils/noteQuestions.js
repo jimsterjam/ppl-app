@@ -79,17 +79,31 @@ const MEDICAL_REFERRAL = new RegExp(
 );
 
 // Antwort rät zum Umstellen der Übungsreihenfolge: nie ausgeben (Absprache Paul: Reihenfolge ist bewusst gewählt, der
-// Tipp wäre keine Lösung). Die Antwort wird verworfen.
+// Tipp wäre keine Lösung). Die Antwort wird verworfen. Geprüft wird je SATZ (nicht über Satzgrenzen hinweg), und Sätze
+// mit Verneinung ("Du musst die Reihenfolge nicht ändern") sind keine Empfehlung. Reine Erklärungen ("kommt früher im
+// Training", "switching your grip") treffen die Muster nicht: sie verlangen ein Verb des Umstellens samt Bezug auf
+// Übungen bzw. Reihenfolge.
+const CHANGE_DE = 'änder|aender|tausch|wechsel|variier|anpass|verschieb|test|probier|dreh|kehr';
+const CHANGE_EN = 'change|alter|adjust|vary|test|try|reverse|flip';
 const REORDER_ADVICE = new RegExp([
-  'umstell', 'vertausch', 'umsortier', 'umordn', 'umgestellt',
-  'reihenfolge(?:\\s+\\S+){0,5}?\\s+(?:änder|aender|tausch|wechsel|variier|anpass|verschieb|test|probier)',
-  '(?:änder|aender|tausch|wechsel|variier|anpass|verschieb|test|probier)\\S*(?:\\s+\\S+){0,5}?\\s+(?:die |deine |der )?reihenfolge',
-  '(?:an|auf)\\s+(?:eine?r?\\s+)?(?:früherer?|späterer?|anderer?|erster?|zweiter?)\\s+(?:stelle|position)',
-  '\\b(?:swap|switch|reorder|resequence|rearrange|reshuffle)',
-  '(?:change|alter|adjust|vary|test)\\S*(?:\\s+\\S+){0,5}?\\s+(?:the |your )?(?:exercise )?order',
-  'order of (?:the |your )?exercises(?:\\s+\\S+){0,5}?\\s+(?:change|swap|switch|vary|differ)',
-  '(?:earlier|later|first|sooner) in (?:the|your) (?:workout|session)'
+  'umstell|vertausch|umsortier|umordn|umgestellt|umgekehrt',
+  '\\bstell\\w*\\s+(?:\\S+\\s+){0,4}?um\\b',
+  '\\btausch\\w*\\s+(?:\\S+\\s+){0,3}?(?:übungen|uebungen)\\b',
+  `reihenfolge(?:\\s+\\S+){0,5}?\\s+(?:${CHANGE_DE})`,
+  `(?:${CHANGE_DE})\\S*(?:\\s+\\S+){0,5}?\\s+(?:die |deine |der |eure )?reihenfolge`,
+  '(?:an|auf)\\s+(?:eine?r?\\s+)?(?:früher|später|ander)\\w*\\s+(?:stelle|position)',
+  '\\b(?:swap|swapping|reorder|reordering|resequenc\\w*|rearrang\\w*|reshuffl\\w*)\\b',
+  '\\bswitch(?:ing)?\\s+(?:the\\s+|these\\s+|those\\s+|your\\s+|their\\s+)?(?:two\\s+|both\\s+)?(?:exercises?|order|positions?|places)\\b',
+  `\\b(?:${CHANGE_EN})\\w*\\s+(?:\\S+\\s+){0,4}?(?:the |your )?(?:exercise |workout )?order\\b`,
+  '\\b(?:move|put|place|do|perform|schedule|start with)\\w*\\s+(?:\\S+\\s+){0,4}?(?:earlier|later|first|sooner)\\s+in\\s+(?:the|your)\\s+(?:workout|session)\\b'
 ].join('|'), 'i');
+const NEGATION = /\b(?:nicht|kein\w*|ohne|nie|niemals|not|no|never|without|avoid|needn'?t)\b|n't\b/i;
+
+export function hasReorderAdvice(text) {
+  return String(text ?? '')
+    .split(/(?<=[.!?;:])\s+|\n+/)
+    .some((sentence) => REORDER_ADVICE.test(sentence) && !NEGATION.test(sentence));
+}
 
 function numbersIn(text) {
   return String(text ?? '').match(/\d+(?:[.,]\d+)?/g) || [];
@@ -119,7 +133,7 @@ export function sanitizeNoteAnswers(rawAnswers, questions, { exerciseNames = [],
     if (kind === 'other' && !question.hasQuestionMark) continue;
     if (kind === 'training') {
       if (MEDICAL_REFERRAL.test(text)) kind = 'health';
-      else if (REORDER_ADVICE.test(text)) continue;
+      else if (hasReorderAdvice(text)) continue;
       else {
         const lower = text.toLowerCase();
         const mentionsExercise = names.some((name) => lower.includes(name));
