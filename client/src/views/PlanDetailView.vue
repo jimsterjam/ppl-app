@@ -144,7 +144,7 @@ function apply(updater) {
 }
 
 function activate() {
-  const name = plan.value.name
+  const name = planDisplayName(plan.value, t)
   const result = activateTrainingPlan({ userId: userId.value, planId: plan.value.id })
   reload()
   if (!result.ok) return
