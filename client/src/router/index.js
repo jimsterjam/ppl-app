@@ -139,7 +139,15 @@ router.beforeEach((to, from, next) => {
 // Einfache Auth-Guards
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
-  const { getCurrentUser, getIdToken } = useFirebaseAuth()
+  // Ohne Firebase-Konfiguration (Web-Version, bewusst ohne Firebase-Web-Config) wirft schon useFirebaseAuth() einen Fehler.
+  // Das brach die Navigation ab und ließ auch die öffentlichen Seiten (Datenschutz, Impressum) leer: dort gilt dann
+  // "niemand angemeldet".
+  let firebase = null
+  try { firebase = useFirebaseAuth() } catch { firebase = null }
+  const getCurrentUser = () => {
+    try { return firebase ? firebase.getCurrentUser() : null } catch { return null }
+  }
+  const getIdToken = (...args) => (firebase ? firebase.getIdToken(...args) : Promise.resolve(null))
 
   if (to.meta.requiresAuth !== false) {
     await waitForAuthHydration(authStore, getCurrentUser)
