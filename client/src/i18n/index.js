@@ -943,6 +943,7 @@ export const messages = {
     },
     builder: {
       noExercisesInCategory: '😅 Keine Übungen für diese Kategorie verfügbar',
+      favoriteLimit: 'Du kannst pro Typ höchstens 10 Favoriten speichern. Lösche zuerst einen bestehenden Favoriten.',
       backToDashboard: '← Zurück',
       backToDashboardTitle: 'Zurück zum Dashboard',
       filterEquipment: 'Equipment filtern',
@@ -2644,6 +2645,7 @@ export const messages = {
     },
     builder: {
       noExercisesInCategory: '😅 No exercises available for this category',
+      favoriteLimit: 'You can save up to 10 favorites per type. Delete an existing favorite first.',
       backToDashboard: '← Back',
       backToDashboardTitle: 'Back to dashboard',
       filterEquipment: 'Filter equipment',

@@ -18,6 +18,8 @@ import { consumeWorkoutBuilderPrefill, normalizeBuilderWorkoutType, readWorkoutB
 import { logger } from '@/utils/logger'
 import { useExerciseTranslation, getEnglishExerciseName } from '@/utils/exerciseTranslation'
 import { setActiveDraft } from '@/utils/activeWorkoutDraft'
+import { saveFavoriteWorkout, normalizeFavoriteName, isFavoriteNameValid, normalizeWorkoutType } from '@/utils/workoutFavorites'
+import AppModal from '@/components/AppModal.vue'
 
 
 // --- State & Stores ---
@@ -66,6 +68,11 @@ const showEquipmentFilter = ref(false)
 const selectedEquipment = ref('')
 const favoriteAutostartTriggered = ref(false)
 const favoriteContext = ref(null)
+// Als Favorit speichern, ohne das Workout zu starten (Absprache Paul 04.11.)
+const showFavoriteModal = ref(false)
+const favoriteName = ref('')
+const favoriteSaving = ref(false)
+const favoriteError = ref('')
 // Alle Equipment-Typen aus den Exercises extrahieren
 const normalizedExercises = ref([])
 const allEquipmentTypes = computed(() => {
@@ -345,6 +352,75 @@ function onDrop(idx) {
 }
 
 // --- Create Workout ---
+// Gewählte Übungen im Speicherformat - für das Workout (createWorkout) und den Favoriten (saveAsFavorite) identisch.
+function buildSelectedExercisePayload() {
+	return selectedExercises.value.map(ex => ({
+		exerciseId: ex.exerciseId || ex._id || ex.id || null,
+		// Immer den englischen Namen speichern, auch bei deutscher App-Sprache
+		// (User-Feedback: deutsche Namen klingen z.T. sehr merkwürdig).
+		name: getEnglishExerciseName(ex),
+		sets: (ex.setDetails || []).filter(s => !s.isWarmup).length || ex.setDetails?.length || 3,
+		reps: (ex.setDetails || []).find(s => !s.isWarmup)?.reps ?? ex.reps ?? 10,
+		weight: (ex.setDetails || []).find(s => !s.isWarmup)?.weight ?? ex.weight ?? 0,
+		category: ex.category,
+		note: typeof ex.note === 'string' ? ex.note : '',
+		...measureModeField(ex.measureMode),
+		setDetails: ex.setDetails || []
+	}))
+}
+
+// Favoriten gehören zum angemeldeten Konto (gleiche Ableitung wie im Dashboard).
+function favoritesUserId() {
+	return String(getCurrentUser?.()?.uid || authStore.user?.uid || authStore.uid || userIdComputed.value || 'guest')
+}
+
+// Nur neu anlegen, nicht beim Anpassen eines bestehenden Favoriten (das speichert die Workout-Ansicht).
+const canSaveAsFavorite = computed(() => !favoriteContext.value?.favoriteId)
+
+function openFavoriteModal() {
+	favoriteError.value = ''
+	favoriteName.value = normalizeFavoriteName(currentTypeLabel.value || '')
+	showFavoriteModal.value = true
+}
+
+function confirmFavoriteSave() {
+	if (favoriteSaving.value) return
+	const name = normalizeFavoriteName(favoriteName.value)
+	if (!name || !isFavoriteNameValid(name)) {
+		favoriteError.value = t('workoutDetail.favoriteNameInvalid')
+		return
+	}
+	favoriteSaving.value = true
+	try {
+		const type = normalizeWorkoutType(selectedType.value)
+		const result = saveFavoriteWorkout({
+			userId: favoritesUserId(),
+			type,
+			name,
+			workout: {
+				name,
+				type,
+				// Ziel aus der Abfrage im Dashboard; fehlt es, fragt der Start des Favoriten einmal nach.
+				goal: readWorkoutBuilderRouteState(route.query).goal,
+				exercises: buildSelectedExercisePayload()
+			}
+		})
+		if (!result.success) {
+			favoriteError.value = result.code === 'INVALID_NAME' || result.code === 'LIMIT_REACHED'
+				? (result.code === 'LIMIT_REACHED' ? t('builder.favoriteLimit') : t('workoutDetail.favoriteNameInvalid'))
+				: t('workoutDetail.favoriteSaveFailed')
+			return
+		}
+		showFavoriteModal.value = false
+		toast.success(t('workoutDetail.favoriteSaved'))
+		router.push({ name: 'dashboard' })
+	} catch {
+		favoriteError.value = t('workoutDetail.favoriteSaveFailed')
+	} finally {
+		favoriteSaving.value = false
+	}
+}
+
 async function createWorkout() {
   errorMsg.value = '';
 	if (!isSignedIn.value) {
@@ -357,19 +433,7 @@ async function createWorkout() {
 			name: `${currentTypeLabel.value} - ${new Date().toLocaleDateString(String(locale.value).startsWith('de') ? 'de-DE' : 'en-US')}`,
 			type: selectedType.value,
 			userId: userIdComputed.value,
-			exercises: selectedExercises.value.map(ex => ({
-				exerciseId: ex.exerciseId || ex._id || ex.id || null,
-				// Immer den englischen Namen speichern, auch bei deutscher App-Sprache
-				// (User-Feedback: deutsche Namen klingen z.T. sehr merkwürdig).
-				name: getEnglishExerciseName(ex),
-				sets: (ex.setDetails || []).filter(s => !s.isWarmup).length || ex.setDetails?.length || 3,
-				reps: (ex.setDetails || []).find(s => !s.isWarmup)?.reps ?? ex.reps ?? 10,
-				weight: (ex.setDetails || []).find(s => !s.isWarmup)?.weight ?? ex.weight ?? 0,
-				category: ex.category,
-				note: typeof ex.note === 'string' ? ex.note : '',
-				...measureModeField(ex.measureMode),
-				setDetails: ex.setDetails || []
-			})),
+			exercises: buildSelectedExercisePayload(),
 			date: new Date().toISOString(),
 			completed: false,
 			// Ziel des Workouts (im Dashboard abgefragt, siehe utils/workoutGoal.js) - danach fest.
@@ -483,6 +547,9 @@ watch(() => `${route.query.quick || ''}:${route.query.favoriteStart || ''}`, () 
 					<button class="create-btn" :disabled="creating || selectedExercises.length === 0 || !isSignedIn" @click="createWorkout">
 						{{ creating ? t('builder.creating') : `${t('builder.create')} (${selectedExercises.length})` }}
 					</button>
+					<button v-if="canSaveAsFavorite" class="fav-btn" type="button" :disabled="creating || selectedExercises.length === 0 || !isSignedIn" @click="openFavoriteModal">
+						{{ t('workoutDetail.saveAsFavorite') }}
+					</button>
 				</div>
 			</div>
 			<select v-else id="wb-type" v-model="selectedType" class="type-dropdown" @change="loadExercises">
@@ -511,6 +578,9 @@ watch(() => `${route.query.quick || ''}:${route.query.favoriteStart || ''}`, () 
 			<div v-if="!isMobile" class="sticky-cta">
 				<button class="create-btn" :disabled="creating || selectedExercises.length === 0 || !isSignedIn" @click="createWorkout">
 					{{ creating ? t('builder.creating') : `${t('builder.create')} (${selectedExercises.length})` }}
+				</button>
+				<button v-if="canSaveAsFavorite" class="fav-btn" type="button" :disabled="creating || selectedExercises.length === 0 || !isSignedIn" @click="openFavoriteModal">
+					{{ t('workoutDetail.saveAsFavorite') }}
 				</button>
 			</div>
 			<div v-if="!isSignedIn" class="auth-gate compact">
@@ -591,6 +661,23 @@ watch(() => `${route.query.quick || ''}:${route.query.favoriteStart || ''}`, () 
 		</div>
 		<BottomNav />
 	</div>
+
+	<AppModal
+		v-model="showFavoriteModal"
+		:title="t('workoutDetail.favoriteNameTitle')"
+		:confirm-text="favoriteSaving ? t('workoutDetail.saving') : t('common.save')"
+		:cancel-text="t('common.cancel')"
+		:close-on-confirm="false"
+		:persistent="favoriteSaving"
+		type="info"
+		@confirm="confirmFavoriteSave"
+	>
+		<label class="favorite-modal-field">
+			<span>{{ t('workoutDetail.favoriteNamePlaceholder') }}</span>
+			<input v-model="favoriteName" class="favorite-modal-input" type="text" maxlength="40" :placeholder="t('workoutDetail.favoriteNamePlaceholder')" @keyup.enter="confirmFavoriteSave" />
+		</label>
+		<p v-if="favoriteError" class="favorite-modal-error" role="alert">{{ favoriteError }}</p>
+	</AppModal>
 </template>
 
 <style scoped>
@@ -877,6 +964,24 @@ watch(() => `${route.query.quick || ''}:${route.query.favoriteStart || ''}`, () 
 	display: block;
 	margin: 0 auto;
 }
+.fav-btn {
+	min-width: 180px;
+	padding: 12px 24px;
+	border-radius: 12px;
+	border: 1px solid var(--card-border);
+	background: var(--surface);
+	color: var(--fg);
+	font-weight: 600;
+	cursor: pointer;
+	display: block;
+	margin: 0 auto;
+}
+.fav-btn:disabled { color: var(--muted); cursor: not-allowed; opacity: 0.7; }
+.mobile-secondary-actions .fav-btn { width: 100%; }
+.sticky-cta { gap: 12px; }
+.favorite-modal-field { display: flex; flex-direction: column; gap: 6px; color: var(--fg-strong); font-size: 0.85rem; }
+.favorite-modal-input { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--line-soft); background: var(--bg-panel); color: var(--fg); }
+.favorite-modal-error { color: var(--danger, #ff6b6b); margin: 8px 0 0; font-size: 0.85rem; }
 .create-btn:disabled {
 	background: color-mix(in srgb, var(--accent) 40%, var(--bg-panel));
 	color: var(--muted);
