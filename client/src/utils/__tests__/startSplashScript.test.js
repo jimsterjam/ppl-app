@@ -6,8 +6,9 @@ import { fileURLToPath } from 'node:url'
 const html = readFileSync(fileURLToPath(new URL('../../../index.html', import.meta.url)), 'utf8')
 const script = html.match(/<script>\s*\(function \(\) \{[\s\S]*?\}\)\(\);\s*<\/script>/)[0].replace(/<\/?script>/g, '')
 
-function run({ lastAlive = null, launchId = '', lastLaunchId = '', shownAt = null, navType = 'navigate' } = {}) {
+function run({ authUser = null, lastAlive = null, launchId = '', lastLaunchId = '', shownAt = null, navType = 'navigate' } = {}) {
   const store = new Map()
+  if (authUser !== null) store.set('auth_user', authUser)
   if (lastAlive !== null) store.set('fbe_last_alive', String(lastAlive))
   if (lastLaunchId) store.set('fbe_launch_id', lastLaunchId)
   if (shownAt !== null) store.set('fbe_splash_at', String(shownAt))
@@ -29,6 +30,30 @@ function run({ lastAlive = null, launchId = '', lastLaunchId = '', shownAt = nul
 describe('Startanimation: nur beim App-Start', () => {
   beforeEach(() => vi.useFakeTimers())
   afterEach(() => vi.useRealTimers())
+
+  it('angemeldet: nie, auch nicht beim App-Start nach langer Pause oder neuer Kennung', () => {
+    const user = JSON.stringify({ uid: 'u1', email: 'a@b.c' })
+    for (const opts of [
+      {},
+      { lastAlive: Date.now() - 5 * 1000, launchId: 'neu', lastLaunchId: 'alt' },
+      { lastAlive: Date.now() - 31 * 60 * 1000 },
+      { launchId: 'x', lastLaunchId: 'y', navType: 'navigate' }
+    ]) {
+      const { el } = run({ authUser: user, ...opts })
+      expect(el.parentNode.removeChild).toHaveBeenCalledTimes(1)
+      vi.advanceTimersByTime(700)
+      expect(el.classList.add).not.toHaveBeenCalled()
+    }
+  })
+
+  it('nicht angemeldet (nichts, kaputter oder leerer Eintrag): Animation läuft', () => {
+    for (const authUser of [null, 'kaputt{', 'null', '{}', '"text"']) {
+      const { el } = run({ authUser })
+      expect(el.parentNode.removeChild).not.toHaveBeenCalled()
+      vi.advanceTimersByTime(700)
+      expect(el.classList.add).toHaveBeenCalledWith('go')
+    }
+  })
 
   it('erster Start (nichts gemerkt): Animation läuft', () => {
     const { el } = run()
