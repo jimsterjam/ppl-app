@@ -55,6 +55,13 @@ function getStoreTokenFallback() {
   }
 }
 
+/** Zwischengespeicherten Token vergessen (Abmelden oder Kontowechsel: der Token gehört zum bisherigen Konto). */
+export function clearAuthTokenCache() {
+  cachedToken = null
+  cacheExpiry = 0
+  lastOfflineError = 0
+}
+
 // Gemeinsamer Helper zum Abrufen eines Firebase JWT Tokens
 export async function getAuthToken({ options } = {}) {
   // Wenn offline und kürzlich fehlgeschlagen, nicht erneut versuchen

@@ -65,3 +65,53 @@ describe('Kontowechsel in derselben Sitzung', () => {
     expect(monthlyReports.hasRealReport).toBe(false)
   })
 })
+
+describe('Kontowechsel: Token, Berichte und Abfragen', () => {
+  it('resetUserBoundStores vergisst zuerst den zwischengespeicherten Token', () => {
+    const calls = []
+    resetUserBoundStores({
+      clearAuthToken: () => calls.push('token'),
+      monthlyReports: { reset: () => calls.push('reports') },
+      subscription: { resetForUserChange: () => calls.push('subscription') }
+    })
+    expect(calls).toEqual(['token', 'reports', 'subscription'])
+  })
+
+  it('eine neue Abfrage des neuen Kontos wird nicht durch das Ende der alten beeinflusst', async () => {
+    const store = useSubscriptionStore()
+    let releaseOld
+    let releaseNew
+    fetchStatus
+      .mockImplementationOnce(() => new Promise((resolve) => { releaseOld = resolve }))
+      .mockImplementationOnce(() => new Promise((resolve) => { releaseNew = resolve }))
+    const oldCheck = store.checkSubscription(null, { force: true })
+    await Promise.resolve(); await Promise.resolve()
+    store.resetForUserChange()
+    const newCheck = store.checkSubscription(null, { force: true })
+    await Promise.resolve(); await Promise.resolve()
+    releaseOld({ subscription: { plan: 'pro', status: 'active', planSource: 'db' }, usage: {} })
+    await oldCheck
+    // Die Abfrage des neuen Kontos läuft noch: eine dritte Abfrage muss sich an sie anhängen, nicht parallel starten.
+    const third = store.checkSubscription(null, { force: true })
+    for (let i = 0; i < 6; i += 1) await Promise.resolve()
+    expect(fetchStatus).toHaveBeenCalledTimes(2)
+    releaseNew({ subscription: { plan: 'free', status: 'active', planSource: 'db' }, usage: { ai: { monthlyCount: 1, monthlyLimit: 30 } } })
+    await Promise.all([newCheck, third])
+    expect(store.subscription.plan).toBe('free')
+    expect(store.usage.aiMonthlyCount).toBe(1)
+  })
+
+  it('Fehler der Abfrage des alten Kontos setzen keine Sperrzeit für das neue Konto', async () => {
+    const store = useSubscriptionStore()
+    let rejectOld
+    fetchStatus.mockImplementationOnce(() => new Promise((_, reject) => { rejectOld = reject }))
+    const oldCheck = store.checkSubscription(null, { force: true })
+    await Promise.resolve(); await Promise.resolve()
+    store.resetForUserChange()
+    rejectOld(Object.assign(new Error('Network Error'), { code: 'ERR_NETWORK' }))
+    await oldCheck
+    fetchStatus.mockResolvedValueOnce({ subscription: { plan: 'free', status: 'active', planSource: 'db' }, usage: {} })
+    await store.checkSubscription(null) // ohne force: würde bei Sperrzeit gar nicht anfragen
+    expect(fetchStatus).toHaveBeenCalledTimes(2)
+  })
+})

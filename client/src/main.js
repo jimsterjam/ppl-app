@@ -9,6 +9,7 @@ import { useThemeStore } from './stores/themeStore'
 import { useSubscriptionStore } from './stores/subscriptionStore'
 import { useMonthlyReportStore } from './stores/monthlyReportStore'
 import { resetUserBoundStores } from './utils/userSessionReset'
+import { clearAuthTokenCache } from './utils/authToken'
 import { useAuthStore } from './stores/authStore'
 import { useUserStore } from './stores/userStore'
 import { useSettingsStore } from './stores/settingsStore'
@@ -272,7 +273,11 @@ async function bootstrapAuth() {
       const accountChanged = lastUid !== user.uid
       if (lastUid && lastUid !== user.uid) {
         userStore.$reset()
-        resetUserBoundStores({ subscription: accountSubscriptionStore, monthlyReports: accountMonthlyReportStore })
+      }
+      // Bei jeder Anmeldung mit geänderter Nutzer-ID, auch beim ersten Rückruf nach einem Kaltstart ohne gemerktes Konto:
+      // die lokalen Zwischenspeicher (Plan, Nutzung, Token) können zu einem früheren Konto gehören.
+      if (accountChanged) {
+        resetUserBoundStores({ subscription: accountSubscriptionStore, monthlyReports: accountMonthlyReportStore, clearAuthToken: clearAuthTokenCache })
       }
       lastUid = user.uid
       // Account-spezifische Daten (avatar, username) für diesen User laden
@@ -409,7 +414,7 @@ async function bootstrapAuth() {
       aiConsentStore.switchUser(null)
       authStore.clearUser()
       userStore.$reset()
-      resetUserBoundStores({ subscription: accountSubscriptionStore, monthlyReports: accountMonthlyReportStore })
+      resetUserBoundStores({ subscription: accountSubscriptionStore, monthlyReports: accountMonthlyReportStore, clearAuthToken: clearAuthTokenCache })
       clearResumeSnapshot()
     }
   })

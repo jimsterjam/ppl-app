@@ -10,6 +10,9 @@ import { isUnseen } from '@/utils/monthlyReportView'
 const MIN_REFRESH_INTERVAL_MS = 5 * 60 * 1000
 
 let inFlight = null
+// Zählt Kontowechsel: Antworten einer vor dem Wechsel gestarteten Anfrage gehören zum alten Konto und werden verworfen
+// (auch die Nachfolge-Anfragen der Fälligkeitsprüfung).
+let epoch = 0
 
 export const useMonthlyReportStore = defineStore('monthlyReports', {
   state: () => ({
@@ -36,52 +39,60 @@ export const useMonthlyReportStore = defineStore('monthlyReports', {
       if (inFlight) return inFlight
       if (!force && this.loaded && Date.now() - this.lastRefreshAt < MIN_REFRESH_INTERVAL_MS) return true
       if (typeof navigator !== 'undefined' && navigator.onLine === false) return this.loaded
-      inFlight = (async () => {
+      const myEpoch = epoch
+      const request = (async () => {
         try {
           const token = await getAuthToken().catch(() => null)
           // Liste zuerst: bestehende Berichte erscheinen sofort. Die Fälligkeitsprüfung (mehrere
           // Datenbankabfragen) läuft danach und lädt die Liste nur neu, wenn sie einen Bericht erzeugt hat.
           const list = await listMonthlyReports(token)
+          if (myEpoch !== epoch) return this.loaded // Konto gewechselt: Antwort gehört zum alten Konto
           if (list.status !== 'ok') return this.loaded
           this.applyList(list)
-          this.checkDue(token)
+          this.checkDue(token, myEpoch)
           return true
         } finally {
-          inFlight = null
+          // Nur die aktive Anfrage räumt auf: nach einem Kontowechsel läuft vielleicht schon die des neuen Kontos.
+          if (inFlight === request) inFlight = null
         }
       })()
-      return inFlight
+      inFlight = request
+      return request
     },
     applyList(list) {
       this.reports = Array.isArray(list.data?.reports) ? list.data.reports : []
       this.loaded = true
       this.lastRefreshAt = Date.now()
     },
-    async checkDue(token) {
+    async checkDue(token, myEpoch = epoch) {
       const check = await checkMonthlyReport(token)
-      if (check?.status !== 'ok' || !check.data?.created) return
+      if (myEpoch !== epoch || check?.status !== 'ok' || !check.data?.created) return
       const list = await listMonthlyReports(token)
-      if (list.status === 'ok') this.applyList(list)
+      if (myEpoch === epoch && list.status === 'ok') this.applyList(list)
     },
     /** Vollständigen Bericht holen (aus dem Speicher, wenn schon geladen). */
     async loadDetail(id) {
       if (this.details[id]) return { status: 'ok', data: this.details[id] }
+      const myEpoch = epoch
       const token = await getAuthToken().catch(() => null)
       const res = await fetchMonthlyReport(token, id)
-      if (res.status === 'ok') this.details[id] = res.data
+      if (res.status === 'ok' && myEpoch === epoch) this.details[id] = res.data
       return res
     },
     /** Bericht als gesehen merken (Dashboard-Zeile verschwindet). */
     async markSeen(id) {
       const report = this.reports.find((r) => r.id === id)
       if (!report || report.seenAt) return
+      const myEpoch = epoch
       report.seenAt = new Date().toISOString()
       const token = await getAuthToken().catch(() => null)
       const res = await markMonthlyReportSeen(token, id)
       // Misslungen: beim nächsten Laden erscheint der Bericht wieder als neu - kein Datenverlust.
-      if (res.status !== 'ok') report.seenAt = null
+      if (myEpoch === epoch && res.status !== 'ok') report.seenAt = null
     },
     reset() {
+      epoch += 1
+      inFlight = null
       this.reports = []
       this.loaded = false
       this.lastRefreshAt = 0
