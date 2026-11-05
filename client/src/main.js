@@ -254,6 +254,11 @@ async function bootstrapAuth() {
   const accountSubscriptionStore = useSubscriptionStore(pinia)
   const accountMonthlyReportStore = useMonthlyReportStore(pinia)
   let lastUid = authStore.uid || null
+  // Token des bisherigen Kontos überall vergessen: Zwischenspeicher in authToken.js UND der Ersatz im authStore.
+  const dropAccountTokens = () => {
+    clearAuthTokenCache()
+    authStore.dropToken()
+  }
 
   logger.debug('[main] Initializing auth listener, store auth state:', authStore.isAuthenticated)
 
@@ -277,7 +282,7 @@ async function bootstrapAuth() {
       // Bei jeder Anmeldung mit geänderter Nutzer-ID, auch beim ersten Rückruf nach einem Kaltstart ohne gemerktes Konto:
       // die lokalen Zwischenspeicher (Plan, Nutzung, Token) können zu einem früheren Konto gehören.
       if (accountChanged) {
-        resetUserBoundStores({ subscription: accountSubscriptionStore, monthlyReports: accountMonthlyReportStore, clearAuthToken: clearAuthTokenCache })
+        resetUserBoundStores({ subscription: accountSubscriptionStore, monthlyReports: accountMonthlyReportStore, clearAuthToken: dropAccountTokens })
       }
       lastUid = user.uid
       // Account-spezifische Daten (avatar, username) für diesen User laden
@@ -414,7 +419,7 @@ async function bootstrapAuth() {
       aiConsentStore.switchUser(null)
       authStore.clearUser()
       userStore.$reset()
-      resetUserBoundStores({ subscription: accountSubscriptionStore, monthlyReports: accountMonthlyReportStore, clearAuthToken: clearAuthTokenCache })
+      resetUserBoundStores({ subscription: accountSubscriptionStore, monthlyReports: accountMonthlyReportStore, clearAuthToken: dropAccountTokens })
       clearResumeSnapshot()
     }
   })
