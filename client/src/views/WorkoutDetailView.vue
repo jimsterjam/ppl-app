@@ -940,10 +940,12 @@
       :next-set="restNextSet"
       :force-full="focus.visible"
       :hide-minimized="focus.visible"
+      :can-undo="Boolean(restUndoPosition)"
       @remember="rememberRestForExercise"
       @minimize="focus.minimize()"
       @adjust-next="onNextSetAdjust"
       @spin-next="onNextSetSpin"
+      @undo-last-set="undoLastSet"
     />
     <!-- Übergangs-Stoppuhr nach der letzten Übung (startet in toggleRowDone, endet mit "Übung starten"). -->
     <TransitionTimer
@@ -1061,7 +1063,7 @@ function onAddExerciseConfirm() {
   loadOneRepMaxData()
   toast.show(t('workoutDetail.exerciseAdded'), { type: 'success', duration: 1500 })
 }
-import { ref, onMounted, onBeforeUnmount, watch, nextTick, computed } from 'vue'
+import { ref, shallowRef, onMounted, onBeforeUnmount, watch, nextTick, computed } from 'vue'
 import { getCurrentInstance } from 'vue'
 import NumberPicker from '@/components/NumberPicker.vue'
 import { useExerciseTranslation, getEnglishExerciseName } from '@/utils/exerciseTranslation'
@@ -1138,6 +1140,7 @@ import { restSecondsFor, sanitizeCustomRest, formatRest } from '@/utils/restTime
 import RestTimerBar from '@/components/timer/RestTimerBar.vue'
 import TransitionTimer from '@/components/timer/TransitionTimer.vue'
 import FocusMode from '@/components/FocusMode.vue'
+import { undoRestSet, findRowPosition } from '@/utils/undoRestSet'
 import { useFocusModeStore } from '@/stores/focusModeStore'
 import { createFocusStateTracker, applyFocusState } from '@/utils/focusStatePersistence'
 import { buildSaveReview, markAllSetsDone } from '@/utils/saveReview'
@@ -2143,6 +2146,7 @@ function toggleRowDone(row, exIndex = -1, rowIndex = -1) {
       // Das Training hat begonnen: ein noch laufender Warm-up-Timer wäre jetzt nur störend (und seine Mitteilung
       // käme mitten im Satz).
       if (warmupTimer.isActive) warmupTimer.cancel()
+      restRowRef.value = row
       restTimer.start({
         seconds: restSecondsForIndex(exIndex),
         exerciseName: name,
@@ -2162,6 +2166,29 @@ function toggleRowDone(row, exIndex = -1, rowIndex = -1) {
 
 // --- Pausentimer -----------------------------------------------------------------------------
 const restTimer = useRestTimerStore()
+// "Letzten Satz zurücknehmen" in der Pause (Absprache Paul 05.11.): Haken des Satzes zurücknehmen, der diese Pause gestartet
+// hat. Der Satz wird über sein Objekt gefunden (utils/undoRestSet.js), nicht über Positionen: die ändern sich, wenn ein
+// Satz davor entfernt wird, und gelten nicht für ein anderes geöffnetes Workout. Nach einem Neuladen der Seite ist die
+// Zuordnung weg, dann gibt es den Link nicht (kein Raten).
+const restRowRef = shallowRef(null)
+const restUndoPosition = computed(() => {
+  if (!restTimer.isVisible || restTimer.showFinished) return null
+  const position = findRowPosition(workout.value?.exercises, restRowRef.value)
+  return position && isRowDone(position.row) ? position : null
+})
+function undoLastSet() {
+  const done = undoRestSet({
+    exercises: workout.value?.exercises,
+    rowRef: restRowRef.value,
+    isDone: isRowDone,
+    toggle: toggleRowDone
+  })
+  // Die Pause gehört zu diesem Satz, auch wenn sich seine Position inzwischen verschoben hat (stopFor gleicht Positionen ab).
+  if (done) {
+    restTimer.clear()
+    restRowRef.value = null
+  }
+}
 const transition = useTransitionTimerStore()
 const warmupTimer = useWarmupTimerStore()
 
