@@ -47,7 +47,7 @@ import {
 import { decideExerciseMatch } from '../utils/exerciseMatching.js';
 import { getMaxExerciseCount } from '../utils/exerciseCountTarget.js';
 import { readAiQuotaConfig, getAiQuotaState, canUseAi, aiQuotaSnapshot } from '../utils/aiQuota.js';
-import { claimAiQuotaSlot, releaseAiQuotaSlot } from '../utils/aiQuotaClaim.js';
+import { claimAiQuotaSlot, releaseAiQuotaSlot, withAiQuotaSlot } from '../utils/aiQuotaClaim.js';
 import { ensureAccountCreatedAt } from '../utils/accountCreation.js';
 import { extractNoteQuestions } from '../utils/noteQuestions.js';
 import { answerNoteQuestions } from '../services/noteQuestionService.js';
@@ -347,13 +347,23 @@ function canUseAiThisMonth(entitlements) {
 async function claimAiSlot(entitlements) {
   if (!entitlements?.profile) return { claimed: false };
   if (!Number.isFinite(entitlements.monthlyAiLimit)) return { claimed: true, paid: true };
+  const uid = entitlements.profile.uid;
   try {
-    const claim = await claimAiQuotaSlot({ model: UserProfile, uid: entitlements.profile.uid, state: getAiState(entitlements) });
-    if (claim.claimed && claim.profile) entitlements.profile = claim.profile;
+    const claim = await claimAiQuotaSlot({ model: UserProfile, uid, state: getAiState(entitlements) });
+    if (claim.claimed && claim.profile) {
+      entitlements.profile = claim.profile;
+    } else if (!claim.claimed) {
+      // Kontingent wirklich erschöpft: Stand neu laden, damit eine gleichzeitige Anfrage, die den letzten Platz bekommen hat,
+      // in der Antwort (aiUsage) schon sichtbar ist. Die Entscheidung bleibt die des atomaren Beanspruchens.
+      const fresh = await UserProfile.findOne({ uid }).catch(() => null);
+      if (fresh) entitlements.profile = fresh;
+    }
     return claim;
   } catch (error) {
+    // Datenbankfehler ist KEIN erschöpftes Kontingent: der Aufrufer antwortet mit einem wiederholbaren Fehler und ruft die
+    // KI nicht auf.
     logger.warn('⚠️ KI-Kontingent konnte nicht beansprucht werden', { error: error?.message });
-    return { claimed: false };
+    return { claimed: false, error: true };
   }
 }
 
@@ -1819,7 +1829,7 @@ router.post("/ai-suggestion", aiAuthMiddleware, requireAiConsent, async (req, re
       const openaiClient = await initializeOpenAI();
       const suggestionClaim = openaiClient ? await claimAiSlot(entitlements) : { claimed: false };
       if (openaiClient && !suggestionClaim.claimed) {
-        fallbackReason = 'monthly_quota_limited';
+        fallbackReason = suggestionClaim.error ? 'quota_unavailable' : 'monthly_quota_limited';
       } else if (openaiClient) {
         try {
           const aiSuggestion = await generateGPT4Suggestion(context, openaiClient, { requestId });
@@ -2316,6 +2326,14 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
 
     // Platz atomar beanspruchen, bevor der KI-Dienst aufgerufen wird. Ohne Ergebnis (Fehler, leerer Text) geht er zurück.
     const feedbackClaim = await claimAiSlot(entitlements);
+    if (feedbackClaim.error) {
+      return res.status(503).json({
+        error: 'AI quota temporarily unavailable',
+        code: 'AI_QUOTA_UNAVAILABLE',
+        retryAfter: 5,
+        requestId
+      });
+    }
     if (!feedbackClaim.claimed) {
       logger.info('🚫 Workout analysis: Free-Plan-Kontingent erschöpft (gleichzeitige Anfrage)', { requestId, workoutId, userId });
       return res.json({
@@ -2919,31 +2937,58 @@ router.post("/ai-progress-feedback", firebaseAuthMiddleware, requireAiConsent, a
       top_declines: trainingData.progression === 'negative' ? [{ exercise: trainingData.exercise, volume_change_percent: trainingData.volume_change_percent }] : []
     };
 
-    // Rufe AI Service auf
+    // Rufe AI Service auf - wie die anderen KI-Endpunkte nur mit freiem Platz im Kontingent (Gratis-Konten), der Platz wird
+    // atomar vor dem Aufruf beansprucht und ohne Ergebnis zurückgegeben (utils/aiQuotaClaim.js).
     const aiService = getAIService();
     let feedback = null;
     let aiError = null;
+    const entitlements = await getEntitlements(userId);
 
-    try {
-      const aiResult = await aiService.generateTrainingAnalysis(analysisForAI, {
-        requestId,
-        temperature: 0.6
-      });
-      feedback = aiResult.feedback;
+    const slot = await withAiQuotaSlot({
+      claim: () => claimAiSlot(entitlements),
+      release: (claim) => releaseAiSlot(entitlements, claim),
+      run: async () => {
+        try {
+          const aiResult = await aiService.generateTrainingAnalysis(analysisForAI, {
+            requestId,
+            temperature: 0.6
+          });
+          logger.debug('✅ Progress feedback generated', {
+            requestId,
+            exercise,
+            provider: aiService.getProviderName()
+          });
+          return aiResult.feedback || null;
+        } catch (error) {
+          aiError = error;
+          logger.error('❌ AI generation failed', {
+            requestId,
+            provider: aiService.getProviderName(),
+            error: error.message
+          });
+          return null;
+        }
+      }
+    });
 
-      logger.debug('✅ Progress feedback generated', {
-        requestId,
-        exercise,
-        provider: aiService.getProviderName()
-      });
-    } catch (error) {
-      aiError = error;
-      logger.error('❌ AI generation failed', {
-        requestId,
-        provider: aiService.getProviderName(),
-        error: error.message
+    if (slot.limited && slot.error) {
+      return res.status(503).json({
+        error: 'AI quota temporarily unavailable',
+        code: 'AI_QUOTA_UNAVAILABLE',
+        retryAfter: 5,
+        requestId
       });
     }
+    if (slot.limited) {
+      logger.info('🚫 Progress feedback: Free-Plan-Kontingent erschöpft', { requestId, userId });
+      return res.status(429).json({
+        error: 'AI quota exhausted',
+        code: 'AI_QUOTA_EXHAUSTED',
+        aiUsage: getAiLimitSnapshot(entitlements),
+        requestId
+      });
+    }
+    feedback = slot.result;
 
     // Gib Antwort zurück
     if (feedback) {
