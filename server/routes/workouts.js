@@ -37,7 +37,6 @@ import {
 import { resolveEffectiveProfile } from '../services/exerciseAnalysisRules.js';
 import {
   startOfIsoWeek,
-  startOfMonth,
   computeWorkoutMetrics
 } from '../utils/workoutMetrics.js';
 import {
@@ -47,6 +46,9 @@ import {
 } from '../utils/workoutSanitizer.js';
 import { decideExerciseMatch } from '../utils/exerciseMatching.js';
 import { getMaxExerciseCount } from '../utils/exerciseCountTarget.js';
+import { readAiQuotaConfig, getAiQuotaState, canUseAi, aiQuotaSnapshot } from '../utils/aiQuota.js';
+import { claimAiQuotaSlot, releaseAiQuotaSlot } from '../utils/aiQuotaClaim.js';
+import { ensureAccountCreatedAt } from '../utils/accountCreation.js';
 import { extractNoteQuestions } from '../utils/noteQuestions.js';
 import { answerNoteQuestions } from '../services/noteQuestionService.js';
 import { selectExercisesForTotalTime, resolveTimeSelectionOptions, BUFFER_SECONDS } from '../utils/workoutTimeModel.js';
@@ -264,12 +266,11 @@ const exerciseNameMapping = {
 const DEFAULT_PROGRESS_RANGE_DAYS = 120;
 const MIN_STATS_SESSIONS = 7;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
-// Umgestellt von 1x/Woche auf 60x/Monat (User-Entscheidung, September 2026): bei gpt-4o-mini-
-// Preisen ($0.15/1M Input-, $0.60/1M Output-Tokens) und ca. 4-5k Input-/200-350 Output-Tokens
-// pro Call liegen die Kosten bei ca. $0.05-0.08 pro User und Monat selbst bei voller Ausschöpfung
-// - das alte Wochenlimit von 1 war primär Missbrauchsschutz, kein echtes Kostenproblem. 60/Monat
-// deckt selbst tägliches Training (max. ~30 Workouts/Monat) komfortabel ab.
-const FREE_AI_MONTHLY_LIMIT = 30;
+// KI-Kontingent für Gratis-Konten: Willkommenskontingent + Monatskontingent, siehe utils/aiQuota.js (Werte per
+// Umgebungsvariable: AI_WELCOME_LIMIT, AI_WELCOME_DAYS, FREE_AI_MONTHLY_LIMIT). Kostenrahmen: bei gpt-4o-mini-Preisen
+// ($0.15/1M Input-, $0.60/1M Output-Tokens) und ca. 4-5k Input-/200-350 Output-Tokens pro Call liegen die Kosten bei
+// ca. $0.001 pro Anfrage; das Limit ist primär Missbrauchsschutz und ein Anreiz für Pro, kein Kostenproblem.
+const AI_QUOTA_CONFIG = readAiQuotaConfig();
 const SUBSCRIPTION_FORCE_PLAN = String(process.env.SUBSCRIPTION_FORCE_PLAN || '').trim().toLowerCase();
 const SUBSCRIPTION_FORCE_SCOPE = String(process.env.SUBSCRIPTION_FORCE_SCOPE || 'all').trim().toLowerCase();
 const SUBSCRIPTION_FORCE_ALLOWLIST = String(process.env.SUBSCRIPTION_FORCE_ALLOWLIST || '')
@@ -310,9 +311,8 @@ function resolveEffectivePlan(profilePlan = 'free', userId = '') {
 async function getOrCreateUserProfile(uid) {
   if (!uid) return null;
   let profile = await UserProfile.findOne({ uid });
-  if (profile) return profile;
-  profile = await UserProfile.create({ uid });
-  return profile;
+  if (!profile) profile = await UserProfile.create({ uid });
+  return ensureAccountCreatedAt(profile, { model: UserProfile, logger });
 }
 
 async function getEntitlements(userId) {
@@ -328,57 +328,51 @@ async function getEntitlements(userId) {
     plan,
     paid,
     canUseAnalytics: true,
-    monthlyAiLimit: paid ? Number.POSITIVE_INFINITY : FREE_AI_MONTHLY_LIMIT
+    monthlyAiLimit: paid ? Number.POSITIVE_INFINITY : AI_QUOTA_CONFIG.monthlyLimit
   };
 }
 
-function getCurrentAiMonthWindowStart() {
-  return startOfMonth(new Date());
-}
-
-function getAiMonthState(profile) {
-  const nowWindow = getCurrentAiMonthWindowStart();
-  const savedWindowRaw = profile?.aiUsage?.monthWindowStart;
-  const savedWindow = savedWindowRaw ? startOfMonth(savedWindowRaw) : null;
-  if (!savedWindow || savedWindow.getTime() !== nowWindow.getTime()) {
-    return { monthWindowStart: nowWindow, monthlyCount: 0 };
-  }
-  return {
-    monthWindowStart: savedWindow,
-    monthlyCount: Math.max(0, Number(profile?.aiUsage?.monthlyCount) || 0)
-  };
+function getAiState(entitlements) {
+  return getAiQuotaState(entitlements.profile, { config: AI_QUOTA_CONFIG });
 }
 
 function canUseAiThisMonth(entitlements) {
   if (!entitlements?.profile) return false;
   if (!Number.isFinite(entitlements.monthlyAiLimit)) return true;
-  const usage = getAiMonthState(entitlements.profile);
-  return usage.monthlyCount < entitlements.monthlyAiLimit;
+  return canUseAi(getAiState(entitlements));
 }
 
-async function markAiUse(entitlements) {
-  if (!entitlements?.profile) return;
-  if (!Number.isFinite(entitlements.monthlyAiLimit)) return;
-  const usage = getAiMonthState(entitlements.profile);
-  entitlements.profile.aiUsage = {
-    monthWindowStart: usage.monthWindowStart,
-    monthlyCount: usage.monthlyCount + 1
-  };
-  await entitlements.profile.save();
+// Platz im KI-Kontingent atomar beanspruchen, BEVOR der KI-Dienst aufgerufen wird (zwei gleichzeitige Anfragen dürfen
+// nicht beide den letzten Platz sehen). Bei Misserfolg (kein Ergebnis) mit releaseAiSlot zurückgeben.
+async function claimAiSlot(entitlements) {
+  if (!entitlements?.profile) return { claimed: false };
+  if (!Number.isFinite(entitlements.monthlyAiLimit)) return { claimed: true, paid: true };
+  try {
+    const claim = await claimAiQuotaSlot({ model: UserProfile, uid: entitlements.profile.uid, state: getAiState(entitlements) });
+    if (claim.claimed && claim.profile) entitlements.profile = claim.profile;
+    return claim;
+  } catch (error) {
+    logger.warn('⚠️ KI-Kontingent konnte nicht beansprucht werden', { error: error?.message });
+    return { claimed: false };
+  }
+}
+
+async function releaseAiSlot(entitlements, claim) {
+  if (!claim?.claimed || claim.paid) return;
+  try {
+    const profile = await releaseAiQuotaSlot({ model: UserProfile, uid: entitlements.profile?.uid, claim });
+    if (profile) entitlements.profile = profile;
+  } catch (error) {
+    logger.warn('⚠️ KI-Kontingent konnte nicht zurückgegeben werden', { error: error?.message });
+  }
 }
 
 function getAiLimitSnapshot(entitlements) {
   if (!entitlements?.profile) return null;
-  const usage = getAiMonthState(entitlements.profile);
-  const limit = entitlements.monthlyAiLimit;
-  const remaining = Number.isFinite(limit) ? Math.max(0, limit - usage.monthlyCount) : null;
-  return {
-    plan: entitlements.plan,
-    monthWindowStart: usage.monthWindowStart,
-    monthlyCount: usage.monthlyCount,
-    monthlyLimit: Number.isFinite(limit) ? limit : null,
-    monthlyRemaining: remaining
-  };
+  const snapshot = aiQuotaSnapshot(getAiState(entitlements), entitlements.plan);
+  if (Number.isFinite(entitlements.monthlyAiLimit)) return snapshot;
+  // Bezahlte Konten: unbegrenzt, die Felder bleiben leer wie bisher.
+  return { ...snapshot, monthlyLimit: null, monthlyRemaining: null, regularMonthlyLimit: null };
 }
 
 // 🎯 Automatische Übungs-Hinzufügung zur Datenbank
@@ -939,7 +933,8 @@ router.post('/quick-generator', aiAuthMiddleware, requireAiConsent, async (req, 
     let suggestion = null;
     let usedRemote = false;
     let errorType = null;
-    if (openaiClient && aiAllowedForUser) {
+    const quickClaim = openaiClient && aiAllowedForUser ? await claimAiSlot(entitlements) : { claimed: false };
+    if (quickClaim.claimed) {
       try {
         // Zeitbudget (Fehlerbild 30.09.): der KI-Relay schlief (Render Free-Plan), das Wecken dauerte
         // über 100 s, die App gab nach 45 s auf und meldete einen Netzwerkfehler. Der Generator baut
@@ -951,9 +946,11 @@ router.post('/quick-generator', aiAuthMiddleware, requireAiConsent, async (req, 
         );
         if (suggestion) {
           usedRemote = true;
-          await markAiUse(entitlements);
+        } else {
+          await releaseAiSlot(entitlements, quickClaim);
         }
       } catch (error) {
+        await releaseAiSlot(entitlements, quickClaim);
         errorType = classifyAiError(error);
         logger.error('❌ Quick generator OpenAI error', {
           requestId,
@@ -1820,7 +1817,10 @@ router.post("/ai-suggestion", aiAuthMiddleware, requireAiConsent, async (req, re
 
     if (tryRemote) {
       const openaiClient = await initializeOpenAI();
-      if (openaiClient) {
+      const suggestionClaim = openaiClient ? await claimAiSlot(entitlements) : { claimed: false };
+      if (openaiClient && !suggestionClaim.claimed) {
+        fallbackReason = 'monthly_quota_limited';
+      } else if (openaiClient) {
         try {
           const aiSuggestion = await generateGPT4Suggestion(context, openaiClient, { requestId });
 
@@ -1849,8 +1849,8 @@ router.post("/ai-suggestion", aiAuthMiddleware, requireAiConsent, async (req, re
           responsePayload = aiSuggestion;
           usedRemote = true;
           modeUsed = 'remote';
-          await markAiUse(entitlements);
         } catch (aiError) {
+          await releaseAiSlot(entitlements, suggestionClaim);
           errorType = classifyAiError(aiError);
           fallbackReason = errorType;
           logger.error('❌ OpenAI Error:', {
@@ -2053,7 +2053,7 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
       });
     }
 
-    // 1c. Free-Plan-Kontingent (siehe FREE_AI_MONTHLY_LIMIT oben) - bisher wurde dieser
+    // 1c. Free-Plan-Kontingent (siehe AI_QUOTA_CONFIG oben) - bisher wurde dieser
     // Haupt-Feedback-Endpoint als einziger der drei AI-Endpunkte NICHT gegen das Kontingent
     // geprüft (bekannte Lücke, siehe TESTPHASE-TESTMATRIX.md Blocker #3). Direkt nach dem
     // Cache-Check, damit weder ein bereits vorhandenes Feedback (oben) noch ein Kontingent-
@@ -2314,6 +2314,24 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
       });
     }
 
+    // Platz atomar beanspruchen, bevor der KI-Dienst aufgerufen wird. Ohne Ergebnis (Fehler, leerer Text) geht er zurück.
+    const feedbackClaim = await claimAiSlot(entitlements);
+    if (!feedbackClaim.claimed) {
+      logger.info('🚫 Workout analysis: Free-Plan-Kontingent erschöpft (gleichzeitige Anfrage)', { requestId, workoutId, userId });
+      return res.json({
+        success: true,
+        workoutId: currentWorkout._id,
+        workoutDate: currentWorkout.date,
+        feedback_status: 'quota_limited',
+        aiUsage: getAiLimitSnapshot(entitlements),
+        metadata: {
+          requestId,
+          timestamp: new Date().toISOString(),
+          aiAvailable: false
+        }
+      });
+    }
+
     try {
       aiResult = await aiService.generateTrainingAnalysis(structuredAnalysis, {
         requestId,
@@ -2328,6 +2346,9 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
       });
       // Gib trotzdem die Backend-Analysen zurück
     }
+
+    // Kein Ergebnis (Fehler oder leerer Text): Platz zurückgeben, es wird nur bei echtem Feedback verbraucht.
+    if (!aiResult?.feedback) await releaseAiSlot(entitlements, feedbackClaim);
 
     // 5b. Kompakte Delta-Zusammenfassung je Übung (Sätze/Wdh./Gewicht mehr bzw. weniger) fürs
     // Frontend - reine Zahlen, keine Wertung. Unabhängig von der AI-Antwort berechenbar, da
@@ -2467,7 +2488,7 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
       // Health-Check-Fehlschlag/network_unavailable oben oder einem AI-Fehler unten) - konsistent
       // mit /quick-generator und /ai-suggestion, die ebenfalls nur bei echtem Erfolg zählen.
       // Blieb vom KI-Text nichts übrig, zählt das nicht gegen das Kontingent (Nutzer bekommt keinen KI-Text).
-      if (!coachText.allDropped) await markAiUse(entitlements);
+      if (coachText.allDropped) await releaseAiSlot(entitlements, feedbackClaim);
       await Workout.updateOne(
         { _id: workoutId, userId },
         {

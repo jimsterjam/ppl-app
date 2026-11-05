@@ -25,15 +25,14 @@ import { firebaseAuthMiddleware } from '../middleware/firebaseAuth.js';
 import UserProfile from '../models/UserProfile.js'
 import { isMockUpgradeAllowed } from '../utils/mockUpgradeGate.js'
 import Workout from '../models/Workout.js'
-import { startOfMonth } from '../utils/workoutMetrics.js'
+import { readAiQuotaConfig, getAiQuotaState, aiQuotaSnapshot } from '../utils/aiQuota.js'
+import { ensureAccountCreatedAt } from '../utils/accountCreation.js'
+import { logger } from '../utils/logger.js'
 
 const router = express.Router()
 
-// Muss synchron zu FREE_AI_MONTHLY_LIMIT in routes/workouts.js bleiben (dort auch die
-// Begründung/Kostenkalkulation) - beide Dateien lesen/schreiben dasselbe UserProfile.aiUsage-Feld,
-// haben aber historisch eigene Konstanten (keine gemeinsame Datei dafür, um den Umbau klein zu
-// halten).
-const FREE_AI_MONTHLY_LIMIT = 30
+// KI-Kontingent: gemeinsame Logik mit routes/workouts.js in utils/aiQuota.js (Willkommenskontingent + Monatskontingent).
+const AI_QUOTA_CONFIG = readAiQuotaConfig()
 const SUBSCRIPTION_FORCE_PLAN = String(process.env.SUBSCRIPTION_FORCE_PLAN || '').trim().toLowerCase()
 const SUBSCRIPTION_FORCE_SCOPE = String(process.env.SUBSCRIPTION_FORCE_SCOPE || 'all').trim().toLowerCase()
 const SUBSCRIPTION_FORCE_ALLOWLIST = String(process.env.SUBSCRIPTION_FORCE_ALLOWLIST || '')
@@ -74,25 +73,15 @@ function resolveEffectivePlan(profilePlan = 'free', userId = '') {
 async function getOrCreateUserProfile(uid) {
   if (!uid) return null
   let profile = await UserProfile.findOne({ uid })
-  if (profile) return profile
-  profile = await UserProfile.create({ uid })
-  return profile
+  if (!profile) profile = await UserProfile.create({ uid })
+  return ensureAccountCreatedAt(profile, { model: UserProfile, logger })
 }
 
 function getAiMonthlyUsage(profile) {
-  const monthWindowStart = startOfMonth(new Date())
-  const savedStartRaw = profile?.aiUsage?.monthWindowStart
-  const savedStart = savedStartRaw ? startOfMonth(savedStartRaw) : null
-  const isCurrentWindow = savedStart && savedStart.getTime() === monthWindowStart.getTime()
-  const monthlyCount = isCurrentWindow ? Math.max(0, Number(profile?.aiUsage?.monthlyCount) || 0) : 0
-  return {
-    monthWindowStart,
-    monthlyCount,
-    monthlyLimit: isPaidPlan(profile?.subscription?.plan || 'free') ? null : FREE_AI_MONTHLY_LIMIT,
-    monthlyRemaining: isPaidPlan(profile?.subscription?.plan || 'free')
-      ? null
-      : Math.max(0, FREE_AI_MONTHLY_LIMIT - monthlyCount)
-  }
+  const paid = isPaidPlan(profile?.subscription?.plan || 'free')
+  const snapshot = aiQuotaSnapshot(getAiQuotaState(profile, { config: AI_QUOTA_CONFIG }), profile?.subscription?.plan || 'free')
+  // Bezahlte Konten: unbegrenzt, die Grenzfelder bleiben leer wie bisher.
+  return paid ? { ...snapshot, monthlyLimit: null, monthlyRemaining: null, regularMonthlyLimit: null } : snapshot
 }
 
 /**

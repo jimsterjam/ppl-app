@@ -10,12 +10,13 @@
         :aria-valuenow="remaining"
         aria-valuemin="0"
         :aria-valuemax="limit"
-        :aria-label="t('aiQuota.barAria')"
+        :aria-label="t(isWelcome ? 'aiQuota.barAriaWelcome' : 'aiQuota.barAria')"
       >
         <span class="quota-fill" :class="`quota-fill--${level}`" :style="{ width: `${percentLeft}%` }"></span>
       </div>
-      <p class="quota-line">{{ t('aiQuota.renews', { date: resetDateLabel }) }}</p>
-      <p class="quota-line">{{ t('aiQuota.used', { used }) }}</p>
+      <p v-if="isWelcome && regularLimit !== null" class="quota-line">{{ t('aiQuota.welcome', { date: resetDateLabel, monthly: regularLimit }) }}</p>
+      <p v-else class="quota-line">{{ t('aiQuota.renews', { date: resetDateLabel }) }}</p>
+      <p class="quota-line">{{ t(isWelcome ? 'aiQuota.usedWelcome' : 'aiQuota.used', { used }) }}</p>
       <p v-if="level === 'empty'" class="quota-alert">{{ t('aiQuota.emptyText', { date: resetDateLabel }) }}</p>
       <p v-else-if="level === 'low'" class="quota-warn">{{ t('aiQuota.lowText') }}</p>
       <p class="quota-hint">{{ t('aiQuota.costRule') }}</p>
@@ -36,7 +37,7 @@ import { useAiQuota } from '@/composables/useAiQuota'
 import { PRO_PURCHASE_ENABLED } from '@/config/features'
 
 const { t } = useI18n()
-const { isFree, limit, used, remaining, percentLeft, level, resetDateLabel, reload } = useAiQuota()
+const { isFree, isWelcome, regularLimit, limit, used, remaining, percentLeft, level, resetDateLabel, reload } = useAiQuota()
 const showUpgrade = ref(false)
 
 async function onUpgraded() {

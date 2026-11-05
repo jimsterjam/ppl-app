@@ -73,12 +73,15 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     workoutsThisMonth: 0,
     totalWorkouts: 0,
     lastWorkoutDate: null,
-    // Umgestellt von wöchentlichem auf monatliches Kontingent (server-seitig FREE_AI_MONTHLY_LIMIT,
-    // siehe server/routes/workouts.js) - Default-Limit hier nur ein Platzhalter bis zur ersten
-    // echten Server-Antwort (checkSubscription), aktueller Server-Wert ist 30.
+    // KI-Kontingent (server/utils/aiQuota.js): Willkommenskontingent in den ersten Tagen, danach ein Monatskontingent.
+    // "Monthly"-Felder beschreiben immer den AKTUELLEN Topf. Default-Limit hier nur ein Platzhalter bis zur ersten
+    // echten Server-Antwort (checkSubscription).
     aiMonthlyCount: 0,
     aiMonthlyLimit: 30,
     aiMonthWindowStart: null,
+    aiPhase: 'monthly',
+    aiResetsAt: null,
+    aiRegularLimit: null,
     quickGenerationsThisMonth: 0,
     quickGenerationMonth: null
   })
@@ -229,7 +232,10 @@ export const useSubscriptionStore = defineStore('subscription', () => {
               aiMonthlyLimit: Number.isFinite(Number(remoteUsage?.ai?.monthlyLimit))
                 ? Number(remoteUsage?.ai?.monthlyLimit)
                 : -1,
-              aiMonthWindowStart: remoteUsage?.ai?.monthWindowStart || null
+              aiMonthWindowStart: remoteUsage?.ai?.monthWindowStart || null,
+              aiPhase: remoteUsage?.ai?.phase === 'welcome' ? 'welcome' : 'monthly',
+              aiResetsAt: remoteUsage?.ai?.resetsAt || null,
+              aiRegularLimit: Number.isFinite(Number(remoteUsage?.ai?.regularMonthlyLimit)) ? Number(remoteUsage.ai.regularMonthlyLimit) : null
             }
             persistUsage()
           }
@@ -336,7 +342,10 @@ export const useSubscriptionStore = defineStore('subscription', () => {
       ...usage.value,
       aiMonthlyCount: Number(ai.monthlyCount) || 0,
       aiMonthlyLimit: Number.isFinite(Number(ai.monthlyLimit)) ? Number(ai.monthlyLimit) : -1,
-      aiMonthWindowStart: ai.monthWindowStart || usage.value.aiMonthWindowStart
+      aiMonthWindowStart: ai.monthWindowStart || usage.value.aiMonthWindowStart,
+      aiPhase: ai.phase === 'welcome' ? 'welcome' : 'monthly',
+      aiResetsAt: ai.resetsAt || usage.value.aiResetsAt,
+      aiRegularLimit: Number.isFinite(Number(ai.regularMonthlyLimit)) ? Number(ai.regularMonthlyLimit) : usage.value.aiRegularLimit
     }
     persistUsage()
   }
@@ -376,6 +385,9 @@ export const useSubscriptionStore = defineStore('subscription', () => {
   // "+7 Tage"-Schätzung, die noch vom wöchentlichen Kontingent stammte und nach der Umstellung
   // auf ein monatliches Fenster ein falsches (viel zu frühes) Reset-Datum angezeigt hätte.
   const quickGeneratorResetDate = computed(() => {
+    // Der Server nennt das Datum, an dem das Kontingent wieder voll ist bzw. das Monatskontingent beginnt.
+    const serverDate = usage.value.aiResetsAt ? new Date(usage.value.aiResetsAt) : null
+    if (serverDate && !Number.isNaN(serverDate.getTime())) return serverDate
     const startRaw = usage.value.aiMonthWindowStart
     const start = startRaw ? new Date(startRaw) : null
     if (start && !Number.isNaN(start.getTime())) {
