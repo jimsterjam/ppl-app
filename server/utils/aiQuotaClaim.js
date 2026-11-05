@@ -65,11 +65,12 @@ export async function releaseAiQuotaSlot({ model, uid, claim }) {
  * wenn der Aufruf kein brauchbares Ergebnis liefert oder einen Fehler wirft (verbraucht wird nur bei Erfolg).
  * @param {{ claim: () => Promise<{claimed: boolean}>, release: (claim: object) => Promise<void>,
  *   run: () => Promise<any>, isSuccess?: (result: any) => boolean }} input
- * @returns {Promise<{ limited: true } | { limited: false, result: any }>}
+ * @returns {Promise<{ limited: true, error: boolean } | { limited: false, result: any }>} `error: true` = Datenbankfehler beim
+ *   Beanspruchen (kein erschöpftes Kontingent): der Aufrufer antwortet wiederholbar und ruft die KI nicht auf
  */
 export async function withAiQuotaSlot({ claim, release, run, isSuccess = Boolean }) {
   const slot = await claim();
-  if (!slot?.claimed) return { limited: true };
+  if (!slot?.claimed) return { limited: true, error: Boolean(slot?.error) };
   let result;
   try {
     result = await run();

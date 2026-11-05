@@ -130,9 +130,21 @@ describe('KI-Kontingent: Aufruf nur mit Platz, Rückgabe ohne Ergebnis', () => {
   it('ohne freien Platz wird der KI-Aufruf gar nicht ausgeführt', async () => {
     const m = make(false)
     const out = await withAiQuotaSlot({ ...m, run: async () => { m.log.ran += 1; return 'text' } })
-    assert.deepEqual(out, { limited: true })
+    assert.deepEqual(out, { limited: true, error: false })
     assert.equal(m.log.ran, 0)
     assert.equal(m.log.released, 0)
+  })
+
+  it('Datenbankfehler beim Beanspruchen ist kein erschöpftes Kontingent und ruft die KI nicht auf', async () => {
+    const log = { ran: 0, released: 0 }
+    const out = await withAiQuotaSlot({
+      claim: async () => ({ claimed: false, error: true }),
+      release: async () => { log.released += 1 },
+      run: async () => { log.ran += 1; return 'text' }
+    })
+    assert.deepEqual(out, { limited: true, error: true })
+    assert.equal(log.ran, 0)
+    assert.equal(log.released, 0)
   })
 
   it('mit Ergebnis bleibt der Platz verbraucht', async () => {
