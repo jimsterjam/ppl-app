@@ -55,6 +55,12 @@ const userProfileSchema = new mongoose.Schema({
   // weekWindowStart/weeklyCount) - bestehende Dokumente mit den alten Feldnamen starten dadurch
   // einmalig wieder bei 0 Aufrufen in diesem Monat, was unkritisch ist (reine Nutzungszählung,
   // keine Trainingsdaten).
+  // Registrierungszeitpunkt des Firebase-Kontos (einmalig übernommen, siehe utils/accountCreation.js). Grundlage für das
+  // Willkommenskontingent (utils/aiQuota.js). Fehlt bei Altdaten, bis er beim nächsten Aufruf nachgetragen wird.
+  accountCreatedAt: {
+    type: Date,
+    default: undefined
+  },
   aiUsage: {
     monthWindowStart: {
       type: Date,

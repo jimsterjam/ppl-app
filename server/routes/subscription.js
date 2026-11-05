@@ -26,6 +26,8 @@ import UserProfile from '../models/UserProfile.js'
 import { isMockUpgradeAllowed } from '../utils/mockUpgradeGate.js'
 import Workout from '../models/Workout.js'
 import { readAiQuotaConfig, getAiQuotaState, aiQuotaSnapshot } from '../utils/aiQuota.js'
+import { ensureAccountCreatedAt } from '../utils/accountCreation.js'
+import { logger } from '../utils/logger.js'
 
 const router = express.Router()
 
@@ -71,9 +73,8 @@ function resolveEffectivePlan(profilePlan = 'free', userId = '') {
 async function getOrCreateUserProfile(uid) {
   if (!uid) return null
   let profile = await UserProfile.findOne({ uid })
-  if (profile) return profile
-  profile = await UserProfile.create({ uid })
-  return profile
+  if (!profile) profile = await UserProfile.create({ uid })
+  return ensureAccountCreatedAt(profile, { model: UserProfile, logger })
 }
 
 function getAiMonthlyUsage(profile) {

@@ -10,7 +10,7 @@
         :aria-valuenow="remaining"
         aria-valuemin="0"
         :aria-valuemax="limit"
-        :aria-label="t('aiQuota.barAria')"
+        :aria-label="t(isWelcome ? 'aiQuota.barAriaWelcome' : 'aiQuota.barAria')"
       >
         <span class="quota-fill" :class="`quota-fill--${level}`" :style="{ width: `${percentLeft}%` }"></span>
       </div>

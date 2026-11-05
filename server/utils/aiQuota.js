@@ -4,6 +4,10 @@
 // `monthlyCount` im Kalendermonat. Dadurch bekommt niemand durch einen Monatswechsel doppelt Anfragen.
 // Alle Werte kommen aus Umgebungsvariablen (Render), damit ein Wechsel keinen neuen Code braucht:
 //   AI_WELCOME_LIMIT (30), AI_WELCOME_DAYS (30), FREE_AI_MONTHLY_LIMIT (10)
+// Die Willkommensphase beginnt mit der REGISTRIERUNG des Firebase-Kontos (`profile.accountCreatedAt`, einmalig aus
+// den Firebase-Kontodaten übernommen, siehe utils/accountCreation.js), nicht mit dem Anlegen des Profil-Dokuments:
+// Profile entstehen erst beim ersten Serveraufruf, auch bei lange registrierten Konten. Fehlt der Wert (Altdaten, Firebase
+// nicht erreichbar), gilt vorsichtshalber das Monatskontingent.
 // Bezahlte Konten (pro/elite) sind unbegrenzt und werden hier nicht gezählt.
 import { startOfMonth } from './workoutMetrics.js';
 
@@ -34,12 +38,12 @@ function nextMonthStart(now) {
 
 /**
  * Aktueller Stand des Kontingents eines Gratis-Kontos.
- * @param {object} profile - UserProfile (createdAt, aiUsage)
+ * @param {object} profile - UserProfile (accountCreatedAt, aiUsage)
  * @returns {{ phase: 'welcome'|'monthly', count: number, limit: number, remaining: number, windowStart: Date|null,
  *   resetsAt: Date, welcomeEndsAt: Date|null, regularLimit: number }}
  */
 export function getAiQuotaState(profile, { now = new Date(), config = readAiQuotaConfig() } = {}) {
-  const created = toDate(profile?.createdAt);
+  const created = toDate(profile?.accountCreatedAt);
   const welcomeEndsAt = created && config.welcomeDays > 0 && config.welcomeLimit > 0
     ? new Date(created.getTime() + config.welcomeDays * MS_PER_DAY)
     : null;
