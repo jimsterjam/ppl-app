@@ -21,7 +21,6 @@
             <span class="ro-next-detail">{{ nextSetDetail }}</span>
           </p>
           <button type="button" class="ro-btn ro-primary" @click="rest.clear()">{{ t('restTimer.continue') }}</button>
-          <button v-if="canUndoSet" type="button" class="ro-link" @click="emit('undo-last-set')">{{ t('restTimer.undoLastSet') }}</button>
         </template>
 
         <template v-else>
@@ -71,7 +70,7 @@
           </div>
           <button type="button" class="ro-btn ro-primary" @click="rest.skip()">{{ t('restTimer.skip') }}</button>
           <!-- Aus Versehen abgehakt (Absprache Paul 05.11.): Haken zurücknehmen, Pause beenden, zurück zu diesem Satz. -->
-          <button v-if="canUndoSet" type="button" class="ro-link" @click="emit('undo-last-set')">{{ t('restTimer.undoLastSet') }}</button>
+          <button v-if="canUndo" type="button" class="ro-link" @click="emit('undo-last-set')">{{ t('restTimer.undoLastSet') }}</button>
 
           <!-- Dauer angepasst: für diese Übung merken (auch im Favoriten, siehe exercise.restSeconds). -->
           <button
@@ -139,7 +138,9 @@ const props = defineProps({
   nextSet: { type: Object, default: null },
   // Fokus-Modus aktiv: Die Großansicht erzwingt das Pausen-Vollbild, minimiert zeigt der Fokus-Modus seine eigene Leiste.
   forceFull: { type: Boolean, default: false },
-  hideMinimized: { type: Boolean, default: false }
+  hideMinimized: { type: Boolean, default: false },
+  // Der Satz, der diese Pause gestartet hat, ist im geöffneten Workout noch vorhanden und abgehakt (entscheidet WorkoutDetailView).
+  canUndo: { type: Boolean, default: false }
 })
 const emit = defineEmits(['remember', 'minimize', 'adjust-next', 'spin-next', 'undo-last-set'])
 const { t, locale } = useI18n()
@@ -149,9 +150,6 @@ const timerStore = useTimerStore()
 // Umfang des Fortschrittsrings (r = 46 im viewBox 0..100).
 const RING_LENGTH = 2 * Math.PI * 46
 // Letzte Sekunden farblich hervorheben - auch aus Entfernung erkennbar.
-
-// Die Pause gehört zu einem abgehakten Satz: nur dann gibt es etwas zurückzunehmen (nicht bei Aufwärm-Timer o. Ä.).
-const canUndoSet = computed(() => rest.exIndex >= 0 && rest.rowIndex >= 0)
 
 // Intervall-Timer aktiv (große Leiste oben) -> Pause kompakter.
 const compact = computed(() => timerStore.isActive && timerStore.miniVisible)

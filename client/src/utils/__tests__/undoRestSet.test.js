@@ -1,37 +1,64 @@
 import { describe, it, expect, vi } from 'vitest'
-import { undoRestSet } from '../undoRestSet.js'
+import { reactive } from 'vue'
+import { undoRestSet, findRowPosition } from '../undoRestSet.js'
 
-const exercises = () => [
-  { setDetails: [{ reps: 5, done: true }, { reps: 5, done: true }, { reps: 5, done: false }] },
-  { setDetails: [{ reps: 8, done: false }] }
-]
 const isDone = (row) => row.done === true
+const makeWorkout = () => reactive({
+  exercises: [
+    { name: 'A', setDetails: [{ reps: 5, done: true }, { reps: 5, done: true }, { reps: 5, done: false }] },
+    { name: 'B', setDetails: [{ reps: 8, done: false }] }
+  ]
+})
+
+describe('Satz zur Pause finden (stabil über das Satz-Objekt)', () => {
+  it('findet den Satz auch über reaktive Proxys', () => {
+    const workout = makeWorkout()
+    const rowRef = workout.exercises[0].setDetails[1]
+    expect(findRowPosition(workout.exercises, rowRef)).toMatchObject({ exIndex: 0, rowIndex: 1 })
+  })
+
+  it('folgt dem Satz, wenn davor ein Satz entfernt oder Übungen verschoben werden', () => {
+    const workout = makeWorkout()
+    const rowRef = workout.exercises[0].setDetails[1]
+    workout.exercises[0].setDetails.splice(0, 1) // Satz davor entfernt
+    expect(findRowPosition(workout.exercises, rowRef)).toMatchObject({ exIndex: 0, rowIndex: 0 })
+    workout.exercises.reverse() // Übungen vertauscht
+    expect(findRowPosition(workout.exercises, rowRef)).toMatchObject({ exIndex: 1, rowIndex: 0 })
+  })
+
+  it('Satz entfernt oder anderes Workout geöffnet: nichts gefunden', () => {
+    const workout = makeWorkout()
+    const rowRef = workout.exercises[0].setDetails[1]
+    workout.exercises[0].setDetails.splice(1, 1)
+    expect(findRowPosition(workout.exercises, rowRef)).toBeNull()
+    const other = makeWorkout() // gleiche Positionen und abgehakt, aber anderes Workout
+    expect(findRowPosition(other.exercises, rowRef)).toBeNull()
+  })
+
+  it('ohne Referenz oder Übungsliste: nichts gefunden', () => {
+    expect(findRowPosition(makeWorkout().exercises, null)).toBeNull()
+    expect(findRowPosition(undefined, {})).toBeNull()
+  })
+})
 
 describe('Letzten Satz zurücknehmen (Pause)', () => {
-  it('nimmt den Haken des Satzes zurück, zu dem die Pause gehört', () => {
-    const ex = exercises()
+  it('nimmt genau den Haken des Satzes zurück, der die Pause gestartet hat', () => {
+    const workout = makeWorkout()
+    const rowRef = workout.exercises[0].setDetails[1]
+    workout.exercises[0].setDetails.splice(0, 1) // Position hat sich verschoben
     const toggle = vi.fn((row) => { row.done = !row.done })
-    const clearRest = vi.fn()
-    expect(undoRestSet({ exercises: ex, exIndex: 0, rowIndex: 1, isDone, toggle, clearRest })).toBe('undone')
-    expect(toggle).toHaveBeenCalledWith(ex[0].setDetails[1], 0, 1)
-    expect(ex[0].setDetails[1].done).toBe(false)
-    expect(ex[0].setDetails[0].done).toBe(true) // andere Sätze bleiben
-    expect(clearRest).not.toHaveBeenCalled() // das Beenden der Pause übernimmt toggleRowDone
+    expect(undoRestSet({ exercises: workout.exercises, rowRef, isDone, toggle })).toBe(true)
+    expect(toggle).toHaveBeenCalledWith(rowRef, 0, 0)
+    expect(rowRef.done).toBe(false)
+    expect(workout.exercises[0].setDetails[1].done).toBe(false) // der offene dritte Satz bleibt offen
   })
 
-  it('Satz schon offen oder unbekannt: nur die Pause beenden, nichts umschalten', () => {
-    for (const [exIndex, rowIndex] of [[0, 2], [5, 0], [0, 9], [-1, -1]]) {
-      const toggle = vi.fn()
-      const clearRest = vi.fn()
-      expect(undoRestSet({ exercises: exercises(), exIndex, rowIndex, isDone, toggle, clearRest })).toBe('cleared')
-      expect(toggle).not.toHaveBeenCalled()
-      expect(clearRest).toHaveBeenCalledTimes(1)
-    }
-  })
-
-  it('ohne Übungsliste kein Fehler', () => {
-    const clearRest = vi.fn()
-    expect(undoRestSet({ exercises: undefined, exIndex: 0, rowIndex: 0, isDone, toggle: vi.fn(), clearRest })).toBe('cleared')
-    expect(clearRest).toHaveBeenCalled()
+  it('schaltet nichts um, wenn der Satz nicht (mehr) abgehakt oder nicht auffindbar ist', () => {
+    const workout = makeWorkout()
+    const toggle = vi.fn()
+    expect(undoRestSet({ exercises: workout.exercises, rowRef: workout.exercises[0].setDetails[2], isDone, toggle })).toBe(false)
+    expect(undoRestSet({ exercises: workout.exercises, rowRef: { done: true }, isDone, toggle })).toBe(false)
+    expect(undoRestSet({ exercises: undefined, rowRef: null, isDone, toggle })).toBe(false)
+    expect(toggle).not.toHaveBeenCalled()
   })
 })
