@@ -201,6 +201,13 @@ export const validateEnv = () => {
   }
   
   // 5. Erfolg
+  const modeNotice = describeEnvironmentMode()
+  if (modeNotice) {
+    const log = modeNotice.level === 'error' ? logger.error : logger.warn
+    log.call(logger, '⚠️  Umgebung ist nicht "production"')
+    modeNotice.lines.forEach((line) => log.call(logger, `   ${line}`))
+  }
+
   logger.info('✅ Umgebungsvariablen validiert')
   logger.info(`   Environment: ${process.env.NODE_ENV || 'development'}`)
   logger.info(`   Port: ${process.env.PORT || '3001'}`)
@@ -211,6 +218,33 @@ export const validateEnv = () => {
     ? `✅ OpenAI über Relay (${process.env.AI_RELAY_URL})`
     : process.env.OPENAI_API_KEY ? '✅ OpenAI (direkt)' : '⚠️  Demo-Modus'}`)
   logger.info('')
+}
+
+// Variablen, die außerhalb von NODE_ENV=production riskantes Verhalten freischalten (siehe utils/entitlements.js,
+// utils/mockUpgradeGate.js, routes/auth.js). Nur die Namen werden gemeldet, nie die Werte.
+const NON_PRODUCTION_RISK_VARS = ['SUBSCRIPTION_FORCE_PLAN', 'SUBSCRIPTION_FORCE_SCOPE', 'SUBSCRIPTION_FORCE_ALLOWLIST', 'ALLOW_MOCK_UPGRADE', 'SHOW_EMAIL_LINKS']
+
+/**
+ * Meldung für den Serverstart, wenn NODE_ENV nicht "production" ist. Auf Render (Umgebungsvariable RENDER) ist das fast
+ * sicher ein Fehler: Fehlerdetails (Stacktraces) in Antworten, ein erzwungener Plan, Demo-Upgrade und ausführlichere Logs
+ * sind dann aktiv, und die Grenzen sind lockerer.
+ * @returns {{ level: 'error'|'warn', lines: string[] }|null} null = alles in Ordnung (production)
+ */
+export function describeEnvironmentMode(env = process.env) {
+  const mode = String(env.NODE_ENV || '').trim().toLowerCase()
+  if (mode === 'production') return null
+  const onRender = String(env.RENDER || '').toLowerCase() === 'true' || Boolean(env.RENDER_SERVICE_ID)
+  const shown = env.NODE_ENV ? `"${env.NODE_ENV}"` : 'nicht gesetzt'
+  const setRisky = NON_PRODUCTION_RISK_VARS.filter((name) => String(env[name] || '').trim() !== '')
+  const lines = onRender
+    ? [
+        `NODE_ENV ist ${shown}, auf Render muss es "production" sein.`,
+        'Dadurch sind Entwicklungsfunktionen aktiv: Fehlerantworten mit Stacktrace, erzwungener Plan, Demo-Upgrade, E-Mail-Links in den Logs.',
+        'Bitte in Render unter Environment NODE_ENV=production setzen.'
+      ]
+    : [`NODE_ENV ist ${shown} (Entwicklungsmodus): Das ist lokal in Ordnung, in der Produktion muss es "production" sein.`]
+  if (setRisky.length) lines.push(`Gesetzt und nur außerhalb von production wirksam: ${setRisky.join(', ')}`)
+  return { level: onRender ? 'error' : 'warn', lines }
 }
 
 /**
