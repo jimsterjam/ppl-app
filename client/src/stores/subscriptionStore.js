@@ -68,7 +68,7 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     features: []
   })
   
-  const usage = ref({
+  const createDefaultUsage = () => ({
     workoutsThisWeek: 0,
     workoutsThisMonth: 0,
     totalWorkouts: 0,
@@ -85,6 +85,8 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     quickGenerationsThisMonth: 0,
     quickGenerationMonth: null
   })
+
+  const usage = ref(createDefaultUsage())
   
   const limits = ref({
     free: {
@@ -160,9 +162,26 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     return snapshot
   }
 
+  // Kontowechsel (Absprache Paul 05.11.): Plan, Nutzung und die lokalen Zwischenspeicher gehören zum bisherigen Konto. Ohne
+  // Zurücksetzen erbt ein anderes Konto in derselben Sitzung dessen Plan (z. B. Pro: dann fehlt die Kontingent-Karte, und
+  // echte Monatsberichte erscheinen). Antworten einer noch laufenden Abfrage des alten Kontos werden verworfen.
+  let userEpoch = 0
+  const resetForUserChange = () => {
+    userEpoch += 1
+    try {
+      localStorage.removeItem('bro_split_subscription')
+      localStorage.removeItem(USAGE_KEY)
+    } catch {}
+    subscription.value = buildPlanSnapshot('free')
+    usage.value = createDefaultUsage()
+    subscriptionCooldownUntil = 0
+    subscriptionCheckPromise = null
+  }
+
   // Subscription Status checken
   const checkSubscription = async (planOverride = null, options = {}) => {
     const force = options?.force === true
+    const epoch = userEpoch
     const effectiveForcedPlan = isValidForcedPlan ? ENV_FORCE_PLAN : null
 
     try {
@@ -205,6 +224,7 @@ export const useSubscriptionStore = defineStore('subscription', () => {
         const token = await getAuthToken()
         if (token) {
           const remote = await fetchSubscriptionStatus(token)
+          if (epoch !== userEpoch) return subscription.value // Konto inzwischen gewechselt: Antwort gehört zum alten Konto
           const remoteSub = remote?.subscription || null
           const remoteUsage = remote?.usage || null
 
@@ -448,6 +468,7 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     limits,
     pricing,
     devPlanOverride,
+    resetForUserChange,
     
     // Actions
     checkSubscription,
