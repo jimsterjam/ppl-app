@@ -3,7 +3,7 @@ import { nextDelayMs, classifyFeedbackResponse, isFinalHttpError, RETRY_DELAYS_M
 
 describe('feedbackRetryRules', () => {
   it('Abstand wächst und bleibt dann beim letzten Wert', () => {
-    expect(nextDelayMs(0)).toBe(30_000)
+    expect(nextDelayMs(0)).toBe(15_000)
     expect(nextDelayMs(1)).toBe(60_000)
     expect(nextDelayMs(99)).toBe(RETRY_DELAYS_MS[RETRY_DELAYS_MS.length - 1])
   })
@@ -30,5 +30,16 @@ describe('feedbackRetryRules', () => {
     expect(isFinalHttpError(429)).toBe(false)
     expect(isFinalHttpError(502)).toBe(false)
     expect(isFinalHttpError(undefined)).toBe(false)
+  })
+
+  it('503 (z. B. AI_QUOTA_UNAVAILABLE bei kurzem Datenbankfehler) bleibt wiederholbar, leeres Kontingent ist endgültig', () => {
+    expect(isFinalHttpError(503)).toBe(false)
+    // Ein leeres Kontingent kommt dagegen als 200 mit quota_limited und ist endgültig.
+    expect(classifyFeedbackResponse({ success: true, feedback_status: 'quota_limited' })).toBe('final')
+  })
+
+  it('der erste erneute Versuch kommt nach 15 Sekunden (so lang wie der Takt des Trackers)', () => {
+    expect(RETRY_DELAYS_MS[0]).toBe(15_000)
+    expect(nextDelayMs(0)).toBe(15_000)
   })
 })
