@@ -944,6 +944,7 @@
       @minimize="focus.minimize()"
       @adjust-next="onNextSetAdjust"
       @spin-next="onNextSetSpin"
+      @undo-last-set="undoLastSet"
     />
     <!-- Übergangs-Stoppuhr nach der letzten Übung (startet in toggleRowDone, endet mit "Übung starten"). -->
     <TransitionTimer
@@ -1138,6 +1139,7 @@ import { restSecondsFor, sanitizeCustomRest, formatRest } from '@/utils/restTime
 import RestTimerBar from '@/components/timer/RestTimerBar.vue'
 import TransitionTimer from '@/components/timer/TransitionTimer.vue'
 import FocusMode from '@/components/FocusMode.vue'
+import { undoRestSet } from '@/utils/undoRestSet'
 import { useFocusModeStore } from '@/stores/focusModeStore'
 import { createFocusStateTracker, applyFocusState } from '@/utils/focusStatePersistence'
 import { buildSaveReview, markAllSetsDone } from '@/utils/saveReview'
@@ -2162,6 +2164,18 @@ function toggleRowDone(row, exIndex = -1, rowIndex = -1) {
 
 // --- Pausentimer -----------------------------------------------------------------------------
 const restTimer = useRestTimerStore()
+// "Letzten Satz zurücknehmen" in der Pause (Absprache Paul 05.11.): Haken des Satzes, zu dem die Pause gehört, wieder
+// entfernen. toggleRowDone beendet dabei die Pause; die Großansicht zeigt danach automatisch wieder diesen Satz.
+function undoLastSet() {
+  undoRestSet({
+    exercises: workout.value?.exercises,
+    exIndex: restTimer.exIndex,
+    rowIndex: restTimer.rowIndex,
+    isDone: isRowDone,
+    toggle: toggleRowDone,
+    clearRest: () => restTimer.clear()
+  })
+}
 const transition = useTransitionTimerStore()
 const warmupTimer = useWarmupTimerStore()
 
