@@ -62,6 +62,20 @@ export const useAuthStore = defineStore('auth', {
     isOfflineSessionValid: (state) => !!state.user && Boolean(state.tokenExpiresAt) && Date.now() < state.tokenExpiresAt,
   },
   actions: {
+    /**
+     * Token des bisherigen Kontos sofort vergessen (Kontowechsel): Zwischen dem Zurücksetzen und dem Setzen des neuen Tokens
+     * darf kein Aufruf den alten als Ersatz (getStoreTokenFallback in utils/authToken.js) oder als Ablaufzeit des neuen Kontos
+     * lesen. Das Konto (user) bleibt bis setUser unverändert.
+     */
+    dropToken() {
+      this.idToken = null
+      this.tokenExpiresAt = 0
+      try {
+        localStorage.removeItem(AUTH_TOKEN_EXP_KEY)
+      } catch (err) {
+        logger.warn('[authStore] Failed to clear stored token exp:', err)
+      }
+    },
     setUser(user, idToken = null) {
       logger.debug('[authStore] setUser called with user:', user?.uid)
       this.user = user

@@ -7,6 +7,9 @@ import router from './router'
 import { createI18nInstance } from './i18n'
 import { useThemeStore } from './stores/themeStore'
 import { useSubscriptionStore } from './stores/subscriptionStore'
+import { useMonthlyReportStore } from './stores/monthlyReportStore'
+import { resetUserBoundStores } from './utils/userSessionReset'
+import { clearAuthTokenCache } from './utils/authToken'
 import { useAuthStore } from './stores/authStore'
 import { useUserStore } from './stores/userStore'
 import { useSettingsStore } from './stores/settingsStore'
@@ -248,7 +251,14 @@ async function bootstrapAuth() {
   const onboardingStore = useOnboardingStore(pinia)
   const coachMarkStore = useCoachMarkStore(pinia)
   const aiConsentStore = useAiConsentStore(pinia)
+  const accountSubscriptionStore = useSubscriptionStore(pinia)
+  const accountMonthlyReportStore = useMonthlyReportStore(pinia)
   let lastUid = authStore.uid || null
+  // Token des bisherigen Kontos überall vergessen: Zwischenspeicher in authToken.js UND der Ersatz im authStore.
+  const dropAccountTokens = () => {
+    clearAuthTokenCache()
+    authStore.dropToken()
+  }
 
   logger.debug('[main] Initializing auth listener, store auth state:', authStore.isAuthenticated)
 
@@ -265,8 +275,14 @@ async function bootstrapAuth() {
   onAuthStateChanged(async (user) => {
     logger.debug('[main] Firebase auth state changed:', user ? user.uid : 'null')
     if (user) {
+      const accountChanged = lastUid !== user.uid
       if (lastUid && lastUid !== user.uid) {
         userStore.$reset()
+      }
+      // Bei jeder Anmeldung mit geänderter Nutzer-ID, auch beim ersten Rückruf nach einem Kaltstart ohne gemerktes Konto:
+      // die lokalen Zwischenspeicher (Plan, Nutzung, Token) können zu einem früheren Konto gehören.
+      if (accountChanged) {
+        resetUserBoundStores({ subscription: accountSubscriptionStore, monthlyReports: accountMonthlyReportStore, clearAuthToken: dropAccountTokens })
       }
       lastUid = user.uid
       // Account-spezifische Daten (avatar, username) für diesen User laden
@@ -297,6 +313,12 @@ async function bootstrapAuth() {
         // Kommentar in firebaseAuth.js) - sonst verlieren genau diese Nutzer den Datenzugriff.
         emailVerified: isEffectivelyEmailVerified(user),
       }, token)
+
+      // Neues Konto (Anmeldung nach Abmeldung oder Kontowechsel): Plan und Kontingent frisch vom Server holen, statt auf eine
+      // spätere Ansicht zu warten (die Kontingent-Karte erscheint z. B. nur, wenn der Plan schon als "free" bekannt ist).
+      if (accountChanged && token) {
+        accountSubscriptionStore.checkSubscription(null, { force: true }).catch(() => {})
+      }
 
       if (token) {
         logger.debug('[main] Trigger processSyncQueue after auth', {
@@ -397,6 +419,7 @@ async function bootstrapAuth() {
       aiConsentStore.switchUser(null)
       authStore.clearUser()
       userStore.$reset()
+      resetUserBoundStores({ subscription: accountSubscriptionStore, monthlyReports: accountMonthlyReportStore, clearAuthToken: dropAccountTokens })
       clearResumeSnapshot()
     }
   })
