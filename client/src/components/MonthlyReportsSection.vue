@@ -15,7 +15,7 @@
         </button>
       </li>
     </ul>
-    <p v-else class="reports-empty">{{ t('monthlyReport.sectionLoading') }}</p>
+    <p v-else class="reports-empty">{{ store.failed ? t('monthlyReport.sectionUnavailable') : t('monthlyReport.sectionLoading') }}</p>
   </section>
 
   <MonthlyReportModal
