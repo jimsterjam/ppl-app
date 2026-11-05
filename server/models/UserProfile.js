@@ -64,6 +64,13 @@ const userProfileSchema = new mongoose.Schema({
       type: Number,
       default: 0,
       min: 0
+    },
+    // Willkommenskontingent der ersten Tage nach der Registrierung (utils/aiQuota.js): eigener Topf, wird nicht
+    // zurückgesetzt. Bestehende Dokumente ohne Feld starten bei 0.
+    welcomeCount: {
+      type: Number,
+      default: 0,
+      min: 0
     }
   },
   analyticsEnabled: {
