@@ -2,7 +2,7 @@
 // damit sie direkt testbar sind.
 
 // Wartezeit vor dem n-ten erneuten Versuch (danach bleibt es beim letzten Wert).
-export const RETRY_DELAYS_MS = [30_000, 60_000, 120_000, 240_000, 480_000, 600_000]
+export const RETRY_DELAYS_MS = [15_000, 60_000, 120_000, 240_000, 480_000, 600_000]
 // Muss zu FEEDBACK_PENDING_FAILED_AFTER_MS auf dem Server passen.
 export const GIVE_UP_AFTER_MS = 30 * 60 * 1000
 // Server weckt ggf. erst den Relay (bis ~100 s) und generiert dann - großzügig bemessen.
