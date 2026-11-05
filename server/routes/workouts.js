@@ -47,7 +47,7 @@ import {
 import { decideExerciseMatch } from '../utils/exerciseMatching.js';
 import { getMaxExerciseCount } from '../utils/exerciseCountTarget.js';
 import { readAiQuotaConfig, getAiQuotaState, canUseAi, aiQuotaSnapshot } from '../utils/aiQuota.js';
-import { claimAiQuotaSlot, releaseAiQuotaSlot } from '../utils/aiQuotaClaim.js';
+import { claimAiQuotaSlot, releaseAiQuotaSlot, withAiQuotaSlot } from '../utils/aiQuotaClaim.js';
 import { ensureAccountCreatedAt } from '../utils/accountCreation.js';
 import { extractNoteQuestions } from '../utils/noteQuestions.js';
 import { answerNoteQuestions } from '../services/noteQuestionService.js';
@@ -2919,31 +2919,50 @@ router.post("/ai-progress-feedback", firebaseAuthMiddleware, requireAiConsent, a
       top_declines: trainingData.progression === 'negative' ? [{ exercise: trainingData.exercise, volume_change_percent: trainingData.volume_change_percent }] : []
     };
 
-    // Rufe AI Service auf
+    // Rufe AI Service auf - wie die anderen KI-Endpunkte nur mit freiem Platz im Kontingent (Gratis-Konten), der Platz wird
+    // atomar vor dem Aufruf beansprucht und ohne Ergebnis zurückgegeben (utils/aiQuotaClaim.js).
     const aiService = getAIService();
     let feedback = null;
     let aiError = null;
+    const entitlements = await getEntitlements(userId);
 
-    try {
-      const aiResult = await aiService.generateTrainingAnalysis(analysisForAI, {
-        requestId,
-        temperature: 0.6
-      });
-      feedback = aiResult.feedback;
+    const slot = await withAiQuotaSlot({
+      claim: () => claimAiSlot(entitlements),
+      release: (claim) => releaseAiSlot(entitlements, claim),
+      run: async () => {
+        try {
+          const aiResult = await aiService.generateTrainingAnalysis(analysisForAI, {
+            requestId,
+            temperature: 0.6
+          });
+          logger.debug('✅ Progress feedback generated', {
+            requestId,
+            exercise,
+            provider: aiService.getProviderName()
+          });
+          return aiResult.feedback || null;
+        } catch (error) {
+          aiError = error;
+          logger.error('❌ AI generation failed', {
+            requestId,
+            provider: aiService.getProviderName(),
+            error: error.message
+          });
+          return null;
+        }
+      }
+    });
 
-      logger.debug('✅ Progress feedback generated', {
-        requestId,
-        exercise,
-        provider: aiService.getProviderName()
-      });
-    } catch (error) {
-      aiError = error;
-      logger.error('❌ AI generation failed', {
-        requestId,
-        provider: aiService.getProviderName(),
-        error: error.message
+    if (slot.limited) {
+      logger.info('🚫 Progress feedback: Free-Plan-Kontingent erschöpft', { requestId, userId });
+      return res.status(429).json({
+        error: 'AI quota exhausted',
+        code: 'AI_QUOTA_EXHAUSTED',
+        aiUsage: getAiLimitSnapshot(entitlements),
+        requestId
       });
     }
+    feedback = slot.result;
 
     // Gib Antwort zurück
     if (feedback) {

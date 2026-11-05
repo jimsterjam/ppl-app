@@ -114,3 +114,46 @@ describe('KI-Kontingent: Platz zurückgeben', () => {
     assert.equal(model.doc.aiUsage.welcomeCount, 5)
   })
 })
+
+import { withAiQuotaSlot } from '../aiQuotaClaim.js'
+
+describe('KI-Kontingent: Aufruf nur mit Platz, Rückgabe ohne Ergebnis', () => {
+  const make = (claimed) => {
+    const log = { ran: 0, released: 0 }
+    return {
+      log,
+      claim: async () => ({ claimed }),
+      release: async () => { log.released += 1 }
+    }
+  }
+
+  it('ohne freien Platz wird der KI-Aufruf gar nicht ausgeführt', async () => {
+    const m = make(false)
+    const out = await withAiQuotaSlot({ ...m, run: async () => { m.log.ran += 1; return 'text' } })
+    assert.deepEqual(out, { limited: true })
+    assert.equal(m.log.ran, 0)
+    assert.equal(m.log.released, 0)
+  })
+
+  it('mit Ergebnis bleibt der Platz verbraucht', async () => {
+    const m = make(true)
+    const out = await withAiQuotaSlot({ ...m, run: async () => 'Feedback' })
+    assert.deepEqual(out, { limited: false, result: 'Feedback' })
+    assert.equal(m.log.released, 0)
+  })
+
+  it('ohne Ergebnis (leer oder null) geht der Platz zurück', async () => {
+    for (const empty of [null, '', undefined]) {
+      const m = make(true)
+      const out = await withAiQuotaSlot({ ...m, run: async () => empty })
+      assert.equal(out.limited, false)
+      assert.equal(m.log.released, 1)
+    }
+  })
+
+  it('bei einem Fehler geht der Platz zurück und der Fehler bleibt sichtbar', async () => {
+    const m = make(true)
+    await assert.rejects(() => withAiQuotaSlot({ ...m, run: async () => { throw new Error('boom') } }), /boom/)
+    assert.equal(m.log.released, 1)
+  })
+})
