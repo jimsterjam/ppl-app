@@ -22,6 +22,16 @@ export function originalExerciseName(oldExercise) {
   return earlier && oldExercise?.replacedScope !== 'plan' ? earlier : oldExercise?.name || ''
 }
 
+/**
+ * Geltungsbereich, der mit dem Workout gespeichert wird (Monatsbericht): 'plan' nur, wenn „auch im Plan“ gewählt war
+ * UND die Planänderung geklappt hat; sonst 'today'.
+ * @param {'today'|'plan'|string} chosenScope
+ * @param {{ ok?: boolean } | null | undefined} planResult Ergebnis von replaceExerciseInPlanDay (undefined = nicht versucht)
+ */
+export function resolveSwapScope(chosenScope, planResult) {
+  return chosenScope === 'plan' && planResult?.ok === true ? 'plan' : 'today'
+}
+
 /** Neue Übung für das laufende Workout (gleiche Form wie „Übung hinzufügen“); `replacedFrom` nur für den Hinweis in der Sitzung. */
 export function buildSwappedExercise(oldExercise, entry) {
   return {

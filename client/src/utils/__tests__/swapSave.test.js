@@ -51,3 +51,25 @@ describe('Gewicht im Bericht', () => {
     expect(formatWeight(80, 'de')).toBe('80')
   })
 })
+
+import { resolveSwapScope } from '../exerciseSwapApply.js'
+
+describe('Plan-Bereich erst nach erfolgreicher Planänderung', () => {
+  it('„auch im Plan“ + Planänderung geklappt = plan', () => {
+    expect(resolveSwapScope('plan', { ok: true })).toBe('plan')
+  })
+  it('„auch im Plan“, aber Planänderung fehlgeschlagen = nur heute', () => {
+    expect(resolveSwapScope('plan', { ok: false, error: 'storage' })).toBe('today')
+    expect(resolveSwapScope('plan', { ok: false })).toBe('today')
+  })
+  it('„auch im Plan“ ohne Ergebnis (nicht versucht) = nur heute', () => {
+    expect(resolveSwapScope('plan', undefined)).toBe('today')
+    expect(resolveSwapScope('plan', null)).toBe('today')
+  })
+  it('„nur heute“ bleibt heute, auch wenn ein Ergebnis ok wäre', () => {
+    expect(resolveSwapScope('today', { ok: true })).toBe('today')
+  })
+  it('unbekannter Wert = nur heute', () => {
+    expect(resolveSwapScope('evil', { ok: true })).toBe('today')
+  })
+})

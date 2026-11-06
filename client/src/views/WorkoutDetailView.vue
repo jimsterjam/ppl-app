@@ -1089,7 +1089,7 @@ import AppModal from '@/components/AppModal.vue'
 import ExerciseList from '@/components/ExerciseList.vue'
 import ExerciseSwapModal from '@/components/ExerciseSwapModal.vue'
 import CoachMarks from '@/components/CoachMarks.vue'
-import { buildSwappedExercise, canSwapExercise, replaceExerciseInPlanDay } from '@/utils/exerciseSwapApply'
+import { buildSwappedExercise, canSwapExercise, replaceExerciseInPlanDay, resolveSwapScope } from '@/utils/exerciseSwapApply'
 import { getPlanDayInfo, planDayTitle } from '@/utils/planProgress'
 import WorkoutTimerConfig from '@/components/timer/WorkoutTimerConfig.vue'
 import TimerMenu from '@/components/timer/TimerMenu.vue'
@@ -2840,7 +2840,7 @@ function onSwapExercise({ entry, scope }) {
       : { ok: false }
     // Nur nach erfolgreicher Planänderung gilt der Wechsel als "im Plan" (Monatsbericht), sonst bleibt es "nur heute".
     const swapped = workout.value?.exercises?.[index]
-    if (result.ok && swapped) {
+    if (swapped && resolveSwapScope(scope, result) === 'plan') {
       swapped.replacedScope = 'plan'
       if (!isFavoriteAdjustMode.value) {
         try { triggerAutoSave() } catch {}
