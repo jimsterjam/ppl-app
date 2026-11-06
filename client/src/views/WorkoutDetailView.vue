@@ -2824,7 +2824,7 @@ function onSwapExercise({ entry, scope }) {
   const index = swapIndex.value
   const old = workout.value?.exercises?.[index]
   if (!old || !entry) return
-  workout.value.exercises.splice(index, 1, { ...buildSwappedExercise(old, entry), replacedScope: scope === 'plan' ? 'plan' : 'today' })
+  workout.value.exercises.splice(index, 1, { ...buildSwappedExercise(old, entry), replacedScope: 'today' })
   if (Array.isArray(exerciseNotes.value)) exerciseNotes.value[index] = ''
   ensureSetDetailsStructure()
   if (!isFavoriteAdjustMode.value) {
@@ -2838,6 +2838,14 @@ function onSwapExercise({ entry, scope }) {
     const result = info?.hasWorkout
       ? replaceExerciseInPlanDay({ userId: getFavoriteUserId(), planId, dayId: planDayId, oldExercise: old, entry })
       : { ok: false }
+    // Nur nach erfolgreicher Planänderung gilt der Wechsel als "im Plan" (Monatsbericht), sonst bleibt es "nur heute".
+    const swapped = workout.value?.exercises?.[index]
+    if (result.ok && swapped) {
+      swapped.replacedScope = 'plan'
+      if (!isFavoriteAdjustMode.value) {
+        try { triggerAutoSave() } catch {}
+      }
+    }
     toast.show(result.ok ? t('swap.planUpdated') : t('swap.planUpdateFailed'), { type: result.ok ? 'success' : 'warning', duration: 3000 })
   }
 }

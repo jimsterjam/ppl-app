@@ -18,6 +18,11 @@ export function formatNumber(value, locale = 'de') {
   return new Intl.NumberFormat(localeTag(locale), { maximumFractionDigits: 0 }).format(Number(value) || 0)
 }
 
+/** Gewicht in kg mit bis zu 2 Nachkommastellen (82,5 kg und 1,25-kg-Schritte bleiben erhalten). */
+export function formatWeight(value, locale = 'de') {
+  return new Intl.NumberFormat(localeTag(locale), { maximumFractionDigits: 2 }).format(Number(value) || 0)
+}
+
 /**
  * Vergleich mit dem Vormonat für eine Kennzahl.
  * @returns {null | { key: 'more'|'fewer'|'same', diff: number }} null = kein Vormonat vorhanden

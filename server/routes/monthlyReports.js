@@ -21,6 +21,7 @@ import Workout from '../models/Workout.js';
 import UserProfile from '../models/UserProfile.js';
 import MonthlyReport from '../models/MonthlyReport.js';
 import Exercise from '../models/Exercise.js';
+import { buildMuscleMap, collectObjectIds } from '../utils/muscleGroups.js';
 import {
   buildMonthlyReport,
   countSessionsInPeriod,
@@ -70,27 +71,23 @@ const defaultDeps = {
     const first = await Workout.findOne({ userId, completed: true }).sort({ date: 1 }).select('date').lean();
     return first?.date || null;
   },
-  // Hauptmuskelgruppe je Übung (erste Gruppe im Katalog) für "Sätze pro Muskelgruppe". Fehler -> leere Zuordnung:
-  // Der Bericht entsteht dann ohne diesen Abschnitt statt gar nicht.
+  // Hauptmuskelgruppe je Übung für "Sätze pro Muskelgruppe": eigene Übungen aus der Datenbank, mitgelieferte Katalog-IDs
+  // ("ex_0001") und Übungen ohne ID über den Namen aus dem Katalog (utils/muscleGroups.js). Fehler -> Bericht entsteht
+  // ohne diesen Abschnitt statt gar nicht.
   async loadMuscleGroups(workouts) {
-    const ids = new Set();
-    for (const workout of workouts) {
-      for (const ex of workout.exercises || []) {
-        const id = String(ex?.exerciseId || '');
-        if (/^[a-f0-9]{24}$/i.test(id)) ids.add(id);
+    const dbById = new Map();
+    const ids = collectObjectIds(workouts);
+    if (ids.length) {
+      try {
+        const rows = await Exercise.find({ _id: { $in: ids } }).select('muscleGroups').lean();
+        for (const row of rows) {
+          if (row.muscleGroups?.[0]) dbById.set(String(row._id), row.muscleGroups[0]);
+        }
+      } catch (error) {
+        logger.warn('[reports] Muskelgruppen konnten nicht geladen werden', { error: error?.message });
       }
     }
-    const map = new Map();
-    if (!ids.size) return map;
-    try {
-      const rows = await Exercise.find({ _id: { $in: [...ids] } }).select('muscleGroups').lean();
-      for (const row of rows) {
-        if (row.muscleGroups?.[0]) map.set(String(row._id), row.muscleGroups[0]);
-      }
-    } catch (error) {
-      logger.warn('[reports] Muskelgruppen konnten nicht geladen werden', { error: error?.message });
-    }
-    return map;
+    return buildMuscleMap(workouts, { dbById });
   },
   async loadWorkouts(userId, now) {
     const since = new Date(now.getTime() - REPORT_HISTORY_DAYS * MS_PER_DAY);

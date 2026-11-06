@@ -175,3 +175,38 @@ describe('Empfehlungen (höchstens 3, "nichts zu ändern" ist gültig)', () => {
     assert.deepEqual(f.recommendations, [])
   })
 })
+
+import { buildMuscleMap, collectObjectIds, loadCatalogMuscles } from '../muscleGroups.js'
+
+describe('Muskelgruppen aus Katalog-IDs, Datenbank-IDs und Namen', () => {
+  const catalog = loadCatalogMuscles([
+    { _id: 'ex_0001', name: 'Bankdrücken', name_en: 'bench press barbell', muscleGroup: 'Brust' },
+    { _id: 'ex_0002', name: 'Kniebeuge', name_en: 'squat', muscleGroup: 'Quadrizeps' }
+  ])
+  const workouts = [{ exercises: [
+    { exerciseId: 'ex_0001', name: 'Bench Press Barbell' },
+    { exerciseId: '507f1f77bcf86cd799439011', name: 'Eigene Übung' },
+    { name: 'Squat' },
+    { exerciseId: 'ex_9999', name: 'Unbekannt' }
+  ] }]
+  test('nur echte ObjectIds gehen in die Datenbankabfrage', () => {
+    assert.deepEqual(collectObjectIds(workouts), ['507f1f77bcf86cd799439011'])
+  })
+  test('Katalog-ID, Datenbank-ID und Name ohne ID werden aufgelöst', () => {
+    const map = buildMuscleMap(workouts, { dbById: new Map([['507f1f77bcf86cd799439011', 'Rücken']]), catalog })
+    assert.equal(map.get('ex_0001'), 'Brust')
+    assert.equal(map.get('507f1f77bcf86cd799439011'), 'Rücken')
+    assert.equal(map.get('name:squat'), 'Quadrizeps')
+    assert.equal(map.has('ex_9999'), false)
+  })
+  test('Sätze werden auch bei Katalog-ID und ohne ID gezählt', () => {
+    const map = buildMuscleMap(workouts, { catalog })
+    const s = [
+      session(0, [{ name: 'Bench Press Barbell', sets: sets(60, 8, 4), ex: { exerciseId: 'ex_0001' } }, { name: 'Squat', sets: sets(80, 5, 4), ex: {} }])
+    ]
+    assert.deepEqual(buildMuscleSetFindings(s, map, 4).items, [{ muscle: 'Brust', setsPerWeek: 1 }, { muscle: 'Quadrizeps', setsPerWeek: 1 }])
+  })
+  test('echter Katalog hat Muskelgruppen für Katalog-IDs', () => {
+    assert.equal(loadCatalogMuscles().byId.get('ex_0001'), 'Bauch')
+  })
+})

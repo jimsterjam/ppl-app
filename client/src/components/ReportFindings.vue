@@ -57,7 +57,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
-import { formatNumber } from '@/utils/monthlyReportView'
+import { formatNumber, formatWeight } from '@/utils/monthlyReportView'
 
 const props = defineProps({
   findings: { type: Object, required: true }
@@ -80,7 +80,7 @@ const muscleLabel = (muscle) => (te(`monthlyReport.findings.muscle.${muscle}`) ?
 function setText(set) {
   const reps = formatNumber(set.reps, locale.value)
   return set.weight > 0
-    ? t('monthlyReport.findings.setWeighted', { weight: formatNumber(set.weight, locale.value), reps })
+    ? t('monthlyReport.findings.setWeighted', { weight: formatWeight(set.weight, locale.value), reps })
     : t('monthlyReport.findings.setBodyweight', { reps })
 }
 

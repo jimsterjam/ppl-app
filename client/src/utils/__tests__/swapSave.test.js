@@ -26,3 +26,28 @@ describe('Speichern übernimmt den Übungswechsel', () => {
     expect('replacedScope' in saved).toBe(false)
   })
 })
+
+import { buildSwappedExercise, originalExerciseName } from '../exerciseSwapApply.js'
+import { formatWeight } from '../monthlyReportView.js'
+
+describe('Zweiter Tausch behält die ursprüngliche Übung', () => {
+  const entry = { _id: 'ex_1', name: 'Cable Fly', muscleGroup: 'Brust' }
+  it('erster Tausch: aktuelle Übung', () => {
+    expect(buildSwappedExercise({ name: 'Bench Press' }, entry).replacedFrom).toBe('Bench Press')
+  })
+  it('zweiter Tausch ("nur heute"): bleibt bei der ersten Übung', () => {
+    expect(buildSwappedExercise({ name: 'Incline Press', replacedFrom: 'Bench Press', replacedScope: 'today' }, entry).replacedFrom).toBe('Bench Press')
+  })
+  it('war der erste Tausch im Plan gespeichert, ist die Zwischenübung die geplante', () => {
+    expect(originalExerciseName({ name: 'Incline Press', replacedFrom: 'Bench Press', replacedScope: 'plan' })).toBe('Incline Press')
+  })
+})
+
+describe('Gewicht im Bericht', () => {
+  it('82,5 kg und 1,25-kg-Schritte bleiben erhalten', () => {
+    expect(formatWeight(82.5, 'de')).toBe('82,5')
+    expect(formatWeight(82.5, 'en')).toBe('82.5')
+    expect(formatWeight(81.25, 'de')).toBe('81,25')
+    expect(formatWeight(80, 'de')).toBe('80')
+  })
+})

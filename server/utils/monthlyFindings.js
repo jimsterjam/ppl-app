@@ -206,7 +206,8 @@ export function buildMuscleSetFindings(periodSessions, muscleByExerciseId, weeks
   const totals = new Map();
   for (const session of periodSessions) {
     for (const entry of session.exercises) {
-      const muscle = muscleByExerciseId.get(String(entry.ex?.exerciseId || ''));
+      const muscle = muscleByExerciseId.get(String(entry.ex?.exerciseId || ''))
+        || muscleByExerciseId.get(`name:${String(entry.name || '').trim().toLowerCase()}`);
       if (!muscle) continue;
       totals.set(muscle, (totals.get(muscle) || 0) + entry.sets.length);
     }
