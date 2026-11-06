@@ -1,10 +1,12 @@
 import { createI18n } from 'vue-i18n'
 
+import { readPref, writePref } from '../utils/userScopedStorage.js'
+
 const STORAGE_KEY = 'app-lang'
 
 function detectLocale() {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY)
+    const stored = readPref(STORAGE_KEY)
     if (stored) return stored
   } catch {}
   const nav = (typeof navigator !== 'undefined' && navigator.language) || 'de'
@@ -3512,7 +3514,7 @@ export function createI18nInstance() {
 
 export function setLocale(i18n, locale) {
   i18n.global.locale.value = locale
-  try { localStorage.setItem(STORAGE_KEY, locale) } catch {}
+  writePref(STORAGE_KEY, locale)
 }
 
 // Sprache für serverseitig erzeugte Texte (z.B. KI-Feedback): nur 'de' oder 'en'.
@@ -3521,5 +3523,5 @@ export function getAppLanguage() {
 }
 
 export function getStoredLocale() {
-  try { return localStorage.getItem(STORAGE_KEY) || detectLocale() } catch { return detectLocale() }
+  return readPref(STORAGE_KEY) || detectLocale()
 }

@@ -18,6 +18,8 @@ import { useFirebaseAuth } from './firebaseAuth'
 import { logger } from './logger'
 import { getAppLanguage } from '@/i18n'
 import { isValidObjectId } from './workoutHelpers'
+import { belongsToActiveAccount, getActiveUid } from './userScopedStorage'
+import { createAccountGuard } from './accountGuard'
 import { AI_FEEDBACK_UPDATED_EVENT } from './offlineStorage'
 
 const STORAGE_KEY = 'ppl_feedback_tracker_v1'
@@ -59,7 +61,7 @@ export function trackPendingFeedback(workoutId, { name = '', firstDelayMs = RETR
   if (existing) {
     if (name && !existing.name) existing.name = name
   } else {
-    list.push({ id, name, queuedAt: Date.now(), attempts: 0, nextAt: Date.now() + firstDelayMs })
+    list.push({ uid: getActiveUid(), id, name, queuedAt: Date.now(), attempts: 0, nextAt: Date.now() + firstDelayMs })
   }
   save(list)
 }
@@ -87,15 +89,25 @@ export async function runFeedbackTracker() {
   if (running) return
   running = true
   try {
+    // Konto vom Start festhalten: wechselt es während der asynchronen Schritte, wird nichts mehr für fremde Einträge angefragt.
+    const guard = createAccountGuard()
+    if (!guard.hasAccount) return
     const now = Date.now()
-    const due = load().filter((entry) => (entry.nextAt || 0) <= now)
+    // Einträge eines anderen Kontos, die nie mehr abgearbeitet werden, verfallen nach derselben Frist (ohne Meldung).
+    const all = load()
+    const kept = all.filter((entry) => belongsToActiveAccount(entry) || now - (entry.queuedAt || 0) <= GIVE_UP_AFTER_MS)
+    if (kept.length !== all.length) save(kept)
+    // Nur Einträge des angemeldeten Kontos abarbeiten; die eines anderen Kontos bleiben für dessen nächste Anmeldung liegen.
+    const due = load().filter((entry) => belongsToActiveAccount(entry) && (entry.nextAt || 0) <= now)
     if (!due.length) return
 
     const { getIdToken } = useFirebaseAuth()
     const token = await getIdToken().catch(() => null)
     if (!token) return
+    if (!guard.isStillActive() || !guard.tokenMatches(token)) return
 
     for (const entry of due) {
+      if (!guard.isStillActive()) break
       // Aufgeben: der Feedback-Verlauf zeigt dann "Erneut versuchen" (Server-Status 'failed').
       if (Date.now() - (entry.queuedAt || 0) > GIVE_UP_AFTER_MS) {
         untrackFeedback(entry.id)
@@ -116,6 +128,9 @@ export async function runFeedbackTracker() {
         outcome = isFinalHttpError(err?.response?.status) ? 'final' : 'retry'
         logger.debug('[feedbackTracker] Versuch fehlgeschlagen', { id: entry.id, status: err?.response?.status, message: err?.message })
       }
+
+      // Konto während der Anfrage gewechselt: nichts melden (Toast mit Workout-Namen) und den Eintrag liegen lassen.
+      if (!guard.isStillActive()) break
 
       if (outcome === 'retry') {
         const list = load()

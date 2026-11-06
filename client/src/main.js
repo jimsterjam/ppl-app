@@ -17,6 +17,11 @@ import { useOnboardingStore } from './stores/onboardingStore'
 import { useCoachMarkStore } from './stores/coachMarkStore'
 import { useAiConsentStore } from './stores/aiConsentStore'
 import { useTimerStore } from './stores/timerStore'
+import { useRestTimerStore } from './stores/restTimerStore'
+import { useWarmupTimerStore } from './stores/warmupTimerStore'
+import { useTransitionTimerStore } from './stores/transitionTimerStore'
+import { useSessionStopwatchStore } from './stores/sessionStopwatch'
+import { applyUserPreferences } from './utils/userPreferences'
 import { initFirebaseAuth, useFirebaseAuth, isEffectivelyEmailVerified } from './utils/firebaseAuth'
 import { getActiveDraft, runningWorkoutPath } from './utils/activeWorkoutDraft'
 import { reconcileFavoritesWithServer } from './utils/workoutFavorites'
@@ -254,6 +259,17 @@ async function bootstrapAuth() {
   const accountSubscriptionStore = useSubscriptionStore(pinia)
   const accountMonthlyReportStore = useMonthlyReportStore(pinia)
   let lastUid = authStore.uid || null
+  // Einstellungen gehören zum Konto (utils/userScopedStorage.js): bei Anmeldung laden, beim Abmelden auf Standard.
+  const applyAccountPreferences = (uid) => applyUserPreferences(uid, {
+    theme: useThemeStore(pinia),
+    settings: settingsStore,
+    restTimer: useRestTimerStore(pinia),
+    warmupTimer: useWarmupTimerStore(pinia),
+    transitionTimer: useTransitionTimerStore(pinia),
+    stopwatch: useSessionStopwatchStore(pinia),
+    timer: useTimerStore(pinia),
+    i18n
+  })
   // Token des bisherigen Kontos überall vergessen: Zwischenspeicher in authToken.js UND der Ersatz im authStore.
   const dropAccountTokens = () => {
     clearAuthTokenCache()
@@ -285,6 +301,7 @@ async function bootstrapAuth() {
         resetUserBoundStores({ subscription: accountSubscriptionStore, monthlyReports: accountMonthlyReportStore, clearAuthToken: dropAccountTokens })
       }
       lastUid = user.uid
+      applyAccountPreferences(user.uid)
       // Account-spezifische Daten (avatar, username) für diesen User laden
       settingsStore.switchUser(user.uid)
       // Onboarding-Status (5-seitiger Einführungsflow) - lädt zunächst den lokalen Cache für
@@ -413,6 +430,7 @@ async function bootstrapAuth() {
       }
     } else {
       lastUid = null
+      applyAccountPreferences(null)
       settingsStore.switchUser(null)
       onboardingStore.switchUser(null)
       coachMarkStore.switchUser(null)

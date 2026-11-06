@@ -2,6 +2,7 @@ import { defineStore } from 'pinia'
 import { fetchAccountProfile, updateAccountProfile } from '@/api/account'
 import { logger } from '@/utils/logger'
 import { sanitizeWorkoutGoal } from '@/utils/workoutGoal'
+import { readPref, writePref } from '@/utils/userScopedStorage'
 
 const PROFILE_REQUEST_COOLDOWN_MS = 15000
 let profileLoadPromise = null
@@ -31,18 +32,18 @@ function lsSet(uid, base, value) {
   } catch {}
 }
 
+function defaultWeeklyGoal() {
+  const envDefault = Number.parseInt(import.meta.env.VITE_DEFAULT_WEEKLY_GOAL || '', 10)
+  const fallback = Number.isFinite(envDefault) && envDefault > 0 ? envDefault : 4
+  const stored = Number.parseInt(readPref('weekly-goal') || '', 10)
+  return Number.isFinite(stored) && stored > 0 ? stored : fallback
+}
+
 export const useSettingsStore = defineStore('settings', {
   state: () => ({
     // Geräte-Einstellungen – keine UID-Bindung
-    language: (() => {
-      try { return localStorage.getItem('app-lang') || null } catch { return null }
-    })(),
-    weeklyGoal: (() => {
-      const envDefault = Number.parseInt(import.meta.env.VITE_DEFAULT_WEEKLY_GOAL || '', 10)
-      const fallback = Number.isFinite(envDefault) && envDefault > 0 ? envDefault : 4
-      const stored = Number.parseInt((typeof localStorage !== 'undefined' && localStorage.getItem('weekly-goal')) || '', 10)
-      return Number.isFinite(stored) && stored > 0 ? stored : fallback
-    })(),
+    language: readPref('app-lang') || null,
+    weeklyGoal: defaultWeeklyGoal(),
     // Account-spezifisch – werden erst nach switchUser(uid) geladen.
     // Beim Start leer, damit kein Account-fremdes Bild aufblitzt.
     _uid: '',
@@ -197,9 +198,14 @@ export const useSettingsStore = defineStore('settings', {
       this.username = clean
       lsSet(this._uid, 'app-username', clean)
     },
+    /** Nach Konto-Wechsel/Abmeldung: Sprache und Wochenziel des aktiven Kontos laden (sonst Standard). */
+    reloadPrefsForUser() {
+      this.language = readPref('app-lang') || null
+      this.weeklyGoal = defaultWeeklyGoal()
+    },
     setLanguage(locale) {
       this.language = locale
-      try { localStorage.setItem('app-lang', locale) } catch {}
+      writePref('app-lang', locale)
     },
     setLastWorkoutGoal(goal) {
       const valid = sanitizeWorkoutGoal(goal)
@@ -212,9 +218,7 @@ export const useSettingsStore = defineStore('settings', {
       // Clamp auf sinnvollen Bereich
       const clamped = Number.isFinite(v) ? Math.max(1, Math.min(14, v)) : 4
       this.weeklyGoal = clamped
-      try {
-        localStorage.setItem('weekly-goal', String(clamped))
-      } catch {}
+      writePref('weekly-goal', String(clamped))
     }
   }
 })

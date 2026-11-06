@@ -115,6 +115,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { clearAdminKeyRefOnReset } from '@/utils/adminKeyReset'
 import { listInsightProposals, analyzeFeedbackInsights, updateInsightProposal, getPendingInsightCount } from '@/api/feedbackInsights'
 
 // Admin-only Review-Oberfläche für KI-generierte Verbesserungsvorschläge zum KI-Feedback-
@@ -126,6 +127,7 @@ import { listInsightProposals, analyzeFeedbackInsights, updateInsightProposal, g
 const STORAGE_KEY = 'admin_feedback_key'
 
 const adminKey = ref(localStorage.getItem(STORAGE_KEY) || '')
+clearAdminKeyRefOnReset(adminKey)
 const statusFilter = ref('')
 const proposals = ref([])
 const loading = ref(false)

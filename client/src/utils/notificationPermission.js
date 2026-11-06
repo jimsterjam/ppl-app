@@ -3,6 +3,7 @@
 // (Warm-up-Karte, Pausentimer-Einstellungen) einen Hinweis mit Knopf zeigen kann - Absprache Paul 11.10.
 import { Capacitor } from '@capacitor/core'
 import { logger } from '@/utils/logger'
+import { readPref, writePref } from '@/utils/userScopedStorage'
 
 const DISMISS_KEY = 'ppl_notification_hint_dismissed_v1'
 
@@ -63,7 +64,7 @@ export async function ensureNotificationPermission() {
 
 function getDismissedState() {
   try {
-    const value = localStorage.getItem(DISMISS_KEY)
+    const value = readPref(DISMISS_KEY)
     // '1' = älterer Stand (nur "denied" konnte ausgeblendet werden)
     return value === '1' ? 'denied' : value
   } catch { return null }
@@ -75,7 +76,7 @@ export function isNotificationHintDismissed(permission) {
 
 /** @param {'prompt'|'denied'} permission Zustand, in dem ausgeblendet wurde */
 export function dismissNotificationHint(permission = 'denied') {
-  try { localStorage.setItem(DISMISS_KEY, permission) } catch {}
+  writePref(DISMISS_KEY, permission)
 }
 
 /** Öffnet die iPhone-Einstellungen der App (dort: Mitteilungen). @returns {Promise<boolean>} geklappt? */

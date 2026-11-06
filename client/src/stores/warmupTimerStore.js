@@ -12,6 +12,7 @@ import { acquireKeepAwake, releaseKeepAwake } from '@/utils/keepAwakeGuard'
 import { scheduleWarmupNotification, cancelWarmupNotification } from '@/utils/warmupSignal'
 import { WARMUP_ADJUST_SECONDS, WARMUP_TIMER_SECONDS, clampWarmupSeconds, sanitizeWarmupDurations } from '@/utils/warmupPlan'
 import { useRestTimerStore } from '@/stores/restTimerStore'
+import { belongsToActiveAccount, getActiveUid, readPref, writePref } from '@/utils/userScopedStorage'
 
 const STATE_KEY = 'ppl_warmup_timer_v1'
 // Vom Nutzer gewählte Zeit je Schritt ({ cardio: 360, ... }) - nur gesetzte Werte, sonst gilt die Empfehlung.
@@ -22,7 +23,7 @@ let tickHandle = null
 
 function readDurations() {
   try {
-    return sanitizeWarmupDurations(JSON.parse(localStorage.getItem(DURATIONS_KEY) || 'null'))
+    return sanitizeWarmupDurations(JSON.parse(readPref(DURATIONS_KEY) || 'null'))
   } catch {
     return {}
   }
@@ -83,6 +84,10 @@ export const useWarmupTimerStore = defineStore('warmupTimer', {
      * Zeit des Schritts um delta Sekunden ändern (−15 / +15). Vor dem Start, im Lauf und in der Pause; die neue Zeit
      * wird für die nächsten Male gemerkt. Läuft der Timer, verschiebt sich das Ende (und die Mitteilung).
      */
+    /** Nach Konto-Wechsel/Abmeldung: Aufwärm-Zeiten des aktiven Kontos laden. */
+    reloadPrefsForUser() {
+      this.durations = readDurations()
+    },
     adjust(step, delta = WARMUP_ADJUST_SECONDS) {
       if (!WARMUP_TIMER_SECONDS[step]) return
       const own = this.step === step
@@ -90,7 +95,7 @@ export const useWarmupTimerStore = defineStore('warmupTimer', {
       const next = clampWarmupSeconds(base + delta)
       const applied = next - base
       this.durations = { ...this.durations, [step]: next }
-      try { localStorage.setItem(DURATIONS_KEY, JSON.stringify(this.durations)) } catch {}
+      writePref(DURATIONS_KEY, JSON.stringify(this.durations))
       if (!own || !this.isActive || applied === 0) return
       this.durationSec = next
       if (this.isRunning) {
@@ -123,6 +128,12 @@ export const useWarmupTimerStore = defineStore('warmupTimer', {
       this.startTick()
       acquireKeepAwake(KEEP_AWAKE_TAG)
       this.scheduleNotification()
+    },
+    /** Kontowechsel/Abmelden: Timer abbrechen, Mitteilung zurücknehmen, Liste der fertigen Schritte leeren. */
+    resetForUserChange() {
+      this.cancel()
+      this.finished = []
+      this.persist()
     },
     /** Abbrechen ohne Abhaken (z. B. Schritt von Hand abgehakt oder das Workout beginnt). */
     cancel() {
@@ -182,6 +193,7 @@ export const useWarmupTimerStore = defineStore('warmupTimer', {
         const hasState = this.endsAt > 0 || this.pausedRemainingMs > 0 || this.finished.length > 0
         if (!hasState) { localStorage.removeItem(STATE_KEY); return }
         localStorage.setItem(STATE_KEY, JSON.stringify({
+          uid: getActiveUid(),
           step: this.step,
           endsAt: this.endsAt,
           durationSec: this.durationSec,
@@ -199,6 +211,7 @@ export const useWarmupTimerStore = defineStore('warmupTimer', {
       try {
         const saved = JSON.parse(localStorage.getItem(STATE_KEY) || 'null')
         if (!saved) return
+        if (!belongsToActiveAccount(saved)) { localStorage.removeItem(STATE_KEY); return }
         this.finished = Array.isArray(saved.finished)
           ? saved.finished.filter((e) => e && typeof e.step === 'string' && typeof e.workoutKey === 'string')
           : []

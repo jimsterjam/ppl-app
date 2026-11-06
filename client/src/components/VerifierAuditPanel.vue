@@ -77,6 +77,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { clearAdminKeyRefOnReset } from '@/utils/adminKeyReset'
 import { listVerifierAuditEntries, getVerifierAuditSummary } from '@/api/verifierAudit'
 import { initFirebaseAuth, useFirebaseAuth } from '@/utils/firebaseAuth'
 
@@ -88,6 +89,7 @@ import { initFirebaseAuth, useFirebaseAuth } from '@/utils/firebaseAuth'
 const STORAGE_KEY = 'admin_feedback_key'
 
 const adminKey = ref(localStorage.getItem(STORAGE_KEY) || '')
+clearAdminKeyRefOnReset(adminKey)
 const modeFilter = ref('')
 const onlyViolations = ref(false)
 const entries = ref([])

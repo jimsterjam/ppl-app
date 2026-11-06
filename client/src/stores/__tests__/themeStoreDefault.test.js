@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useThemeStore } from '../themeStore.js'
+import { setActiveUid } from '../../utils/userScopedStorage.js'
 
 // Absprache Paul 12.10.: Erstinstallation = dunkel + Lime, egal was das iPhone eingestellt hat.
 describe('Theme-Standard bei Erstinstallation', () => {
@@ -14,6 +15,7 @@ describe('Theme-Standard bei Erstinstallation', () => {
     })
     // System steht auf "hell" - darf keinen Einfluss haben
     vi.stubGlobal('window', { matchMedia: () => ({ matches: true }) })
+    setActiveUid(null)
     setActivePinia(createPinia())
   })
   afterEach(() => vi.unstubAllGlobals())
@@ -24,9 +26,21 @@ describe('Theme-Standard bei Erstinstallation', () => {
     expect(theme.colorMode).toBe('lime')
   })
 
+  it('ein anderes Konto sieht die Wahl nicht (dark + lime)', () => {
+    setActiveUid('uidA')
+    store.set('theme:uidA', 'light')
+    store.set('theme-accent:uidA', 'ocean')
+    setActiveUid('uidB')
+    const theme = useThemeStore()
+    expect(theme.theme).toBe('dark')
+    expect(theme.colorMode).toBe('lime')
+  })
+
   it('gespeicherte Wahl des Nutzers bleibt erhalten', () => {
-    store.set('theme', 'light')
-    store.set('theme-accent', 'ocean')
+    // Einstellungen gehören zum Konto (Schlüssel mit UID), nicht zum Gerät
+    setActiveUid('uidA')
+    store.set('theme:uidA', 'light')
+    store.set('theme-accent:uidA', 'ocean')
     const theme = useThemeStore()
     expect(theme.theme).toBe('light')
     expect(theme.colorMode).toBe('ocean')

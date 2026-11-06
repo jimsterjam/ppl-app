@@ -17,6 +17,7 @@
 
 import { KeepAwake } from '@capacitor-community/keep-awake'
 import { logger } from './logger'
+import { readPref, writePref } from '@/utils/userScopedStorage'
 
 const activeTags = new Set()
 
@@ -33,10 +34,15 @@ const WORKOUT_ONLY_TAGS = new Set(['session-stopwatch'])
 // privater Modus), gilt die Wahl trotzdem bis zum Beenden der App.
 let currentMode = null
 
+/** Nach Konto-Wechsel/Abmeldung: den im Speicher gemerkten Modus verwerfen, damit der des neuen Kontos gilt. */
+export function resetKeepAwakeModeCache() {
+  currentMode = null
+}
+
 export function getKeepAwakeMode() {
   if (currentMode) return currentMode
   try {
-    const stored = localStorage.getItem(MODE_STORAGE_KEY)
+    const stored = readPref(MODE_STORAGE_KEY)
     return KEEP_AWAKE_MODES.includes(stored) ? stored : DEFAULT_KEEP_AWAKE_MODE
   } catch {
     return DEFAULT_KEEP_AWAKE_MODE
@@ -46,7 +52,7 @@ export function getKeepAwakeMode() {
 export async function setKeepAwakeMode(mode) {
   if (!KEEP_AWAKE_MODES.includes(mode)) return
   currentMode = mode
-  try { localStorage.setItem(MODE_STORAGE_KEY, mode) } catch {}
+  writePref(MODE_STORAGE_KEY, mode)
   await applyKeepAwake('mode-changed')
 }
 

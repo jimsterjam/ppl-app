@@ -7,6 +7,7 @@ import {
   emitTimerSignal
 } from '@/utils/timerAudio'
 import { wrapPlugin } from '@/utils/capacitorPlugin'
+import { belongsToActiveAccount, getActiveUid, readPref, writePref } from '@/utils/userScopedStorage'
 
 const TICK_MS = 250
 const TIMER_STATE_KEY = 'timer_state_v1'
@@ -32,6 +33,7 @@ const readPersistedTimerState = () => {
     if (!raw) return null
     const parsed = JSON.parse(raw)
     if (!parsed || typeof parsed !== 'object') return null
+    if (!belongsToActiveAccount(parsed)) return null
     const savedAt = Number(parsed.savedAt || 0)
     if (!Number.isFinite(savedAt) || savedAt <= 0) return null
     if (Date.now() - savedAt > TIMER_STATE_MAX_AGE_MS) return null
@@ -44,7 +46,7 @@ const readPersistedTimerState = () => {
 const readPersistedTimerSettings = () => {
   if (typeof window === 'undefined') return null
   try {
-    const raw = localStorage.getItem(TIMER_SETTINGS_KEY)
+    const raw = readPref(TIMER_SETTINGS_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw)
     return parsed && typeof parsed === 'object' ? parsed : null
@@ -271,10 +273,15 @@ export const useTimerStore = defineStore('timer', {
     }
   },
   actions: {
+    /** Nach Konto-Wechsel/Abmeldung: Timer-Einstellungen des aktiven Kontos laden (ein laufender Timer bleibt unberührt). */
+    reloadPrefsForUser() {
+      if (this.status !== 'idle') return
+      this.config = { ...DEFAULT_CONFIG, ...(readPersistedTimerSettings() || {}) }
+    },
     saveSettings(source = 'unknown') {
       if (typeof window === 'undefined') return false
       try {
-        localStorage.setItem(TIMER_SETTINGS_KEY, JSON.stringify(this.config || {}))
+        writePref(TIMER_SETTINGS_KEY, JSON.stringify(this.config || {}))
         this.debugPersistLastAt = Date.now()
         this.debugPersistSource = `settings:${source}`
         return true
@@ -306,6 +313,7 @@ export const useTimerStore = defineStore('timer', {
       lastPersistAt = now
       try {
         localStorage.setItem(TIMER_STATE_KEY, JSON.stringify({
+          uid: getActiveUid(),
           savedAt: now,
           config: this.config,
           status: this.status,
@@ -508,6 +516,10 @@ export const useTimerStore = defineStore('timer', {
       this.pausedTotalMs = 0
       setKeepAwake(false)
       this.persistState(true, 'reset')
+    },
+    /** Kontowechsel/Abmelden: laufenden Timer beenden und Mitteilungen zurücknehmen. */
+    resetForUserChange() {
+      this.reset()
     },
     prepare(config = null) {
       const cfg = config ? { ...DEFAULT_CONFIG, ...config } : this.config

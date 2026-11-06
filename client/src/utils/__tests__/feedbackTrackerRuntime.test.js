@@ -16,7 +16,8 @@ let doc
 let win
 
 function setup() {
-  store = new Map()
+  // Der Tracker fragt nur für ein angemeldetes Konto an (Einträge gehören zum Konto)
+  store = new Map([['ppl_active_uid_v1', 'uidA']])
   vi.stubGlobal('localStorage', {
     getItem: (k) => (store.has(k) ? store.get(k) : null),
     setItem: (k, v) => store.set(k, String(v)),

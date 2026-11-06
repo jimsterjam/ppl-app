@@ -8,6 +8,7 @@ import { emitTimerSignal, ensureAudioUnlocked } from '@/utils/timerAudio'
 import { clampRestSeconds, REST_ENDING_MS, REST_STEP_SECONDS, sanitizeRestOverrides, shouldAutoExpandRest } from '@/utils/restTimerRules'
 import { alarmSoundFile, sanitizeRestSound } from '@/utils/restMelodies'
 import { acquireKeepAwake, releaseKeepAwake } from '@/utils/keepAwakeGuard'
+import { belongsToActiveAccount, getActiveUid, readPref, removePref, writePref } from '@/utils/userScopedStorage'
 import { scheduleRestEndSignal, cancelRestEndSignal } from '@/utils/restEndSignal'
 
 // Weiterhin hier exportiert (Tests/Aufrufer): Mitteilung und Verzögerung leben in utils/restEndSignal.js
@@ -29,7 +30,7 @@ let lastCountSec = 0
 
 function readSound() {
   try {
-    return sanitizeRestSound(localStorage.getItem(SOUND_KEY))
+    return sanitizeRestSound(readPref(SOUND_KEY))
   } catch {
     return sanitizeRestSound(null)
   }
@@ -37,7 +38,7 @@ function readSound() {
 
 function readDurations() {
   try {
-    return sanitizeRestOverrides(JSON.parse(localStorage.getItem(DURATIONS_KEY) || 'null'))
+    return sanitizeRestOverrides(JSON.parse(readPref(DURATIONS_KEY) || 'null'))
   } catch {
     return {}
   }
@@ -87,9 +88,14 @@ export const useRestTimerStore = defineStore('restTimer', {
     }
   },
   actions: {
+    /** Nach Konto-Wechsel/Abmeldung: Ton und Pausenzeiten des aktiven Kontos laden. */
+    reloadPrefsForUser() {
+      this.soundId = readSound()
+      this.durations = readDurations()
+    },
     setSound(id) {
       this.soundId = sanitizeRestSound(id)
-      try { localStorage.setItem(SOUND_KEY, this.soundId) } catch {}
+      writePref(SOUND_KEY, this.soundId)
     },
     /** Eigene Standard-Pause setzen; value = null/Standardwert entfernt den eigenen Wert. */
     setDuration(goal, type, value) {
@@ -98,11 +104,11 @@ export const useRestTimerStore = defineStore('restTimer', {
         [goal]: { ...this.durations?.[goal], [type]: value == null ? null : clampRestSeconds(value) }
       })
       this.durations = next
-      try { localStorage.setItem(DURATIONS_KEY, JSON.stringify(next)) } catch {}
+      writePref(DURATIONS_KEY, JSON.stringify(next))
     },
     resetDurations() {
       this.durations = {}
-      try { localStorage.removeItem(DURATIONS_KEY) } catch {}
+      removePref(DURATIONS_KEY)
     },
     /** Vollbild verkleinern - die Pause läuft unverändert als Leiste weiter. */
     minimize() {
@@ -158,6 +164,15 @@ export const useRestTimerStore = defineStore('restTimer', {
       this.persist()
       if (nextRemaining <= 0) this.finish()
       else this.scheduleEndSignal()
+    },
+    /** Kontowechsel/Abmelden: laufende Pause beenden, Ersatz-Mitteilung/Wecker zurücknehmen, gespeicherten Stand löschen. */
+    resetForUserChange() {
+      this.clear()
+      // Texte der Pause (Übungsname, Mitteilung) nicht im Speicher des nächsten Kontos stehen lassen.
+      this.exerciseName = ''
+      this.notifyTitle = ''
+      this.notifyBody = ''
+      this.alarmStopLabel = ''
     },
     skip() {
       this.clear()
@@ -236,6 +251,7 @@ export const useRestTimerStore = defineStore('restTimer', {
       try {
         if (!this.endsAt) { localStorage.removeItem(STATE_KEY); return }
         localStorage.setItem(STATE_KEY, JSON.stringify({
+          uid: getActiveUid(),
           endsAt: this.endsAt,
           durationSec: this.durationSec,
           baseSec: this.baseSec,
@@ -250,7 +266,7 @@ export const useRestTimerStore = defineStore('restTimer', {
     restore() {
       try {
         const saved = JSON.parse(localStorage.getItem(STATE_KEY) || 'null')
-        if (!saved || !saved.endsAt || saved.finishedAt || saved.endsAt <= Date.now()) {
+        if (!saved || !belongsToActiveAccount(saved) || !saved.endsAt || saved.finishedAt || saved.endsAt <= Date.now()) {
           localStorage.removeItem(STATE_KEY)
           return
         }
