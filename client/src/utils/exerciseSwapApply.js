@@ -13,6 +13,25 @@ function workingSetCount(exercise) {
   return rows.length || Math.max(1, Number(exercise?.sets) || 1)
 }
 
+/**
+ * Ursprünglich geplante Übung: bei einem zweiten Tausch bleibt die erste erhalten, damit der Bericht den Wechsel nicht
+ * der Zwischenübung zuschreibt. Wurde der erste Tausch im Plan gespeichert, ist die Zwischenübung die geplante.
+ */
+export function originalExerciseName(oldExercise) {
+  const earlier = String(oldExercise?.replacedFrom || '').trim()
+  return earlier && oldExercise?.replacedScope !== 'plan' ? earlier : oldExercise?.name || ''
+}
+
+/**
+ * Geltungsbereich, der mit dem Workout gespeichert wird (Monatsbericht): 'plan' nur, wenn „auch im Plan“ gewählt war
+ * UND die Planänderung geklappt hat; sonst 'today'.
+ * @param {'today'|'plan'|string} chosenScope
+ * @param {{ ok?: boolean } | null | undefined} planResult Ergebnis von replaceExerciseInPlanDay (undefined = nicht versucht)
+ */
+export function resolveSwapScope(chosenScope, planResult) {
+  return chosenScope === 'plan' && planResult?.ok === true ? 'plan' : 'today'
+}
+
 /** Neue Übung für das laufende Workout (gleiche Form wie „Übung hinzufügen“); `replacedFrom` nur für den Hinweis in der Sitzung. */
 export function buildSwappedExercise(oldExercise, entry) {
   return {
@@ -24,7 +43,7 @@ export function buildSwappedExercise(oldExercise, entry) {
     thumbnailStaticUrl: entry.thumbnailStaticUrl || '',
     setDetails: Array.from({ length: workingSetCount(oldExercise) }, () => ({ reps: 10, weight: 0 })),
     note: '',
-    replacedFrom: oldExercise?.name || ''
+    replacedFrom: originalExerciseName(oldExercise)
   }
 }
 

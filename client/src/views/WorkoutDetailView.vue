@@ -1089,7 +1089,7 @@ import AppModal from '@/components/AppModal.vue'
 import ExerciseList from '@/components/ExerciseList.vue'
 import ExerciseSwapModal from '@/components/ExerciseSwapModal.vue'
 import CoachMarks from '@/components/CoachMarks.vue'
-import { buildSwappedExercise, canSwapExercise, replaceExerciseInPlanDay } from '@/utils/exerciseSwapApply'
+import { buildSwappedExercise, canSwapExercise, replaceExerciseInPlanDay, resolveSwapScope } from '@/utils/exerciseSwapApply'
 import { getPlanDayInfo, planDayTitle } from '@/utils/planProgress'
 import WorkoutTimerConfig from '@/components/timer/WorkoutTimerConfig.vue'
 import TimerMenu from '@/components/timer/TimerMenu.vue'
@@ -2824,7 +2824,7 @@ function onSwapExercise({ entry, scope }) {
   const index = swapIndex.value
   const old = workout.value?.exercises?.[index]
   if (!old || !entry) return
-  workout.value.exercises.splice(index, 1, buildSwappedExercise(old, entry))
+  workout.value.exercises.splice(index, 1, { ...buildSwappedExercise(old, entry), replacedScope: 'today' })
   if (Array.isArray(exerciseNotes.value)) exerciseNotes.value[index] = ''
   ensureSetDetailsStructure()
   if (!isFavoriteAdjustMode.value) {
@@ -2838,6 +2838,14 @@ function onSwapExercise({ entry, scope }) {
     const result = info?.hasWorkout
       ? replaceExerciseInPlanDay({ userId: getFavoriteUserId(), planId, dayId: planDayId, oldExercise: old, entry })
       : { ok: false }
+    // Nur nach erfolgreicher Planänderung gilt der Wechsel als "im Plan" (Monatsbericht), sonst bleibt es "nur heute".
+    const swapped = workout.value?.exercises?.[index]
+    if (swapped && resolveSwapScope(scope, result) === 'plan') {
+      swapped.replacedScope = 'plan'
+      if (!isFavoriteAdjustMode.value) {
+        try { triggerAutoSave() } catch {}
+      }
+    }
     toast.show(result.ok ? t('swap.planUpdated') : t('swap.planUpdateFailed'), { type: result.ok ? 'success' : 'warning', duration: 3000 })
   }
 }

@@ -52,6 +52,8 @@ export function normalizeWorkoutForSave({ workout, exerciseNotes, sessionStopwat
       ...measureModeField(ex.measureMode),
       // Eigene Trainingsart der Übung (siehe weightSuggestion.js resolveExerciseGoal) - nur wenn gewählt.
       ...(sanitizeExerciseTrainingType(ex.trainingType) ? { trainingType: ex.trainingType } : {}),
+      // Übungswechsel (Monatsbericht): ursprüngliche Übung und Geltungsbereich - nur wenn getauscht wurde.
+      ...(ex.replacedFrom ? { replacedFrom: ex.replacedFrom, ...(['today', 'plan'].includes(ex.replacedScope) ? { replacedScope: ex.replacedScope } : {}) } : {}),
       // Vom Nutzer gemerkte Pausendauer (Pausentimer) - nur wenn gesetzt.
       ...(sanitizeCustomRest(ex.restSeconds) ? { restSeconds: ex.restSeconds } : {}),
       note: Array.isArray(exerciseNotes) && typeof exerciseNotes[idx] !== 'undefined'

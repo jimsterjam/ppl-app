@@ -6,7 +6,8 @@ import {
   evaluateReportDue,
   REPORT_MIN_SESSIONS,
   REPORT_PERIOD_DAYS,
-  MAX_CURVE_EXERCISES
+  MAX_CURVE_EXERCISES,
+  REPORT_VERSION
 } from '../monthlyReport.js'
 import { __setFocusCatalogForTests, getProgressionEngine } from '../nextSessionFocus.js'
 
@@ -78,7 +79,7 @@ describe('buildMonthlyReport', () => {
     assert.equal(facts.totals.sessions, 2)
     assert.equal(facts.totals.sets, 5)
     assert.equal(facts.totals.volumeKg, 3 * 80 * 8 + 2 * 82.5 * 5)
-    assert.equal(facts.version, 1)
+    assert.equal(facts.version, REPORT_VERSION)
   })
 
   test('Wochen: vier Blöcke, Summe = Einheiten im Zeitraum', () => {

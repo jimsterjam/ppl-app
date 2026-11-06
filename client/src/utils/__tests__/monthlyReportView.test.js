@@ -45,8 +45,15 @@ describe('Beispielbericht', () => {
   it('ist als Beispiel markiert und hat die Struktur der Serverdaten', () => {
     expect(sample.isExample).toBe(true)
     expect(sample.id).toBe('example')
-    expect(sample.facts.version).toBe(1)
+    expect(sample.facts.version).toBe(2)
     expect(sample.facts.days).toBe(28)
+    // Befunde: Empfehlungen verweisen auf vorhandene Einträge, höchstens 3
+    const f = sample.facts.findings
+    expect(f.recommendations.length).toBeLessThanOrEqual(3)
+    for (const rec of f.recommendations) {
+      const list = rec.section === 'progress' ? f.progress.items : rec.section === 'repRange' ? f.repRange.items : f.swaps.items
+      expect(list[rec.index]).toBeTruthy()
+    }
     expect(sample.facts.weeks).toHaveLength(4)
     expect(sample.facts.weeks.reduce((sum, w) => sum + w.sessions, 0)).toBe(sample.facts.totals.sessions)
     expect(conclusionKey(sample.facts.conclusion)).not.toBeNull()

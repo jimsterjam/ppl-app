@@ -55,6 +55,9 @@
           </article>
         </section>
 
+        <!-- Befunde ab Berichtsversion 2 (älteren Berichten fehlen sie) -->
+        <ReportFindings v-if="facts.findings" :findings="facts.findings" />
+
         <p class="muted basis">{{ t('monthlyReport.basis') }}</p>
 
         <!-- PDF: für Pro (auch beim Beispiel, damit man sieht, wie es aussieht) -->
@@ -75,6 +78,7 @@ import { useI18n } from 'vue-i18n'
 import AppModal from '@/components/AppModal.vue'
 import ReportWeeksChart from '@/components/ReportWeeksChart.vue'
 import ReportWeightChart from '@/components/ReportWeightChart.vue'
+import ReportFindings from '@/components/ReportFindings.vue'
 import { useMonthlyReportStore } from '@/stores/monthlyReportStore'
 import { buildSampleReport } from '@/utils/sampleMonthlyReport'
 import { diagnosisTextKeys } from '@/utils/coachDiagnosisText'

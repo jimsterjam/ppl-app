@@ -19,6 +19,7 @@
 // ---------------------------------------------------------------------------
 
 import { getProgressionEngine } from './nextSessionFocus.js';
+import { buildFindings } from './monthlyFindings.js';
 import {
   buildStagnationDiagnosis,
   estimateOneRepMax,
@@ -29,7 +30,7 @@ import {
   WINDOW_DAYS
 } from './stagnationDiagnosis.js';
 
-export const REPORT_VERSION = 1;
+export const REPORT_VERSION = 2;
 export const REPORT_PERIOD_DAYS = 28;
 export const REPORT_MIN_SESSIONS = 12;
 // Benötigte Workout-Historie: Zeitraum + Vergleichszeitraum + Rest für Bestleistungen/Diagnose.
@@ -195,7 +196,7 @@ function conclusionFor(current, previous) {
  * @param {{ now?: Date, engine?: object }} [options]
  * @returns {{ unavailable: true } | { periodStart: Date, periodEnd: Date, facts: object }}
  */
-export function buildMonthlyReport(workouts, { now = new Date(), engine = getProgressionEngine() } = {}) {
+export function buildMonthlyReport(workouts, { now = new Date(), engine = getProgressionEngine(), muscleByExerciseId = null } = {}) {
   // Ohne Progressionslogik keine Aussage - lieber "nicht verfügbar" als falsche Zahlen.
   if (!engine) return { unavailable: true };
 
@@ -226,7 +227,8 @@ export function buildMonthlyReport(workouts, { now = new Date(), engine = getPro
       conclusion: conclusionFor(current, previous),
       weeks: buildWeeks(periodSessions, periodStart),
       exercises: buildCurves(periodSessions),
-      stagnation: { items: stalled, analyzedExercises: diagnosis.analyzedExercises || 0 }
+      stagnation: { items: stalled, analyzedExercises: diagnosis.analyzedExercises || 0 },
+      findings: buildFindings(periodSessions, { muscleByExerciseId, periodDays: REPORT_PERIOD_DAYS })
     }
   };
 }
