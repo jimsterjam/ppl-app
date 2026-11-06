@@ -112,4 +112,45 @@ describe('userScopedStorage', () => {
     expect(s.readPref('theme')).toBeNull()
     expect(s.readPref('theme', 'uidA')).toBe('light')
   })
+
+  it('Update: schlägt das Schreiben fehl, bleibt der alte Wert erhalten und die Übernahme wird später wiederholt', async () => {
+    vi.resetModules()
+    const data = new Map([['theme', 'light'], ['app-lang', 'en']])
+    let failWrites = true
+    vi.stubGlobal('localStorage', {
+      getItem: (k) => (data.has(k) ? data.get(k) : null),
+      setItem: (k, v) => { if (failWrites) throw new Error('QuotaExceededError'); data.set(k, String(v)) },
+      removeItem: (k) => { data.delete(k) }
+    })
+    const s = await import('../userScopedStorage.js')
+    s.setActiveUid('uidA')
+    expect(data.get('theme')).toBe('light')
+    expect(data.get('app-lang')).toBe('en')
+    expect(data.has('ppl_user_prefs_migrated_v1')).toBe(false)
+
+    failWrites = false
+    expect(s.migrateLegacyPrefs('uidA')).toBe(true)
+    expect(s.readPref('theme', 'uidA')).toBe('light')
+    expect(s.readPref('app-lang', 'uidA')).toBe('en')
+    expect(data.has('theme')).toBe(false)
+    expect(data.get('ppl_user_prefs_migrated_v1')).toBe('1')
+  })
+
+  it('Wahl aus der Zeit ohne Konto: scheitert das Schreiben, wird sie trotzdem nicht an ein späteres Konto weitergegeben', async () => {
+    vi.resetModules()
+    const data = new Map([['ppl_user_prefs_migrated_v1', '1']])
+    let failWrites = false
+    vi.stubGlobal('localStorage', {
+      getItem: (k) => (data.has(k) ? data.get(k) : null),
+      setItem: (k, v) => { if (failWrites) throw new Error('QuotaExceededError'); data.set(k, String(v)) },
+      removeItem: (k) => { data.delete(k) }
+    })
+    const s = await import('../userScopedStorage.js')
+    s.writePref('app-lang', 'en')
+    failWrites = true
+    expect(() => s.setActiveUid('uidA')).not.toThrow()
+    failWrites = false
+    s.setActiveUid('uidB')
+    expect(s.readPref('app-lang')).toBeNull()
+  })
 })
