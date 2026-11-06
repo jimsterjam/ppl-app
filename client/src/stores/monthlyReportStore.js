@@ -19,6 +19,9 @@ export const useMonthlyReportStore = defineStore('monthlyReports', {
     reports: [],
     // Liste wurde mindestens einmal erfolgreich geladen (vorher weiß die App nicht, ob es Berichte gibt).
     loaded: false,
+    // Die Liste konnte nicht geladen werden (offline, Server sagt "Pro erforderlich", Fehler): die Ansicht zeigt dann eine
+    // ruhige Meldung statt endlos "Wird geladen". Verschwindet beim nächsten erfolgreichen Laden.
+    failed: false,
     lastRefreshAt: 0,
     // Vollständige Berichte nach ID: ein Bericht ändert sich nicht, zweites Öffnen ohne Wartezeit.
     details: {}
@@ -38,7 +41,10 @@ export const useMonthlyReportStore = defineStore('monthlyReports', {
     async refresh({ force = false } = {}) {
       if (inFlight) return inFlight
       if (!force && this.loaded && Date.now() - this.lastRefreshAt < MIN_REFRESH_INTERVAL_MS) return true
-      if (typeof navigator !== 'undefined' && navigator.onLine === false) return this.loaded
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        if (!this.loaded) this.failed = true
+        return this.loaded
+      }
       const myEpoch = epoch
       const request = (async () => {
         try {
@@ -47,7 +53,10 @@ export const useMonthlyReportStore = defineStore('monthlyReports', {
           // Datenbankabfragen) läuft danach und lädt die Liste nur neu, wenn sie einen Bericht erzeugt hat.
           const list = await listMonthlyReports(token)
           if (myEpoch !== epoch) return this.loaded // Konto gewechselt: Antwort gehört zum alten Konto
-          if (list.status !== 'ok') return this.loaded
+          if (list.status !== 'ok') {
+            if (!this.loaded) this.failed = true
+            return this.loaded
+          }
           this.applyList(list)
           this.checkDue(token, myEpoch)
           return true
@@ -62,6 +71,7 @@ export const useMonthlyReportStore = defineStore('monthlyReports', {
     applyList(list) {
       this.reports = Array.isArray(list.data?.reports) ? list.data.reports : []
       this.loaded = true
+      this.failed = false
       this.lastRefreshAt = Date.now()
     },
     async checkDue(token, myEpoch = epoch) {
@@ -95,6 +105,7 @@ export const useMonthlyReportStore = defineStore('monthlyReports', {
       inFlight = null
       this.reports = []
       this.loaded = false
+      this.failed = false
       this.lastRefreshAt = 0
       this.details = {}
     }

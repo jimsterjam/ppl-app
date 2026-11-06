@@ -37,6 +37,7 @@ import { logger } from '@/utils/logger'
 import { getAuthToken } from '@/utils/authToken'
 import { fetchSubscriptionStatus, upgradeSubscriptionRequest } from '@/api/subscription'
 import { PRO_PURCHASE_ENABLED } from '@/config/features'
+import { readPlanOverrideConfig } from '@/utils/planOverrideConfig'
 // Avoid calling useClerk/useAuth here: Pinia stores run outside a component setup
 // context and calling useClerk() may throw. We will rely on getAuthToken()
 // which falls back to window.Clerk or cached tokens.
@@ -45,9 +46,14 @@ const TRANSIENT_REQUEST_COOLDOWN_MS = 15000
 let subscriptionCheckPromise = null
 let subscriptionCooldownUntil = 0
 
-const ENV_FORCE_PLAN = String(import.meta.env.VITE_FORCE_PLAN || '').trim().toLowerCase()
-const isValidForcedPlan = ['free', 'pro', 'elite'].includes(ENV_FORCE_PLAN)
-const DEV_PLAN_OVERRIDE_ENABLED = String(import.meta.env.VITE_ENABLE_DEV_PLAN_OVERRIDE || '0').trim() === '1'
+// Erzwungener Plan und Entwickler-Überschreibung gelten nur in Entwicklungs-Builds (utils/planOverrideConfig.js).
+const planOverrideConfig = readPlanOverrideConfig(import.meta.env)
+if (planOverrideConfig.ignoredInProduction) {
+  logger.warn('[subscription] VITE_FORCE_PLAN / VITE_ENABLE_DEV_PLAN_OVERRIDE sind gesetzt, werden im Produktions-Build aber ignoriert.')
+}
+const ENV_FORCE_PLAN = planOverrideConfig.forcedPlan || ''
+const isValidForcedPlan = Boolean(ENV_FORCE_PLAN)
+const DEV_PLAN_OVERRIDE_ENABLED = planOverrideConfig.devOverrideEnabled
 
 function isTransientRequestError(error) {
   const status = Number(error?.statusCode || error?.response?.status || error?.context?.originalError?.response?.status || 0)
