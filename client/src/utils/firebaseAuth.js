@@ -103,6 +103,11 @@ async function sha256Hex(input) {
     .join('')
 }
 
+// Die Zeit läuft, während der Nutzer im Google-Fenster ist (Passwort, Bestätigungscode per SMS/App, Konto wählen). 25 s
+// reichten dafür nicht: wer einen Code eingeben musste, bekam danach "timed out". Abgebrochen wird weiterhin vom
+// Google-Fenster selbst; das Limit fängt nur ein dauerhaft hängendes Plugin ab.
+export const GOOGLE_NATIVE_SIGNIN_TIMEOUT_MS = 5 * 60 * 1000
+
 function withTimeout(promise, timeoutMs, label = 'operation') {
   let timeoutId
   const timeoutPromise = new Promise((_, reject) => {
@@ -255,7 +260,7 @@ export function useFirebaseAuth() {
         serverClientId: googleConfig.webClientId,
         forceCodeForRefreshToken: true
       }),
-      25000,
+      GOOGLE_NATIVE_SIGNIN_TIMEOUT_MS,
       'Google native sign-in'
     )
 

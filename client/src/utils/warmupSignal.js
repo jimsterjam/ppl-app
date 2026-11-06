@@ -7,15 +7,17 @@
 import { Capacitor } from '@capacitor/core'
 import { NOTIFICATION_DELAY_MS, NOTIFICATION_SOUND } from '@/utils/restEndSignal'
 import { logDiagnostic } from '@/utils/diagnosticsLog'
+import { wrapPlugin } from './capacitorPlugin'
 
 export const WARMUP_NOTIFICATION_ID = 940002
 
+// Plugin nie direkt aus einer async-Funktion zurückgeben (siehe utils/capacitorPlugin.js).
 async function getLocalNotifications() {
   try {
     const module = await import('@capacitor/local-notifications')
-    return module?.LocalNotifications || null
+    return wrapPlugin(module?.LocalNotifications)
   } catch {
-    return null
+    return wrapPlugin(null)
   }
 }
 
@@ -32,7 +34,7 @@ export function buildWarmupNotification(at, title, body, platform = 'web') {
 
 /** Planen; ersetzt eine vorherige Warm-up-Mitteilung. Wirft nie. */
 export async function scheduleWarmupNotification(at, { title, body }) {
-  const LocalNotifications = await getLocalNotifications()
+  const { plugin: LocalNotifications } = await getLocalNotifications()
   if (!LocalNotifications) return
   try {
     // Erst die Erlaubnis (fragt iOS nur beim ersten Mal), dann aufräumen - ein Fehler beim Aufräumen darf sie nicht verhindern.
@@ -46,7 +48,7 @@ export async function scheduleWarmupNotification(at, { title, body }) {
 }
 
 export async function cancelWarmupNotification() {
-  const LocalNotifications = await getLocalNotifications()
+  const { plugin: LocalNotifications } = await getLocalNotifications()
   if (!LocalNotifications) return
   try { await LocalNotifications.cancel({ notifications: [{ id: WARMUP_NOTIFICATION_ID }] }) } catch {}
 }
