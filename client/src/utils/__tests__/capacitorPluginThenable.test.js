@@ -20,7 +20,8 @@ vi.mock('@/utils/diagnosticsLog', () => ({ logDiagnostic: () => {} }))
 describe('Plugin wird nie als Promise-Ergebnis zurückgegeben', () => {
   it('Pausenende: Mitteilung zurücknehmen wirft nicht', async () => {
     const { cancelRestEndSignal } = await import('../restEndSignal.js')
-    await expect(cancelRestEndSignal({ cancelAlarm: async () => {} })).resolves.toBeUndefined()
+    const result = await cancelRestEndSignal({ cancelAlarm: async () => {} })
+    expect(result).toBeUndefined()
     expect(calls.cancel).toHaveBeenCalled()
   })
 
@@ -31,14 +32,21 @@ describe('Plugin wird nie als Promise-Ergebnis zurückgegeben', () => {
     expect(calls.schedule).toHaveBeenCalled()
   })
 
-  it('Warm-up: planen und zurücknehmen wirft nicht', async () => {
-    const warmup = await import('../warmupSignal.js')
-    const names = Object.keys(warmup).filter((name) => typeof warmup[name] === 'function' && /^(schedule|cancel)/i.test(name))
-    expect(names.length).toBeGreaterThan(0)
+  it('Warm-up: planen wirft nicht und übergibt die Mitteilung an das Plugin', async () => {
+    const { scheduleWarmupNotification } = await import('../warmupSignal.js')
+    calls.schedule.mockClear()
+    const result = await scheduleWarmupNotification(5_000_000, { title: 'Cardio geschafft', body: 'Weiter mit: Gelenke aufwärmen' })
+    expect(result).toBeUndefined()
+    expect(calls.schedule).toHaveBeenCalledTimes(1)
+    const [{ notifications }] = calls.schedule.mock.calls[0]
+    expect(notifications[0]).toMatchObject({ title: 'Cardio geschafft', body: 'Weiter mit: Gelenke aufwärmen' })
+  })
+
+  it('Warm-up: zurücknehmen wirft nicht und ruft das Plugin auf', async () => {
+    const { cancelWarmupNotification } = await import('../warmupSignal.js')
     calls.cancel.mockClear()
-    for (const name of names) {
-      await expect(Promise.resolve(warmup[name](5_000_000, 't', 'b'))).resolves.not.toThrow()
-    }
-    expect(calls.cancel).toHaveBeenCalled()
+    const result = await cancelWarmupNotification()
+    expect(result).toBeUndefined()
+    expect(calls.cancel).toHaveBeenCalledTimes(1)
   })
 })
