@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
+import { setActiveUid } from '../userScopedStorage.js'
 
 const mocks = vi.hoisted(() => ({
   isNative: vi.fn(),
@@ -20,6 +21,7 @@ import {
 // mit Knopf zu den iPhone-Einstellungen.
 describe('Mitteilungs-Erlaubnis', () => {
   beforeEach(() => {
+    setActiveUid(null)
     Object.values(mocks).forEach((fn) => fn.mockReset())
     const store = new Map()
     vi.stubGlobal('localStorage', {
@@ -105,7 +107,8 @@ describe('Mitteilungs-Erlaubnis', () => {
   })
 
   it('älterer Stand ("1") zählt als ausgeblendet für "denied"', () => {
-    localStorage.setItem('ppl_notification_hint_dismissed_v1', '1')
+    setActiveUid('uidA')
+    localStorage.setItem('ppl_notification_hint_dismissed_v1:uidA', '1')
     expect(isNotificationHintDismissed('denied')).toBe(true)
     expect(isNotificationHintDismissed('prompt')).toBe(false)
   })

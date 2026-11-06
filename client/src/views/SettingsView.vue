@@ -411,6 +411,7 @@ import { useScrollLock } from '@/composables/useScrollLock'
 import { useRouter, useRoute } from 'vue-router'
 import { initFirebaseAuth, useFirebaseAuth } from '@/utils/firebaseAuth'
 import { logger } from '@/utils/logger'
+import { removePref } from '@/utils/userScopedStorage'
 import { deleteAllWorkouts } from '@/api/workouts'
 import { isOnline, db } from '@/utils/offlineStorage'
 import { exportAccountData } from '@/api/account'
@@ -835,13 +836,14 @@ async function confirmDelete() {
           key.startsWith('bro_split_') ||
           key.startsWith('wb_') ||
           key === 'exercise_media_cache_index_v2' ||
-          key === 'app-lang' ||
           key === 'enableDevTools'
         ) {
           localStorage.removeItem(key)
         }
       })
     } catch {}
+    // Sprache des angemeldeten Kontos (Schlüssel mit UID, siehe utils/userScopedStorage.js)
+    removePref('app-lang')
 
     // 4. SessionStorage: gezielt Drafts/temporäres löschen
     try {

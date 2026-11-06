@@ -7,6 +7,7 @@ import {
   emitTimerSignal
 } from '@/utils/timerAudio'
 import { wrapPlugin } from '@/utils/capacitorPlugin'
+import { readPref, writePref } from '@/utils/userScopedStorage'
 
 const TICK_MS = 250
 const TIMER_STATE_KEY = 'timer_state_v1'
@@ -44,7 +45,7 @@ const readPersistedTimerState = () => {
 const readPersistedTimerSettings = () => {
   if (typeof window === 'undefined') return null
   try {
-    const raw = localStorage.getItem(TIMER_SETTINGS_KEY)
+    const raw = readPref(TIMER_SETTINGS_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw)
     return parsed && typeof parsed === 'object' ? parsed : null
@@ -271,10 +272,15 @@ export const useTimerStore = defineStore('timer', {
     }
   },
   actions: {
+    /** Nach Konto-Wechsel/Abmeldung: Timer-Einstellungen des aktiven Kontos laden (ein laufender Timer bleibt unberührt). */
+    reloadPrefsForUser() {
+      if (this.status !== 'idle') return
+      this.config = { ...DEFAULT_CONFIG, ...(readPersistedTimerSettings() || {}) }
+    },
     saveSettings(source = 'unknown') {
       if (typeof window === 'undefined') return false
       try {
-        localStorage.setItem(TIMER_SETTINGS_KEY, JSON.stringify(this.config || {}))
+        writePref(TIMER_SETTINGS_KEY, JSON.stringify(this.config || {}))
         this.debugPersistLastAt = Date.now()
         this.debugPersistSource = `settings:${source}`
         return true
