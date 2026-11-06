@@ -2824,7 +2824,7 @@ function onSwapExercise({ entry, scope }) {
   const index = swapIndex.value
   const old = workout.value?.exercises?.[index]
   if (!old || !entry) return
-  workout.value.exercises.splice(index, 1, buildSwappedExercise(old, entry))
+  workout.value.exercises.splice(index, 1, { ...buildSwappedExercise(old, entry), replacedScope: scope === 'plan' ? 'plan' : 'today' })
   if (Array.isArray(exerciseNotes.value)) exerciseNotes.value[index] = ''
   ensureSetDetailsStructure()
   if (!isFavoriteAdjustMode.value) {

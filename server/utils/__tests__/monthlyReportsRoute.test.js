@@ -51,6 +51,7 @@ describe('/api/reports/monthly', () => {
       loadProfile: async () => ({ paid: state.plan !== 'free' }),
       loadLastReport: async () => state.last,
       loadFirstWorkoutDate: async () => state.first,
+      loadMuscleGroups: async () => new Map(),
       loadWorkouts: async () => { state.workoutLoads++; return state.workouts },
       saveReport: async (userId, built, now) => {
         if (state.saveError) throw state.saveError
@@ -154,7 +155,7 @@ describe('/api/reports/monthly', () => {
 
     const detail = await (await call(`/${ID_A}`)).json()
     assert.equal(detail.id, ID_A)
-    assert.equal(detail.facts.version, 1)
+    assert.equal(detail.facts.version, 2)
 
     assert.equal((await call(`/${ID_A}`, { uid: 'other-pro' })).status, 404)
     assert.equal((await call(`/${ID_A}/seen`, { uid: 'other-pro', method: 'POST' })).status, 404)

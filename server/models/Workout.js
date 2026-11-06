@@ -82,6 +82,11 @@ const workoutSchema = new mongoose.Schema({
     // strikt getrennt von athleteBodyweightKg - z.B. Zusatzgewicht am Gürtel bei
     // Klimmzügen. Additiv/optional, null = nicht erfasst.)
     externalLoadKg: { type: Number, default: null },
+    // Übungswechsel in DIESER Session (Monatsbericht V1): Name der ursprünglich geplanten Übung und ob der
+    // Wechsel nur heute galt ('today') oder auch im Plan gespeichert wurde ('plan'). Beides optional; ältere
+    // Workouts haben keins von beiden. Ungültiger Bereich wird zu undefined statt das Speichern zu stoppen.
+    replacedFrom: { type: String, default: undefined, set: textSetter(TEXT_LIMITS.exerciseName) },
+    replacedScope: { type: String, default: undefined, set: (v) => (['today', 'plan'].includes(v) ? v : undefined) },
     // Detaillierte Set-Informationen (modernes Format)
     setDetails: [{
       reps: Number,

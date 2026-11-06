@@ -20,6 +20,7 @@ import mongoose from 'mongoose';
 import Workout from '../models/Workout.js';
 import UserProfile from '../models/UserProfile.js';
 import MonthlyReport from '../models/MonthlyReport.js';
+import Exercise from '../models/Exercise.js';
 import {
   buildMonthlyReport,
   countSessionsInPeriod,
@@ -37,7 +38,7 @@ const RATE_LIMIT_MAX = Math.max(1, Number(process.env.REPORT_RATE_LIMIT_MAX) || 
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
 
 const WORKOUT_FIELDS = 'date completedAt goal exercises.exerciseId exercises.name exercises.trainingType ' +
-  'exercises.category exercises.equipment exercises.setDetails.reps exercises.setDetails.weight ' +
+  'planDayId exercises.measureMode exercises.replacedFrom exercises.replacedScope exercises.category exercises.equipment exercises.setDetails.reps exercises.setDetails.weight ' +
   'exercises.setDetails.isWarmup exercises.setDetails.done';
 
 // Login-Prüfung erst beim ersten Aufruf laden (siehe routes/coach.js).
@@ -68,6 +69,28 @@ const defaultDeps = {
   async loadFirstWorkoutDate(userId) {
     const first = await Workout.findOne({ userId, completed: true }).sort({ date: 1 }).select('date').lean();
     return first?.date || null;
+  },
+  // Hauptmuskelgruppe je Übung (erste Gruppe im Katalog) für "Sätze pro Muskelgruppe". Fehler -> leere Zuordnung:
+  // Der Bericht entsteht dann ohne diesen Abschnitt statt gar nicht.
+  async loadMuscleGroups(workouts) {
+    const ids = new Set();
+    for (const workout of workouts) {
+      for (const ex of workout.exercises || []) {
+        const id = String(ex?.exerciseId || '');
+        if (/^[a-f0-9]{24}$/i.test(id)) ids.add(id);
+      }
+    }
+    const map = new Map();
+    if (!ids.size) return map;
+    try {
+      const rows = await Exercise.find({ _id: { $in: [...ids] } }).select('muscleGroups').lean();
+      for (const row of rows) {
+        if (row.muscleGroups?.[0]) map.set(String(row._id), row.muscleGroups[0]);
+      }
+    } catch (error) {
+      logger.warn('[reports] Muskelgruppen konnten nicht geladen werden', { error: error?.message });
+    }
+    return map;
   },
   async loadWorkouts(userId, now) {
     const since = new Date(now.getTime() - REPORT_HISTORY_DAYS * MS_PER_DAY);
@@ -146,7 +169,8 @@ export function createMonthlyReportsRouter(overrides = {}) {
       const due = evaluateReportDue({ now, lastPeriodEnd: last?.periodEnd, firstWorkoutDate, sessionsInPeriod });
       if (!due.due) return res.json({ created: false, reason: due.reason });
 
-      const built = buildMonthlyReport(workouts, { now });
+      const muscleByExerciseId = await deps.loadMuscleGroups(workouts);
+      const built = buildMonthlyReport(workouts, { now, muscleByExerciseId });
       if (built.unavailable) return res.status(503).json({ error: 'report_unavailable' });
 
       try {
