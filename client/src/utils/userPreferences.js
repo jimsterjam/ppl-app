@@ -7,9 +7,9 @@
 // die Stores ihren Stand wieder her.
 import { getActiveUid, setActiveUid } from './userScopedStorage'
 import { resetKeepAwakeModeCache } from './keepAwakeGuard'
+import { clearAdminKey } from './adminKeyReset'
 
-// Im localStorage gemerkter Admin-Schlüssel der Admin-Panels (AdminFeedbackPanel, VerifierAuditPanel, AiInsightsPanel).
-export const ADMIN_KEY_STORAGE_KEY = 'admin_feedback_key'
+export { ADMIN_KEY_STORAGE_KEY } from './adminKeyReset'
 
 /** Alle laufenden Zustände des bisherigen Kontos beenden. Fehler in einem Store stoppen die anderen nicht. */
 export function resetRunningStatesForUserChange({ restTimer, warmupTimer, transitionTimer, timer, stopwatch } = {}) {
@@ -20,7 +20,7 @@ export function resetRunningStatesForUserChange({ restTimer, warmupTimer, transi
 
 /** Geräteweit gemerkte Schlüssel entfernen, die nicht zum nächsten Konto gehören dürfen. */
 export function clearDeviceSecrets() {
-  try { localStorage.removeItem(ADMIN_KEY_STORAGE_KEY) } catch { /* optional */ }
+  clearAdminKey()
 }
 
 /**
@@ -33,8 +33,10 @@ export function applyUserPreferences(uid, { theme, settings, restTimer, warmupTi
   // Abgemeldet oder anderes Konto: erst die laufenden Zustände beenden (solange noch das alte Konto aktiv ist), dann wechseln.
   if (previous && previous !== next) {
     resetRunningStatesForUserChange({ restTimer, warmupTimer, transitionTimer, timer, stopwatch })
-    clearDeviceSecrets()
   }
+  // Admin-Schlüssel bei jeder Änderung des Anmeldezustands löschen, auch bei der ersten Anmeldung nach einem Neustart:
+  // ein Rest aus einer älteren App-Version darf nicht an das nächste Konto gehen.
+  if (previous !== next) clearDeviceSecrets()
   setActiveUid(uid)
   resetKeepAwakeModeCache()
   theme?.reloadForUser?.()

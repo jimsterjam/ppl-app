@@ -25,6 +25,7 @@ import { logger } from './logger'
 import { getAppLanguage } from '@/i18n'
 import { trackPendingFeedback } from './feedbackTracker'
 import { belongsToActiveAccount, getActiveUid } from './userScopedStorage'
+import { createAccountGuard } from './accountGuard'
 import { classifyFeedbackResponse, REQUEST_TIMEOUT_MS } from './feedbackRetryRules'
 
 const STORAGE_KEY = 'bro_split_pending_ai_feedback_v1'
@@ -87,11 +88,20 @@ export async function processPendingAiFeedback() {
   try {
     const list = loadQueue()
     if (!list.length) return
+    // Konto vom Start festhalten (siehe accountGuard.js): nach jedem asynchronen Schritt erneut prüfen.
+    const guard = createAccountGuard()
+    if (!guard.hasAccount) return
 
     const now = Date.now()
     const stillPending = []
 
-    for (const entry of list) {
+    for (let index = 0; index < list.length; index += 1) {
+      const entry = list[index]
+      // Konto gewechselt: alle noch nicht bearbeiteten Einträge unverändert zurücklegen.
+      if (!guard.isStillActive()) {
+        stillPending.push(...list.slice(index))
+        break
+      }
       if (now - (entry.queuedAt || 0) > MAX_AGE_MS) {
         logger.warn('[pendingAiFeedback] Eintrag verworfen (zu alt, > 3 Tage ungelöst)', { id: entry.id })
         continue
@@ -119,6 +129,10 @@ export async function processPendingAiFeedback() {
       }
 
       const realId = await resolveRealIdFromDraftId(entry.id).catch(() => '')
+      if (!guard.isStillActive()) {
+        stillPending.push(...list.slice(index))
+        break
+      }
       // Sicherheitsnetz (siehe isValidObjectId-Kommentar in workoutHelpers.js): eine aufgelöste,
       // aber nicht wie eine echte ObjectId aussehende ID wird wie "nicht aufgelöst" behandelt.
       if (!realId || !isValidObjectId(realId)) {
@@ -135,6 +149,11 @@ export async function processPendingAiFeedback() {
       try {
         const { getIdToken } = useFirebaseAuth()
         const token = await getIdToken().catch(() => null)
+        // Konto gewechselt oder Token gehört zu einem anderen Konto: nicht anfragen, Eintrag unverändert zurücklegen.
+        if (!guard.isStillActive() || !guard.tokenMatches(token)) {
+          stillPending.push(...list.slice(index))
+          break
+        }
         const response = await axios.post(
           `${apiUrl('workouts')}/${realId}/ai-analysis`,
           { language: getAppLanguage() },
@@ -161,7 +180,10 @@ export async function processPendingAiFeedback() {
       }
     }
 
-    saveQueue(stillPending)
+    // Einträge, die während der Verarbeitung neu eingereiht wurden (z. B. nach einem Kontowechsel), nicht überschreiben.
+    const handledIds = new Set(list.map((item) => item.id))
+    const addedMeanwhile = loadQueue().filter((item) => !handledIds.has(item.id))
+    saveQueue([...stillPending, ...addedMeanwhile])
   } finally {
     processing = false
   }
