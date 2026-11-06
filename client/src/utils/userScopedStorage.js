@@ -114,6 +114,15 @@ export function removePref(base, uid = activeUid) {
   lsRemove(scopedKey(base, owner))
 }
 
+/**
+ * Gehört ein gespeicherter Zustand/Eintrag (mit Feld `uid`) zum angemeldeten Konto? Einträge ohne `uid` stammen aus der Zeit
+ * vor dieser Änderung und zählen für das aktive Konto (sie sind kurzlebig bzw. der Server prüft die Konto-ID ohnehin).
+ */
+export function belongsToActiveAccount(record) {
+  const owner = record?.uid
+  return owner === undefined || owner === null || String(owner) === activeUid
+}
+
 /** Nur für Tests. */
 export function __resetUserScopedStorageForTests() {
   memory.clear()

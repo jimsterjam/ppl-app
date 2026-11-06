@@ -60,6 +60,7 @@
 
 <script setup>
 import { ref } from 'vue'
+import { clearAdminKeyRefOnReset } from '@/utils/adminKeyReset'
 import { listAppFeedback } from '@/api/feedback'
 
 // Wiederverwendbares Panel für die AppFeedback-Admin-Übersicht (siehe server/routes/feedback.js
@@ -71,6 +72,7 @@ import { listAppFeedback } from '@/api/feedback'
 const STORAGE_KEY = 'admin_feedback_key'
 
 const adminKey = ref(localStorage.getItem(STORAGE_KEY) || '')
+clearAdminKeyRefOnReset(adminKey)
 const categoryFilter = ref('')
 const statusFilter = ref('')
 const entries = ref([])

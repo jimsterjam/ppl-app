@@ -19,6 +19,8 @@ import { useAiConsentStore } from './stores/aiConsentStore'
 import { useTimerStore } from './stores/timerStore'
 import { useRestTimerStore } from './stores/restTimerStore'
 import { useWarmupTimerStore } from './stores/warmupTimerStore'
+import { useTransitionTimerStore } from './stores/transitionTimerStore'
+import { useSessionStopwatchStore } from './stores/sessionStopwatch'
 import { applyUserPreferences } from './utils/userPreferences'
 import { initFirebaseAuth, useFirebaseAuth, isEffectivelyEmailVerified } from './utils/firebaseAuth'
 import { getActiveDraft, runningWorkoutPath } from './utils/activeWorkoutDraft'
@@ -263,6 +265,8 @@ async function bootstrapAuth() {
     settings: settingsStore,
     restTimer: useRestTimerStore(pinia),
     warmupTimer: useWarmupTimerStore(pinia),
+    transitionTimer: useTransitionTimerStore(pinia),
+    stopwatch: useSessionStopwatchStore(pinia),
     timer: useTimerStore(pinia),
     i18n
   })
