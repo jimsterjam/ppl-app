@@ -8,7 +8,7 @@ import { emitTimerSignal, ensureAudioUnlocked } from '@/utils/timerAudio'
 import { clampRestSeconds, REST_ENDING_MS, REST_STEP_SECONDS, sanitizeRestOverrides, shouldAutoExpandRest } from '@/utils/restTimerRules'
 import { alarmSoundFile, sanitizeRestSound } from '@/utils/restMelodies'
 import { acquireKeepAwake, releaseKeepAwake } from '@/utils/keepAwakeGuard'
-import { readPref, removePref, writePref } from '@/utils/userScopedStorage'
+import { belongsToActiveAccount, getActiveUid, readPref, removePref, writePref } from '@/utils/userScopedStorage'
 import { scheduleRestEndSignal, cancelRestEndSignal } from '@/utils/restEndSignal'
 
 // Weiterhin hier exportiert (Tests/Aufrufer): Mitteilung und Verzögerung leben in utils/restEndSignal.js
@@ -165,6 +165,15 @@ export const useRestTimerStore = defineStore('restTimer', {
       if (nextRemaining <= 0) this.finish()
       else this.scheduleEndSignal()
     },
+    /** Kontowechsel/Abmelden: laufende Pause beenden, Ersatz-Mitteilung/Wecker zurücknehmen, gespeicherten Stand löschen. */
+    resetForUserChange() {
+      this.clear()
+      // Texte der Pause (Übungsname, Mitteilung) nicht im Speicher des nächsten Kontos stehen lassen.
+      this.exerciseName = ''
+      this.notifyTitle = ''
+      this.notifyBody = ''
+      this.alarmStopLabel = ''
+    },
     skip() {
       this.clear()
     },
@@ -242,6 +251,7 @@ export const useRestTimerStore = defineStore('restTimer', {
       try {
         if (!this.endsAt) { localStorage.removeItem(STATE_KEY); return }
         localStorage.setItem(STATE_KEY, JSON.stringify({
+          uid: getActiveUid(),
           endsAt: this.endsAt,
           durationSec: this.durationSec,
           baseSec: this.baseSec,
@@ -256,7 +266,7 @@ export const useRestTimerStore = defineStore('restTimer', {
     restore() {
       try {
         const saved = JSON.parse(localStorage.getItem(STATE_KEY) || 'null')
-        if (!saved || !saved.endsAt || saved.finishedAt || saved.endsAt <= Date.now()) {
+        if (!saved || !belongsToActiveAccount(saved) || !saved.endsAt || saved.finishedAt || saved.endsAt <= Date.now()) {
           localStorage.removeItem(STATE_KEY)
           return
         }

@@ -4,6 +4,7 @@
 // Zeitbasis ist der Startzeitpunkt, damit die Zeit bei gesperrtem Display bzw. nach App-Neustart stimmt.
 import { defineStore } from 'pinia'
 import { acquireKeepAwake, releaseKeepAwake } from '@/utils/keepAwakeGuard'
+import { belongsToActiveAccount, getActiveUid } from '@/utils/userScopedStorage'
 
 const STATE_KEY = 'ppl_transition_timer_v1'
 const KEEP_AWAKE_TAG = 'transition-timer'
@@ -46,6 +47,11 @@ export const useTransitionTimerStore = defineStore('transitionTimer', {
       releaseKeepAwake(KEEP_AWAKE_TAG)
       this.persist()
     },
+    /** Kontowechsel/Abmelden: laufenden Übergang beenden und gespeicherten Stand löschen. */
+    resetForUserChange() {
+      this.clear()
+      try { localStorage.removeItem(STATE_KEY) } catch {}
+    },
     minimize() {
       this.minimized = true
     },
@@ -67,7 +73,7 @@ export const useTransitionTimerStore = defineStore('transitionTimer', {
     persist() {
       try {
         if (!this.startedAt) { localStorage.removeItem(STATE_KEY); return }
-        localStorage.setItem(STATE_KEY, JSON.stringify({ startedAt: this.startedAt, exIndex: this.exIndex }))
+        localStorage.setItem(STATE_KEY, JSON.stringify({ uid: getActiveUid(), startedAt: this.startedAt, exIndex: this.exIndex }))
       } catch {}
     },
     /** Nach App-Neustart: laufenden Übergang wiederherstellen (zu alte verwerfen). */
@@ -75,7 +81,7 @@ export const useTransitionTimerStore = defineStore('transitionTimer', {
       try {
         const saved = JSON.parse(localStorage.getItem(STATE_KEY) || 'null')
         const age = saved ? Date.now() - Number(saved.startedAt) : Infinity
-        if (!saved || !(saved.startedAt > 0) || age < 0 || age > TRANSITION_MAX_AGE_MS) {
+        if (!saved || !belongsToActiveAccount(saved) || !(saved.startedAt > 0) || age < 0 || age > TRANSITION_MAX_AGE_MS) {
           localStorage.removeItem(STATE_KEY)
           return
         }

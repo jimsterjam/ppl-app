@@ -18,6 +18,7 @@ import { useFirebaseAuth } from './firebaseAuth'
 import { logger } from './logger'
 import { getAppLanguage } from '@/i18n'
 import { isValidObjectId } from './workoutHelpers'
+import { belongsToActiveAccount, getActiveUid } from './userScopedStorage'
 import { AI_FEEDBACK_UPDATED_EVENT } from './offlineStorage'
 
 const STORAGE_KEY = 'ppl_feedback_tracker_v1'
@@ -59,7 +60,7 @@ export function trackPendingFeedback(workoutId, { name = '', firstDelayMs = RETR
   if (existing) {
     if (name && !existing.name) existing.name = name
   } else {
-    list.push({ id, name, queuedAt: Date.now(), attempts: 0, nextAt: Date.now() + firstDelayMs })
+    list.push({ uid: getActiveUid(), id, name, queuedAt: Date.now(), attempts: 0, nextAt: Date.now() + firstDelayMs })
   }
   save(list)
 }
@@ -88,7 +89,12 @@ export async function runFeedbackTracker() {
   running = true
   try {
     const now = Date.now()
-    const due = load().filter((entry) => (entry.nextAt || 0) <= now)
+    // Einträge eines anderen Kontos, die nie mehr abgearbeitet werden, verfallen nach derselben Frist (ohne Meldung).
+    const all = load()
+    const kept = all.filter((entry) => belongsToActiveAccount(entry) || now - (entry.queuedAt || 0) <= GIVE_UP_AFTER_MS)
+    if (kept.length !== all.length) save(kept)
+    // Nur Einträge des angemeldeten Kontos abarbeiten; die eines anderen Kontos bleiben für dessen nächste Anmeldung liegen.
+    const due = load().filter((entry) => belongsToActiveAccount(entry) && (entry.nextAt || 0) <= now)
     if (!due.length) return
 
     const { getIdToken } = useFirebaseAuth()

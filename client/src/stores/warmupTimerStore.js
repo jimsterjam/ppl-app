@@ -12,7 +12,7 @@ import { acquireKeepAwake, releaseKeepAwake } from '@/utils/keepAwakeGuard'
 import { scheduleWarmupNotification, cancelWarmupNotification } from '@/utils/warmupSignal'
 import { WARMUP_ADJUST_SECONDS, WARMUP_TIMER_SECONDS, clampWarmupSeconds, sanitizeWarmupDurations } from '@/utils/warmupPlan'
 import { useRestTimerStore } from '@/stores/restTimerStore'
-import { readPref, writePref } from '@/utils/userScopedStorage'
+import { belongsToActiveAccount, getActiveUid, readPref, writePref } from '@/utils/userScopedStorage'
 
 const STATE_KEY = 'ppl_warmup_timer_v1'
 // Vom Nutzer gewählte Zeit je Schritt ({ cardio: 360, ... }) - nur gesetzte Werte, sonst gilt die Empfehlung.
@@ -129,6 +129,12 @@ export const useWarmupTimerStore = defineStore('warmupTimer', {
       acquireKeepAwake(KEEP_AWAKE_TAG)
       this.scheduleNotification()
     },
+    /** Kontowechsel/Abmelden: Timer abbrechen, Mitteilung zurücknehmen, Liste der fertigen Schritte leeren. */
+    resetForUserChange() {
+      this.cancel()
+      this.finished = []
+      this.persist()
+    },
     /** Abbrechen ohne Abhaken (z. B. Schritt von Hand abgehakt oder das Workout beginnt). */
     cancel() {
       this.reset()
@@ -187,6 +193,7 @@ export const useWarmupTimerStore = defineStore('warmupTimer', {
         const hasState = this.endsAt > 0 || this.pausedRemainingMs > 0 || this.finished.length > 0
         if (!hasState) { localStorage.removeItem(STATE_KEY); return }
         localStorage.setItem(STATE_KEY, JSON.stringify({
+          uid: getActiveUid(),
           step: this.step,
           endsAt: this.endsAt,
           durationSec: this.durationSec,
@@ -204,6 +211,7 @@ export const useWarmupTimerStore = defineStore('warmupTimer', {
       try {
         const saved = JSON.parse(localStorage.getItem(STATE_KEY) || 'null')
         if (!saved) return
+        if (!belongsToActiveAccount(saved)) { localStorage.removeItem(STATE_KEY); return }
         this.finished = Array.isArray(saved.finished)
           ? saved.finished.filter((e) => e && typeof e.step === 'string' && typeof e.workoutKey === 'string')
           : []

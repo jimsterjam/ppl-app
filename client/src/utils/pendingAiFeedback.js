@@ -24,6 +24,7 @@ import { useFirebaseAuth } from './firebaseAuth'
 import { logger } from './logger'
 import { getAppLanguage } from '@/i18n'
 import { trackPendingFeedback } from './feedbackTracker'
+import { belongsToActiveAccount, getActiveUid } from './userScopedStorage'
 import { classifyFeedbackResponse, REQUEST_TIMEOUT_MS } from './feedbackRetryRules'
 
 const STORAGE_KEY = 'bro_split_pending_ai_feedback_v1'
@@ -64,7 +65,7 @@ export function queuePendingAiFeedback(tempWorkoutId) {
   if (!id) return
   const list = loadQueue()
   if (list.some((entry) => entry.id === id)) return
-  list.push({ id, queuedAt: Date.now() })
+  list.push({ uid: getActiveUid(), id, queuedAt: Date.now() })
   saveQueue(list)
   logger.debug('[pendingAiFeedback] Eingereiht', { id })
 }
@@ -93,6 +94,12 @@ export async function processPendingAiFeedback() {
     for (const entry of list) {
       if (now - (entry.queuedAt || 0) > MAX_AGE_MS) {
         logger.warn('[pendingAiFeedback] Eintrag verworfen (zu alt, > 3 Tage ungelöst)', { id: entry.id })
+        continue
+      }
+
+      // Eintrag eines anderen Kontos: nicht anfassen (bleibt für dessen nächste Anmeldung, bis er zu alt ist).
+      if (!belongsToActiveAccount(entry)) {
+        stillPending.push(entry)
         continue
       }
 

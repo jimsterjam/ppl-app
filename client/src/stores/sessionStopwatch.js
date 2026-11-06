@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { acquireKeepAwake, releaseKeepAwake } from '@/utils/keepAwakeGuard'
+import { belongsToActiveAccount, getActiveUid } from '@/utils/userScopedStorage'
 
 const KEEP_AWAKE_TAG = 'session-stopwatch'
 const TICK_MS = 250
@@ -13,6 +14,11 @@ function loadPersistedState() {
     if (!raw) return null
     const parsed = JSON.parse(raw)
     if (!parsed || typeof parsed !== 'object') return null
+    // Stand eines anderen Kontos (Kontowechsel auf demselben Gerät): verwerfen, nicht übernehmen.
+    if (!belongsToActiveAccount(parsed)) {
+      localStorage.removeItem(STORAGE_KEY)
+      return null
+    }
     return parsed
   } catch {
     return null
@@ -21,7 +27,7 @@ function loadPersistedState() {
 
 function savePersistedState(state) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ uid: getActiveUid(), ...state }))
   } catch {}
 }
 
@@ -162,6 +168,8 @@ export const useSessionStopwatchStore = defineStore('sessionStopwatch', () => {
     stop,
     resume,
     reset,
+    /** Kontowechsel/Abmelden: Stoppuhr beenden und gespeicherten Stand löschen. */
+    resetForUserChange: reset,
     startIfIdle,
     toggleStartStop
   }
