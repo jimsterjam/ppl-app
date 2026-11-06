@@ -6,6 +6,7 @@ import {
   clearSignalHistory,
   emitTimerSignal
 } from '@/utils/timerAudio'
+import { wrapPlugin } from '@/utils/capacitorPlugin'
 
 const TICK_MS = 250
 const TIMER_STATE_KEY = 'timer_state_v1'
@@ -52,12 +53,13 @@ const readPersistedTimerSettings = () => {
   }
 }
 
+// Plugin nie direkt aus einer async-Funktion zurückgeben (siehe utils/capacitorPlugin.js).
 const getLocalNotifications = async () => {
   try {
     const module = await import('@capacitor/local-notifications')
-    return module?.LocalNotifications || null
+    return wrapPlugin(module?.LocalNotifications)
   } catch {
-    return null
+    return wrapPlugin(null)
   }
 }
 
@@ -68,7 +70,7 @@ const getTimerNotificationIdList = () => {
 }
 
 const cancelTimerNotifications = async () => {
-  const LocalNotifications = await getLocalNotifications()
+  const { plugin: LocalNotifications } = await getLocalNotifications()
   if (!LocalNotifications) return
   try {
     await LocalNotifications.cancel({ notifications: getTimerNotificationIdList() })
@@ -93,7 +95,7 @@ const scheduleTimerNotifications = async (storeState) => {
   if (remainingMs <= 0) return
   if (Math.abs(scheduledNotificationAt - (now + remainingMs)) < 1200) return
 
-  const LocalNotifications = await getLocalNotifications()
+  const { plugin: LocalNotifications } = await getLocalNotifications()
   if (!LocalNotifications) return
 
   try {

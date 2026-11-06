@@ -9,6 +9,7 @@
 import { Capacitor } from '@capacitor/core'
 import { cancelRestAlarm, scheduleRestAlarm } from '@/utils/restAlarm'
 import { logDiagnostic } from '@/utils/diagnosticsLog'
+import { wrapPlugin } from './capacitorPlugin'
 
 export const NOTIFICATION_ID = 940001
 // Ton der Ersatz-Mitteilung (Datei im iOS-Projekt: ios/App/App/rest-end.wav, als Ressource eingetragen).
@@ -16,12 +17,15 @@ export const NOTIFICATION_ID = 940001
 export const NOTIFICATION_SOUND = 'rest-end.wav'
 export const NOTIFICATION_DELAY_MS = 1200
 
+// Das Plugin darf NIE direkt aus einer async-Funktion zurückgegeben werden: Promise-Auflösung ruft `.then` am
+// Plugin-Proxy ab, und Capacitor wirft auf iOS "LocalNotifications.then() is not implemented on ios". Deshalb in einem
+// Objekt zurückgeben (siehe utils/capacitorPlugin.js).
 async function getLocalNotifications() {
   try {
     const module = await import('@capacitor/local-notifications')
-    return module?.LocalNotifications || null
+    return wrapPlugin(module?.LocalNotifications)
   } catch {
-    return null
+    return wrapPlugin(null)
   }
 }
 
@@ -37,13 +41,13 @@ export function buildRestNotification(at, title, body, platform = 'web') {
 }
 
 async function cancelNotification(LocalNotifications) {
-  const plugin = LocalNotifications || await getLocalNotifications()
+  const plugin = LocalNotifications || (await getLocalNotifications()).plugin
   if (!plugin) return
   try { await plugin.cancel({ notifications: [{ id: NOTIFICATION_ID }] }) } catch {}
 }
 
 async function scheduleNotification(at, title, body) {
-  const LocalNotifications = await getLocalNotifications()
+  const { plugin: LocalNotifications } = await getLocalNotifications()
   if (!LocalNotifications) return
   try {
     await LocalNotifications.cancel({ notifications: [{ id: NOTIFICATION_ID }] })
