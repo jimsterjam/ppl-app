@@ -70,20 +70,26 @@ export function setActiveUid(uid) {
 export function migrateLegacyPrefs(uid) {
   const owner = clean(uid)
   if (!owner || lsGet(MIGRATION_FLAG_KEY)) return false
+  let allMigrated = true
   for (const base of LEGACY_PREF_KEYS) {
     const legacy = lsGet(base)
     if (legacy == null) continue
-    if (lsGet(scopedKey(base, owner)) == null) lsSet(scopedKey(base, owner), legacy)
-    lsRemove(base)
+    // Den alten Wert nur löschen, wenn das Konto ihn schon hat oder das Schreiben geklappt hat. Schlägt es fehl (Speicher
+    // voll/nicht verfügbar), bleibt der alte Wert erhalten und die Übernahme wird beim nächsten Start erneut versucht.
+    const migrated = lsGet(scopedKey(base, owner)) != null || lsSet(scopedKey(base, owner), legacy)
+    if (migrated) lsRemove(base)
+    else allMigrated = false
   }
-  lsSet(MIGRATION_FLAG_KEY, '1')
-  return true
+  if (!allMigrated) return false
+  return lsSet(MIGRATION_FLAG_KEY, '1')
 }
 
 function adoptMemoryPrefs(uid) {
   for (const [base, value] of memory) {
     if (lsGet(scopedKey(base, uid)) == null) lsSet(scopedKey(base, uid), value)
   }
+  // Auch wenn das Schreiben fehlschlug (Speicher voll): die Wahl aus der Zeit ohne Konto gehört nur dem Konto, das sich
+  // jetzt anmeldet, und darf nicht an ein späteres weitergegeben werden.
   memory.clear()
 }
 
