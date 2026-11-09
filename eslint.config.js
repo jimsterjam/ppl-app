@@ -16,7 +16,8 @@ export default [
       'server/node_modules/**',
       '**/node_modules/**',
       '**/*.min.js',
-      'server/server.log'
+      'server/server.log',
+      'site/dist/**'
     ]
   },
   js.configs.recommended,
@@ -47,6 +48,17 @@ export default [
       'vue/no-dupe-v-else-if': 'warn',
       'vue/no-unused-vars': 'warn'
     }
+  },
+  // Website (site/): Build-Skripte und Tests laufen in Node, assets/calc.js im Browser
+  {
+    files: ['site/**/*.mjs'],
+    languageOptions: { ecmaVersion: 'latest', sourceType: 'module', globals: { ...globals.node } },
+    rules: { 'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }] }
+  },
+  {
+    files: ['site/assets/**/*.js'],
+    languageOptions: { ecmaVersion: 'latest', sourceType: 'module', globals: { ...globals.browser } },
+    rules: { 'no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }] }
   },
   // Server-side (Node/Express)
   {
