@@ -183,3 +183,13 @@ describe('Texte', () => {
     assert.match(get('/en/privacy/index.html'), /Part A: This website[\s\S]*Part B: The fbe app/)
   })
 })
+
+test("Header-Marke: drei Buchstaben-Spans, weiß statt Akzentfarbe", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const render = await readFile(new URL("../src/render.mjs", import.meta.url), "utf8");
+  const css = await readFile(new URL("../assets/style.css", import.meta.url), "utf8");
+  assert.match(render, /class="bm-f"[^>]*>f<\/span><span class="bm-b"[^>]*>b<\/span><span[^>]*>e<\/span>/);
+  const rule = css.match(/\n\.brand \{[^}]*\}/)[0];
+  assert.doesNotMatch(rule, /var\(--accent\)/);
+  assert.match(rule, /font-kerning: none/);
+});

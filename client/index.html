@@ -17,7 +17,9 @@
 #start-splash { --u: calc(100vmax / 2732); position: fixed; inset: 0; z-index: 2147483647; overflow: hidden; background: #000; color: #fff; font-family: 'Comfortaa', sans-serif; transition: opacity 300ms ease; }
 #start-splash.is-leaving { opacity: 0; pointer-events: none; }
 #start-splash .ss-mark, #start-splash .ss-slogan { position: absolute; left: 0; right: 0; text-align: center; white-space: nowrap; opacity: 0; }
-#start-splash .ss-mark { top: calc(var(--u) * 949); font-size: calc(var(--u) * 626); line-height: 1; font-weight: 700; color: #fff; }
+#start-splash .ss-mark { top: calc(var(--u) * 949); font-size: calc(var(--u) * 626); line-height: 1; font-weight: 700; color: #fff; font-kerning: none; font-feature-settings: "kern" 0; padding-left: 0.035em; }
+#start-splash .ss-mark .bm-f { margin-right: 0.0055em; }
+#start-splash .ss-mark .bm-b { margin-right: -0.0395em; }
 #start-splash .ss-slogan { top: calc(var(--u) * 1648); font-size: calc(var(--u) * 77); line-height: 1; font-weight: 500; letter-spacing: 0.34em; padding-left: 0.34em; color: #9a9a9a; text-transform: uppercase; }
 /* Sichtbar bleiben beide auch ohne JS/Animation (Fallback = statisches Startbild). */
 #start-splash.is-static .ss-mark, #start-splash.is-static .ss-slogan { opacity: 1; }
@@ -33,7 +35,7 @@
     </style>
   </head>
   <body>
-    <div id="start-splash" aria-hidden="true"><div class="ss-mark">fbe</div><div class="ss-slogan">Form Beats Ego</div></div>
+    <div id="start-splash" aria-hidden="true"><div class="ss-mark"><span class="bm-f">f</span><span class="bm-b">b</span><span>e</span></div><div class="ss-slogan">Form Beats Ego</div></div>
     <script>
 (function () {
   var el = document.getElementById('start-splash');

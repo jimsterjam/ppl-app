@@ -17,7 +17,9 @@ a:focus-visible, button:focus-visible, input:focus-visible { outline: 3px solid 
 .wrap { width: 100%; max-width: var(--maxw); margin: 0 auto; padding-inline: max(20px, env(safe-area-inset-left)); }
 header.site { border-bottom: 1px solid var(--line); }
 .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 24px; padding-block: 14px; }
-.brand { font-family: var(--font-head); font-weight: 700; font-size: 1.6rem; color: var(--accent); text-decoration: none; letter-spacing: 0.02em; }
+.brand { font-family: var(--font-head); font-weight: 700; font-size: 1.6rem; color: var(--fg); text-decoration: none; font-kerning: none; font-feature-settings: "kern" 0; }
+.brand .bm-f { margin-right: 0.0055em; }
+.brand .bm-b { margin-right: -0.0395em; }
 nav.main { display: flex; flex-wrap: wrap; gap: 6px 20px; margin-right: auto; }
 nav.main a { color: var(--fg); text-decoration: none; font-size: 0.98rem; padding: 4px 0; border-bottom: 2px solid transparent; }
 nav.main a:hover, nav.main a[aria-current="page"] { border-bottom-color: var(--accent); }
