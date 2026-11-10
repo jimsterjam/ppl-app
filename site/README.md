@@ -17,7 +17,8 @@ Statische Website mit Startseite, kostenlosen Werkzeugen (1RM-Rechner, Wiederhol
 
 ## Veröffentlichen (Render, Static Site)
 1. Neuer Dienst: **Static Site**, Repository `jimsterjam/ppl-app`, Branch `main`.
-2. **Build Command:** `node site/build.mjs`
+2. **Build Command:** `cd client && npm ci --ignore-scripts && cd .. && node site/build.mjs`
+   (Die Texte der App laden `vue-i18n`, deshalb müssen die Pakete von `client/` installiert sein. Mit `node site/build.mjs` allein bricht der Build auf einem frischen Checkout ab. Der Befehl dauert etwa eine halbe Minute.)
 3. **Publish Directory:** `site/dist`
 4. **Environment Variable:** `SITE_URL` = die Adresse der Website, ohne Schrägstrich am Ende (zum Beispiel `https://deine-adresse.de`).
 5. Unter *Settings → Custom Domains* die Adresse eintragen und die genannten DNS-Einträge beim Anbieter der Adresse setzen.
