@@ -161,6 +161,12 @@ describe('Texte', () => {
   test('keine Cookies und keine Zähl-/Werbedienste', () => {
     for (const [file, html] of htmlFiles()) assert.ok(!/google-analytics|googletagmanager|facebook|doubleclick|document\.cookie/i.test(html), file)
   })
+  test('Kontakt: support@formbeatsego.de auf Support, Impressum und Datenschutz, die alte Adresse nirgends', () => {
+    for (const file of ['/support/index.html', '/impressum/index.html', '/datenschutz/index.html', '/en/support/index.html', '/en/legal-notice/index.html', '/en/privacy/index.html']) {
+      assert.ok(get(file).includes('support@formbeatsego.de'), file)
+    }
+    for (const [file, html] of htmlFiles()) assert.ok(!/push-pull-legs\.de/.test(html), `${file}: alte Domain`)
+  })
   test('Seitengröße: höchstens 120 KB HTML je Seite', () => {
     for (const [file, html] of htmlFiles()) assert.ok(Buffer.byteLength(html) < 120 * 1024, file)
   })

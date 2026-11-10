@@ -16,12 +16,12 @@ const t = (key, params) => ({
 
 describe('Feedback per E-Mail', () => {
   it('Adresse ist die Kontaktadresse aus dem Impressum', () => {
-    expect(FEEDBACK_EMAIL).toBe('admin@push-pull-legs.de')
+    expect(FEEDBACK_EMAIL).toBe('support@formbeatsego.de')
   })
 
   it('mailto: kodiert Betreff und Text, Zeilenumbrüche als %0D%0A', () => {
     const url = buildFeedbackMailto({ subject: 'FBE Feedback & Idee', body: 'Hallo\nÄ ü?' })
-    expect(url.startsWith('mailto:admin@push-pull-legs.de?subject=')).toBe(true)
+    expect(url.startsWith('mailto:support@formbeatsego.de?subject=')).toBe(true)
     expect(url).toContain('FBE%20Feedback%20%26%20Idee')
     expect(url).toContain('Hallo%0D%0A')
     expect(url).not.toMatch(/ |\n/)
@@ -51,7 +51,7 @@ describe('Feedback per E-Mail', () => {
       t, toast, deps: { collectDetails: async () => ({}), openUrl: async () => { throw new Error('boom') } }
     })
     expect(result).toBe('failed')
-    expect(toast.show.mock.calls[0][0]).toContain('admin@push-pull-legs.de')
+    expect(toast.show.mock.calls[0][0]).toContain('support@formbeatsego.de')
     expect(toast.show.mock.calls[0][0]).not.toMatch(/kopiert|copied/i)
   })
 
@@ -64,7 +64,7 @@ describe('Feedback per E-Mail', () => {
       const toast = { show: vi.fn() }
       const result = await sendFeedbackMail({ t, toast, deps: { collectDetails: async () => ({ osVersion: '26.1' }) } })
       expect(result).toBe('opened')
-      expect(location.href.startsWith('mailto:admin@push-pull-legs.de?subject=FBE%20Feedback&body=')).toBe(true)
+      expect(location.href.startsWith('mailto:support@formbeatsego.de?subject=FBE%20Feedback&body=')).toBe(true)
       expect(location.href).toContain('iOS%3A%2026.1')
       expect(toast.show).not.toHaveBeenCalled()
     })
