@@ -51,8 +51,9 @@ bei jeder neuen Sitzung neu gelernt werden müssen. Bei Widerspruch gilt die jü
   Zustände/Warteschlangen tragen die UID (`belongsToActiveAccount`). Ein zweites Konto auf demselben
   Gerät darf nichts vom ersten sehen.
 - **Kontakt-E-Mail:** `support@formbeatsego.de`, zentral in `client/src/config/legalOwner.js`.
-- **Website `site/`** (formbeatsego.de): statischer Generator ohne Abhängigkeiten, nutzt Pläne,
-  Katalog und Texte der App. Übungsnamen dort englisch mit deutschem Begriff in Klammern
+- **Website `site/`** (formbeatsego.de): statischer Generator ohne eigene Pakete, nutzt Pläne,
+  Katalog und Texte der App. Er importiert dafür Dateien und `vue-i18n` aus `client/` – vor
+  `npm run site:build`/`site:test` auf einem frischen Checkout erst `cd client && npm ci`. Übungsnamen dort englisch mit deutschem Begriff in Klammern
   („Bench Press (Bankdrücken)“) – bewusste Ausnahme zur App-Regel. Keine Cookies, kein Tracking.
   App-Store-Links mit `?ct=web-<seite>`. Tests: `npm run site:test` (auch in `check-all.sh` und CI).
 - Antworten an Paul auf Deutsch, knapp, Ergebnis zuerst.
