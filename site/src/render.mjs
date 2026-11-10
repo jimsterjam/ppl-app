@@ -87,7 +87,7 @@ ${extraHead}
 <body>
 <a class="skip" href="#inhalt">${esc(t.footer.skip)}</a>
 <header class="site"><div class="wrap bar">
-<a class="brand" href="${urlFor('home', lang)}" aria-label="${esc(t.nav.home)}">fbe</a>
+<a class="brand" href="${urlFor('home', lang)}" aria-label="${esc(t.nav.home)}"><span class="bm-f" aria-hidden="true">f</span><span class="bm-b" aria-hidden="true">b</span><span aria-hidden="true">e</span></a>
 <nav class="main" aria-label="${esc(t.nav.menu)}">${nav('rm', t.nav.rm)}${nav('reps', t.nav.reps)}${nav('plans', t.nav.plans)}${nav('support', t.nav.support)}</nav>
 <div class="lang" role="group" aria-label="${esc(t.footer.language)}">${lang === 'de' ? langSwitch : orderedLangs}</div>
 </div></header>
