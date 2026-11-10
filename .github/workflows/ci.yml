@@ -50,3 +50,18 @@ jobs:
         run: npm ci
       - working-directory: server
         run: npm test
+
+  # Website (site/): Die Tests laden die Texte der App (vue-i18n aus client/) und vergleichen die Rechenformel mit der
+  # des Servers. Dafür genügen die Pakete von client/; die Dateien aus server/ brauchen keine Pakete.
+  site-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.22'
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+      - working-directory: client
+        run: npm ci --ignore-scripts
+      - run: npm run site:test
