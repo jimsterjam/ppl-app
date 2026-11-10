@@ -1,5 +1,6 @@
 // Angaben zum Betreiber für Impressum und Datenschutzerklärung - EINZIGE Stelle, an der sie gepflegt werden.
-// TODO (Paul): vor dem App-Store-Start Name und Anschrift eintragen (aktuell Platzhalter in eckigen Klammern).
+// Angaben von Paul am 24.10.2026 eingetragen und am 10.11.2026 als richtig bestätigt. Sie stehen im Impressum und in der
+// Datenschutzerklärung der App und der Website (site/), also öffentlich.
 export const LEGAL_OWNER = {
   name: 'Cem Özdemir',
   street: 'Wildenbruchstr. 91',

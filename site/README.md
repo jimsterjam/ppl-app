@@ -4,7 +4,7 @@ Statische Website mit Startseite, kostenlosen Werkzeugen (1RM-Rechner, Wiederhol
 
 ## Befehle (im Projektordner)
 - `npm run site:build` baut nach `site/dist` (ohne `SITE_URL` als lokale Vorschau)
-- `npm run site:test` führt die Tests aus
+- `npm run site:test` führt die Tests aus (im frischen Checkout vorher `cd client && npm ci --ignore-scripts && cd ..`, weil die Tests die Texte der App laden)
 - Vorschau: `python3 -m http.server 4173 -d site/dist`, dann http://localhost:4173
 
 ## Wie die Seiten entstehen

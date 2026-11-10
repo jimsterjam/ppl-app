@@ -108,6 +108,12 @@ describe('Seiten', () => {
         const key = href.endsWith('/') ? `${href}index.html` : href
         assert.ok(files.has(key), `${file}: ${href}`)
       }
+      // Anker (#faq): die Zielseite muss das Element mit dieser ID enthalten
+      for (const [, target, anchor] of html.matchAll(/href="(\/[^"#?]*)#([^"]+)"/g)) {
+        const targetHtml = files.get(target.endsWith('/') ? `${target}index.html` : target)
+        assert.ok(targetHtml && targetHtml.includes(`id="${anchor}"`), `${file}: Anker ${target}#${anchor} fehlt`)
+      }
+      for (const [, anchor] of html.matchAll(/href="#([^"]+)"/g)) assert.ok(html.includes(`id="${anchor}"`), `${file}: Anker #${anchor} fehlt`)
     }
   })
   test('keine fremden Ressourcen: nur der App-Store-Link und mailto zeigen nach außen', () => {
@@ -157,6 +163,14 @@ describe('Texte', () => {
   })
   test('Seitengröße: höchstens 120 KB HTML je Seite', () => {
     for (const [file, html] of htmlFiles()) assert.ok(Buffer.byteLength(html) < 120 * 1024, file)
+  })
+  test('Datenschutzseite: Anschrift des Verantwortlichen in Teil A und in Teil B; Hosting-Text ohne Protokoll-Behauptung', () => {
+    for (const [file, lang] of [['/datenschutz/index.html', 'de'], ['/en/privacy/index.html', 'en']]) {
+      const html = get(file)
+      const partB = html.split(lang === 'de' ? 'Teil B: Die App fbe' : 'Part B: The fbe app')[1]
+      assert.ok(partB.includes('<pre>') && partB.includes('Deutschland'), `${file}: Anschrift in Teil B`)
+      assert.ok(!/Protokolldaten|log data/i.test(html.split(lang === 'de' ? 'Teil B' : 'Part B')[0]), `${file}: Protokoll-Behauptung`)
+    }
   })
   test('Datenschutzseite enthält Website-Teil und App-Teil', () => {
     assert.match(get('/datenschutz/index.html'), /Teil A: Diese Website[\s\S]*Teil B: Die App fbe/)

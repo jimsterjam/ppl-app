@@ -135,7 +135,7 @@ ${storeButton(t, 'home')}
 <section><h2>${esc(h.moreTitle)}</h2><ul class="ticks">${h.more.map((m) => `<li>${esc(m)}</li>`).join('')}</ul></section>
 <section class="callout"><h2>${esc(h.freeTitle)}</h2><p>${esc(h.free)}</p>${storeButton(t, 'home-free')}</section>
 <section><h2>${esc(h.toolsTitle)}</h2><div class="cards">${h.tools.map(([id, name, text]) => `<a class="card" href="${urlFor(id, lang)}"><h3>${esc(name)}</h3><p>${esc(text)}</p></a>`).join('')}</div></section>
-<section><h2>${esc(h.faqTitle)}</h2>${faqHtml(h.faq)}</section>`
+<section id="faq"><h2>${esc(h.faqTitle)}</h2>${faqHtml(h.faq)}</section>`
   return layout({ lang, pageId: 'home', title: h.title, description: h.description, siteUrl, body, extraHead: `<script type="application/ld+json">${jsonLd}</script>` })
 }
 
@@ -266,7 +266,7 @@ const WEBSITE_PRIVACY = {
     a: [
       ['Verantwortlicher', 'Verantwortlich im Sinne der Datenschutz-Grundverordnung (DSGVO) ist:'],
       ['Das Wichtigste in Kürze', 'Diese Website setzt keine Cookies, nutzt keine Analyse- oder Werbedienste und lädt keine Schriften oder Skripte von anderen Anbietern. Der 1RM-Rechner rechnet in deinem Browser. Deine Eingaben werden nicht an uns gesendet.'],
-      ['Hosting und Server-Protokolle', 'Die Website wird bei Render (Render Services, Inc., USA) gehostet. Beim Aufruf entstehen technisch bedingt Protokolldaten, zum Beispiel IP-Adresse, Zeitpunkt, aufgerufene Seite und Browserkennung. Wir verarbeiten sie, um die Seite auszuliefern und für Sicherheit und Fehlersuche (Art. 6 Abs. 1 lit. f DSGVO). Render kann dafür ein Netzwerk zur Auslieferung von Inhalten einsetzen.'],
+      ['Hosting', 'Die Website wird bei Render (Render Services, Inc., USA) gehostet und über ein weltweites Netzwerk zur Auslieferung von Inhalten ausgeliefert. Beim Aufruf verarbeitet der Hosting-Anbieter technisch bedingt Verbindungsdaten wie die IP-Adresse, um die Seite auszuliefern und abzusichern (Art. 6 Abs. 1 lit. f DSGVO). Dabei können Daten auch außerhalb der EU verarbeitet werden. Wir selbst erhalten für diese Website keine Zugriffsprotokolle und werten keine Besucher aus.'],
       ['Links zum App Store', 'Die Knöpfe „Im App Store laden“ führen zu Apple. Ab dem Klick gelten die Datenschutzhinweise von Apple.'],
       ['Kontakt', 'Wenn du uns per E-Mail schreibst, verarbeiten wir deine E-Mail-Adresse und deinen Text, um dir zu antworten (Art. 6 Abs. 1 lit. f DSGVO).'],
       ['Deine Rechte', 'Du hast das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit und Widerspruch. Du kannst dich außerdem bei einer Datenschutz-Aufsichtsbehörde beschweren. Anfragen an:']
@@ -280,7 +280,7 @@ const WEBSITE_PRIVACY = {
     a: [
       ['Controller', 'The controller within the meaning of the General Data Protection Regulation (GDPR) is:'],
       ['In short', 'This website sets no cookies, uses no analytics or advertising services and loads no fonts or scripts from other providers. The 1RM calculator runs in your browser. Your inputs are not sent to us.'],
-      ['Hosting and server logs', 'The website is hosted by Render (Render Services, Inc., USA). Visiting it creates technical log data, for example IP address, time, requested page and browser identifier. We process it to deliver the site and for security and troubleshooting (Art. 6(1)(f) GDPR). Render may use a content delivery network for this.'],
+      ['Hosting', 'The website is hosted by Render (Render Services, Inc., USA) and delivered through a worldwide content delivery network. When you visit it, the hosting provider technically processes connection data such as your IP address to deliver and protect the site (Art. 6(1)(f) GDPR). Data may also be processed outside the EU. We ourselves receive no access logs for this website and do not analyse visitors.'],
       ['Links to the App Store', 'The “Download on the App Store” buttons lead to Apple. From the click on, Apple’s privacy information applies.'],
       ['Contact', 'If you write to us by email, we process your email address and your text to reply to you (Art. 6(1)(f) GDPR).'],
       ['Your rights', 'You have the right of access, rectification, erasure, restriction of processing, data portability and objection. You can also complain to a data protection authority. Requests to:']
@@ -300,7 +300,7 @@ export function renderPrivacy(lang, siteUrl) {
     let text = l[`s${n}Text`]
     if (!title || !text) continue
     text = text.replace('{email}', email)
-    appSections.push(`<h3>${esc(title)}</h3>${text.split('\n').map((line) => `<p>${esc(line)}</p>`).join('')}${l[`s${n}Mail`] ? `<p>${esc(l[`s${n}Mail`].replace('{email}', email))}</p>` : ''}`)
+    appSections.push(`<h3>${esc(title)}</h3>${text.split('\n').map((line) => `<p>${esc(line)}</p>`).join('')}${n === 1 ? `<pre>${esc(address)}</pre>` : ''}${l[`s${n}Mail`] ? `<p>${esc(l[`s${n}Mail`].replace('{email}', email))}</p>` : ''}`)
   }
   const body = `<div class="legal"><h1>${esc(w.h1)}</h1><p>${esc(w.intro)}</p>
 <h2>${esc(w.aTitle)}</h2>
