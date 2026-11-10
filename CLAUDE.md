@@ -40,6 +40,21 @@ bei jeder neuen Sitzung neu gelernt werden müssen. Bei Widerspruch gilt die jü
   Entscheidungen aus der Notiz (z.B. weniger Gewicht für den Zielmuskel) bestätigen statt als
   „weniger Gewicht“ formulieren (Prompt-Regeln 8, 12, 14, 27). Zahlen im Text müssen aus den echten
   Trainingsdaten stammen (Verifier, `AI_VERIFIER_MODE=active`).
+- **Marke:** immer „Form Beats Ego“, nie „Form schlägt Ego“ – auch in deutschen Texten. Das
+  Zeichen „fbe“ ist weiß, nie in der Akzentfarbe. Gleiche Buchstabenabstände über einzelne Spans
+  (`bm-f`/`bm-b`, `font-kerning: none`) an drei Stellen: App (`client/src/components/BrandLockup.vue`),
+  Startbildschirm (`#start-splash` in `client/index.html` **und** die drei PNGs in
+  `client/ios/App/App/Assets.xcassets/Splash.imageset` – pixelgleich halten, sonst springt der
+  Übergang) und Website (`site/`).
+- **Einstellungen und Zustände gehören zum Konto, nicht zum Gerät.** Neue gespeicherte Werte nur über
+  `client/src/utils/userScopedStorage.js` (`readPref`/`writePref`, Schlüssel `<name>:<UID>`); laufende
+  Zustände/Warteschlangen tragen die UID (`belongsToActiveAccount`). Ein zweites Konto auf demselben
+  Gerät darf nichts vom ersten sehen.
+- **Kontakt-E-Mail:** `support@formbeatsego.de`, zentral in `client/src/config/legalOwner.js`.
+- **Website `site/`** (formbeatsego.de): statischer Generator ohne Abhängigkeiten, nutzt Pläne,
+  Katalog und Texte der App. Übungsnamen dort englisch mit deutschem Begriff in Klammern
+  („Bench Press (Bankdrücken)“) – bewusste Ausnahme zur App-Regel. Keine Cookies, kein Tracking.
+  App-Store-Links mit `?ct=web-<seite>`. Tests: `npm run site:test` (auch in `check-all.sh` und CI).
 - Antworten an Paul auf Deutsch, knapp, Ergebnis zuerst.
 
 ## Regeln für Texteingaben (jedes Freitextfeld)
@@ -89,6 +104,12 @@ bei jeder neuen Sitzung neu gelernt werden müssen. Bei Widerspruch gilt die jü
   `ppl-app-server`). Die sichtbare Liste im Client steht in `client/src/config/admin.js` –
   beide synchron halten.
 - iOS: Client-Änderungen erst nach `npm run build` + `npx cap sync ios` + Xcode-Build sichtbar.
+- iOS-Release: Build-Nummer (`CURRENT_PROJECT_VERSION`, in Xcode die Zahl in Klammern) immer höher
+  als der höchste Build in App Store Connect (Stand 10.11.: 12 für Version 1.0.1), nicht als der
+  lokale Wert im Projekt. Jede veröffentlichte Version braucht in App Store Connect eine neue Version.
+- Website: Render Static Site `fbe-website`, Domain `formbeatsego.de` (ohne www). Build Command
+  `cd client && npm ci --ignore-scripts && cd .. && node site/build.mjs` (die App-Texte brauchen
+  `vue-i18n` aus `client/`), Details in `site/README.md`. Deploy nach Merge auf `main`.
 
 ## Bekannte Einschränkungen der Sandbox (Cowork) – nur lokal
 

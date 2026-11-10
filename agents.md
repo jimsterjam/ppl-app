@@ -10,7 +10,7 @@ Mission
 
 Before Making Changes
 
-● Read this file, the root README, relevant package manifests, and documentation for the affected area.
+● Read this file, `CLAUDE.md`, relevant package manifests, and documentation for the affected area.
 
 ● Inspect the current implementation, nearby tests, and repository conventions before proposing a solution.
 
@@ -125,6 +125,7 @@ Maintain this section as the project evolves:
   - Server only: `cd server && npm test` → `node --test utils/__tests__/*.test.js` (Node's built-in test runner, no Jest/Mocha). New server tests must live in `utils/__tests__/` or be added to this glob, or they will silently not run.
   - Do NOT add a second glob segment (e.g. `middleware/__tests__/*.test.js`) for a directory that currently has no `.test.js` files in it - Node's test runner CLI errors out with "Could not find '<path>'" if a glob segment matches zero files (confirmed: passed locally under bash, failed on GitHub Actions' shell - do not assume "works locally" is enough proof here). If middleware tests are reintroduced later, add the segment back once at least one matching file exists, and verify in CI, not just locally.
   - Do NOT use bare `node --test` (no path args) as a "just discover everything" shortcut either - tried once during this project's setup and it recursively picked up unrelated files and hung indefinitely (over 120s, had to be killed). Stick to explicit `<dir>/__tests__/*.test.js` globs per directory that actually contains tests.
+  - Website only: `npm run site:test` (root) → `node --test site/tests/site.test.mjs`. Needs `client/` dependencies installed, because the site reuses the app's i18n texts.
   - Client only: `cd client && npm test` → `vitest run` (Vitest). Client tests live in `client/src/**/__tests__/*.test.js`.
   - i18n check: `cd client && npm run i18n:check` (deterministic; also runs as the Vitest test `src/i18n/__tests__/i18nConsistency.test.js`). Fails only on findings not listed in `client/scripts/i18n-baseline.json` - fix the translation instead of adding to the baseline.
   - Client test caveat: IndexedDB (Dexie) is not available in the Vitest/jsdom environment - `offlineStorage.js`-dependent code logs a `DexieError [MissingAPIError]` during test runs; this is expected noise, not a failure, as long as the test still reports pass.
@@ -136,6 +137,7 @@ Maintain this section as the project evolves:
 ● Build command:
   - Client (the only thing that gets "built" in the traditional sense): `npm run build` (root) or `cd client && npm run build` → runs `clean:dist` then `vite build`, output in `client/dist/`.
   - Server has no build step; it runs directly via Node (`server/server.js`).
+  - Website: `npm run site:build` (root) → `node site/build.mjs`, output in `site/dist/` (set `SITE_URL` for production URLs). On a fresh checkout install `client/` dependencies first (see `site/README.md`).
   - iOS native build is a separate, manual step outside this repo's automated tooling - see Architecture notes.
 
 ● Start command:
@@ -144,6 +146,7 @@ Maintain this section as the project evolves:
   - Both together: `npm run dev` (root) → runs `./dev-stable.sh`.
 
 ● Architecture notes:
+  - Static website `site/` (formbeatsego.de, Render static site): dependency-free generator that renders pages from the app's plan templates, exercise catalog and i18n texts; tests in `site/tests/`.
   - Three-part system: `client/` (Vue 3 + Capacitor 7 iOS app, Pinia, vue-router, vue-i18n with DE/EN dual-locale objects in `client/src/i18n/index.js`), `server/` (Node/Express 5 + MongoDB/Mongoose, deployed to Render.com per `render.yaml`), and the native iOS project at `client/ios/App/` (git-tracked except `Pods/`, `build/`, and the synced web `public/` folder - see `.gitignore`).
   - Client-side changes are NOT visible in the iOS app until the native project is rebuilt: `npm run build` (client) → `npx cap sync ios` (or `npm run cap:sync` in `client/`) → rebuild in Xcode. Server-side changes take effect after Render redeploys; no local rebuild step needed for those.
   - Xcode scheme gotcha: `client/ios/App/App.xcodeproj/xcshareddata/xcschemes/App.xcscheme` has separate `buildConfiguration` values per action (`LaunchAction` = Debug for local dev/Safari Web Inspector debugging, `ArchiveAction` = Release for App Store submission). Do not "fix" one by copying the other's value - they serve different purposes and were previously a source of confusion (Safari Web Inspector showing an empty/no-content device when `LaunchAction` was accidentally set to Release, since Capacitor's `isInspectable` is gated behind the `DEBUG` compile flag).
