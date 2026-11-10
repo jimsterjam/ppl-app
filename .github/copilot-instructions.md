@@ -1,68 +1,63 @@
-Ziel
-----
-Dieses Repository ist eine kleine Monorepo-App mit einem Vue/Vite/Capacitor-Frontend und einem Node/Express-Backend. Die Datei hier gibt Agenten genau die Informationen, die sie brauchen, um schnell produktiv zu werden (Aufbau, Start-/Build‑Befehle, Konventionen, Integrationspunkte).
+# Review-Regeln für fbe – Form Beats Ego
 
-Kurzüberblick
---------------
-- Architektur: Frontend in `client/` (Vue 3 + Vite + Capacitor), Backend in `server/` (Express, Mongoose optional). Siehe [client/package.json](client/package.json) und [server/package.json](server/package.json).
-- API: Backend exponiert REST-Endpunkte unter `/api/*` (Router in `server/routes/`). Schlüsselfiles: [server/server.js](server/server.js), [server/routes/workouts.js](server/routes/workouts.js), [server/routes/exercises.js](server/routes/exercises.js).
-- Auth: Server prüft Firebase-ID-Tokens via `server/middleware/firebaseAuth.js` und `server/utils/firebaseAdmin.js` (serviceAccount.json oder env `FIREBASE_ADMIN_CREDENTIAL_JSON`).
+Diese Datei liest der KI-Reviewer (GitHub Copilot) bei jedem Pull Request. Sie sagt, was in diesem
+Repo als Fehler zählt. Aufbau, Befehle und feste Absprachen stehen in `CLAUDE.md` und `agents.md`;
+bei Widerspruch gelten diese beiden.
 
-Wichtige Befehle / Dev-Workflows
--------------------------------
-- Monorepo-Dev (empfohlen): `npm run dev` im Repo-Root startet die standard Dev-Umgebung (siehe `./dev-stable.sh`). Siehe [package.json](package.json).
-- Server einzeln: `cd server && npm run dev` (nodemon). Start/Prod: `npm run start` im `server`-Ordner.
-- Client einzeln (lokal): `cd client && npm run dev` (Vite). Build: `cd client && npm run build` oder `npm run build` im Root (delegiert).
-- Capacitor / iOS helper: `npm run ios`, `npm run cap:sync` aus `client/` (siehe [client/package.json](client/package.json)).
+## Kurz zum Projekt
 
-Umgebungsvariablen & Secrets
----------------------------
-- Server lädt `server/.env` (dotenv mit relativem Pfad in [server/server.js](server/server.js)).
-- Kritisch: `MONGO_URI` ist required (siehe [server/utils/validateEnv.js](server/utils/validateEnv.js)). Fehlt es, beendet der Server den Start.
-- Optional / Features: `OPENAI_API_KEY` aktiviert echte OpenAI-Anfragen; ohne Key läuft das Backend in Demo‑/Fallback‑Modus. `PORT` kann überschreiben.
-- Firebase Admin: `server/serviceAccount.json` wird verwendet, wenn `FIREBASE_ADMIN_CREDENTIAL_JSON` nicht gesetzt ist.
+- `client/`: Vue 3 + Pinia + Capacitor 7, wird nur als iOS-App genutzt. Texte DE/EN in
+  `client/src/i18n/index.js`. Offline-first: Workouts in IndexedDB (`utils/offlineStorage.js`),
+  Sync-Warteschlange in `utils/syncManager.js`.
+- `server/`: Node/Express 5 + MongoDB/Mongoose auf Render. Auth über Firebase-ID-Token
+  (`middleware/firebaseAuth.js`). KI-Feedback in `routes/workouts.js` und `services/`.
+- `site/`: statische Website formbeatsego.de, erzeugt aus Plänen, Katalog und Texten der App.
+- Eine Person (Paul) prüft und mergt. Die meisten PRs schreibt ein Agent.
 
-Daten & Integrationen (wichtige Patterns)
------------------------------------------
-- Bild-Uploads:
-  - Übungen: werden in GridFS gespeichert (Bucket-Name: `exerciseImages`) — Suche: `saveToGridFS` / `getExerciseBucket` in [server/server.js](server/server.js).
-  - Workouts (Cover): werden als Dateien unter `server/public/uploads/workouts/` geschrieben (siehe `processAndStoreWorkoutImage`).
-- Statische Fallback-Daten: Wenn DB leer, nutzt `server/data/exercises.js` als Fallback (siehe [server/routes/exercises.js](server/routes/exercises.js)).
-- AI-Integration: `server/routes/workouts.js` initialisiert OpenAI on‑demand. Wenn `OPENAI_API_KEY` vorhanden ist, wird `openai` verwendet, sonst Demo‑Antworten. Agenten sollten die Funktion `generateGPT4Suggestion` / `generateDemoSuggestion` beachten (erwartet JSON-Ausgabe vom Modell).
-- DB: Mongo optional — viele endpoints arbeiten auch mit statischen Daten/fallbacks, aber echte persistente Features benötigen `MONGO_URI`.
+## Was hier als Fehler zählt (höchste Priorität zuerst)
 
-Konventionen & hilfreiche Hinweise
----------------------------------
-- ESM-Only: Projekt nutzt `type: "module"`; verwende `import`/`export` (keine `require`).
-- Auth-Konvention: Geschützte Endpunkte verwenden `firebaseAuthMiddleware` → erwartet `Authorization: Bearer <idToken>` Header.
-- Logging & env-checks: `server/utils/logger.js` und `server/utils/validateEnv.js` zentralisieren Logging und ENV-Validierung — Änderungen dort beeinflussen Startup/Crash-Verhalten.
-- Performance/DB: Routen wie `validateAndMapExercisesWithAutoAdd` bevorzugen Batch-Queries statt Einzelabfragen — folge diesem Muster bei Erweiterungen.
+1. **Daten eines anderen Kontos werden sichtbar.** Einstellungen und laufende Zustände gehören zum
+   Konto, nicht zum Gerät: gespeicherte Werte nur über `client/src/utils/userScopedStorage.js`
+   (`readPref`/`writePref`), Einträge mit `uid` über `belongsToActiveAccount`. Serverrouten
+   filtern immer nach der UID aus dem Token, nie nach einer UID aus dem Request-Body.
+2. **Ein Workout geht verloren oder entsteht doppelt** (Offline-Sync, Entwürfe, Tombstones,
+   Wiederholungen nach Fehlern). Ein vom Server abgelehnter Save wird vom Client endlos wiederholt –
+   Freitext deshalb serverseitig kürzen statt ablehnen (`server/utils/textLimits.js`).
+3. **Nutzertext erreicht die KI ungeschützt** oder wird mit `v-html` angezeigt. Vor der KI immer
+   einkapseln (`wrapUserNote`, `wrapExerciseName`, `wrapQuickGeneratorFreeText`,
+   `wrapCorrectionText`). Request-Bodies nie ungeprüft speichern.
+4. **Eine Zahl im KI-Text stammt nicht aus den echten Trainingsdaten**, oder Gewichte/Wiederholungen
+   werden falsch gerundet oder umgerechnet.
+5. **Ein sichtbarer Text fehlt in DE oder EN**, ist hart codiert (auch `aria-label`,
+   `placeholder`, `title`, Toasts), oder nutzt `t('key') || 'Fallback'` (greift nie; ESLint
+   meldet nur die direkte Form, über eine Variable oder einen Ternary bleibt es ein Fund). Übungsnamen in der App immer englisch.
+6. **Ein Test prüft nichts**: Assertion, die immer besteht, Mock statt echter Funktion, Test
+   außerhalb der Globs in `server/package.json` bzw. `client/src/**/__tests__/`.
+7. **Die Doku lügt**: `CLAUDE.md`, `agents.md`, `site/README.md` oder diese Datei beschreiben
+   etwas, das der Diff anders macht, oder eine Zeile darin wird durch den Diff veraltet.
 
-Praktische Beispiele
---------------------
-- Starten Server lokal (dev):
+## So schreibst du Funde
 
-  cd server
-  npm run dev
+- Jeder Fund mit **Datei und Zeile** als Beleg und einem konkreten Ablauf, der zum Fehler führt.
+  Keine Vermutung nur aus einem Funktions- oder Variablennamen.
+- Fehler, die der PR nicht eingeführt hat, als **„bestehend"** kennzeichnen.
+- **Höchstens drei Kleinigkeiten** (Stil, Benennung, Formulierung) pro Review; Formatierung prüft
+  Prettier/ESLint.
+- Gleiche Fehlerart an mehreren Stellen: einmal nennen und alle Stellen auflisten.
+- Einen Fund, der schon in einem früheren Review dieses PRs steht, nicht wiederholen.
+- Zusammenfassung beginnt mit der Zahl der Funde. Wenn nichts zu beheben ist, das klar sagen.
 
-- Simpler curl-Test (geschützte Route, ersetze TOKEN und ID):
+## Nicht prüfen
 
-  curl -H "Authorization: Bearer $TOKEN" -F "image=@./cover.jpg" http://localhost:3001/api/workouts/WORKOUT_ID/image
+- `client/public/data/default-exercises.json` und `client/public/exercises/**` (Katalog-Rohdaten,
+  bekannte Dubletten bleiben bewusst so)
+- `client/scripts/i18n-baseline.json`, `**/package-lock.json`
+- `client/ios/App/Pods/**`, `client/ios/App/App/public/**`, `client/dist/**`, `site/dist/**`
+- Bilder und Binärdateien (PNG, MP4, JPG)
 
-- API-Health & Test:
+## Bewusst so, kein Fund
 
-  GET http://localhost:3001/api/health
-  GET http://localhost:3001/api/test
-
-Was ein Agent vermeiden sollte
-----------------------------
-- Geheimnisse direkt in Commits: `serviceAccount.json` und `.env` gehören nicht ins Repo (prüfe trotzdem `server/serviceAccount.json` existence fallback).
-- Annahmen über DB‑Schema: Verwende vorhandene Models in `server/models/` (z. B. `Workout.js`, `Exercise.js`) statt frei erfundener Felder.
-
-Änderungen an dieser Datei
--------------------------
-Wenn du weitere, projekt-spezifische Regeln entdeckst (z. B. CI-Checks, spezielle ESLint/Prettier-Settings), erweitere diese Datei knapp und verlinke die relevanten Dateien.
-
-Feedback
---------
-Bitte prüfe diese Zusammenfassung und sag, ob ich Details zu bestimmten Bereichen (z. B. DB-Schema, CI, iOS build flow) ergänzen soll.
+- Favoriten (`client/src/utils/workoutFavorites.js`) synchronisieren einfacher als Workouts
+  (nur `localStorage` + Server ohne Warteschlange).
+- Die Web-Version hat keine Firebase-Web-Konfiguration; die App läuft nur auf iOS.
+- Website: Übungsnamen englisch mit deutschem Begriff in Klammern (Ausnahme zur App-Regel).

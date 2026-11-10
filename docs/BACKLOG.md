@@ -10,7 +10,7 @@ trägt ihre Backlog-Änderung mit; bis zum Merge steht sie nur dort).
 Kennzeichnung: **[A]** autonom erlaubt · **[F]** Freigabe von Paul nötig · **[P]** wartet auf Paul
 (Info, Entscheidung oder Handgriff außerhalb des Repos). Priorität: P1 (zuerst) bis P3.
 
-Zuletzt aktualisiert: 2026-10-10
+Zuletzt aktualisiert: 2026-11-10
 
 ---
 
@@ -64,6 +64,14 @@ Zuletzt aktualisiert: 2026-10-10
 - Stillstand-Diagnose sieht Bestleistungen älter als 12 Wochen nicht („seit X Wochen“ zu niedrig) – Teil von F3.
 - `vitest` hängt in der lokalen Cowork-Sandbox (läuft in CI und Cloud-Sessions).
 - Server-Tests laufen nur aus `server/utils/__tests__/*.test.js` (Glob in `server/package.json`).
+
+## Fehler aus Produktion
+
+Je echter Bug aus App oder Server (nicht aus dem Review eines offenen PRs): welche Prüfung hätte ihn
+finden sollen und was daran geändert wurde. Regel in `CLAUDE.md` (Cloud-Sessions).
+
+| Datum | Fehler | Hätte finden sollen | Geändert |
+|---|---|---|---|
 
 ## Entscheidungen (Log)
 

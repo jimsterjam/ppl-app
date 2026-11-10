@@ -134,8 +134,8 @@ describe('Seiten', () => {
 
 describe('Texte', () => {
   const all = () => htmlFiles().map(([file, html]) => [file, html.replace(/<script[\s\S]*?<\/script>/g, '')])
-  test('der Name ist überall "Form Beats Ego", nie "Form schlägt Ego"', () => {
-    for (const [file, text] of all()) assert.ok(!/form schlägt ego/i.test(text), file)
+  test('der Name ist überall "Form Beats Ego", nie "Form schlägt Ego"', () => { // repo-text-rules: erlaubt
+    for (const [file, text] of all()) assert.ok(!/form schlägt ego/i.test(text), file) // repo-text-rules: erlaubt
     assert.ok(get('/index.html').includes('Form Beats Ego.'))
     assert.ok(get('/en/index.html').includes('Form Beats Ego.'))
   })
