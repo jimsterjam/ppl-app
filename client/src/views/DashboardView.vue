@@ -17,6 +17,12 @@
     <main class="dashboard-content" :class="{ 'has-draft': hasDraft }">
       <CoachMarks :marks="coachMarks" :active="coachActive" />
       <WeekStrip class="dashboard-week" :workouts="store.workouts || []" :caption="weeklyProgressLabel" :streak="weekStreak" />
+      <TrainingReminderAsk
+        :has-trained="hasCompletedWorkout"
+        :blocked="showStartOptions || hasDraft"
+        :plan-days="todayPlan?.plan?.days?.length || 0"
+        :uid="authStore.uid || ''"
+      />
 
       <SessionStopwatch v-if="showStopwatchCard" @session-time="onSessionTime" />
 
@@ -310,6 +316,7 @@ import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 import { migrateTemplateFavoritesToPlans, removeOrphanTemplateFavorites } from '@/utils/planMigration'
 import { messages } from '@/i18n'
 import WeekStrip from '@/components/WeekStrip.vue'
+import TrainingReminderAsk from '@/components/TrainingReminderAsk.vue'
 import CoachMarks from '@/components/CoachMarks.vue'
 import { countWeekWorkouts, countWeekStreak } from '@/utils/weekStrip'
 import { Star, ClipboardList, Timer } from 'lucide-vue-next'
@@ -486,6 +493,8 @@ const weeklyProgressLabel = computed(() => $t('dashboard.weeklyProgress', { done
 // Kacheln, die Gym-Zeit-Karte erscheint erst, wenn sie gebraucht wird (laufende Zeit oder vorhandene Workouts).
 // Erst nach dem Laden der Workouts entscheiden: davor ist die Liste leer, und der Hinweis blitzte bei jedem App-Start
 // kurz auf, bis die Workouts da waren (User-Report 24.10.).
+// Trainings-Erinnerung: Frage erst nach dem ersten abgeschlossenen Training (Absprache Paul 11.11.).
+const hasCompletedWorkout = computed(() => store.workoutsLoaded && (store.workouts || []).some(w => w?.completed === true))
 const isFirstUse = computed(() => store.workoutsLoaded && !hasDraft.value && !(store.workouts || []).some(w => w?.completed === true))
 // Gym-Zeit erst zeigen, wenn sie läuft oder pausiert ist (Absprache Paul 28.10.): sie startet mit Workout/Warm-up.
 const showStopwatchCard = computed(() => Boolean(sessionStopwatchStore.startedAt))

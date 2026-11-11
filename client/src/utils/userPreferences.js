@@ -8,6 +8,7 @@
 import { getActiveUid, setActiveUid } from './userScopedStorage'
 import { resetKeepAwakeModeCache } from './keepAwakeGuard'
 import { clearAdminKey } from './adminKeyReset'
+import { cancelTrainingReminder } from './trainingReminder'
 
 export { ADMIN_KEY_STORAGE_KEY } from './adminKeyReset'
 
@@ -33,6 +34,9 @@ export function applyUserPreferences(uid, { theme, settings, restTimer, warmupTi
   // Abgemeldet oder anderes Konto: erst die laufenden Zustände beenden (solange noch das alte Konto aktiv ist), dann wechseln.
   if (previous && previous !== next) {
     resetRunningStatesForUserChange({ restTimer, warmupTimer, transitionTimer, timer, stopwatch })
+    // Geplante Trainings-Erinnerung gehört zum alten Konto (Text mit dessen Plan-Tag) - löschen; für das neue Konto
+    // plant utils/trainingReminder.js neu, sobald dessen Einstellungen und Workouts geladen sind.
+    cancelTrainingReminder()
   }
   // Admin-Schlüssel bei jeder Änderung des Anmeldezustands löschen, auch bei der ersten Anmeldung nach einem Neustart:
   // ein Rest aus einer älteren App-Version darf nicht an das nächste Konto gehen.

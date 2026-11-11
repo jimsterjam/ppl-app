@@ -13,6 +13,7 @@ import { clearAuthTokenCache } from './utils/authToken'
 import { useAuthStore } from './stores/authStore'
 import { useUserStore } from './stores/userStore'
 import { useSettingsStore } from './stores/settingsStore'
+import { startTrainingReminderSync } from './utils/trainingReminder'
 import { useOnboardingStore } from './stores/onboardingStore'
 import { useCoachMarkStore } from './stores/coachMarkStore'
 import { useAiConsentStore } from './stores/aiConsentStore'
@@ -468,6 +469,16 @@ async function bootstrapAuth() {
 }
 
 bootstrapAuth()
+
+// Trainings-Erinnerung (Absprache Paul 11.11.): nächste Mitteilung bei Änderungen und beim Zurückkehren neu planen.
+startTrainingReminderSync({
+  authStore: useAuthStore(pinia),
+  userStore: useUserStore(pinia),
+  settingsStore: useSettingsStore(pinia),
+  i18n,
+  router,
+  capacitorApp: CapacitorApp
+})
 
 // App-Lifecycle: Beim Verlassen Zustand sichern, beim Zurückkehren ggf. wiederherstellen.
 CapacitorApp.addListener('appStateChange', async ({ isActive }) => {
