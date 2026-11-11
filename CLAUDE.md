@@ -40,7 +40,7 @@ bei jeder neuen Sitzung neu gelernt werden müssen. Bei Widerspruch gilt die jü
   Entscheidungen aus der Notiz (z.B. weniger Gewicht für den Zielmuskel) bestätigen statt als
   „weniger Gewicht“ formulieren (Prompt-Regeln 8, 12, 14, 27). Zahlen im Text müssen aus den echten
   Trainingsdaten stammen (Verifier, `AI_VERIFIER_MODE=active`).
-- **Marke:** immer „Form Beats Ego“, nie „Form schlägt Ego“ – auch in deutschen Texten. Das
+- **Marke:** immer „Form Beats Ego“, nie „Form schlägt Ego“ – auch in deutschen Texten (Test `repoTextRules`). Das <!-- repo-text-rules: erlaubt -->
   Zeichen „fbe“ ist weiß, nie in der Akzentfarbe. Gleiche Buchstabenabstände über einzelne Spans
   (`bm-f`/`bm-b`, `font-kerning: none`) an drei Stellen: App (`client/src/components/BrandLockup.vue`),
   Startbildschirm (`#start-splash` in `client/index.html` **und** die drei PNGs in
@@ -135,8 +135,21 @@ die lokale Cowork-Sandbox. In Cloud-Sessions gilt stattdessen:
   Zusätzlich technisch gesperrt über `.claude/settings.json` (deny-Regeln für Merge/Auto-Merge)
   und den PreToolUse-Hook `.claude/hooks/block-main-push.sh` (blockiert jedes `git push` auf
   `main` und GitHub-Dateiänderungen direkt auf `main`).
-- **Vor dem PR:** `cd server && npm test`, `cd client && npm test` (inkl. i18n-Konsistenztest),
-  im Root `npm run lint`. Ergebnis in die PR-Beschreibung.
+- **Vor dem PR:** `bash scripts/check-all.sh` (Client-Änderung: `--build`), deckt Server-, Client-,
+  i18n-, Lint- und Website-Prüfungen ab. Ergebnis in die PR-Beschreibung.
+- **Selbst-Review vor dem PR:** den eigenen Diff mit frischem Kontext prüfen – `/code-review`
+  (oder ein Sub-Agent ohne Vorwissen), bei Auth, Konto-Speicher, Offline-Sync oder Nutzereingaben
+  zusätzlich `/security-review`. Echte Funde vor dem PR beheben; Zahl der Funde und was behoben
+  ist, steht in der PR-Beschreibung.
+- **PR-Vorlage verwenden** (`.github/pull_request_template.md`) mit allen Abschnitten, auch
+  „Risiko" und „Wie zurücknehmen".
+- **Review-Funde** (Copilot, Paul): jeden beantworten – beheben oder mit Begründung ablehnen.
+  Kommt dieselbe Fehlerart wieder, an der Ursache beheben: Test, Lint-Regel, `CLAUDE.md` oder die
+  Review-Regeln in `.github/copilot-instructions.md`. **Höchstens drei Review-Runden** pro PR; danach
+  anhalten, Paul den Stand zeigen und den Ansatz überdenken statt weiter einzeln zu flicken.
+- **Bug in Produktion:** bekommt einen Regressionstest, der vor dem Fix fehlschlägt, und in
+  `docs/BACKLOG.md` (Abschnitt „Fehler aus Produktion") eine Zeile, welche Prüfung ihn hätte finden sollen (Test, Lint, Review-Regel,
+  Selbst-Review) und was daran geändert wurde.
 - **PR-Beschreibung auf Deutsch:** Was/Warum, was verifiziert vs. nur per Code-Lektüre geprüft ist,
   offene Punkte, und ob ein iOS-Build nötig ist (Client-Änderung → Paul macht `npm run build`
   + `npx cap sync ios` + Xcode).

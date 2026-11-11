@@ -10,13 +10,26 @@
 - Server-Tests (`cd server && npm test`):
 - Client-Tests inkl. i18n (`cd client && npm test`):
 - Lint (`npm run lint`):
+- Website-Tests (`npm run site:test`):
 - Client-Build (`cd client && npm run build`):
+- Selbst-Review vor dem PR (`/code-review`, bei Auth/Speicher/Eingaben auch `/security-review`): Zahl der Funde und was behoben ist
 
 ## Nur per Code-Lektüre geprüft
 
 <!-- Was nicht automatisch getestet ist (z. B. UI auf dem iPhone) und wie es geprüft wurde. -->
 
-## Offene Punkte / Risiken
+## Risiko
+
+<!-- niedrig (Doku, Texte, Website) / mittel (normale App- oder Server-Änderung) /
+     hoch (Offline-Sync, Auth, Konto-Speicher, Abo, KI-Pipeline). Was kann im schlimmsten Fall passieren? -->
+
+## Wie zurücknehmen
+
+<!-- Server/Website: Revert-PR oder auf Render den vorherigen Deploy wiederherstellen.
+     iOS: nicht zurückrollbar, nur durch ein neues Update ersetzbar – daher bei Client-Änderungen sorgfältiger.
+     Datenänderungen: wie lassen sie sich rückgängig machen? -->
+
+## Offene Punkte
 
 ## iOS-Build nötig?
 

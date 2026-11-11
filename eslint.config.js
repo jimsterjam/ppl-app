@@ -5,6 +5,21 @@ import unusedImports from 'eslint-plugin-unused-imports'
 import prettier from 'eslint-config-prettier'
 import globals from 'globals'
 
+// `t('x') || 'Fallback'` bzw. `$t(...)`, `i18n.global.t(...)`, `this.$t(...)` – wirkungslos, siehe Regel unten
+const I18N_FALLBACK_MESSAGE =
+  "vue-i18n gibt bei fehlendem Key den Key selbst zurück, '|| Fallback' greift nie. Key in DE und EN anlegen."
+const I18N_FALLBACK_RULES = [
+  {
+    selector: "LogicalExpression[operator=/^(\\|\\||\\?\\?)$/] > CallExpression.left[callee.name=/^\\$?t$/]",
+    message: I18N_FALLBACK_MESSAGE
+  },
+  {
+    selector:
+      "LogicalExpression[operator=/^(\\|\\||\\?\\?)$/] > CallExpression.left[callee.type='MemberExpression'][callee.property.name=/^\\$?t$/]",
+    message: I18N_FALLBACK_MESSAGE
+  }
+]
+
 export default [
   {
     ignores: [
@@ -46,7 +61,11 @@ export default [
       // Vue convenience rules for our code style
       'vue/multi-word-component-names': 'off', // allow single-word component names
       'vue/no-dupe-v-else-if': 'warn',
-      'vue/no-unused-vars': 'warn'
+      'vue/no-unused-vars': 'warn',
+      // vue-i18n liefert für fehlende Keys den Key-String zurück, `t('a.b') || 'Fallback'` greift nie.
+      // Der Key muss in DE und EN existieren (CLAUDE.md, i18n-Check).
+      'no-restricted-syntax': ['error', ...I18N_FALLBACK_RULES],
+      'vue/no-restricted-syntax': ['error', ...I18N_FALLBACK_RULES]
     }
   },
   // Website (site/): Build-Skripte und Tests laufen in Node, assets/calc.js im Browser
