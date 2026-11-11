@@ -17,12 +17,6 @@
     <main class="dashboard-content" :class="{ 'has-draft': hasDraft }">
       <CoachMarks :marks="coachMarks" :active="coachActive" />
       <WeekStrip class="dashboard-week" :workouts="store.workouts || []" :caption="weeklyProgressLabel" :streak="weekStreak" />
-      <TrainingReminderAsk
-        :has-trained="hasCompletedWorkout"
-        :blocked="showStartOptions || hasDraft"
-        :plan-days="todayPlan?.plan?.days?.length || 0"
-        :uid="authStore.uid || ''"
-      />
 
       <SessionStopwatch v-if="showStopwatchCard" @session-time="onSessionTime" />
 
@@ -44,6 +38,14 @@
         </button>
         <button class="today-remove" type="button" :aria-label="$t('plans.removeAria')" :title="$t('plans.remove')" @click="showRemovePlan = true">✕</button>
       </section>
+
+      <!-- Unter der Karte „Heute“ wie im freigegebenen Mockup (Absprache Paul 11.11.). -->
+      <TrainingReminderAsk
+        :has-trained="hasCompletedWorkout"
+        :blocked="showStartOptions || hasDraft"
+        :plan-days="todayPlan?.plan?.days?.length || 0"
+        :uid="authStore.uid || ''"
+      />
 
       <section class="quick-start">
         <div v-if="!showStartOptions" class="quick-area">

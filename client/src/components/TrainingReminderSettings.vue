@@ -42,7 +42,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ToggleSwitch from '@/components/ToggleSwitch.vue'
 import NotificationHint from '@/components/NotificationHint.vue'
@@ -56,12 +56,16 @@ const settings = useSettingsStore()
 const PRESET_LABEL_KEYS = { morning: 'trainingReminder.presetMorning', midday: 'trainingReminder.presetMidday', afternoon: 'trainingReminder.presetAfternoon' }
 const presets = computed(() => REMINDER_TIME_PRESETS.map((p) => ({ ...p, label: t(PRESET_LABEL_KEYS[p.key]) })))
 // Eigene Zeit ist offen, wenn die gespeicherte Uhrzeit keine Vorgabe ist.
-const customOpen = ref(!REMINDER_TIME_PRESETS.some((p) => p.time === settings.trainingReminderTime))
+const isPreset = (time) => REMINDER_TIME_PRESETS.some((p) => p.time === time)
+const customOpen = ref(!isPreset(settings.trainingReminderTime))
+// Kontowechsel oder Änderung von außen: Auswahl an die gespeicherte Uhrzeit anpassen.
+watch(() => settings.trainingReminderTime, (time) => { if (!isPreset(time)) customOpen.value = true })
 
 async function toggle(next) {
-  settings.setTrainingReminderEnabled(next)
-  // Einschalten: iOS fragt nur, wenn es noch nie gefragt hat; sonst zeigt NotificationHint den Weg in die Einstellungen.
+  // Einschalten: erst die iOS-Frage (nur, wenn iOS noch nie gefragt hat), dann speichern - so plant die Erinnerung
+  // erst, wenn die Erlaubnis feststeht. Ohne Erlaubnis zeigt NotificationHint den Weg in die iPhone-Einstellungen.
   if (next) await ensureNotificationPermission()
+  settings.setTrainingReminderEnabled(next)
 }
 
 function pick(time) {

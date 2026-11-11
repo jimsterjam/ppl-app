@@ -5,7 +5,7 @@
 import { watch } from 'vue'
 import { Capacitor } from '@capacitor/core'
 import { logger } from '@/utils/logger'
-import { readPref, writePref, getActiveUid } from '@/utils/userScopedStorage'
+import { readPref, writePref, removePref, getActiveUid } from '@/utils/userScopedStorage'
 import { getNotificationPermission } from '@/utils/notificationPermission'
 import { planNextReminder, resolveWeeklyRhythm } from '@/utils/trainingNudge'
 
@@ -14,6 +14,8 @@ export const TRAINING_REMINDER_ID = 940003
 const LAST_KEY = 'training-reminder-last'
 const ASKED_KEY = 'training-reminder-asked'
 const SYNC_DELAY_MS = 800
+/** Länge des Plan-Tags im Text (Sperrbildschirm): eigene Bezeichnungen können lang sein. */
+const PLAN_DAY_MAX = 30
 
 async function getPlugin() {
   if (!Capacitor.isNativePlatform()) return null
@@ -34,9 +36,9 @@ export function markReminderAsked() {
   writePref(ASKED_KEY, '1')
 }
 
-function readLast() {
+function readLast(uid) {
   try {
-    const parsed = JSON.parse(readPref(LAST_KEY) || 'null')
+    const parsed = JSON.parse(readPref(LAST_KEY, uid) || 'null')
     return parsed && typeof parsed.pauseKey === 'string' && Number.isFinite(Number(parsed.at)) ? parsed : null
   } catch {
     return null
@@ -49,6 +51,8 @@ function readLast() {
  * @param {{ t: Function, planDay?: string }} options
  */
 export function buildReminderText(reminder, { t, planDay = '' } = {}) {
+  const day = String(planDay || '').trim()
+  planDay = day.length > PLAN_DAY_MAX ? `${day.slice(0, PLAN_DAY_MAX - 1).trimEnd()}…` : day
   const next = planDay ? t('trainingReminder.nextPlanDay', { day: planDay }) : t('trainingReminder.nextNoPlan')
   if (reminder.kind === 'goal') {
     return { title: t('trainingReminder.goalTitle', { count: reminder.remaining }, reminder.remaining), body: next }
@@ -59,8 +63,21 @@ export function buildReminderText(reminder, { t, planDay = '' } = {}) {
   }
 }
 
-/** Geplante Erinnerung löschen (Abmelden, Kontowechsel, Schalter aus). Wirft nie. */
-export async function cancelTrainingReminder() {
+/**
+ * Noch nicht zugestellte Erinnerung des Kontos vergessen, damit sie nach Abmelden/Ausschalten nicht als „schon
+ * zugestellt“ zählt (höchstens eine pro Pause gilt nur für wirklich zugestellte).
+ */
+function forgetPending(uid, now = Date.now()) {
+  const last = readLast(uid)
+  if (last && Number(last.at) > now) removePref(LAST_KEY, uid)
+}
+
+/**
+ * Geplante Erinnerung löschen (Abmelden, Kontowechsel). Wirft nie.
+ * @param {{ forgetFor?: string }} [options] Konto, dessen noch offene Erinnerung vergessen wird
+ */
+export async function cancelTrainingReminder({ forgetFor = '' } = {}) {
+  if (forgetFor) forgetPending(forgetFor)
   const plugin = await getPlugin()
   if (!plugin) return
   try {
@@ -80,7 +97,11 @@ export async function syncTrainingReminder({ settings, workouts, t, now = new Da
   if (!plugin) return null
   await cancelTrainingReminder()
   const uid = getActiveUid()
-  if (!uid || !settings?.trainingReminderEnabled) return null
+  if (!uid) return null
+  if (!settings?.trainingReminderEnabled) {
+    forgetPending(uid, now.getTime())
+    return null
+  }
   if ((await getNotificationPermission()) !== 'granted') return null
   try {
     // Erst hier laden: planProgress zieht die Plan-API nach sich, Abmelden/Kontowechsel brauchen nur cancelTrainingReminder.
@@ -97,14 +118,16 @@ export async function syncTrainingReminder({ settings, workouts, t, now = new Da
       now,
       perWeek: rhythm?.perWeek ?? null,
       time: settings.trainingReminderTime,
-      previous: readLast()
+      previous: readLast(uid)
     })
     if (!reminder) return null
     const { title, body } = buildReminderText(reminder, { t, planDay: planDayTitle(planInfo) })
+    // Konto inzwischen gewechselt (Abmelden während der Wartezeiten oben)? Dann nichts mit fremdem Text planen.
+    if (getActiveUid() !== uid) return null
     await plugin.schedule({
       notifications: [{ id: TRAINING_REMINDER_ID, title, body, schedule: { at: reminder.at, allowWhileIdle: true } }]
     })
-    writePref(LAST_KEY, JSON.stringify({ pauseKey: reminder.pauseKey, at: reminder.at.getTime() }))
+    writePref(LAST_KEY, JSON.stringify({ pauseKey: reminder.pauseKey, at: reminder.at.getTime() }), uid)
     return reminder.at
   } catch (error) {
     logger.warn('[trainingReminder] Planen fehlgeschlagen', { message: error?.message })
@@ -149,7 +172,8 @@ export function startTrainingReminderSync({ authStore, userStore, settingsStore,
       settingsStore.weeklyGoal,
       settingsStore.hasExplicitWeeklyGoal,
       i18n.global.locale.value
-    ],
+    ].join('|'),
+    // Als Text vergleichen: ein neues Array bei jedem Lesen würde bei jeder Berührung neu planen.
     run
   )
   capacitorApp?.addListener?.('appStateChange', ({ isActive }) => { if (isActive) run() })

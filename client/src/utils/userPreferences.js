@@ -36,7 +36,7 @@ export function applyUserPreferences(uid, { theme, settings, restTimer, warmupTi
     resetRunningStatesForUserChange({ restTimer, warmupTimer, transitionTimer, timer, stopwatch })
     // Geplante Trainings-Erinnerung gehört zum alten Konto (Text mit dessen Plan-Tag) - löschen; für das neue Konto
     // plant utils/trainingReminder.js neu, sobald dessen Einstellungen und Workouts geladen sind.
-    cancelTrainingReminder()
+    cancelTrainingReminder({ forgetFor: previous })
   }
   // Admin-Schlüssel bei jeder Änderung des Anmeldezustands löschen, auch bei der ersten Anmeldung nach einem Neustart:
   // ein Rest aus einer älteren App-Version darf nicht an das nächste Konto gehen.
