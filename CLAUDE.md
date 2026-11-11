@@ -138,10 +138,29 @@ die lokale Cowork-Sandbox. In Cloud-Sessions gilt stattdessen:
   `main` und GitHub-Dateiänderungen direkt auf `main`).
 - **Vor dem PR:** `bash scripts/check-all.sh` (Client-Änderung: `--build`), deckt Server-, Client-,
   i18n-, Lint- und Website-Prüfungen ab. Ergebnis in die PR-Beschreibung.
-- **Selbst-Review vor dem PR:** den eigenen Diff mit frischem Kontext prüfen – `/code-review`
-  (oder ein Sub-Agent ohne Vorwissen), bei Auth, Konto-Speicher, Offline-Sync oder Nutzereingaben
-  zusätzlich `/security-review`. Echte Funde vor dem PR beheben; Zahl der Funde und was behoben
-  ist, steht in der PR-Beschreibung.
+- **Selbst-Review vor dem PR:** erst committen (neue Dateien sind sonst nicht im Blick), dann den
+  eigenen Diff mit frischem Kontext prüfen – `/code-review` (oder ein Sub-Agent ohne Vorwissen),
+  bei Auth, Konto-Speicher, Offline-Sync oder Nutzereingaben zusätzlich `/security-review`.
+  **Stufe „hoch“**, sobald iOS/Capacitor-Plugins, Konto-Speicher, Fenster/Scrollen, Offline-Sync,
+  Auth oder Mitteilungen betroffen sind; sonst mindestens „mittel“. Echte Funde vor dem PR beheben;
+  Zahl der Funde und was behoben ist, steht in der PR-Beschreibung.
+- **Tests gegen die Gegenannahme:** zu jeder Freigabe, Ausnahme oder Sonderregel ein Test für den
+  Fall, der NICHT freigegeben sein darf (z. B. Liste im Hintergrund, anderes Konto, Ende einer Liste).
+  Plattformverhalten realistisch nachbilden statt als normales Objekt: Capacitor-Plugins mit dem
+  iOS-Proxy-Mock (`capacitorPluginThenable.test.js`), Größen/Layout im echten Browser (happy-dom
+  rechnet kein Layout). Bei Bugfixes zeigen, dass der Test vor dem Fix fehlschlägt.
+- **Copilot-Review vor der Meldung an Paul:** nach dem Erstellen des PRs den Copilot-Review
+  anfordern (GitHub-MCP-Werkzeug `request_copilot_review` der Cloud-Session; fehlt es, Paul bitten,
+  ihn in GitHub anzufordern), Ergebnis abwarten (nicht mit `sleep` pollen: PR-Ereignisse abonnieren
+  bzw. eine Rückmeldung planen, soweit die Session das anbietet) und die Funde abarbeiten.
+  Erst wenn Copilot nichts Blockierendes mehr findet (höchstens drei Runden, siehe unten), Paul den
+  PR als fertig melden – mit Zahl der Copilot-Runden und -Funde. Findet Copilot nach drei Runden
+  noch etwas, Paul den Stand zeigen statt weiter zu flicken.
+- **Vor jedem Push auf einen PR-Branch prüfen, ob der PR noch offen ist** – maßgeblich ist der
+  PR-Status in GitHub (`pull_request_read` → `state`/`merged`), nicht Git allein: nach einem
+  Squash-Merge ist der Branch kein Vorfahre von `main` (`git merge-base --is-ancestor` erkennt das
+  nur bei Merge-Commits). Ist er gemergt oder geschlossen: neuer Branch von `main` und neuer PR, nie
+  auf den gemergten weiterpushen (Fund 11.11.: zwei Commits landeten nicht im Merge).
 - **PR-Vorlage verwenden** (`.github/pull_request_template.md`) mit allen Abschnitten, auch
   „Risiko" und „Wie zurücknehmen".
 - **Review-Funde** (Copilot, Paul): jeden beantworten – beheben oder mit Begründung ablehnen.
