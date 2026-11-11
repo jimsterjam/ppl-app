@@ -75,6 +75,10 @@
         </div>
       </SettingsSectionCard>
 
+      <SettingsSectionCard class="card card--app" :title="$t('trainingReminder.settingsTitle')">
+        <TrainingReminderSettings />
+      </SettingsSectionCard>
+
       <SettingsSectionCard class="card card--app" :title="$t('settings.weeklyGoal')">
         <p class="hint">{{ $t('settings.weeklyGoalHint') }}</p>
         <div class="goal-row">
@@ -418,6 +422,7 @@ import { exportAccountData } from '@/api/account'
 import { isAdminUid } from '@/config/admin'
 import SettingsSectionCard from '../components/SettingsSectionCard.vue'
 import ToggleSwitch from '../components/ToggleSwitch.vue'
+import TrainingReminderSettings from '../components/TrainingReminderSettings.vue'
 import BrandLockup from '../components/BrandLockup.vue'
 import { App as CapacitorApp } from '@capacitor/app'
 import AiQuotaCard from '../components/AiQuotaCard.vue'

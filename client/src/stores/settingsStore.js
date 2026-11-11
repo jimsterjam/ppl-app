@@ -3,6 +3,7 @@ import { fetchAccountProfile, updateAccountProfile } from '@/api/account'
 import { logger } from '@/utils/logger'
 import { sanitizeWorkoutGoal } from '@/utils/workoutGoal'
 import { readPref, writePref } from '@/utils/userScopedStorage'
+import { sanitizeReminderTime } from '@/utils/trainingNudge'
 
 const PROFILE_REQUEST_COOLDOWN_MS = 15000
 let profileLoadPromise = null
@@ -39,11 +40,24 @@ function defaultWeeklyGoal() {
   return Number.isFinite(stored) && stored > 0 ? stored : fallback
 }
 
+/** Wochenziel bewusst gesetzt? Der Standardwert (4) wird nicht gespeichert (Trainings-Erinnerung, Absprache 11.11.). */
+function hasStoredWeeklyGoal() {
+  const stored = Number.parseInt(readPref('weekly-goal') || '', 10)
+  return Number.isFinite(stored) && stored > 0
+}
+
+// Trainings-Erinnerung (Absprache Paul 11.11.): pro Konto an/aus und Uhrzeit.
+const readReminderEnabled = () => readPref('training-reminder') === '1'
+const readReminderTime = () => sanitizeReminderTime(readPref('training-reminder-time'))
+
 export const useSettingsStore = defineStore('settings', {
   state: () => ({
     // Geräte-Einstellungen – keine UID-Bindung
     language: readPref('app-lang') || null,
     weeklyGoal: defaultWeeklyGoal(),
+    hasExplicitWeeklyGoal: hasStoredWeeklyGoal(),
+    trainingReminderEnabled: readReminderEnabled(),
+    trainingReminderTime: readReminderTime(),
     // Account-spezifisch – werden erst nach switchUser(uid) geladen.
     // Beim Start leer, damit kein Account-fremdes Bild aufblitzt.
     _uid: '',
@@ -202,6 +216,17 @@ export const useSettingsStore = defineStore('settings', {
     reloadPrefsForUser() {
       this.language = readPref('app-lang') || null
       this.weeklyGoal = defaultWeeklyGoal()
+      this.hasExplicitWeeklyGoal = hasStoredWeeklyGoal()
+      this.trainingReminderEnabled = readReminderEnabled()
+      this.trainingReminderTime = readReminderTime()
+    },
+    setTrainingReminderEnabled(enabled) {
+      this.trainingReminderEnabled = Boolean(enabled)
+      writePref('training-reminder', enabled ? '1' : '0')
+    },
+    setTrainingReminderTime(value) {
+      this.trainingReminderTime = sanitizeReminderTime(value)
+      writePref('training-reminder-time', this.trainingReminderTime)
     },
     setLanguage(locale) {
       this.language = locale
@@ -218,6 +243,7 @@ export const useSettingsStore = defineStore('settings', {
       // Clamp auf sinnvollen Bereich
       const clamped = Number.isFinite(v) ? Math.max(1, Math.min(14, v)) : 4
       this.weeklyGoal = clamped
+      this.hasExplicitWeeklyGoal = true
       writePref('weekly-goal', String(clamped))
     }
   }

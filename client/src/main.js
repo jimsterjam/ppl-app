@@ -13,6 +13,7 @@ import { clearAuthTokenCache } from './utils/authToken'
 import { useAuthStore } from './stores/authStore'
 import { useUserStore } from './stores/userStore'
 import { useSettingsStore } from './stores/settingsStore'
+import { startTrainingReminderSync } from './utils/trainingReminder'
 import { useOnboardingStore } from './stores/onboardingStore'
 import { useCoachMarkStore } from './stores/coachMarkStore'
 import { useAiConsentStore } from './stores/aiConsentStore'
@@ -136,6 +137,11 @@ function warmupExercisesArea() {
   setTimeout(runWarmup, 350)
 }
 
+// Tipp auf die Trainings-Erinnerung: kurz danach nicht die zuletzt gespeicherte Seite wiederherstellen, sondern im
+// Dashboard bleiben (ein laufendes Workout hat weiterhin Vorrang).
+const REMINDER_TAP_WINDOW_MS = 5000
+let reminderTapAt = 0
+
 // Laufendes Workout (aktiver Entwurf des angemeldeten Nutzers) -> Pfad der Workout-Ansicht, sonst null.
 function getRunningWorkoutPath() {
   try {
@@ -151,6 +157,7 @@ async function tryRestoreLastRoute(reason = 'unknown') {
   // Laufendes Workout hat Vorrang vor dem zuletzt gespeicherten Pfad (Absprache Paul 23.10.).
   const runningPath = getRunningWorkoutPath()
   if (!snapshot && !runningPath) return false
+  if (!runningPath && Date.now() - reminderTapAt < REMINDER_TAP_WINDOW_MS) return false
 
   const current = router.currentRoute.value
   const currentPath = String(current?.fullPath || '')
@@ -468,6 +475,20 @@ async function bootstrapAuth() {
 }
 
 bootstrapAuth()
+
+// Trainings-Erinnerung (Absprache Paul 11.11.): nächste Mitteilung bei Änderungen und beim Zurückkehren neu planen.
+startTrainingReminderSync({
+  authStore: useAuthStore(pinia),
+  userStore: useUserStore(pinia),
+  settingsStore: useSettingsStore(pinia),
+  i18n,
+  onTap: () => {
+    reminderTapAt = Date.now()
+    if (getRunningWorkoutPath()) return
+    router.push({ name: 'dashboard' }).catch(() => {})
+  },
+  capacitorApp: CapacitorApp
+})
 
 // App-Lifecycle: Beim Verlassen Zustand sichern, beim Zurückkehren ggf. wiederherstellen.
 CapacitorApp.addListener('appStateChange', async ({ isActive }) => {
