@@ -59,7 +59,7 @@ const presets = computed(() => REMINDER_TIME_PRESETS.map((p) => ({ ...p, label: 
 const isPreset = (time) => REMINDER_TIME_PRESETS.some((p) => p.time === time)
 const customOpen = ref(!isPreset(settings.trainingReminderTime))
 // Kontowechsel oder Änderung von außen: Auswahl an die gespeicherte Uhrzeit anpassen.
-watch(() => settings.trainingReminderTime, (time) => { if (!isPreset(time)) customOpen.value = true })
+watch(() => settings.trainingReminderTime, (time) => { customOpen.value = !isPreset(time) })
 
 async function toggle(next) {
   // Einschalten: erst die iOS-Frage (nur, wenn iOS noch nie gefragt hat), dann speichern - so plant die Erinnerung

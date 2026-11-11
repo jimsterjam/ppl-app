@@ -7,7 +7,7 @@ vi.mock('@capacitor/local-notifications', () => ({ LocalNotifications: ln }))
 vi.mock('@/utils/notificationPermission', () => perm)
 vi.mock('@/utils/planProgress', () => ({ getTodayPlanInfo: () => null, planDayTitle: () => '' }))
 
-import { syncTrainingReminder, cancelTrainingReminder, TRAINING_REMINDER_ID } from '../trainingReminder'
+import { syncTrainingReminder, cancelTrainingReminder, workoutsSignature, TRAINING_REMINDER_ID } from '../trainingReminder'
 import { setActiveUid, readPref, writePref, __resetUserScopedStorageForTests } from '../userScopedStorage'
 
 const t = (key, named) => `${key}${named ? JSON.stringify(named) : ''}`
@@ -53,10 +53,12 @@ describe('syncTrainingReminder', () => {
     expect(readPref('training-reminder-last')).toBeNull()
   })
 
-  it('ohne Erlaubnis: nichts planen', async () => {
+  it('ohne Erlaubnis: nichts planen und eine offene Erinnerung vergessen (nicht zugestellt)', async () => {
+    writePref('training-reminder-last', JSON.stringify({ pauseKey: '2026-11-09', at: new Date(2026, 10, 13, 12, 30).getTime() }))
     perm.getNotificationPermission.mockResolvedValue('denied')
     expect(await syncTrainingReminder({ settings: settings(), workouts, t, now: monday() })).toBeNull()
     expect(ln.schedule).not.toHaveBeenCalled()
+    expect(readPref('training-reminder-last')).toBeNull()
   })
 
   it('Kontowechsel während der Berechnung: kein Text des alten Kontos für das neue', async () => {
@@ -70,5 +72,17 @@ describe('syncTrainingReminder', () => {
     await syncTrainingReminder({ settings: settings(), workouts, t, now: monday() })
     await cancelTrainingReminder({ forgetFor: 'uid-a' })
     expect(readPref('training-reminder-last', 'uid-a')).toBeNull()
+  })
+})
+
+describe('workoutsSignature', () => {
+  it('erkennt ein verschobenes älteres Training bei gleicher Anzahl', () => {
+    const a = [{ date: '2026-11-02T18:00:00.000Z' }, { date: '2026-11-09T18:00:00.000Z' }]
+    const b = [{ date: '2026-11-10T18:00:00.000Z' }, { date: '2026-11-09T18:00:00.000Z' }]
+    expect(workoutsSignature(a)).not.toBe(workoutsSignature(b))
+  })
+  it('Entwürfe zählen nicht', () => {
+    const base = [{ date: '2026-11-09T18:00:00.000Z' }]
+    expect(workoutsSignature([...base, { date: '2026-11-10T18:00:00.000Z', _isDraft: true }])).toBe(workoutsSignature(base))
   })
 })

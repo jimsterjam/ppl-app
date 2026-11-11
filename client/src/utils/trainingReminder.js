@@ -102,7 +102,11 @@ export async function syncTrainingReminder({ settings, workouts, t, now = new Da
     forgetPending(uid, now.getTime())
     return null
   }
-  if ((await getNotificationPermission()) !== 'granted') return null
+  if ((await getNotificationPermission()) !== 'granted') {
+    // Gelöscht, bevor sie kommen konnte: zählt nicht als zugestellt.
+    forgetPending(uid, now.getTime())
+    return null
+  }
   try {
     // Erst hier laden: planProgress zieht die Plan-API nach sich, Abmelden/Kontowechsel brauchen nur cancelTrainingReminder.
     const { getTodayPlanInfo, planDayTitle } = await import('@/utils/planProgress')
@@ -135,31 +139,40 @@ export async function syncTrainingReminder({ settings, workouts, t, now = new Da
   }
 }
 
-/** Kurzer Fingerabdruck der Workouts: Anzahl und jüngstes Datum reichen, um Änderungen zu erkennen. */
-function workoutsSignature(workouts) {
-  let latest = ''
+/**
+ * Kurzer Fingerabdruck der Workouts: Anzahl und Summe aller Zeitpunkte. Ändert sich das Datum irgendeines Trainings
+ * (auch eines älteren, z. B. in die laufende Woche verschoben), ändert sich die Summe.
+ */
+export function workoutsSignature(workouts) {
   let count = 0
+  let sum = 0
   for (const w of workouts || []) {
     if (!w || w.isDraft || w._isDraft) continue
+    const time = new Date(w.date || w.updatedAt || 0).getTime()
+    if (!Number.isFinite(time)) continue
     count += 1
-    const raw = String(w.date || w.updatedAt || '')
-    if (raw > latest) latest = raw
+    sum += time
   }
-  return `${count}|${latest}`
+  return `${count}|${sum}`
 }
 
 /**
  * Einmal beim App-Start aufrufen (main.js). Plant neu, sobald sich Konto, Workouts oder Einstellungen ändern und wenn
  * die App wieder in den Vordergrund kommt. Ein Tipp auf die Mitteilung öffnet das Dashboard.
  */
-export function startTrainingReminderSync({ authStore, userStore, settingsStore, i18n, router, capacitorApp }) {
+export function startTrainingReminderSync({ authStore, userStore, settingsStore, i18n, onTap, capacitorApp }) {
   let timer = null
+  // Nacheinander statt parallel: ein langsamer älterer Lauf darf nach einem neueren nicht mehr seinen Stand planen.
+  // Jeder Lauf liest Einstellungen und Workouts erst, wenn er dran ist.
+  let queue = Promise.resolve()
   const run = () => {
     clearTimeout(timer)
     timer = setTimeout(() => {
-      // Ohne geladene Workouts nicht rechnen: eine leere Liste hieße „noch nie trainiert“.
-      if (!userStore.workoutsLoaded) return
-      syncTrainingReminder({ settings: settingsStore, workouts: userStore.workouts, t: i18n.global.t })
+      queue = queue.then(() => {
+        // Ohne geladene Workouts nicht rechnen: eine leere Liste hieße „noch nie trainiert“.
+        if (!userStore.workoutsLoaded) return null
+        return syncTrainingReminder({ settings: settingsStore, workouts: userStore.workouts, t: i18n.global.t })
+      }).catch(() => null)
     }, SYNC_DELAY_MS)
   }
   watch(
@@ -179,7 +192,8 @@ export function startTrainingReminderSync({ authStore, userStore, settingsStore,
   capacitorApp?.addListener?.('appStateChange', ({ isActive }) => { if (isActive) run() })
   getPlugin().then((plugin) => {
     plugin?.addListener?.('localNotificationActionPerformed', (event) => {
-      if (event?.notification?.id === TRAINING_REMINDER_ID) router?.push?.({ name: 'dashboard' })?.catch?.(() => {})
+      // Das Plugin hält das Ereignis bis zum ersten Listener zurück (auch beim Kaltstart); Navigation macht main.js.
+      if (event?.notification?.id === TRAINING_REMINDER_ID) onTap?.()
     })
   })
   run()

@@ -137,6 +137,11 @@ function warmupExercisesArea() {
   setTimeout(runWarmup, 350)
 }
 
+// Tipp auf die Trainings-Erinnerung: kurz danach nicht die zuletzt gespeicherte Seite wiederherstellen, sondern im
+// Dashboard bleiben (ein laufendes Workout hat weiterhin Vorrang).
+const REMINDER_TAP_WINDOW_MS = 5000
+let reminderTapAt = 0
+
 // Laufendes Workout (aktiver Entwurf des angemeldeten Nutzers) -> Pfad der Workout-Ansicht, sonst null.
 function getRunningWorkoutPath() {
   try {
@@ -152,6 +157,7 @@ async function tryRestoreLastRoute(reason = 'unknown') {
   // Laufendes Workout hat Vorrang vor dem zuletzt gespeicherten Pfad (Absprache Paul 23.10.).
   const runningPath = getRunningWorkoutPath()
   if (!snapshot && !runningPath) return false
+  if (!runningPath && Date.now() - reminderTapAt < REMINDER_TAP_WINDOW_MS) return false
 
   const current = router.currentRoute.value
   const currentPath = String(current?.fullPath || '')
@@ -476,7 +482,11 @@ startTrainingReminderSync({
   userStore: useUserStore(pinia),
   settingsStore: useSettingsStore(pinia),
   i18n,
-  router,
+  onTap: () => {
+    reminderTapAt = Date.now()
+    if (getRunningWorkoutPath()) return
+    router.push({ name: 'dashboard' }).catch(() => {})
+  },
   capacitorApp: CapacitorApp
 })
 
