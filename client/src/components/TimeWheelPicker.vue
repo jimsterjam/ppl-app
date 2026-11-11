@@ -36,6 +36,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, reactive } from 'vue'
+import { parseWheelTime } from '@/utils/trainingNudge'
 
 const props = defineProps({
   /** 'HH:MM' */
@@ -51,14 +52,7 @@ const pad = (n) => String(n).padStart(2, '0')
 const hours = Array.from({ length: 24 }, (_, i) => i)
 const minutes = computed(() => Array.from({ length: Math.floor(60 / props.minuteStep) }, (_, i) => i * props.minuteStep))
 
-const parsed = computed(() => {
-  const [h, m] = String(props.modelValue || '12:30').split(':').map(Number)
-  const hour = Number.isFinite(h) ? Math.min(23, Math.max(0, h)) : 12
-  // Gespeicherte Minuten außerhalb des Rasters auf den nächsten Schritt runden (höchstens die letzte Stufe).
-  const raw = Number.isFinite(m) ? m : 30
-  const stepped = Math.min(60 - props.minuteStep, Math.round(raw / props.minuteStep) * props.minuteStep)
-  return { hour, minute: stepped }
-})
+const parsed = computed(() => parseWheelTime(props.modelValue, props.minuteStep))
 
 const columns = computed(() => [
   { key: 'hour', label: props.hourLabel, options: hours, value: parsed.value.hour },
@@ -87,17 +81,28 @@ function select(key, value, scroll = false) {
   if (scroll) scrollToValue(key, value, true)
 }
 
+/** Wert unter dem Band aus der Scroll-Position übernehmen. */
+function settle(key) {
+  clearTimeout(scrollTimers[key])
+  const el = wheelEls[key]
+  const col = columns.value.find((c) => c.key === key)
+  if (!el || !col) return
+  const index = Math.min(col.options.length - 1, Math.max(0, Math.round(el.scrollTop / ITEM_PX)))
+  const value = col.options[index]
+  if (value !== col.value) select(key, value)
+}
+
 function onScroll(key) {
   clearTimeout(scrollTimers[key])
-  scrollTimers[key] = setTimeout(() => {
-    const el = wheelEls[key]
-    const col = columns.value.find((c) => c.key === key)
-    if (!el || !col) return
-    const index = Math.min(col.options.length - 1, Math.max(0, Math.round(el.scrollTop / ITEM_PX)))
-    const value = col.options[index]
-    if (value !== col.value) select(key, value)
-  }, 90)
+  scrollTimers[key] = setTimeout(() => settle(key), 90)
 }
+
+/** Vor dem Übernehmen aufrufen: ein Wischen kurz vor dem Tipp ist sonst noch nicht übernommen. */
+function commit() {
+  settle('hour')
+  settle('minute')
+}
+defineExpose({ commit })
 
 function onKey(event, col) {
   const index = col.options.indexOf(col.value)

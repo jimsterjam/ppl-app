@@ -7,7 +7,7 @@
     <p class="reminder-ask-text">{{ t('trainingReminder.askText') }}</p>
     <div class="reminder-ask-stepper">
       <button type="button" class="reminder-ask-step" :aria-label="t('trainingReminder.askDecrease')" :disabled="busy || count <= REMINDER_GOAL_MIN" @click="count -= 1">−</button>
-      <p class="reminder-ask-value" aria-live="polite" :aria-label="t('trainingReminder.askCountAria', { count }, count)">
+      <p class="reminder-ask-value" role="status" aria-live="polite" :aria-label="t('trainingReminder.askCountAria', { count }, count)">
         <strong>{{ count }}</strong><small>{{ t('trainingReminder.askPerWeek') }}</small>
       </p>
       <button type="button" class="reminder-ask-step" :aria-label="t('trainingReminder.askIncrease')" :disabled="busy || count >= REMINDER_GOAL_MAX" @click="count += 1">+</button>
@@ -24,7 +24,7 @@ import { useSettingsStore } from '@/stores/settingsStore'
 import { useToastStore } from '@/stores/toastStore'
 import { getNotificationPermission, ensureNotificationPermission } from '@/utils/notificationPermission'
 import { wasReminderAsked, markReminderAsked } from '@/utils/trainingReminder'
-import { REMINDER_GOAL_MIN, REMINDER_GOAL_MAX } from '@/utils/trainingNudge'
+import { REMINDER_GOAL_MIN, REMINDER_GOAL_MAX, clampReminderGoal } from '@/utils/trainingNudge'
 
 const props = defineProps({
   /** Mindestens ein abgeschlossenes Training vorhanden (Workouts geladen). */
@@ -44,7 +44,7 @@ const asked = ref(true)
 const supported = ref(false)
 const busy = ref(false)
 
-const clampChoice = (n) => Math.min(REMINDER_GOAL_MAX, Math.max(REMINDER_GOAL_MIN, Math.round(n)))
+const clampChoice = clampReminderGoal
 const suggested = computed(() => {
   if (settings.hasExplicitWeeklyGoal) return clampChoice(settings.weeklyGoal)
   if (props.planDays > 0) return clampChoice(props.planDays)
@@ -85,7 +85,11 @@ function decline() {
   asked.value = true
 }
 
-watch(() => props.uid, readAsked)
+watch(() => props.uid, () => {
+  // Anderes Konto: eigene Frage-Antwort lesen und die Zahl des vorigen Kontos verwerfen.
+  picked.value = null
+  readAsked()
+})
 
 onMounted(async () => {
   readAsked()

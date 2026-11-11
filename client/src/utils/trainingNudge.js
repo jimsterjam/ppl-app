@@ -29,6 +29,21 @@ export function sanitizeReminderTime(value) {
   return `${String(hours).padStart(2, '0')}:${match[2]}`
 }
 
+/**
+ * Uhrzeit für die Drehräder: Stunde 0–23 und Minute auf das Raster gerundet (höchstens die letzte Stufe, z. B. 55).
+ * @returns {{ hour: number, minute: number }}
+ */
+export function parseWheelTime(value, step = REMINDER_MINUTE_STEP) {
+  const [h, m] = sanitizeReminderTime(value).split(':').map(Number)
+  return { hour: h, minute: Math.min(60 - step, Math.round(m / step) * step) }
+}
+
+/** Zahl in der Frage nach dem ersten Training auf 1–14 begrenzen. */
+export function clampReminderGoal(value) {
+  const n = Math.round(Number(value))
+  return Number.isFinite(n) ? Math.min(REMINDER_GOAL_MAX, Math.max(REMINDER_GOAL_MIN, n)) : 3
+}
+
 /** Lokaler Tag (00:00) plus `days` Tage. */
 function addDays(day, days) {
   return new Date(day.getFullYear(), day.getMonth(), day.getDate() + days)
