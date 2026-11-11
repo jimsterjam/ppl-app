@@ -205,7 +205,9 @@ describe('Header-Marke', () => {
     // --mark nur einmal definiert, und zwar in :root
     const defs = css.match(/--mark:[^;]*;/g) || []
     assert.deepEqual(defs, ['--mark: #ffffff;'])
-    assert.match(css.match(/:root\s*\{[^}]*\}/)[0], /--mark: #ffffff;/)
+    const root = css.match(/:root\s*\{[^}]*\}/)
+    assert.ok(root, 'CSS-Regel :root fehlt')
+    assert.match(root[0], /--mark: #ffffff;/)
     assert.match(rule[0], /font-kerning: none/)
   })
 })
