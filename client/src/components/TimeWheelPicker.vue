@@ -47,7 +47,13 @@ const props = defineProps({
 })
 const emit = defineEmits(['update:modelValue'])
 
+// Höhe eines Eintrags: aus dem DOM gemessen (Fund iPhone 11.11.: die globale Knopf-Mindesthöhe machte 48 statt 40 px
+// daraus, das Rad zeigte eine andere Stunde als es übernahm). ITEM_PX ist nur der Rückfall ohne Layout.
 const ITEM_PX = 40
+function itemPx(el) {
+  const h = el?.querySelector('.wheel-item')?.offsetHeight
+  return h > 0 ? h : ITEM_PX
+}
 const pad = (n) => String(n).padStart(2, '0')
 const hours = Array.from({ length: 24 }, (_, i) => i)
 const minutes = computed(() => Array.from({ length: Math.floor(60 / props.minuteStep) }, (_, i) => i * props.minuteStep))
@@ -71,7 +77,7 @@ function scrollToValue(key, value, smooth = false) {
   const col = columns.value.find((c) => c.key === key)
   if (!el || !col) return
   const index = Math.max(0, col.options.indexOf(value))
-  el.scrollTo({ top: index * ITEM_PX, behavior: smooth ? 'smooth' : 'auto' })
+  el.scrollTo({ top: index * itemPx(el), behavior: smooth ? 'smooth' : 'auto' })
 }
 
 function select(key, value, scroll = false) {
@@ -87,7 +93,7 @@ function settle(key) {
   const el = wheelEls[key]
   const col = columns.value.find((c) => c.key === key)
   if (!el || !col) return
-  const index = Math.min(col.options.length - 1, Math.max(0, Math.round(el.scrollTop / ITEM_PX)))
+  const index = Math.min(col.options.length - 1, Math.max(0, Math.round(el.scrollTop / itemPx(el))))
   const value = col.options[index]
   if (value !== col.value) select(key, value)
 }
@@ -103,7 +109,7 @@ function valueAt(key, fallback) {
   const el = wheelEls[key]
   const col = columns.value.find((c) => c.key === key)
   if (!el || !col) return fallback
-  const index = Math.min(col.options.length - 1, Math.max(0, Math.round(el.scrollTop / ITEM_PX)))
+  const index = Math.min(col.options.length - 1, Math.max(0, Math.round(el.scrollTop / itemPx(el))))
   return col.options[index]
 }
 
@@ -165,8 +171,12 @@ onMounted(async () => {
 .wheel-pad { height: 80px; }
 .wheel-item {
   display: block;
+  box-sizing: border-box;
   width: 100%;
   height: 40px;
+  min-height: 0; /* globale Knopf-Mindesthöhe (48 px) hier aus: Band, Polster und Rechnung gehen von 40 px aus */
+  padding: 0;
+  margin: 0;
   border: none;
   background: transparent;
   color: var(--muted);

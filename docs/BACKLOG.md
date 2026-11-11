@@ -72,6 +72,7 @@ finden sollen und was daran geändert wurde. Regel in `CLAUDE.md` (Cloud-Session
 
 | Datum | Fehler | Hätte finden sollen | Geändert |
 |---|---|---|---|
+| 11.11.2026 | Trainings-Erinnerung, Fenster „Eigene Uhrzeit“: auf dem iPhone wurde die gewählte Zeit nicht übernommen. Die globale Knopf-Mindesthöhe (48 px) machte die Rad-Einträge höher als die angenommenen 40 px; das Rad zeigte eine andere Stunde, als es las. | Test im echten Browser mit Layout (Komponententests in happy-dom rechnen keine Größen). | Höhe wird gemessen, Mindesthöhe im Rad aufgehoben; Regressionstest mit 48-px-Einträgen; Hinweis zu fehlendem Layout in `agents.md`. Geprüft zusätzlich in Chromium (Handy-Ansicht) mit der echten Komponente. |
 
 ## Entscheidungen (Log)
 
