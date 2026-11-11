@@ -13,6 +13,24 @@ import { planNextReminder, resolveWeeklyRhythm, lastTrainingDay } from '@/utils/
 
 /** Eigene ID, getrennt von Pausentimer (940001), Warm-up (940002) und Workout-Timer (930000+). */
 export const TRAINING_REMINDER_ID = 940003
+/**
+ * Eigener kurzer Ton (Absprache Paul 11.11.): das Plugin spielt unter iOS nur Dateien aus dem App-Bundle, ohne Datei
+ * bleibt die Mitteilung stumm; den Systemton erreicht man darüber nicht. Datei: ios/App/App/training-reminder.wav
+ * (selbst erzeugt, 1,1 s, in „Copy Bundle Resources“), bewusst anders als der Pausen-Gong.
+ */
+export const TRAINING_REMINDER_SOUND = 'training-reminder.wav'
+
+/** Mitteilung für das Plugin; Ton nur unter iOS (dort liegt die Datei). */
+export function buildReminderNotification(id, { title, body, at }, platform = Capacitor.getPlatform()) {
+  return {
+    id,
+    title,
+    body,
+    schedule: { at, allowWhileIdle: true },
+    ...(platform === 'ios' ? { sound: TRAINING_REMINDER_SOUND } : {})
+  }
+}
+
 /** Test-Mitteilung aus der Admin-Diagnose (Einstellungen), getrennt von der echten Erinnerung. */
 export const TRAINING_REMINDER_TEST_ID = 940004
 const LAST_KEY = 'training-reminder-last'
@@ -170,7 +188,7 @@ export async function syncTrainingReminder({ settings, workouts, t, now = new Da
     // Konto inzwischen gewechselt (Abmelden während der Wartezeiten oben)? Dann nichts mit fremdem Text planen.
     if (getActiveUid() !== uid) return diag('account-changed') ?? null
     await plugin.schedule({
-      notifications: [{ id: TRAINING_REMINDER_ID, title, body, schedule: { at: reminder.at, allowWhileIdle: true } }]
+      notifications: [buildReminderNotification(TRAINING_REMINDER_ID, { title, body, at: reminder.at })]
     })
     writePref(LAST_KEY, JSON.stringify({ pauseKey: reminder.pauseKey, at: reminder.at.getTime() }), uid)
     diag('scheduled', { ...facts, at: reminder.at.toISOString(), kind: reminder.kind, remaining: reminder.remaining, daysSince: reminder.daysSince })
@@ -222,7 +240,7 @@ export async function scheduleTrainingReminderTest({ t, seconds = 60 } = {}) {
   try {
     const at = new Date(Date.now() + seconds * 1000)
     const { title, body } = buildReminderText({ kind: 'gap', daysSince: 4, remaining: 0 }, { t })
-    await plugin.schedule({ notifications: [{ id: TRAINING_REMINDER_TEST_ID, title, body, schedule: { at, allowWhileIdle: true } }] })
+    await plugin.schedule({ notifications: [buildReminderNotification(TRAINING_REMINDER_TEST_ID, { title, body, at })] })
     appendDiag(getActiveUid(), 'tests', { at: at.toISOString() })
     return { ok: true, at: at.toISOString() }
   } catch (error) {

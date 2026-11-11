@@ -56,9 +56,15 @@
 
 <script setup>
 import BrandLockup from '@/components/BrandLockup.vue'
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { useScrollLock } from '@/composables/useScrollLock'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/settingsStore'
+
+// Seite dahinter nicht scrollbar, solange die Einführung offen ist (Fund Paul 11.11.)
+const scrollLock = useScrollLock()
+onMounted(scrollLock.lock)
+onBeforeUnmount(scrollLock.unlock)
 
 // Vollbild-Overlay statt eigener Router-Route (siehe Begründung in onboardingStore.js/main.js):
 // eine eigene Route hätte sich mit dem bestehenden, bereits fragilen Zusammenspiel aus

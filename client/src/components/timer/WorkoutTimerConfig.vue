@@ -153,11 +153,17 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, onMounted, onBeforeUnmount } from 'vue'
+import { useScrollLock } from '@/composables/useScrollLock'
 import { useI18n } from 'vue-i18n'
 import { useTimerStore } from '@/stores/timerStore'
 import NumberPicker from '@/components/NumberPicker.vue'
 import { playBoxGong, playChineseGong, playBell } from '@/utils/timerAudio'
+
+// Hintergrund sperren, solange das Fenster offen ist (Modal-Muster, CLAUDE.md; Fund Paul 11.11.)
+const scrollLock = useScrollLock()
+onMounted(scrollLock.lock)
+onBeforeUnmount(scrollLock.unlock)
 
 const emit = defineEmits(['close'])
 const { t, locale } = useI18n()

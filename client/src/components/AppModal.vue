@@ -89,7 +89,7 @@ watch(() => props.modelValue, async (open) => {
     unlockBodyScroll()
     window.removeEventListener('keydown', onKey)
   }
-})
+}, { immediate: true }) // auch sperren, wenn das Fenster gleich offen eingehängt wird (Fund 11.11.)
 
 onBeforeUnmount(() => {
   window.removeEventListener('keydown', onKey)

@@ -41,6 +41,8 @@ describe('syncTrainingReminder', () => {
     expect(ln.cancel).toHaveBeenCalledWith({ notifications: [{ id: TRAINING_REMINDER_ID }] })
     const [{ notifications }] = ln.schedule.mock.calls[0]
     expect(notifications[0].id).toBe(TRAINING_REMINDER_ID)
+    // Ton aus dem App-Bundle (ohne Ton blieb die Mitteilung auf dem iPhone stumm, Paul 11.11.)
+    expect(notifications[0].sound).toBe('training-reminder.wav')
     expect(notifications[0].schedule.at).toEqual(at)
     expect(JSON.parse(readPref('training-reminder-last')).pauseKey).toBe('2026-11-09')
   })
@@ -111,6 +113,7 @@ describe('Diagnose der Trainings-Erinnerung', () => {
     const result = await scheduleTrainingReminderTest({ t, seconds: 60 })
     expect(result.ok).toBe(true)
     expect(ln.schedule.mock.calls[0][0].notifications[0].id).toBe(TRAINING_REMINDER_TEST_ID)
+    expect(ln.schedule.mock.calls[0][0].notifications[0].sound).toBe('training-reminder.wav')
     expect(readPref('training-reminder-last')).toBeNull()
     expect(readTrainingReminderDiag().tests).toHaveLength(1)
     expect(readTrainingReminderDiag().syncs).toHaveLength(0)
