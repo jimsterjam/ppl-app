@@ -723,7 +723,8 @@ export const messages = {
       resetDone: 'Die Hinweise werden erneut angezeigt.'
     },
     brand: {
-      slogan: 'Form Beats Ego'
+      slogan: 'Form Beats Ego',
+      markLabel: 'fbe'
     },
     transition: {
       label: 'Übergang zur nächsten Übung',
@@ -2467,7 +2468,8 @@ export const messages = {
       resetDone: 'The hints will be shown again.'
     },
     brand: {
-      slogan: 'Form Beats Ego'
+      slogan: 'Form Beats Ego',
+      markLabel: 'fbe'
     },
     transition: {
       label: 'Moving to the next exercise',

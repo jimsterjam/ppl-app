@@ -184,12 +184,24 @@ describe('Texte', () => {
   })
 })
 
-test("Header-Marke: drei Buchstaben-Spans, weiß statt Akzentfarbe", async () => {
-  const { readFile } = await import("node:fs/promises");
-  const render = await readFile(new URL("../src/render.mjs", import.meta.url), "utf8");
-  const css = await readFile(new URL("../assets/style.css", import.meta.url), "utf8");
-  assert.match(render, /class="bm-f"[^>]*>f<\/span><span class="bm-b"[^>]*>b<\/span><span[^>]*>e<\/span>/);
-  const rule = css.match(/\n\.brand \{[^}]*\}/)[0];
-  assert.doesNotMatch(rule, /var\(--accent\)/);
-  assert.match(rule, /font-kerning: none/);
-});
+describe('Header-Marke', () => {
+  test('jede Seite: drei Buchstaben-Spans in der fertigen Seite', () => {
+    for (const [file, html] of htmlFiles()) {
+      const brand = html.match(/<a class="brand"[^>]*>([\s\S]*?)<\/a>/)
+      assert.ok(brand, `${file}: kein Header-Link .brand`)
+      assert.match(
+        brand[1],
+        /^<span class="bm-f"[^>]*>f<\/span><span class="bm-b"[^>]*>b<\/span><span[^>]*>e<\/span>$/,
+        file
+      )
+    }
+  })
+  test('weiß (#ffffff), nicht in der Akzentfarbe, ohne Kerning', () => {
+    const css = fs.readFileSync(path.join(here, '../assets/style.css'), 'utf8')
+    const rule = css.match(/(?:^|\n)\.brand \{[^}]*\}/)
+    assert.ok(rule, 'CSS-Regel .brand fehlt')
+    assert.match(rule[0], /color: var\(--mark\)/)
+    assert.match(css, /--mark: #ffffff;/)
+    assert.match(rule[0], /font-kerning: none/)
+  })
+})

@@ -2,7 +2,7 @@
   <!-- Markenzeichen: "fbe" klein in der Schrift des App-Icons (Comfortaa fett), optional mit "Form Beats Ego" darunter. -->
   <div class="brand-lockup" :class="`brand-lockup--${size}`">
     <!-- Buchstaben einzeln, damit der Abstand f-b gleich dem Abstand b-e ist (wie im App-Icon). Für Screenreader bleibt es "fbe". -->
-    <span class="brand-mark" data-i18n-ignore role="img" aria-label="fbe"><span class="bm-f" aria-hidden="true">f</span><span class="bm-b" aria-hidden="true">b</span><span aria-hidden="true">e</span></span>
+    <span class="brand-mark" data-i18n-ignore role="img" :aria-label="t('brand.markLabel')"><span class="bm-f" aria-hidden="true">f</span><span class="bm-b" aria-hidden="true">b</span><span aria-hidden="true">e</span></span>
     <span v-if="slogan" class="brand-slogan">{{ t('brand.slogan') }}</span>
   </div>
 </template>
@@ -30,8 +30,9 @@ const { t } = useI18n()
      Schrift ist b-e sonst deutlich weiter als f-b (0,159 zu 0,102 der Höhe), weil der Querstrich des f zum b ragt. */
   font-kerning: none;
   font-feature-settings: "kern" 0;
-  transform: translateX(0.0175em);
 }
+/* Tinte mittig: nur in den gestapelten Varianten. In "sm" (Zeile mit Slogan) gibt es nichts zu zentrieren. */
+.brand-lockup:not(.brand-lockup--sm) .brand-mark { transform: translateX(0.0175em); }
 .brand-mark .bm-f { margin-right: 0.0055em; }
 .brand-mark .bm-b { margin-right: -0.0395em; }
 .brand-slogan {
