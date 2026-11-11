@@ -86,6 +86,21 @@ describe('TrainingReminderSettings (Einstellungen)', () => {
     expect(chip(w, 'Eigene').text()).toContain('2:45')
   })
 
+  it('Regression iPhone 11.11.: Einträge 48 px hoch (globale Knopf-Mindesthöhe) – gespeichert wird die angezeigte Stunde', async () => {
+    const settings = useSettingsStore()
+    settings.setTrainingReminderEnabled(true)
+    const w = await mountSettings()
+    await chip(w, 'Eigene').trigger('click')
+    await flushPromises()
+    // happy-dom rechnet kein Layout: Höhe wie auf dem Gerät vorgeben
+    for (const item of w.findAll('.wheel-item')) Object.defineProperty(item.element, 'offsetHeight', { value: 48, configurable: true })
+    w.find('.wheel--hour').element.scrollTop = 10 * 48 + 4 // auf dem Gerät sichtbar: 10 Uhr
+    w.find('.wheel--minute').element.scrollTop = 3 * 48 // 15
+    await w.find('.modal-actions .btn.primary').trigger('click')
+    await flushPromises()
+    expect(settings.trainingReminderTime).toBe('10:15')
+  })
+
   it('Kontowechsel bei offenem Fenster: Fenster zu, nichts ins neue Konto gespeichert', async () => {
     const settings = useSettingsStore()
     settings.setTrainingReminderEnabled(true)
