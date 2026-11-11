@@ -270,6 +270,10 @@
         <p class="hint">Ergebnisse der automatischen Prüfung des KI-Feedbacks (Zahlen und Regeln), letzte 30 Tage.</p>
         <VerifierAuditPanel />
       </SettingsSectionCard>
+      <SettingsSectionCard v-if="showVerifierAudit" class="card" data-i18n-ignore title="Trainings-Erinnerung (Admin-Diagnose)">
+        <p class="hint">Was ist geplant und warum (oder warum nicht)? Test-Mitteilung prüft die Zustellung durch iOS.</p>
+        <TrainingReminderAdminPanel />
+      </SettingsSectionCard>
     </div>
 
     <!-- Bestätigungs-Dialog. Teleport + Scroll-Lock (Modal-Muster der App, siehe CLAUDE.md):
@@ -423,6 +427,8 @@ import { isAdminUid } from '@/config/admin'
 import SettingsSectionCard from '../components/SettingsSectionCard.vue'
 import ToggleSwitch from '../components/ToggleSwitch.vue'
 import TrainingReminderSettings from '../components/TrainingReminderSettings.vue'
+import { getTrainingReminderDiagnostics } from '@/utils/trainingReminder'
+import TrainingReminderAdminPanel from '../components/TrainingReminderAdminPanel.vue'
 import BrandLockup from '../components/BrandLockup.vue'
 import { App as CapacitorApp } from '@capacitor/app'
 import AiQuotaCard from '../components/AiQuotaCard.vue'
@@ -670,7 +676,9 @@ async function copyDraftDebugLog() {
       generatedAt: new Date().toISOString(),
       diagnostics,
       resumeSnapshot,
-      activeDrafts
+      activeDrafts,
+      // Trainings-Erinnerung: Einstellungen, Erlaubnis, bei iOS geplante Mitteilung (Diagnose 11.11.)
+      trainingReminder: await getTrainingReminderDiagnostics(settings)
     }
     const text = JSON.stringify(payload, null, 2)
     if (navigator?.clipboard?.writeText) {

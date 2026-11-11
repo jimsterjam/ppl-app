@@ -7,10 +7,14 @@ import { Capacitor } from '@capacitor/core'
 import { logger } from '@/utils/logger'
 import { readPref, writePref, removePref, getActiveUid } from '@/utils/userScopedStorage'
 import { getNotificationPermission } from '@/utils/notificationPermission'
-import { planNextReminder, resolveWeeklyRhythm } from '@/utils/trainingNudge'
+import { logDiagnostic } from '@/utils/diagnosticsLog'
+import { localDayKey } from '@/utils/weekStrip'
+import { planNextReminder, resolveWeeklyRhythm, lastTrainingDay } from '@/utils/trainingNudge'
 
 /** Eigene ID, getrennt von Pausentimer (940001), Warm-up (940002) und Workout-Timer (930000+). */
 export const TRAINING_REMINDER_ID = 940003
+/** Test-Mitteilung aus der Admin-Diagnose (Einstellungen), getrennt von der echten Erinnerung. */
+export const TRAINING_REMINDER_TEST_ID = 940004
 const LAST_KEY = 'training-reminder-last'
 const ASKED_KEY = 'training-reminder-asked'
 const SYNC_DELAY_MS = 800
@@ -97,15 +101,18 @@ export async function syncTrainingReminder({ settings, workouts, t, now = new Da
   if (!plugin) return null
   await cancelTrainingReminder()
   const uid = getActiveUid()
-  if (!uid) return null
+  // Diagnose (Einstellungen → Debug-Log): nur Zahlen, Tage und Gründe, keine Texte oder Namen.
+  const diag = (result, extra = {}) => logDiagnostic('training-reminder-sync', { result, ...extra })
+  if (!uid) return diag('no-account') ?? null
   if (!settings?.trainingReminderEnabled) {
     forgetPending(uid, now.getTime())
-    return null
+    return diag('disabled') ?? null
   }
-  if ((await getNotificationPermission()) !== 'granted') {
+  const permission = await getNotificationPermission()
+  if (permission !== 'granted') {
     // Gelöscht, bevor sie kommen konnte: zählt nicht als zugestellt.
     forgetPending(uid, now.getTime())
-    return null
+    return diag('no-permission', { permission }) ?? null
   }
   try {
     // Erst hier laden: planProgress zieht die Plan-API nach sich, Abmelden/Kontowechsel brauchen nur cancelTrainingReminder.
@@ -117,25 +124,83 @@ export async function syncTrainingReminder({ settings, workouts, t, now = new Da
       workouts,
       now
     })
+    const previous = readLast(uid)
     const reminder = planNextReminder({
       workouts,
       now,
       perWeek: rhythm?.perWeek ?? null,
       time: settings.trainingReminderTime,
-      previous: readLast(uid)
+      previous
     })
-    if (!reminder) return null
+    const facts = {
+      time: settings.trainingReminderTime,
+      perWeek: rhythm?.perWeek ?? null,
+      rhythm: rhythm?.source ?? 'none',
+      lastTrainingDay: localDayKey(lastTrainingDay(workouts, now) || '') || null,
+      previous
+    }
+    if (!reminder) return diag('nothing-due', facts) ?? null
     const { title, body } = buildReminderText(reminder, { t, planDay: planDayTitle(planInfo) })
     // Konto inzwischen gewechselt (Abmelden während der Wartezeiten oben)? Dann nichts mit fremdem Text planen.
-    if (getActiveUid() !== uid) return null
+    if (getActiveUid() !== uid) return diag('account-changed') ?? null
     await plugin.schedule({
       notifications: [{ id: TRAINING_REMINDER_ID, title, body, schedule: { at: reminder.at, allowWhileIdle: true } }]
     })
     writePref(LAST_KEY, JSON.stringify({ pauseKey: reminder.pauseKey, at: reminder.at.getTime() }), uid)
+    diag('scheduled', { ...facts, at: reminder.at.toISOString(), kind: reminder.kind, remaining: reminder.remaining, daysSince: reminder.daysSince })
     return reminder.at
   } catch (error) {
     logger.warn('[trainingReminder] Planen fehlgeschlagen', { message: error?.message })
+    diag('error', { message: String(error?.message || error).slice(0, 200) })
     return null
+  }
+}
+
+/**
+ * Zustand für den Debug-Log-Export (Einstellungen): Einstellungen, Erlaubnis, bei iOS geplante Erinnerung und die
+ * zuletzt gemerkte Pause. Wirft nie.
+ */
+export async function getTrainingReminderDiagnostics(settings) {
+  const out = {
+    enabled: Boolean(settings?.trainingReminderEnabled),
+    time: settings?.trainingReminderTime ?? null,
+    weeklyGoal: settings?.weeklyGoal ?? null,
+    explicitGoal: Boolean(settings?.hasExplicitWeeklyGoal),
+    last: readLast(getActiveUid())
+  }
+  try {
+    out.permission = await getNotificationPermission()
+    const plugin = await getPlugin()
+    if (plugin?.getPending) {
+      const { notifications = [] } = await plugin.getPending()
+      out.pending = notifications
+        .filter((n) => Number(n.id) === TRAINING_REMINDER_ID)
+        .map((n) => ({ id: n.id, at: n.schedule?.at ?? null }))
+    }
+  } catch (error) {
+    out.error = String(error?.message || error).slice(0, 200)
+  }
+  return out
+}
+
+/**
+ * Admin-Test: eine Mitteilung in `seconds` Sekunden mit dem echten Text des Pause-Falls. Prüft den Zustellweg von iOS
+ * unabhängig von den Regeln; ändert weder die geplante Erinnerung noch die gemerkte Pause.
+ * @returns {Promise<{ ok: boolean, at?: string, reason?: string }>}
+ */
+export async function scheduleTrainingReminderTest({ t, seconds = 60 } = {}) {
+  const plugin = await getPlugin()
+  if (!plugin) return { ok: false, reason: 'not-native' }
+  const permission = await getNotificationPermission()
+  if (permission !== 'granted') return { ok: false, reason: `permission:${permission}` }
+  try {
+    const at = new Date(Date.now() + seconds * 1000)
+    const { title, body } = buildReminderText({ kind: 'gap', daysSince: 4, remaining: 0 }, { t })
+    await plugin.schedule({ notifications: [{ id: TRAINING_REMINDER_TEST_ID, title, body, schedule: { at, allowWhileIdle: true } }] })
+    logDiagnostic('training-reminder-test', { at: at.toISOString() })
+    return { ok: true, at: at.toISOString() }
+  } catch (error) {
+    return { ok: false, reason: String(error?.message || error).slice(0, 200) }
   }
 }
 
