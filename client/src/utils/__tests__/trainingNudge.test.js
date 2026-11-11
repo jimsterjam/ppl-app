@@ -5,6 +5,8 @@ import {
   gapThresholdDays,
   planNextReminder,
   lastTrainingDay,
+  parseWheelTime,
+  clampReminderGoal,
   DEFAULT_REMINDER_TIME,
   FALLBACK_GAP_DAYS
 } from '../trainingNudge'
@@ -14,15 +16,15 @@ const at = (day, h = 12, m = 0) => new Date(2026, 10, day, h, m)
 const workout = (day, extra = {}) => ({ date: at(day, 18).toISOString(), completed: true, ...extra })
 
 describe('sanitizeReminderTime', () => {
-  it('nimmt gültige Zeiten im Bereich 6:00 bis 21:00', () => {
+  it('nimmt jede gültige Uhrzeit, auch nachts (Nachtschicht)', () => {
     expect(sanitizeReminderTime('12:30')).toBe('12:30')
     expect(sanitizeReminderTime('8:00')).toBe('08:00')
-    expect(sanitizeReminderTime('21:00')).toBe('21:00')
+    expect(sanitizeReminderTime('00:05')).toBe('00:05')
+    expect(sanitizeReminderTime('23:55')).toBe('23:55')
   })
-  it('klemmt außerhalb des Bereichs und fällt bei Unsinn auf die Standardzeit zurück', () => {
-    expect(sanitizeReminderTime('05:10')).toBe('06:00')
-    expect(sanitizeReminderTime('23:45')).toBe('21:00')
+  it('fällt bei Unsinn auf die Standardzeit zurück', () => {
     expect(sanitizeReminderTime('25:00')).toBe(DEFAULT_REMINDER_TIME)
+    expect(sanitizeReminderTime('12:60')).toBe(DEFAULT_REMINDER_TIME)
     expect(sanitizeReminderTime('abc')).toBe(DEFAULT_REMINDER_TIME)
     expect(sanitizeReminderTime(null)).toBe(DEFAULT_REMINDER_TIME)
   })
@@ -127,5 +129,20 @@ describe('planNextReminder', () => {
   it('Uhrzeit wird übernommen', () => {
     const r = planNextReminder({ workouts: [workout(9)], now: at(9, 19), perWeek: 3, time: '16:00' })
     expect(r.at).toEqual(at(13, 16, 0))
+  })
+})
+
+describe('parseWheelTime / clampReminderGoal', () => {
+  it('Minuten auf 5er-Raster, höchstens 55; Stunde bleibt', () => {
+    expect(parseWheelTime('18:43')).toEqual({ hour: 18, minute: 45 })
+    expect(parseWheelTime('23:58')).toEqual({ hour: 23, minute: 55 })
+    expect(parseWheelTime('00:02')).toEqual({ hour: 0, minute: 0 })
+    expect(parseWheelTime('quatsch')).toEqual({ hour: 12, minute: 30 })
+  })
+  it('Zahl pro Woche 1–14', () => {
+    expect(clampReminderGoal(0)).toBe(1)
+    expect(clampReminderGoal(15)).toBe(14)
+    expect(clampReminderGoal(6)).toBe(6)
+    expect(clampReminderGoal('x')).toBe(3)
   })
 })

@@ -19,25 +19,28 @@
         >
           <small>{{ preset.label }}</small>{{ preset.time.replace(/^0/, '') }}
         </button>
-        <button type="button" class="reminder-chip" :aria-pressed="customOpen ? 'true' : 'false'" @click="customOpen = true">
+        <button type="button" class="reminder-chip" :aria-pressed="customOpen ? 'true' : 'false'" @click="openCustom">
           <small>{{ t('trainingReminder.presetCustom') }}</small>{{ customOpen ? settings.trainingReminderTime.replace(/^0/, '') : '…' }}
         </button>
       </div>
-      <template v-if="customOpen">
-        <input
-          id="training-reminder-time"
-          class="reminder-time-input"
-          type="time"
-          :min="MIN_REMINDER_TIME"
-          :max="MAX_REMINDER_TIME"
-          step="300"
-          :value="settings.trainingReminderTime"
-          :aria-label="t('trainingReminder.customAria')"
-          @change="onCustom($event)"
-        />
-        <p class="hint">{{ t('trainingReminder.customHint') }}</p>
-      </template>
     </template>
+    <!-- Eigene Uhrzeit (Absprache Paul 11.11.): Tipp auf „Eigene“ öffnet sofort dieses Fenster, jede Uhrzeit erlaubt. -->
+    <AppModal
+      v-model="customModal"
+      type="info"
+      :title="t('trainingReminder.customTitle')"
+      :confirm-text="t('trainingReminder.apply')"
+      @confirm="applyCustom"
+    >
+      <TimeWheelPicker
+        v-if="customModal"
+        ref="wheelPicker"
+        v-model="draftTime"
+        :minute-step="REMINDER_MINUTE_STEP"
+        :hour-label="t('trainingReminder.hourLabel')"
+        :minute-label="t('trainingReminder.minuteLabel')"
+      />
+    </AppModal>
   </div>
 </template>
 
@@ -46,9 +49,12 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ToggleSwitch from '@/components/ToggleSwitch.vue'
 import NotificationHint from '@/components/NotificationHint.vue'
+import AppModal from '@/components/AppModal.vue'
+import TimeWheelPicker from '@/components/TimeWheelPicker.vue'
 import { useSettingsStore } from '@/stores/settingsStore'
+import { getActiveUid } from '@/utils/userScopedStorage'
 import { ensureNotificationPermission } from '@/utils/notificationPermission'
-import { REMINDER_TIME_PRESETS, MIN_REMINDER_TIME, MAX_REMINDER_TIME } from '@/utils/trainingNudge'
+import { REMINDER_TIME_PRESETS, REMINDER_MINUTE_STEP } from '@/utils/trainingNudge'
 
 const { t } = useI18n()
 const settings = useSettingsStore()
@@ -57,9 +63,14 @@ const PRESET_LABEL_KEYS = { morning: 'trainingReminder.presetMorning', midday: '
 const presets = computed(() => REMINDER_TIME_PRESETS.map((p) => ({ ...p, label: t(PRESET_LABEL_KEYS[p.key]) })))
 // Eigene Zeit ist offen, wenn die gespeicherte Uhrzeit keine Vorgabe ist.
 const isPreset = (time) => REMINDER_TIME_PRESETS.some((p) => p.time === time)
-const customOpen = ref(!isPreset(settings.trainingReminderTime))
-// Kontowechsel oder Änderung von außen: Auswahl an die gespeicherte Uhrzeit anpassen.
-watch(() => settings.trainingReminderTime, (time) => { customOpen.value = !isPreset(time) })
+// „Eigene“ ist markiert, sobald die gespeicherte Uhrzeit keine Vorgabe ist (auch nach Kontowechsel richtig).
+const customOpen = computed(() => !isPreset(settings.trainingReminderTime))
+const customModal = ref(false)
+const draftTime = ref(settings.trainingReminderTime)
+// Konto beim Öffnen: wechselt es, solange das Fenster offen ist, wird der Entwurf verworfen (nicht ins neue Konto).
+const draftUid = ref('')
+watch(() => settings._uid, (uid) => { if (customModal.value && uid !== draftUid.value) customModal.value = false })
+const wheelPicker = ref(null)
 
 async function toggle(next) {
   // Einschalten: erst die iOS-Frage (nur, wenn iOS noch nie gefragt hat), dann speichern - so plant die Erinnerung
@@ -69,14 +80,19 @@ async function toggle(next) {
 }
 
 function pick(time) {
-  customOpen.value = false
   settings.setTrainingReminderTime(time)
 }
 
-function onCustom(event) {
-  settings.setTrainingReminderTime(event?.target?.value)
-  // Außerhalb 6:00–21:00 korrigiert der Store; das Feld zeigt den gespeicherten Wert.
-  if (event?.target) event.target.value = settings.trainingReminderTime
+function openCustom() {
+  draftTime.value = settings.trainingReminderTime
+  draftUid.value = getActiveUid()
+  customModal.value = true
+}
+
+function applyCustom() {
+  const time = wheelPicker.value?.commit() || draftTime.value
+  if (getActiveUid() !== draftUid.value) return
+  settings.setTrainingReminderTime(time)
 }
 </script>
 
@@ -103,15 +119,4 @@ function onCustom(event) {
 .reminder-chip small { font-size: 0.66rem; font-weight: 600; color: var(--muted); }
 .reminder-chip[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-contrast, #060606); }
 .reminder-chip[aria-pressed="true"] small { color: var(--accent-contrast, #060606); }
-.reminder-time-input {
-  justify-self: start;
-  min-height: 44px;
-  padding: 6px 12px;
-  border-radius: 12px;
-  border: 1px solid var(--card-border);
-  background: var(--card-soft, transparent);
-  color: var(--fg);
-  font: inherit;
-  font-size: 1rem;
-}
 </style>
