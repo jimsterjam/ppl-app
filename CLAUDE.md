@@ -150,14 +150,17 @@ die lokale Cowork-Sandbox. In Cloud-Sessions gilt stattdessen:
   iOS-Proxy-Mock (`capacitorPluginThenable.test.js`), Größen/Layout im echten Browser (happy-dom
   rechnet kein Layout). Bei Bugfixes zeigen, dass der Test vor dem Fix fehlschlägt.
 - **Copilot-Review vor der Meldung an Paul:** nach dem Erstellen des PRs den Copilot-Review
-  anfordern (`mcp__github__request_copilot_review`), Ergebnis abwarten (nicht mit `sleep` pollen:
-  PR-Ereignisse abonnieren oder eine Rückmeldung per `send_later` planen) und die Funde abarbeiten.
+  anfordern (GitHub-MCP-Werkzeug `request_copilot_review` der Cloud-Session; fehlt es, Paul bitten,
+  ihn in GitHub anzufordern), Ergebnis abwarten (nicht mit `sleep` pollen: PR-Ereignisse abonnieren
+  bzw. eine Rückmeldung planen, soweit die Session das anbietet) und die Funde abarbeiten.
   Erst wenn Copilot nichts Blockierendes mehr findet (höchstens drei Runden, siehe unten), Paul den
   PR als fertig melden – mit Zahl der Copilot-Runden und -Funde. Findet Copilot nach drei Runden
   noch etwas, Paul den Stand zeigen statt weiter zu flicken.
-- **Vor jedem Push auf einen PR-Branch prüfen, ob der PR noch offen ist** (`git fetch` +
-  `git merge-base --is-ancestor <branch> origin/main`). Ist er gemergt: neuer Branch von `main` und
-  neuer PR, nie auf den gemergten weiterpushen (Fund 11.11.: zwei Commits landeten nicht im Merge).
+- **Vor jedem Push auf einen PR-Branch prüfen, ob der PR noch offen ist** – maßgeblich ist der
+  PR-Status in GitHub (`pull_request_read` → `state`/`merged`), nicht Git allein: nach einem
+  Squash-Merge ist der Branch kein Vorfahre von `main` (`git merge-base --is-ancestor` erkennt das
+  nur bei Merge-Commits). Ist er gemergt oder geschlossen: neuer Branch von `main` und neuer PR, nie
+  auf den gemergten weiterpushen (Fund 11.11.: zwei Commits landeten nicht im Merge).
 - **PR-Vorlage verwenden** (`.github/pull_request_template.md`) mit allen Abschnitten, auch
   „Risiko" und „Wie zurücknehmen".
 - **Review-Funde** (Copilot, Paul): jeden beantworten – beheben oder mit Begründung ablehnen.
