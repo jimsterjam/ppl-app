@@ -34,6 +34,7 @@
     >
       <TimeWheelPicker
         v-if="customModal"
+        ref="wheelPicker"
         v-model="draftTime"
         :minute-step="REMINDER_MINUTE_STEP"
         :hour-label="t('trainingReminder.hourLabel')"
@@ -65,6 +66,7 @@ const isPreset = (time) => REMINDER_TIME_PRESETS.some((p) => p.time === time)
 const customOpen = computed(() => !isPreset(settings.trainingReminderTime))
 const customModal = ref(false)
 const draftTime = ref(settings.trainingReminderTime)
+const wheelPicker = ref(null)
 
 async function toggle(next) {
   // Einschalten: erst die iOS-Frage (nur, wenn iOS noch nie gefragt hat), dann speichern - so plant die Erinnerung
@@ -83,6 +85,7 @@ function openCustom() {
 }
 
 function applyCustom() {
+  wheelPicker.value?.commit()
   settings.setTrainingReminderTime(draftTime.value)
 }
 </script>
