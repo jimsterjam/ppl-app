@@ -170,7 +170,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { useScrollLock } from '@/composables/useScrollLock'
 import { useI18n } from 'vue-i18n'
 import { getAppLanguage } from '@/i18n'
 import { useRouter } from 'vue-router'
@@ -238,6 +239,10 @@ const notDoneExercises = computed(() => {
 })
 
 const showSummary = ref(true)
+// Seite dahinter sperren, solange die Zusammenfassung offen ist (Fund Paul 11.11.)
+const scrollLock = useScrollLock()
+watch(showSummary, (open) => (open ? scrollLock.lock() : scrollLock.unlock()), { immediate: true })
+onBeforeUnmount(scrollLock.unlock)
 const deferredConfirmation = ref(props.deferred)
 const loading = ref(!props.deferred)
 const feedback = ref(null)
