@@ -241,7 +241,9 @@ const notDoneExercises = computed(() => {
 const showSummary = ref(true)
 // Seite dahinter sperren, solange die Zusammenfassung offen ist (Fund Paul 11.11.)
 const scrollLock = useScrollLock()
-watch(showSummary, (open) => (open ? scrollLock.lock() : scrollLock.unlock()), { immediate: true })
+// Erst nach dem Einhängen sperren: ein in setup gesetztes Sperren bliebe bei abgebrochenem Mount hängen (Review).
+onMounted(() => { if (showSummary.value) scrollLock.lock() })
+watch(showSummary, (open) => (open ? scrollLock.lock() : scrollLock.unlock()))
 onBeforeUnmount(scrollLock.unlock)
 const deferredConfirmation = ref(props.deferred)
 const loading = ref(!props.deferred)

@@ -70,7 +70,7 @@
           <p v-if="isFirstUse" class="quick-first-hint">{{ $t('dashboard.firstHint') }}</p>
           <TimerMenu v-if="showTimerMenu" @close="showTimerMenu = false" @select="onTimerMenuSelect" />
           <RestTimerSettings v-if="showRestSettings" @close="showRestSettings = false" />
-          <WorkoutTimerConfig v-if="showTimerConfig" @close="showTimerConfig = false" />
+          <Teleport to="body"><WorkoutTimerConfig v-if="showTimerConfig" @close="showTimerConfig = false" /></Teleport>
         </div>
 
         <div v-else-if="showAllFavoritesPanel" class="quick-mode-panel">

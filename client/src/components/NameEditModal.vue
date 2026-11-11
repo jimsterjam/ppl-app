@@ -73,7 +73,7 @@ watch(() => props.modelValue, async (open) => {
   } else {
     unlockBodyScroll()
   }
-})
+}, { immediate: true }) // auch sperren, wenn das Fenster gleich offen eingehängt wird (wie AppModal, 11.11.)
 onBeforeUnmount(unlockBodyScroll)
 
 function close() {
