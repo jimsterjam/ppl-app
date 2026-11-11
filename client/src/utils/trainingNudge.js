@@ -4,9 +4,7 @@
 import { localDayKey, startOfWeek, countWeekWorkouts } from './weekStrip'
 
 export const DEFAULT_REMINDER_TIME = '12:30'
-export const MIN_REMINDER_TIME = '06:00'
-export const MAX_REMINDER_TIME = '21:00'
-/** Vorgaben in den Einstellungen; daneben „Eigene“ Uhrzeit zwischen MIN und MAX. */
+/** Vorgaben in den Einstellungen; daneben eine beliebige „Eigene“ Uhrzeit (auch nachts, z. B. Nachtschicht – Paul 11.11.). */
 export const REMINDER_TIME_PRESETS = Object.freeze([
   Object.freeze({ key: 'morning', time: '08:00' }),
   Object.freeze({ key: 'midday', time: '12:30' }),
@@ -14,24 +12,21 @@ export const REMINDER_TIME_PRESETS = Object.freeze([
 ])
 /** Pause ohne bekannten Rhythmus (kein Ziel, kein Plan, zu wenig Verlauf). */
 export const FALLBACK_GAP_DAYS = 5
-/** Auswahl in der Frage nach dem ersten Training. */
-export const REMINDER_GOAL_CHOICES = Object.freeze([2, 3, 4, 5])
+/** Trainings pro Woche in der Frage nach dem ersten Training (− / +), wie das Wochenziel in den Einstellungen. */
+export const REMINDER_GOAL_MIN = 1
+export const REMINDER_GOAL_MAX = 14
+/** Minuten im Fenster „Eigene Uhrzeit“. */
+export const REMINDER_MINUTE_STEP = 5
 
 const DAY_MS = 24 * 60 * 60 * 1000
-const toMinutes = (hhmm) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5))
-
-/** 'H:MM' oder 'HH:MM' → 'HH:MM' im erlaubten Bereich; sonst die Standardzeit. */
+/** 'H:MM' oder 'HH:MM' (00:00–23:59) → 'HH:MM'; sonst die Standardzeit. */
 export function sanitizeReminderTime(value) {
   const match = /^(\d{1,2}):(\d{2})$/.exec(String(value ?? '').trim())
   if (!match) return DEFAULT_REMINDER_TIME
   const hours = Number(match[1])
   const minutes = Number(match[2])
   if (hours > 23 || minutes > 59) return DEFAULT_REMINDER_TIME
-  const time = `${String(hours).padStart(2, '0')}:${match[2]}`
-  const total = toMinutes(time)
-  if (total < toMinutes(MIN_REMINDER_TIME)) return MIN_REMINDER_TIME
-  if (total > toMinutes(MAX_REMINDER_TIME)) return MAX_REMINDER_TIME
-  return time
+  return `${String(hours).padStart(2, '0')}:${match[2]}`
 }
 
 /** Lokaler Tag (00:00) plus `days` Tage. */

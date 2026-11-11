@@ -734,8 +734,11 @@ export const messages = {
       nextNoPlan: 'Heute wäre ein guter Tag.',
       askTitle: 'Soll fbe dich ans Training erinnern?',
       askText: 'Eine kurze Mitteilung, wenn deine Pause länger wird als geplant. Standardmäßig um 12:30 Uhr, änderbar in den Einstellungen. Wie oft willst du pro Woche trainieren?',
-      askChoices: 'Trainings pro Woche',
-      askChoiceAria: '{count}× pro Woche, Erinnerung einschalten',
+      askPerWeek: 'pro Woche',
+      askCountAria: '{count} Training pro Woche | {count} Trainings pro Woche',
+      askDecrease: 'Ein Training weniger',
+      askIncrease: 'Ein Training mehr',
+      askConfirm: 'Erinnerung einschalten',
       askNo: 'Nein, danke',
       askHide: 'Frage ausblenden',
       enabledToast: 'Erinnerung ist an. Uhrzeit und Wochenziel änderst du in den Einstellungen.',
@@ -748,8 +751,10 @@ export const messages = {
       presetMidday: 'Mittags',
       presetAfternoon: 'Nachmittags',
       presetCustom: 'Eigene',
-      customAria: 'Eigene Uhrzeit',
-      customHint: 'Eigene Zeit zwischen 6:00 und 21:00 Uhr.'
+      customTitle: 'Eigene Uhrzeit',
+      apply: 'Übernehmen',
+      hourLabel: 'Stunde',
+      minuteLabel: 'Minute'
     },
     transition: {
       label: 'Übergang zur nächsten Übung',
@@ -2504,8 +2509,11 @@ export const messages = {
       nextNoPlan: 'Today would be a good day.',
       askTitle: 'Should fbe remind you to train?',
       askText: 'A short notification when your break gets longer than planned. By default at 12:30, changeable in Settings. How often do you want to train per week?',
-      askChoices: 'Workouts per week',
-      askChoiceAria: '{count}× per week, turn on reminder',
+      askPerWeek: 'per week',
+      askCountAria: '{count} workout per week | {count} workouts per week',
+      askDecrease: 'One workout less',
+      askIncrease: 'One workout more',
+      askConfirm: 'Turn on reminder',
       askNo: 'No, thanks',
       askHide: 'Hide question',
       enabledToast: 'Reminder is on. You can change the time and weekly goal in Settings.',
@@ -2518,8 +2526,10 @@ export const messages = {
       presetMidday: 'Midday',
       presetAfternoon: 'Afternoon',
       presetCustom: 'Custom',
-      customAria: 'Custom time',
-      customHint: 'Custom time between 6:00 and 21:00.'
+      customTitle: 'Custom time',
+      apply: 'Apply',
+      hourLabel: 'Hour',
+      minuteLabel: 'Minute'
     },
     transition: {
       label: 'Moving to the next exercise',
