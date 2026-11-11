@@ -86,12 +86,14 @@ describe('Einstellungen der Trainings-Erinnerung (pro Konto)', () => {
     expect(wasReminderAsked()).toBe(true)
   })
 
-  it('eigene Uhrzeit außerhalb 6:00–21:00 wird geklemmt', () => {
+  it('eigene Uhrzeit ist frei wählbar, ungültige Werte fallen auf 12:30 zurück', () => {
     setActiveUid('uid-a')
     const store = useSettingsStore()
     store.setTrainingReminderTime('22:30')
-    expect(store.trainingReminderTime).toBe('21:00')
-    store.setTrainingReminderTime('05:00')
-    expect(store.trainingReminderTime).toBe('06:00')
+    expect(store.trainingReminderTime).toBe('22:30')
+    store.setTrainingReminderTime('03:15')
+    expect(store.trainingReminderTime).toBe('03:15')
+    store.setTrainingReminderTime('99:99')
+    expect(store.trainingReminderTime).toBe('12:30')
   })
 })

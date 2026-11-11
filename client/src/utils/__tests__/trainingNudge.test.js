@@ -14,15 +14,15 @@ const at = (day, h = 12, m = 0) => new Date(2026, 10, day, h, m)
 const workout = (day, extra = {}) => ({ date: at(day, 18).toISOString(), completed: true, ...extra })
 
 describe('sanitizeReminderTime', () => {
-  it('nimmt gültige Zeiten im Bereich 6:00 bis 21:00', () => {
+  it('nimmt jede gültige Uhrzeit, auch nachts (Nachtschicht)', () => {
     expect(sanitizeReminderTime('12:30')).toBe('12:30')
     expect(sanitizeReminderTime('8:00')).toBe('08:00')
-    expect(sanitizeReminderTime('21:00')).toBe('21:00')
+    expect(sanitizeReminderTime('00:05')).toBe('00:05')
+    expect(sanitizeReminderTime('23:55')).toBe('23:55')
   })
-  it('klemmt außerhalb des Bereichs und fällt bei Unsinn auf die Standardzeit zurück', () => {
-    expect(sanitizeReminderTime('05:10')).toBe('06:00')
-    expect(sanitizeReminderTime('23:45')).toBe('21:00')
+  it('fällt bei Unsinn auf die Standardzeit zurück', () => {
     expect(sanitizeReminderTime('25:00')).toBe(DEFAULT_REMINDER_TIME)
+    expect(sanitizeReminderTime('12:60')).toBe(DEFAULT_REMINDER_TIME)
     expect(sanitizeReminderTime('abc')).toBe(DEFAULT_REMINDER_TIME)
     expect(sanitizeReminderTime(null)).toBe(DEFAULT_REMINDER_TIME)
   })
