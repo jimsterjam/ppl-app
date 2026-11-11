@@ -7,7 +7,7 @@ vi.mock('@capacitor/local-notifications', () => ({ LocalNotifications: ln }))
 vi.mock('@/utils/notificationPermission', () => perm)
 vi.mock('@/utils/planProgress', () => ({ getTodayPlanInfo: () => null, planDayTitle: () => '' }))
 
-import { syncTrainingReminder, cancelTrainingReminder, workoutsSignature, TRAINING_REMINDER_ID } from '../trainingReminder'
+import { syncTrainingReminder, cancelTrainingReminder, workoutsSignature, scheduleTrainingReminderTest, readTrainingReminderDiag, TRAINING_REMINDER_ID, TRAINING_REMINDER_TEST_ID } from '../trainingReminder'
 import { setActiveUid, readPref, writePref, __resetUserScopedStorageForTests } from '../userScopedStorage'
 
 const t = (key, named) => `${key}${named ? JSON.stringify(named) : ''}`
@@ -72,6 +72,56 @@ describe('syncTrainingReminder', () => {
     await syncTrainingReminder({ settings: settings(), workouts, t, now: monday() })
     await cancelTrainingReminder({ forgetFor: 'uid-a' })
     expect(readPref('training-reminder-last', 'uid-a')).toBeNull()
+  })
+})
+
+describe('Diagnose der Trainings-Erinnerung', () => {
+  const diags = () => readTrainingReminderDiag().syncs
+  beforeEach(() => {
+    const mem = new Map()
+    vi.stubGlobal('localStorage', {
+      getItem: (k) => (mem.has(k) ? mem.get(k) : null),
+      setItem: (k, v) => mem.set(k, String(v)),
+      removeItem: (k) => mem.delete(k)
+    })
+    __resetUserScopedStorageForTests()
+    setActiveUid('uid-a')
+    Object.values(ln).forEach((fn) => fn.mockReset())
+    perm.getNotificationPermission.mockReset().mockResolvedValue('granted')
+  })
+
+  it('schreibt den Grund jedes Laufs ins Diagnose-Log (geplant mit Zeitpunkt, sonst warum nicht)', async () => {
+    await syncTrainingReminder({ settings: settings(), workouts, t, now: monday() })
+    await syncTrainingReminder({ settings: settings({ trainingReminderEnabled: false }), workouts, t, now: monday() })
+    perm.getNotificationPermission.mockResolvedValue('denied')
+    await syncTrainingReminder({ settings: settings(), workouts, t, now: monday() })
+    const [scheduled, disabled, noPerm] = diags()
+    expect(scheduled).toMatchObject({ result: 'scheduled', kind: 'gap', perWeek: 3, rhythm: 'goal', lastTrainingDay: '2026-11-09', time: '12:30' })
+    expect(disabled.result).toBe('disabled')
+    expect(noPerm).toMatchObject({ result: 'no-permission', permission: 'denied' })
+  })
+
+  it('schon zugestellt in dieser Pause: Grund „nothing-due“ mit der gemerkten Pause', async () => {
+    writePref('training-reminder-last', JSON.stringify({ pauseKey: '2026-11-09', at: new Date(2026, 10, 10, 12, 30).getTime() }))
+    expect(await syncTrainingReminder({ settings: settings(), workouts, t, now: new Date(2026, 10, 11, 9) })).toBeNull()
+    expect(diags()[0]).toMatchObject({ result: 'nothing-due', previous: { pauseKey: '2026-11-09' } })
+  })
+
+  it('Test-Mitteilung: eigene ID, ändert die gemerkte Pause nicht', async () => {
+    const result = await scheduleTrainingReminderTest({ t, seconds: 60 })
+    expect(result.ok).toBe(true)
+    expect(ln.schedule.mock.calls[0][0].notifications[0].id).toBe(TRAINING_REMINDER_TEST_ID)
+    expect(readPref('training-reminder-last')).toBeNull()
+    expect(readTrainingReminderDiag().tests).toHaveLength(1)
+    expect(readTrainingReminderDiag().syncs).toHaveLength(0)
+  })
+
+  it('Diagnose gehört zum Konto: Konto B sieht die Läufe von Konto A nicht, nichts im geräteweiten Log', async () => {
+    await syncTrainingReminder({ settings: settings(), workouts, t, now: monday() })
+    expect(readTrainingReminderDiag().syncs).toHaveLength(1)
+    setActiveUid('uid-b')
+    expect(readTrainingReminderDiag().syncs).toHaveLength(0)
+    expect(localStorage.getItem('bro_split_load_diagnostics_v1')).toBeNull()
   })
 })
 
