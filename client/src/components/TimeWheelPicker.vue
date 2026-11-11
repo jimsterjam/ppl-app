@@ -97,10 +97,26 @@ function onScroll(key) {
   scrollTimers[key] = setTimeout(() => settle(key), 90)
 }
 
-/** Vor dem Übernehmen aufrufen: ein Wischen kurz vor dem Tipp ist sonst noch nicht übernommen. */
+/** Wert unter dem Band eines Rads (aus der Scroll-Position), ohne zu senden. */
+function valueAt(key, fallback) {
+  clearTimeout(scrollTimers[key])
+  const el = wheelEls[key]
+  const col = columns.value.find((c) => c.key === key)
+  if (!el || !col) return fallback
+  const index = Math.min(col.options.length - 1, Math.max(0, Math.round(el.scrollTop / ITEM_PX)))
+  return col.options[index]
+}
+
+/**
+ * Vor dem Übernehmen aufrufen: liest beide Räder auf einmal (ein Wischen kurz vor dem Tipp ist sonst noch nicht
+ * übernommen) und sendet eine Uhrzeit. Gibt sie auch zurück, damit der Aufrufer nicht auf v-model warten muss.
+ * @returns {string} 'HH:MM'
+ */
 function commit() {
-  settle('hour')
-  settle('minute')
+  const { hour, minute } = parsed.value
+  const time = `${pad(valueAt('hour', hour))}:${pad(valueAt('minute', minute))}`
+  emit('update:modelValue', time)
+  return time
 }
 defineExpose({ commit })
 

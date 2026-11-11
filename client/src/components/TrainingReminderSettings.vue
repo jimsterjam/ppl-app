@@ -45,13 +45,14 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ToggleSwitch from '@/components/ToggleSwitch.vue'
 import NotificationHint from '@/components/NotificationHint.vue'
 import AppModal from '@/components/AppModal.vue'
 import TimeWheelPicker from '@/components/TimeWheelPicker.vue'
 import { useSettingsStore } from '@/stores/settingsStore'
+import { getActiveUid } from '@/utils/userScopedStorage'
 import { ensureNotificationPermission } from '@/utils/notificationPermission'
 import { REMINDER_TIME_PRESETS, REMINDER_MINUTE_STEP } from '@/utils/trainingNudge'
 
@@ -66,6 +67,9 @@ const isPreset = (time) => REMINDER_TIME_PRESETS.some((p) => p.time === time)
 const customOpen = computed(() => !isPreset(settings.trainingReminderTime))
 const customModal = ref(false)
 const draftTime = ref(settings.trainingReminderTime)
+// Konto beim Öffnen: wechselt es, solange das Fenster offen ist, wird der Entwurf verworfen (nicht ins neue Konto).
+const draftUid = ref('')
+watch(() => settings._uid, (uid) => { if (customModal.value && uid !== draftUid.value) customModal.value = false })
 const wheelPicker = ref(null)
 
 async function toggle(next) {
@@ -81,12 +85,14 @@ function pick(time) {
 
 function openCustom() {
   draftTime.value = settings.trainingReminderTime
+  draftUid.value = getActiveUid()
   customModal.value = true
 }
 
 function applyCustom() {
-  wheelPicker.value?.commit()
-  settings.setTrainingReminderTime(draftTime.value)
+  const time = wheelPicker.value?.commit() || draftTime.value
+  if (getActiveUid() !== draftUid.value) return
+  settings.setTrainingReminderTime(time)
 }
 </script>
 
