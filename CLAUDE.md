@@ -41,7 +41,8 @@ bei jeder neuen Sitzung neu gelernt werden müssen. Bei Widerspruch gilt die jü
   „weniger Gewicht“ formulieren (Prompt-Regeln 8, 12, 14, 27). Zahlen im Text müssen aus den echten
   Trainingsdaten stammen (Verifier, `AI_VERIFIER_MODE=active`).
 - **Marke:** immer „Form Beats Ego“, nie „Form schlägt Ego“ – auch in deutschen Texten (Test `repoTextRules`). Das <!-- repo-text-rules: erlaubt -->
-  Zeichen „fbe“ ist weiß, nie in der Akzentfarbe. Gleiche Buchstabenabstände über einzelne Spans
+  Zeichen „fbe“ ist auf dunklem Grund weiß (Startbildschirm, Website, App im dunklen Modus; im hellen
+  Modus der App in der Textfarbe), nie in der Akzentfarbe. Gleiche Buchstabenabstände über einzelne Spans
   (`bm-f`/`bm-b`, `font-kerning: none`) an drei Stellen: App (`client/src/components/BrandLockup.vue`),
   Startbildschirm (`#start-splash` in `client/index.html` **und** die drei PNGs in
   `client/ios/App/App/Assets.xcassets/Splash.imageset` – pixelgleich halten, sonst springt der

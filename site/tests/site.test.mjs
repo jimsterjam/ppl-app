@@ -201,7 +201,11 @@ describe('Header-Marke', () => {
     const rule = css.match(/(?:^|\n)\.brand \{[^}]*\}/)
     assert.ok(rule, 'CSS-Regel .brand fehlt')
     assert.match(rule[0], /color: var\(--mark\)/)
-    assert.match(css, /--mark: #ffffff;/)
+    assert.doesNotMatch(rule[0], /var\(--accent\)/)
+    // --mark nur einmal definiert, und zwar in :root
+    const defs = css.match(/--mark:[^;]*;/g) || []
+    assert.deepEqual(defs, ['--mark: #ffffff;'])
+    assert.match(css.match(/:root\s*\{[^}]*\}/)[0], /--mark: #ffffff;/)
     assert.match(rule[0], /font-kerning: none/)
   })
 })
