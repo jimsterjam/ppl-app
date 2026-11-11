@@ -7,7 +7,7 @@ vi.mock('@capacitor/local-notifications', () => ({ LocalNotifications: ln }))
 vi.mock('@/utils/notificationPermission', () => perm)
 vi.mock('@/utils/planProgress', () => ({ getTodayPlanInfo: () => null, planDayTitle: () => '' }))
 
-import { syncTrainingReminder, cancelTrainingReminder, workoutsSignature, scheduleTrainingReminderTest, TRAINING_REMINDER_ID, TRAINING_REMINDER_TEST_ID } from '../trainingReminder'
+import { syncTrainingReminder, cancelTrainingReminder, workoutsSignature, scheduleTrainingReminderTest, readTrainingReminderDiag, TRAINING_REMINDER_ID, TRAINING_REMINDER_TEST_ID } from '../trainingReminder'
 import { setActiveUid, readPref, writePref, __resetUserScopedStorageForTests } from '../userScopedStorage'
 
 const t = (key, named) => `${key}${named ? JSON.stringify(named) : ''}`
@@ -76,7 +76,7 @@ describe('syncTrainingReminder', () => {
 })
 
 describe('Diagnose der Trainings-Erinnerung', () => {
-  const diags = () => JSON.parse(localStorage.getItem('bro_split_load_diagnostics_v1') || '[]').filter((e) => e.event.startsWith('training-reminder'))
+  const diags = () => readTrainingReminderDiag().syncs
   beforeEach(() => {
     const mem = new Map()
     vi.stubGlobal('localStorage', {
@@ -112,6 +112,16 @@ describe('Diagnose der Trainings-Erinnerung', () => {
     expect(result.ok).toBe(true)
     expect(ln.schedule.mock.calls[0][0].notifications[0].id).toBe(TRAINING_REMINDER_TEST_ID)
     expect(readPref('training-reminder-last')).toBeNull()
+    expect(readTrainingReminderDiag().tests).toHaveLength(1)
+    expect(readTrainingReminderDiag().syncs).toHaveLength(0)
+  })
+
+  it('Diagnose gehört zum Konto: Konto B sieht die Läufe von Konto A nicht, nichts im geräteweiten Log', async () => {
+    await syncTrainingReminder({ settings: settings(), workouts, t, now: monday() })
+    expect(readTrainingReminderDiag().syncs).toHaveLength(1)
+    setActiveUid('uid-b')
+    expect(readTrainingReminderDiag().syncs).toHaveLength(0)
+    expect(localStorage.getItem('bro_split_load_diagnostics_v1')).toBeNull()
   })
 })
 

@@ -31,9 +31,13 @@ bei Widerspruch gelten diese beiden.
 5. **Ein sichtbarer Text fehlt in DE oder EN**, ist hart codiert (auch `aria-label`,
    `placeholder`, `title`, Toasts), oder nutzt `t('key') || 'Fallback'` (greift nie; ESLint
    meldet nur die direkte Form, über eine Variable oder einen Ternary bleibt es ein Fund). Übungsnamen in der App immer englisch.
-6. **Ein Test prüft nichts**: Assertion, die immer besteht, Mock statt echter Funktion, Test
+6. **Capacitor-Plugin direkt aus einer async-Funktion zurückgegeben oder mit `await` verarbeitet** (z. B.
+   `return LocalNotifications`). Auf iOS wirft dann der Abruf von `.then` am Plugin-Proxy; immer über
+   `wrapPlugin` (`client/src/utils/capacitorPlugin.js`) weiterreichen. Tests dafür mit dem Proxy-Mock aus
+   `capacitorPluginThenable.test.js`, nicht mit einem normalen Objekt.
+7. **Ein Test prüft nichts**: Assertion, die immer besteht, Mock statt echter Funktion, Test
    außerhalb der Globs in `server/package.json` bzw. `client/src/**/__tests__/`.
-7. **Die Doku lügt**: `CLAUDE.md`, `agents.md`, `site/README.md` oder diese Datei beschreiben
+8. **Die Doku lügt**: `CLAUDE.md`, `agents.md`, `site/README.md` oder diese Datei beschreiben
    etwas, das der Diff anders macht, oder eine Zeile darin wird durch den Diff veraltet.
 
 ## So schreibst du Funde

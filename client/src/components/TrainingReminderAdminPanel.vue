@@ -16,7 +16,7 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/settingsStore'
-import { getTrainingReminderDiagnostics, scheduleTrainingReminderTest } from '@/utils/trainingReminder'
+import { getTrainingReminderDiagnostics, scheduleTrainingReminderTest, readTrainingReminderDiag } from '@/utils/trainingReminder'
 
 const { t } = useI18n()
 const settings = useSettingsStore()
@@ -24,18 +24,11 @@ const text = ref('')
 const note = ref('')
 const testing = ref(false)
 
-function recentSyncs() {
-  try {
-    const all = JSON.parse(localStorage.getItem('bro_split_load_diagnostics_v1') || '[]')
-    return all.filter((e) => String(e?.event || '').startsWith('training-reminder')).slice(-8)
-  } catch {
-    return []
-  }
-}
-
 async function load() {
   const status = await getTrainingReminderDiagnostics(settings)
-  text.value = JSON.stringify({ now: new Date().toISOString(), status, recent: recentSyncs() }, null, 2)
+  // Nur das aktive Konto; Planungsläufe und Tests getrennt.
+  const { syncs, tests } = readTrainingReminderDiag()
+  text.value = JSON.stringify({ now: new Date().toISOString(), status, syncs, tests }, null, 2)
   note.value = ''
 }
 
