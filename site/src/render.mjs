@@ -93,8 +93,8 @@ ${extraHead}
 <button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-menu" aria-label="${esc(t.nav.open)}" data-label-open="${esc(t.nav.open)}" data-label-close="${esc(t.nav.close)}"><span></span><span></span><span></span></button>
 <div class="menu" id="site-menu">
 <nav class="main" aria-label="${esc(t.nav.menu)}">${nav('rm', t.nav.rm)}${nav('reps', t.nav.reps)}${nav('plans', t.nav.plans)}${nav('support', t.nav.support)}</nav>
-<div class="lang" role="group" aria-label="${esc(t.footer.language)}">${lang === 'de' ? langSwitch : orderedLangs}</div>
 </div>
+<div class="lang" role="group" aria-label="${esc(t.footer.language)}">${lang === 'de' ? langSwitch : orderedLangs}</div>
 </div></header>
 <main id="inhalt"><div class="wrap">
 ${body}

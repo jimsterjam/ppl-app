@@ -24,19 +24,21 @@ nav.main { display: flex; flex-wrap: wrap; gap: 6px 20px; margin-right: auto; }
 .menu { display: contents; }
 .menu-btn { display: none; }
 @media (max-width: 720px) {
-  .bar { flex-wrap: nowrap; justify-content: space-between; }
-  html.js .menu-btn { display: inline-flex; flex-direction: column; justify-content: center; gap: 5px; width: 48px; height: 48px; padding: 12px; margin-right: -12px; background: none; border: 0; cursor: pointer; }
+  .bar { flex-wrap: nowrap; gap: 12px; }
+  .bar .lang { margin-left: auto; }
+  html.js .menu-btn { order: 3; display: inline-flex; flex-direction: column; justify-content: center; gap: 5px; width: 48px; height: 48px; padding: 12px; margin-right: -12px; background: none; border: 0; cursor: pointer; }
   .menu-btn span { display: block; height: 2px; width: 24px; background: var(--fg); border-radius: 2px; transition: transform .2s, opacity .2s; }
   .bar.is-open .menu-btn span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
   .bar.is-open .menu-btn span:nth-child(2) { opacity: 0; }
   .bar.is-open .menu-btn span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
   html.js .menu { display: none; }
   html.js .bar.is-open { flex-wrap: wrap; }
-  html.js .bar.is-open .menu { display: flex; flex-direction: column; gap: 16px; flex-basis: 100%; padding-block: 8px 12px; }
+  html.js .bar.is-open .menu { order: 4; display: block; flex-basis: 100%; padding-block: 4px 8px; }
   html.js .bar.is-open nav.main { flex-direction: column; gap: 0; margin: 0; }
   html.js .bar.is-open nav.main a { padding: 12px 0; font-size: 1.1rem; border-bottom: 1px solid var(--line); }
   html.js .bar.is-open nav.main a[aria-current="page"] { color: var(--accent); }
 }
+@media (max-width: 720px) and (prefers-reduced-motion: reduce) { .menu-btn span { transition: none; } }
 nav.main a { color: var(--fg); text-decoration: none; font-size: 0.98rem; padding: 4px 0; border-bottom: 2px solid transparent; }
 nav.main a:hover, nav.main a[aria-current="page"] { border-bottom-color: var(--accent); }
 .lang { display: flex; gap: 4px; font-size: 0.9rem; }
