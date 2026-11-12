@@ -214,6 +214,10 @@ describe('Header-Marke', () => {
 })
 
 describe('Seite Push/Pull/Legs erklärt', () => {
+  const catalog = JSON.parse(fs.readFileSync(path.resolve(here, '../../client/public/data/default-exercises.json'), 'utf8'))
+  // Echter Katalogeintrag der Beispielübung, damit Einordnung und Steigerungsschritt wie in der App gelten
+  const bench = catalog.find((e) => e._id === 'ex_0025')
+  const session = (weight, repsList) => ({ setDetails: repsList.map((reps) => ({ weight, reps })) })
   const pplHref = { de: '/push-pull-legs/', en: '/en/push-pull-legs/' }
   test('verlinkt von Startseite, Plan-Übersicht und beiden PPL-Plänen (DE und EN)', () => {
     for (const lang of ['de', 'en']) {
@@ -240,18 +244,20 @@ describe('Seite Push/Pull/Legs erklärt', () => {
     const en = get('/en/push-pull-legs/index.html')
     assert.ok(de.includes('Bench Press Barbell <span class="de-name">(Bankdrücken mit der Langhantel)</span>'))
     assert.ok(en.includes('Bench Press Barbell') && !en.includes('Bankdrücken'))
-    for (const lang of ['de', 'en']) for (const [, , , ids] of content[lang].ppl.days) for (const id of ids) assert.ok(EXERCISE_DE[id], id)
+    for (const lang of ['de', 'en']) for (const [, , , ids] of content[lang].ppl.days) for (const id of ids) {
+      assert.ok(EXERCISE_DE[id], `deutscher Begriff fehlt: ${id}`)
+      assert.ok(catalog.some((e) => e._id === id), `nicht im Katalog: ${id}`)
+    }
   })
   test('Steigerungs-Beispiel folgt der Logik der App (8–12, mehr Gewicht erst bei 12 in allen Sätzen, +2,5 kg)', () => {
-    const bench = { name_en: 'bench press barbell', equipment_en: 'barbell', category: 'chest', aiMetadata: { exerciseType: 'compound' } }
-    const session = (weight, reps) => ({ setDetails: [1, 2, 3].map(() => ({ weight, reps })) })
+    assert.ok(bench, 'ex_0025 fehlt im Katalog')
     for (const lang of ['de', 'en']) {
       const rows = content[lang].ppl.example.map(([, w, r]) => [Number(w.replace(',', '.').replace(' kg', '')), Number.parseInt(r, 10)])
       assert.equal(rows[0][1], 8, 'Start bei 8')
       for (let i = 0; i < rows.length - 1; i += 1) {
         const [weight, reps] = rows[i]
         const [nextWeight, nextReps] = rows[i + 1]
-        const status = getProgressionStatus(bench, session(weight, reps), 'hypertrophy')
+        const status = getProgressionStatus(bench, session(weight, [reps, reps, reps]), 'hypertrophy')
         if (nextWeight === weight) {
           assert.equal(status.state, 'climb', `${lang} Zeile ${i}`)
           assert.equal(status.nextReps, nextReps, `${lang} Zeile ${i}`)
@@ -264,8 +270,7 @@ describe('Seite Push/Pull/Legs erklärt', () => {
     }
   })
   test('Gegenprobe: 12 nur in zwei von drei Sätzen bringt kein höheres Gewicht', () => {
-    const bench = { name_en: 'bench press barbell', equipment_en: 'barbell', category: 'chest', aiMetadata: { exerciseType: 'compound' } }
-    const status = getProgressionStatus(bench, { setDetails: [12, 12, 11].map((reps) => ({ weight: 60, reps })) }, 'hypertrophy')
+    const status = getProgressionStatus(bench, session(60, [12, 12, 11]), 'hypertrophy')
     assert.equal(status.state, 'climb')
     assert.equal(status.suggestion, null)
   })

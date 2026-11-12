@@ -180,12 +180,15 @@ ${appBlock(t, 'reps', r.appTitle, r.app)}`
   return layout({ lang, pageId: 'reps', title: r.title, description: r.description, siteUrl, body })
 }
 
-const PPL_PLANS = new Set(['ppl3', 'ppl6'])
+// Plan-Seiten mit Link zur Erklärseite: dieselben Pläne, die die Erklärseite unter „So fängst du an“ nennt
+const PPL_PLANS = new Set(content.de.ppl.start.map(([id]) => id))
 const pplLink = (t, lang) => `<p><a href="${urlFor('ppl', lang)}">${esc(t.ppl.link)} →</a></p>`
 
 /** Beispielübung: englischer Name aus dem Katalog, auf Deutsch mit deutschem Begriff in Klammern. */
 function exerciseLabel(id, lang) {
-  const en = esc(titleCase(byId.get(id).name_en))
+  const entry = byId.get(id)
+  if (!entry || !EXERCISE_DE[id]) throw new Error(`Beispielübung ${id}: fehlt im Katalog oder in exercise-de.mjs`)
+  const en = esc(titleCase(entry.name_en))
   return lang === 'de' ? `${en} <span class="de-name">(${esc(EXERCISE_DE[id])})</span>` : en
 }
 
