@@ -1,6 +1,6 @@
 <template>
   <div ref="rootRef" class="session-stopwatch" :class="{ 'session-stopwatch--compact': props.compact }">
-    <!-- Dashboard-Variante (Wunsch Paul: Stoppuhr war "zu klein und armselig"): eigene Karte mit
+    <!-- Dashboard-Variante (Wunsch Jimmy: Stoppuhr war "zu klein und armselig"): eigene Karte mit
          großer Zeitanzeige und Bedienung direkt auf der Karte, ohne Popup. Die kompakte
          Header-Variante (WorkoutDetailView) behält Trigger + Popup, dort fehlt der Platz. -->
     <section

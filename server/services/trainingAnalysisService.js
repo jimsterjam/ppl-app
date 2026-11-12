@@ -93,7 +93,7 @@ export function isExerciseNotDone(exercise) {
 }
 
 /**
- * Nicht gemachte Übungen des aktuellen Workouts für den KI-Kontext (Absprache Paul 13.10.):
+ * Nicht gemachte Übungen des aktuellen Workouts für den KI-Kontext (Absprache Jimmy 13.10.):
  * [{ exercise, exerciseNameForAI, workoutIndex, note, noteContext }] - ohne jede Zahl.
  */
 export function collectNotDoneExercises(currentWorkout, { userNoteByExerciseName = new Map(), enNameByExerciseName = new Map() } = {}) {
@@ -417,7 +417,7 @@ export function analyzeExercise(exerciseName, currentEx, previousEx = null, days
     },
     progression: 'first_session',
     period_days: daysDiff,
-    // Zeit-Übung (Absprache Paul 15.10.): keine kg-Analyse, nur Messart + Verlauf (Regel 30).
+    // Zeit-Übung (Absprache Jimmy 15.10.): keine kg-Analyse, nur Messart + Verlauf (Regel 30).
     ...(getMeasureMode(currentEx) ? { measureMode: getMeasureMode(currentEx), timeTrend: compareTimedExercise(currentEx, previousEx) } : {}),
     note: note || null,
     noteContext,
@@ -869,7 +869,7 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
     }))
   };
 
-  // Nicht gemachte Übungen (Absprache Paul 13.10.): ohne Zahlen, nur "nicht gemacht" + Notiz, in Workout-Reihenfolge
+  // Nicht gemachte Übungen (Absprache Jimmy 13.10.): ohne Zahlen, nur "nicht gemacht" + Notiz, in Workout-Reihenfolge
   // einsortiert. Zählen nicht in total_exercises_analyzed/progression_summary.
   if (Array.isArray(notDoneExercises) && notDoneExercises.length > 0) {
     const entries = structured.exercises.map((entry, i) => ({

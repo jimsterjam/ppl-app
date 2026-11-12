@@ -129,7 +129,7 @@ describe('buildDeltaSentence: Wiederholungen je Satz', () => {
     expect(buildDeltaSentence(item, t, fmt)).toBe('5 Wiederholungen mehr geschafft und 1 Sätze mehr gemacht, bei gleichem Gewicht – eine klare Steigerung.')
   })
 
-  describe('mehr Gewicht, leicht weniger Wiederholungen (Absprache Paul 29.10.)', () => {
+  describe('mehr Gewicht, leicht weniger Wiederholungen (Absprache Jimmy 29.10.)', () => {
     it('Weighted Pull-Up aus dem Feedback: Steigerung vorn, kein „weniger Gewicht bewegt“, „ganz normal“', () => {
       const item = {
         weight_change_scope: 'mixed', top_weight_kg: 35, top_weight_change_kg: 2.5, volume_change_percent: -3.5,

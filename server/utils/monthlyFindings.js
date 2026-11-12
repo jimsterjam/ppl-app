@@ -1,5 +1,5 @@
 // ---------------------------------------------------------------------------
-// Monatsbericht V1: Befunde (Spezifikation "Intelligenter Monatsbericht", Absprache Paul 06.11.2026).
+// Monatsbericht V1: Befunde (Spezifikation "Intelligenter Monatsbericht", Absprache Jimmy 06.11.2026).
 //
 // Rein deterministisch: der Server rechnet alle Befunde aus den abgeschlossenen Workouts, der Client
 // zeigt feste Texte (DE+EN) dazu. Keine Bewertung ohne festgelegte Schwelle - es gibt bewusst KEINE
@@ -14,7 +14,7 @@ import { exerciseKey } from './stagnationDiagnosis.js';
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-// Schwellen (freigegeben von Paul 06.11.2026)
+// Schwellen (freigegeben von Jimmy 06.11.2026)
 export const PROGRESS_MIN_SESSIONS = 3;
 export const PROGRESS_MIN_DAYS = 14;
 export const STAGNATION_MIN_SESSIONS = 4;

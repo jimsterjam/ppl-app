@@ -31,7 +31,7 @@ export const CLIENT_ROOT = path.resolve(__dirname, '..')
 const SRC_DIR = path.join(CLIENT_ROOT, 'src')
 export const BASELINE_PATH = path.join(__dirname, 'i18n-baseline.json')
 
-// Bewusste Ausnahmen (mit Paul abgestimmt): nur intern erreichbare Seiten, keine Endnutzer-UI.
+// Bewusste Ausnahmen (mit Jimmy abgestimmt): nur intern erreichbare Seiten, keine Endnutzer-UI.
 // Teilbereiche einer Datei stattdessen im Template mit dem Attribut `data-i18n-ignore`
 // markieren (gilt für das Element und alles darunter), Script-Zeilen mit `// i18n-ignore`.
 const IGNORED_FILES = new Map([

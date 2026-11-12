@@ -168,7 +168,7 @@ export const useSubscriptionStore = defineStore('subscription', () => {
     return snapshot
   }
 
-  // Kontowechsel (Absprache Paul 05.11.): Plan, Nutzung und die lokalen Zwischenspeicher gehören zum bisherigen Konto. Ohne
+  // Kontowechsel (Absprache Jimmy 05.11.): Plan, Nutzung und die lokalen Zwischenspeicher gehören zum bisherigen Konto. Ohne
   // Zurücksetzen erbt ein anderes Konto in derselben Sitzung dessen Plan (z. B. Pro: dann fehlt die Kontingent-Karte, und
   // echte Monatsberichte erscheinen). Antworten einer noch laufenden Abfrage des alten Kontos werden verworfen.
   let userEpoch = 0

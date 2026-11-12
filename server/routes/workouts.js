@@ -96,7 +96,7 @@ const exerciseCatalog = Array.isArray(exercises) ? exercises : [];
 // - Alternative zum reinen Wiederholungs-Zähler: liegt die erste identische Session bereits
 //   mindestens 4 Wochen zurück, ist genug Trainingszeitraum vergangen, auch ohne 8 identische
 //   Workouts.
-// Neu (Absprache Paul 29.10.): Unter dieser Anzahl gleicher Workouts gibt es eine "Erste Einordnung" (ohne Vergleich), ab
+// Neu (Absprache Jimmy 29.10.): Unter dieser Anzahl gleicher Workouts gibt es eine "Erste Einordnung" (ohne Vergleich), ab
 // ihr das vergleichende Feedback. Standard 4 (= ab dem 4. gleichen Workout); die frühere Zeit-Alternative (Tage) entfällt.
 const AI_FEEDBACK_MIN_REPETITIONS = Number.parseInt(process.env.AI_FEEDBACK_MIN_REPETITIONS, 10) || FIRST_LOOK_COMPARISON_MIN;
 
@@ -2058,7 +2058,7 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
     // identische Sessions ist AI-Feedback nicht aussagekräftig – kein AI-Call, kein
     // Kontingent-Verbrauch, stattdessen ein "noch X Workouts"-Hinweis.
     const { matchingCount } = analyzeMatchingCompletedWorkouts(currentWorkout, allWorkouts);
-    // Erste Einordnung statt Wartezeit (Absprache Paul 29.10.): Gibt es weniger als AI_FEEDBACK_MIN_REPETITIONS gleiche
+    // Erste Einordnung statt Wartezeit (Absprache Jimmy 29.10.): Gibt es weniger als AI_FEEDBACK_MIN_REPETITIONS gleiche
     // Workouts (Standard 4), fehlt die Vergleichsbasis - die KI ordnet dann nur diese eine Einheit ein (ohne Vergleiche,
     // ohne Empfehlungen; den Ausblick hängt die App selbst an). Ab dem 4. gleichen Workout folgt das vergleichende Feedback.
     // Auch ein ganz neues Workout bekommt so eine Erste Einordnung.

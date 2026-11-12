@@ -1,4 +1,4 @@
-// Fragen in Trainingsnotizen (Absprache Paul 03.11.): Schreibt ein Nutzer eine Frage zu seinem Training in eine Notiz,
+// Fragen in Trainingsnotizen (Absprache Jimmy 03.11.): Schreibt ein Nutzer eine Frage zu seinem Training in eine Notiz,
 // bekommt er unter dem Feedback eine eigene Antwort ("Deine Frage"). Die Erkennung läuft in drei Stufen:
 //   1. extractNoteQuestions(): einfache Prüfung, ob eine Notiz überhaupt eine Frage enthält (Fragezeichen, typische Wendungen).
 //   2. Die KI sortiert jede Frage (services/noteQuestionService.js): 'training' | 'health' | 'other'.
@@ -69,7 +69,7 @@ export function extractNoteQuestions({ exerciseNotes = [], workoutNote = '' } = 
   return questions;
 }
 
-// Antwort empfiehlt Ärzte/Therapeuten o. Ä.: nie ausgeben (Absprache Paul), stattdessen gilt die Frage als 'health'.
+// Antwort empfiehlt Ärzte/Therapeuten o. Ä.: nie ausgeben (Absprache Jimmy), stattdessen gilt die Frage als 'health'.
 const MEDICAL_REFERRAL = new RegExp(
   '(?<![a-zäöüß])(?:' + [
     'arzt', 'ärzt', 'aerzt', 'doktor', 'medizinisch', 'physiotherap', 'orthopäd', 'orthopaed', 'therapeut', 'heilprakt',
@@ -78,7 +78,7 @@ const MEDICAL_REFERRAL = new RegExp(
   'i'
 );
 
-// Antwort rät zum Umstellen der Übungsreihenfolge: nie ausgeben (Absprache Paul: Reihenfolge ist bewusst gewählt, der
+// Antwort rät zum Umstellen der Übungsreihenfolge: nie ausgeben (Absprache Jimmy: Reihenfolge ist bewusst gewählt, der
 // Tipp wäre keine Lösung). Die Antwort wird verworfen. Geprüft wird je SATZ (nicht über Satzgrenzen hinweg), und Sätze
 // mit Verneinung ("Du musst die Reihenfolge nicht ändern") sind keine Empfehlung. Reine Erklärungen ("kommt früher im
 // Training", "switching your grip") treffen die Muster nicht: sie verlangen ein Verb des Umstellens samt Bezug auf

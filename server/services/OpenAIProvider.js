@@ -20,7 +20,7 @@ import { languageDirective, EXERCISE_ORDER_DIRECTIVE, reorderBulletLinesByExerci
 // exakt gleichen, produktionskritischen Prompt-Text lesen können, ohne eine OpenAIProvider-
 // Instanz zu erzeugen (die einen konfigurierten API-Key voraussetzt) und ohne den Text zu
 // duplizieren (Duplizierung würde unweigerlich auseinanderlaufen). Inhaltlich unverändert.
-// Erste Einordnung (Absprache Paul 29.10.): weniger als 4 gleiche Workouts, keine Vergleichsbasis. Wird bei
+// Erste Einordnung (Absprache Jimmy 29.10.): weniger als 4 gleiche Workouts, keine Vergleichsbasis. Wird bei
 // feedback_mode "first_look" an den System-Prompt gehängt und hat Vorrang vor OUTPUT-FORMAT und Regel 25. Den Ausblick
 // (Empfehlungen der App, Eigenverantwortung bei der Ausführung) hängt die App selbst an - die KI formuliert ihn NICHT.
 export function getFirstLookDirectiveText() {
@@ -401,7 +401,7 @@ KRITISCHE REGELN:
     - Ohne Notiz: höchstens ein neutraler Halbsatz, dass die Übung als Technik-Übung lief, oder weglassen.
     - Keine Zahlen (FAKTEN-REGEL). Zählt zur Höchstgrenze von 3 Übungen mit Besonderheit, niedrige Priorität ohne Notiz.
 
-32. MEHR GEWICHT, LEICHT WENIGER WIEDERHOLUNGEN (Absprache Paul 29.10.): Steigt bei einer Übung das Gewicht und
+32. MEHR GEWICHT, LEICHT WENIGER WIEDERHOLUNGEN (Absprache Jimmy 29.10.): Steigt bei einer Übung das Gewicht und
     sinken die Wiederholungen nur leicht (Sätze nicht weniger), ist das ein normaler Schritt nach vorn - mehr Last
     heißt fast immer ein paar Wiederholungen weniger, kein Rückschritt und kein Grund zur Mahnung.
     - Würdige die Steigerung (Mut, saubere Arbeit mit mehr Last), ohne Zahlen (FAKTEN-REGEL).

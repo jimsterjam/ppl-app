@@ -176,7 +176,7 @@ function buildFavoriteWorkoutPayload(workout, type) {
 }
 
 /**
- * Workout-Daten für "Speichern + Favorit aktualisieren": der Favorit bildet die letzte Session ab (Absprache Paul
+ * Workout-Daten für "Speichern + Favorit aktualisieren": der Favorit bildet die letzte Session ab (Absprache Jimmy
  * 14.10.) - inklusive der Notiz je Übung, damit sie beim nächsten Start wieder im Workout steht. Vorher fehlte
  * `note` in diesem Mapping, und das Aktualisieren löschte die Notizen des Favoriten.
  */

@@ -1,4 +1,4 @@
-// Austausch-Liste (Absprache Paul 28.10., Version 2): Ersatz-Vorschläge für die Grundübungen, Einsteiger-freundlich zuerst.
+// Austausch-Liste (Absprache Jimmy 28.10., Version 2): Ersatz-Vorschläge für die Grundübungen, Einsteiger-freundlich zuerst.
 // Bei freien Gewichten (Lang-/Kurzhantel) stehen geführte Maschinen vorn: die Maschine gibt die Bewegung vor, man muss
 // nichts ausbalancieren. Alle Namen sind englische Katalognamen (`name_en`); Test: exerciseSwaps.test.js prüft sie gegen den Katalog.
 export const CURATED_SWAPS = Object.freeze({

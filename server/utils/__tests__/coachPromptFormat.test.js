@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { getCoachSystemPromptText } from '../../services/OpenAIProvider.js'
 import { getVerifierChecklistText } from '../../services/feedbackVerificationService.js'
 
-// Absprache 09.10. (Paul, Variante 2 "Coach statt Protokoll"): höchstens 3 Übungen mit
+// Absprache 09.10. (Jimmy, Variante 2 "Coach statt Protokoll"): höchstens 3 Übungen mit
 // Einordnung, bewusste Entscheidungen aus der Notiz werden bestätigt statt als "weniger Gewicht"
 // formuliert. Schützt davor, dass das alte Zusammenfassungs-Format unbemerkt zurückkommt.
 test('Coach-Prompt: höchstens 3 Übungen, keine Zusammenfassung', () => {
@@ -26,7 +26,7 @@ test('Prüf-KI: bestätigte bewusste Entscheidung ist kein Verstoß, nicht alle 
   assert.match(checklist, /NICHT alle Übungen vorkommen/)
 })
 
-// Absprache Paul 29.10.: mehr Gewicht bei leicht weniger Wiederholungen ist ein normaler Schritt nach vorn und wird
+// Absprache Jimmy 29.10.: mehr Gewicht bei leicht weniger Wiederholungen ist ein normaler Schritt nach vorn und wird
 // nie als Defizit gerahmt (Rückmeldung zum Beispiel-Feedback: "Luft nach oben", "weniger Gewicht bewegt").
 test('Coach-Prompt: Regel 32 - mehr Gewicht, leicht weniger Wiederholungen ist normal, keine Defizit-Rahmung', () => {
   const prompt = getCoachSystemPromptText()

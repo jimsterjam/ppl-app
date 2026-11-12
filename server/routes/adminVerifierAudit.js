@@ -10,7 +10,7 @@ import { logger } from '../utils/logger.js';
 // feedbackVerificationService.js). Liest ausschließlich das anonyme, aggregierbare
 // VerifierAudit-Protokoll (kein User-/Workout-Bezug, siehe Modell-Kommentar dort) - analog zu
 // den bestehenden Admin-Routen (routes/feedback.js, routes/adminFeedbackInsights.js), gleicher
-// Schutz per requireAdminKey - und zusätzlich (Wunsch Paul) nur für eingeloggte Accounts, deren
+// Schutz per requireAdminKey - und zusätzlich (Wunsch Jimmy) nur für eingeloggte Accounts, deren
 // UID in ADMIN_UIDS steht (firebaseAuthMiddleware + requireAdminUid). Das Panel dazu ist in der
 // App nur für diesen Account sichtbar (SettingsView.vue); die Server-Prüfung ist der eigentliche
 // Schutz, falls der Admin-Schlüssel einmal durchsickert.

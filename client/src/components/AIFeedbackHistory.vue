@@ -178,7 +178,7 @@ const toast = useToastStore()
 const aiConsent = useAiConsentStore()
 const subscriptionStore = useSubscriptionStore()
 
-// Gratis-Tarif: eine (Neu-)Auswertung kostet 1 KI-Anfrage (Absprache Paul 24.10.).
+// Gratis-Tarif: eine (Neu-)Auswertung kostet 1 KI-Anfrage (Absprache Jimmy 24.10.).
 const costHint = computed(() => {
   if (!Number.isFinite(subscriptionStore.aiRequestsLimit)) return ''
   if (subscriptionStore.aiRequestsRemaining <= 0) return t('quota.exhausted')

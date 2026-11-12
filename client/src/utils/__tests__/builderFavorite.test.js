@@ -1,4 +1,4 @@
-// Favorit direkt im Workout-Builder speichern, ohne das Workout zu starten (Absprache Paul 04.11.):
+// Favorit direkt im Workout-Builder speichern, ohne das Workout zu starten (Absprache Jimmy 04.11.):
 // WorkoutBuilder.vue ruft saveFavoriteWorkout mit Name, Typ, Ziel und den gewählten Übungen auf.
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 

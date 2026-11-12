@@ -1,4 +1,4 @@
-// "Erste Einordnung" (Absprache Paul 29.10.): Solange es weniger als FIRST_LOOK_COMPARISON_MIN gleiche Workouts gibt,
+// "Erste Einordnung" (Absprache Jimmy 29.10.): Solange es weniger als FIRST_LOOK_COMPARISON_MIN gleiche Workouts gibt,
 // fehlt die Vergleichsbasis. Die KI ordnet dann nur diese eine Einheit ein; der Ausblick darunter ist FESTER Text der
 // App (nicht von der KI): Er beschreibt, wie die App-Empfehlungen aussehen werden, und erinnert daran, dass die
 // Ausführung in Eigenverantwortung liegt - die App kann sie nicht prüfen.

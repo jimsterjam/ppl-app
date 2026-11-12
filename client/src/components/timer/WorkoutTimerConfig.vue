@@ -160,7 +160,7 @@ import { useTimerStore } from '@/stores/timerStore'
 import NumberPicker from '@/components/NumberPicker.vue'
 import { playBoxGong, playChineseGong, playBell } from '@/utils/timerAudio'
 
-// Hintergrund sperren, solange das Fenster offen ist (Modal-Muster, CLAUDE.md; Fund Paul 11.11.)
+// Hintergrund sperren, solange das Fenster offen ist (Modal-Muster, CLAUDE.md; Fund Jimmy 11.11.)
 const scrollLock = useScrollLock()
 onMounted(scrollLock.lock)
 onBeforeUnmount(scrollLock.unlock)

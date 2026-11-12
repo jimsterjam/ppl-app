@@ -154,7 +154,7 @@ function getRunningWorkoutPath() {
 
 async function tryRestoreLastRoute(reason = 'unknown') {
   const snapshot = readResumeSnapshot()
-  // Laufendes Workout hat Vorrang vor dem zuletzt gespeicherten Pfad (Absprache Paul 23.10.).
+  // Laufendes Workout hat Vorrang vor dem zuletzt gespeicherten Pfad (Absprache Jimmy 23.10.).
   const runningPath = getRunningWorkoutPath()
   if (!snapshot && !runningPath) return false
   if (!runningPath && Date.now() - reminderTapAt < REMINDER_TAP_WINDOW_MS) return false
@@ -476,7 +476,7 @@ async function bootstrapAuth() {
 
 bootstrapAuth()
 
-// Trainings-Erinnerung (Absprache Paul 11.11.): nächste Mitteilung bei Änderungen und beim Zurückkehren neu planen.
+// Trainings-Erinnerung (Absprache Jimmy 11.11.): nächste Mitteilung bei Änderungen und beim Zurückkehren neu planen.
 startTrainingReminderSync({
   authStore: useAuthStore(pinia),
   userStore: useUserStore(pinia),

@@ -1,7 +1,7 @@
-// Kontowechsel: Einstellungen des angemeldeten Kontos laden bzw. beim Abmelden auf Standardwerte zurück (Absprache Paul
+// Kontowechsel: Einstellungen des angemeldeten Kontos laden bzw. beim Abmelden auf Standardwerte zurück (Absprache Jimmy
 // 06.11.2026, siehe utils/userScopedStorage.js). Aufgerufen in main.js bei jeder Änderung des Anmeldezustands.
 //
-// Zusätzlich (Absprache Paul 06.11.2026, zweite Gruppe): Beim Abmelden und beim Wechsel auf ein anderes Konto werden laufende
+// Zusätzlich (Absprache Jimmy 06.11.2026, zweite Gruppe): Beim Abmelden und beim Wechsel auf ein anderes Konto werden laufende
 // Zustände beendet (Pause, Aufwärm-Timer, Übergang, Timer, Stoppuhr; geplante Mitteilungen werden zurückgenommen) und
 // geräteweit gemerkte Admin-Schlüssel gelöscht. Bei einem Kaltstart mit demselben Konto passiert nichts davon: dort stellen
 // die Stores ihren Stand wieder her.

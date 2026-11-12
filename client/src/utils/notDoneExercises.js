@@ -1,4 +1,4 @@
-// "Nicht gemacht" (Absprache Paul 13.10.): Eine Übung gilt als nicht gemacht, wenn sie Arbeitssätze hat und keiner
+// "Nicht gemacht" (Absprache Jimmy 13.10.): Eine Übung gilt als nicht gemacht, wenn sie Arbeitssätze hat und keiner
 // davon abgehakt wurde (done:false, siehe saveReview.markOpenSetsNotDone). Ältere Daten ohne done-Angabe zählen als gemacht.
 
 export function isExerciseNotDone(exercise) {

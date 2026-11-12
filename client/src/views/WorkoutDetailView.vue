@@ -26,7 +26,7 @@
       </div>
 
       <div v-else class="workout">
-        <!-- Kompakte Titelzeile (Wunsch Paul: Name, Typ und Datum standen doppelt da - der Name
+        <!-- Kompakte Titelzeile (Wunsch Jimmy: Name, Typ und Datum standen doppelt da - der Name
              enthielt schon das Datum, darunter nochmal Typ-Plakette + Datum mit Uhrzeit). Jetzt:
              Name ohne angehängtes Datum, rechts "Heute" bzw. das Datum ohne Uhrzeit. Der
              gespeicherte Name bleibt unverändert (nur Anzeige, siehe displayWorkoutName). -->
@@ -65,7 +65,7 @@
              Workouts statt erst nach dem Durchscrollen der gesamten Übungsliste (User-Feedback).
              Infotext hinter einem Info-Button versteckt (toggle statt IMMER sichtbar), damit das
              Feld hier oben möglichst wenig Platz einnimmt. -->
-        <!-- Einzeilig (Wunsch Paul: Feld war zu groß): Symbol, Label, "(optional)", Info-Button,
+        <!-- Einzeilig (Wunsch Jimmy: Feld war zu groß): Symbol, Label, "(optional)", Info-Button,
              Eingabe, kg. Der Infotext klappt bei Bedarf darunter auf. Platzhalter = zuletzt
              eingetragenes Körpergewicht aus einem früheren Workout - nur als Anzeige, gespeichert
              wird ausschließlich, was der Nutzer selbst einträgt (keine geschätzten Werte). -->
@@ -103,7 +103,7 @@
           <small v-if="showBodyweightHint" class="bodyweight-hint">{{ t('workoutDetail.bodyweightHint') }}</small>
         </div>
 
-          <!-- Warm-up (Absprache Paul 11.10.): fest oben im laufenden Workout, nicht einklappbar. -->
+          <!-- Warm-up (Absprache Jimmy 11.10.): fest oben im laufenden Workout, nicht einklappbar. -->
           <WarmupCard
             v-if="setTrackingActive && workout && !isReordering"
             :warmup="workout.warmup || null"
@@ -199,7 +199,7 @@
                 <!-- Übungskopf (UI-Überarbeitung): Name, Trainingsart-Chip und "⋮"-Menü. Bild, 1RM
                      und Entfernen liegen im Menü (openExerciseMenu), "Dein Feedback" unten neben
                      "+ Satz" (wird meist nach der Übung ausgefüllt). Das Vorschaubild bleibt
-                     (Wunsch Paul: gerade für Einsteiger hilfreich), Tippen öffnet Bild/Video. -->
+                     (Wunsch Jimmy: gerade für Einsteiger hilfreich), Tippen öffnet Bild/Video. -->
                 <img
                   :src="getExerciseImage(ex)"
                   :alt="getTranslatedExerciseName(ex.name)"
@@ -597,7 +597,7 @@
                     <button class="remove-row-btn" :title="t('workoutDetail.removeSet')" @click="removeSetRow(i, rIdx)"><Minus class="btn-icon" aria-hidden="true" /></button>
                   </span>
                 </div>
-                <!-- Abhaken-Leiste als Teil des aktuellen Satzes (Absprache Paul 18.10., Variante B). Die Pause zeigt der
+                <!-- Abhaken-Leiste als Teil des aktuellen Satzes (Absprache Jimmy 18.10., Variante B). Die Pause zeigt der
                      Pausentimer (groß bzw. minimiert als Leiste unten), nicht diese Leiste. -->
                 <div
                   v-if="doneBarCurrent && doneBarCurrent.exIndex === i && doneBarCurrent.rowIndex === rIdx"
@@ -866,7 +866,7 @@
           />
           {{ t('workoutDetail.trackOneRepMax') }}
         </label>
-        <!-- Messart (Absprache Paul 16.10.): Gewicht + Wdh., Zeit halten oder Wdh. in fester Zeit - für jede Übung. -->
+        <!-- Messart (Absprache Jimmy 16.10.): Gewicht + Wdh., Zeit halten oder Wdh. in fester Zeit - für jede Übung. -->
         <label v-if="showTrainingTypeControl" class="exercise-menu-field">
           <span>{{ t('exercises.measureModeLabel') }}</span>
           <select :value="sanitizeMeasureMode(exerciseMenuExercise.measureMode)" @change="setExerciseMeasureMode(exerciseMenuIndex, $event.target.value)">
@@ -1296,7 +1296,7 @@ const showLeaveModal = ref(false)
 const showTimerConfig = ref(false)
 const showTimerMenu = ref(false)
 const showRestSettings = ref(false)
-// Solange ein Timer-Fenster offen ist, bleiben der Satz-Start-Knopf und die Sprechblasen aus (Absprache Paul 29.10.).
+// Solange ein Timer-Fenster offen ist, bleiben der Satz-Start-Knopf und die Sprechblasen aus (Absprache Jimmy 29.10.).
 const timerOverlayOpen = computed(() => showTimerMenu.value || showRestSettings.value || showTimerConfig.value)
 function onTimerMenuSelect(target) {
   showTimerMenu.value = false
@@ -2129,7 +2129,7 @@ function toggleRowDone(row, exIndex = -1, rowIndex = -1) {
     // Erster abgehakter Arbeitssatz: Gesamttimer (Gym-Zeit) starten, falls er noch nicht benutzt wurde
     // (z. B. Warm-up ausgelassen). Läuft er oder ist er pausiert, bleibt er unberührt.
     sessionStopwatchStore.startIfIdle()
-    // Letzter Arbeitssatz dieser Übung (Absprache Paul 24.10.): keine Pause, es folgt direkt die nächste Übung.
+    // Letzter Arbeitssatz dieser Übung (Absprache Jimmy 24.10.): keine Pause, es folgt direkt die nächste Übung.
     const exercise = workout.value?.exercises?.[exIndex]
     const isLastSetOfExercise = !!exercise && (exercise.setDetails || []).every((r) => !r || r.isWarmup || r === row || r.done === true)
     // Ein neuer abgehakter Satz beendet einen noch laufenden Übergang (Übung wurde ohne "Übung starten" begonnen).
@@ -2139,7 +2139,7 @@ function toggleRowDone(row, exIndex = -1, rowIndex = -1) {
       // clear() statt stopFor(): läuft noch die Pause des vorherigen Satzes, gehört sie nicht zu dieser Zeile
       // und bliebe sonst stehen - die kleine Ansicht zeigte dann die alte Pause statt der Übergangs-Stoppuhr.
       restTimer.clear()
-      // Letzter Satz der Übung (Absprache Paul 24.10.): keine Pause, sondern die Übergangs-Stoppuhr - falls noch eine Übung folgt.
+      // Letzter Satz der Übung (Absprache Jimmy 24.10.): keine Pause, sondern die Übergangs-Stoppuhr - falls noch eine Übung folgt.
       if (nextOpenSetFrom(exIndex + 1)) transition.start(exIndex)
     } else if (restTimer.autoStart) {
       const name = getTranslatedExerciseName(workout.value?.exercises?.[exIndex]?.name || '')
@@ -2166,7 +2166,7 @@ function toggleRowDone(row, exIndex = -1, rowIndex = -1) {
 
 // --- Pausentimer -----------------------------------------------------------------------------
 const restTimer = useRestTimerStore()
-// "Letzten Satz zurücknehmen" in der Pause (Absprache Paul 05.11.): Haken des Satzes zurücknehmen, der diese Pause gestartet
+// "Letzten Satz zurücknehmen" in der Pause (Absprache Jimmy 05.11.): Haken des Satzes zurücknehmen, der diese Pause gestartet
 // hat. Der Satz wird über sein Objekt gefunden (utils/undoRestSet.js), nicht über Positionen: die ändern sich, wenn ein
 // Satz davor entfernt wird, und gelten nicht für ein anderes geöffnetes Workout. Nach einem Neuladen der Seite ist die
 // Zuordnung weg, dann gibt es den Link nicht (kein Raten).
@@ -2326,18 +2326,18 @@ function onBigDone() {
   try { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(30) } catch {}
 }
 
-// --- Fokus-Modus (Absprache Paul 19.10.) ---------------------------------------------------------
+// --- Fokus-Modus (Absprache Jimmy 19.10.) ---------------------------------------------------------
 // Großansicht für den aktuellen Satz (components/FocusMode.vue). Gilt in jedem laufenden Workout gleich
 // (selbst erstellt, generiert, Favorit), da sie nur von setTrackingActive/doneBarCurrent abhängt.
 const focus = useFocusModeStore()
 
-// Der Knopf erscheint, sobald das Warm-up nicht (mehr) läuft - Warm-up überspringen oder beenden (Absprache Paul 20.10.).
+// Der Knopf erscheint, sobald das Warm-up nicht (mehr) läuft - Warm-up überspringen oder beenden (Absprache Jimmy 20.10.).
 const hasBottomBar = computed(() => showFocusStart.value || restTimer.isVisible || (focus.active && focus.minimized))
-// Nur zu Beginn einer Übung (Absprache Paul 24.10.): ab Satz 2 führt die Pause bzw. die Großansicht direkt weiter.
+// Nur zu Beginn einer Übung (Absprache Jimmy 24.10.): ab Satz 2 führt die Pause bzw. die Großansicht direkt weiter.
 const showFocusStart = computed(() => !!doneBarCurrent.value && !focus.active && !timerOverlayOpen.value && !restTimer.isVisible && !transition.isActive && !warmupTimer.isActive
   && (doneBarCurrent.value.setNumber <= 1 || !!focusWarmupPending.value))
 
-// Aufwärmsätze in der Großansicht (Absprache Paul 19.10.): vor dem ersten Arbeitssatz jeder Übung, ohne Timer -
+// Aufwärmsätze in der Großansicht (Absprache Jimmy 19.10.): vor dem ersten Arbeitssatz jeder Übung, ohne Timer -
 // abhaken oder überspringen. Nur solange in dieser Übung noch kein Arbeitssatz abgehakt ist. Erledigte Aufwärmsätze
 // stehen als `warmupHandled` im Entwurf (bleibt nach App-Neustart), beim finalen Speichern wird das Feld entfernt.
 
@@ -2448,7 +2448,7 @@ function onFocusAdjust(field, direction) {
   if (cur) adjustSetField(cur.exIndex, cur.rowIndex, field, direction)
 }
 
-// Wiederholungen/Gewicht in der Großansicht wie in der Übersicht (Absprache Paul 24.10.): Gewicht in 0,25-kg-Schritten,
+// Wiederholungen/Gewicht in der Großansicht wie in der Übersicht (Absprache Jimmy 24.10.): Gewicht in 0,25-kg-Schritten,
 // gedrückt halten wiederholt und beschleunigt.
 function onFocusSpin(field, direction, active) {
   const cur = focusCurrent.value
@@ -2519,7 +2519,7 @@ watch(() => focus.finishedKey, (key) => {
   completeFocusSet(cur, focus.durationSec)
 })
 
-// Zeitübung als nächster Satz (Absprache Paul 20.10.): Vorwarnung bei 10 s und Zähltöne 3-2-1 vor dem Pausenende.
+// Zeitübung als nächster Satz (Absprache Jimmy 20.10.): Vorwarnung bei 10 s und Zähltöne 3-2-1 vor dem Pausenende.
 watch([() => restTimer.isRunning, focusCurrent, () => focus.active], () => {
   restTimer.cues = restTimer.isRunning && focus.active && !!focusCurrent.value && focusCurrent.value.mode !== 'weight'
 }, { immediate: true })
@@ -2528,7 +2528,7 @@ watch([() => restTimer.isRunning, focusCurrent, () => focus.active], () => {
 // Zeitübung, läuft deren Timer jetzt automatisch los (Pause regulär abgelaufen; "Überspringen" startet nicht).
 watch(() => restTimer.showFinished, (finished) => {
   if (!finished) return
-  // Pause in der Übersicht vorbei (Absprache Paul 24.10.): direkt mit dem nächsten Satz in die Großansicht, ohne "Weiter".
+  // Pause in der Übersicht vorbei (Absprache Jimmy 24.10.): direkt mit dem nächsten Satz in die Großansicht, ohne "Weiter".
   if (!focus.active) {
     if (!doneBarCurrent.value) return
     restTimer.clear()
@@ -2616,7 +2616,7 @@ const transitionNextSet = computed(() => {
   return nextOpenSetFrom(transition.exIndex + 1)
 })
 
-// Aktueller Satz (Absprache Paul 13.10.): der erste noch nicht abgehakte Arbeitssatz im Workout leuchtet
+// Aktueller Satz (Absprache Jimmy 13.10.): der erste noch nicht abgehakte Arbeitssatz im Workout leuchtet
 // (Rahmen der Eingabefelder), bis er abgehakt wird - dann der nächste. Gilt nur im laufenden Workout.
 const nextSetHighlight = computed(() => {
   if (!setTrackingActive.value || isReordering.value) return { exIndex: -1, rowIndex: -1 }
@@ -2787,7 +2787,7 @@ function toggleWarmups(index) {
   warmupOpenOverride.value = { ...warmupOpenOverride.value, [index]: !isWarmupOpen(index) }
 }
 
-// --- Sprechblasen (Absprache Paul 29.10.): Übung wechseln, Reihenfolge, Timer -----------------------------
+// --- Sprechblasen (Absprache Jimmy 29.10.): Übung wechseln, Reihenfolge, Timer -----------------------------
 const coachMarks = computed(() => [
   { id: 'coach-swap', selector: '.ex-swap-btn', title: t('coach.swapTitle'), text: t('coach.swapText') },
   { id: 'coach-reorder', selector: '.reorder-toggle', title: t('coach.reorderTitle'), text: t('coach.reorderText') },
@@ -3403,7 +3403,7 @@ function openExerciseMedia(exercise) {
   }).catch(() => {})
 }
 
-// Kein Video vorhanden oder nicht ladbar: stattdessen das Foto groß zeigen (Absprache Paul).
+// Kein Video vorhanden oder nicht ladbar: stattdessen das Foto groß zeigen (Absprache Jimmy).
 function onMediaVideoError() {
   if (!mediaExercise.value) return
   // Spätere Ergebnisse von resolveExerciseMedia für diese Anfrage verwerfen (sonst käme das Video zurück).
@@ -3879,7 +3879,7 @@ async function performSaveWorkout(updateFavorite = false, { deferAiFeedback = fa
   suppressDraftPersistence.value = true
   // Vor jedem await festhalten: laufendes Workout (Abhaken aktiv)? Dann werden nicht abgehakte Sätze als "nicht gemacht" gespeichert.
   const trackingAtSave = setTrackingActive.value
-  // Gespeichertes Workout wird nur angepasst (Absprache Paul 24.10.): keine automatische KI-Anfrage, sie kostet Kontingent.
+  // Gespeichertes Workout wird nur angepasst (Absprache Jimmy 24.10.): keine automatische KI-Anfrage, sie kostet Kontingent.
   // Die Zusammenfassung bietet „KI-Auswertung neu erstellen“ mit Kostenhinweis an.
   const editedSaved = workout.value?.completed === true
   if (editedSaved) deferAiFeedback = true
@@ -4608,7 +4608,7 @@ onBeforeRouteLeave(async (to) => {
     return true
   }
 
-  // Kein Timer-Fenster beim Verlassen (Absprache Paul, 30.09.): Wechselt der Nutzer aus einem
+  // Kein Timer-Fenster beim Verlassen (Absprache Jimmy, 30.09.): Wechselt der Nutzer aus einem
   // laufenden Workout in einen anderen Tab, läuft der Timer einfach weiter - das Workout bleibt
   // aktiv (Entwurf ist oben gesichert, Timer ist app-weit sichtbar). Gefragt wird nur noch beim
   // Speichern (saveWorkout, pendingTimerAction 'save'). Beim Abbrechen setzt discardDraftAndLeave
@@ -4854,7 +4854,7 @@ onBeforeUnmount(() => {
    überzugehen) - macht auf einen Blick klar, wo "Infos zur Übung" aufhört und "Sätze
    eintragen" anfängt, statt dass die ganze Karte wie ein einziger durchgehender Block wirkt. */
 .ex-sets {
-  /* Kein eigener Kasten mehr (Absprache Paul 21.10.): die Satzzeilen liegen direkt in der Übungsliste und sind breiter. */
+  /* Kein eigener Kasten mehr (Absprache Jimmy 21.10.): die Satzzeilen liegen direkt in der Übungsliste und sind breiter. */
   margin-top: 6px;
   padding: 0;
 }
@@ -4865,7 +4865,7 @@ onBeforeUnmount(() => {
   grid-template-columns: 34px 1fr 1.35fr 36px;
   gap: 8px;
   align-items: center;
-  /* Etwas mehr Luft (Wunsch Paul: Zeilen wirkten zu eng). */
+  /* Etwas mehr Luft (Wunsch Jimmy: Zeilen wirkten zu eng). */
   padding: 6px 0;
 }
 .set-row.header { color: var(--muted); font-size: 0.75rem; padding-top: 0; }
@@ -5194,7 +5194,7 @@ onBeforeUnmount(() => {
 .ex-replaced-chip { display: inline-block; margin-right: 6px; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent); font-weight: 700; font-size: 0.72rem; }
 .ex-title-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 .ex-more-btn {
-  /* Deutlich größer und als Knopf erkennbar (Absprache Paul 16.10.): 44x44 Tippfläche, sichtbarer Rand. */
+  /* Deutlich größer und als Knopf erkennbar (Absprache Jimmy 16.10.): 44x44 Tippfläche, sichtbarer Rand. */
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -5322,7 +5322,7 @@ onBeforeUnmount(() => {
 }
 .set-row.warmup-row {
   opacity: 0.85;
-  /* Aufwärmsätze leicht abgesetzt (Absprache Paul 23.10.): dezenter Orange-Ton wie die Aufwärm-Beschriftung. */
+  /* Aufwärmsätze leicht abgesetzt (Absprache Jimmy 23.10.): dezenter Orange-Ton wie die Aufwärm-Beschriftung. */
   background: color-mix(in srgb, #f59e0b 10%, transparent);
   border-radius: 12px;
   margin: 0 -6px;
@@ -5357,9 +5357,9 @@ onBeforeUnmount(() => {
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-/* Abhaken-Leiste unter dem aktuellen Satz: gehört optisch zur Zeile (Absprache Paul 18.10.). */
+/* Abhaken-Leiste unter dem aktuellen Satz: gehört optisch zur Zeile (Absprache Jimmy 18.10.). */
 .set-done-strip {
-  /* Abstand zur Satzzeile (vorher negativer Rand: Zeile und Knopf überlappten, Rückmeldung Paul 29.10.). */
+  /* Abstand zur Satzzeile (vorher negativer Rand: Zeile und Knopf überlappten, Rückmeldung Jimmy 29.10.). */
   position: relative;
   z-index: 1;
   margin: 10px 6px 12px;

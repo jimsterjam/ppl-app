@@ -1,4 +1,4 @@
-// Mitteilung am Ende eines Warm-up-Timers, wenn die App nicht im Vordergrund ist (Absprache Paul 11.10.:
+// Mitteilung am Ende eines Warm-up-Timers, wenn die App nicht im Vordergrund ist (Absprache Jimmy 11.10.:
 // normale Mitteilung mit Ton, kein Wecker - der Wecker (AlarmKit) gehört dem Pausentimer und kennt nur einen
 // Platz). Eigene Mitteilungs-ID, damit sie sich nicht mit der Pausen-Mitteilung (940001) in die Quere kommt.
 // Wie beim Pausentimer kommt sie etwas NACH dem Ende (NOTIFICATION_DELAY_MS): Läuft die App im Vordergrund,

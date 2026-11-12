@@ -33,7 +33,7 @@ export function normalizeTrainingGoal(goal) {
 // eine eigene Trainingsart wählen (exercise.trainingType), z.B. im Kraft-Workout Hack Calf Raise
 // auf Muskelaufbau. Explosive Übungen (Sprünge, Speed-Varianten, Umsetzen/Reißen) werden
 // automatisch erkannt: dort zählt das Tempo, es gibt kein Wiederholungsziel.
-// 'technique' (Absprache Paul 16.10.): kein Wiederholungsziel, kein Gewichtsvorschlag, kein Tempo-Maßstab - der Nutzer
+// 'technique' (Absprache Jimmy 16.10.): kein Wiederholungsziel, kein Gewichtsvorschlag, kein Tempo-Maßstab - der Nutzer
 // entscheidet selbst, wann er steigert.
 export const EXERCISE_TRAINING_TYPES = Object.freeze(['strength', 'hypertrophy', 'explosive', 'technique'])
 
@@ -86,7 +86,7 @@ export function classifyExercise(info = {}) {
   return equipmentValues(info).some((eq) => eq === 'langhantel' || eq === 'barbell') ? 'compound' : 'isolation'
 }
 
-// --- Fortschrittslogik: Schema statt fester Zahl (Absprache Paul) ---------------------------
+// --- Fortschrittslogik: Schema statt fester Zahl (Absprache Jimmy) ---------------------------
 // Kraft (Grundübungen): festes Schema im Bereich 1-6 Wdh. (5x5, 6x1, 4x5 ...). Die Ziel-
 //   Wiederholungen liest die App aus den letzten Sessions (häufigste Wdh.-Zahl der Hauptsätze);
 //   ohne Verlauf 5. Mehr Gewicht erst, wenn alle Hauptsätze das Schema zweimal hintereinander mit demselben
@@ -100,7 +100,7 @@ export const PROGRESSION_RANGES = Object.freeze({
 })
 export const DEFAULT_STRENGTH_REPS = 5
 
-// Übergangswert zwischen Kraft (1-6) und Muskelaufbau (8-12), Absprache Paul: schafft jemand bei
+// Übergangswert zwischen Kraft (1-6) und Muskelaufbau (8-12), Absprache Jimmy: schafft jemand bei
 // Kraft 7+ in allen Hauptsätzen, ist das Gewicht zu leicht; bei Muskelaufbau unter 8 eher zu schwer.
 export const TRANSITION_REPS = 7
 
@@ -212,7 +212,7 @@ export function getWorkingSets(exercise = {}) {
 // Zusatzsätze (Back-off): leichtere Sätze NACH den Hauptsätzen, z.B. 5x5 mit 100 kg + 2x10 mit
 // 80 kg. Sie zählen für Vorschlag/Einschätzung nicht - aber nur, wenn sie deutlich leichter sind
 // (höchstens 85 % des Hauptgewichts). Kleine Reduzierungen (100 -> 95 kg) gelten als "Hauptsatz
-// nicht geschafft" und verhindern den Vorschlag (Absprache Paul, Variante b).
+// nicht geschafft" und verhindern den Vorschlag (Absprache Jimmy, Variante b).
 export const BACKOFF_MAX_RATIO = 0.85
 
 /**
@@ -296,7 +296,7 @@ export function getProgressionStatus(info = {}, lastSessionExerciseRaw = null, g
   }
 
   if (!below.length) {
-    // Festes Kraft-Schema (5x5, 6x1, ...): erst nach zweimal Schaffen mit demselben Gewicht steigern (Absprache Paul
+    // Festes Kraft-Schema (5x5, 6x1, ...): erst nach zweimal Schaffen mit demselben Gewicht steigern (Absprache Jimmy
     // 21.10.) - beim ersten Mal festigen. Ausnahme: 7+ Wdh. in allen Hauptsätzen = Gewicht war klar zu leicht.
     if (target.mode === 'fixed' && minReps < TRANSITION_REPS &&
       !schemeAchieved(previousSessions[0], split.weight, target.target)) {

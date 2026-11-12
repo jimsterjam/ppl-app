@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { emitTimerSignal, ensureAudioUnlocked } from '@/utils/timerAudio'
 
-// Fokus-Modus im laufenden Workout (Absprache Paul 19.10.): Großansicht, die Satz für Satz durch das Workout führt.
+// Fokus-Modus im laufenden Workout (Absprache Jimmy 19.10.): Großansicht, die Satz für Satz durch das Workout führt.
 // Dieser Store hält nur den Zustand der Ansicht (aktiv/minimiert) und den Satz-Timer für Zeitübungen
 // (z. B. Plank 120 s). Die Pause zwischen den Sätzen bleibt im restTimerStore.
 export const useFocusModeStore = defineStore('focusMode', () => {

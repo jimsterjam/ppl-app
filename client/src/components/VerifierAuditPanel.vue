@@ -45,7 +45,7 @@
 
     <p v-if="loaded && !loading && !entries.length" class="muted">Keine Einträge gefunden.</p>
 
-    <!-- Standardmäßig nur die neuesten Prüfungen (Wunsch Paul: Bereich wird sonst immer länger),
+    <!-- Standardmäßig nur die neuesten Prüfungen (Wunsch Jimmy: Bereich wird sonst immer länger),
          der Rest per Button aufklappbar. Server liefert bereits neueste zuerst. -->
     <div v-if="entries.length" class="entry-list">
       <article v-for="entry in visibleEntries" :key="entry.id" class="entry">

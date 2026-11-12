@@ -61,7 +61,7 @@ export function getActiveDraft(uid) {
 }
 
 /**
- * Pfad der Workout-Ansicht für ein gerade LAUFENDES Workout (Absprache Paul 23.10.: beim Zurückkehren in die App direkt
+ * Pfad der Workout-Ansicht für ein gerade LAUFENDES Workout (Absprache Jimmy 23.10.: beim Zurückkehren in die App direkt
  * dorthin, nicht ins Dashboard). Kein Pfad bei fehlendem Entwurf, bereits abgeschlossenem Workout oder
  * "Favorit anpassen"-Entwurf.
  */

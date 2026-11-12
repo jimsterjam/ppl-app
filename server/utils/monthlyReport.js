@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // Monatsbericht (Pro): Zahlen, Kurven und Stillstand der letzten 28 Tage.
 //
-// Rein deterministisch - keine KI, keine erfundenen Zahlen (Absprache Paul 10.10.). Alles, was der
+// Rein deterministisch - keine KI, keine erfundenen Zahlen (Absprache Jimmy 10.10.). Alles, was der
 // Bericht zeigt, rechnet diese Datei aus den abgeschlossenen Workouts. Der Fazit-Satz ist nur ein
 // Schlüssel ('more' | 'same' | 'fewer' | 'first'); den Text dazu setzt der Client (DE/EN).
 //
@@ -9,7 +9,7 @@
 //   - höchstens alle REPORT_PERIOD_DAYS Tage (28)
 //   - der erste Bericht frühestens REPORT_PERIOD_DAYS Tage nach dem ersten abgeschlossenen Workout
 //   - und nur mit mindestens REPORT_MIN_SESSIONS (12) Einheiten im Zeitraum - mit weniger lässt sich
-//     kein Fortschritt belegen (Absprache Paul 10.10.)
+//     kein Fortschritt belegen (Absprache Jimmy 10.10.)
 //
 // Zeitraum: [now - 28 Tage, now]. Vergleichszeitraum: die 28 Tage davor.
 // Bestleistung: bestes geschätztes 1RM (Epley, wie die Stillstand-Diagnose) einer Übung im Zeitraum,

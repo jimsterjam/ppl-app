@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { buildExerciseMediaUrl, buildExerciseCacheKey } from '../assetResolver.js'
 
-// Absprache Paul 11.10.: Gibt es kein Video, zeigt die Großansicht das Foto. Eigene Übungen haben nie ein
+// Absprache Jimmy 11.10.: Gibt es kein Video, zeigt die Großansicht das Foto. Eigene Übungen haben nie ein
 // Video - vorher baute die App trotzdem eine Video-Adresse aus ihrer ID, und die Großansicht blieb leer.
 describe('Video-Adressen nur für Katalog-Übungen', () => {
   it('Katalog-Übung (ex_0001 / 0001): Video-Adresse und Cache-Schlüssel', () => {

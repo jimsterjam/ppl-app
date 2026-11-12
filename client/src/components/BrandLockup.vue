@@ -26,7 +26,7 @@ const { t } = useI18n()
   letter-spacing: 0;
   text-transform: none;
   /* Abstände von Hand, nicht über Kerning (in allen Browsern gleich): Der nächste Abstand f-b und b-e ist gleich groß
-     (je ca. 0,109 der Buchstabenhöhe wie im App-Icon, Absprache Paul 10.11.2026), und die Tinte sitzt mittig. In der
+     (je ca. 0,109 der Buchstabenhöhe wie im App-Icon, Absprache Jimmy 10.11.2026), und die Tinte sitzt mittig. In der
      Schrift ist b-e sonst deutlich weiter als f-b (0,159 zu 0,102 der Höhe), weil der Querstrich des f zum b ragt. */
   font-kerning: none;
   font-feature-settings: "kern" 0;

@@ -3,7 +3,7 @@ import { getFavoritesByType } from './workoutFavorites'
 import { createTrainingPlan, getTrainingPlans } from './trainingPlanStorage'
 import { canCreatePlan, normalizePlanLevel } from './trainingPlan'
 
-// Plan aus einer Vorlage anlegen (Absprache Paul 28.10.): die Übungen jedes Trainingstages werden direkt im Plan
+// Plan aus einer Vorlage anlegen (Absprache Jimmy 28.10.): die Übungen jedes Trainingstages werden direkt im Plan
 // gespeichert, es entstehen keine Favoriten (der Favoritenbereich bleibt das, was der Nutzer selbst ablegt).
 
 const FAVORITE_TYPES = ['push', 'pull', 'legs', 'fullbody']

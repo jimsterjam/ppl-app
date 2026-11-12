@@ -1,5 +1,5 @@
 <template>
-  <!-- Zwei Drehräder für Stunde und Minute (Trainings-Erinnerung, Absprache Paul 11.11.): wischen oder antippen,
+  <!-- Zwei Drehräder für Stunde und Minute (Trainings-Erinnerung, Absprache Jimmy 11.11.): wischen oder antippen,
        Pfeiltasten auf dem fokussierten Rad. Ohne Abhängigkeit; Einrasten über CSS scroll-snap. -->
   <div class="wheels">
     <div class="wheel-band" aria-hidden="true"></div>

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { calculateExerciseVolume, getExerciseBestWeight } from '../workoutMetrics.js';
 import { calculateExerciseStats } from '../../services/trainingAnalysisService.js';
 
-// Absprache Paul 13.10.: Nicht gemachte Sätze (done:false) bleiben gespeichert, zählen aber nicht in Auswertungen.
+// Absprache Jimmy 13.10.: Nicht gemachte Sätze (done:false) bleiben gespeichert, zählen aber nicht in Auswertungen.
 const exercise = {
   weight: 100,
   reps: 5,

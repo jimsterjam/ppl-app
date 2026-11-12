@@ -1,5 +1,5 @@
 <template>
-  <!-- Trainings-Erinnerung (Absprache Paul 11.11.): einmalige Frage nach dem ersten Training. Die gewählte Zahl wird
+  <!-- Trainings-Erinnerung (Absprache Jimmy 11.11.): einmalige Frage nach dem ersten Training. Die gewählte Zahl wird
        das Wochenziel; danach fragt iOS nach der Erlaubnis für Mitteilungen (nur, wenn es noch nie gefragt hat). -->
   <section v-if="visible" class="reminder-ask" aria-labelledby="reminder-ask-title">
     <button type="button" class="reminder-ask-hide" :aria-label="t('trainingReminder.askHide')" @click="decline">✕</button>

@@ -265,7 +265,7 @@
 
       <!-- Nur für den Admin-Testaccount (client/src/config/admin.js). Nur Sichtbarkeit - die
            Daten gibt der Server ausschließlich mit Admin-Schlüssel + passender UID heraus.
-           Bewusst nicht übersetzt (data-i18n-ignore), da nur Paul diesen Bereich sieht. -->
+           Bewusst nicht übersetzt (data-i18n-ignore), da nur Jimmy diesen Bereich sieht. -->
       <SettingsSectionCard v-if="showVerifierAudit" class="card" data-i18n-ignore title="Verifier-Protokoll (Admin)">
         <p class="hint">Ergebnisse der automatischen Prüfung des KI-Feedbacks (Zahlen und Regeln), letzte 30 Tage.</p>
         <VerifierAuditPanel />

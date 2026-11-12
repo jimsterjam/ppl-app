@@ -6,7 +6,7 @@ vi.mock('@/utils/timerAudio', () => ({ emitTimerSignal: signal, ensureAudioUnloc
 
 import { useFocusModeStore } from '../focusModeStore.js'
 
-// Fokus-Modus (Absprache Paul 19.10.): Ansicht minimieren darf den Satz-Timer nicht beenden.
+// Fokus-Modus (Absprache Jimmy 19.10.): Ansicht minimieren darf den Satz-Timer nicht beenden.
 describe('Fokus-Modus: Ansicht und Satz-Timer', () => {
   let store
   beforeEach(() => {

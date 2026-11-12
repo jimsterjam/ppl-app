@@ -1,4 +1,4 @@
-// Gängige deutsche Begriffe für die Übungen der Plan-Vorlagen (Absprache Paul 09.11.2026: englischer Name zuerst,
+// Gängige deutsche Begriffe für die Übungen der Plan-Vorlagen (Absprache Jimmy 09.11.2026: englischer Name zuerst,
 // deutscher Begriff in Klammern, damit die Seiten auch bei deutschen Suchanfragen gefunden werden).
 // Die Namen im Katalog sind teils maschinell übersetzt ("Hebeln Sie die Beinbeugung im Sitzen"), daher eine eigene Liste.
 // Der Test tests/site.test.mjs prüft, dass jede Übung aller Vorlagen hier einen Eintrag hat.

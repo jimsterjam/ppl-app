@@ -3,7 +3,7 @@ import { completeDay, getActiveDay } from './trainingPlan'
 import { getAllFavorites, buildTemplateExercise } from './planFromTemplate'
 
 // Plan im Alltag: welcher Tag ist heute dran, und was passiert nach dem Speichern eines Plan-Trainings.
-// Rotation statt Kalender (Absprache Paul): nach dem trainierten Tag rückt der Plan zum Tag danach vor.
+// Rotation statt Kalender (Absprache Jimmy): nach dem trainierten Tag rückt der Plan zum Tag danach vor.
 
 /**
  * Tag samt seinen Übungen. Die Übungen stehen im Plan-Tag selbst (Vorlagen-Pläne) oder, bei älteren Plänen und

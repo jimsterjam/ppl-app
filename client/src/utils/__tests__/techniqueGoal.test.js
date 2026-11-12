@@ -3,7 +3,7 @@ import { EXERCISE_TRAINING_TYPES, sanitizeExerciseTrainingType, resolveExerciseG
 import { buildSaveReview } from '../saveReview.js'
 import { restSecondsFor } from '../restTimerRules.js'
 
-// Absprache Paul 16.10.: Trainingsart "Technik" - keine Wiederholungsziele, keine Vorschläge.
+// Absprache Jimmy 16.10.: Trainingsart "Technik" - keine Wiederholungsziele, keine Vorschläge.
 const info = { name: 'Barbell High Bar Squat', name_en: 'barbell high bar squat', category: 'Legs', equipment: 'barbell', equipment_en: 'barbell' }
 const sets = (reps, weight = 100) => reps.map((r) => ({ reps: r, weight, done: true }))
 
@@ -39,7 +39,7 @@ describe('Trainingsart Technik', () => {
   })
 })
 
-// Absprache Paul 19.10.: Explosiv und Technik sind auch als Workout-Ziel wählbar (Voreinstellung für alle Übungen).
+// Absprache Jimmy 19.10.: Explosiv und Technik sind auch als Workout-Ziel wählbar (Voreinstellung für alle Übungen).
 describe('Workout-Ziel Explosiv/Technik', () => {
   const jump = { name: 'Jump Squat', name_en: 'jump squat', category: 'Legs', equipment: 'body weight', equipment_en: 'body weight' }
 

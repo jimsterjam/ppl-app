@@ -39,7 +39,7 @@
         <button class="today-remove" type="button" :aria-label="$t('plans.removeAria')" :title="$t('plans.remove')" @click="showRemovePlan = true">✕</button>
       </section>
 
-      <!-- Unter der Karte „Heute“ wie im freigegebenen Mockup (Absprache Paul 11.11.). -->
+      <!-- Unter der Karte „Heute“ wie im freigegebenen Mockup (Absprache Jimmy 11.11.). -->
       <TrainingReminderAsk
         :has-trained="hasCompletedWorkout"
         :blocked="showStartOptions || hasDraft"
@@ -84,7 +84,7 @@
               {{ $t('dashboard.allFavoritesEmpty') }}
             </div>
             <div v-for="favorite in allFavoriteWorkouts" :key="favorite.id" class="favorite-item favorite-item--compact">
-              <!-- Aufgeräumt (Wunsch Paul: zu viele Buttons): nur "Starten" sichtbar, Anpassen/
+              <!-- Aufgeräumt (Wunsch Jimmy: zu viele Buttons): nur "Starten" sichtbar, Anpassen/
                    Namen ändern/Löschen im "⋮"-Menü (favoriteMenu-Modal). -->
               <div class="favorite-main">
                 <div class="favorite-name">{{ favorite.name }}<span class="fav-type-badge">{{ favorite.type }}</span></div>
@@ -132,7 +132,7 @@
             </div>
 
             <div v-for="favorite in favoriteWorkouts" :key="favorite.id" class="favorite-item favorite-item--compact">
-              <!-- Aufgeräumt (Wunsch Paul: zu viele Buttons): nur "Starten" sichtbar, Anpassen/
+              <!-- Aufgeräumt (Wunsch Jimmy: zu viele Buttons): nur "Starten" sichtbar, Anpassen/
                    Namen ändern/Löschen im "⋮"-Menü (favoriteMenu-Modal). -->
               <div class="favorite-main">
                 <div class="favorite-name">{{ favorite.name }}</div>
@@ -162,7 +162,7 @@
 
     </main>
 
-    <!-- Ziel-Abfrage als eigenes Fenster (Wunsch Paul: rest tritt in den Hintergrund, kein
+    <!-- Ziel-Abfrage als eigenes Fenster (Wunsch Jimmy: rest tritt in den Hintergrund, kein
          Scrollen). Für Manuell, Generieren und Favoriten ohne gespeichertes Ziel. -->
     <AppModal
       v-model="showGoalModal"
@@ -468,10 +468,10 @@ function onSessionTime({ totalMs, formattedTime }) {
 const weeklyGoal = computed(() => Number(settings.weeklyGoal) || 4)
 // Diese Woche = Montag bis Sonntag (passend zum Wochenstreifen), nicht mehr „die letzten 7 Tage“.
 const weeklyCount = computed(() => countWeekWorkouts({ workouts: store.workouts || [] }))
-// Wochenserie: Wochen in Folge mit erreichtem Wochenziel (Absprache Paul 29.10.).
+// Wochenserie: Wochen in Folge mit erreichtem Wochenziel (Absprache Jimmy 29.10.).
 const weekStreak = computed(() => countWeekStreak({ workouts: store.workouts || [], goal: weeklyGoal.value }))
 
-// Kacheln „Selbst zusammenstellen“: nur der Name (der Begriff erklärt sich selbst, Absprache Paul 29.10.).
+// Kacheln „Selbst zusammenstellen“: nur der Name (der Begriff erklärt sich selbst, Absprache Jimmy 29.10.).
 const typeTiles = computed(() => [
   { type: 'push', label: 'Push' },
   { type: 'pull', label: 'Pull' },
@@ -479,7 +479,7 @@ const typeTiles = computed(() => [
   { type: 'fullbody', label: $t('dashboard.fullBodyLabel') }
 ])
 
-// Sprechblasen auf dem Dashboard (Absprache Paul 29.10.): Wochenstreifen und, mit aktivem Plan, „Heute“.
+// Sprechblasen auf dem Dashboard (Absprache Jimmy 29.10.): Wochenstreifen und, mit aktivem Plan, „Heute“.
 const coachMarks = computed(() => [
   { id: 'coach-week', selector: '.dashboard-week', title: $t('coach.weekTitle'), text: $t('coach.weekText') },
   { id: 'coach-today', selector: '.today-card', title: $t('coach.todayTitle'), text: $t('coach.todayText') }
@@ -491,14 +491,14 @@ const coachActive = computed(() => isSignedIn.value && !showStartOptions.value &
 
 const weeklyProgressLabel = computed(() => $t('dashboard.weeklyProgress', { done: weeklyCount.value, goal: weeklyGoal.value }))
 
-// Erstnutzung (Absprache Paul 22.10.): noch kein abgeschlossenes Workout und kein Entwurf -> kurze Erklärung unter den
+// Erstnutzung (Absprache Jimmy 22.10.): noch kein abgeschlossenes Workout und kein Entwurf -> kurze Erklärung unter den
 // Kacheln, die Gym-Zeit-Karte erscheint erst, wenn sie gebraucht wird (laufende Zeit oder vorhandene Workouts).
 // Erst nach dem Laden der Workouts entscheiden: davor ist die Liste leer, und der Hinweis blitzte bei jedem App-Start
 // kurz auf, bis die Workouts da waren (User-Report 24.10.).
-// Trainings-Erinnerung: Frage erst nach dem ersten abgeschlossenen Training (Absprache Paul 11.11.).
+// Trainings-Erinnerung: Frage erst nach dem ersten abgeschlossenen Training (Absprache Jimmy 11.11.).
 const hasCompletedWorkout = computed(() => store.workoutsLoaded && (store.workouts || []).some(w => w?.completed === true))
 const isFirstUse = computed(() => store.workoutsLoaded && !hasDraft.value && !(store.workouts || []).some(w => w?.completed === true))
-// Gym-Zeit erst zeigen, wenn sie läuft oder pausiert ist (Absprache Paul 28.10.): sie startet mit Workout/Warm-up.
+// Gym-Zeit erst zeigen, wenn sie läuft oder pausiert ist (Absprache Jimmy 28.10.): sie startet mit Workout/Warm-up.
 const showStopwatchCard = computed(() => Boolean(sessionStopwatchStore.startedAt))
 
 const recentTypes = computed(() => analyzeRecentTypes(store.workouts))
@@ -795,7 +795,7 @@ watch(goalModalChoice, (goal) => {
   if (goal) goalModalError.value = false
 })
 
-// Der Generator kennt nur Muskelaufbau/Kraft (Absprache Paul 19.10.); sonst alle vier Ziele.
+// Der Generator kennt nur Muskelaufbau/Kraft (Absprache Jimmy 19.10.); sonst alle vier Ziele.
 const goalModalGoals = computed(() => (goalModalContext.value?.path === 'generate' ? GENERATOR_GOALS : WORKOUT_GOALS))
 
 function openGoalModal(context) {
@@ -1375,7 +1375,7 @@ onActivated(async () => {
 }
 
 .dashboard-content {
-  /* Wunsch Paul: Dashboard soll NICHT scrollen, auch mit der größeren Stoppuhr-Karte.
+  /* Wunsch Jimmy: Dashboard soll NICHT scrollen, auch mit der größeren Stoppuhr-Karte.
      Vorher: min-height + Workout-Kacheln mit fester aspect-ratio (Höhe hing an der Breite) - kam
      mehr Inhalt dazu, wurde die Seite länger als der Bildschirm. Jetzt (wie bisher schon im
      Entwurfs-Modus): feste Höhe = Platz zwischen Header und Bottom-Nav, Hero und Stoppuhr in
@@ -1400,7 +1400,7 @@ onActivated(async () => {
   flex-shrink: 0;
 }
 
-/* Gym-Zeit-Karte im Dashboard kleiner (Wunsch Paul 29.10.): weniger Höhe, damit alles ohne Scrollen passt. */
+/* Gym-Zeit-Karte im Dashboard kleiner (Wunsch Jimmy 29.10.): weniger Höhe, damit alles ohne Scrollen passt. */
 .dashboard-content :deep(.sw-card) {
   gap: 10px;
   padding: 8px 12px;
@@ -1455,7 +1455,7 @@ onActivated(async () => {
 }
 
 .dashboard-week {
-  /* Mehr Luft zwischen Kopfzeile und Wochenstreifen (Wunsch Paul 29.10.). */
+  /* Mehr Luft zwischen Kopfzeile und Wochenstreifen (Wunsch Jimmy 29.10.). */
   margin-top: 14px;
 }
 
@@ -1677,7 +1677,7 @@ onActivated(async () => {
   gap: 8px;
 }
 
-/* Trainingspläne darunter über die ganze Breite (Wunsch Paul 29.10.). */
+/* Trainingspläne darunter über die ganze Breite (Wunsch Jimmy 29.10.). */
 .quick-bar-btn--wide {
   grid-column: 1 / -1;
 }
@@ -1769,7 +1769,7 @@ onActivated(async () => {
 }
 
 .favorite-more-btn {
-  /* Schmal und hochkant (Wunsch Paul) - Tippfläche bleibt über die Höhe groß genug. */
+  /* Schmal und hochkant (Wunsch Jimmy) - Tippfläche bleibt über die Höhe groß genug. */
   flex-shrink: 0;
   width: 24px;
   min-width: 0; /* globale Button-Regel (style.css) setzt 48px */

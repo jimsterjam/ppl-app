@@ -38,7 +38,7 @@ describe('restTimerRules', () => {
   })
 })
 
-// Wunsch Paul 10.10.: Standard-Pausen je Ziel (Kraft, Muskelaufbau, Speed) und Übungsart einstellbar.
+// Wunsch Jimmy 10.10.: Standard-Pausen je Ziel (Kraft, Muskelaufbau, Speed) und Übungsart einstellbar.
 describe('eigene Standard-Pausen', () => {
   const own = { strength: { compound: 240 }, hypertrophy: { isolation: 60 } }
 

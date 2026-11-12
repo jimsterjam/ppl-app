@@ -23,7 +23,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import HeaderBar from '@/components/HeaderBar.vue'
 
-// Vor dem eigenen Plan (Absprache Paul 29.10.): Empfehlung, mit einer fertigen Vorlage zu starten - bei jedem Anlegen.
+// Vor dem eigenen Plan (Absprache Jimmy 29.10.): Empfehlung, mit einer fertigen Vorlage zu starten - bei jedem Anlegen.
 const { t } = useI18n()
 const router = useRouter()
 const paragraphs = computed(() => t('plans.custom.infoText').split('\n\n'))

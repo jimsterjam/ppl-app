@@ -28,7 +28,7 @@
         </span>
       </div>
 
-      <!-- Eigene Pläne (ohne Vorlage) frei bearbeiten: Tage und Übungen (Absprache Paul 29.10.). -->
+      <!-- Eigene Pläne (ohne Vorlage) frei bearbeiten: Tage und Übungen (Absprache Jimmy 29.10.). -->
       <button v-if="!plan.templateId" type="button" class="btn-secondary" @click="router.push({ name: 'plan-edit', params: { id: plan.id } })">{{ t('plans.custom.edit') }}</button>
       <p v-if="notice" class="muted notice" role="status">{{ notice }}</p>
       <p class="muted small">{{ t('plans.explain') }}</p>

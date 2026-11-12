@@ -4,7 +4,7 @@
 // Firebase-UID ist eine Kennung, kein Geheimnis, und darf deshalb im Client stehen.
 // Muss zur Render-Variable ADMIN_UIDS von ppl-app-server passen.
 export const ADMIN_UIDS = Object.freeze([
-  '6zCFJN4TH3eqm470FiLgGBG337r2' // Paul, Testaccount
+  '6zCFJN4TH3eqm470FiLgGBG337r2' // Jimmy, Testaccount
 ])
 
 export function isAdminUid(uid) {

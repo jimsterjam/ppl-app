@@ -1,4 +1,4 @@
-// Wochenstreifen im Dashboard (Absprache Paul 29.10.): die Tage der aktuellen Woche (Montag bis Sonntag) mit Haken für
+// Wochenstreifen im Dashboard (Absprache Jimmy 29.10.): die Tage der aktuellen Woche (Montag bis Sonntag) mit Haken für
 // Tage, an denen trainiert wurde. Reine Funktionen, damit sie ohne Oberfläche testbar sind.
 
 const pad = (n) => String(n).padStart(2, '0')
@@ -56,7 +56,7 @@ export function countWeekWorkouts({ workouts = [], now = new Date() } = {}) {
 }
 
 /**
- * Wochenserie (Absprache Paul 29.10.): wie viele Wochen (Montag bis Sonntag) in Folge das Wochenziel erreicht wurde.
+ * Wochenserie (Absprache Jimmy 29.10.): wie viele Wochen (Montag bis Sonntag) in Folge das Wochenziel erreicht wurde.
  * Die laufende Woche zählt mit, sobald das Ziel erreicht ist; solange sie noch läuft, bricht sie die Serie nicht.
  * Entwürfe zählen nicht.
  * @returns {number} Wochen in Folge (0 = keine Serie)

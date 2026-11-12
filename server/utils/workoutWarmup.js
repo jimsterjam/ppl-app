@@ -1,4 +1,4 @@
-// Warm-up eines Workouts (Karte oben im Workout, Absprache Paul 11.10.): drei Schritte, jeweils abgehakt
+// Warm-up eines Workouts (Karte oben im Workout, Absprache Jimmy 11.10.): drei Schritte, jeweils abgehakt
 // oder nicht. Gespeichert wird nur das - keine Zeiten, kein Text. Für die spätere Auswertung im
 // Monatsbericht ("Warm-up in X von Y Einheiten").
 //   null      = unbekannt (Workouts von vor dieser Funktion)

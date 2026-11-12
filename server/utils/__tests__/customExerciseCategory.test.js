@@ -7,7 +7,7 @@ import { TEXT_LIMITS, normalizeMuscleGroup } from '../textLimits.js'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const { default: CustomExercise } = await import(join(__dirname, '../../models/CustomExercise.js'))
 
-// Absprache Paul 23.10.: Bei "Sonstiges" darf eine eigene Kategorie als Text eingegeben werden.
+// Absprache Jimmy 23.10.: Bei "Sonstiges" darf eine eigene Kategorie als Text eingegeben werden.
 describe('Eigene Übung: Kategorie als Freitext', () => {
   test('bekannte Gruppe und eigene Kategorie bleiben erhalten', () => {
     assert.equal(new CustomExercise({ userId: 'u', name: 'X', muscleGroup: 'chest' }).muscleGroup, 'chest')

@@ -1,5 +1,5 @@
 <template>
-  <!-- Filter-Auswahl im Karten-Look der FAQ/Einstellungen (Absprache Paul 26.10.): Knopf mit Beschriftung, Wert und Pfeil,
+  <!-- Filter-Auswahl im Karten-Look der FAQ/Einstellungen (Absprache Jimmy 26.10.): Knopf mit Beschriftung, Wert und Pfeil,
        darunter öffnet ein eigenes Dropdown im gleichen Stil statt der Systemauswahl. -->
   <div ref="root" class="fd" :class="{ open }">
     <button

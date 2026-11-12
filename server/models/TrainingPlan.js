@@ -27,7 +27,7 @@ const trainingPlanSchema = new mongoose.Schema({
   clientId: { type: String, required: true, maxlength: PLAN_LIMITS.maxId },
   name: { type: String, required: true, trim: true, maxlength: PLAN_LIMITS.maxName },
   days: { type: [daySchema], default: [] },
-  // Stufe des Plans (Absprache Paul 28.10.): Anfänger ist der Standard.
+  // Stufe des Plans (Absprache Jimmy 28.10.): Anfänger ist der Standard.
   level: { type: String, enum: PLAN_LEVELS, default: "beginner" },
   // Vorlage, aus der der Plan stammt (z. B. "ppl3"); leer bei selbst gebauten Plänen.
   templateId: { type: String, default: "", maxlength: 24 },

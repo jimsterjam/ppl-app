@@ -71,7 +71,7 @@ import { getDayMuscleGroups } from '@/utils/planProgress'
 import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 
-// Vorschau einer Vorlage (Absprache Paul 28.10.): Erklärung, Stufe (Anfänger/Fortgeschritten), Tage mit Übungen - erst
+// Vorschau einer Vorlage (Absprache Jimmy 28.10.): Erklärung, Stufe (Anfänger/Fortgeschritten), Tage mit Übungen - erst
 // „Diesen Plan wählen“ legt den Plan an.
 const { t } = useI18n()
 const route = useRoute()

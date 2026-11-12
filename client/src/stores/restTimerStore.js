@@ -46,7 +46,7 @@ function readDurations() {
 
 export const useRestTimerStore = defineStore('restTimer', {
   state: () => ({
-    // Immer an (Absprache Paul 10.10.): Pause startet beim Abhaken eines Satzes und erscheint groß in
+    // Immer an (Absprache Jimmy 10.10.): Pause startet beim Abhaken eines Satzes und erscheint groß in
     // der Mitte; verkleinern/überspringen geht während der Pause. Frühere Schalter-Werte im Gerät
     // (ppl_rest_timer_auto_v1 / _fullscreen_v1) werden bewusst nicht mehr gelesen.
     autoStart: true,

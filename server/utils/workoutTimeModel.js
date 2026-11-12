@@ -1,4 +1,4 @@
-// Zeitmodell des Workout-Generators (Absprache Paul 02.11.): Die Wunschzeit ist die GESAMTZEIT inklusive Warm-up.
+// Zeitmodell des Workout-Generators (Absprache Jimmy 02.11.): Die Wunschzeit ist die GESAMTZEIT inklusive Warm-up.
 // Gerechnet wird, was beim Training wirklich Zeit kostet:
 //
 //   Gesamtzeit = W + Σ (C_i + n_i · s_i + (n_i − 1) · r_i) + P
@@ -10,12 +10,12 @@
 //   r_i  Pause zwischen den Sätzen (Standard des Pausentimers bzw. Wert der Übung)
 //   P    Puffer: Trinken, Notizen, Handy                                                    ~ 3 min
 //   K    Cool-down am Ende (Vorschlag, 5-10 min): locker bewegen, dehnen, die Spannung wieder loslassen. Bekommt die
-//        Zeit, die nach den Übungen übrig bleibt, statt zusätzlicher Sätze (Absprache Paul 02.11.). Zählt zur Gesamtzeit,
+//        Zeit, die nach den Übungen übrig bleibt, statt zusätzlicher Sätze (Absprache Jimmy 02.11.). Zählt zur Gesamtzeit,
 //        ist aber unabhängig vom persönlichen Faktor k.
 //
 // Zusätzliche Sätze gibt es nur für Grundübungen, und erst nachdem Platz für das Cool-down reserviert ist.
 // Nach dem letzten Satz einer Übung zählt keine Pause, sondern die Wechselzeit der nächsten.
-// Eichpunkt (Paul): 4 Kraftübungen (5 + 5 + 4 + 3 Sätze) inklusive Warm-up ~ 70 min; das Modell liefert ~ 65 min,
+// Eichpunkt (Jimmy): 4 Kraftübungen (5 + 5 + 4 + 3 Sätze) inklusive Warm-up ~ 70 min; das Modell liefert ~ 65 min,
 // ein persönlicher Faktor k (aus echten Trainingsdauern, standardmäßig 1) gleicht den Rest aus.
 import { getGeneratorRule } from './repTargets.js';
 import { getMaxExerciseCount } from './exerciseCountTarget.js';

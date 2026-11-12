@@ -1,4 +1,4 @@
-// Einstellungen gehören zum Konto, nicht zum Gerät (Absprache Paul 06.11.2026): Meldet sich ein zweiter Nutzer auf
+// Einstellungen gehören zum Konto, nicht zum Gerät (Absprache Jimmy 06.11.2026): Meldet sich ein zweiter Nutzer auf
 // demselben Gerät an, übernimmt er keine Einstellungen des ersten (Farbmodus, Sprache, Pausenzeiten ...).
 //
 // Schlüssel im localStorage: `<name>:<UID>`. Ohne angemeldeten Nutzer (Willkommens-/Anmeldeseite) wird nichts

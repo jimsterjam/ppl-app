@@ -5,7 +5,7 @@ import { getFirstLookDirectiveText, getCoachSystemPromptText } from '../../servi
 import { getVerifierChecklistText } from '../../services/feedbackVerificationService.js'
 import Workout from '../../models/Workout.js'
 
-// Absprache Paul 29.10.: Erste Einordnung bei den ersten 3 gleichen Workouts, ab dem 4. das vergleichende Feedback.
+// Absprache Jimmy 29.10.: Erste Einordnung bei den ersten 3 gleichen Workouts, ab dem 4. das vergleichende Feedback.
 test('Schwelle: 1.-3. gleiches Workout = Erste Einordnung, ab dem 4. Vergleich', () => {
   assert.equal(FIRST_LOOK_COMPARISON_MIN, 4)
   assert.equal(isFirstLook(1), true)

@@ -1,6 +1,6 @@
 import { PLAN_LIMITS, cleanPlanText, normalizePlanExercises } from './trainingPlan'
 
-// Eigener Plan (Absprache Paul 29.10.): freier Entwurf aus Name, Tagen und Übungen. Reine Funktionen auf einem Entwurf,
+// Eigener Plan (Absprache Jimmy 29.10.): freier Entwurf aus Name, Tagen und Übungen. Reine Funktionen auf einem Entwurf,
 // damit sich Bauen und Bearbeiten ohne Oberfläche testen lässt. Entwurf:
 //   { name, days: [{ id?, label, exercises: [{ exerciseId, name, muscleGroup, category?, sets }] }] }
 // `id` (und lastDoneAt) bleiben beim Bearbeiten eines bestehenden Plans erhalten; `category` ist nur für die Tagesart gedacht.

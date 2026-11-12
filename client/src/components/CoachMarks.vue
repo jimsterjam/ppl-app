@@ -21,7 +21,7 @@ import { useI18n } from 'vue-i18n'
 import { useCoachMarkStore } from '@/stores/coachMarkStore'
 import { useScrollLock } from '@/composables/useScrollLock'
 
-// Sprechblasen (Absprache Paul 29.10.): zeigt nacheinander die Hinweise einer Seite, jeweils auf das Element gerichtet.
+// Sprechblasen (Absprache Jimmy 29.10.): zeigt nacheinander die Hinweise einer Seite, jeweils auf das Element gerichtet.
 // Pro Mark: { id, selector, title, text }. Eine Blase erscheint nur, wenn `active` gilt (kein Fenster offen), Hinweise
 // eingeschaltet und noch nicht „Verstanden“ sind und das Element sichtbar ist. Die Seite entscheidet über `active`.
 const props = defineProps({

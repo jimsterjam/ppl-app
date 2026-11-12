@@ -17,7 +17,7 @@ vi.mock('@/utils/offlineStorage', () => ({
 
 import { syncCustomExercisesWithServer } from '../customExercises.js'
 
-// Fund Paul 11.10.: Eigene Übungen waren nach einer Neuinstallation weg - die Server-Liste wurde nie geladen.
+// Fund Jimmy 11.10.: Eigene Übungen waren nach einer Neuinstallation weg - die Server-Liste wurde nie geladen.
 describe('Eigene Übungen: Abgleich mit dem Server', () => {
   beforeEach(() => {
     Object.values(mocks).forEach((v) => { if (typeof v?.mockReset === 'function') v.mockReset() })

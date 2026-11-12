@@ -1,6 +1,6 @@
 // Mitteilungs-Erlaubnis (iOS). iOS fragt nur EINMAL: Wurde "Nicht erlauben" getippt, lässt sich das nur noch in den
 // iPhone-Einstellungen der App ändern. Diese Datei erkennt den Zustand und öffnet die Einstellungen, damit die App
-// (Warm-up-Karte, Pausentimer-Einstellungen) einen Hinweis mit Knopf zeigen kann - Absprache Paul 11.10.
+// (Warm-up-Karte, Pausentimer-Einstellungen) einen Hinweis mit Knopf zeigen kann - Absprache Jimmy 11.10.
 import { Capacitor } from '@capacitor/core'
 import { logger } from '@/utils/logger'
 import { readPref, writePref } from '@/utils/userScopedStorage'
@@ -35,7 +35,7 @@ export function shouldShowNotificationHint({ permission, dismissed }) {
 
 /**
  * Ausblenden gilt nur für den Zustand, in dem es getippt wurde: Wer den "Erlauben"-Hinweis ausblendet und später
- * in der iOS-Frage ablehnt, bekommt "Mitteilungen sind aus" trotzdem (Fund Paul 11.10.).
+ * in der iOS-Frage ablehnt, bekommt "Mitteilungen sind aus" trotzdem (Fund Jimmy 11.10.).
  */
 export function isHintDismissedFor(permission) {
   return getDismissedState() === permission

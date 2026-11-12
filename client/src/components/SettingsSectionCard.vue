@@ -1,5 +1,5 @@
 <template>
-  <!-- Einstellungs-Bereich (Absprache Paul 26.10.): Karte mit Titel und Pfeil wie in den FAQ; Tippen öffnet ein
+  <!-- Einstellungs-Bereich (Absprache Jimmy 26.10.): Karte mit Titel und Pfeil wie in den FAQ; Tippen öffnet ein
        Fenster (Overlay) mit dem Inhalt. Ersetzt die frühere Aufklapp-Karte (CollapsibleCard). -->
   <button type="button" class="card section-card" v-bind="$attrs" :aria-haspopup="'dialog'" @click="open = true">
     <h3 class="card-title sc-title">{{ title }}</h3>

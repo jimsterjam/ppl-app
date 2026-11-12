@@ -2,7 +2,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { useScrollLock, canScrollInside, __resetScrollLockForTests } from '../useScrollLock'
 
-// iOS/WKWebView scrollt trotz `overflow: hidden` am body weiter (Paul 11.11.). Die Sperre fängt Wischbewegungen ab,
+// iOS/WKWebView scrollt trotz `overflow: hidden` am body weiter (Jimmy 11.11.). Die Sperre fängt Wischbewegungen ab,
 // außer in scrollbaren Bereichen eines Fensters, die in Wischrichtung noch Platz haben.
 function touch(type, target, y) {
   const event = new Event(type, { bubbles: true, cancelable: true })

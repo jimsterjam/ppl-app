@@ -1,4 +1,4 @@
-// Trainings-Erinnerung (Absprache Paul 11.11.2026): plant die nächste lokale iOS-Mitteilung im Voraus, weil bei
+// Trainings-Erinnerung (Absprache Jimmy 11.11.2026): plant die nächste lokale iOS-Mitteilung im Voraus, weil bei
 // geschlossener App kein Code läuft. Neu gerechnet wird bei jeder Änderung der Workouts oder Einstellungen und beim
 // Zurückkehren in die App; ein Training vor dem Zeitpunkt verschiebt die Mitteilung, sie kommt dann nie an.
 // Rechenregeln: utils/trainingNudge.js. Kein Server, keine Daten verlassen das Gerät.
@@ -14,7 +14,7 @@ import { planNextReminder, resolveWeeklyRhythm, lastTrainingDay } from '@/utils/
 /** Eigene ID, getrennt von Pausentimer (940001), Warm-up (940002) und Workout-Timer (930000+). */
 export const TRAINING_REMINDER_ID = 940003
 /**
- * Eigener kurzer Ton (Absprache Paul 11.11.): das Plugin spielt unter iOS nur Dateien aus dem App-Bundle, ohne Datei
+ * Eigener kurzer Ton (Absprache Jimmy 11.11.): das Plugin spielt unter iOS nur Dateien aus dem App-Bundle, ohne Datei
  * bleibt die Mitteilung stumm; den Systemton erreicht man darüber nicht. Datei: ios/App/App/training-reminder.wav
  * (selbst erzeugt, 1,1 s, in „Copy Bundle Resources“), bewusst anders als der Pausen-Gong.
  */

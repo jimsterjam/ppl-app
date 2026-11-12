@@ -44,7 +44,7 @@ describe('Zeitmodell: Übungsblock', () => {
   })
 })
 
-describe('Zeitmodell: Eichpunkt (Paul: 4 Kraftübungen inkl. Warm-up ca. 70 min)', () => {
+describe('Zeitmodell: Eichpunkt (Jimmy: 4 Kraftübungen inkl. Warm-up ca. 70 min)', () => {
   const session = [
     { sets: 5, rest: 180, isIsolation: false, demandTier: 'high' },
     { sets: 5, rest: 180, isIsolation: false, demandTier: 'high' },
@@ -225,7 +225,7 @@ describe('Zeitmodell: Auswahl für die Wunschzeit (Gesamtzeit inkl. Warm-up)', (
     assert.equal(warmupSecondsFor(undefined), WARMUP_SECONDS)
   })
 
-  describe('Cool-down am Ende (Vorschlag, 5-10 min, Absprache Paul)', () => {
+  describe('Cool-down am Ende (Vorschlag, 5-10 min, Absprache Jimmy)', () => {
     test('Muskelaufbau 75 min: Cool-down von 10 min, Gesamtzeit nahe der Wunschzeit', () => {
       const result = run(hypertrophyPool(), 'hypertrophy', 75)
       assert.equal(result.cooldownSeconds, COOLDOWN_MAX_SECONDS)

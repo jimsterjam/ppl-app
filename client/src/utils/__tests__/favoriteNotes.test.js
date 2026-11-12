@@ -14,7 +14,7 @@ vi.stubGlobal('localStorage', {
 })
 beforeEach(() => { for (const k of Object.keys(store)) delete store[k] })
 
-// Absprache Paul 14.10.: Ein Favorit bildet die letzte Session ab - inklusive der Notizen je Übung.
+// Absprache Jimmy 14.10.: Ein Favorit bildet die letzte Session ab - inklusive der Notizen je Übung.
 describe('Favoriten speichern Notizen mit', () => {
   const saved = () => ({
     name: 'Push Day',

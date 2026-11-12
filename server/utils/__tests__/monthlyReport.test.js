@@ -23,7 +23,7 @@ const sets = (weight, reps, count = 3) => Array.from({ length: count }, () => ({
 const workout = (ago, exercises, extra = {}) => ({ date: daysAgo(ago), goal: 'hypertrophy', exercises, ...extra })
 const bench = (weight, reps = 8, count = 3) => ({ name: 'Bankdrücken Langhantel', setDetails: sets(weight, reps, count) })
 
-describe('evaluateReportDue (Absprache Paul 10.10.: mind. 12 Einheiten in 28 Tagen, erster Bericht nach 4 Wochen)', () => {
+describe('evaluateReportDue (Absprache Jimmy 10.10.: mind. 12 Einheiten in 28 Tagen, erster Bericht nach 4 Wochen)', () => {
   test('Konstanten wie vereinbart', () => {
     assert.equal(REPORT_MIN_SESSIONS, 12)
     assert.equal(REPORT_PERIOD_DAYS, 28)

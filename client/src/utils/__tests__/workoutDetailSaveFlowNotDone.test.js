@@ -10,7 +10,7 @@ const workout = () => ({
   ]
 })
 
-// Absprache Paul 13.10.: Nichts wird entfernt - gespeichert wird exakt Gemachtes und Nicht-Gemachtes.
+// Absprache Jimmy 13.10.: Nichts wird entfernt - gespeichert wird exakt Gemachtes und Nicht-Gemachtes.
 describe('Speichern: gemacht / nicht gemacht', () => {
   it('laufendes Workout: alle Sätze bleiben, nicht abgehakte Arbeitssätze sind ausdrücklich done:false', () => {
     const result = normalizeWorkoutForSave({ workout: workout(), exerciseNotes: ['', 'Schulter tat weh'], trackingActive: true })

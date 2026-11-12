@@ -122,7 +122,7 @@ const TEXTS = {
   }
 };
 
-// Keine Senkung, nur ein Hinweis (Absprache Paul): nach PLATEAU_SESSIONS Einheiten mit demselben
+// Keine Senkung, nur ein Hinweis (Absprache Jimmy): nach PLATEAU_SESSIONS Einheiten mit demselben
 // Hauptgewicht ohne Steigerung.
 export const PLATEAU_SESSIONS = 3;
 const PRIORITY = { increase: 1, plateau: 2, below: 2, speed: 3, confirm: 4, close: 5, climb: 6, hold: 7 };
@@ -167,7 +167,7 @@ function resolveCandidate({ ex, info, hint, goal, history, lang }) {
   if (status?.state === 'increase' && status.suggestion?.suggestedWeights?.length) {
     candidate = { kind: 'increase', params: { weight: formatKg(status.suggestion.suggestedWeights[0], lang) } };
   } else if (status?.state === 'climb' && status.belowRange) {
-    // Muskelaufbau unter 8 Wdh.: nur Hinweis im Feedback, keine direkte Senkung (Absprache Paul).
+    // Muskelaufbau unter 8 Wdh.: nur Hinweis im Feedback, keine direkte Senkung (Absprache Jimmy).
     candidate = { kind: 'below', params: { ...params, min: status.min } };
   } else if (status && compatible.length >= PLATEAU_SESSIONS - 1
     && compatible.slice(0, PLATEAU_SESSIONS - 1).every((prev) => mainWeightOf(prev) === status.weight)) {
@@ -189,7 +189,7 @@ const AI_PROGRESSION_STATES = {
 };
 
 /**
- * Fortschrittszustand je Übung als Tatsache für die KI (Absprache Paul 14.10.): z. B. "almost_there" = Ziel nur knapp
+ * Fortschrittszustand je Übung als Tatsache für die KI (Absprache Jimmy 14.10.): z. B. "almost_there" = Ziel nur knapp
  * verfehlt (ein Satz genau 1 Wdh. zu wenig). Nur Zustände, die dem Nutzer etwas sagen; sonst kein Eintrag.
  * @returns {Map<string, string>} Übungsname (lowercase) -> Zustand
  */

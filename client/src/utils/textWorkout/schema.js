@@ -1,6 +1,6 @@
 // Freitext-Einstieg ("Was trainierst du heute?"), Schritt 1: Ausgabeschema.
 //
-// Leitlinien (Absprache Paul):
+// Leitlinien (Absprache Jimmy):
 // - Spiegeln statt Vorgeben: Es steht nur drin, was der Nutzer gesagt hat. Fehlende Zahlen bleiben null (leer, später
 //   grau angezeigt) - es werden KEINE Wiederholungen/Gewichte erfunden (siehe Generator: "10 Wdh. / 0 kg" waren ein Fehler).
 // - Einzige Ausnahme: die Satzanzahl. Fehlt sie, gilt DEFAULT_SETS und `assumed` enthält "sets" (nur die Anzahl leerer Zeilen).

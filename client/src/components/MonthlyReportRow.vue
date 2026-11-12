@@ -1,6 +1,6 @@
 <template>
   <!-- Kompakte Dashboard-Zeile nur bei neuem Bericht - oder als Beispielbericht, solange noch kein
-       echter Bericht existiert (auch ohne Pro). Sonst nichts (Absprache Paul 10.10.). -->
+       echter Bericht existiert (auch ohne Pro). Sonst nichts (Absprache Jimmy 10.10.). -->
   <button v-if="mode" type="button" class="report-row" :class="{ attention: mode === 'new' }" @click="open">
     <FileBarChart class="report-row-icon" aria-hidden="true" />
     <span class="report-row-text">

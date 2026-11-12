@@ -1,5 +1,5 @@
 /**
- * Bereinigt Übungs-Dubletten in der Datenbank (einmalig von Paul auszuführen).
+ * Bereinigt Übungs-Dubletten in der Datenbank (einmalig von Jimmy auszuführen).
  *
  * Hintergrund: Der Workout-Generator hat Übungen unter Namen angefragt, die im Katalog
  * (client/public/data/default-exercises.json) anders heißen - z.B. "Barbell Bench Press" statt

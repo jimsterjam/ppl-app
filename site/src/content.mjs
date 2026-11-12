@@ -1,4 +1,4 @@
-// Texte der Website (Deutsch/Englisch). Freigegeben von Paul am 09.11.2026 (Startseite, 1RM-Rechner, Wiederholungen).
+// Texte der Website (Deutsch/Englisch). Freigegeben von Jimmy am 09.11.2026 (Startseite, 1RM-Rechner, Wiederholungen).
 // Der Name bleibt in beiden Sprachen "Form Beats Ego". Aussagen über die App stammen aus den Store-Texten und der App.
 export const APP_STORE_URL = 'https://apps.apple.com/app/fbe-form-beats-ego/id6808702632'
 export const APP_ID = '6808702632'

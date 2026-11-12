@@ -5,7 +5,7 @@ import { analyzeWorkoutProgression, structureAnalysisForAI } from '../../service
 import OpenAIProvider, { getCoachSystemPromptText } from '../../services/OpenAIProvider.js'
 import { getVerifierChecklistText, RULE_LABELS } from '../../services/feedbackVerificationService.js'
 
-// Absprache Paul 14.10.: Mehr Gewicht, vier Sätze à 5 und im fünften nur 4 = "knapp dran" = motivierender Fortschritt,
+// Absprache Jimmy 14.10.: Mehr Gewicht, vier Sätze à 5 und im fünften nur 4 = "knapp dran" = motivierender Fortschritt,
 // nicht "zwar mehr Gewicht, aber eine Wiederholung weniger".
 const session = (weight, reps, date, id) => ({
   _id: id, date, completed: true, goal: 'strength',

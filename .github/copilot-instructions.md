@@ -12,7 +12,7 @@ bei Widerspruch gelten diese beiden.
 - `server/`: Node/Express 5 + MongoDB/Mongoose auf Render. Auth über Firebase-ID-Token
   (`middleware/firebaseAuth.js`). KI-Feedback in `routes/workouts.js` und `services/`.
 - `site/`: statische Website formbeatsego.de, erzeugt aus Plänen, Katalog und Texten der App.
-- Eine Person (Paul) prüft und mergt. Die meisten PRs schreibt ein Agent.
+- Eine Person (Jimmy) prüft und mergt. Die meisten PRs schreibt ein Agent.
 
 ## Was hier als Fehler zählt (höchste Priorität zuerst)
 
