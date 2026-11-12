@@ -1,4 +1,4 @@
-// KI-Kontingent für Gratis-Konten (Absprache Paul 05.11.): In den ersten Tagen nach der Registrierung gibt es ein
+// KI-Kontingent für Gratis-Konten (Absprache Jimmy 05.11.): In den ersten Tagen nach der Registrierung gibt es ein
 // Willkommenskontingent (Standard: 30 Anfragen in 30 Tagen), danach ein festes Monatskontingent (Standard: 10 pro
 // Kalendermonat). Beide Töpfe werden getrennt gezählt: In der Willkommensphase zählt nur `welcomeCount`, danach
 // `monthlyCount` im Kalendermonat. Dadurch bekommt niemand durch einen Monatswechsel doppelt Anfragen.

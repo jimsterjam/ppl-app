@@ -1,10 +1,10 @@
-// Trainings-Erinnerung (Absprache Paul 11.11.2026): eine lokale iOS-Mitteilung, wenn die Pause länger wird als geplant
+// Trainings-Erinnerung (Absprache Jimmy 11.11.2026): eine lokale iOS-Mitteilung, wenn die Pause länger wird als geplant
 // oder das Wochenziel knapp wird. Reine Funktionen ohne Oberfläche und ohne Capacitor, damit alles testbar ist.
 // Planen/Löschen der Mitteilung: utils/trainingReminder.js.
 import { localDayKey, startOfWeek, countWeekWorkouts } from './weekStrip'
 
 export const DEFAULT_REMINDER_TIME = '12:30'
-/** Vorgaben in den Einstellungen; daneben eine beliebige „Eigene“ Uhrzeit (auch nachts, z. B. Nachtschicht – Paul 11.11.). */
+/** Vorgaben in den Einstellungen; daneben eine beliebige „Eigene“ Uhrzeit (auch nachts, z. B. Nachtschicht – Jimmy 11.11.). */
 export const REMINDER_TIME_PRESETS = Object.freeze([
   Object.freeze({ key: 'morning', time: '08:00' }),
   Object.freeze({ key: 'midday', time: '12:30' }),
@@ -79,7 +79,7 @@ export function lastTrainingDay(workouts, now = new Date()) {
 }
 
 /**
- * Wie oft pro Woche trainiert werden soll. Reihenfolge (Absprache Paul 11.11.): selbst gesetztes Wochenziel, sonst die
+ * Wie oft pro Woche trainiert werden soll. Reihenfolge (Absprache Jimmy 11.11.): selbst gesetztes Wochenziel, sonst die
  * Tage des aktiven Plans (ein Durchgang pro Woche, höchstens 6), sonst der eigene Rhythmus der letzten 4 vollen Wochen
  * (nur mit mindestens 2 Trainingswochen), sonst null (dann gilt nur die Pause von FALLBACK_GAP_DAYS Tagen).
  * @returns {{ perWeek: number, source: 'goal'|'plan'|'history' } | null}

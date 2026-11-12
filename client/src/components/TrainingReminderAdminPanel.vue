@@ -1,5 +1,5 @@
 <template>
-  <!-- Admin-Diagnose der Trainings-Erinnerung (nur Paul, wie das Verifier-Protokoll; bewusst nicht übersetzt).
+  <!-- Admin-Diagnose der Trainings-Erinnerung (nur Jimmy, wie das Verifier-Protokoll; bewusst nicht übersetzt).
        Zeigt Einstellungen, Erlaubnis, bei iOS geplante Mitteilung und die letzten Planungsläufe mit Grund. -->
   <div class="reminder-admin" data-i18n-ignore>
     <div class="reminder-admin-actions">

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # PreToolUse-Hook: verhindert, dass Claude auf `main` pusht oder dort Dateien ändert.
-# Absprache mit Paul: Änderungen laufen immer über einen eigenen Branch + PR,
-# Merge auf `main` macht nur Paul selbst (siehe CLAUDE.md, Abschnitt "Cloud-Sessions").
+# Absprache mit Jimmy: Änderungen laufen immer über einen eigenen Branch + PR,
+# Merge auf `main` macht nur Jimmy selbst (siehe CLAUDE.md, Abschnitt "Cloud-Sessions").
 #
 # Geprüft werden:
 #   - Bash: jedes `git push`, das `main` als Ziel hat (explizit, z.B. `origin main`,
@@ -16,7 +16,7 @@ input="$(cat)"
 tool="$(printf '%s' "$input" | jq -r '.tool_name // empty')"
 
 block() {
-  echo "Blockiert: $1 Änderungen nur über eigenen Branch + Pull Request; Merge auf main macht Paul selbst." >&2
+  echo "Blockiert: $1 Änderungen nur über eigenen Branch + Pull Request; Merge auf main macht Jimmy selbst." >&2
   exit 2
 }
 

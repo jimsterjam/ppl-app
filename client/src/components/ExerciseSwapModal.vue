@@ -91,7 +91,7 @@ import { resolveExerciseMedia, buildExerciseMediaUrl } from '@/utils/assetResolv
 import { resolveServerMediaUrl } from '@/api/http'
 import { useScrollLock } from '@/composables/useScrollLock'
 
-// „Übung wechseln“ (Absprache Paul 28.10.): Ersatz-Vorschläge (Einsteiger-freundlich zuerst), eigene Suche und bei einem
+// „Übung wechseln“ (Absprache Jimmy 28.10.): Ersatz-Vorschläge (Einsteiger-freundlich zuerst), eigene Suche und bei einem
 // Plan-Training die Frage „nur heute“ oder „auch im Plan-Tag“. Die Komponente ersetzt nichts selbst, sie meldet nur die Wahl.
 const props = defineProps({
   modelValue: { type: Boolean, default: false },

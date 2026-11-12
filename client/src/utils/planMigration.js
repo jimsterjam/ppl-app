@@ -3,7 +3,7 @@ import { getAllFavorites } from './planFromTemplate'
 import { deleteFavoriteWorkout } from './workoutFavorites'
 import { normalizePlanExercises } from './trainingPlan'
 
-// Einmalige Umstellung (Absprache Paul 28.10.): Pläne, die mit der ersten Fassung aus einer Vorlage angelegt wurden,
+// Einmalige Umstellung (Absprache Jimmy 28.10.): Pläne, die mit der ersten Fassung aus einer Vorlage angelegt wurden,
 // verweisen auf je einen Favoriten pro Tag. Das war falsch - der Favoritenbereich gehört dem Nutzer. Hier wandern die
 // Übungen in den Plan-Tag, und genau diese Vorlagen-Favoriten werden entfernt. Erkannt werden sie am Namen
 // „<Vorlagen-Präfix> <Tagbezeichnung>“; selbst angelegte Favoriten bleiben unberührt.

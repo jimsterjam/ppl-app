@@ -110,7 +110,7 @@ import {
   addExercisesTo, removeExerciseAt, moveExerciseBy, changeSets
 } from '@/utils/planBuilder'
 
-// Eigener Plan (Absprache Paul 29.10.): Name, Tage und Übungen frei wählen. Mit Plan-ID in der Route wird ein
+// Eigener Plan (Absprache Jimmy 29.10.): Name, Tage und Übungen frei wählen. Mit Plan-ID in der Route wird ein
 // bestehender eigener Plan bearbeitet.
 const { t, locale } = useI18n()
 const route = useRoute()

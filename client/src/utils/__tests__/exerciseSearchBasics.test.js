@@ -4,7 +4,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { searchAndRankExercises } from '../exerciseSearch.js'
 
-// Absprache Paul 15.10.: Die Suche zeigt zuerst die Basisübung, danach die Varianten - geprüft gegen den echten Katalog.
+// Absprache Jimmy 15.10.: Die Suche zeigt zuerst die Basisübung, danach die Varianten - geprüft gegen den echten Katalog.
 const catalog = JSON.parse(fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../public/data/default-exercises.json'), 'utf8'))
 const items = catalog.map((e) => ({ name: e.name_en || e.name, de: e.name, equipment: e.equipment_en }))
 const search = (q, list = items) => searchAndRankExercises(list, q, { getPrimaryText: (i) => i.name, getSecondaryTexts: (i) => [i.de] }).map((i) => i.name)

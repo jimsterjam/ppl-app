@@ -9,7 +9,7 @@ vi.mock('@/utils/authToken', () => ({ getAuthToken: vi.fn().mockResolvedValue(nu
 
 import { useSubscriptionStore } from '../subscriptionStore.js'
 
-// Absprache Paul 29.10.: Kostenlos = Tracking ohne Limits. Vorher sperrte der Workout-Builder im Gratis-Tarif das
+// Absprache Jimmy 29.10.: Kostenlos = Tracking ohne Limits. Vorher sperrte der Workout-Builder im Gratis-Tarif das
 // vierte Workout einer Woche (und 6 Übungen je Workout waren vorgesehen) - das passt nicht zu Plänen mit 6 Tagen.
 beforeEach(() => {
   const data = new Map()

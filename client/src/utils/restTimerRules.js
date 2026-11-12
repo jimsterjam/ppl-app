@@ -2,7 +2,7 @@
 // Ohne Imports, damit direkt testbar.
 //
 // Die Pause startet durch ein Ereignis (Satz abgehakt), nicht nach einer festen Arbeitsphase -
-// wie lange ein Satz dauert, weiß die App nicht (Absprache Paul). Standarddauer je
+// wie lange ein Satz dauert, weiß die App nicht (Absprache Jimmy). Standarddauer je
 // Trainingsart und Übungsart; eine vom Nutzer gemerkte Dauer (exercise.restSeconds) hat Vorrang.
 
 export const REST_DEFAULT_SECONDS = Object.freeze({

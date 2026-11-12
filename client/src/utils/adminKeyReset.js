@@ -1,6 +1,6 @@
 // Admin-Schlüssel der Admin-Panels (AdminFeedbackPanel, VerifierAuditPanel, AiInsightsPanel): wird bei Abmeldung/Kontowechsel
 // aus dem localStorage gelöscht UND in den noch gemounteten Panels geleert, sonst würden sie ihn beim nächsten Laden wieder
-// speichern (Absprache Paul 06.11.2026).
+// speichern (Absprache Jimmy 06.11.2026).
 import { getCurrentInstance, onUnmounted } from 'vue'
 
 export const ADMIN_KEY_STORAGE_KEY = 'admin_feedback_key'

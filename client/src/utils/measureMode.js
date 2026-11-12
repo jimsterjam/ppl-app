@@ -1,4 +1,4 @@
-// Messart einer Übung (Absprache Paul 15.10.):
+// Messart einer Übung (Absprache Jimmy 15.10.):
 //   'weight'   - Wiederholungen + kg (Standard, wie bisher)
 //   'time'     - Zeit halten (z. B. Plank): Ergebnis ist die Zeit in Sekunden
 //   'repsTime' - Wiederholungen in einer festen Zeit: die Zeit ist der Rahmen, das Ergebnis sind die Wiederholungen

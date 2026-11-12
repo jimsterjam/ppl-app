@@ -5,7 +5,7 @@
 //
 // Zwei Gruppen:
 //   forgotten - Hinweis auf Nicht-Gemachtes: ganze Übung nicht gemacht, nicht abgehakte Sätze, Übung ohne Sätze
-//               (Absprache Paul 13.10.: die App entfernt nie etwas - sie weist nur hin, gespeichert wird exakt
+//               (Absprache Jimmy 13.10.: die App entfernt nie etwas - sie weist nur hin, gespeichert wird exakt
 //               das Gemachte und das Nicht-Gemachte)
 //   check     - bitte prüfen: auffälliges Gewicht, 0 kg, auffällige Wiederholungen, Feedback fehlt
 

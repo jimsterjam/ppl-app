@@ -1,5 +1,5 @@
 <template>
-  <!-- Fokus-Modus (Absprache Paul 19.10.): Großansicht für den aktuellen Satz; die Pause zeigt der Pausentimer
+  <!-- Fokus-Modus (Absprache Jimmy 19.10.): Großansicht für den aktuellen Satz; die Pause zeigt der Pausentimer
        (RestTimerBar, ebenfalls groß). Modal-Muster: Teleport + Scroll-Sperre; Minimieren beendet nichts. -->
   <Teleport to="body">
     <div v-if="focus.visible && current" class="fm" role="dialog" aria-modal="true" :aria-label="t('focus.dialogAria')">

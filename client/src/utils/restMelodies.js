@@ -53,7 +53,7 @@ function phrase(names, step, velocities) {
 // cycleSec: Länge eines Durchgangs inkl. Pause danach. Der letzte Ton klingt innerhalb des
 // Durchgangs aus (wird getestet), damit sich die Wiederholung sauber anschließt.
 export const REST_MELODIES = Object.freeze({
-  // Drei tiefe Glockenschläge, dann Pause (Wunsch Paul 10.10.)
+  // Drei tiefe Glockenschläge, dann Pause (Wunsch Jimmy 10.10.)
   deep: Object.freeze({
     timbre: BELL,
     ringSec: 4.5,

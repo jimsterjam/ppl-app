@@ -69,7 +69,7 @@
             <button type="button" class="ro-btn" :aria-label="t('restTimer.plusAria')" @click="rest.adjust(REST_STEP_SECONDS)">{{ t('restTimer.plusLabel') }}</button>
           </div>
           <button type="button" class="ro-btn ro-primary" @click="rest.skip()">{{ t('restTimer.skip') }}</button>
-          <!-- Aus Versehen abgehakt (Absprache Paul 05.11.): Haken zurücknehmen, Pause beenden, zurück zu diesem Satz. -->
+          <!-- Aus Versehen abgehakt (Absprache Jimmy 05.11.): Haken zurücknehmen, Pause beenden, zurück zu diesem Satz. -->
           <button v-if="canUndo" type="button" class="ro-link" @click="emit('undo-last-set')">{{ t('restTimer.undoLastSet') }}</button>
 
           <!-- Dauer angepasst: für diese Übung merken (auch im Favoriten, siehe exercise.restSeconds). -->

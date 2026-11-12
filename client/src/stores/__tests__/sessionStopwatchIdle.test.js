@@ -5,7 +5,7 @@ vi.mock('@/utils/keepAwakeGuard', () => ({ acquireKeepAwake: vi.fn(), releaseKee
 
 import { useSessionStopwatchStore } from '../sessionStopwatch.js'
 
-// Absprache Paul 11.10.: Warm-up-Start und erster abgehakter Arbeitssatz starten den Gesamttimer (Gym-Zeit),
+// Absprache Jimmy 11.10.: Warm-up-Start und erster abgehakter Arbeitssatz starten den Gesamttimer (Gym-Zeit),
 // aber nur, wenn er noch nicht benutzt wurde.
 describe('Gesamttimer: startIfIdle', () => {
   beforeEach(() => {

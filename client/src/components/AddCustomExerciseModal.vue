@@ -50,7 +50,7 @@
           <option value="other">{{ t('muscleGroups.other') }}</option>
         </select>
       </label>
-      <!-- Bei "Sonstiges" eine eigene Kategorie eingeben (Absprache Paul 23.10.). -->
+      <!-- Bei "Sonstiges" eine eigene Kategorie eingeben (Absprache Jimmy 23.10.). -->
       <label v-if="muscleGroup === 'other'" class="field">
         <span>{{ t('exercises.customCategoryLabel') }}</span>
         <input
@@ -127,7 +127,7 @@ const errorMsg = ref('')
 const selectedImageFile = ref(null)
 const imagePreviewUrl = ref('')
 const description = ref('')
-// Messart (Absprache Paul 15.10.): Gewicht + Wdh. (Standard), Zeit halten oder Wdh. in fester Zeit
+// Messart (Absprache Jimmy 15.10.): Gewicht + Wdh. (Standard), Zeit halten oder Wdh. in fester Zeit
 const measureMode = ref('weight')
 
 const isEditMode = computed(() => Boolean(props.exercise?._id))

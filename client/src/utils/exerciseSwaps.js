@@ -1,6 +1,6 @@
 import { CURATED_SWAPS } from '@/data/exerciseSwapList'
 
-// Ersatz-Vorschläge für „Übung wechseln“ (Absprache Paul 28.10.): zuerst die handgepflegte Liste für die Grundübungen,
+// Ersatz-Vorschläge für „Übung wechseln“ (Absprache Jimmy 28.10.): zuerst die handgepflegte Liste für die Grundübungen,
 // sonst/zusätzlich automatisch nach Zielmuskel, Gerät und Schwierigkeit. Bei freien Gewichten kommen geführte Maschinen
 // zuerst - wer die Übung noch nicht sicher beherrscht, muss dort nichts ausbalancieren.
 

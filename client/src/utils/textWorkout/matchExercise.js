@@ -5,7 +5,7 @@
 //   match('Seitheben')   -> { status: 'ambiguous', candidates: [...] }            (Rückfrage mit Auswahl)
 //   match('Face Pulls')  -> { status: 'not_found', suggestions: [...] }            (nie raten, nie still neu anlegen)
 //
-// Regeln (Absprache Paul): Falsch erkannte Daten sind schlimmer als ein langsamerer Einstieg.
+// Regeln (Absprache Jimmy): Falsch erkannte Daten sind schlimmer als ein langsamerer Einstieg.
 // - "matched" nur bei genau einer sicheren Übung. Eine Standardwahl ohne Nutzerangabe (z. B. "Bankdrücken" -> Langhantel)
 //   ist sichtbar als assumed: ["variant"] markiert.
 // - Hat der Nutzer ein Merkmal genannt (Kurzhantel, Kabel, sitzend ...), das keine Katalogübung des Begriffs hat, wird NICHT

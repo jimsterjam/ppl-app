@@ -12,7 +12,7 @@
 let lockCount = 0
 let saved = null
 
-// iOS/WKWebView ignoriert `overflow: hidden` am body beim Wischen: die Seite scrollte hinter Fenstern weiter (Paul 11.11.).
+// iOS/WKWebView ignoriert `overflow: hidden` am body beim Wischen: die Seite scrollte hinter Fenstern weiter (Jimmy 11.11.).
 // Darum zusätzlich Wischbewegungen abfangen, die nicht in einem scrollbaren Bereich des Fensters liegen (Listen,
 // Drehräder scrollen weiter), und das Weiterreichen des Scrollens am Ende solcher Bereiche an die Seite unterbinden.
 // Bewusst NICHT body fixieren: das setzte window.scrollY auf 0 (gespeicherte Workout-Position), ließ die

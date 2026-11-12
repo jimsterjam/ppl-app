@@ -3,7 +3,7 @@ import { setActivePinia, createPinia } from 'pinia'
 import { useThemeStore } from '../themeStore.js'
 import { setActiveUid } from '../../utils/userScopedStorage.js'
 
-// Absprache Paul 12.10.: Erstinstallation = dunkel + Lime, egal was das iPhone eingestellt hat.
+// Absprache Jimmy 12.10.: Erstinstallation = dunkel + Lime, egal was das iPhone eingestellt hat.
 describe('Theme-Standard bei Erstinstallation', () => {
   let store
   beforeEach(() => {

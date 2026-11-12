@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 
-// Sprechblasen (Absprache Paul 29.10.): kurze Hinweise, die beim ersten Besuch einer Seite auf ein Bedienelement zeigen
+// Sprechblasen (Absprache Jimmy 29.10.): kurze Hinweise, die beim ersten Besuch einer Seite auf ein Bedienelement zeigen
 // (Wochenstreifen, Heute, Übung wechseln, Reihenfolge, Timer). Jede Blase erscheint einmal; „Verstanden“ merkt sie sich.
 // Der Stand liegt je Konto lokal auf dem Gerät (localStorage, gleiches Schlüssel-Muster wie onboardingStore.js) - es
 // gibt bewusst keinen Server-Abgleich: Das Zurücksetzen in den Einstellungen wirkt sofort und ohne Netz.

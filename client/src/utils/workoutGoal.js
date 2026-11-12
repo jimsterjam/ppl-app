@@ -5,7 +5,7 @@
 
 export const WORKOUT_GOALS = Object.freeze(['hypertrophy', 'strength', 'explosive', 'technique'])
 
-// Der KI-Workout-Generator kennt nur diese beiden Ziele (Absprache Paul 19.10.).
+// Der KI-Workout-Generator kennt nur diese beiden Ziele (Absprache Jimmy 19.10.).
 export const GENERATOR_GOALS = Object.freeze(['hypertrophy', 'strength'])
 
 // i18n-Schlüssel für Anzeigenamen und Wiederholungsbereich je Ziel.

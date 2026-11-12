@@ -13,7 +13,7 @@ vi.mock('@/utils/restEndSignal', () => ({
 
 import { useRestTimerStore } from '../restTimerStore.js'
 
-// Absprache Paul 20.10.: Vor Zeitübungen Ton bei 10 s und Zähltöne 3-2-1 vor dem Pausenende.
+// Absprache Jimmy 20.10.: Vor Zeitübungen Ton bei 10 s und Zähltöne 3-2-1 vor dem Pausenende.
 describe('Pausentimer: Töne vor dem Ende', () => {
   let rest
   beforeEach(() => {

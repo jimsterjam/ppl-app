@@ -41,7 +41,7 @@ describe('syncTrainingReminder', () => {
     expect(ln.cancel).toHaveBeenCalledWith({ notifications: [{ id: TRAINING_REMINDER_ID }] })
     const [{ notifications }] = ln.schedule.mock.calls[0]
     expect(notifications[0].id).toBe(TRAINING_REMINDER_ID)
-    // Ton aus dem App-Bundle (ohne Ton blieb die Mitteilung auf dem iPhone stumm, Paul 11.11.)
+    // Ton aus dem App-Bundle (ohne Ton blieb die Mitteilung auf dem iPhone stumm, Jimmy 11.11.)
     expect(notifications[0].sound).toBe('training-reminder.wav')
     expect(notifications[0].schedule.at).toEqual(at)
     expect(JSON.parse(readPref('training-reminder-last')).pauseKey).toBe('2026-11-09')

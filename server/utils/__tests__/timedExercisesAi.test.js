@@ -4,7 +4,7 @@ import { analyzeWorkoutProgression, structureAnalysisForAI, compareTimedExercise
 import OpenAIProvider, { getCoachSystemPromptText } from '../../services/OpenAIProvider.js'
 import { calculateExerciseVolume } from '../workoutMetrics.js'
 
-// Absprache Paul 15.10.: Messarten "Zeit halten" und "Wiederholungen in Zeit" - keine kg-Auswertung.
+// Absprache Jimmy 15.10.: Messarten "Zeit halten" und "Wiederholungen in Zeit" - keine kg-Auswertung.
 const plank = (secs, date, id) => ({
   _id: id, date, completed: true,
   exercises: [{ name: 'Plank', measureMode: 'time', setDetails: secs.map((s) => ({ durationSeconds: s, done: true })) }]

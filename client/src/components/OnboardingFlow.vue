@@ -61,7 +61,7 @@ import { useScrollLock } from '@/composables/useScrollLock'
 import { useI18n } from 'vue-i18n'
 import { useSettingsStore } from '@/stores/settingsStore'
 
-// Seite dahinter nicht scrollbar, solange die Einführung offen ist (Fund Paul 11.11.)
+// Seite dahinter nicht scrollbar, solange die Einführung offen ist (Fund Jimmy 11.11.)
 const scrollLock = useScrollLock()
 onMounted(scrollLock.lock)
 onBeforeUnmount(scrollLock.unlock)
@@ -71,7 +71,7 @@ onBeforeUnmount(scrollLock.unlock)
 // Router-Guards/Resume-Snapshot/Auth-Redirect in main.js überschnitten. Als reines Overlay über
 // der aktuellen Seite blockiert es keine bestehende Navigation.
 // Schritt 2 ("So machst du wirklich Fortschritte") ist die einzige Seite mit einer Liste statt
-// Fließtext - daher totalSteps (jetzt 8, Absprache Paul 22.10. und 29.10.: Seite „Trainingspläne“) und ein eigenes Flag, das im Template die Regel-Liste
+// Fließtext - daher totalSteps (jetzt 8, Absprache Jimmy 22.10. und 29.10.: Seite „Trainingspläne“) und ein eigenes Flag, das im Template die Regel-Liste
 // zusätzlich zum normalen step2Text rendert (siehe onboarding.rulesItem1-5 in i18n/index.js).
 const totalSteps = 8
 const RULES_STEP_INDEX = 1

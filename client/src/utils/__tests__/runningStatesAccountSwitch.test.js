@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 
-// Laufende Zustände gehören zum Konto (Absprache Paul 06.11.2026, zweite Gruppe): Kontowechsel und Abmelden beenden Pause,
+// Laufende Zustände gehören zum Konto (Absprache Jimmy 06.11.2026, zweite Gruppe): Kontowechsel und Abmelden beenden Pause,
 // Aufwärm-Timer, Übergang, Timer und Stoppuhr des bisherigen Kontos; ein Kaltstart mit demselben Konto stellt sie wieder her.
 const post = vi.hoisted(() => vi.fn(async () => ({ data: { feedback_ready: true } })))
 // Haken, um mitten in einem asynchronen Schritt das Konto zu wechseln

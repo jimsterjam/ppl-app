@@ -1,4 +1,4 @@
-// Warm-up-Karte oben im Workout (Absprache Paul 11.10.): drei Schritte zum Abhaken.
+// Warm-up-Karte oben im Workout (Absprache Jimmy 11.10.): drei Schritte zum Abhaken.
 //   1. Cardio (5 Min., Timer)   2. Gelenke aufwärmen (2 Min., Timer)   3. eine einfache Körpergewichts-Übung
 // zur ersten Hauptübung (einmal, kein Timer). Danach folgen wie bisher die Aufwärmsätze der Übungen
 // (isWarmup-Sätze), die dieses Feature nicht ändert.
@@ -11,7 +11,7 @@ export const WARMUP_JOINTS_SECONDS = 2 * 60
 // Schritte mit Timer
 export const WARMUP_TIMER_SECONDS = Object.freeze({ cardio: WARMUP_CARDIO_SECONDS, joints: WARMUP_JOINTS_SECONDS })
 
-// Zeit je Timer-Schritt ist nur eine Empfehlung (Absprache Paul 14.10.): der Nutzer stellt sie in 15-s-Schritten
+// Zeit je Timer-Schritt ist nur eine Empfehlung (Absprache Jimmy 14.10.): der Nutzer stellt sie in 15-s-Schritten
 // selbst ein, die App merkt sich die gewählte Zeit je Schritt.
 export const WARMUP_ADJUST_SECONDS = 15
 export const WARMUP_MIN_SECONDS = 15

@@ -1,4 +1,4 @@
-// Feedback per E-Mail (Absprache Paul 02.11.): statt eines Formulars öffnet die App eine vorbereitete Mail an die
+// Feedback per E-Mail (Absprache Jimmy 02.11.): statt eines Formulars öffnet die App eine vorbereitete Mail an die
 // Kontaktadresse aus dem Impressum. Technische Angaben stehen sichtbar im Mailtext, der Nutzer kann sie löschen.
 // Nie Trainingsdaten, Notizen oder KI-Texte.
 import { App as CapacitorApp } from '@capacitor/app'

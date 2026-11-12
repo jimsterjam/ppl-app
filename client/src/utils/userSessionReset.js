@@ -1,6 +1,6 @@
 // Kontowechsel in derselben App-Sitzung (Abmelden und mit einem anderen Konto anmelden): Speicher, die zum bisherigen Konto
 // gehören, werden geleert. Sonst zeigt das neue Konto zunächst den Plan und die Monatsberichte des vorherigen und fragt
-// mit dessen noch zwischengespeichertem Token beim Server an (Absprache Paul 05.11.). Aufgerufen in main.js beim Abmelden
+// mit dessen noch zwischengespeichertem Token beim Server an (Absprache Jimmy 05.11.). Aufgerufen in main.js beim Abmelden
 // und bei jeder Anmeldung mit geänderter Nutzer-ID (auch bei der ersten Anmeldung nach einem Kaltstart ohne gemerktes Konto).
 
 /**

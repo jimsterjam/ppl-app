@@ -1,4 +1,4 @@
-// Übergangs-Stoppuhr (Absprache Paul 24.10.): läuft nach dem letzten Satz einer Übung hoch, bis die nächste
+// Übergangs-Stoppuhr (Absprache Jimmy 24.10.): läuft nach dem letzten Satz einer Übung hoch, bis die nächste
 // Übung gestartet wird ("Übergang zur nächsten Übung"). Anders als die Pause kennt sie kein Ziel, keinen Ton und
 // keine Mitteilung - wie lange der Wechsel dauert (Gerät besetzt, weiter Weg), weiß vorher niemand.
 // Zeitbasis ist der Startzeitpunkt, damit die Zeit bei gesperrtem Display bzw. nach App-Neustart stimmt.

@@ -17,7 +17,7 @@ import {
   dismissNotificationHint, isNotificationHintDismissed
 } from '../notificationPermission.js'
 
-// Absprache Paul 11.10.: iOS fragt nur einmal. Wer "Nicht erlauben" getippt hat, bekommt in der App einen Hinweis
+// Absprache Jimmy 11.10.: iOS fragt nur einmal. Wer "Nicht erlauben" getippt hat, bekommt in der App einen Hinweis
 // mit Knopf zu den iPhone-Einstellungen.
 describe('Mitteilungs-Erlaubnis', () => {
   beforeEach(() => {

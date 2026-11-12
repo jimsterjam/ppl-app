@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 
-// Kontowechsel auf demselben Gerät (Absprache Paul 06.11.2026): Das zweite Konto übernimmt keine Einstellungen des
+// Kontowechsel auf demselben Gerät (Absprache Jimmy 06.11.2026): Das zweite Konto übernimmt keine Einstellungen des
 // ersten, das erste bekommt seine eigenen beim Zurückwechseln wieder.
 vi.mock('@capacitor/core', () => ({ Capacitor: { getPlatform: () => 'ios', isNativePlatform: () => false }, registerPlugin: () => ({}) }))
 vi.mock('@capacitor-community/keep-awake', () => ({ KeepAwake: { keepAwake: async () => {}, allowSleep: async () => {}, isSupported: async () => ({ isSupported: false }) } }))

@@ -32,7 +32,7 @@ const customExerciseSchema = new mongoose.Schema({
     trim: true,
     maxlength: 500
   },
-  // Messart (Absprache Paul 15.10.): 'weight' = Wdh. + kg (Standard), 'time' = Zeit halten (Sek.),
+  // Messart (Absprache Jimmy 15.10.): 'weight' = Wdh. + kg (Standard), 'time' = Zeit halten (Sek.),
   // 'repsTime' = Wiederholungen in einer festen Zeit. Unbekannte Werte -> 'weight'.
   measureMode: {
     type: String,

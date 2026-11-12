@@ -1,4 +1,4 @@
-// Vorgaben des Workout-Generators je Trainingsziel und Übungsrolle (Schritt A, Absprache Paul):
+// Vorgaben des Workout-Generators je Trainingsziel und Übungsrolle (Schritt A, Absprache Jimmy):
 //   Muskelaufbau: alle Übungen 8-12 Wdh., 2-4 Sätze (Standard 3).
 //   Kraft:        Grundübungen 3-6 Wdh. (7 = Übergang, ab da zu leicht), 3-5 Sätze (Standard 4);
 //                 Zubehör/Isolation 8-12 Wdh., 2-4 Sätze (Standard 3).

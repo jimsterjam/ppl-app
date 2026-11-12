@@ -75,7 +75,7 @@ const workoutSchema = new mongoose.Schema({
     // Vom Nutzer gemerkte Pausendauer zwischen Sätzen in Sekunden (Pausentimer); fehlt = Standard
     // je Trainingsart (client/src/utils/restTimerRules.js).
     restSeconds: { type: Number, min: 15, max: 600 },
-    // Messart der Übung (Absprache Paul 15.10.): fehlt = 'weight' (Wdh. + kg). 'time' = Zeit halten,
+    // Messart der Übung (Absprache Jimmy 15.10.): fehlt = 'weight' (Wdh. + kg). 'time' = Zeit halten,
     // 'repsTime' = Wiederholungen in fester Zeit - die Zeit steht je Satz in setDetails.durationSeconds.
     measureMode: { type: String, enum: ['time', 'repsTime'], default: undefined, set: (value) => (['time', 'repsTime'].includes(value) ? value : undefined) },
     // Tatsächlich bewegtes externes Gewicht für diese Übung in dieser Session (Kap. 24.2:

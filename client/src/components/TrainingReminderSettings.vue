@@ -1,5 +1,5 @@
 <template>
-  <!-- Trainings-Erinnerung in den Einstellungen (Absprache Paul 11.11.): an/aus, Uhrzeit (Vorgaben oder eigene Zeit). -->
+  <!-- Trainings-Erinnerung in den Einstellungen (Absprache Jimmy 11.11.): an/aus, Uhrzeit (Vorgaben oder eigene Zeit). -->
   <div class="reminder-settings">
     <p class="hint">{{ t('trainingReminder.settingsHint') }}</p>
     <ToggleSwitch :model-value="settings.trainingReminderEnabled" @update:model-value="toggle">
@@ -24,7 +24,7 @@
         </button>
       </div>
     </template>
-    <!-- Eigene Uhrzeit (Absprache Paul 11.11.): Tipp auf „Eigene“ öffnet sofort dieses Fenster, jede Uhrzeit erlaubt. -->
+    <!-- Eigene Uhrzeit (Absprache Jimmy 11.11.): Tipp auf „Eigene“ öffnet sofort dieses Fenster, jede Uhrzeit erlaubt. -->
     <AppModal
       v-model="customModal"
       type="info"

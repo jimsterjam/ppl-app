@@ -215,7 +215,7 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
-  // Ein bereits gespeichertes Workout wurde nur angepasst (Absprache Paul 24.10.): zusammen mit deferred.
+  // Ein bereits gespeichertes Workout wurde nur angepasst (Absprache Jimmy 24.10.): zusammen mit deferred.
   edited: {
     type: Boolean,
     default: false
@@ -239,7 +239,7 @@ const notDoneExercises = computed(() => {
 })
 
 const showSummary = ref(true)
-// Seite dahinter sperren, solange die Zusammenfassung offen ist (Fund Paul 11.11.)
+// Seite dahinter sperren, solange die Zusammenfassung offen ist (Fund Jimmy 11.11.)
 const scrollLock = useScrollLock()
 // Erst nach dem Einhängen sperren: ein in setup gesetztes Sperren bliebe bei abgebrochenem Mount hängen (Review).
 onMounted(() => { if (showSummary.value) scrollLock.lock() })

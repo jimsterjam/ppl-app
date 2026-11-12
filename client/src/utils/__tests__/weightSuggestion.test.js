@@ -14,7 +14,7 @@ const squat = { name: 'Kniebeugen mit der Langhantel', name_en: 'barbell high ba
 const lateralRaise = { name: 'Seitheben Kurzhanteln', name_en: 'dumbbell lateral raise', category: 'Push', equipment: 'Kurzhanteln', aiMetadata: { exerciseType: 'compound' } }
 const crunch = { name: 'Crunch', name_en: 'crunch', category: 'Core', equipment: 'Körpergewicht', aiMetadata: { exerciseType: 'core' } }
 
-// Feste Kraft-Schemata: Steigern erst nach zweimal Schaffen (Absprache Paul 21.10.). Diese Tests prüfen die Vorschlags-Berechnung und
+// Feste Kraft-Schemata: Steigern erst nach zweimal Schaffen (Absprache Jimmy 21.10.). Diese Tests prüfen die Vorschlags-Berechnung und
 // simulieren deshalb eine bereits bestätigte Vorsession; die Bestätigungs-Regel selbst steht in 'Bestätigen vor dem Steigern'.
 const getWeightSuggestion = (info, last, goal, options = {}) =>
   rawGetWeightSuggestion(info, last, goal, { previousSessions: [last], ...options })
@@ -293,7 +293,7 @@ describe('Trainingsart-passende Historie und 7er-Übergang', () => {
   })
 })
 
-describe('Bestätigen vor dem Steigern (Absprache Paul 21.10.)', () => {
+describe('Bestätigen vor dem Steigern (Absprache Jimmy 21.10.)', () => {
   const at = (reps, weight = 100) => session(reps.map((r) => ({ reps: r, weight })))
 
   it('5x5 zum ersten Mal geschafft -> festigen, kein Gewichtsvorschlag', () => {

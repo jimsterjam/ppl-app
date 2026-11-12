@@ -2,7 +2,7 @@
   <div class="exercise-list-root">
     <h1 v-if="showTitle" class="text-3xl font-bold mb-6">{{ t('exercises.title') }}</h1>
 
-    <!-- Filter im Karten-Look der FAQ (Absprache Paul 26.10.): Typ + Muskelgruppe nebeneinander, darunter Equipment + Zurücksetzen. -->
+    <!-- Filter im Karten-Look der FAQ (Absprache Jimmy 26.10.): Typ + Muskelgruppe nebeneinander, darunter Equipment + Zurücksetzen. -->
     <div v-if="showControls" class="filter-grid">
       <div class="filter-line">
         <FilterDropdown
@@ -106,7 +106,7 @@
           </div>
           <p class="desc">{{ ex.renderedDescription }}</p>
           <p class="equip">{{ t('exercises.equipment') }}: {{ ex.renderedEquipment || ex.equipment }}</p>
-          <!-- Eigene Übungen (Absprache Paul 23.10.): Titel + Bild in einer Zeile, darunter Beschreibung, dann Bearbeiten/Löschen. -->
+          <!-- Eigene Übungen (Absprache Jimmy 23.10.): Titel + Bild in einer Zeile, darunter Beschreibung, dann Bearbeiten/Löschen. -->
           <div v-if="ex._isCustom" class="custom-actions custom-actions--row">
             <button
               class="custom-action-btn"
@@ -605,7 +605,7 @@ function openMedia(exercise) {
   }).catch(() => {})
 }
 
-// Kein Video vorhanden oder nicht ladbar: stattdessen das Foto groß zeigen (Absprache Paul).
+// Kein Video vorhanden oder nicht ladbar: stattdessen das Foto groß zeigen (Absprache Jimmy).
 function onMediaVideoError() {
   if (!mediaExercise.value) return
   // Spätere Ergebnisse von resolveExerciseMedia für diese Anfrage verwerfen (sonst käme das Video zurück).

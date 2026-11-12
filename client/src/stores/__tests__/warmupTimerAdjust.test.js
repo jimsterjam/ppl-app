@@ -16,7 +16,7 @@ vi.mock('@/stores/restTimerStore', () => ({ useRestTimerStore: () => ({ soundId:
 import { useWarmupTimerStore } from '../warmupTimerStore.js'
 import { clampWarmupSeconds, sanitizeWarmupDurations, WARMUP_MAX_SECONDS, WARMUP_MIN_SECONDS } from '../../utils/warmupPlan.js'
 
-// Absprache Paul 14.10.: Die Warm-up-Zeiten sind nur eine Empfehlung - ±15 s, die Wahl wird gemerkt.
+// Absprache Jimmy 14.10.: Die Warm-up-Zeiten sind nur eine Empfehlung - ±15 s, die Wahl wird gemerkt.
 describe('Warm-up-Zeit anpassen', () => {
   let storage
   beforeEach(() => {

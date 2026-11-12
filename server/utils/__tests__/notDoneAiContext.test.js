@@ -5,7 +5,7 @@ import {
 } from '../../services/trainingAnalysisService.js'
 import OpenAIProvider, { getCoachSystemPromptText } from '../../services/OpenAIProvider.js'
 
-// Absprache Paul 13.10.: Nicht gemachte Übungen bleiben gespeichert; die KI bekommt "nicht gemacht" + Notiz, aber keine Zahlen.
+// Absprache Jimmy 13.10.: Nicht gemachte Übungen bleiben gespeichert; die KI bekommt "nicht gemacht" + Notiz, aber keine Zahlen.
 const workout = () => ({
   _id: 'w1',
   date: '2026-10-13',

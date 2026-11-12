@@ -17,7 +17,7 @@ const VARIANT_MARKERS = [
   'sitzend', 'neutral', 'sumo', 'rumanisch', 'rumanisches', 'variante'
 ]
 
-// Hauptübungen: Suche nach genau diesem Begriff zeigt zuerst die Basisübungen (Absprache Paul 15.10.), danach die
+// Hauptübungen: Suche nach genau diesem Begriff zeigt zuerst die Basisübungen (Absprache Jimmy 15.10.), danach die
 // Varianten. `basics` = englische Katalognamen (normalisiert, Bindestrich = Leerzeichen) in fester Reihenfolge.
 const CANONICAL_GROUPS = [
   {

@@ -16,7 +16,7 @@
 //
 // "eine klare Steigerung" nur, wenn mindestens ein Wert gestiegen und keiner gesunken ist.
 //
-// Mehr Gewicht, leicht weniger Wiederholungen (Absprache Paul 29.10.): Das ist ein normaler Schritt nach vorn, kein
+// Mehr Gewicht, leicht weniger Wiederholungen (Absprache Jimmy 29.10.): Das ist ein normaler Schritt nach vorn, kein
 // Minus. Dann bleibt die Steigerung vorn, ein „insgesamt x % weniger Gewicht bewegt“ entfällt (es ist nur die Folge),
 // und der Satz schließt mit „bei mehr Gewicht ganz normal“. „Leicht“ = höchstens 2 Wdh. je Satz bzw. 3 insgesamt (ohne
 // Satzdaten) und nicht weniger Sätze.

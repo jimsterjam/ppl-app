@@ -177,7 +177,7 @@ html {
 }
 
 [data-theme="light"][data-accent="ocean"] {
-  /* Dunkleres Blau mit weißer Schrift/Icons auf Knöpfen (Kontrast >= 4,5:1, Absprache Paul 18.10.). */
+  /* Dunkleres Blau mit weißer Schrift/Icons auf Knöpfen (Kontrast >= 4,5:1, Absprache Jimmy 18.10.). */
   --accent: #2a6ec4;
   --accent-strong: #2c72c9;
   --accent-contrast: #ffffff;
@@ -188,7 +188,7 @@ html {
 }
 
 [data-theme="light"][data-accent="violet"] {
-  /* Weiße Schrift/Icons auf Knöpfen, Kontrast >= 4,5:1 (Absprache Paul 18.10.). */
+  /* Weiße Schrift/Icons auf Knöpfen, Kontrast >= 4,5:1 (Absprache Jimmy 18.10.). */
   --accent: #7650cc;
   --accent-strong: #7c58d2;
   --accent-contrast: #ffffff;
@@ -199,7 +199,7 @@ html {
 }
 
 [data-theme="light"][data-accent="sunset"] {
-  /* Weiße Schrift/Icons auf Knöpfen, Kontrast >= 4,5:1 (Absprache Paul 18.10.). */
+  /* Weiße Schrift/Icons auf Knöpfen, Kontrast >= 4,5:1 (Absprache Jimmy 18.10.). */
   --accent: #b84f27;
   --accent-strong: #c0532a;
   --accent-contrast: #ffffff;
@@ -651,7 +651,7 @@ p { line-height: 1.6; }
 }
 
 /* --------------------------------------------------------------------------
-   Auswahlfelder (Dropdowns) und Knöpfe, die etwas aufklappen: immer mit Pfeil (Absprache Paul 16.10.)
+   Auswahlfelder (Dropdowns) und Knöpfe, die etwas aufklappen: immer mit Pfeil (Absprache Jimmy 16.10.)
    Der Pfeil sitzt mit !important, weil Komponenten-Regeln mit `background:` ihn sonst überschreiben würden
    (z. B. Filter in der Übungsliste, Messart im ⋮-Menü).
 --------------------------------------------------------------------------- */

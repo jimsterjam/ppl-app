@@ -130,7 +130,7 @@ export async function deleteCustomExercise(id, token = null) {
 }
 
 /**
- * Gleicht die eigenen Übungen nach dem Login mit dem Server ab (Absprache Paul 11.10.: nach einer Neuinstallation
+ * Gleicht die eigenen Übungen nach dem Login mit dem Server ab (Absprache Jimmy 11.10.: nach einer Neuinstallation
  * waren sie weg, weil nur der lokale Speicher gelesen und die Server-Liste nie geladen wurde):
  *  1. Nur offline angelegte Übungen (lokale custom_-ID, _pendingSync) werden zum Server hochgeladen.
  *  2. Danach wird die Server-Liste geladen und lokal zwischengespeichert.

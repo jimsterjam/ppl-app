@@ -22,7 +22,7 @@ Neue Entscheidungen hier ergänzen (Datum, Entscheidung, Grund in einem Satz).
 Übungsnamen sind immer englisch. Navigation bleibt „Home · Stats · Übungen · FAQs · Einst.“.
 
 ## Entscheidungen
-- **Git/Cloud:** Nie auf `main`; Branch `claude/<kurz>` + PR; Paul mergt. Keine Produktionszugriffe.
+- **Git/Cloud:** Nie auf `main`; Branch `claude/<kurz>` + PR; Jimmy mergt. Keine Produktionszugriffe.
 - **Texte:** Alles DE+EN über `t()`; neue Features/UI/Texte erst als Vorschlag.
 - **Gilt überall gleich:** Workout-Funktionen in selbst erstellten, generierten und Favoriten-Workouts identisch.
 - **Abhaken:** Leiste unter dem aktuellen Satz („Variante B“), kein extra Block; Pause im Pausentimer.

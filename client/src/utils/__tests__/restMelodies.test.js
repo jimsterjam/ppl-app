@@ -7,7 +7,7 @@ import {
   noteHz, sanitizeRestSound, alarmSoundFile, alarmFileSeconds, renderAlarmSamples
 } from '../restMelodies.js'
 
-// Wunsch Paul 10.10.: mehrere Melodien zur Auswahl für das Pausenende. Dieselben Noten spielt die App
+// Wunsch Jimmy 10.10.: mehrere Melodien zur Auswahl für das Pausenende. Dieselben Noten spielt die App
 // (Web Audio) und der Generator für die Wecker-Dateien (iOS).
 const iosDir = resolve(dirname(fileURLToPath(import.meta.url)), '../../../ios/App')
 

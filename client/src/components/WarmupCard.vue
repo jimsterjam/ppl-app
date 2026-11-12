@@ -1,9 +1,9 @@
 <template>
-  <!-- Warm-up am Anfang jedes laufenden Workouts (Absprache Paul 11.10.): nicht einklappbar, drei Zeilen zum
+  <!-- Warm-up am Anfang jedes laufenden Workouts (Absprache Jimmy 11.10.): nicht einklappbar, drei Zeilen zum
        Abhaken. Cardio und Gelenke haben einen Timer (läuft nach "Start", hakt den Schritt am Ende selbst ab),
        der dritte Schritt ist eine einfache Körpergewichts-Übung. Überspringen = nicht abhaken. -->
   <section class="warmup-card" :aria-label="t('warmup.title')">
-    <!-- Standardmäßig offen, per Tipp auf die Überschrift zuklappbar (Absprache Paul 23.10.). Läuft ein Timer, bleibt
+    <!-- Standardmäßig offen, per Tipp auf die Überschrift zuklappbar (Absprache Jimmy 23.10.). Läuft ein Timer, bleibt
          die Restzeit auch zugeklappt sichtbar. -->
     <button type="button" class="warmup-head" :aria-expanded="open" @click="open = !open">
       <h3 class="warmup-title">{{ t('warmup.title') }} <span class="warmup-optional">{{ t('warmup.optional') }}</span></h3>
@@ -59,7 +59,7 @@
     </ul>
     </template>
 
-    <!-- Große Anzeige wie beim Pausentimer (Absprache Paul 24.10.): öffnet beim Start eines Timer-Schritts, zeigt danach den
+    <!-- Große Anzeige wie beim Pausentimer (Absprache Jimmy 24.10.): öffnet beim Start eines Timer-Schritts, zeigt danach den
          nächsten Schritt (Cardio/Gelenke mit einstellbarer Zeit, Standard 2 Min. für Gelenke; gemerkt) bzw. die Empfehlung für
          die einfache Übung. "Verkleinern" bringt zurück zur Karte. -->
     <Teleport to="body">

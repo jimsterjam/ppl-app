@@ -1,5 +1,5 @@
-// Trainingsplan (Absprache Paul 28.10.): geordnete Reihe von Trainingstagen. Ein Tag enthält seine Übungen selbst
-// (Pläne aus Vorlagen, getrennt von den Favoriten); ältere Pläne und Tage, die Paul selbst aus Favoriten hinzufügt,
+// Trainingsplan (Absprache Jimmy 28.10.): geordnete Reihe von Trainingstagen. Ein Tag enthält seine Übungen selbst
+// (Pläne aus Vorlagen, getrennt von den Favoriten); ältere Pläne und Tage, die Jimmy selbst aus Favoriten hinzufügt,
 // verweisen stattdessen auf einen Favoriten (utils/workoutFavorites.js). Der Plan richtet sich nach den Trainings, nicht nach dem Kalender ("Rotation"):
 // Nach dem Speichern eines Plan-Trainings rückt er zum Tag NACH dem trainierten vor, nach dem letzten Tag wieder zum
 // ersten. Reine Funktionen ohne Speicher/Netz - Speicherung und Server-Abgleich: utils/trainingPlanStorage.js.

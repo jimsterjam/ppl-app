@@ -1,4 +1,4 @@
-// Aufwärmsätze in der Großansicht (Absprache Paul 19.10.): vor dem ersten Arbeitssatz einer Übung, ohne Timer.
+// Aufwärmsätze in der Großansicht (Absprache Jimmy 19.10.): vor dem ersten Arbeitssatz einer Übung, ohne Timer.
 // Gibt den nächsten noch nicht erledigten Aufwärmsatz zurück oder null (kein Aufwärmsatz, schon alle erledigt
 // oder in dieser Übung wurde bereits ein Arbeitssatz abgehakt).
 // Erledigt/übersprungen steht als `warmupHandled` am Satz im Entwurf (übersteht App-Neustart) und wird beim

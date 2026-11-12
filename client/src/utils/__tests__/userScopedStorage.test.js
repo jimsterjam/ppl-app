@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-// Einstellungen gehören zum Konto, nicht zum Gerät (Absprache Paul 06.11.2026).
+// Einstellungen gehören zum Konto, nicht zum Gerät (Absprache Jimmy 06.11.2026).
 function installStorage(initial = {}) {
   const data = new Map(Object.entries(initial))
   vi.stubGlobal('localStorage', {

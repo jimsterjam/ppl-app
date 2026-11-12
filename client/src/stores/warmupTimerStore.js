@@ -1,4 +1,4 @@
-// Timer der Warm-up-Karte (Cardio 5 Min., Gelenke 2 Min.) - Absprache Paul 11.10.
+// Timer der Warm-up-Karte (Cardio 5 Min., Gelenke 2 Min.) - Absprache Jimmy 11.10.
 // Zeitbasis ist ein fester Endzeitpunkt (endsAt), damit der Timer auch bei gesperrtem Display bzw. nach einem
 // App-Neustart stimmt (wie stores/restTimerStore.js). Es läuft immer nur EIN Warm-up-Timer.
 //

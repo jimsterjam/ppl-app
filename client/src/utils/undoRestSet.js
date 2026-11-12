@@ -1,4 +1,4 @@
-// "Letzten Satz zurücknehmen" in der Pause (Absprache Paul 05.11.): den Satz, zu dem die laufende Pause gehört, wieder
+// "Letzten Satz zurücknehmen" in der Pause (Absprache Jimmy 05.11.): den Satz, zu dem die laufende Pause gehört, wieder
 // als offen markieren. Das eigentliche Umschalten (inkl. Beenden der Pause) macht toggleRowDone in WorkoutDetailView.
 //
 // Der Satz wird über das Satz-OBJEKT gefunden, nicht über Positionen: Positionen (Übung/Satznummer) ändern sich, wenn in

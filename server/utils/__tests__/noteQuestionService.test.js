@@ -35,7 +35,7 @@ function fakeClient(answers, { fail = false } = {}) {
 }
 
 describe('Fragen in Notizen: ganzer Weg mit gespielter KI', () => {
-  test('Trainingsfrage (Beispiel von Paul) bekommt eine geprüfte Antwort', async () => {
+  test('Trainingsfrage (Beispiel von Jimmy) bekommt eine geprüfte Antwort', async () => {
     const questions = extractNoteQuestions({ exerciseNotes: [{ exercise: 'Bench Press', note: 'Kann es sein, dass die Übung davor mich so ermüdet, dass ich hier nicht steigere?' }] })
     const client = fakeClient([{ id: 1, kind: 'training', answer: 'Das ist möglich: Barbell Squat kommt vor Bench Press. Halte nächstes Mal das Wiederholungsziel, bevor du steigerst.' }])
     const out = await answerNoteQuestions({ questions, structuredAnalysis: analysis, exerciseNames, deps: { client } })

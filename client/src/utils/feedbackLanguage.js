@@ -1,6 +1,6 @@
 // Sprache eines gespeicherten KI-Feedbacks. Der Server merkt sie sich seit neuem (ai_feedback_language); bei älteren
 // Einträgen wird sie am Text erkannt. Vergleichsteil und Coach-Text erscheinen in dieser Sprache, damit nach einem
-// Wechsel der App-Sprache nichts gemischt wird (Absprache Paul 02.11.).
+// Wechsel der App-Sprache nichts gemischt wird (Absprache Jimmy 02.11.).
 const DE_WORDS = new Set([
   'der', 'die', 'das', 'und', 'mit', 'nicht', 'bei', 'mehr', 'weniger', 'satz', 'sätze', 'wdh', 'heute', 'nächstes',
   'mal', 'gewicht', 'ganz', 'ist', 'dein', 'deine', 'du', 'hast', 'für', 'auf', 'ein', 'eine', 'zu', 'aber', 'noch',

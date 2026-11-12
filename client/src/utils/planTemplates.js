@@ -1,4 +1,4 @@
-// Vorlagen für Trainingspläne (Absprache Paul 28.10.): Tage mit Übungen aus dem Katalog (IDs aus data/default-exercises.json).
+// Vorlagen für Trainingspläne (Absprache Jimmy 28.10.): Tage mit Übungen aus dem Katalog (IDs aus data/default-exercises.json).
 // Jede Vorlage gibt es in zwei Stufen: Anfänger (Standard: geführte Maschinen, weniger Übungen und Sätze - die Maschine gibt
 // die Bewegung vor, man muss nichts ausbalancieren) und Fortgeschritten (freie Gewichte, mehr Umfang). Ziel ist immer
 // Muskelaufbau; nur die Sätze sind vorgegeben, Wiederholungen und Gewicht kommen wie bei jedem Workout aus dem Ziel bzw.

@@ -46,7 +46,7 @@ function hasStoredWeeklyGoal() {
   return Number.isFinite(stored) && stored > 0
 }
 
-// Trainings-Erinnerung (Absprache Paul 11.11.): pro Konto an/aus und Uhrzeit.
+// Trainings-Erinnerung (Absprache Jimmy 11.11.): pro Konto an/aus und Uhrzeit.
 const readReminderEnabled = () => readPref('training-reminder') === '1'
 const readReminderTime = () => sanitizeReminderTime(readPref('training-reminder-time'))
 

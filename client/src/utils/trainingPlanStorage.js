@@ -12,7 +12,7 @@ import {
   setActivePlan
 } from './trainingPlan'
 
-// Speicher für Trainingspläne (Absprache Paul 28.10.): localStorage pro Nutzer ist die primäre, sofort verfügbare Quelle;
+// Speicher für Trainingspläne (Absprache Jimmy 28.10.): localStorage pro Nutzer ist die primäre, sofort verfügbare Quelle;
 // jede Änderung wird best-effort und nicht blockierend an den Server gespiegelt (gleiches Muster wie die Favoriten in
 // utils/workoutFavorites.js, bewusst NICHT über die robuste Workout-Sync-Warteschlange). Die Logik selbst (Rotation,
 // Tage, Limits) steckt in utils/trainingPlan.js.

@@ -5,7 +5,7 @@ import { buildNextSessionFocus, buildProgressionStates } from '../nextSessionFoc
 import OpenAIProvider, { getCoachSystemPromptText } from '../../services/OpenAIProvider.js'
 import { getVerifierChecklistText, RULE_LABELS } from '../../services/feedbackVerificationService.js'
 
-// Absprache Paul 16.10.: Trainingsart "Technik" - keine Vorgaben, der Nutzer entscheidet selbst.
+// Absprache Jimmy 16.10.: Trainingsart "Technik" - keine Vorgaben, der Nutzer entscheidet selbst.
 const session = (reps, date, id, trainingType) => ({
   _id: id, date, completed: true, goal: 'strength',
   exercises: [{ name: 'Barbell High Bar Squat', ...(trainingType ? { trainingType } : {}), note: trainingType ? 'Fokus auf Tiefe' : undefined, setDetails: reps.map((r) => ({ reps: r, weight: 60, done: true })) }]
