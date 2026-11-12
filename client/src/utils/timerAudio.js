@@ -17,6 +17,8 @@
  */
 import { logDiagnostic } from '@/utils/diagnosticsLog'
 import { getRestMelody } from '@/utils/restMelodies'
+import { timerSoundFile } from '@/utils/timerSoundFiles'
+import { isNativeTimerSoundReady, playNativeTimerSound } from '@/utils/nativeTimerSound'
 
 let audioContext = null
 let audioMasterNode = null
@@ -214,6 +216,11 @@ export const ensureAudioUnlocked = () => {
   return true
 }
 
+// ---------------------------------------------------------------------------
+// KLANG-ÄNDERUNG: Auf iOS spielen Tondateien, die scripts/timerSoundSynth.mjs aus denselben Angaben nachrechnet.
+// Ändert sich ab hier ein Ton (bis shouldEmitSignal), dort nachziehen, `node scripts/generate-timer-sounds.mjs`
+// ausführen und die Prüfsumme in timerSoundFiles.test.js aktualisieren (der Test meldet sich).
+// ---------------------------------------------------------------------------
 export const playBeep = (frequency = 880, durationMs = 250, whenOffsetSec = 0, peakGain = 0.5) => {
   const ctx = getAudioContext()
   if (!ctx) return
@@ -560,55 +567,88 @@ export const clearSignalHistory = () => {
   signalHistory.clear()
 }
 
-export const emitTimerSignal = ({ eventKey, soundEnabled, soundType = 'box-gong', kind, melodyId = null }) => {
-  if (!shouldEmitSignal(eventKey)) return
+// Ein Ton, der so viel später als geplant käme, wird nicht mehr gespielt (Meldung 12.11.: nach dem Zurückkehren in
+// die App kamen aufgestaute Töne der vergangenen Pause).
+export const LATE_SIGNAL_MS = 1500
 
-  const play = () => {
+/**
+ * Timer-Ton spielen. Auf iOS über das Plugin TimerSound (utils/nativeTimerSound.js), sonst per Web Audio.
+ * @param {object} signal
+ * @param {number|null} [signal.dueAt] - geplanter Zeitpunkt (ms seit 1970); liegt er mehr als LATE_SIGNAL_MS zurück,
+ *   bleibt der Ton aus
+ */
+export const emitTimerSignal = ({ eventKey, soundEnabled, soundType = 'box-gong', kind, melodyId = null, dueAt = null }) => {
+  if (!shouldEmitSignal(eventKey)) return
+  const isLate = () => Number.isFinite(dueAt) && dueAt > 0 && Date.now() - dueAt > LATE_SIGNAL_MS
+  if (soundEnabled && isLate()) {
+    logDiagnostic('audio-late-drop', { kind, lateMs: Date.now() - dueAt })
+    return
+  }
+  const file = soundEnabled ? timerSoundFile({ kind, soundType, melodyId }) : null
+  if (file && isNativeTimerSoundReady()) {
+    // Klappt es über iOS nicht (Datei fehlt im Build, Spieler startet nicht): sofort per Web Audio. Ausnahme: App im
+    // Hintergrund - dann bleibt es still (Web Audio würde den Ton aufstauen und verspätet spielen).
+    playNativeTimerSound(file).then((result) => {
+      if (!result?.played && result?.reason !== 'background' && !isLate()) playWeb()
+    }, () => playWeb())
+    return
+  }
+  playWeb()
+
+  // Web Audio (Browser bzw. Rückfall ohne iOS-Plugin)
+  function playWeb() {
+    const play = () => {
+      try {
+        if (kind === 'round-start') {
+          playWhistleStart(1900)
+        } else if (kind === 'rest-end') {
+          // Pausenende: gewählte Melodie, ohne Auswahl bzw. bei 'default' der bisherige Gong.
+          if (!melodyId || !playRestMelody(melodyId)) playWhistleStart(1900)
+        } else if (kind === 'rest-warn') {
+          // Vorwarnung (10 s vor Pausenende bei Zeitübungen): ein einzelner, dezenter Ton.
+          playBell(0.4)
+        } else if (kind === 'session-end') {
+          playSiren(1200)
+        } else if (kind === 'countdown-3') {
+          if (soundType === 'box-gong') playBoxGong(0.45)
+          else if (soundType === 'chinese-gong') playChineseGong(0.4)
+          else if (soundType === 'bell') playBell(0.45)
+          else playBeep(900, 160, 0, 0.5)
+        } else if (kind === 'countdown-2') {
+          if (soundType === 'box-gong') playBoxGong(0.62)
+          else if (soundType === 'chinese-gong') playChineseGong(0.57)
+          else if (soundType === 'bell') playBell(0.62)
+          else playBeep(1120, 160, 0, 0.52)
+        } else if (kind === 'countdown-1') {
+          if (soundType === 'box-gong') playBoxGong(0.85)
+          else if (soundType === 'chinese-gong') playChineseGong(0.75)
+          else if (soundType === 'bell') playBell(0.85)
+          else playBeep(1360, 170, 0, 0.56)
+        }
+      } catch {}
+    }
+
     try {
-      if (kind === 'round-start') {
-        playWhistleStart(1900)
-      } else if (kind === 'rest-end') {
-        // Pausenende: gewählte Melodie, ohne Auswahl bzw. bei 'default' der bisherige Gong.
-        if (!melodyId || !playRestMelody(melodyId)) playWhistleStart(1900)
-      } else if (kind === 'rest-warn') {
-        // Vorwarnung (10 s vor Pausenende bei Zeitübungen): ein einzelner, dezenter Ton.
-        playBell(0.4)
-      } else if (kind === 'session-end') {
-        playSiren(1200)
-      } else if (kind === 'countdown-3') {
-        if (soundType === 'box-gong') playBoxGong(0.45)
-        else if (soundType === 'chinese-gong') playChineseGong(0.4)
-        else if (soundType === 'bell') playBell(0.45)
-        else playBeep(900, 160, 0, 0.5)
-      } else if (kind === 'countdown-2') {
-        if (soundType === 'box-gong') playBoxGong(0.62)
-        else if (soundType === 'chinese-gong') playChineseGong(0.57)
-        else if (soundType === 'bell') playBell(0.62)
-        else playBeep(1120, 160, 0, 0.52)
-      } else if (kind === 'countdown-1') {
-        if (soundType === 'box-gong') playBoxGong(0.85)
-        else if (soundType === 'chinese-gong') playChineseGong(0.75)
-        else if (soundType === 'bell') playBell(0.85)
-        else playBeep(1360, 170, 0, 0.56)
+      if (!soundEnabled) return
+      ensureAudioUnlocked()
+      const ctx = getAudioContext()
+      if (ctx && ctx.state !== 'running') {
+        // Kontext steht (z.B. 'interrupted' nach dem Hintergrund): erst starten, dann spielen. Klappt der Start nicht,
+        // NICHT spielen: der Ton bliebe im stehenden Kontext hängen und käme erst, wenn er wieder läuft - also verspätet
+        // (Meldung 12.11.). Beim nächsten Antippen wird der Kontext erneut aufgeweckt.
+        const before = ctx.state
+        ensureAudioRunning().then((running) => {
+          logDiagnostic('audio-signal-resume', { kind, before, running, state: getAudioContext()?.state })
+          if (!running) {
+            armGestureResume()
+            return
+          }
+          if (isLate()) return
+          play()
+        }, () => armGestureResume())
+        return
       }
+      play()
     } catch {}
   }
-
-  try {
-    if (!soundEnabled) return
-    ensureAudioUnlocked()
-    const ctx = getAudioContext()
-    if (ctx && ctx.state !== 'running') {
-      // Kontext steht (z.B. 'interrupted' nach dem Hintergrund): erst starten, dann spielen. Klappt der
-      // Start nicht, trotzdem spielen - und beim nächsten Antippen erneut aufwecken.
-      const before = ctx.state
-      ensureAudioRunning().then((running) => {
-        logDiagnostic('audio-signal-resume', { kind, before, running, state: getAudioContext()?.state })
-        if (!running) armGestureResume()
-        play()
-      }, play)
-      return
-    }
-    play()
-  } catch {}
 }

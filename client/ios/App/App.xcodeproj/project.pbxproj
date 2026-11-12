@@ -25,6 +25,26 @@
 		5E57E2D3A1B2C3D4E5F60718 /* RestAlarmPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E57E2D2A1B2C3D4E5F60718 /* RestAlarmPlugin.swift */; };
 		5E57E2D5A1B2C3D4E5F60718 /* MainViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E57E2D4A1B2C3D4E5F60718 /* MainViewController.swift */; };
 		A084ECDBA7D38E1E42DFC39D /* Pods_App.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */; };
+		7A1E5D100002A1B2C3D4E5F6 /* timer-whistle.wav in Resources */ = {isa = PBXBuildFile; fileRef = 7A1E5D100001A1B2C3D4E5F6 /* timer-whistle.wav */; };
+		7A1E5D100004A1B2C3D4E5F6 /* timer-bell-warn.wav in Resources */ = {isa = PBXBuildFile; fileRef = 7A1E5D100003A1B2C3D4E5F6 /* timer-bell-warn.wav */; };
+		7A1E5D100006A1B2C3D4E5F6 /* timer-siren.wav in Resources */ = {isa = PBXBuildFile; fileRef = 7A1E5D100005A1B2C3D4E5F6 /* timer-siren.wav */; };
+		7A1E5D100008A1B2C3D4E5F6 /* timer-boxgong-1.wav in Resources */ = {isa = PBXBuildFile; fileRef = 7A1E5D100007A1B2C3D4E5F6 /* timer-boxgong-1.wav */; };
+		7A1E5D10000AA1B2C3D4E5F6 /* timer-boxgong-2.wav in Resources */ = {isa = PBXBuildFile; fileRef = 7A1E5D100009A1B2C3D4E5F6 /* timer-boxgong-2.wav */; };
+		7A1E5D10000CA1B2C3D4E5F6 /* timer-boxgong-3.wav in Resources */ = {isa = PBXBuildFile; fileRef = 7A1E5D10000BA1B2C3D4E5F6 /* timer-boxgong-3.wav */; };
+		7A1E5D10000EA1B2C3D4E5F6 /* timer-chinesegong-1.wav in Resources */ = {isa = PBXBuildFile; fileRef = 7A1E5D10000DA1B2C3D4E5F6 /* timer-chinesegong-1.wav */; };
+		7A1E5D100010A1B2C3D4E5F6 /* timer-chinesegong-2.wav in Resources */ = {isa = PBXBuildFile; fileRef = 7A1E5D10000FA1B2C3D4E5F6 /* timer-chinesegong-2.wav */; };
+		7A1E5D100012A1B2C3D4E5F6 /* timer-chinesegong-3.wav in Resources */ = {isa = PBXBuildFile; fileRef = 7A1E5D100011A1B2C3D4E5F6 /* timer-chinesegong-3.wav */; };
+		7A1E5D100014A1B2C3D4E5F6 /* timer-bell-1.wav in Resources */ = {isa = PBXBuildFile; fileRef = 7A1E5D100013A1B2C3D4E5F6 /* timer-bell-1.wav */; };
+		7A1E5D100016A1B2C3D4E5F6 /* timer-bell-2.wav in Resources */ = {isa = PBXBuildFile; fileRef = 7A1E5D100015A1B2C3D4E5F6 /* timer-bell-2.wav */; };
+		7A1E5D100018A1B2C3D4E5F6 /* timer-bell-3.wav in Resources */ = {isa = PBXBuildFile; fileRef = 7A1E5D100017A1B2C3D4E5F6 /* timer-bell-3.wav */; };
+		7A1E5D10001AA1B2C3D4E5F6 /* timer-beep-1.wav in Resources */ = {isa = PBXBuildFile; fileRef = 7A1E5D100019A1B2C3D4E5F6 /* timer-beep-1.wav */; };
+		7A1E5D10001CA1B2C3D4E5F6 /* timer-beep-2.wav in Resources */ = {isa = PBXBuildFile; fileRef = 7A1E5D10001BA1B2C3D4E5F6 /* timer-beep-2.wav */; };
+		7A1E5D10001EA1B2C3D4E5F6 /* timer-beep-3.wav in Resources */ = {isa = PBXBuildFile; fileRef = 7A1E5D10001DA1B2C3D4E5F6 /* timer-beep-3.wav */; };
+		7A1E5D100020A1B2C3D4E5F6 /* timer-melody-deep.wav in Resources */ = {isa = PBXBuildFile; fileRef = 7A1E5D10001FA1B2C3D4E5F6 /* timer-melody-deep.wav */; };
+		7A1E5D100022A1B2C3D4E5F6 /* timer-melody-chimes.wav in Resources */ = {isa = PBXBuildFile; fileRef = 7A1E5D100021A1B2C3D4E5F6 /* timer-melody-chimes.wav */; };
+		7A1E5D100024A1B2C3D4E5F6 /* timer-melody-marimba.wav in Resources */ = {isa = PBXBuildFile; fileRef = 7A1E5D100023A1B2C3D4E5F6 /* timer-melody-marimba.wav */; };
+		7A1E5D100026A1B2C3D4E5F6 /* timer-melody-bright.wav in Resources */ = {isa = PBXBuildFile; fileRef = 7A1E5D100025A1B2C3D4E5F6 /* timer-melody-bright.wav */; };
+		7A1E5D100028A1B2C3D4E5F6 /* TimerSoundPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A1E5D100027A1B2C3D4E5F6 /* TimerSoundPlugin.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -50,6 +70,26 @@
 		AF277DCFFFF123FFC6DF26C7 /* Pods_App.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_App.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		AF51FD2D460BCFE21FA515B2 /* Pods-App.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.release.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.release.xcconfig"; sourceTree = "<group>"; };
 		FC68EB0AF532CFC21C3344DD /* Pods-App.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-App.debug.xcconfig"; path = "Pods/Target Support Files/Pods-App/Pods-App.debug.xcconfig"; sourceTree = "<group>"; };
+		7A1E5D100001A1B2C3D4E5F6 /* timer-whistle.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "timer-whistle.wav"; sourceTree = "<group>"; };
+		7A1E5D100003A1B2C3D4E5F6 /* timer-bell-warn.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "timer-bell-warn.wav"; sourceTree = "<group>"; };
+		7A1E5D100005A1B2C3D4E5F6 /* timer-siren.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "timer-siren.wav"; sourceTree = "<group>"; };
+		7A1E5D100007A1B2C3D4E5F6 /* timer-boxgong-1.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "timer-boxgong-1.wav"; sourceTree = "<group>"; };
+		7A1E5D100009A1B2C3D4E5F6 /* timer-boxgong-2.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "timer-boxgong-2.wav"; sourceTree = "<group>"; };
+		7A1E5D10000BA1B2C3D4E5F6 /* timer-boxgong-3.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "timer-boxgong-3.wav"; sourceTree = "<group>"; };
+		7A1E5D10000DA1B2C3D4E5F6 /* timer-chinesegong-1.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "timer-chinesegong-1.wav"; sourceTree = "<group>"; };
+		7A1E5D10000FA1B2C3D4E5F6 /* timer-chinesegong-2.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "timer-chinesegong-2.wav"; sourceTree = "<group>"; };
+		7A1E5D100011A1B2C3D4E5F6 /* timer-chinesegong-3.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "timer-chinesegong-3.wav"; sourceTree = "<group>"; };
+		7A1E5D100013A1B2C3D4E5F6 /* timer-bell-1.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "timer-bell-1.wav"; sourceTree = "<group>"; };
+		7A1E5D100015A1B2C3D4E5F6 /* timer-bell-2.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "timer-bell-2.wav"; sourceTree = "<group>"; };
+		7A1E5D100017A1B2C3D4E5F6 /* timer-bell-3.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "timer-bell-3.wav"; sourceTree = "<group>"; };
+		7A1E5D100019A1B2C3D4E5F6 /* timer-beep-1.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "timer-beep-1.wav"; sourceTree = "<group>"; };
+		7A1E5D10001BA1B2C3D4E5F6 /* timer-beep-2.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "timer-beep-2.wav"; sourceTree = "<group>"; };
+		7A1E5D10001DA1B2C3D4E5F6 /* timer-beep-3.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "timer-beep-3.wav"; sourceTree = "<group>"; };
+		7A1E5D10001FA1B2C3D4E5F6 /* timer-melody-deep.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "timer-melody-deep.wav"; sourceTree = "<group>"; };
+		7A1E5D100021A1B2C3D4E5F6 /* timer-melody-chimes.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "timer-melody-chimes.wav"; sourceTree = "<group>"; };
+		7A1E5D100023A1B2C3D4E5F6 /* timer-melody-marimba.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "timer-melody-marimba.wav"; sourceTree = "<group>"; };
+		7A1E5D100025A1B2C3D4E5F6 /* timer-melody-bright.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = "timer-melody-bright.wav"; sourceTree = "<group>"; };
+		7A1E5D100027A1B2C3D4E5F6 /* TimerSoundPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimerSoundPlugin.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -111,6 +151,26 @@
 				5E57E270A1B2C3D4E5F60718 /* rest-alarm-bright.wav */,
 				5E57E2D2A1B2C3D4E5F60718 /* RestAlarmPlugin.swift */,
 				5E57E2D4A1B2C3D4E5F60718 /* MainViewController.swift */,
+				7A1E5D100001A1B2C3D4E5F6 /* timer-whistle.wav */,
+				7A1E5D100003A1B2C3D4E5F6 /* timer-bell-warn.wav */,
+				7A1E5D100005A1B2C3D4E5F6 /* timer-siren.wav */,
+				7A1E5D100007A1B2C3D4E5F6 /* timer-boxgong-1.wav */,
+				7A1E5D100009A1B2C3D4E5F6 /* timer-boxgong-2.wav */,
+				7A1E5D10000BA1B2C3D4E5F6 /* timer-boxgong-3.wav */,
+				7A1E5D10000DA1B2C3D4E5F6 /* timer-chinesegong-1.wav */,
+				7A1E5D10000FA1B2C3D4E5F6 /* timer-chinesegong-2.wav */,
+				7A1E5D100011A1B2C3D4E5F6 /* timer-chinesegong-3.wav */,
+				7A1E5D100013A1B2C3D4E5F6 /* timer-bell-1.wav */,
+				7A1E5D100015A1B2C3D4E5F6 /* timer-bell-2.wav */,
+				7A1E5D100017A1B2C3D4E5F6 /* timer-bell-3.wav */,
+				7A1E5D100019A1B2C3D4E5F6 /* timer-beep-1.wav */,
+				7A1E5D10001BA1B2C3D4E5F6 /* timer-beep-2.wav */,
+				7A1E5D10001DA1B2C3D4E5F6 /* timer-beep-3.wav */,
+				7A1E5D10001FA1B2C3D4E5F6 /* timer-melody-deep.wav */,
+				7A1E5D100021A1B2C3D4E5F6 /* timer-melody-chimes.wav */,
+				7A1E5D100023A1B2C3D4E5F6 /* timer-melody-marimba.wav */,
+				7A1E5D100025A1B2C3D4E5F6 /* timer-melody-bright.wav */,
+				7A1E5D100027A1B2C3D4E5F6 /* TimerSoundPlugin.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -195,6 +255,25 @@
 				5E57E269A1B2C3D4E5F60718 /* rest-alarm-marimba.wav in Resources */,
 				1ABDF1C1309776C600543A32 /* PrivacyInfo.xcprivacy in Resources */,
 				5E57E271A1B2C3D4E5F60718 /* rest-alarm-bright.wav in Resources */,
+				7A1E5D100002A1B2C3D4E5F6 /* timer-whistle.wav in Resources */,
+				7A1E5D100004A1B2C3D4E5F6 /* timer-bell-warn.wav in Resources */,
+				7A1E5D100006A1B2C3D4E5F6 /* timer-siren.wav in Resources */,
+				7A1E5D100008A1B2C3D4E5F6 /* timer-boxgong-1.wav in Resources */,
+				7A1E5D10000AA1B2C3D4E5F6 /* timer-boxgong-2.wav in Resources */,
+				7A1E5D10000CA1B2C3D4E5F6 /* timer-boxgong-3.wav in Resources */,
+				7A1E5D10000EA1B2C3D4E5F6 /* timer-chinesegong-1.wav in Resources */,
+				7A1E5D100010A1B2C3D4E5F6 /* timer-chinesegong-2.wav in Resources */,
+				7A1E5D100012A1B2C3D4E5F6 /* timer-chinesegong-3.wav in Resources */,
+				7A1E5D100014A1B2C3D4E5F6 /* timer-bell-1.wav in Resources */,
+				7A1E5D100016A1B2C3D4E5F6 /* timer-bell-2.wav in Resources */,
+				7A1E5D100018A1B2C3D4E5F6 /* timer-bell-3.wav in Resources */,
+				7A1E5D10001AA1B2C3D4E5F6 /* timer-beep-1.wav in Resources */,
+				7A1E5D10001CA1B2C3D4E5F6 /* timer-beep-2.wav in Resources */,
+				7A1E5D10001EA1B2C3D4E5F6 /* timer-beep-3.wav in Resources */,
+				7A1E5D100020A1B2C3D4E5F6 /* timer-melody-deep.wav in Resources */,
+				7A1E5D100022A1B2C3D4E5F6 /* timer-melody-chimes.wav in Resources */,
+				7A1E5D100024A1B2C3D4E5F6 /* timer-melody-marimba.wav in Resources */,
+				7A1E5D100026A1B2C3D4E5F6 /* timer-melody-bright.wav in Resources */,
 				504EC30F1FED79650016851F /* Assets.xcassets in Resources */,
 				50379B232058CBB4000EE86E /* capacitor.config.json in Resources */,
 				504EC30D1FED79650016851F /* Main.storyboard in Resources */,
@@ -262,6 +341,7 @@
 			files = (
 				5E57E2D3A1B2C3D4E5F60718 /* RestAlarmPlugin.swift in Sources */,
 				5E57E2D5A1B2C3D4E5F60718 /* MainViewController.swift in Sources */,
+				7A1E5D100028A1B2C3D4E5F6 /* TimerSoundPlugin.swift in Sources */,
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				1A704AE52FFBE523008493A5 /* SceneDelegate.swift in Sources */,
 			);

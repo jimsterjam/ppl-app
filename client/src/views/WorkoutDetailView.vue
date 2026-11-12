@@ -2521,7 +2521,7 @@ watch(() => focus.finishedKey, (key) => {
 
 // Zeitübung als nächster Satz (Absprache Jimmy 20.10.): Vorwarnung bei 10 s und Zähltöne 3-2-1 vor dem Pausenende.
 watch([() => restTimer.isRunning, focusCurrent, () => focus.active], () => {
-  restTimer.cues = restTimer.isRunning && focus.active && !!focusCurrent.value && focusCurrent.value.mode !== 'weight'
+  restTimer.setCues(restTimer.isRunning && focus.active && !!focusCurrent.value && focusCurrent.value.mode !== 'weight')
 }, { immediate: true })
 
 // Pause vorbei: im Fokus-Modus sofort mit dem nächsten Satz weiter (ohne "Weiter"-Knopf). Ist der nächste Satz eine
