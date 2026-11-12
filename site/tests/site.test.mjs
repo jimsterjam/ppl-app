@@ -291,3 +291,55 @@ describe('Seite Push/Pull/Legs erklärt', () => {
     assert.equal(status.suggestion, null)
   })
 })
+
+describe('Kopfzeile auf dem Handy (Hamburger-Menü)', () => {
+  const css = () => fs.readFileSync(path.join(here, '../assets/style.css'), 'utf8')
+  // Regeln als [Selektor, Inhalt], Kommentare entfernt, Leerraum vereinheitlicht
+  const rules = () => [...css().replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .map(([, sel, body]) => [sel.replace(/\s+/g, ' ').trim(), body.replace(/\s+/g, ' ').replace(/\s*:\s*/g, ': ')])
+  test('jede Seite: Menüknopf steuert das Menü, Beschriftung DE/EN, Skript mit Inhalts-Kennung eingebunden', () => {
+    for (const [file, html] of htmlFiles()) {
+      const t = content[file.startsWith('/en/') ? 'en' : 'de'].nav
+      const btn = html.match(/<button class="menu-btn"[^>]*>/)?.[0]
+      assert.ok(btn, `${file}: Menüknopf fehlt`)
+      assert.ok(btn.includes('aria-expanded="false"') && btn.includes('aria-controls="site-menu"'), file)
+      assert.ok(btn.includes(`aria-label="${t.open}"`) && btn.includes(`data-label-close="${t.close}"`), `${file}: Beschriftung`)
+      assert.ok(html.includes('<div class="menu" id="site-menu">'), `${file}: Menü-Ziel fehlt`)
+      assert.match(html, /<script type="module" src="\/assets\/menu\.js\?v=[0-9a-f]{10}"><\/script>/, `${file}: menu.js`)
+      assert.match(html, /<link rel="stylesheet" href="\/assets\/style\.css\?v=[0-9a-f]{10}">/, `${file}: style.css`)
+      assert.ok(!/(?:src|href)="\/assets\/[^"?]+\.(?:js|css)"/.test(html), `${file}: Skript oder Stylesheet ohne Kennung`)
+    }
+    for (const lang of ['de', 'en']) {
+      const html = get(`${PAGES.find((p) => p.id === 'rm')[lang]}index.html`)
+      assert.match(html, /<script type="module" src="\/assets\/calc\.js\?v=[0-9a-f]{10}"><\/script>/, `1RM-Rechner (${lang}): calc.js`)
+    }
+  })
+  test('Gegenprobe: Sprachwahl liegt NICHT im zuklappbaren Menü (immer sichtbar)', () => {
+    for (const [file, html] of htmlFiles()) {
+      const menu = html.match(/<div class="menu" id="site-menu">([\s\S]*?)<\/div>\n/)?.[1] || ''
+      assert.ok(menu.includes('<nav class="main"'), `${file}: Navigation im Menü`)
+      assert.ok(!menu.includes('class="lang"'), `${file}: Sprachwahl im Menü`)
+      assert.ok(html.includes('<div class="lang" role="group"'), `${file}: Sprachwahl fehlt`)
+    }
+  })
+  test('Gegenprobe ohne JavaScript bzw. ohne menu.js: das Menü wird nur unter html.js versteckt, und "js" fällt weg, wenn menu.js nicht läuft', () => {
+    const hiding = rules().filter(([sel, body]) => /\.menu(?![-\w])/.test(sel) && /display: none|visibility: hidden|max-height: 0|height: 0/.test(body))
+    assert.ok(hiding.length > 0)
+    for (const [sel] of hiding) for (const part of sel.split(',')) assert.ok(part.trim().startsWith('html.js '), `"${part.trim()}" versteckt das Menü auch ohne JavaScript`)
+    // Ohne html.js darf die Kopfzeile auf dem Handy nicht am Umbrechen gehindert werden (sonst quetscht sich die Navigation)
+    for (const [sel, body] of rules()) if (/nowrap/.test(body) && /\.bar/.test(sel)) assert.ok(sel.startsWith('html.js '), sel)
+    const html = get('/index.html')
+    assert.ok(html.includes("classList.contains('menu-ready'))h.classList.remove('js')"), 'Rückfall, wenn menu.js nicht läuft')
+    assert.ok(fs.readFileSync(path.join(here, '../assets/menu.js'), 'utf8').includes("classList.add('menu-ready')"))
+  })
+  test('Regression 12.11.: Regeln für .shots-hero stehen nach .shots (sonst überschreibt .shots Wischleiste und Abstand)', () => {
+    const all = rules()
+    const base = all.findIndex(([sel]) => sel === '.shots')
+    assert.ok(base >= 0)
+    const hero = all.map(([sel], i) => [sel, i]).filter(([sel]) => /\.shots-hero/.test(sel))
+    assert.ok(hero.length >= 3)
+    for (const [sel, i] of hero) assert.ok(i > base, `"${sel}" steht vor .shots`)
+    assert.ok(all.some(([sel, body]) => sel === '.shots-hero' && /display: flex/.test(body)), 'Wischleiste auf dem Handy')
+    assert.ok(all.some(([sel, body]) => sel === '.shots-hero' && /grid-template-columns: repeat\(2, 1fr\)/.test(body)), '2 × 2 auf dem iPad')
+  })
+})

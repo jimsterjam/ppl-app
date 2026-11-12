@@ -9,7 +9,7 @@ export const content = {
   de: {
     lang: 'de',
     langName: 'Deutsch',
-    nav: { rm: '1RM-Rechner', reps: 'Wiederholungen', plans: 'Pläne', support: 'Support', menu: 'Hauptmenü', home: 'fbe Startseite' },
+    nav: { rm: '1RM-Rechner', reps: 'Wiederholungen', plans: 'Pläne', support: 'Support', menu: 'Hauptmenü', home: 'fbe Startseite', open: 'Menü öffnen', close: 'Menü schließen' },
     cta: { store: 'Im App Store laden', storeAria: 'fbe im App Store laden', small: 'Kostenlos. Für iPhone. Ohne Abo, ohne Werbung.' },
     footer: {
       legal: 'Impressum', privacy: 'Datenschutz', support: 'Support',
@@ -189,7 +189,7 @@ export const content = {
   en: {
     lang: 'en',
     langName: 'English',
-    nav: { rm: '1RM calculator', reps: 'Reps', plans: 'Plans', support: 'Support', menu: 'Main menu', home: 'fbe home' },
+    nav: { rm: '1RM calculator', reps: 'Reps', plans: 'Plans', support: 'Support', menu: 'Main menu', home: 'fbe home', open: 'Open menu', close: 'Close menu' },
     cta: { store: 'Download on the App Store', storeAria: 'Download fbe on the App Store', small: 'Free. For iPhone. No subscription, no ads.' },
     footer: {
       legal: 'Legal notice', privacy: 'Privacy', support: 'Support',

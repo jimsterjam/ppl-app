@@ -1,5 +1,6 @@
 // Erzeugt alle Seiten als HTML-Text. Keine Abhängigkeiten, keine Skripte von Dritten, keine Cookies.
 import fs from 'node:fs'
+import { createHash } from 'node:crypto'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { content, PAGES, APP_STORE_URL, APP_ID } from './content.mjs'
@@ -11,6 +12,16 @@ import { LEGAL_OWNER, legalAddressLines } from '../../client/src/config/legalOwn
 const here = path.dirname(fileURLToPath(import.meta.url))
 const catalog = JSON.parse(fs.readFileSync(path.resolve(here, '../../client/public/data/default-exercises.json'), 'utf8'))
 const byId = new Map(catalog.map((entry) => [entry._id, entry]))
+
+// Eigene Dateien mit Inhalts-Kennung (?v=), damit nach einem Deploy keine alte style.css zu neuem HTML passt
+const assetVersions = new Map()
+export function asset(name) {
+  if (!assetVersions.has(name)) {
+    const data = fs.readFileSync(path.resolve(here, '../assets', name))
+    assetVersions.set(name, createHash('sha256').update(data).digest('hex').slice(0, 10))
+  }
+  return `/assets/${name}?v=${assetVersions.get(name)}`
+}
 
 export const esc = (value) => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 const paragraphs = (text) => String(text).split(/\n\n+/).map((p) => `<p>${esc(p)}</p>`).join('\n')
@@ -81,14 +92,19 @@ ${og}
 <meta name="theme-color" content="#0d0f12">
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <link rel="preload" href="/assets/fonts/Comfortaa-Variable.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="stylesheet" href="/assets/style.css">
+<link rel="stylesheet" href="${asset('style.css')}">
+<script>document.documentElement.classList.add('js');addEventListener('load',()=>{const h=document.documentElement;if(!h.classList.contains('menu-ready'))h.classList.remove('js')})</script>
+<script type="module" src="${asset('menu.js')}"></script>
 ${extraHead}
 </head>
 <body>
 <a class="skip" href="#inhalt">${esc(t.footer.skip)}</a>
 <header class="site"><div class="wrap bar">
 <a class="brand" href="${urlFor('home', lang)}" aria-label="${esc(t.nav.home)}"><span class="bm-f" aria-hidden="true">f</span><span class="bm-b" aria-hidden="true">b</span><span aria-hidden="true">e</span></a>
+<button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-menu" aria-label="${esc(t.nav.open)}" data-label-open="${esc(t.nav.open)}" data-label-close="${esc(t.nav.close)}"><span></span><span></span><span></span></button>
+<div class="menu" id="site-menu">
 <nav class="main" aria-label="${esc(t.nav.menu)}">${nav('rm', t.nav.rm)}${nav('reps', t.nav.reps)}${nav('plans', t.nav.plans)}${nav('support', t.nav.support)}</nav>
+</div>
 <div class="lang" role="group" aria-label="${esc(t.footer.language)}">${lang === 'de' ? langSwitch : orderedLangs}</div>
 </div></header>
 <main id="inhalt"><div class="wrap">
@@ -162,7 +178,7 @@ export function renderRm(lang, siteUrl) {
 <section><h2>${esc(r.goodTitle)}</h2><ul class="ticks">${r.good.map((g) => `<li>${esc(g)}</li>`).join('')}</ul></section>
 <section><h2>${esc(r.useTitle)}</h2><p>${esc(r.use)} <a href="${urlFor('reps', lang)}">${esc(r.useLink)}</a>.</p></section>
 ${appBlock(t, 'rm', r.appTitle, r.app)}`
-  return layout({ lang, pageId: 'rm', title: r.title, description: r.description, siteUrl, body, extraHead: '<script type="module" src="/assets/calc.js"></script>' })
+  return layout({ lang, pageId: 'rm', title: r.title, description: r.description, siteUrl, body, extraHead: `<script type="module" src="${asset('calc.js')}"></script>` })
 }
 
 export function renderReps(lang, siteUrl) {
