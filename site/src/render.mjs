@@ -82,14 +82,19 @@ ${og}
 <link rel="icon" href="/assets/favicon.svg" type="image/svg+xml">
 <link rel="preload" href="/assets/fonts/Comfortaa-Variable.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/assets/style.css">
+<script>document.documentElement.classList.add('js')</script>
+<script src="/assets/menu.js" defer></script>
 ${extraHead}
 </head>
 <body>
 <a class="skip" href="#inhalt">${esc(t.footer.skip)}</a>
 <header class="site"><div class="wrap bar">
 <a class="brand" href="${urlFor('home', lang)}" aria-label="${esc(t.nav.home)}"><span class="bm-f" aria-hidden="true">f</span><span class="bm-b" aria-hidden="true">b</span><span aria-hidden="true">e</span></a>
+<button class="menu-btn" type="button" aria-expanded="false" aria-controls="site-menu" aria-label="${esc(t.nav.open)}" data-label-open="${esc(t.nav.open)}" data-label-close="${esc(t.nav.close)}"><span></span><span></span><span></span></button>
+<div class="menu" id="site-menu">
 <nav class="main" aria-label="${esc(t.nav.menu)}">${nav('rm', t.nav.rm)}${nav('reps', t.nav.reps)}${nav('plans', t.nav.plans)}${nav('support', t.nav.support)}</nav>
 <div class="lang" role="group" aria-label="${esc(t.footer.language)}">${lang === 'de' ? langSwitch : orderedLangs}</div>
+</div>
 </div></header>
 <main id="inhalt"><div class="wrap">
 ${body}
