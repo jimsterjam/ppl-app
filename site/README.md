@@ -1,6 +1,6 @@
 # fbe-Website (site/)
 
-Statische Website mit Startseite, kostenlosen Werkzeugen (1RM-Rechner, Wiederholungs-Bereiche), Trainingsplänen, Support, Impressum und Datenschutz. Deutsch und Englisch (`/en/`). Getrennt von der App: Die App (`client/`) wird dadurch nicht verändert.
+Statische Website mit Startseite, kostenlosen Werkzeugen (1RM-Rechner, Wiederholungs-Bereiche), Erklärseite Push/Pull/Legs, Trainingsplänen, Support, Impressum und Datenschutz. Deutsch und Englisch (`/en/`). Getrennt von der App: Die App (`client/`) wird dadurch nicht verändert.
 
 ## Befehle (im Projektordner)
 - `npm run site:build` baut nach `site/dist` (ohne `SITE_URL` als lokale Vorschau)
@@ -8,7 +8,7 @@ Statische Website mit Startseite, kostenlosen Werkzeugen (1RM-Rechner, Wiederhol
 - Vorschau: `python3 -m http.server 4173 -d site/dist`, dann http://localhost:4173
 
 ## Wie die Seiten entstehen
-- Texte: `src/content.mjs` (Deutsch und Englisch, Seitenliste `PAGES`)
+- Texte: `src/content.mjs` (Deutsch und Englisch, Seitenliste `PAGES`). Die Seite Push/Pull/Legs (`/push-pull-legs/`) nennt Beispielübungen über ihre Katalog-ID; ihr Steigerungs-Beispiel prüft ein Test gegen die Logik der App (`client/src/utils/weightSuggestion.js`).
 - Pläne: aus `client/src/utils/planTemplates.js` und dem Übungskatalog, Namen und Erklärungen aus `client/src/i18n/index.js`. Ändert sich ein Plan in der App, ändert sich die Seite beim nächsten Build.
 - Deutsche Übungsbegriffe: `src/exercise-de.mjs` (englischer Name zuerst, deutscher in Klammern). Ein Test meldet fehlende Einträge.
 - Impressum und Datenschutz: Betreiberangaben aus `client/src/config/legalOwner.js`, Texte der App aus der i18n-Datei, dazu ein Website-Teil in `src/render.mjs`.

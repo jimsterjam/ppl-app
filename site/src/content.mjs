@@ -23,7 +23,7 @@ export const content = {
       lead: 'Erst die saubere Ausführung, dann das Gewicht. fbe ist dein Trainingstagebuch mit Plan, Pausentimer und einem KI-Coach, der dir nach jedem Workout sagt, was als Nächstes dran ist.',
       whatTitle: 'Was fbe für dich tut',
       what: [
-        ['Dein Plan sagt, was heute dran ist.', 'Starte mit Vorlagen wie Push/Pull/Legs, Ober-/Unterkörper oder Ganzkörper, für Anfänger oder Fortgeschrittene. Auf dem Startbildschirm siehst du das nächste Training.'],
+        ['Dein Plan sagt, was heute dran ist.', 'Starte mit Vorlagen wie Push/Pull/Legs, Ober-/Unterkörper oder Ganzkörper, für Anfänger oder Fortgeschrittene. Auf dem Startbildschirm siehst du das nächste Training.', 'ppl'],
         ['Ein Satz. Voller Fokus.', 'Die Großansicht zeigt dir nur den aktuellen Satz. Wiederholungen und Gewicht trägst du mit wenigen Tipps ein, auch Aufwärmsätze und Notizen zu jeder Übung.'],
         ['Pause im Griff.', 'Der Pausentimer startet, wenn du einen Satz abhakst. Mit Plus und Minus passt du ihn in 15-Sekunden-Schritten an und bekommst am Ende ein Signal.'],
         ['Ein Coach, der nur deine Zahlen kennt.', 'Nach dem Workout bekommst du eine kurze, sachliche Einordnung und einen konkreten Vorschlag für das nächste Mal, zum Beispiel erst Wiederholungen steigern, dann das Gewicht.']
@@ -109,6 +109,56 @@ export const content = {
       appTitle: 'Die passenden Bereiche, automatisch',
       app: 'fbe kennt diese Bereiche. Wenn du das Ziel pro Workout oder Übung festlegst, bekommst du Vorschläge für Wiederholungen und Gewicht. Nach dem Training sagt dir der KI-Coach, was als Nächstes dran ist.'
     },
+    ppl: {
+      title: 'Push/Pull/Legs erklärt: Aufbau, Vorteile, für wen es passt | fbe',
+      description: 'Was Push/Pull/Legs ist, warum die Aufteilung so gut funktioniert und wann ein anderer Plan besser passt – mit Beispielübungen und fertigen Plänen.',
+      h1: 'Push/Pull/Legs: Drücken, Ziehen, Beine',
+      intro: 'Push/Pull/Legs (kurz PPL) teilt dein Training in drei Tage auf. Jeder Tag trainiert Muskeln, die bei ähnlichen Bewegungen zusammenarbeiten.',
+      days: [
+        ['Push', 'Drücken', 'Brust, Schultern, Trizeps', ['ex_0025', 'ex_0405', 'ex_0200']],
+        ['Pull', 'Ziehen', 'Rücken, Bizeps, hintere Schulter', ['ex_0197', 'ex_0027', 'ex_0031']],
+        ['Legs', 'Beine', 'Oberschenkel, Gesäß, Waden', ['ex_1436', 'ex_0739', 'ex_0599']]
+      ],
+      whyTitle: 'Warum die Aufteilung funktioniert',
+      why: [
+        ['Was zusammenarbeitet, trainierst du zusammen.', 'Beim Bench Press (Bankdrücken) arbeiten Brust, Schultern und Trizeps. Am Push-Tag kommen sie alle dran, und du musst sie nicht auf mehrere Tage verteilen.'],
+        ['Erholung, während du weitertrainierst.', 'Nach dem Push-Tag haben Brust, Schultern und Trizeps Pause, während am nächsten Tag Rücken und Beine dran sind. So kannst du oft trainieren, ohne dieselben Muskeln jeden Tag zu belasten.'],
+        ['Passt zu 3 oder 6 Tagen pro Woche.', 'Mit drei Tagen trainierst du jede Gruppe einmal pro Woche, mit sechs Tagen zweimal.'],
+        ['Leicht zu merken.', 'Drei Tage, eine feste Reihenfolge. Du weißt immer, was als Nächstes dran ist.']
+      ],
+      whoTitle: 'Für wen es passt – und für wen eher nicht',
+      who: [
+        'Push/Pull/Legs passt gut, wenn du drei oder mehr Tage pro Woche trainieren kannst. Wer regelmäßig fünf- oder sechsmal geht, profitiert am meisten, weil jede Muskelgruppe dann zweimal pro Woche drankommt.',
+        'Kannst du nur zweimal pro Woche trainieren, fährst du mit einem Ganzkörperplan oft besser: Dann trainierst du jede Muskelgruppe in jeder Einheit statt nur etwa alle eineinhalb Wochen, wie es mit Push/Pull/Legs bei zwei Einheiten wäre.'
+      ],
+      startTitle: 'So fängst du an',
+      start: [['ppl3', '3 Tage pro Woche', 'jede Gruppe einmal pro Woche, gut zum Einstieg.'], ['ppl6', '6 Tage pro Woche', 'jede Gruppe zweimal pro Woche.']],
+      progTitle: 'Wann nehme ich mehr Gewicht?',
+      prog: [
+        'Nicht sofort. Bleib erst einmal beim selben Gewicht und versuch, nach und nach mehr Wiederholungen zu schaffen. Mehr Gewicht kommt erst, wenn es dir zu leicht wird.',
+        'Bei den Plänen läuft das so: Du suchst dir ein Gewicht, mit dem du auf jeden Fall 8 Wiederholungen schaffst. Und zwar sauber, also ohne Schwung und ohne die Bewegung abzukürzen. Darauf musst du selbst achten, denn die App sieht nur deine Zahlen, nicht deine Ausführung.',
+        'Schaffst du bei einer Übung in allen Sätzen 8 Wiederholungen, gehst du auf 9 pro Satz. Klappen irgendwann in allen Sätzen 9, gehst du auf 10, und so weiter.',
+        'Schaffst du 12 in allen Sätzen, ist das Gewicht zu leicht geworden. Dann erhöhst du das Gewicht so weit, dass du wieder mindestens 8 Wiederholungen schaffst. Von dort arbeitest du dich wieder bis 12 hoch.'
+      ],
+      exampleIntro: 'Am Beispiel Bench Press (Bankdrücken) kann das so aussehen:',
+      exampleCols: ['Woche', 'Gewicht', 'Wiederholungen pro Satz'],
+      example: [['1', '60 kg', '8'], ['3', '60 kg', '9'], ['5', '60 kg', '10'], ['7', '60 kg', '11'], ['9', '60 kg', '12 ✓'], ['11', '62,5 kg', '8']],
+      whyNotTitle: 'Warum nicht gleich mehr?',
+      whyNot: 'Wer zu früh mehr auflegt, riskiert, dass die Ausführung leidet. Genau darum heißt die App Form Beats Ego.',
+      progEnd: [
+        'Klappt es einmal nicht, bleibst du beim Gewicht und versuchst es beim nächsten Mal wieder. Lass dich nicht entmutigen, wenn du nicht von Woche zu Woche stärker wirst. Das ist ganz normal.',
+        'Du musst dir das nicht selbst merken: Die App merkt sich deine Sätze und schlägt dir beim nächsten Training das passende Gewicht vor.'
+      ],
+      ownTitle: 'Warum fbe auf Push/Pull/Legs setzt',
+      own: [
+        'Ich trainiere so gut wie jeden Tag. Dafür passt Push/Pull/Legs für mich am besten: Während eine Muskelgruppe trainiert wird, erholen sich die anderen. Das funktioniert für mich sehr gut, und ich sehe deutliche Fortschritte.',
+        'Genau deshalb habe ich fbe entwickelt. Ich wollte keine App, die alles ein bisschen abdeckt, sondern eine, die sich auf das konzentriert, was ich aus eigenem Training kenne und vertreten kann: einen klaren Plan, saubere Sätze und den nächsten sinnvollen Schritt.'
+      ],
+      ownSign: '– Jimmy, Entwickler von fbe',
+      appTitle: 'Push/Pull/Legs mit fbe',
+      app: 'Wähle die Vorlage für 3 oder 6 Tage, und fbe zeigt dir jeden Tag, was dran ist. Nach dem Training sagt dir der KI-Coach, wie es lief und was du anpassen kannst.',
+      link: 'Was ist Push/Pull/Legs?'
+    },
     plans: {
       title: 'Trainingspläne: Push/Pull/Legs, Ober-/Unterkörper, Ganzkörper | fbe',
       description: 'Fertige Trainingspläne mit Übungen und Sätzen für Anfänger und Fortgeschrittene: Push/Pull/Legs, Ober-/Unterkörper und Ganzkörper.',
@@ -151,7 +201,7 @@ export const content = {
       lead: 'Clean reps first, weight second. fbe is your training log with a plan, a rest timer and an AI coach that tells you what to do next after every workout.',
       whatTitle: 'What fbe does for you',
       what: [
-        ['Your plan knows what’s next.', 'Start from templates like Push/Pull/Legs, Upper/Lower or Full Body, for beginners or advanced lifters. Your home screen shows your next workout.'],
+        ['Your plan knows what’s next.', 'Start from templates like Push/Pull/Legs, Upper/Lower or Full Body, for beginners or advanced lifters. Your home screen shows your next workout.', 'ppl'],
         ['One set. Full focus.', 'The large view shows only your current set. Enter reps and weight with a few taps, including warm-up sets and notes for each exercise.'],
         ['Rest under control.', 'The rest timer starts when you check off a set. Adjust it in 15-second steps with plus and minus and get a signal at the end.'],
         ['A coach that only knows your numbers.', 'After your workout you get a short, factual summary and a concrete suggestion for next time, for example add reps first, then weight.']
@@ -237,6 +287,56 @@ export const content = {
       appTitle: 'The right ranges, automatically',
       app: 'fbe knows these ranges. When you set the goal per workout or exercise, you get suggestions for reps and weight. After training the AI coach tells you what to do next.'
     },
+    ppl: {
+      title: 'Push/Pull/Legs explained: structure, benefits, who it suits | fbe',
+      description: 'What Push/Pull/Legs is, why the split works so well and when another plan suits you better – with example exercises and ready-made plans.',
+      h1: 'Push/Pull/Legs: push, pull, legs',
+      intro: 'Push/Pull/Legs (PPL) splits your training into three days. Each day trains muscles that work together in similar movements.',
+      days: [
+        ['Push', '', 'Chest, shoulders, triceps', ['ex_0025', 'ex_0405', 'ex_0200']],
+        ['Pull', '', 'Back, biceps, rear delts', ['ex_0197', 'ex_0027', 'ex_0031']],
+        ['Legs', '', 'Thighs, glutes, calves', ['ex_1436', 'ex_0739', 'ex_0599']]
+      ],
+      whyTitle: 'Why the split works',
+      why: [
+        ['Train together what works together.', 'The bench press uses your chest, shoulders and triceps. On push day they all get trained, without spreading them over several days.'],
+        ['Recover while you keep training.', 'After push day, your chest, shoulders and triceps rest while your back and legs take their turn. You can train often without loading the same muscles every day.'],
+        ['Fits 3 or 6 days a week.', 'With three days you train each group once a week, with six days twice.'],
+        ['Easy to remember.', 'Three days, a fixed order. You always know what comes next.']
+      ],
+      whoTitle: 'Who it suits – and who it doesn’t',
+      who: [
+        'Push/Pull/Legs works well if you can train three or more days a week. If you go five or six times, you benefit most, because each muscle group gets trained twice a week.',
+        'If you can only train twice a week, a full-body plan is often the better choice: you train every muscle group in every session instead of only about every ten days, as Push/Pull/Legs would give you with two sessions.'
+      ],
+      startTitle: 'How to start',
+      start: [['ppl3', '3 days a week', 'each group once a week, a good start.'], ['ppl6', '6 days a week', 'each group twice a week.']],
+      progTitle: 'When should I add weight?',
+      prog: [
+        'Not right away. Stick with the same weight for a while and try to do a few more reps over time. Add weight only once it starts to feel too easy.',
+        'With the plans, it works like this: pick a weight you can definitely lift for 8 reps. Clean reps, that is: no swinging and no cutting the movement short. That part is up to you, because the app only sees your numbers, not your form.',
+        'Once you get 8 reps in every set of an exercise, aim for 9 per set. When you eventually manage 9 in every set, go for 10, and so on.',
+        'Once you get 12 in every set, the weight has become too light. Increase it just enough that you can still do at least 8 reps. From there, work your way back up to 12.'
+      ],
+      exampleIntro: 'For the bench press, it could look like this:',
+      exampleCols: ['Week', 'Weight', 'Reps per set'],
+      example: [['1', '60 kg', '8'], ['3', '60 kg', '9'], ['5', '60 kg', '10'], ['7', '60 kg', '11'], ['9', '60 kg', '12 ✓'], ['11', '62.5 kg', '8']],
+      whyNotTitle: 'Why not add more right away?',
+      whyNot: 'If you go heavier too soon, your form may suffer. That’s exactly why the app is called Form Beats Ego.',
+      progEnd: [
+        'If it doesn’t work out one day, keep the weight and try again next time. Don’t get discouraged if you don’t get stronger every single week. That’s completely normal.',
+        'You don’t have to keep track yourself: the app remembers your sets and suggests the right weight for your next workout.'
+      ],
+      ownTitle: 'Why fbe is built around Push/Pull/Legs',
+      own: [
+        'I train almost every day. For that, Push/Pull/Legs works best for me: while one muscle group is trained, the others recover. It works very well for me, and I see clear progress.',
+        'That is exactly why I built fbe. I didn’t want an app that covers a little of everything, but one that focuses on what I know from my own training and can stand behind: a clear plan, clean sets and the next sensible step.'
+      ],
+      ownSign: '– Jimmy, developer of fbe',
+      appTitle: 'Push/Pull/Legs with fbe',
+      app: 'Pick the 3- or 6-day template, and fbe shows you what’s next every day. After your workout, the AI coach tells you how it went and what you can adjust.',
+      link: 'What is Push/Pull/Legs?'
+    },
     plans: {
       title: 'Workout plans: Push/Pull/Legs, Upper/Lower, Full Body | fbe',
       description: 'Ready-made workout plans with exercises and sets for beginners and advanced lifters: Push/Pull/Legs, Upper/Lower and Full Body.',
@@ -269,6 +369,7 @@ export const PAGES = [
   { id: 'home', de: '/', en: '/en/' },
   { id: 'rm', de: '/werkzeuge/1rm-rechner/', en: '/en/tools/1rm-calculator/' },
   { id: 'reps', de: '/werkzeuge/wiederholungen-kraft-muskelaufbau/', en: '/en/tools/reps-strength-vs-muscle/' },
+  { id: 'ppl', de: '/push-pull-legs/', en: '/en/push-pull-legs/' },
   { id: 'plans', de: '/plaene/', en: '/en/plans/' },
   { id: 'ppl3', de: '/plaene/push-pull-legs-3-tage/', en: '/en/plans/push-pull-legs-3-day/' },
   { id: 'ppl6', de: '/plaene/push-pull-legs-6-tage/', en: '/en/plans/push-pull-legs-6-day/' },

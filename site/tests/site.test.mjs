@@ -9,6 +9,7 @@ import { EXERCISE_DE } from '../src/exercise-de.mjs'
 import { PLAN_TEMPLATES } from '../../client/src/utils/planTemplates.js'
 import { estimateOneRepMax, weightForReps, buildTable, parseNumber, validate } from '../assets/calc.js'
 import { estimateOneRepMax as appEstimate } from '../../server/utils/stagnationDiagnosis.js'
+import { getProgressionStatus } from '../../client/src/utils/weightSuggestion.js'
 
 const SITE = 'https://example.test'
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -209,5 +210,63 @@ describe('Header-Marke', () => {
     assert.ok(root, 'CSS-Regel :root fehlt')
     assert.match(root[0], /--mark: #ffffff;/)
     assert.match(rule[0], /font-kerning: none/)
+  })
+})
+
+describe('Seite Push/Pull/Legs erklärt', () => {
+  const pplHref = { de: '/push-pull-legs/', en: '/en/push-pull-legs/' }
+  test('verlinkt von Startseite, Plan-Übersicht und beiden PPL-Plänen (DE und EN)', () => {
+    for (const lang of ['de', 'en']) {
+      for (const id of ['home', 'plans', 'ppl3', 'ppl6']) {
+        const html = get(`${PAGES.find((p) => p.id === id)[lang]}index.html`)
+        assert.ok(html.includes(`<a href="${pplHref[lang]}">${content[lang].ppl.link} →</a>`), `${id} (${lang})`)
+      }
+    }
+  })
+  test('Gegenprobe: nicht im Hauptmenü und nicht auf den anderen Plänen', () => {
+    for (const lang of ['de', 'en']) {
+      for (const id of ['ul4', 'fb3']) {
+        const html = get(`${PAGES.find((p) => p.id === id)[lang]}index.html`)
+        assert.ok(!html.includes(`href="${pplHref[lang]}"`), `${id} (${lang})`)
+      }
+      for (const [file, html] of htmlFiles()) {
+        const nav = html.match(/<nav class="main"[\s\S]*?<\/nav>/)?.[0] || ''
+        assert.ok(!nav.includes('push-pull-legs/"'), `${file}: Hauptmenü`)
+      }
+    }
+  })
+  test('Beispielübungen: englischer Name, auf Deutsch mit deutschem Begriff in Klammern', () => {
+    const de = get('/push-pull-legs/index.html')
+    const en = get('/en/push-pull-legs/index.html')
+    assert.ok(de.includes('Bench Press Barbell <span class="de-name">(Bankdrücken mit der Langhantel)</span>'))
+    assert.ok(en.includes('Bench Press Barbell') && !en.includes('Bankdrücken'))
+    for (const lang of ['de', 'en']) for (const [, , , ids] of content[lang].ppl.days) for (const id of ids) assert.ok(EXERCISE_DE[id], id)
+  })
+  test('Steigerungs-Beispiel folgt der Logik der App (8–12, mehr Gewicht erst bei 12 in allen Sätzen, +2,5 kg)', () => {
+    const bench = { name_en: 'bench press barbell', equipment_en: 'barbell', category: 'chest', aiMetadata: { exerciseType: 'compound' } }
+    const session = (weight, reps) => ({ setDetails: [1, 2, 3].map(() => ({ weight, reps })) })
+    for (const lang of ['de', 'en']) {
+      const rows = content[lang].ppl.example.map(([, w, r]) => [Number(w.replace(',', '.').replace(' kg', '')), Number.parseInt(r, 10)])
+      assert.equal(rows[0][1], 8, 'Start bei 8')
+      for (let i = 0; i < rows.length - 1; i += 1) {
+        const [weight, reps] = rows[i]
+        const [nextWeight, nextReps] = rows[i + 1]
+        const status = getProgressionStatus(bench, session(weight, reps), 'hypertrophy')
+        if (nextWeight === weight) {
+          assert.equal(status.state, 'climb', `${lang} Zeile ${i}`)
+          assert.equal(status.nextReps, nextReps, `${lang} Zeile ${i}`)
+        } else {
+          assert.equal(reps, 12, 'Gewicht erst bei 12')
+          assert.equal(status.state, 'increase', `${lang} Zeile ${i}`)
+          assert.equal(status.suggestion.suggestedWeights[0], nextWeight, `${lang} Zeile ${i}`)
+        }
+      }
+    }
+  })
+  test('Gegenprobe: 12 nur in zwei von drei Sätzen bringt kein höheres Gewicht', () => {
+    const bench = { name_en: 'bench press barbell', equipment_en: 'barbell', category: 'chest', aiMetadata: { exerciseType: 'compound' } }
+    const status = getProgressionStatus(bench, { setDetails: [12, 12, 11].map((reps) => ({ weight: 60, reps })) }, 'hypertrophy')
+    assert.equal(status.state, 'climb')
+    assert.equal(status.suggestion, null)
   })
 })
