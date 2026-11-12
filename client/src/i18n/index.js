@@ -765,6 +765,7 @@ export const messages = {
     restTimer: {
       label: 'Pause',
       finished: 'Pause vorbei – nächster Satz',
+      mediaMuted: 'Medienlautstärke ist aus – die Pausentöne sind nicht zu hören. Mit der Lauter-Taste einschalten.',
       skip: 'Pause beenden',
       undoLastSet: 'Letzten Satz zurücknehmen',
       minusAria: 'Pause 15 Sekunden kürzer',
@@ -2540,6 +2541,7 @@ export const messages = {
     restTimer: {
       label: 'Rest',
       finished: 'Rest over – next set',
+      mediaMuted: 'Media volume is off – you won’t hear the rest sounds. Press volume up to turn it on.',
       skip: 'End rest',
       undoLastSet: 'Undo last set',
       minusAria: 'Rest 15 seconds shorter',

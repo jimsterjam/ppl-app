@@ -10,6 +10,15 @@ import { alarmSoundFile, sanitizeRestSound } from '@/utils/restMelodies'
 import { acquireKeepAwake, releaseKeepAwake } from '@/utils/keepAwakeGuard'
 import { belongsToActiveAccount, getActiveUid, readPref, removePref, writePref } from '@/utils/userScopedStorage'
 import { scheduleRestEndSignal, cancelRestEndSignal } from '@/utils/restEndSignal'
+import { timerSoundFile } from '@/utils/timerSoundFiles'
+import {
+  cancelNativeTimerSounds,
+  getMediaVolume,
+  isNativeTimerSoundReady,
+  onMediaVolumeChange,
+  probeNativeTimerSound,
+  scheduleNativeTimerSounds
+} from '@/utils/nativeTimerSound'
 
 // Weiterhin hier exportiert (Tests/Aufrufer): Mitteilung und Verzögerung leben in utils/restEndSignal.js
 export { buildRestNotification, NOTIFICATION_DELAY_MS } from '@/utils/restEndSignal'
@@ -27,6 +36,29 @@ let tickHandle = null
 // Töne vor dem Pausenende (nur wenn der nächste Satz eine Zeitübung ist, die gleich automatisch startet).
 let warnedAtTen = false
 let lastCountSec = 0
+// Auf iOS plant das Plugin TimerSound die Töne dieser Pause (endsAt) selbst ein - dann spielt der Takt hier keine Töne,
+// sonst kämen sie doppelt. 0 = nicht nativ geplant (Web Audio wie bisher).
+let nativeCuesFor = 0
+let volumeListening = false
+// Store, der Lautstärke-Änderungen bekommt (eine Anmeldung beim Plugin für die ganze App)
+let volumeStore = null
+
+/**
+ * Töne einer Pause mit festen Zeitpunkten (wie playCues/finish): Vorwarnung 10 s und 3-2-1 nur mit `cues`,
+ * Ende immer. Nur künftige Zeitpunkte.
+ * @returns {Array<{ key: string, file: string, at: number }>}
+ */
+export function buildRestCues({ endsAt, cues, soundId, now = Date.now() }) {
+  const list = []
+  if (cues) {
+    list.push({ key: 'rest-warn', file: timerSoundFile({ kind: 'rest-warn' }), at: endsAt - 10000 })
+    for (const sec of [3, 2, 1]) {
+      list.push({ key: `countdown-${sec}`, file: timerSoundFile({ kind: `countdown-${sec}`, soundType: 'bell' }), at: endsAt - sec * 1000 })
+    }
+  }
+  list.push({ key: 'rest-end', file: timerSoundFile({ kind: 'rest-end', melodyId: soundId }), at: endsAt })
+  return list.filter((cue) => cue.at > now)
+}
 
 function readSound() {
   try {
@@ -72,7 +104,9 @@ export const useRestTimerStore = defineStore('restTimer', {
     // Texte für die Mitteilung (von der View in App-Sprache übergeben).
     notifyTitle: '',
     notifyBody: '',
-    alarmStopLabel: ''
+    alarmStopLabel: '',
+    // Medienlautstärke 0..1 (nur iOS mit Plugin TimerSound); 0 = Töne nicht hörbar -> Hinweis in der Pause
+    mediaVolume: null
   }),
   getters: {
     isRunning: (s) => s.endsAt > 0 && s.finishedAt === 0,
@@ -82,6 +116,8 @@ export const useRestTimerStore = defineStore('restTimer', {
       return this.isRunning || this.showFinished
     },
     isAdjusted: (s) => s.durationSec !== s.baseSec,
+    /** Medienlautstärke ist aus: Pausentöne nicht hörbar (Hinweis in RestTimerBar). */
+    mediaMuted: (s) => s.mediaVolume === 0,
     /** Große Anzeige in der Mitte statt Leiste. */
     showOverlay() {
       return this.isVisible && this.fullscreen && !this.minimized
@@ -139,6 +175,50 @@ export const useRestTimerStore = defineStore('restTimer', {
       this.startTick()
       acquireKeepAwake(KEEP_AWAKE_TAG)
       this.scheduleEndSignal()
+      this.scheduleSounds()
+      this.checkMediaVolume()
+    },
+    /** Zähltöne bei 10 s / 3-2-1 an oder aus (Workout-Ansicht: nächster Satz ist eine Zeitübung). */
+    setCues(value) {
+      const next = !!value
+      if (this.cues === next) return
+      this.cues = next
+      if (this.isRunning) this.scheduleSounds()
+    },
+    /**
+     * Töne dieser Pause bei iOS einplanen (Plugin TimerSound). Klappt das, spielt iOS sie zeitgenau und der Takt hier
+     * bleibt still; sonst Web Audio wie bisher.
+     */
+    scheduleSounds() {
+      if (!this.isRunning) return
+      const plan = () => {
+        if (!this.isRunning) return
+        const endsAt = this.endsAt
+        const cues = buildRestCues({ endsAt, cues: this.cues, soundId: this.soundId })
+        // Bis iOS antwortet, nicht doppelt spielen; die Antwort kommt in Millisekunden, lange vor dem ersten Ton.
+        nativeCuesFor = endsAt
+        scheduleNativeTimerSounds(cues).then((ok) => {
+          if (!ok && nativeCuesFor === endsAt) {
+            nativeCuesFor = 0
+            cancelNativeTimerSounds()
+          }
+        })
+      }
+      if (isNativeTimerSoundReady()) plan()
+      // Direkt nach dem App-Start (Pause wiederhergestellt) läuft die Prüfung evtl. noch
+      else probeNativeTimerSound().then((ok) => { if (ok) plan() })
+    },
+    /** Medienlautstärke abfragen und Änderungen verfolgen (Hinweis, wenn sie auf 0 steht). */
+    checkMediaVolume() {
+      probeNativeTimerSound().then((ok) => {
+        if (!ok) return
+        volumeStore = this
+        getMediaVolume().then((volume) => { this.mediaVolume = volume })
+        if (!volumeListening) {
+          volumeListening = true
+          onMediaVolumeChange((volume) => { if (volumeStore) volumeStore.mediaVolume = volume })
+        }
+      })
     },
     /** Wecker (bzw. Ersatz-Mitteilung) für das Pausenende - nur relevant, wenn die App nicht vorn ist. */
     scheduleEndSignal() {
@@ -163,7 +243,10 @@ export const useRestTimerStore = defineStore('restTimer', {
       lastCountSec = 0
       this.persist()
       if (nextRemaining <= 0) this.finish()
-      else this.scheduleEndSignal()
+      else {
+        this.scheduleEndSignal()
+        this.scheduleSounds()
+      }
     },
     /** Kontowechsel/Abmelden: laufende Pause beenden, Ersatz-Mitteilung/Wecker zurücknehmen, gespeicherten Stand löschen. */
     resetForUserChange() {
@@ -184,9 +267,14 @@ export const useRestTimerStore = defineStore('restTimer', {
     finish() {
       if (this.finishedAt) return
       this.finishedAt = Date.now()
+      const dueAt = this.endsAt
       this.endsAt = this.finishedAt
       cancelRestEndSignal().catch(() => {})
-      emitTimerSignal({ eventKey: `rest-end-${this.finishedAt}`, soundEnabled: true, kind: 'rest-end', melodyId: this.soundId })
+      // iOS hat den Ton eingeplant (bzw. im Hintergrund bewusst nicht nachgespielt) - hier nicht noch einmal.
+      if (nativeCuesFor !== dueAt) {
+        emitTimerSignal({ eventKey: `rest-end-${this.finishedAt}`, soundEnabled: true, kind: 'rest-end', melodyId: this.soundId, dueAt })
+      }
+      nativeCuesFor = 0
       try { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([200, 100, 200]) } catch {}
       this.persist()
     },
@@ -202,6 +290,8 @@ export const useRestTimerStore = defineStore('restTimer', {
       this.cues = false
       this.stopTick()
       cancelRestEndSignal().catch(() => {})
+      if (nativeCuesFor) cancelNativeTimerSounds()
+      nativeCuesFor = 0
       releaseKeepAwake(KEEP_AWAKE_TAG)
       this.persist()
     },
@@ -228,14 +318,16 @@ export const useRestTimerStore = defineStore('restTimer', {
     playCues() {
       const sec = Math.ceil(this.remainingMs / 1000)
       if (sec <= 0) return
+      // Nativ eingeplant: iOS spielt die Töne selbst (nur den Stand mitführen).
+      const silent = nativeCuesFor === this.endsAt
       if (sec <= 3) {
         if (lastCountSec !== sec) {
           lastCountSec = sec
-          emitTimerSignal({ eventKey: `rest-count-${this.endsAt}-${sec}`, soundEnabled: true, soundType: 'bell', kind: `countdown-${sec}` })
+          if (!silent) emitTimerSignal({ eventKey: `rest-count-${this.endsAt}-${sec}`, soundEnabled: true, soundType: 'bell', kind: `countdown-${sec}`, dueAt: this.endsAt - sec * 1000 })
         }
       } else if (sec <= 10 && !warnedAtTen) {
         warnedAtTen = true
-        emitTimerSignal({ eventKey: `rest-warn-${this.endsAt}`, soundEnabled: true, kind: 'rest-warn' })
+        if (!silent) emitTimerSignal({ eventKey: `rest-warn-${this.endsAt}`, soundEnabled: true, kind: 'rest-warn', dueAt: this.endsAt - 10000 })
       }
     },
     startTick() {
@@ -273,6 +365,8 @@ export const useRestTimerStore = defineStore('restTimer', {
         Object.assign(this, saved, { nowMs: Date.now() })
         this.startTick()
         acquireKeepAwake(KEEP_AWAKE_TAG)
+        this.scheduleSounds()
+        this.checkMediaVolume()
       } catch {}
     }
   }

@@ -25,6 +25,8 @@
 
         <template v-else>
           <p class="ro-label">{{ t('restTimer.label') }}</p>
+          <!-- Medienlautstärke auf 0 (Lauter-Tasten): Gong und 3-2-1 wären nicht zu hören (Absprache Jimmy 12.11.) -->
+          <p v-if="rest.mediaMuted" class="ro-muted" role="status">{{ t('restTimer.mediaMuted') }}</p>
           <div class="ro-ring" role="timer" aria-live="off">
             <svg viewBox="0 0 100 100" aria-hidden="true">
               <circle class="ro-ring-track" cx="50" cy="50" r="46" />
@@ -105,6 +107,7 @@
           :title="t('restTimer.expandAria')"
           @click="rest.expand()"
         >⤢</button>
+        <p v-if="rest.mediaMuted" class="rest-muted" role="status">{{ t('restTimer.mediaMuted') }}</p>
         <div class="rest-info">
           <span class="rest-label">{{ t('restTimer.label') }}<template v-if="rest.exerciseName"> · {{ rest.exerciseName }}</template></span>
           <span class="rest-time">{{ timeText }}</span>
@@ -259,6 +262,22 @@ onBeforeUnmount(unlock)
   text-transform: uppercase;
   color: var(--muted);
 }
+/* Hinweis Medienlautstärke aus: gut lesbar, aber nicht als Fehler (Warnfarbe nur als Rand). */
+.ro-muted,
+.rest-muted {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--warning, #f5a524) 60%, transparent);
+  background: color-mix(in srgb, var(--warning, #f5a524) 12%, transparent);
+  color: var(--fg);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+  max-width: 34ch;
+}
+.rest-muted { flex-basis: 100%; max-width: none; font-size: 0.82rem; text-align: left; }
 .ro-ring {
   position: relative;
   width: min(86vw, 380px);

@@ -152,6 +152,8 @@ export const useWarmupTimerStore = defineStore('warmupTimer', {
     /** Zeit abgelaufen: Schritt als fertig merken, Ton im Vordergrund. `silent` = beim Wiederherstellen nach Neustart. */
     finish({ silent = false } = {}) {
       if (!this.step) return
+      // Geplantes Ende: kommt die App erst später zurück (Hintergrund), bleibt der verspätete Ton aus.
+      const dueAt = this.endsAt || null
       this.finished = [...this.finished, { step: this.step, workoutKey: this.workoutKey }]
       this.reset()
       this.stopTick()
@@ -160,7 +162,7 @@ export const useWarmupTimerStore = defineStore('warmupTimer', {
       if (!silent) {
         let melodyId = null
         try { melodyId = useRestTimerStore().soundId } catch {}
-        emitTimerSignal({ eventKey: `warmup-end-${Date.now()}`, soundEnabled: true, kind: 'rest-end', melodyId })
+        emitTimerSignal({ eventKey: `warmup-end-${Date.now()}`, soundEnabled: true, kind: 'rest-end', melodyId, dueAt })
         try { if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate([200, 100, 200]) } catch {}
       }
       this.persist()

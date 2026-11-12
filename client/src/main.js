@@ -42,6 +42,7 @@ import { stripWorkoutNameDate } from '@/utils/workoutName'
 import { dismissStartSplash } from '@/utils/startSplash'
 import { reapplyKeepAwake } from '@/utils/keepAwakeGuard'
 import { rearmAudio } from '@/utils/timerAudio'
+import { probeNativeTimerSound } from '@/utils/nativeTimerSound'
 // Bewusst NICHT statisch importiert (siehe warmupExercisesArea unten): defaultExercisesLoader.js
 // importiert die ~3,3MB große Übungsdatenbank (default-exercises.json) statisch - ein Top-Level-
 // Import hier würde sie fest in den Haupt-Bundle-Chunk backen, obwohl sie erst gebraucht wird,
@@ -216,6 +217,9 @@ if (import.meta.env.DEV) {
     logger.warn('⚠️ Vue-Warnung', { msg, trace })
   }
 }
+
+// Timer-Töne über iOS (Plugin TimerSound) - früh prüfen, damit der erste Pausen-Gong schon darüber läuft.
+probeNativeTimerSound()
 
 const pinia = createPinia()
 const i18n = createI18nInstance()

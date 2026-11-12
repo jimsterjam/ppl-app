@@ -89,7 +89,9 @@ describe('timerAudio: Zustand des AudioContext', () => {
     expect(log.contexts[0].state).toBe('running')
   })
 
-  it('resume() antwortet nie (iOS ohne Geste): Gong wird nach kurzer Wartezeit trotzdem angestoßen, Geste armiert', async () => {
+  // Meldung 12.11.: Früher wurde der Gong hier "trotzdem angestoßen" - im stehenden Kontext blieb er hängen und kam
+  // erst beim Zurückkehren in die App (verspätet). Jetzt: nicht spielen, nur die nächste Geste armieren.
+  it('resume() antwortet nie (iOS ohne Geste): Gong wird NICHT in den stehenden Kontext gelegt, Geste armiert', async () => {
     vi.useFakeTimers()
     const log = installFakeAudioContext({ resumeBehavior: 'never', rebuiltState: 'interrupted' })
     const audio = await freshAudio()
@@ -98,7 +100,8 @@ describe('timerAudio: Zustand des AudioContext', () => {
     expect(log.oscStarts).toBe(0)
     // 2 x Wartezeit: erster Startversuch, Neuaufbau, zweiter Startversuch
     await vi.advanceTimersByTimeAsync(1500)
-    expect(log.oscStarts).toBeGreaterThan(0)
+    // Gong = 4 Oszillatoren; höchstens der stumme Entsperr-Oszillator darf gestartet sein
+    expect(log.oscStarts).toBeLessThan(4)
     // Nächstes Antippen weckt den Kontext
     log.resumeCalls = 0
     document.dispatchEvent(new Event('touchend', { bubbles: true }))
@@ -215,6 +218,31 @@ describe('timerAudio: Zustand des AudioContext', () => {
     audio.emitTimerSignal({ eventKey: 'd', soundEnabled: false, kind: 'round-start' })
     expect(log.resumeCalls).toBe(0)
     expect(log.oscStarts).toBe(0)
+  })
+
+  it('verspäteter Ton (dueAt länger als LATE_SIGNAL_MS her) wird nicht gespielt; pünktlicher schon', async () => {
+    const log = installFakeAudioContext()
+    const audio = await freshAudio()
+    audio.emitTimerSignal({ eventKey: 'late1', soundEnabled: true, kind: 'rest-end', dueAt: Date.now() - audio.LATE_SIGNAL_MS - 500 })
+    expect(log.oscStarts).toBe(0)
+    audio.emitTimerSignal({ eventKey: 'late2', soundEnabled: true, kind: 'rest-end', dueAt: Date.now() - 200 })
+    expect(log.oscStarts).toBeGreaterThanOrEqual(4)
+  })
+
+  it('iOS-Plugin bereit: Ton geht als Datei an das Plugin, Web Audio bleibt still; ohne Datei (unbekannte Art) Web Audio', async () => {
+    const log = installFakeAudioContext()
+    const play = vi.fn(async () => true)
+    vi.resetModules()
+    vi.doMock('@/utils/nativeTimerSound', () => ({ isNativeTimerSoundReady: () => true, playNativeTimerSound: play }))
+    const audio = await import('../timerAudio.js')
+    audio.emitTimerSignal({ eventKey: 'n1', soundEnabled: true, kind: 'countdown-2', soundType: 'chinese-gong' })
+    audio.emitTimerSignal({ eventKey: 'n2', soundEnabled: true, kind: 'rest-end', melodyId: 'deep' })
+    expect(play.mock.calls.map((c) => c[0])).toEqual(['timer-chinesegong-2.wav', 'timer-melody-deep.wav'])
+    expect(log.oscStarts).toBe(0)
+    // Gegenprobe: Ton aus -> auch das Plugin bleibt still
+    audio.emitTimerSignal({ eventKey: 'n3', soundEnabled: false, kind: 'rest-end' })
+    expect(play).toHaveBeenCalledTimes(2)
+    vi.doUnmock('@/utils/nativeTimerSound')
   })
 
   it('Pausenende mit Melodie: spielt die Noten, nicht den Gong; unbekannte ID fällt auf den Gong zurück', async () => {

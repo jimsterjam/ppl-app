@@ -17,6 +17,8 @@
  */
 import { logDiagnostic } from '@/utils/diagnosticsLog'
 import { getRestMelody } from '@/utils/restMelodies'
+import { timerSoundFile } from '@/utils/timerSoundFiles'
+import { isNativeTimerSoundReady, playNativeTimerSound } from '@/utils/nativeTimerSound'
 
 let audioContext = null
 let audioMasterNode = null
@@ -560,8 +562,28 @@ export const clearSignalHistory = () => {
   signalHistory.clear()
 }
 
-export const emitTimerSignal = ({ eventKey, soundEnabled, soundType = 'box-gong', kind, melodyId = null }) => {
+// Ein Ton, der so viel später als geplant käme, wird nicht mehr gespielt (Meldung 12.11.: nach dem Zurückkehren in
+// die App kamen aufgestaute Töne der vergangenen Pause).
+export const LATE_SIGNAL_MS = 1500
+
+/**
+ * Timer-Ton spielen. Auf iOS über das Plugin TimerSound (utils/nativeTimerSound.js), sonst per Web Audio.
+ * @param {object} signal
+ * @param {number|null} [signal.dueAt] - geplanter Zeitpunkt (ms seit 1970); liegt er mehr als LATE_SIGNAL_MS zurück,
+ *   bleibt der Ton aus
+ */
+export const emitTimerSignal = ({ eventKey, soundEnabled, soundType = 'box-gong', kind, melodyId = null, dueAt = null }) => {
   if (!shouldEmitSignal(eventKey)) return
+  const isLate = () => Number.isFinite(dueAt) && dueAt > 0 && Date.now() - dueAt > LATE_SIGNAL_MS
+  if (soundEnabled && isLate()) {
+    logDiagnostic('audio-late-drop', { kind, lateMs: Date.now() - dueAt })
+    return
+  }
+  const file = soundEnabled ? timerSoundFile({ kind, soundType, melodyId }) : null
+  if (file && isNativeTimerSoundReady()) {
+    playNativeTimerSound(file)
+    return
+  }
 
   const play = () => {
     try {
@@ -599,14 +621,19 @@ export const emitTimerSignal = ({ eventKey, soundEnabled, soundType = 'box-gong'
     ensureAudioUnlocked()
     const ctx = getAudioContext()
     if (ctx && ctx.state !== 'running') {
-      // Kontext steht (z.B. 'interrupted' nach dem Hintergrund): erst starten, dann spielen. Klappt der
-      // Start nicht, trotzdem spielen - und beim nächsten Antippen erneut aufwecken.
+      // Kontext steht (z.B. 'interrupted' nach dem Hintergrund): erst starten, dann spielen. Klappt der Start nicht,
+      // NICHT spielen: der Ton bliebe im stehenden Kontext hängen und käme erst, wenn er wieder läuft - also verspätet
+      // (Meldung 12.11.). Beim nächsten Antippen wird der Kontext erneut aufgeweckt.
       const before = ctx.state
       ensureAudioRunning().then((running) => {
         logDiagnostic('audio-signal-resume', { kind, before, running, state: getAudioContext()?.state })
-        if (!running) armGestureResume()
+        if (!running) {
+          armGestureResume()
+          return
+        }
+        if (isLate()) return
         play()
-      }, play)
+      }, () => armGestureResume())
       return
     }
     play()
