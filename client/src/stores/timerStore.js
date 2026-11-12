@@ -606,7 +606,8 @@ export const useTimerStore = defineStore('timer', {
               eventKey: `sw-countdown:${swKey}:${remainingSeconds}`,
               soundEnabled: String(this.config.countdownSoundType ?? 'box-gong') !== 'none',
               soundType: this.config.countdownSoundType || 'box-gong',
-              kind: `countdown-${remainingSeconds}`
+              kind: `countdown-${remainingSeconds}`,
+              dueAt: this.nowMs - (remainingSeconds * 1000 - remainingMs)
             })
             this.countdownLastSecond = remainingSeconds
           } else if (remainingSeconds > 3) {
@@ -620,7 +621,9 @@ export const useTimerStore = defineStore('timer', {
                 eventKey: `sw-session-end:${swKey}`,
                 soundEnabled: String(this.config.countdownSoundType ?? 'box-gong') !== 'none',
                 soundType: this.config.countdownSoundType || 'box-gong',
-                kind: 'session-end'
+                kind: 'session-end',
+                // Geplantes Ende: lief es ab, während die App im Hintergrund war, bleibt der Ton beim Zurückkehren aus
+                dueAt: this.nowMs - (stopwatchElapsed - startMs)
               })
               lastSessionEndSignalKey = swKey
             }
@@ -719,7 +722,8 @@ export const useTimerStore = defineStore('timer', {
               : `countdown:${intervalKey}:${remainingSeconds}`,
             soundEnabled: String(this.config.countdownSoundType ?? 'box-gong') !== 'none',
             soundType: this.config.countdownSoundType || 'box-gong',
-            kind: `countdown-${remainingSeconds}`
+            kind: `countdown-${remainingSeconds}`,
+            dueAt: this.nowMs - (remainingSeconds * 1000 - Math.max(0, phaseDuration - phaseElapsed))
           })
           this.countdownLastSecond = remainingSeconds
         } else if (remainingSeconds > 3) {
@@ -739,7 +743,9 @@ export const useTimerStore = defineStore('timer', {
             eventKey: `session-end:${sessionEndKey}`,
             soundEnabled: String(this.config.countdownSoundType ?? 'box-gong') !== 'none',
             soundType: this.config.countdownSoundType || 'box-gong',
-            kind: 'session-end'
+            kind: 'session-end',
+            // Geplantes Ende: lief es ab, während die App im Hintergrund war, bleibt der Ton beim Zurückkehren aus
+            dueAt: this.nowMs - (this.elapsedMs - totalTime)
           })
           lastSessionEndSignalKey = sessionEndKey
         }
