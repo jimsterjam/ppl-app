@@ -291,3 +291,38 @@ describe('Seite Push/Pull/Legs erklärt', () => {
     assert.equal(status.suggestion, null)
   })
 })
+
+describe('Kopfzeile auf dem Handy (Hamburger-Menü)', () => {
+  const css = () => fs.readFileSync(path.join(here, '../assets/style.css'), 'utf8')
+  test('jede Seite: Menüknopf steuert das Menü, Beschriftung DE/EN, Skript eingebunden', () => {
+    for (const [file, html] of htmlFiles()) {
+      const t = content[file.startsWith('/en/') ? 'en' : 'de'].nav
+      const btn = html.match(/<button class="menu-btn"[^>]*>/)?.[0]
+      assert.ok(btn, `${file}: Menüknopf fehlt`)
+      assert.ok(btn.includes('aria-expanded="false"') && btn.includes('aria-controls="site-menu"'), file)
+      assert.ok(btn.includes(`aria-label="${t.open}"`) && btn.includes(`data-label-close="${t.close}"`), `${file}: Beschriftung`)
+      assert.ok(html.includes('<div class="menu" id="site-menu">'), `${file}: Menü-Ziel fehlt`)
+      assert.ok(html.includes('<script src="/assets/menu.js" defer></script>'), `${file}: menu.js`)
+    }
+  })
+  test('Gegenprobe: Sprachwahl liegt NICHT im zuklappbaren Menü (immer sichtbar)', () => {
+    for (const [file, html] of htmlFiles()) {
+      const menu = html.match(/<div class="menu" id="site-menu">([\s\S]*?)<\/div>\n/)?.[1] || ''
+      assert.ok(menu.includes('<nav class="main"'), `${file}: Navigation im Menü`)
+      assert.ok(!menu.includes('class="lang"'), `${file}: Sprachwahl im Menü`)
+      assert.ok(html.includes('<div class="lang" role="group"'), `${file}: Sprachwahl fehlt`)
+    }
+  })
+  test('Gegenprobe ohne JavaScript: Menü wird nur versteckt, wenn das Skript die Klasse "js" gesetzt hat', () => {
+    const style = css()
+    const hides = [...style.matchAll(/([^{}\n]*)\{[^}]*display: none/g)].map((m) => m[1].trim()).filter((sel) => /\.menu\b(?!-)/.test(sel))
+    assert.ok(hides.length > 0)
+    for (const sel of hides) assert.ok(sel.startsWith('html.js '), `"${sel}" versteckt das Menü auch ohne JavaScript`)
+  })
+  test('Regression 12.11.: App-Bilder auf dem Handy als Wischleiste – die Handy-Regel schlägt .shots (display: grid)', () => {
+    const style = css()
+    const phone = style.match(/@media \(max-width: 640px\) \{([\s\S]*?)\n\}/)?.[1] || ''
+    assert.match(phone, /\.shots\.shots-hero \{ display: flex;/)
+    assert.match(style, /@media \(min-width: 641px\) and \(max-width: 900px\) \{ \.shots\.shots-hero \{ grid-template-columns: repeat\(2, 1fr\)/)
+  })
+})

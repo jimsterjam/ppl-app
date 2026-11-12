@@ -10,7 +10,7 @@ trägt ihre Backlog-Änderung mit; bis zum Merge steht sie nur dort).
 Kennzeichnung: **[A]** autonom erlaubt · **[F]** Freigabe von Jimmy nötig · **[P]** wartet auf Jimmy
 (Info, Entscheidung oder Handgriff außerhalb des Repos). Priorität: P1 (zuerst) bis P3.
 
-Zuletzt aktualisiert: 2026-11-10
+Zuletzt aktualisiert: 2026-11-12
 
 ---
 
@@ -74,6 +74,7 @@ finden sollen und was daran geändert wurde. Regel in `CLAUDE.md` (Cloud-Session
 |---|---|---|---|
 | 11.11.2026 | Trainings-Erinnerung kam auf dem iPhone nie: `getPlugin()` gab das Capacitor-Plugin direkt aus einer async-Funktion zurück; auf iOS wirft der Promise-Abruf von `.then` am Plugin-Proxy, Planen, Löschen und Tipp-Listener schlugen still fehl. Bekanntes Muster (`capacitorPlugin.js`, `capacitorPluginThenable.test.js`), trotzdem neu eingebaut. | Selbst-Review und Test mit dem iOS-Proxy-Mock (die Planungstests mockten das Plugin als normales Objekt). Gefunden erst vom Copilot-Review zu #174. | `wrapPlugin` in `trainingReminder.js`; Regressionstest `trainingReminderThenable.test.js` mit Proxy (schlug vorher fehl); Regel in `.github/copilot-instructions.md`. |
 | 11.11.2026 | Trainings-Erinnerung, Fenster „Eigene Uhrzeit“: auf dem iPhone wurde die gewählte Zeit nicht übernommen. Die globale Knopf-Mindesthöhe (48 px) machte die Rad-Einträge höher als die angenommenen 40 px; das Rad zeigte eine andere Stunde, als es las. | Test im echten Browser mit Layout (Komponententests in happy-dom rechnen keine Größen). | Höhe wird gemessen, Mindesthöhe im Rad aufgehoben; Regressionstest mit 48-px-Einträgen; Hinweis zu fehlendem Layout in `agents.md`. Geprüft zusätzlich in Chromium (Handy-Ansicht) mit der echten Komponente. |
+| 12.11.2026 | Website, Startseite auf dem Handy: die App-Bilder standen untereinander statt als Wischleiste. Die Handy-Regel `.shots-hero { display: flex }` stand vor `.shots { display: grid }` mit gleicher Gewichtung und wurde überschrieben. | Prüfung der Startseite im echten Browser in Handybreite (bisher nur die neue Seite geprüft). | Selektor `.shots.shots-hero`, Regressionstest in `site/tests/site.test.mjs`; bei Website-Änderungen im Browser auch die Startseite bei 390 px ansehen. |
 
 ## Entscheidungen (Log)
 

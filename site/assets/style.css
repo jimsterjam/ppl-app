@@ -54,8 +54,11 @@ main { padding-block: 40px 72px; }
 section { margin-block: 56px; }
 .hero { display: grid; gap: 32px; align-items: center; }
 .shots-hero { margin-block: 40px 0; max-width: 900px; }
+/* iPad hochkant: 2 × 2 statt 3 + 1 (vier App-Bilder) */
+@media (min-width: 641px) and (max-width: 900px) { .shots.shots-hero { grid-template-columns: repeat(2, 1fr); max-width: 460px; } }
 @media (max-width: 640px) {
-  .shots-hero { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 12px; padding-bottom: 10px; margin-inline: calc(-1 * max(20px, env(safe-area-inset-left))); padding-inline: max(20px, env(safe-area-inset-left)); }
+  /* .shots.shots-hero: muss .shots (display: grid, steht weiter unten) schlagen */
+  .shots.shots-hero { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: max(20px, env(safe-area-inset-left)); gap: 12px; padding-bottom: 10px; margin-inline: calc(-1 * max(20px, env(safe-area-inset-left))); padding-inline: max(20px, env(safe-area-inset-left)); }
   .shots-hero img { flex: 0 0 62%; max-width: 240px; scroll-snap-align: start; }
 }
 .hero p.lead { font-size: 1.2rem; max-width: 36em; }
