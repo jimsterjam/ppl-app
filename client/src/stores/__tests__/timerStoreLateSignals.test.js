@@ -56,4 +56,17 @@ describe('Intervall-Timer: Töne mit geplantem Zeitpunkt (dueAt)', () => {
       ['countdown-1', T0 + 19_000]
     ])
   })
+
+  it('Vorbereitung 3-2-1 und Rundenstart tragen ihren geplanten Zeitpunkt', () => {
+    timer.start({ mode: 'interval', minutes: 0, seconds: 10, restSeconds: 0, intervals: 1, prepSeconds: 5 })
+    vi.advanceTimersByTime(5_500)
+    const calls = signal.mock.calls.map((c) => c[0])
+    expect(calls.filter((s) => /^countdown-/.test(s.kind)).map((s) => [s.kind, s.dueAt])).toEqual([
+      ['countdown-3', T0 + 2000],
+      ['countdown-2', T0 + 3000],
+      ['countdown-1', T0 + 4000]
+    ])
+    const start = calls.find((s) => s.kind === 'round-start')
+    expect(start.dueAt).toBe(T0 + 5000)
+  })
 })

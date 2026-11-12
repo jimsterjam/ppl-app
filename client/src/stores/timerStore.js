@@ -570,7 +570,8 @@ export const useTimerStore = defineStore('timer', {
                 eventKey: `sw-prep-countdown:${safeRemaining}:${this.startedAt || 0}`,
                 soundEnabled: String(this.config.countdownSoundType ?? 'box-gong') !== 'none',
                 soundType: this.config.countdownSoundType || 'box-gong',
-                kind: `countdown-${safeRemaining}`
+                kind: `countdown-${safeRemaining}`,
+                dueAt: this.startedAt - safeRemaining * 1000
               })
             }
           } else if (this.countdownOverlayVariant === 'prep') {
@@ -591,7 +592,8 @@ export const useTimerStore = defineStore('timer', {
             eventKey: `sw-start:${swKey}`,
             soundEnabled: String(this.config.countdownSoundType ?? 'box-gong') !== 'none',
             soundType: this.config.countdownSoundType || 'box-gong',
-            kind: 'round-start'
+            kind: 'round-start',
+            dueAt: this.nowMs - stopwatchElapsed
           })
           lastRoundStartSignalKey = swKey
         }
@@ -655,7 +657,8 @@ export const useTimerStore = defineStore('timer', {
               eventKey: `prep:${safeRemaining}:${this.startedAt || 0}`,
               soundEnabled: String(this.config.countdownSoundType ?? 'box-gong') !== 'none',
               soundType: this.config.countdownSoundType || 'box-gong',
-              kind: `countdown-${safeRemaining}`
+              kind: `countdown-${safeRemaining}`,
+              dueAt: this.startedAt - safeRemaining * 1000
             })
           }
         } else if (this.countdownOverlayVariant === 'prep') {
@@ -692,7 +695,8 @@ export const useTimerStore = defineStore('timer', {
               eventKey: `phase-start:${phaseState}:${this.startedAt || 0}`,
               soundEnabled: String(this.config.countdownSoundType ?? 'box-gong') !== 'none',
               soundType: this.config.countdownSoundType || 'box-gong',
-              kind: 'round-start'
+              kind: 'round-start',
+              dueAt: this.nowMs - phaseElapsed
             })
           }
           lastRoundStartSignalKey = intervalKey

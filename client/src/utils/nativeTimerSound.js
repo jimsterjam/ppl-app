@@ -45,16 +45,21 @@ export function isNativeTimerSoundReady() {
   return available === true
 }
 
-/** Ton sofort spielen. @returns {Promise<boolean>} */
+/**
+ * Ton sofort spielen.
+ * @returns {Promise<{ played: boolean, reason?: string }>} reason 'background': App nicht im Vordergrund - bewusst
+ *   still (dann auch NICHT per Web Audio spielen, der Ton käme sonst verspätet beim Zurückkehren)
+ */
 export async function playNativeTimerSound(file) {
-  if (!isNativeTimerSoundReady() || !file) return false
+  if (!isNativeTimerSoundReady() || !file) return { played: false, reason: 'unavailable' }
   try {
     const result = await TimerSound.play({ file })
-    if (result?.played !== true) logDiagnostic('timer-sound-play', { file, reason: result?.reason || 'not-played' })
-    return result?.played === true
+    const played = result?.played === true
+    if (!played) logDiagnostic('timer-sound-play', { file, reason: result?.reason || 'not-played' })
+    return played ? { played } : { played, reason: result?.reason || 'not-played' }
   } catch (error) {
     logDiagnostic('timer-sound-play', { file, error: String(error?.message || error) })
-    return false
+    return { played: false, reason: 'plugin-error' }
   }
 }
 

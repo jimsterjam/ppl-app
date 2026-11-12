@@ -51,6 +51,8 @@ describe('Fokus-Modus: Ansicht und Satz-Timer', () => {
     expect(store.consumeFinished()).toBe('2:1')
     expect(store.consumeFinished()).toBe('')
     expect(signal).toHaveBeenCalledTimes(1)
+    // Geplantes Satzende als dueAt (Copilot PR 181): kommt die App später zurück, verwirft emitTimerSignal den Ton
+    expect(signal.mock.calls[0][0].dueAt).toBe(new Date('2026-10-19T10:00:10Z').getTime())
   })
 
   it('anhalten, weiter und Zeit anpassen', () => {

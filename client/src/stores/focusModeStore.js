@@ -46,11 +46,13 @@ export const useFocusModeStore = defineStore('focusMode', () => {
 
   function finishTimer() {
     const key = timerKey.value
+    // Geplantes Satzende: kam die App erst später aus dem Hintergrund zurück, bleibt der verspätete Ton aus
+    const dueAt = endsAt.value || null
     endsAt.value = 0
     pausedRemainingMs.value = 0
     stopTick()
     finishedKey.value = key
-    emitTimerSignal({ eventKey: `set-end-${key}-${Date.now()}`, soundEnabled: true, kind: 'rest-end' })
+    emitTimerSignal({ eventKey: `set-end-${key}-${Date.now()}`, soundEnabled: true, kind: 'rest-end', dueAt })
   }
 
   function open() {

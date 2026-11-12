@@ -586,8 +586,11 @@ export const emitTimerSignal = ({ eventKey, soundEnabled, soundType = 'box-gong'
   }
   const file = soundEnabled ? timerSoundFile({ kind, soundType, melodyId }) : null
   if (file && isNativeTimerSoundReady()) {
-    // Klappt es über iOS nicht (Datei fehlt im Build, Spieler startet nicht): sofort per Web Audio
-    playNativeTimerSound(file).then((ok) => { if (!ok && !isLate()) playWeb() }, () => playWeb())
+    // Klappt es über iOS nicht (Datei fehlt im Build, Spieler startet nicht): sofort per Web Audio. Ausnahme: App im
+    // Hintergrund - dann bleibt es still (Web Audio würde den Ton aufstauen und verspätet spielen).
+    playNativeTimerSound(file).then((result) => {
+      if (!result?.played && result?.reason !== 'background' && !isLate()) playWeb()
+    }, () => playWeb())
     return
   }
   playWeb()

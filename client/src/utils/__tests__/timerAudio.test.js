@@ -231,7 +231,7 @@ describe('timerAudio: Zustand des AudioContext', () => {
 
   it('iOS-Plugin bereit: Ton geht als Datei an das Plugin, Web Audio bleibt still; ohne Datei (unbekannte Art) Web Audio', async () => {
     const log = installFakeAudioContext()
-    const play = vi.fn(async () => true)
+    const play = vi.fn(async () => ({ played: true }))
     vi.resetModules()
     vi.doMock('@/utils/nativeTimerSound', () => ({ isNativeTimerSoundReady: () => true, playNativeTimerSound: play }))
     const audio = await import('../timerAudio.js')
@@ -248,12 +248,24 @@ describe('timerAudio: Zustand des AudioContext', () => {
   it('Gegenprobe: iOS-Plugin kann nicht spielen (Datei fehlt) -> sofort Web Audio statt Stille', async () => {
     const log = installFakeAudioContext()
     vi.resetModules()
-    vi.doMock('@/utils/nativeTimerSound', () => ({ isNativeTimerSoundReady: () => true, playNativeTimerSound: async () => false }))
+    vi.doMock('@/utils/nativeTimerSound', () => ({ isNativeTimerSoundReady: () => true, playNativeTimerSound: async () => ({ played: false, reason: 'missing-file' }) }))
     const audio = await import('../timerAudio.js')
     audio.emitTimerSignal({ eventKey: 'f1', soundEnabled: true, kind: 'round-start' })
     await Promise.resolve()
     await Promise.resolve()
     expect(log.oscStarts).toBeGreaterThanOrEqual(4)
+    vi.doUnmock('@/utils/nativeTimerSound')
+  })
+
+  it('Gegenprobe: iOS meldet "App im Hintergrund" -> still, KEIN Web Audio (würde sich aufstauen und verspätet kommen)', async () => {
+    const log = installFakeAudioContext()
+    vi.resetModules()
+    vi.doMock('@/utils/nativeTimerSound', () => ({ isNativeTimerSoundReady: () => true, playNativeTimerSound: async () => ({ played: false, reason: 'background' }) }))
+    const audio = await import('../timerAudio.js')
+    audio.emitTimerSignal({ eventKey: 'bg1', soundEnabled: true, kind: 'round-start' })
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(log.oscStarts).toBe(0)
     vi.doUnmock('@/utils/nativeTimerSound')
   })
 

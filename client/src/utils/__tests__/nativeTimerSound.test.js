@@ -43,7 +43,7 @@ describe('nativeTimerSound: Brücke zum iOS-Plugin', () => {
     expect(m.isNativeTimerSoundReady()).toBe(false)
     expect(await m.probeNativeTimerSound()).toBe(true)
     expect(m.isNativeTimerSoundReady()).toBe(true)
-    expect(await m.playNativeTimerSound('timer-whistle.wav')).toBe(true)
+    expect(await m.playNativeTimerSound('timer-whistle.wav')).toEqual({ played: true })
     expect(env.calls.play[0][0]).toEqual({ file: 'timer-whistle.wav' })
     const cues = [{ key: 'rest-end', file: 'timer-whistle.wav', at: 123 }]
     expect(await m.scheduleNativeTimerSounds(cues)).toBe(true)
@@ -56,7 +56,7 @@ describe('nativeTimerSound: Brücke zum iOS-Plugin', () => {
     env.impl = {}
     const m = await fresh()
     expect(await m.probeNativeTimerSound()).toBe(false)
-    expect(await m.playNativeTimerSound('timer-whistle.wav')).toBe(false)
+    expect((await m.playNativeTimerSound('timer-whistle.wav')).played).toBe(false)
     expect(await m.scheduleNativeTimerSounds([{ key: 'k', file: 'f', at: 1 }])).toBe(false)
     expect(await m.getMediaVolume()).toBe(null)
     expect(env.calls.play).toBeUndefined()
@@ -73,6 +73,13 @@ describe('nativeTimerSound: Brücke zum iOS-Plugin', () => {
     const m = await fresh()
     expect(await m.probeNativeTimerSound()).toBe(false)
     expect(env.calls.isAvailable).toBeUndefined()
+  })
+
+  it('App im Hintergrund: Grund "background" wird an den Aufrufer weitergegeben (der dann nicht auf Web Audio ausweicht)', async () => {
+    env.impl.play = async () => ({ played: false, reason: 'background' })
+    const m = await fresh()
+    await m.probeNativeTimerSound()
+    expect(await m.playNativeTimerSound('timer-whistle.wav')).toEqual({ played: false, reason: 'background' })
   })
 
   it('nur teilweise eingeplant (z. B. Datei fehlt) gilt als nicht geplant -> Aufrufer spielt per Web Audio', async () => {
