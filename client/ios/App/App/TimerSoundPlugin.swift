@@ -60,6 +60,8 @@ public class TimerSoundPlugin: CAPPlugin, CAPBridgedPlugin {
         center.addObserver(self, selector: #selector(willEnterForeground), name: UIApplication.willEnterForegroundNotification, object: nil)
         center.addObserver(self, selector: #selector(audioInterrupted(_:)), name: AVAudioSession.interruptionNotification, object: nil)
         center.addObserver(self, selector: #selector(mediaServicesReset), name: AVAudioSession.mediaServicesWereResetNotification, object: nil)
+        // Kopfhörer/Bluetooth verbunden oder getrennt: eingeplante Spieler hängen am alten Ausgang - neu einplanen
+        center.addObserver(self, selector: #selector(routeChanged), name: AVAudioSession.routeChangeNotification, object: nil)
         volumeObservation = AVAudioSession.sharedInstance().observe(\.outputVolume, options: [.new]) { [weak self] session, _ in
             self?.notifyListeners("volume", data: ["volume": session.outputVolume])
         }
@@ -108,7 +110,11 @@ public class TimerSoundPlugin: CAPPlugin, CAPBridgedPlugin {
         DispatchQueue.main.async {
             self.disarm()
             self.cues = next
-            let count = self.inForeground ? self.arm(allowLate: true) : 0
+            // Im Vordergrund: Anzahl tatsächlich eingeplanter Töne. Im Hintergrund wird erst beim Zurückkehren eingeplant;
+            // gemeldet wird dann, wie viele Töne eine Datei im App-Paket haben (fehlt eine, spielt JS per Web Audio).
+            let count = self.inForeground
+                ? self.arm(allowLate: true)
+                : next.filter { self.hasFile($0.file) }.count
             call.resolve(["scheduled": count, "total": next.count])
         }
     }
@@ -131,6 +137,9 @@ public class TimerSoundPlugin: CAPPlugin, CAPBridgedPlugin {
     /// allowLate: nur beim frischen Planen darf ein gerade fälliger Ton (bis lateTolerance) sofort kommen; beim erneuten
     /// Planen nach Hintergrund/Unterbrechung nur künftige Töne (ein eben gespielter Ton käme sonst doppelt).
     private func arm(allowLate: Bool = false) -> Int {
+        // Immer erst die bisher eingeplanten Spieler stoppen - sonst kämen Töne doppelt (z. B. Rückkehr aus dem
+        // Hintergrund UND Ende einer Unterbrechung direkt nacheinander).
+        disarm()
         activateSession()
         let now = Date()
         var count = 0
@@ -152,6 +161,10 @@ public class TimerSoundPlugin: CAPPlugin, CAPBridgedPlugin {
     private func disarm() {
         for player in armed { player.stop() }
         armed.removeAll()
+    }
+
+    private func hasFile(_ file: String) -> Bool {
+        Bundle.main.url(forResource: (file as NSString).lastPathComponent, withExtension: nil) != nil
     }
 
     private func makePlayer(_ file: String) -> AVAudioPlayer? {
@@ -189,7 +202,21 @@ public class TimerSoundPlugin: CAPPlugin, CAPBridgedPlugin {
         DispatchQueue.main.async {
             self.inForeground = true
             _ = self.arm()
+            // Lautstärke kann sich im Hintergrund geändert haben (Kontrollzentrum) - Hinweis in der App aktualisieren
+            self.notifyVolume()
         }
+    }
+
+    @objc private func routeChanged() {
+        // Kurz warten: AppDelegate setzt die Audio-Einstellung bei jedem Wechsel neu
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            if self.inForeground { _ = self.arm() }
+            self.notifyVolume()
+        }
+    }
+
+    private func notifyVolume() {
+        notifyListeners("volume", data: ["volume": AVAudioSession.sharedInstance().outputVolume])
     }
 
     @objc private func audioInterrupted(_ notification: Notification) {

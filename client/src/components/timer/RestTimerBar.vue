@@ -262,14 +262,14 @@ onBeforeUnmount(unlock)
   text-transform: uppercase;
   color: var(--muted);
 }
-/* Hinweis Medienlautstärke aus: gut lesbar, aber nicht als Fehler (Warnfarbe nur als Rand). */
+/* Hinweis Medienlautstärke aus: Warnfarben aus style.css (hell/dunkel), Text in normaler Schriftfarbe. */
 .ro-muted,
 .rest-muted {
   margin: 0;
   padding: 8px 12px;
   border-radius: 12px;
-  border: 1px solid color-mix(in srgb, var(--warning, #f5a524) 60%, transparent);
-  background: color-mix(in srgb, var(--warning, #f5a524) 12%, transparent);
+  border: 1px solid var(--warning);
+  background: var(--warning-bg);
   color: var(--fg);
   font-size: 0.9rem;
   font-weight: 600;

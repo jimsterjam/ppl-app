@@ -245,6 +245,18 @@ describe('timerAudio: Zustand des AudioContext', () => {
     vi.doUnmock('@/utils/nativeTimerSound')
   })
 
+  it('Gegenprobe: iOS-Plugin kann nicht spielen (Datei fehlt) -> sofort Web Audio statt Stille', async () => {
+    const log = installFakeAudioContext()
+    vi.resetModules()
+    vi.doMock('@/utils/nativeTimerSound', () => ({ isNativeTimerSoundReady: () => true, playNativeTimerSound: async () => false }))
+    const audio = await import('../timerAudio.js')
+    audio.emitTimerSignal({ eventKey: 'f1', soundEnabled: true, kind: 'round-start' })
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(log.oscStarts).toBeGreaterThanOrEqual(4)
+    vi.doUnmock('@/utils/nativeTimerSound')
+  })
+
   it('Pausenende mit Melodie: spielt die Noten, nicht den Gong; unbekannte ID fällt auf den Gong zurück', async () => {
     const log = installFakeAudioContext()
     const audio = await freshAudio()

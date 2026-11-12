@@ -138,4 +138,31 @@ describe('Pausentimer: Töne über iOS (Plugin TimerSound)', () => {
     expect(rest.mediaVolume).toBe(null)
     expect(rest.mediaMuted).toBe(false)
   })
+
+  it('Regression Review: -15 s bis auf 0 beendet sofort, nimmt die für das alte Ende geplanten Töne zurück und spielt jetzt', async () => {
+    rest.start({ seconds: 30 })
+    await Promise.resolve()
+    vi.advanceTimersByTime(20_000)
+    native.cancel.mockClear()
+    rest.adjust(-15)
+    expect(native.cancel).toHaveBeenCalled()
+    expect(kinds()).toEqual(['rest-end'])
+  })
+
+  it('Gegenprobe: Ende genau wie geplant -> kein Zurücknehmen und kein zweiter Ton aus JS', async () => {
+    rest.start({ seconds: 10 })
+    await Promise.resolve()
+    native.cancel.mockClear()
+    vi.advanceTimersByTime(10_500)
+    expect(kinds()).toEqual([])
+    expect(native.cancel).not.toHaveBeenCalled()
+  })
+
+  it('Melodie während der Pause geändert: iOS plant das Ende mit der neuen Melodie neu', async () => {
+    rest.start({ seconds: 30 })
+    await Promise.resolve()
+    rest.setSound('marimba')
+    await Promise.resolve()
+    expect(lastCues().at(-1).file).toBe('timer-melody-marimba.wav')
+  })
 })

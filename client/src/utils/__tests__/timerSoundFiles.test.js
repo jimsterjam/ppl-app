@@ -3,6 +3,7 @@ import { readFileSync, existsSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Buffer } from 'node:buffer'
+import { createHash } from 'node:crypto'
 import { timerSoundFile, melodySoundFile, TIMER_SOUND_FILES } from '../timerSoundFiles.js'
 import { REST_MELODIES, REST_SOUND_IDS } from '../restMelodies.js'
 
@@ -52,7 +53,7 @@ describe('Timer-Tondateien für das iOS-Plugin TimerSound', () => {
     for (const method of ['isAvailable', 'play', 'schedule', 'cancel', 'getVolume']) expect(plugin).toContain(`name: "${method}"`)
   })
 
-  it('Dateien sind unverändert aus dem Generator (nicht von Hand bearbeitet, Klang passt zu timerAudio.js)', async () => {
+  it('Dateien sind unverändert aus dem Generator (nicht von Hand bearbeitet)', async () => {
     const { renderAll, wavBuffer } = await import('../../../scripts/generate-timer-sounds.mjs')
     const { SR } = await import('../../../scripts/timerSoundSynth.mjs')
     for (const [file, samples] of renderAll()) {
@@ -65,4 +66,13 @@ describe('Timer-Tondateien für das iOS-Plugin TimerSound', () => {
       expect(peak, file).toBeLessThanOrEqual(0.9)
     }
   }, 20000)
+
+  // Stolperdraht: Die Klänge stehen zweimal (Web Audio in timerAudio.js, Nachrechnung für iOS in
+  // scripts/timerSoundSynth.mjs). Ändert sich ein Ton in timerAudio.js, schlägt dieser Test fehl, bis die Nachrechnung
+  // angepasst, die Dateien neu erzeugt und die Prüfsumme hier aktualisiert ist - sonst klängen iOS und Browser verschieden.
+  it('Klang-Code in timerAudio.js unverändert seit der letzten Nachrechnung (sonst timerSoundSynth.mjs nachziehen)', () => {
+    const source = readFileSync(resolve(here, '../timerAudio.js'), 'utf8')
+    const part = source.slice(source.indexOf('export const playBeep'), source.indexOf('export const shouldEmitSignal'))
+    expect(createHash('sha256').update(part).digest('hex').slice(0, 16)).toBe('d80e9ee4ec3f3a7e')
+  })
 })

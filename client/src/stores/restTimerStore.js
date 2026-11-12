@@ -132,6 +132,8 @@ export const useRestTimerStore = defineStore('restTimer', {
     setSound(id) {
       this.soundId = sanitizeRestSound(id)
       writePref(SOUND_KEY, this.soundId)
+      // Laufende Pause: iOS soll am Ende den neuen Ton spielen
+      if (this.isRunning) this.scheduleSounds()
     },
     /** Eigene Standard-Pause setzen; value = null/Standardwert entfernt den eigenen Wert. */
     setDuration(goal, type, value) {
@@ -270,8 +272,11 @@ export const useRestTimerStore = defineStore('restTimer', {
       const dueAt = this.endsAt
       this.endsAt = this.finishedAt
       cancelRestEndSignal().catch(() => {})
-      // iOS hat den Ton eingeplant (bzw. im Hintergrund bewusst nicht nachgespielt) - hier nicht noch einmal.
-      if (nativeCuesFor !== dueAt) {
+      // iOS hat den Ton für genau dieses Ende eingeplant (bzw. im Hintergrund bewusst nicht nachgespielt) - hier nicht
+      // noch einmal. Endet die Pause früher als geplant (-15 s bis auf 0), die alten Töne zurücknehmen und jetzt spielen.
+      const nativeHandled = nativeCuesFor === dueAt
+      if (nativeCuesFor && !nativeHandled) cancelNativeTimerSounds()
+      if (!nativeHandled) {
         emitTimerSignal({ eventKey: `rest-end-${this.finishedAt}`, soundEnabled: true, kind: 'rest-end', melodyId: this.soundId, dueAt })
       }
       nativeCuesFor = 0
