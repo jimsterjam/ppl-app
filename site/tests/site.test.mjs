@@ -294,7 +294,10 @@ describe('Seite Push/Pull/Legs erklärt', () => {
 
 describe('Kopfzeile auf dem Handy (Hamburger-Menü)', () => {
   const css = () => fs.readFileSync(path.join(here, '../assets/style.css'), 'utf8')
-  test('jede Seite: Menüknopf steuert das Menü, Beschriftung DE/EN, Skript eingebunden', () => {
+  // Regeln als [Selektor, Inhalt], Kommentare entfernt, Leerraum vereinheitlicht
+  const rules = () => [...css().replace(/\/\*[\s\S]*?\*\//g, '').matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .map(([, sel, body]) => [sel.replace(/\s+/g, ' ').trim(), body.replace(/\s+/g, ' ').replace(/\s*:\s*/g, ': ')])
+  test('jede Seite: Menüknopf steuert das Menü, Beschriftung DE/EN, Skript mit Inhalts-Kennung eingebunden', () => {
     for (const [file, html] of htmlFiles()) {
       const t = content[file.startsWith('/en/') ? 'en' : 'de'].nav
       const btn = html.match(/<button class="menu-btn"[^>]*>/)?.[0]
@@ -302,7 +305,8 @@ describe('Kopfzeile auf dem Handy (Hamburger-Menü)', () => {
       assert.ok(btn.includes('aria-expanded="false"') && btn.includes('aria-controls="site-menu"'), file)
       assert.ok(btn.includes(`aria-label="${t.open}"`) && btn.includes(`data-label-close="${t.close}"`), `${file}: Beschriftung`)
       assert.ok(html.includes('<div class="menu" id="site-menu">'), `${file}: Menü-Ziel fehlt`)
-      assert.ok(html.includes('<script src="/assets/menu.js" defer></script>'), `${file}: menu.js`)
+      assert.match(html, /<script type="module" src="\/assets\/menu\.js\?v=[0-9a-f]{10}"><\/script>/, `${file}: menu.js`)
+      assert.match(html, /<link rel="stylesheet" href="\/assets\/style\.css\?v=[0-9a-f]{10}">/, `${file}: style.css`)
     }
   })
   test('Gegenprobe: Sprachwahl liegt NICHT im zuklappbaren Menü (immer sichtbar)', () => {
@@ -313,16 +317,24 @@ describe('Kopfzeile auf dem Handy (Hamburger-Menü)', () => {
       assert.ok(html.includes('<div class="lang" role="group"'), `${file}: Sprachwahl fehlt`)
     }
   })
-  test('Gegenprobe ohne JavaScript: Menü wird nur versteckt, wenn das Skript die Klasse "js" gesetzt hat', () => {
-    const style = css()
-    const hides = [...style.matchAll(/([^{}\n]*)\{[^}]*display: none/g)].map((m) => m[1].trim()).filter((sel) => /\.menu\b(?!-)/.test(sel))
-    assert.ok(hides.length > 0)
-    for (const sel of hides) assert.ok(sel.startsWith('html.js '), `"${sel}" versteckt das Menü auch ohne JavaScript`)
+  test('Gegenprobe ohne JavaScript bzw. ohne menu.js: das Menü wird nur unter html.js versteckt, und "js" fällt weg, wenn menu.js nicht läuft', () => {
+    const hiding = rules().filter(([sel, body]) => /\.menu(?![-\w])/.test(sel) && /display: none|visibility: hidden|max-height: 0|height: 0/.test(body))
+    assert.ok(hiding.length > 0)
+    for (const [sel] of hiding) for (const part of sel.split(',')) assert.ok(part.trim().startsWith('html.js '), `"${part.trim()}" versteckt das Menü auch ohne JavaScript`)
+    // Ohne html.js darf die Kopfzeile auf dem Handy nicht am Umbrechen gehindert werden (sonst quetscht sich die Navigation)
+    for (const [sel, body] of rules()) if (/nowrap/.test(body) && /\.bar/.test(sel)) assert.ok(sel.startsWith('html.js '), sel)
+    const html = get('/index.html')
+    assert.ok(html.includes("classList.contains('menu-ready'))h.classList.remove('js')"), 'Rückfall, wenn menu.js nicht läuft')
+    assert.ok(fs.readFileSync(path.join(here, '../assets/menu.js'), 'utf8').includes("classList.add('menu-ready')"))
   })
-  test('Regression 12.11.: App-Bilder auf dem Handy als Wischleiste – die Handy-Regel schlägt .shots (display: grid)', () => {
-    const style = css()
-    const phone = style.match(/@media \(max-width: 640px\) \{([\s\S]*?)\n\}/)?.[1] || ''
-    assert.match(phone, /\.shots\.shots-hero \{ display: flex;/)
-    assert.match(style, /@media \(min-width: 641px\) and \(max-width: 900px\) \{ \.shots\.shots-hero \{ grid-template-columns: repeat\(2, 1fr\)/)
+  test('Regression 12.11.: Regeln für .shots-hero stehen nach .shots (sonst überschreibt .shots Wischleiste und Abstand)', () => {
+    const all = rules()
+    const base = all.findIndex(([sel]) => sel === '.shots')
+    assert.ok(base >= 0)
+    const hero = all.map(([sel], i) => [sel, i]).filter(([sel]) => /\.shots-hero/.test(sel))
+    assert.ok(hero.length >= 3)
+    for (const [sel, i] of hero) assert.ok(i > base, `"${sel}" steht vor .shots`)
+    assert.ok(all.some(([sel, body]) => sel === '.shots-hero' && /display: flex/.test(body)), 'Wischleiste auf dem Handy')
+    assert.ok(all.some(([sel, body]) => sel === '.shots-hero' && /grid-template-columns: repeat\(2, 1fr\)/.test(body)), '2 × 2 auf dem iPad')
   })
 })
