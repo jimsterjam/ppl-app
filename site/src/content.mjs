@@ -117,7 +117,7 @@ export const content = {
       days: [
         ['Push', 'Drücken', 'Brust, Schultern, Trizeps', ['ex_0025', 'ex_0405', 'ex_0200']],
         ['Pull', 'Ziehen', 'Rücken, Bizeps, hintere Schulter', ['ex_0197', 'ex_0027', 'ex_0031']],
-        ['Legs', 'Beine', 'Oberschenkel, Gesäß, Waden', ['ex_1436', 'ex_0739', 'ex_0599']]
+        ['Legs', 'Beine', 'Oberschenkel, Gesäß, Waden', ['ex_1436', 'ex_0739', 'ex_0599', 'ex_0594']]
       ],
       whyTitle: 'Warum die Aufteilung funktioniert',
       why: [
@@ -138,11 +138,13 @@ export const content = {
         'Nicht sofort. Bleib erst einmal beim selben Gewicht und versuch, nach und nach mehr Wiederholungen zu schaffen. Mehr Gewicht kommt erst, wenn es dir zu leicht wird.',
         'Bei den Plänen läuft das so: Du suchst dir ein Gewicht, mit dem du auf jeden Fall 8 Wiederholungen schaffst. Und zwar sauber, also ohne Schwung und ohne die Bewegung abzukürzen. Darauf musst du selbst achten, denn die App sieht nur deine Zahlen, nicht deine Ausführung.',
         'Schaffst du bei einer Übung in allen Sätzen 8 Wiederholungen, gehst du auf 9 pro Satz. Klappen irgendwann in allen Sätzen 9, gehst du auf 10, und so weiter.',
-        'Schaffst du 12 in allen Sätzen, ist das Gewicht zu leicht geworden. Dann erhöhst du das Gewicht so weit, dass du wieder mindestens 8 Wiederholungen schaffst. Von dort arbeitest du dich wieder bis 12 hoch.'
+        'Schaffst du 12 in allen Sätzen, ist das Gewicht nicht mehr fordernd genug. Dann nimmst du beim nächsten Mal etwas mehr, meist die kleinste Stufe: 2,5 kg, bei Kurzhanteln 2 kg. Weil der Schritt so klein ist, schaffst du damit in der Regel locker 8, oft sogar 10 Wiederholungen. Von dort arbeitest du dich wieder bis 12 hoch.',
+        'Eine gute Faustregel dabei sind „2 in Reserve“: Du beendest einen Satz, wenn du noch etwa 2 Wiederholungen mehr geschafft hättest. Ein Beispiel: Du hast dir 8 Wiederholungen vorgenommen, schaffst sie sauber und spürst, dass noch 2 gegangen wären. Trotzdem hörst du bewusst auf. So bleibt dir genug Kraft, um auch in den nächsten Sätzen deine 8 zu schaffen. Schaffst du dagegen schon im ersten Satz gerade so 8, ist das Gewicht zu schwer: Im zweiten Satz rutschst du dann meist unter 8. Das heißt nicht, dass so ein Satz nichts für den Muskelaufbau bringt, aber optimal ist er nicht. Deshalb orientieren wir uns an der 8: Sie ist nicht in Stein gemeißelt, aber ein guter Richtwert, an den wir uns halten. Nimm in dem Fall lieber etwas weniger.'
       ],
+      progStrength: 'Das gilt für das Ziel Muskelaufbau, auf das die Pläne ausgelegt sind. Wählst du in der App das Ziel Kraft, steigerst du anders. Mehr dazu unter',
       exampleIntro: 'Am Beispiel Bench Press (Bankdrücken) kann das so aussehen:',
       exampleCols: ['Woche', 'Gewicht', 'Wiederholungen pro Satz'],
-      example: [['1', '60 kg', '8'], ['3', '60 kg', '9'], ['5', '60 kg', '10'], ['7', '60 kg', '11'], ['9', '60 kg', '12 ✓'], ['11', '62,5 kg', '8']],
+      example: [['1', '60 kg', '8'], ['3', '60 kg', '9'], ['5', '60 kg', '10'], ['7', '60 kg', '11'], ['9', '60 kg', '12 ✓'], ['11', '62,5 kg', '10']],
       whyNotTitle: 'Warum nicht gleich mehr?',
       whyNot: 'Wer zu früh mehr auflegt, riskiert, dass die Ausführung leidet. Genau darum heißt die App Form Beats Ego.',
       progEnd: [
@@ -295,7 +297,7 @@ export const content = {
       days: [
         ['Push', '', 'Chest, shoulders, triceps', ['ex_0025', 'ex_0405', 'ex_0200']],
         ['Pull', '', 'Back, biceps, rear delts', ['ex_0197', 'ex_0027', 'ex_0031']],
-        ['Legs', '', 'Thighs, glutes, calves', ['ex_1436', 'ex_0739', 'ex_0599']]
+        ['Legs', '', 'Thighs, glutes, calves', ['ex_1436', 'ex_0739', 'ex_0599', 'ex_0594']]
       ],
       whyTitle: 'Why the split works',
       why: [
@@ -316,11 +318,13 @@ export const content = {
         'Not right away. Stick with the same weight for a while and try to do a few more reps over time. Add weight only once it starts to feel too easy.',
         'With the plans, it works like this: pick a weight you can definitely lift for 8 reps. Clean reps, that is: no swinging and no cutting the movement short. That part is up to you, because the app only sees your numbers, not your form.',
         'Once you get 8 reps in every set of an exercise, aim for 9 per set. When you eventually manage 9 in every set, go for 10, and so on.',
-        'Once you get 12 in every set, the weight has become too light. Increase it just enough that you can still do at least 8 reps. From there, work your way back up to 12.'
+        'Once you get 12 in every set, the weight is no longer challenging enough. Next time, go a little heavier, usually the smallest step: 2.5 kg, or 2 kg on dumbbells. Because the step is so small, you will usually manage 8 reps easily, often even 10. From there, work your way back up to 12.',
+        'A good rule of thumb is “2 in reserve”: end a set when you could still have done about 2 more reps. For example: you planned 8 reps, finish them cleanly and feel that 2 more would have been possible. You still stop on purpose. That leaves you enough strength to get your 8 in the next sets too. If you only just scrape 8 reps in your first set, the weight is too heavy: in the second set you will usually drop below 8. That doesn’t mean such a set does nothing for muscle growth, but it isn’t ideal. That’s why we go by 8: it isn’t set in stone, but it’s a good guideline that we stick to. In that case, go a little lighter.'
       ],
+      progStrength: 'This applies to the muscle-building goal the plans are designed for. If you pick the strength goal in the app, you progress differently. More in',
       exampleIntro: 'For the bench press, it could look like this:',
       exampleCols: ['Week', 'Weight', 'Reps per set'],
-      example: [['1', '60 kg', '8'], ['3', '60 kg', '9'], ['5', '60 kg', '10'], ['7', '60 kg', '11'], ['9', '60 kg', '12 ✓'], ['11', '62.5 kg', '8']],
+      example: [['1', '60 kg', '8'], ['3', '60 kg', '9'], ['5', '60 kg', '10'], ['7', '60 kg', '11'], ['9', '60 kg', '12 ✓'], ['11', '62.5 kg', '10']],
       whyNotTitle: 'Why not add more right away?',
       whyNot: 'If you go heavier too soon, your form may suffer. That’s exactly why the app is called Form Beats Ego.',
       progEnd: [

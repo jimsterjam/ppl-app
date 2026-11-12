@@ -208,6 +208,7 @@ export function renderPpl(lang, siteUrl) {
 <section><h2>${esc(x.whoTitle)}</h2>${x.who.map((w) => `<p>${esc(w)}</p>`).join('')}<p><a href="${urlFor('fb3', lang)}">${esc(planName('fb3'))} →</a></p></section>
 <section><h2>${esc(x.startTitle)}</h2><ul class="ticks">${x.start.map(([id, days, text]) => `<li><strong>${esc(days)}:</strong> <a href="${urlFor(id, lang)}">${esc(planName(id))}</a> – ${esc(text)}</li>`).join('')}</ul></section>
 <section><h2>${esc(x.progTitle)}</h2>${x.prog.map((q) => `<p>${esc(q)}</p>`).join('')}
+<p>${esc(x.progStrength)} <a href="${urlFor('reps', lang)}">${esc(t.home.tools.find(([id]) => id === 'reps')[1])}</a></p>
 <p>${esc(x.exampleIntro)}</p>
 ${table(x.exampleCols, exampleRows)}
 <p><strong>${esc(x.whyNotTitle)}</strong> ${esc(x.whyNot)}</p>

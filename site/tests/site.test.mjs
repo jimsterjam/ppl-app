@@ -269,6 +269,22 @@ describe('Seite Push/Pull/Legs erklärt', () => {
       }
     }
   })
+  test('Legs-Karte nennt Waden und hat eine Wadenübung; Hinweis auf das Ziel Kraft verlinkt die Seite Wiederholungen', () => {
+    for (const lang of ['de', 'en']) {
+      const legs = content[lang].ppl.days.find(([name]) => name === 'Legs')
+      assert.ok(/Waden|calves/.test(legs[2]))
+      assert.ok(legs[3].some((id) => /calf raise/i.test(catalog.find((e) => e._id === id).name_en)), `Wadenübung fehlt (${lang})`)
+      const html = get(pplHref[lang] + 'index.html')
+      assert.ok(html.includes(`${content[lang].ppl.progStrength} <a href="${PAGES.find((p) => p.id === 'reps')[lang]}">`), `Kraft-Hinweis (${lang})`)
+    }
+  })
+  test('Text nennt den Steigerungsschritt der App (2,5 kg Langhantel, 2 kg Kurzhantel)', () => {
+    const dumbbell = catalog.find((e) => e._id === 'ex_0405')
+    const up = getProgressionStatus(dumbbell, session(20, [12, 12, 12]), 'hypertrophy')
+    assert.equal(up.suggestion.suggestedWeights[0], 22)
+    assert.ok(content.de.ppl.prog.join(' ').includes('2,5 kg, bei Kurzhanteln 2 kg'))
+    assert.ok(content.en.ppl.prog.join(' ').includes('2.5 kg, or 2 kg on dumbbells'))
+  })
   test('Gegenprobe: 12 nur in zwei von drei Sätzen bringt kein höheres Gewicht', () => {
     const status = getProgressionStatus(bench, session(60, [12, 12, 11]), 'hypertrophy')
     assert.equal(status.state, 'climb')
