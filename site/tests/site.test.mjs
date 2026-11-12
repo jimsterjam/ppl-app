@@ -307,6 +307,11 @@ describe('Kopfzeile auf dem Handy (Hamburger-Menü)', () => {
       assert.ok(html.includes('<div class="menu" id="site-menu">'), `${file}: Menü-Ziel fehlt`)
       assert.match(html, /<script type="module" src="\/assets\/menu\.js\?v=[0-9a-f]{10}"><\/script>/, `${file}: menu.js`)
       assert.match(html, /<link rel="stylesheet" href="\/assets\/style\.css\?v=[0-9a-f]{10}">/, `${file}: style.css`)
+      assert.ok(!/(?:src|href)="\/assets\/[^"?]+\.(?:js|css)"/.test(html), `${file}: Skript oder Stylesheet ohne Kennung`)
+    }
+    for (const lang of ['de', 'en']) {
+      const html = get(`${PAGES.find((p) => p.id === 'rm')[lang]}index.html`)
+      assert.match(html, /<script type="module" src="\/assets\/calc\.js\?v=[0-9a-f]{10}"><\/script>/, `1RM-Rechner (${lang}): calc.js`)
     }
   })
   test('Gegenprobe: Sprachwahl liegt NICHT im zuklappbaren Menü (immer sichtbar)', () => {
