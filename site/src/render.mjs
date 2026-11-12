@@ -130,7 +130,7 @@ ${storeButton(t, 'home')}
 </div>
 </div>
 <div class="shots shots-hero" role="region" tabindex="0" aria-label="${esc(h.shotsLabel)}">${shots}</div>
-<section><h2>${esc(h.whatTitle)}</h2><div class="cards">${h.what.map(([a, b]) => `<div class="card"><h3>${esc(a)}</h3><p>${esc(b)}</p></div>`).join('')}</div></section>
+<section><h2>${esc(h.whatTitle)}</h2><div class="cards">${h.what.map(([a, b, link]) => `<div class="card"><h3>${esc(a)}</h3><p>${esc(b)}</p>${link ? `<p class="small"><a href="${urlFor(link, lang)}">${esc(t[link].link)} →</a></p>` : ''}</div>`).join('')}</div></section>
 <section class="callout"><h2>${esc(h.honestTitle)}</h2><p>${esc(h.honest)}</p></section>
 <section><h2>${esc(h.moreTitle)}</h2><ul class="ticks">${h.more.map((m) => `<li>${esc(m)}</li>`).join('')}</ul></section>
 <section class="callout"><h2>${esc(h.freeTitle)}</h2><p>${esc(h.free)}</p>${storeButton(t, 'home-free')}</section>
@@ -180,6 +180,44 @@ ${appBlock(t, 'reps', r.appTitle, r.app)}`
   return layout({ lang, pageId: 'reps', title: r.title, description: r.description, siteUrl, body })
 }
 
+// Plan-Seiten mit Link zur Erklärseite: dieselben Pläne, die die Erklärseite unter „So fängst du an“ nennt
+const PPL_PLANS = new Set(content.de.ppl.start.map(([id]) => id))
+const pplLink = (t, lang) => `<p><a href="${urlFor('ppl', lang)}">${esc(t.ppl.link)} →</a></p>`
+
+/** Beispielübung: englischer Name aus dem Katalog, auf Deutsch mit deutschem Begriff in Klammern. */
+function exerciseLabel(id, lang) {
+  const entry = byId.get(id)
+  if (!entry || !EXERCISE_DE[id]) throw new Error(`Beispielübung ${id}: fehlt im Katalog oder in exercise-de.mjs`)
+  const en = esc(titleCase(entry.name_en))
+  return lang === 'de' ? `${en} <span class="de-name">(${esc(EXERCISE_DE[id])})</span>` : en
+}
+
+export function renderPpl(lang, siteUrl) {
+  const t = content[lang]
+  const x = t.ppl
+  const planName = (id) => messages[lang].plans.templates[id].name
+  const table = (cols, rows) => `<div class="tablewrap"><table><thead><tr>${cols.map((c) => `<th scope="col">${esc(c)}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table></div>`
+  // Karten statt Tabelle: drei Spalten mit langen Übungsnamen passen auf dem Handy nicht nebeneinander
+  const dayCards = x.days.map(([name, local, muscles, ids]) => `<div class="card"><h3>${esc(name)}${local ? ` <span class="de-name">(${esc(local)})</span>` : ''}</h3><p>${esc(muscles)}</p><ul class="ticks">${ids.map((id) => `<li>${exerciseLabel(id, lang)}</li>`).join('')}</ul></div>`).join('')
+  const exampleRows = x.example.map(([week, weight, reps]) => `<tr><th scope="row">${esc(week)}</th><td>${esc(weight)}</td><td>${esc(reps)}</td></tr>`).join('')
+  const body = `
+<h1>${esc(x.h1)}</h1>
+<p class="lead">${esc(x.intro)}</p>
+<div class="cards">${dayCards}</div>
+<section><h2>${esc(x.whyTitle)}</h2><ul class="ticks">${x.why.map(([a, b]) => `<li><strong>${esc(a)}</strong> ${esc(b)}</li>`).join('')}</ul></section>
+<section><h2>${esc(x.whoTitle)}</h2>${x.who.map((w) => `<p>${esc(w)}</p>`).join('')}<p><a href="${urlFor('fb3', lang)}">${esc(planName('fb3'))} →</a></p></section>
+<section><h2>${esc(x.startTitle)}</h2><ul class="ticks">${x.start.map(([id, days, text]) => `<li><strong>${esc(days)}:</strong> <a href="${urlFor(id, lang)}">${esc(planName(id))}</a> – ${esc(text)}</li>`).join('')}</ul></section>
+<section><h2>${esc(x.progTitle)}</h2>${x.prog.map((q) => `<p>${esc(q)}</p>`).join('')}
+<p>${esc(x.progStrength)} <a href="${urlFor('reps', lang)}">${esc(t.home.tools.find(([id]) => id === 'reps')[1])}</a></p>
+<p>${esc(x.exampleIntro)}</p>
+${table(x.exampleCols, exampleRows)}
+<p><strong>${esc(x.whyNotTitle)}</strong> ${esc(x.whyNot)}</p>
+${x.progEnd.map((q) => `<p>${esc(q)}</p>`).join('')}</section>
+<section><h2>${esc(x.ownTitle)}</h2>${x.own.map((q) => `<p>${esc(q)}</p>`).join('')}<p><em>${esc(x.ownSign)}</em></p></section>
+${appBlock(t, 'ppl', x.appTitle, x.app)}`
+  return layout({ lang, pageId: 'ppl', title: x.title, description: x.description, siteUrl, body })
+}
+
 /** Plan-Daten aus den Vorlagen der App: je Stufe und Tag die Übungen mit Sätzen. */
 export function planData(templateId) {
   const template = PLAN_TEMPLATES[templateId]
@@ -215,6 +253,7 @@ ${day.levels[level].map((e) => `<tr><td>${esc(e.en)}${lang === 'de' ? ` <span cl
 <p class="muted"><a href="${urlFor('plans', lang)}">← ${esc(p.back)}</a></p>
 <h1>${esc(tpl.name)}</h1>
 <p class="lead">${esc(tpl.desc)}</p>
+${PPL_PLANS.has(templateId) ? pplLink(t, lang) : ''}
 <div class="pillrow"><a href="#beginner">${esc(p.beginner)}</a><a href="#advanced">${esc(p.advanced)}</a></div>
 <p>${esc(p.repsLine)}</p><p>${esc(p.tips)}</p>
 ${levelHtml}
@@ -227,7 +266,7 @@ export function renderPlans(lang, siteUrl) {
   const t = content[lang]
   const p = t.plans
   const cards = Object.keys(PLAN_TEMPLATES).map((id) => `<a class="card" href="${urlFor(id, lang)}"><h3>${esc(messages[lang].plans.templates[id].name)}</h3><p>${esc(messages[lang].plans.templates[id].desc)}</p><p class="small">${esc(p.open)} →</p></a>`).join('')
-  const body = `<h1>${esc(p.h1)}</h1><p class="lead">${esc(p.intro)}</p><div class="cards">${cards}</div>${appBlock(t, 'plans', p.startTitle, p.start)}`
+  const body = `<h1>${esc(p.h1)}</h1><p class="lead">${esc(p.intro)}</p>${pplLink(t, lang)}<div class="cards">${cards}</div>${appBlock(t, 'plans', p.startTitle, p.start)}`
   return layout({ lang, pageId: 'plans', title: p.title, description: p.description, siteUrl, body })
 }
 
@@ -333,6 +372,7 @@ export function renderAll(siteUrl) {
     add(urlFor('home', lang), renderHome(lang, siteUrl))
     add(urlFor('rm', lang), renderRm(lang, siteUrl))
     add(urlFor('reps', lang), renderReps(lang, siteUrl))
+    add(urlFor('ppl', lang), renderPpl(lang, siteUrl))
     add(urlFor('plans', lang), renderPlans(lang, siteUrl))
     for (const id of Object.keys(PLAN_TEMPLATES)) add(urlFor(id, lang), renderPlan(id, lang, siteUrl))
     add(urlFor('support', lang), renderSupport(lang, siteUrl))

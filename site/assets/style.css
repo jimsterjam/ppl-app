@@ -52,6 +52,7 @@ a.card { color: inherit; text-decoration: none; display: block; }
 a.card:hover { border-color: var(--accent); }
 .card p { margin: 0; color: var(--muted); }
 .card h3 { color: var(--fg); }
+.card ul { margin: 12px 0 0; }
 .callout { border-left: 4px solid var(--accent); padding: 4px 0 4px 18px; max-width: 46em; }
 ul.ticks { padding-left: 1.2em; } ul.ticks li { margin-bottom: 6px; }
 details { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 18px; margin-bottom: 10px; }

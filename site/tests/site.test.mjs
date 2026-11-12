@@ -9,6 +9,7 @@ import { EXERCISE_DE } from '../src/exercise-de.mjs'
 import { PLAN_TEMPLATES } from '../../client/src/utils/planTemplates.js'
 import { estimateOneRepMax, weightForReps, buildTable, parseNumber, validate } from '../assets/calc.js'
 import { estimateOneRepMax as appEstimate } from '../../server/utils/stagnationDiagnosis.js'
+import { getProgressionStatus } from '../../client/src/utils/weightSuggestion.js'
 
 const SITE = 'https://example.test'
 const here = path.dirname(fileURLToPath(import.meta.url))
@@ -209,5 +210,84 @@ describe('Header-Marke', () => {
     assert.ok(root, 'CSS-Regel :root fehlt')
     assert.match(root[0], /--mark: #ffffff;/)
     assert.match(rule[0], /font-kerning: none/)
+  })
+})
+
+describe('Seite Push/Pull/Legs erklärt', () => {
+  const catalog = JSON.parse(fs.readFileSync(path.resolve(here, '../../client/public/data/default-exercises.json'), 'utf8'))
+  // Echter Katalogeintrag der Beispielübung, damit Einordnung und Steigerungsschritt wie in der App gelten
+  const bench = catalog.find((e) => e._id === 'ex_0025')
+  const session = (weight, repsList) => ({ setDetails: repsList.map((reps) => ({ weight, reps })) })
+  const pplHref = { de: '/push-pull-legs/', en: '/en/push-pull-legs/' }
+  test('verlinkt von Startseite, Plan-Übersicht und beiden PPL-Plänen (DE und EN)', () => {
+    for (const lang of ['de', 'en']) {
+      for (const id of ['home', 'plans', 'ppl3', 'ppl6']) {
+        const html = get(`${PAGES.find((p) => p.id === id)[lang]}index.html`)
+        assert.ok(html.includes(`<a href="${pplHref[lang]}">${content[lang].ppl.link} →</a>`), `${id} (${lang})`)
+      }
+    }
+  })
+  test('Gegenprobe: nicht im Hauptmenü und nicht auf den anderen Plänen', () => {
+    for (const lang of ['de', 'en']) {
+      for (const id of ['ul4', 'fb3']) {
+        const html = get(`${PAGES.find((p) => p.id === id)[lang]}index.html`)
+        assert.ok(!html.includes(`href="${pplHref[lang]}"`), `${id} (${lang})`)
+      }
+      for (const [file, html] of htmlFiles()) {
+        const nav = html.match(/<nav class="main"[\s\S]*?<\/nav>/)?.[0] || ''
+        assert.ok(!nav.includes('push-pull-legs/"'), `${file}: Hauptmenü`)
+      }
+    }
+  })
+  test('Beispielübungen: englischer Name, auf Deutsch mit deutschem Begriff in Klammern', () => {
+    const de = get('/push-pull-legs/index.html')
+    const en = get('/en/push-pull-legs/index.html')
+    assert.ok(de.includes('Bench Press Barbell <span class="de-name">(Bankdrücken mit der Langhantel)</span>'))
+    assert.ok(en.includes('Bench Press Barbell') && !en.includes('Bankdrücken'))
+    for (const lang of ['de', 'en']) for (const [, , , ids] of content[lang].ppl.days) for (const id of ids) {
+      assert.ok(EXERCISE_DE[id], `deutscher Begriff fehlt: ${id}`)
+      assert.ok(catalog.some((e) => e._id === id), `nicht im Katalog: ${id}`)
+    }
+  })
+  test('Steigerungs-Beispiel folgt der Logik der App (8–12, mehr Gewicht erst bei 12 in allen Sätzen, +2,5 kg)', () => {
+    assert.ok(bench, 'ex_0025 fehlt im Katalog')
+    for (const lang of ['de', 'en']) {
+      const rows = content[lang].ppl.example.map(([, w, r]) => [Number(w.replace(',', '.').replace(' kg', '')), Number.parseInt(r, 10)])
+      assert.equal(rows[0][1], 8, 'Start bei 8')
+      for (let i = 0; i < rows.length - 1; i += 1) {
+        const [weight, reps] = rows[i]
+        const [nextWeight, nextReps] = rows[i + 1]
+        const status = getProgressionStatus(bench, session(weight, [reps, reps, reps]), 'hypertrophy')
+        if (nextWeight === weight) {
+          assert.equal(status.state, 'climb', `${lang} Zeile ${i}`)
+          assert.equal(status.nextReps, nextReps, `${lang} Zeile ${i}`)
+        } else {
+          assert.equal(reps, 12, 'Gewicht erst bei 12')
+          assert.equal(status.state, 'increase', `${lang} Zeile ${i}`)
+          assert.equal(status.suggestion.suggestedWeights[0], nextWeight, `${lang} Zeile ${i}`)
+        }
+      }
+    }
+  })
+  test('Legs-Karte nennt Waden und hat eine Wadenübung; Hinweis auf das Ziel Kraft verlinkt die Seite Wiederholungen', () => {
+    for (const lang of ['de', 'en']) {
+      const legs = content[lang].ppl.days.find(([name]) => name === 'Legs')
+      assert.ok(/Waden|calves/.test(legs[2]))
+      assert.ok(legs[3].some((id) => /calf raise/i.test(catalog.find((e) => e._id === id).name_en)), `Wadenübung fehlt (${lang})`)
+      const html = get(pplHref[lang] + 'index.html')
+      assert.ok(html.includes(`${content[lang].ppl.progStrength} <a href="${PAGES.find((p) => p.id === 'reps')[lang]}">`), `Kraft-Hinweis (${lang})`)
+    }
+  })
+  test('Text nennt den Steigerungsschritt der App (2,5 kg Langhantel, 2 kg Kurzhantel)', () => {
+    const dumbbell = catalog.find((e) => e._id === 'ex_0405')
+    const up = getProgressionStatus(dumbbell, session(20, [12, 12, 12]), 'hypertrophy')
+    assert.equal(up.suggestion.suggestedWeights[0], 22)
+    assert.ok(content.de.ppl.prog.join(' ').includes('2,5 kg, bei Kurzhanteln 2 kg'))
+    assert.ok(content.en.ppl.prog.join(' ').includes('2.5 kg, or 2 kg on dumbbells'))
+  })
+  test('Gegenprobe: 12 nur in zwei von drei Sätzen bringt kein höheres Gewicht', () => {
+    const status = getProgressionStatus(bench, session(60, [12, 12, 11]), 'hypertrophy')
+    assert.equal(status.state, 'climb')
+    assert.equal(status.suggestion, null)
   })
 })
