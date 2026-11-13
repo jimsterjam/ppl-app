@@ -167,7 +167,13 @@ export function buildCoachCheckData(workout, language = 'de') {
   const lang = language === 'en' ? 'en' : 'de';
   const catalogMuscles = [];
   const exercises = (Array.isArray(workout?.exercises) ? workout.exercises : []).map((ex, index) => {
-    const working = (Array.isArray(ex?.setDetails) ? ex.setDetails : []).filter(isLoggedSet);
+    const details = Array.isArray(ex?.setDetails) ? ex.setDetails : [];
+    // Älteres Format ohne setDetails (sets/reps an der Übung, wie in workoutHasLoggedSets): in Sätze umrechnen
+    const legacyReps = Number(ex?.reps) > 0 ? Number(ex.reps) : null;
+    const legacySets = Number(ex?.sets) > 0 ? Math.min(Number(ex.sets), 20) : (legacyReps ? 1 : 0);
+    const working = details.length
+      ? details.filter(isLoggedSet)
+      : Array.from({ length: legacySets }, () => ({ reps: legacyReps }));
     const reps = working.map((s) => Number(s.reps)).filter((n) => Number.isFinite(n) && n > 0);
     const timed = ex?.measureMode === 'time' || ex?.measureMode === 'repsTime';
     const catalogMuscle = targetMuscle(ex?.name);

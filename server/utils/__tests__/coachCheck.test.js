@@ -375,8 +375,13 @@ describe('Coach-Check: Selbstprüfung zum Fix Alltagssprache', () => {
     }, data);
     assert.match(text, /Reihenfolge: Glutes Kickback steht allein/);
   });
-  it('älteres Format ohne setDetails zählt als Workout mit Werten', () => {
-    assert.equal(workoutHasLoggedSets({ exercises: [{ name: 'Bench', sets: 3, reps: 10, weight: 60 }] }), true);
+  it('älteres Format ohne setDetails zählt als Workout mit Werten und geht mit Sätzen/Wdh. an den Coach-Check', () => {
+    const legacy = { type: 'push', exercises: [{ name: 'Archer Push Up', sets: 3, reps: 10, weight: 60 }] };
+    assert.equal(workoutHasLoggedSets(legacy), true);
+    const ex = buildCoachCheckData(legacy).exercises[0];
+    assert.deepEqual([ex.sets, ex.reps, ex.logged], [3, [10, 10, 10], true]);
+    // Geänderte Wiederholungen im alten Format machen einen gespeicherten Coach-Check ungültig
+    assert.equal(coachCheckInputChanged(legacy, { ...legacy, exercises: [{ ...legacy.exercises[0], reps: 5 }] }), true);
     assert.equal(workoutHasLoggedSets({ exercises: [{ name: 'Bench', setDetails: [] }] }), false);
   });
   it('Abfrage für den Verlauf entspricht workoutHasLoggedSets (MongoDB-Abfrage an Beispielen, ausgewertet mit sift)', async () => {
