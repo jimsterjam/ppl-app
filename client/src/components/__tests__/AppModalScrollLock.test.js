@@ -67,12 +67,12 @@ describe('AppModal: stackedActions', () => {
   const mountModal = (props) =>
     mount(AppModal, { props: { modelValue: true, title: 'T', confirmText: 'Alle abhaken', cancelText: 'So speichern', ...props }, global: { plugins: [createI18nInstance()], stubs: { teleport: true } } })
 
-  it('setzt die Klasse für die gestapelte Anordnung; Bestätigen steht im DOM nach Abbrechen (column-reverse = oben)', async () => {
+  it('Bestätigen steht im DOM zuerst (Anzeige oben = Lese-/Tab-Reihenfolge); Lage oben im Browser geprüft', async () => {
     const w = mountModal({ stackedActions: true })
     const actions = w.find('.modal-actions')
     expect(actions.classes()).toContain('actions-stacked')
     const buttons = actions.findAll('button')
-    expect(buttons.map((b) => b.text())).toEqual(['So speichern', 'Alle abhaken'])
+    expect(buttons.map((b) => b.text())).toEqual(['Alle abhaken', 'So speichern'])
     w.unmount()
   })
 

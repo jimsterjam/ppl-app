@@ -764,18 +764,18 @@
     <AppModal
       v-model="showSaveReviewModal"
       :title="t('workoutDetail.reviewTitle')"
-      :confirm-text="saveReview.hasOpenSets ? t('workoutDetail.reviewMarkAllDone') : t('workoutDetail.reviewSaveAnyway')"
-      :cancel-text="saveReview.hasOpenSets ? t('workoutDetail.reviewSaveAsIs') : t('workoutDetail.reviewBack')"
-      :extra-text="saveReview.hasOpenSets ? t('workoutDetail.reviewBackToWorkout') : ''"
-      :dismiss-separately="saveReview.hasOpenSets"
-      :stacked-actions="saveReview.hasOpenSets"
+      :confirm-text="t(reviewActions.primary.textKey)"
+      :cancel-text="t(reviewActions.secondary.textKey)"
+      :extra-text="reviewActions.extra ? t(reviewActions.extra.textKey) : ''"
+      dismiss-separately
+      :stacked-actions="reviewActions.stacked"
       type="warning"
-      @confirm="onReviewPrimary"
-      @cancel="onReviewSecondary"
+      @confirm="runReviewAction(reviewActions.primary.action)"
+      @cancel="runReviewAction(reviewActions.secondary.action)"
     >
       <!-- Offene Sätze (Absprache Jimmy 13.11.): "Alle abhaken und speichern" als Hauptknopf statt kleinem Link,
            darüber kurz, was nicht abgehakte Sätze bedeuten. ✕/daneben/"Zurück zum Workout" = zurück, nichts gespeichert. -->
-      <p v-if="saveReview.hasOpenSets" class="review-open-hint">{{ t('workoutDetail.reviewOpenSetsHint') }}</p>
+      <p v-if="reviewActions.showHint" class="review-open-hint">{{ t('workoutDetail.reviewOpenSetsHint') }}</p>
       <div v-if="saveReview.forgotten.length" class="review-group">
         <div class="review-group-title">{{ t('workoutDetail.reviewForgotten') }}</div>
         <button
@@ -1158,7 +1158,7 @@ import FocusMode from '@/components/FocusMode.vue'
 import { undoRestSet, findRowPosition } from '@/utils/undoRestSet'
 import { useFocusModeStore } from '@/stores/focusModeStore'
 import { createFocusStateTracker, applyFocusState } from '@/utils/focusStatePersistence'
-import { buildSaveReview, markAllSetsDone } from '@/utils/saveReview'
+import { buildSaveReview, markAllSetsDone, saveReviewActions } from '@/utils/saveReview'
 import { isExerciseNotDone } from '@/utils/notDoneExercises'
 import { showsReps, showsTime, showsWeight, sanitizeMeasureMode, DURATION_MAX_SECONDS, DURATION_STEP_SECONDS } from '@/utils/measureMode'
 import {
@@ -2041,14 +2041,12 @@ function onReviewConfirm() {
   proceedAfterReview()
 }
 
-// Hauptknopf: mit offenen Sätzen "Alle abhaken und speichern", sonst "Trotzdem speichern"
-function onReviewPrimary() {
-  if (saveReview.value.hasOpenSets) onReviewMarkAllDone()
-  else onReviewConfirm()
-}
-// Zweiter Knopf: mit offenen Sätzen "So speichern" (nicht Abgehaktes bleibt "nicht gemacht"), sonst "Zurück"
-function onReviewSecondary() {
-  if (saveReview.value.hasOpenSets) onReviewConfirm()
+// Knöpfe im "Kurz prüfen"-Fenster: Texte und Aktionen aus utils/saveReview.js (saveReviewActions). 'back' schließt
+// nur (macht AppModal selbst); ✕/daneben/Escape melden 'dismiss' und speichern nie.
+const reviewActions = computed(() => saveReviewActions(saveReview.value.hasOpenSets))
+function runReviewAction(action) {
+  if (action === 'markAllAndSave') onReviewMarkAllDone()
+  else if (action === 'save') onReviewConfirm()
 }
 
 function onReviewMarkAllDone() {

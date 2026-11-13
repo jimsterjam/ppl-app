@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildSaveReview, markOpenSetsNotDone, markAllSetsDone, setLabelFor } from '../saveReview.js'
+import { buildSaveReview, markOpenSetsNotDone, markAllSetsDone, setLabelFor, saveReviewActions } from '../saveReview.js'
 
 const done = (reps, weight, extra = {}) => ({ reps, weight, done: true, ...extra })
 const open = (reps, weight, extra = {}) => ({ reps, weight, ...extra })
@@ -173,5 +173,25 @@ describe('Messarten (Zeit halten / Wiederholungen in Zeit)', () => {
       lastSessions: [lastAt(80)]
     })
     expect(review.check.map((c) => c.kind)).toEqual(['zeroReps'])
+  })
+})
+
+// "Kurz prüfen" (Absprache Jimmy 13.11.): Hauptknopf "Alle abhaken und speichern"
+describe('Alle abhaken und Knöpfe im Kurz-prüfen-Fenster', () => {
+  it('hakt nur Sätze mit Werten ab; leere Sätze und Aufwärmsätze bleiben offen', () => {
+    const [ex] = markAllSetsDone([{ setDetails: [
+      { reps: 10, weight: 50 }, { reps: null, weight: null }, { reps: 0 }, { durationSeconds: 30 }, { reps: 8, isWarmup: true }
+    ] }])
+    expect(ex.setDetails.map((s) => s.done)).toEqual([true, undefined, undefined, true, undefined])
+  })
+  it('mit offenen Sätzen: Hauptknopf hakt ab und speichert, zweiter speichert so, Link geht zurück', () => {
+    const a = saveReviewActions(true)
+    expect([a.primary.action, a.secondary.action, a.extra.action]).toEqual(['markAllAndSave', 'save', 'back'])
+    expect(a.stacked && a.showHint).toBe(true)
+  })
+  it('Gegenprobe: ohne offene Sätze wird nichts abgehakt, zweiter Knopf speichert nicht', () => {
+    const a = saveReviewActions(false)
+    expect([a.primary.action, a.secondary.action, a.extra]).toEqual(['save', 'back', null])
+    expect(Object.values(a).some((v) => v?.action === 'markAllAndSave')).toBe(false)
   })
 })

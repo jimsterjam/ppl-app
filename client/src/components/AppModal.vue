@@ -16,7 +16,12 @@
             <p v-if="message">{{ message }}</p>
           </slot>
         </div>
-        <div :class="['modal-actions', { 'actions-stacked': stackedActions }]">
+        <!-- Gestapelt: Bestätigen steht auch im DOM zuerst (Lese- und Tab-Reihenfolge = Anzeige, VoiceOver) -->
+        <div v-if="stackedActions" class="modal-actions actions-stacked">
+          <button ref="confirmBtn" class="btn primary" :class="type" @click="onConfirm">{{ confirmText || t('common.confirm') }}</button>
+          <button v-if="showCancel" class="btn secondary" @click="onCancel">{{ cancelText || t('common.cancel') }}</button>
+        </div>
+        <div v-else class="modal-actions">
           <button v-if="showCancel" class="btn secondary" @click="onCancel">{{ cancelText || t('common.cancel') }}</button>
           <button ref="confirmBtn" class="btn primary" :class="type" @click="onConfirm">{{ confirmText || t('common.confirm') }}</button>
         </div>
@@ -165,7 +170,7 @@ onBeforeUnmount(() => {
   border-top: 1px solid color-mix(in srgb, var(--card-border) 78%, transparent);
   background: color-mix(in srgb, var(--card-bg) 94%, transparent);
 }
-.modal-actions.actions-stacked { flex-direction: column-reverse; align-items: stretch; }
+.modal-actions.actions-stacked { flex-direction: column; align-items: stretch; }
 .modal-actions.actions-stacked .btn { width: 100%; }
 .btn { padding: 10px 14px; border-radius: 10px; border: 1px solid transparent; cursor: pointer; font-weight: 600; }
 .btn.secondary { background: var(--surface); border-color: var(--card-border); color: var(--fg); }
