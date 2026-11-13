@@ -16,7 +16,7 @@
             <p v-if="message">{{ message }}</p>
           </slot>
         </div>
-        <div class="modal-actions">
+        <div :class="['modal-actions', { 'actions-stacked': stackedActions }]">
           <button v-if="showCancel" class="btn secondary" @click="onCancel">{{ cancelText || t('common.cancel') }}</button>
           <button ref="confirmBtn" class="btn primary" :class="type" @click="onConfirm">{{ confirmText || t('common.confirm') }}</button>
         </div>
@@ -53,7 +53,10 @@ const props = defineProps({
   closeOnExtra: { type: Boolean, default: true },
   // true: ✕, Tippen neben das Fenster und Escape melden 'dismiss' statt 'cancel' - für Fenster, deren Abbrechen-Knopf
   // eine eigene Antwort ist (z. B. Favorit-Frage "Nein" = trotzdem speichern, ✕ = zurück). Ohne die Angabe wie bisher.
-  dismissSeparately: { type: Boolean, default: false }
+  dismissSeparately: { type: Boolean, default: false },
+  // true: Knöpfe untereinander in voller Breite, Bestätigen oben (Hauptweg klar erkennbar, z. B. "Kurz prüfen" mit
+  // offenen Sätzen). Ohne die Angabe wie bisher nebeneinander.
+  stackedActions: { type: Boolean, default: false }
 })
 
 const emit = defineEmits(['update:modelValue', 'confirm', 'cancel', 'dismiss', 'extra'])
@@ -162,6 +165,8 @@ onBeforeUnmount(() => {
   border-top: 1px solid color-mix(in srgb, var(--card-border) 78%, transparent);
   background: color-mix(in srgb, var(--card-bg) 94%, transparent);
 }
+.modal-actions.actions-stacked { flex-direction: column-reverse; align-items: stretch; }
+.modal-actions.actions-stacked .btn { width: 100%; }
 .btn { padding: 10px 14px; border-radius: 10px; border: 1px solid transparent; cursor: pointer; font-weight: 600; }
 .btn.secondary { background: var(--surface); border-color: var(--card-border); color: var(--fg); }
 .btn.primary { background: var(--accent); color: var(--accent-contrast); }

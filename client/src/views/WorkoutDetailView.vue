@@ -764,13 +764,18 @@
     <AppModal
       v-model="showSaveReviewModal"
       :title="t('workoutDetail.reviewTitle')"
-      :confirm-text="t('workoutDetail.reviewSaveAnyway')"
-      :cancel-text="t('workoutDetail.reviewBack')"
-      :extra-text="saveReview.hasOpenSets ? t('workoutDetail.reviewMarkAllDone') : ''"
+      :confirm-text="saveReview.hasOpenSets ? t('workoutDetail.reviewMarkAllDone') : t('workoutDetail.reviewSaveAnyway')"
+      :cancel-text="saveReview.hasOpenSets ? t('workoutDetail.reviewSaveAsIs') : t('workoutDetail.reviewBack')"
+      :extra-text="saveReview.hasOpenSets ? t('workoutDetail.reviewBackToWorkout') : ''"
+      :dismiss-separately="saveReview.hasOpenSets"
+      :stacked-actions="saveReview.hasOpenSets"
       type="warning"
-      @confirm="onReviewConfirm"
-      @extra="onReviewMarkAllDone"
+      @confirm="onReviewPrimary"
+      @cancel="onReviewSecondary"
     >
+      <!-- Offene Sätze (Absprache Jimmy 13.11.): "Alle abhaken und speichern" als Hauptknopf statt kleinem Link,
+           darüber kurz, was nicht abgehakte Sätze bedeuten. ✕/daneben/"Zurück zum Workout" = zurück, nichts gespeichert. -->
+      <p v-if="saveReview.hasOpenSets" class="review-open-hint">{{ t('workoutDetail.reviewOpenSetsHint') }}</p>
       <div v-if="saveReview.forgotten.length" class="review-group">
         <div class="review-group-title">{{ t('workoutDetail.reviewForgotten') }}</div>
         <button
@@ -2034,6 +2039,16 @@ function proceedAfterReview() {
 // Speichern, wie es ist: Nicht Abgehaktes bleibt erhalten und wird als "nicht gemacht" gespeichert (nichts wird entfernt).
 function onReviewConfirm() {
   proceedAfterReview()
+}
+
+// Hauptknopf: mit offenen Sätzen "Alle abhaken und speichern", sonst "Trotzdem speichern"
+function onReviewPrimary() {
+  if (saveReview.value.hasOpenSets) onReviewMarkAllDone()
+  else onReviewConfirm()
+}
+// Zweiter Knopf: mit offenen Sätzen "So speichern" (nicht Abgehaktes bleibt "nicht gemacht"), sonst "Zurück"
+function onReviewSecondary() {
+  if (saveReview.value.hasOpenSets) onReviewConfirm()
 }
 
 function onReviewMarkAllDone() {
@@ -5474,6 +5489,7 @@ onBeforeUnmount(() => {
   font-size: 0.95rem;
 }
 /* "Kurz prüfen"-Fenster (Slot-Inhalt von AppModal). */
+.review-open-hint { margin: 0 0 12px; font-size: 0.9rem; line-height: 1.4; color: var(--fg); }
 .review-group + .review-group { margin-top: 14px; }
 .review-group-title {
   font-size: 0.72rem;
