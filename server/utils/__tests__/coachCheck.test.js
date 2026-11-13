@@ -2,7 +2,8 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   sanitizeWorkoutOrigin, shouldAutoCoachCheck, canRequestCoachCheck, buildCoachCheckData,
-  sanitizeCoachCheck, firstCoachCheckIntro, sanitizeStoredCoachCheck, MAX_COACH_CHECK_HINTS, coachCheckInputChanged
+  sanitizeCoachCheck, firstCoachCheckIntro, sanitizeStoredCoachCheck, MAX_COACH_CHECK_HINTS, coachCheckInputChanged,
+  withoutFields, mentionsForeignExercise, SERVER_ONLY_CREATE_FIELDS, SERVER_ONLY_UPDATE_FIELDS
 } from '../coachCheck.js';
 import { runCoachCheck, getCoachCheckSystemPrompt } from '../../services/coachCheckService.js';
 import Workout from '../../models/Workout.js';
@@ -131,5 +132,34 @@ describe('Coach-Check: Texte und Speicherung', () => {
     assert.equal(stored.language, 'de');
     assert.ok(stored.text.length <= 900 && !stored.text.includes('\u0007'));
     assert.equal(new Workout({ userId: 'u', ai_feedback_kind: 'coach_check' }).ai_feedback_kind, 'coach_check');
+  });
+});
+
+describe('Coach-Check: Copilot-Review 13.11.', () => {
+  it('Herkunft lässt sich beim Bearbeiten nicht ändern, beim Anlegen schon', () => {
+    const body = { origin: 'manual', ai_coach_check: { text: 'x' }, ai_coach_check_lock_at: new Date(), name: 'A' };
+    assert.deepEqual(withoutFields(body, SERVER_ONLY_UPDATE_FIELDS), { name: 'A' });
+    // Gegenprobe: beim Anlegen bleibt origin, nur die Server-Felder fallen weg
+    assert.deepEqual(withoutFields(body, SERVER_ONLY_CREATE_FIELDS), { origin: 'manual', name: 'A' });
+    assert.equal(body.origin, 'manual', 'Original-Body bleibt unverändert');
+  });
+  it('Hinweise mit einer fremden Übung fallen weg, Übungen aus dem Workout und Muskelgruppen bleiben', () => {
+    const data = buildCoachCheckData(workout);
+    const names = data.exercises.map((ex) => ex.name.toLowerCase());
+    assert.equal(mentionsForeignExercise('Squat is missing.', names), true);
+    assert.equal(mentionsForeignExercise('Kniebeugen fehlen.', names), true);
+    assert.equal(mentionsForeignExercise('Bench Press steht gut am Anfang.', names), false);
+    assert.equal(mentionsForeignExercise('Für den Trizeps passt der Pushdown.', names), false);
+    assert.equal(mentionsForeignExercise('Für Push fehlt etwas für die Schultern.', names), false);
+    const text = sanitizeCoachCheck({ intro: 'Solide.', hints: [
+      { exercise: '', text: 'Squat is missing.' },
+      { exercise: '', text: 'Für die Schultern fehlt noch etwas.' }
+    ] }, data);
+    assert.equal(text, 'Solide.\n- Für die Schultern fehlt noch etwas.');
+  });
+  it('Prompt: keine Wiederholungs-Hinweise bei Explosivkraft und Technik, keine fremden Übungen', () => {
+    const prompt = getCoachCheckSystemPrompt();
+    assert.match(prompt, /explosive und technique gibt es keinen Wiederholungsbereich/);
+    assert.match(prompt, /Keine Übungen vorschlagen, die nicht im Workout sind/);
   });
 });

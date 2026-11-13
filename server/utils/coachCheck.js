@@ -14,6 +14,12 @@ import { clampText } from './textLimits.js';
 export const WORKOUT_ORIGINS = Object.freeze(['manual', 'generated', 'favorite', 'plan']);
 export const MAX_COACH_CHECK_HINTS = 3;
 export const MAX_COACH_CHECK_TEXT = 900;
+// Länger als die längste Anfrage (Client wartet bis 150 s, siehe client/src/utils/feedbackRetryRules.js)
+export const COACH_CHECK_LOCK_MS = 3 * 60 * 1000;
+// Felder, die nur der Server setzt - aus POST/PUT-Bodys entfernen. origin nur beim Anlegen (POST), nie beim Bearbeiten:
+// Sonst ließe sich ein generiertes Workout nachträglich zu "selbst zusammengestellt" machen (Copilot-Review 13.11.).
+export const SERVER_ONLY_CREATE_FIELDS = Object.freeze(['ai_coach_check', 'ai_coach_check_lock_at']);
+export const SERVER_ONLY_UPDATE_FIELDS = Object.freeze([...SERVER_ONLY_CREATE_FIELDS, 'origin']);
 const MAX_LINE = 260;
 const WORKOUT_TYPES = new Set(['push', 'pull', 'legs', 'fullbody']);
 const GOALS = new Set(['strength', 'hypertrophy', 'explosive', 'technique']);
@@ -103,6 +109,33 @@ function cleanLine(value) {
 
 const numbersIn = (text) => String(text ?? '').match(/\d+/g) || [];
 
+/** Body ohne die angegebenen Felder (flache Kopie). */
+export function withoutFields(body, fields) {
+  const copy = { ...(body && typeof body === 'object' ? body : {}) };
+  for (const field of fields) delete copy[field];
+  return copy;
+}
+
+// Häufige Übungswörter (englisch, wie in der App, und die üblichen deutschen Begriffe). Nennt ein Hinweis eines davon,
+// ohne dass eine Übung im Workout es im Namen trägt, schlägt die KI eine fremde Übung vor - der Hinweis fällt weg.
+// Fehlendes soll sie als Muskelgruppe nennen (Prompt). Copilot-Review 13.11.
+const EXERCISE_WORDS = [
+  'squat', 'deadlift', 'bench press', 'overhead press', 'shoulder press', 'leg press', 'row', 'pull-up', 'pullup',
+  'chin-up', 'pulldown', 'lunge', 'curl', 'dip', 'dips', 'fly', 'flye', 'raise', 'extension', 'pushdown', 'push-up',
+  'pushup', 'plank', 'crunch', 'hip thrust', 'face pull', 'shrug', 'kickback', 'step-up',
+  'kniebeuge', 'kniebeugen', 'kreuzheben', 'bankdrücken', 'rudern', 'klimmzug', 'klimmzüge', 'ausfallschritt',
+  'ausfallschritte', 'liegestütz', 'liegestütze', 'schulterdrücken', 'beinpresse'
+];
+const wordPattern = (word) => new RegExp(`(^|[^\\p{L}])${word}($|[^\\p{L}])`, 'iu');
+const EXERCISE_WORD_PATTERNS = EXERCISE_WORDS.map((word) => ({ word, pattern: wordPattern(word) }));
+
+/** Nennt der Text eine Übung, die nicht im Workout ist? */
+export function mentionsForeignExercise(text, exerciseNames) {
+  const names = (exerciseNames || []).map((n) => String(n).toLowerCase());
+  return EXERCISE_WORD_PATTERNS.some(({ word, pattern }) =>
+    pattern.test(text) && !names.some((name) => pattern.test(name) || name.includes(word)));
+}
+
 /**
  * Antwort der KI prüfen: Einstieg ohne Zahlen, höchstens MAX_COACH_CHECK_HINTS Hinweise, nur erlaubte Zahlen, genannte
  * Übungen müssen im Workout vorkommen. Ungültige Hinweise fallen weg; ohne gültigen Einstieg gibt es keinen Text.
@@ -122,6 +155,7 @@ export function sanitizeCoachCheck(raw, data) {
     if (!numbersIn(text).every((n) => allowed.has(n))) continue;
     const exercise = cleanLine(entry?.exercise).toLowerCase();
     if (exercise && !names.includes(exercise)) continue;
+    if (mentionsForeignExercise(text, names)) continue;
     hints.push(text);
   }
   const lines = [intro, ...hints.map((h) => `- ${h}`)];

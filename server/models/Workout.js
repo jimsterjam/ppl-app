@@ -213,6 +213,10 @@ const workoutSchema = new mongoose.Schema({
     default: null,
     set: sanitizeStoredCoachCheck
   },
+  // Sperre, solange ein Coach-Check läuft (Copilot-Review 13.11.): Zwei gleichzeitige Anfragen sollen nicht zweimal das
+  // Kontingent verbrauchen. Nur der Server setzt sie (routes/workouts.js, claimCoachCheckLock); nach COACH_CHECK_LOCK_MS
+  // gilt sie als verfallen (Server-Absturz mitten in der Anfrage).
+  ai_coach_check_lock_at: { type: Date, default: null },
   // Sprache des gespeicherten Feedback-Texts ('de' | 'en'), null = älteres Feedback ohne Angabe.
   ai_feedback_language: {
     type: String,
