@@ -382,7 +382,11 @@ describe('Coach-Check: Selbstprüfung zum Fix Alltagssprache', () => {
     assert.deepEqual([ex.sets, ex.reps, ex.logged], [3, [10, 10, 10], true]);
     // Geänderte Wiederholungen im alten Format machen einen gespeicherten Coach-Check ungültig
     assert.equal(coachCheckInputChanged(legacy, { ...legacy, exercises: [{ ...legacy.exercises[0], reps: 5 }] }), true);
+    // Gegenprobe (Copilot-Review #185): leere Satzliste mit Ersatzwerten an der Übung zählt NICHT
     assert.equal(workoutHasLoggedSets({ exercises: [{ name: 'Bench', setDetails: [] }] }), false);
+    const emptyModern = { type: 'push', exercises: [{ name: 'Archer Push Up', sets: 3, reps: 10, setDetails: [] }] };
+    assert.equal(workoutHasLoggedSets(emptyModern), false);
+    assert.equal(buildCoachCheckData(emptyModern).exercises[0].logged, false);
   });
   it('Abfrage für den Verlauf entspricht workoutHasLoggedSets (MongoDB-Abfrage an Beispielen, ausgewertet mit sift)', async () => {
     // sift wertet MongoDB-Abfragen in JS aus (kommt mit mongoose) - so prüft der Test die echte Abfrage, nicht nur ihren Text
@@ -398,6 +402,7 @@ describe('Coach-Check: Selbstprüfung zum Fix Alltagssprache', () => {
       { exercises: [{ setDetails: [{ reps: 10, done: false }] }] },
       { exercises: [{ setDetails: [{ reps: 10, isWarmup: true }] }] },
       { exercises: [{ setDetails: [] }] },
+      { exercises: [{ sets: 3, reps: 10, setDetails: [] }] },
       { exercises: [] },
       // Feld "duration" am Satz gibt es im Schema nicht - beide Wege werten es gleich (nicht) aus
       { exercises: [{ setDetails: [{ duration: 30 }] }] }

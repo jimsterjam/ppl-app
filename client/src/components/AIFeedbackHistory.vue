@@ -331,6 +331,8 @@ async function generateNow(item) {
       // Keine erledigten Sätze mit Werten: es gibt kein Feedback - Eintrag aus der Liste nehmen (der Server listet ihn
       // ebenfalls nicht mehr, solange keine Werte da sind)
       items.value = items.value.filter((entry) => entry !== item)
+      // Auch im Zwischenspeicher, sonst taucht der Eintrag offline wieder auf (wie beim Löschen, Copilot-Review #185)
+      cacheFirstPage(items.value.slice(0, FEEDBACK_PAGE_SIZE), hasMore.value)
       toast.show(t('postWorkout.noDataFeedback'), { type: 'info', duration: 4000 })
       logDiagnostic('feedback-history-generate-now', { workoutId: item.workoutId, outcome: 'no_data' })
     } else if (data?.feedback_status === 'insufficient_history') {

@@ -74,6 +74,7 @@ function targetMuscle(name) {
 // Gleich wie HAS_LOGGED_SETS_QUERY (setDetails kennt nur reps und durationSeconds, siehe models/Workout.js)
 const setHasData = (s) => Number(s?.reps) > 0 || Number(s?.durationSeconds) > 0;
 const isLoggedSet = (s) => s && !s.isWarmup && s.done !== false && setHasData(s);
+const isLegacyExercise = (ex) => !Array.isArray(ex?.setDetails);
 
 /**
  * Hat das Workout mindestens einen erledigten Arbeitssatz mit Werten? Ohne gibt es kein KI-Feedback (Absprache Jimmy
@@ -81,10 +82,10 @@ const isLoggedSet = (s) => s && !s.isWarmup && s.done !== false && setHasData(s)
  */
 export function workoutHasLoggedSets(workout) {
   return (Array.isArray(workout?.exercises) ? workout.exercises : []).some((ex) => {
-    const details = Array.isArray(ex?.setDetails) ? ex.setDetails : [];
-    // Älteres Format ohne setDetails: Sätze/Wiederholungen direkt an der Übung (trainingAnalysisService kennt es noch)
-    if (details.length === 0) return Number(ex?.reps) > 0 || Number(ex?.sets) > 0;
-    return details.some(isLoggedSet);
+    // Älteres Format: Feld setDetails fehlt ganz, Sätze/Wiederholungen stehen an der Übung. Eine LEERE Liste ist das
+    // heutige Format ohne Sätze - die Ersatzwerte an der Übung (z. B. reps 10) zählen dann nicht (Copilot-Review #185).
+    if (isLegacyExercise(ex)) return Number(ex?.reps) > 0 || Number(ex?.sets) > 0;
+    return ex.setDetails.some(isLoggedSet);
   });
 }
 
@@ -98,7 +99,7 @@ export const HAS_LOGGED_SETS_QUERY = Object.freeze({
       isWarmup: { $ne: true }, done: { $ne: false },
       $or: [{ reps: { $gt: 0 } }, { durationSeconds: { $gt: 0 } }]
     } } } } },
-    { exercises: { $elemMatch: { 'setDetails.0': { $exists: false }, $or: [{ reps: { $gt: 0 } }, { sets: { $gt: 0 } }] } } }
+    { exercises: { $elemMatch: { setDetails: { $exists: false }, $or: [{ reps: { $gt: 0 } }, { sets: { $gt: 0 } }] } } }
   ]
 });
 
@@ -167,13 +168,12 @@ export function buildCoachCheckData(workout, language = 'de') {
   const lang = language === 'en' ? 'en' : 'de';
   const catalogMuscles = [];
   const exercises = (Array.isArray(workout?.exercises) ? workout.exercises : []).map((ex, index) => {
-    const details = Array.isArray(ex?.setDetails) ? ex.setDetails : [];
-    // Älteres Format ohne setDetails (sets/reps an der Übung, wie in workoutHasLoggedSets): in Sätze umrechnen
+    // Älteres Format (Feld setDetails fehlt, wie in workoutHasLoggedSets): sets/reps der Übung in Sätze umrechnen
     const legacyReps = Number(ex?.reps) > 0 ? Number(ex.reps) : null;
     const legacySets = Number(ex?.sets) > 0 ? Math.min(Number(ex.sets), 20) : (legacyReps ? 1 : 0);
-    const working = details.length
-      ? details.filter(isLoggedSet)
-      : Array.from({ length: legacySets }, () => ({ reps: legacyReps }));
+    const working = isLegacyExercise(ex)
+      ? Array.from({ length: legacySets }, () => ({ reps: legacyReps }))
+      : ex.setDetails.filter(isLoggedSet);
     const reps = working.map((s) => Number(s.reps)).filter((n) => Number.isFinite(n) && n > 0);
     const timed = ex?.measureMode === 'time' || ex?.measureMode === 'repsTime';
     const catalogMuscle = targetMuscle(ex?.name);

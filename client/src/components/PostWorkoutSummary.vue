@@ -502,6 +502,10 @@ async function loadAIFeedback({ refresh = false } = {}) {
     } else if (response.data?.feedback_status === 'no_data') {
       untrackFeedback(resolvedWorkoutId)
       noData.value = true
+      // Ein offener Feedback-Verlauf lädt neu und blendet den Eintrag aus (Copilot-Review #185)
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent(AI_FEEDBACK_UPDATED_EVENT, { detail: { workoutId: resolvedWorkoutId } }))
+      }
       logDiagnostic('ai-feedback-result', { workoutId: props.workoutId, outcome: 'no_data' })
     } else if (response.data?.feedback_status === 'insufficient_history') {
       untrackFeedback(resolvedWorkoutId)
