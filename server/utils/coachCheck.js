@@ -71,7 +71,8 @@ function targetMuscle(name) {
   return /^[a-z ]{2,30}$/.test(muscle) ? muscle : '';
 }
 
-const setHasData = (s) => Number(s?.reps) > 0 || Number(s?.durationSeconds) > 0 || Number(s?.duration) > 0;
+// Gleich wie HAS_LOGGED_SETS_QUERY (setDetails kennt nur reps und durationSeconds, siehe models/Workout.js)
+const setHasData = (s) => Number(s?.reps) > 0 || Number(s?.durationSeconds) > 0;
 const isLoggedSet = (s) => s && !s.isWarmup && s.done !== false && setHasData(s);
 
 /**
@@ -184,10 +185,15 @@ export function buildCoachCheckData(workout, language = 'de') {
     };
   }).filter((ex) => ex.name);
   const workoutType = WORKOUT_TYPES.has(workout?.type) ? workout.type : 'unknown';
+  const missingGroups = missingDayGroups(workoutType, catalogMuscles, lang);
+  const coveredGroups = missingGroups.length
+    ? (DAY_GROUPS[workoutType] || []).map((g) => g.label[lang]).filter((label) => !missingGroups.includes(label))
+    : [];
   return {
     workout_type: workoutType,
     goal: GOALS.has(workout?.goal) ? workout.goal : 'hypertrophy',
-    missing_groups: missingDayGroups(workoutType, catalogMuscles, lang),
+    missing_groups: missingGroups,
+    covered_groups: coveredGroups,
     // Summe der Arbeitssätze - damit die KI den Umfang mit einer echten Zahl nennen kann
     total_sets: exercises.reduce((sum, ex) => sum + ex.sets, 0),
     exercises
@@ -340,6 +346,10 @@ const MISSING_SENTENCE = {
   de: (day, groups) => `Für einen ${day}-Tag fehlt noch eine Übung für: ${groups}.`,
   en: (day, groups) => `A ${day} day still needs an exercise for: ${groups}.`
 };
+const COVERED_SENTENCE = {
+  de: (groups) => `Abgedeckt: ${groups}.`,
+  en: (groups) => `Covered: ${groups}.`
+};
 
 const nameTokens = (value) => String(value ?? '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
 
@@ -396,7 +406,14 @@ export function sanitizeCoachCheck(raw, data, language = 'de') {
   const missing = Array.isArray(data?.missing_groups) ? data.missing_groups : [];
   if (result.selection && missing.length) {
     const day = DAY_NAMES[data.workout_type] || '';
-    result.selection = { verdict: 'hint', text: `${result.selection.text} ${MISSING_SENTENCE[lang](day, missing.join(', '))}` };
+    const missingSentence = MISSING_SENTENCE[lang](day, missing.join(', '));
+    // Erwähnt die KI eine fehlende Gruppe trotzdem (z. B. "Trizeps ist abgedeckt"), gilt nur der Satz der App - sonst
+    // stünde eine falsche Aussage oder dieselbe Gruppe doppelt da (Copilot-Review #185)
+    const lower = result.selection.text.toLowerCase();
+    const conflicting = missing.some((g) => g.toLowerCase().split(/\s+(?:oder|or)\s+/).some((part) => lower.includes(part)));
+    const covered = Array.isArray(data.covered_groups) ? data.covered_groups : [];
+    const appOnly = [covered.length ? COVERED_SENTENCE[lang](covered.join(', ')) : '', missingSentence].filter(Boolean).join(' ');
+    result.selection = { verdict: 'hint', text: conflicting ? appOnly : `${result.selection.text} ${missingSentence}` };
   }
   // Ohne eingetragene Werte gibt es zu Wiederholungen nichts einzuordnen; der Umfang (total_sets zählt nur Sätze mit
   // Werten) wäre schon bei einer Übung ohne Werte zu klein gerechnet

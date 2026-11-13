@@ -337,7 +337,12 @@ describe('Coach-Check: Alltagssprache und fehlende Muskelgruppe (Fall aus Produk
   it('Gegenproben: behauptet die KI, der Trizeps sei abgedeckt, nennt die App ihn trotzdem; vollständiger Push ohne Hinweis', () => {
     const data = buildCoachCheckData(push);
     const wrong = sanitizeCoachCheck({ ...aiAnswer, selection: { verdict: 'ok', text: 'Brust, Schultern und Trizeps sind gut abgedeckt.' } }, data);
-    assert.match(wrong, /Für einen Push-Tag fehlt noch eine Übung für: Trizeps\./);
+    // Falsche Aussage der KI fliegt raus, nur der Satz der App bleibt (Copilot-Review #185)
+    assert.match(wrong, /- Auswahl: Abgedeckt: Brust, Schultern\. Für einen Push-Tag fehlt noch eine Übung für: Trizeps\.\n/);
+    assert.ok(!wrong.includes('gut abgedeckt'));
+    // Nennt die KI den Trizeps als fehlend: ebenfalls nur einmal
+    const twice = sanitizeCoachCheck({ ...aiAnswer, selection: { verdict: 'hint', text: 'Für den Trizeps fehlt eine Übung.' } }, data);
+    assert.equal((twice.match(/Trizeps/g) || []).length, 1);
     const full = buildCoachCheckData({ ...push, exercises: [...push.exercises, { name: 'Band Close-Grip Push-Up', setDetails: done }] });
     assert.deepEqual(full.missing_groups, []);
     // Eigene Übung ohne Katalog-Muskel: keine Aussage über Fehlendes
@@ -388,7 +393,9 @@ describe('Coach-Check: Selbstprüfung zum Fix Alltagssprache', () => {
       { exercises: [{ setDetails: [{ reps: 10, done: false }] }] },
       { exercises: [{ setDetails: [{ reps: 10, isWarmup: true }] }] },
       { exercises: [{ setDetails: [] }] },
-      { exercises: [] }
+      { exercises: [] },
+      // Feld "duration" am Satz gibt es im Schema nicht - beide Wege werten es gleich (nicht) aus
+      { exercises: [{ setDetails: [{ duration: 30 }] }] }
     ];
     for (const w of cases) assert.equal(matches(w), workoutHasLoggedSets(w), JSON.stringify(w));
   });
