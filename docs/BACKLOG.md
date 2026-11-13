@@ -24,6 +24,7 @@ Zuletzt aktualisiert: 2026-11-13
 | A9 | P3 | Eval-/Qualitäts-Skripte an die FAKTEN-REGEL anpassen | `server/scripts/evalCases/*.js`, `qualityLoopRunner.js`, `regressionTest_aiCoach.js` erwarten noch Texte mit Zahlen/Satzaussagen (alter Prompt). Nicht Teil von CI. Mit echtem KI-Zugang prüfen, wie der neue Prompt wirkt. |
 | A10 | P3 | Startton in `WorkoutSplash.vue` lädt `/sounds/start-long.mp3`, die Datei gibt es nicht | `client/public/sounds/` existiert nicht (nie im Repo). Ton klären (Datei ergänzen oder Synthese wie im Timer) – ohne Ton-Entscheidung von Jimmy nur melden. |
 | A11 | P3 | Intervall-Timer-Mitteilungen (`timerStore.js`) ohne Ton | Gleiches Muster wie beim Pausentimer: ohne `sound` stumm im Hintergrund. Nach dem Test des Pausen-Weckers (P4) mit `restEndSignal.js` angleichen. |
+| A12 | P3 | KI-Feedback: „Wird erstellt“ endet nicht, wenn das Kontingent in einer gleichzeitigen Anfrage aufgebraucht ist | `POST /:id/ai-analysis` setzt `ai_feedback_status: 'pending'` und antwortet danach bei einem verlorenen Kontingent-Wettlauf mit `quota_limited`, ohne den Status zu ändern (bestehender Weg und Coach-Check, Copilot-Review PR #182 Runde 3). Der Verlauf zeigt dann bis zu 30 Min. „Wird erstellt“. Für alle Feedback-Arten gemeinsam einen Endzustand setzen (z. B. Status zurück auf `none`). |
 | A6 | P3 | Tests für Flows aus `TESTPHASE-TESTMATRIX.md` ohne Testabdeckung ergänzen | Erst Lücke benennen, dann je Flow ein kleiner PR. Nur reine Logik (Utils), keine UI-Mount-Tests ohne Infrastruktur. |
 
 ## Offen – Freigabe nötig [F]

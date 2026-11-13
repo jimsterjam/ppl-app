@@ -71,6 +71,7 @@ import {
 import { z } from 'zod';
 import {
   shouldAutoCoachCheck, canRequestCoachCheck, firstCoachCheckIntro, coachCheckInputChanged, withoutFields,
+  generateAndPersistCoachCheck, isCoachCheckSaved,
   SERVER_ONLY_CREATE_FIELDS, SERVER_ONLY_UPDATE_FIELDS, COACH_CHECK_LOCK_MS
 } from '../utils/coachCheck.js';
 
@@ -2141,10 +2142,36 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
       }
       try {
         const language = resolveFeedbackLanguage(req);
+        const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+        const feedbackFor = (text) => applyFirstLookOutlook(`${firstCoachCheckIntro(language)}\n\n${text}`, language);
         const slot = await withAiQuotaSlot({
           claim: () => claimAiSlot(entitlements),
           release: (claim) => releaseAiSlot(entitlements, claim),
-          run: () => runCoachCheck({ workout: currentWorkout, language, requestId })
+          // Erzeugen und Speichern zusammen: verbraucht wird nur, was auch gespeichert ist
+          run: () => generateAndPersistCoachCheck({
+            generate: () => runCoachCheck({ workout: currentWorkout, language, requestId }),
+            // Nur speichern, solange die eigene Sperre gilt (kein PUT hat die Zusammenstellung inzwischen geändert)
+            persist: async (text) => {
+              const saved = await Workout.updateOne(
+                { _id: workoutId, userId, ai_coach_check_lock_at: lockAt },
+                {
+                  $set: {
+                    ai_feedback: feedbackFor(text),
+                    ai_generated_at: new Date(),
+                    ai_metadata: { provider: 'openai', model },
+                    ai_analysis_snapshot: [],
+                    ai_feedback_kind: 'coach_check',
+                    ai_feedback_language: language,
+                    ai_note_answers: [],
+                    ai_feedback_status: 'generated'
+                  }
+                }
+              );
+              return saved.matchedCount === 1 ? 'ok' : 'stale';
+            },
+            onPersistError: (e) => logger.warn('⚠️ Konnte Coach-Check nicht speichern', { requestId, error: e.message })
+          }),
+          isSuccess: isCoachCheckSaved
         });
         // Datenbankfehler beim Beanspruchen: unten normal weiter (dort antwortet der Server wiederholbar)
         if (slot.limited && !slot.error) {
@@ -2157,40 +2184,21 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
             metadata: { requestId, timestamp: new Date().toISOString(), aiAvailable: false }
           });
         }
-        if (!slot.limited && slot.result) {
-          const feedback = applyFirstLookOutlook(`${firstCoachCheckIntro(language)}\n\n${slot.result}`, language);
-          const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
-          // Nur speichern, solange die eigene Sperre gilt (kein PUT hat die Zusammenstellung inzwischen geändert)
-          const saved = await Workout.updateOne(
-            { _id: workoutId, userId, ai_coach_check_lock_at: lockAt },
-            {
-              $set: {
-                ai_feedback: feedback,
-                ai_generated_at: new Date(),
-                ai_metadata: { provider: 'openai', model },
-                ai_analysis_snapshot: [],
-                ai_feedback_kind: 'coach_check',
-                ai_feedback_language: language,
-                ai_note_answers: [],
-                ai_feedback_status: 'generated'
-              }
-            }
-          ).catch((e) => {
-            logger.warn('⚠️ Konnte Coach-Check nicht speichern', { requestId, error: e.message });
-            return null;
+        if (!slot.limited && slot.result && !isCoachCheckSaved(slot.result)) {
+          // Nicht gespeichert (Workout inzwischen umgebaut oder Datenbankfehler): Platz ist zurückgegeben, alten Stand
+          // nicht zeigen - der Client lädt später neu (feedbackTracker)
+          logger.info('🧭 Coach-Check nicht gespeichert', { requestId, workoutId, reason: slot.result.saved });
+          return res.json({
+            success: true,
+            workoutId: currentWorkout._id,
+            workoutDate: currentWorkout.date,
+            feedback_status: 'pending',
+            aiUsage: getAiLimitSnapshot(entitlements),
+            metadata: { requestId, timestamp: new Date().toISOString(), aiAvailable: true }
           });
-          if (saved && saved.matchedCount === 0) {
-            // Workout wurde währenddessen umgebaut: alten Stand nicht zeigen, der Client lädt später neu
-            logger.info('🧭 Coach-Check verworfen (Workout inzwischen geändert)', { requestId, workoutId });
-            return res.json({
-              success: true,
-              workoutId: currentWorkout._id,
-              workoutDate: currentWorkout.date,
-              feedback_status: 'pending',
-              aiUsage: getAiLimitSnapshot(entitlements),
-              metadata: { requestId, timestamp: new Date().toISOString(), aiAvailable: true }
-            });
-          }
+        }
+        if (!slot.limited && slot.result) {
+          const feedback = feedbackFor(slot.result.text);
           logger.info('🧭 Coach-Check (erstes Mal) erzeugt', { requestId, workoutId });
           return res.json({
             success: true,
@@ -2730,29 +2738,37 @@ router.post("/:id/coach-check", firebaseAuthMiddleware, requireAiConsent, async 
     if (!lockAt) {
       return res.status(409).json({ error: 'Coach check already running', code: 'COACH_CHECK_RUNNING', requestId });
     }
-    let stale = false;
     const entitlements = await getEntitlements(userId);
     const language = resolveFeedbackLanguage(req);
+    const generatedAt = new Date();
     let slot;
     try {
       slot = await withAiQuotaSlot({
         claim: () => claimAiSlot(entitlements),
         release: (claim) => releaseAiSlot(entitlements, claim),
-        run: () => runCoachCheck({ workout, language, requestId })
+        // Erzeugen und Speichern zusammen: verbraucht wird nur, was auch gespeichert ist
+        run: () => generateAndPersistCoachCheck({
+          generate: () => runCoachCheck({ workout, language, requestId }),
+          // Nur speichern, solange die eigene Sperre gilt (kein PUT hat die Zusammenstellung inzwischen geändert)
+          persist: async (text) => {
+            const saved = await Workout.updateOne(
+              { _id: workoutId, userId, ai_coach_check_lock_at: lockAt },
+              { $set: { ai_coach_check: { text, language, generated_at: generatedAt } } }
+            );
+            return saved.matchedCount === 1 ? 'ok' : 'stale';
+          },
+          onPersistError: (e) => logger.warn('⚠️ Konnte Coach-Check nicht speichern', { requestId, error: e.message })
+        }),
+        isSuccess: isCoachCheckSaved
       });
-      if (!slot.limited && slot.result) {
-        // Nur speichern, solange die eigene Sperre gilt (kein PUT hat die Zusammenstellung inzwischen geändert)
-        const saved = await Workout.updateOne(
-          { _id: workoutId, userId, ai_coach_check_lock_at: lockAt },
-          { $set: { ai_coach_check: { text: slot.result, language, generated_at: new Date() } } }
-        );
-        stale = saved.matchedCount === 0;
-      }
     } finally {
       await releaseCoachCheckLock(workoutId, userId, lockAt);
     }
-    if (stale) {
+    if (!slot.limited && slot.result?.saved === 'stale') {
       return res.status(409).json({ error: 'Workout changed during coach check', code: 'COACH_CHECK_STALE', requestId });
+    }
+    if (!slot.limited && slot.result?.saved === 'error') {
+      return res.status(503).json({ error: 'Coach check could not be saved', code: 'COACH_CHECK_SAVE_FAILED', retryAfter: 5, requestId });
     }
     if (slot.limited && slot.error) {
       return res.status(503).json({ error: 'AI quota temporarily unavailable', code: 'AI_QUOTA_UNAVAILABLE', retryAfter: 5, requestId });
@@ -2763,7 +2779,7 @@ router.post("/:id/coach-check", firebaseAuthMiddleware, requireAiConsent, async 
     if (!slot.result) {
       return res.status(502).json({ error: 'Coach check could not be generated', code: 'COACH_CHECK_FAILED', requestId });
     }
-    const coachCheck = { text: slot.result, language, generated_at: new Date() };
+    const coachCheck = { text: slot.result.text, language, generated_at: generatedAt };
     logger.info('🧭 Coach-Check (auf Wunsch) erzeugt', { requestId, workoutId });
     return res.json({ success: true, coach_check: coachCheck, aiUsage: getAiLimitSnapshot(entitlements), requestId });
   } catch (error) {

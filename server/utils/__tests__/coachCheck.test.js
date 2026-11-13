@@ -3,8 +3,10 @@ import assert from 'node:assert/strict';
 import {
   sanitizeWorkoutOrigin, shouldAutoCoachCheck, canRequestCoachCheck, buildCoachCheckData,
   sanitizeCoachCheck, firstCoachCheckIntro, sanitizeStoredCoachCheck, MAX_COACH_CHECK_HINTS, coachCheckInputChanged,
-  withoutFields, mentionsForeignExercise, SERVER_ONLY_CREATE_FIELDS, SERVER_ONLY_UPDATE_FIELDS
+  withoutFields, mentionsForeignExercise, SERVER_ONLY_CREATE_FIELDS, SERVER_ONLY_UPDATE_FIELDS,
+  generateAndPersistCoachCheck, isCoachCheckSaved
 } from '../coachCheck.js';
+import { withAiQuotaSlot } from '../aiQuotaClaim.js';
 import { runCoachCheck, getCoachCheckSystemPrompt } from '../../services/coachCheckService.js';
 import Workout from '../../models/Workout.js';
 
@@ -23,10 +25,12 @@ const workout = {
 
 describe('Coach-Check: wann (Absprache Jimmy 13.11.)', () => {
   it('automatisch nur beim ersten Mal und nur bei selbst zusammengestellten Workouts', () => {
-    assert.equal(shouldAutoCoachCheck({ origin: 'manual' }, 1), true);
+    assert.equal(shouldAutoCoachCheck({ origin: 'manual', completed: true }, 1), true);
     // Gegenproben: zweites Mal, generiert, Favorit, Plan, älteres Workout ohne Herkunft
-    assert.equal(shouldAutoCoachCheck({ origin: 'manual' }, 2), false);
-    for (const origin of ['generated', 'favorite', 'plan', null, undefined]) assert.equal(shouldAutoCoachCheck({ origin }, 1), false, String(origin));
+    assert.equal(shouldAutoCoachCheck({ origin: 'manual', completed: true }, 2), false);
+    // Gegenprobe: laufendes Workout (Copilot-Review Runde 3)
+    assert.equal(shouldAutoCoachCheck({ origin: 'manual', completed: false }, 1), false);
+    for (const origin of ['generated', 'favorite', 'plan', null, undefined]) assert.equal(shouldAutoCoachCheck({ origin, completed: true }, 1), false, String(origin));
   });
   it('auf Wunsch nur bei selbst zusammengestellten, abgeschlossenen Workouts', () => {
     assert.equal(canRequestCoachCheck({ origin: 'manual', completed: true }), true);
@@ -37,8 +41,8 @@ describe('Coach-Check: wann (Absprache Jimmy 13.11.)', () => {
     assert.equal(canRequestCoachCheck({ origin: 'manual', completed: true, ai_feedback_kind: 'first_look' }), true);
   });
   it('nicht automatisch, wenn eine Übung eine Notiz hat (die beantwortet die Erste Einordnung)', () => {
-    assert.equal(shouldAutoCoachCheck({ origin: 'manual', exercises: [{ name: 'A', note: '   ' }] }, 1), true);
-    assert.equal(shouldAutoCoachCheck({ origin: 'manual', exercises: [{ name: 'A' }, { name: 'B', note: 'Ist die Reihenfolge ok?' }] }, 1), false);
+    assert.equal(shouldAutoCoachCheck({ origin: 'manual', completed: true, exercises: [{ name: 'A', note: '   ' }] }, 1), true);
+    assert.equal(shouldAutoCoachCheck({ origin: 'manual', completed: true, exercises: [{ name: 'A' }, { name: 'B', note: 'Ist die Reihenfolge ok?' }] }, 1), false);
   });
   it('gespeicherter Coach-Check: nur ungültig, wenn sich die Zusammenstellung ändert', () => {
     // Notiz und Gewicht geändert: bleibt
@@ -166,5 +170,34 @@ describe('Coach-Check: Copilot-Review 13.11.', () => {
     const prompt = getCoachCheckSystemPrompt();
     assert.match(prompt, /explosive und technique gibt es keinen Wiederholungsbereich/);
     assert.match(prompt, /Keine Übungen vorschlagen, die nicht im Workout sind/);
+  });
+});
+
+describe('Coach-Check: Kontingent nur bei gespeichertem Ergebnis (Copilot-Review Runde 3)', () => {
+  const runWith = async ({ text = 'Passt.', persist }) => {
+    let released = 0;
+    const slot = await withAiQuotaSlot({
+      claim: async () => ({ claimed: true }),
+      release: async () => { released += 1; },
+      run: () => generateAndPersistCoachCheck({ generate: async () => text, persist }),
+      isSuccess: isCoachCheckSaved
+    });
+    return { slot, released };
+  };
+  it('gespeichert: Platz bleibt verbraucht', async () => {
+    const { slot, released } = await runWith({ persist: async () => 'ok' });
+    assert.equal(slot.result.saved, 'ok');
+    assert.equal(released, 0);
+  });
+  it('Gegenproben: Datenbankfehler, Workout umgebaut, keine Antwort der KI -> Platz zurück', async () => {
+    const failed = await runWith({ persist: async () => { throw new Error('db down'); } });
+    assert.equal(failed.slot.result.saved, 'error');
+    assert.equal(failed.released, 1);
+    const stale = await runWith({ persist: async () => 'stale' });
+    assert.equal(stale.slot.result.saved, 'stale');
+    assert.equal(stale.released, 1);
+    const empty = await runWith({ text: null, persist: async () => 'ok' });
+    assert.equal(empty.slot.result, null);
+    assert.equal(empty.released, 1);
   });
 });

@@ -41,7 +41,9 @@ const hasExerciseNote = (workout) => (Array.isArray(workout?.exercises) ? workou
  * Fragen aus der Notiz und bestätigt bewusste Entscheidungen - der Coach-Check sieht keine Notizen (Selbstprüfung 13.11.).
  */
 export function shouldAutoCoachCheck(workout, matchingCount) {
-  return workout?.origin === 'manual' && Number(matchingCount) <= 1 && !hasExerciseNote(workout);
+  // completed: wie canRequestCoachCheck - ein laufendes Workout bekommt keinen Coach-Check (Copilot-Review Runde 3)
+  return workout?.origin === 'manual' && workout?.completed === true && Number(matchingCount) <= 1
+    && !hasExerciseNote(workout);
 }
 
 /**
@@ -108,6 +110,26 @@ function cleanLine(value) {
 }
 
 const numbersIn = (text) => String(text ?? '').match(/\d+/g) || [];
+
+/**
+ * Coach-Check erzeugen UND speichern als ein Schritt für withAiQuotaSlot (Copilot-Review Runde 3): Der Platz im
+ * Kontingent zählt nur, wenn das Ergebnis auch gespeichert ist. Scheitert das Speichern (Datenbankfehler) oder wurde
+ * das Workout inzwischen umgebaut ('stale'), geht der Platz zurück (isCoachCheckSaved).
+ * @param {{ generate: () => Promise<string|null>, persist: (text: string) => Promise<'ok'|'stale'>,
+ *   onPersistError?: (error: Error) => void }} input
+ * @returns {Promise<{ text: string, saved: 'ok'|'stale'|'error' } | null>} null = KI lieferte nichts Verwertbares
+ */
+export async function generateAndPersistCoachCheck({ generate, persist, onPersistError = () => {} }) {
+  const text = await generate();
+  if (!text) return null;
+  try {
+    return { text, saved: (await persist(text)) === 'ok' ? 'ok' : 'stale' };
+  } catch (error) {
+    onPersistError(error);
+    return { text, saved: 'error' };
+  }
+}
+export const isCoachCheckSaved = (result) => result?.saved === 'ok';
 
 /** Body ohne die angegebenen Felder (flache Kopie). */
 export function withoutFields(body, fields) {
