@@ -146,7 +146,7 @@ export function sanitizeCoachCheck(raw, data) {
   const allowed = allowedCoachCheckNumbers(data);
   const names = (data?.exercises || []).map((ex) => ex.name.toLowerCase());
   const intro = cleanLine(raw.intro);
-  if (!intro || numbersIn(intro).length) return null;
+  if (!intro || numbersIn(intro).length || mentionsForeignExercise(intro, names)) return null;
   const hints = [];
   for (const entry of Array.isArray(raw.hints) ? raw.hints : []) {
     if (hints.length >= MAX_COACH_CHECK_HINTS) break;

@@ -157,6 +157,11 @@ describe('Coach-Check: Copilot-Review 13.11.', () => {
     ] }, data);
     assert.equal(text, 'Solide.\n- Für die Schultern fehlt noch etwas.');
   });
+  it('Einstieg mit fremder Übung: kein Coach-Check (Copilot-Review Runde 2)', () => {
+    const data = buildCoachCheckData(workout);
+    assert.equal(sanitizeCoachCheck({ intro: 'Squat is missing.', hints: [] }, data), null);
+    assert.equal(sanitizeCoachCheck({ intro: 'Bench Press passt gut an den Anfang.', hints: [] }, data), 'Bench Press passt gut an den Anfang.');
+  });
   it('Prompt: keine Wiederholungs-Hinweise bei Explosivkraft und Technik, keine fremden Übungen', () => {
     const prompt = getCoachCheckSystemPrompt();
     assert.match(prompt, /explosive und technique gibt es keinen Wiederholungsbereich/);
