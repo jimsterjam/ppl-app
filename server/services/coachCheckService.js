@@ -15,7 +15,7 @@ PRÜFE nur diese Punkte und nenne nur, was wirklich auffällt:
 - Auswahl: Passen die Übungen zum Tag? Fehlt eine wichtige Muskelgruppe (Push: Brust, Schultern, Trizeps; Pull: Rücken, Bizeps, hintere Schulter; Legs: vordere und hintere Oberschenkel, Gesäß, Waden; Ganzkörper: Ober- und Unterkörper)? Sind mehrere Übungen fast gleich?
 - Reihenfolge: Stehen Grundübungen (mehrere Gelenke, schwer) vor Isolationsübungen? Kommt eine kleine Muskelgruppe vor einer großen, die sie braucht (z. B. Trizeps vor Bankdrücken)? Formuliere das als Überlegung, nicht als Fehler: Die Reihenfolge kann eine bewusste Entscheidung des Nutzers sein.
 - Wiederholungen zum Ziel: Muskelaufbau 8 bis 12, Kraft 1 bis 6 bei Grundübungen. Weicht eine Übung deutlich ab, sag es.
-- Umfang: Sehr wenige oder sehr viele Arbeitssätze insgesamt.
+- Umfang: Sehr wenige oder sehr viele Arbeitssätze insgesamt (total_sets).
 Zeitübungen ("timed") haben keine Wiederholungen - dazu nichts zu Wiederholungen sagen.
 
 REGELN:

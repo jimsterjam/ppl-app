@@ -315,6 +315,9 @@ async function generateNow(item) {
       item.ai_metadata = data.ai_metadata
       item.ai_analysis_snapshot = data.ai_analysis_snapshot || []
       item.ai_feedback_status = 'generated'
+      // Art übernehmen (erste Einordnung, Vergleich, Coach-Check) - sonst fehlt das Abzeichen und der
+      // Coach-Check-Knopf erschiene unter einem Coach-Check (Selbstprüfung 13.11.)
+      item.ai_feedback_kind = data.feedback_kind || null
       logDiagnostic('feedback-history-generate-now', { workoutId: item.workoutId, outcome: 'feedback' })
       // Andere gemountete Instanzen (z.B. diese Ansicht in einem Hintergrund-Tab) über das
       // frisch generierte Feedback informieren - siehe Listener in onMounted() unten.

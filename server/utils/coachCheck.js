@@ -26,17 +26,32 @@ export function sanitizeWorkoutOrigin(value) {
   return WORKOUT_ORIGINS.includes(value) ? value : null;
 }
 
+const hasExerciseNote = (workout) => (Array.isArray(workout?.exercises) ? workout.exercises : [])
+  .some((ex) => typeof ex?.note === 'string' && ex.note.trim() !== '');
+
 /**
  * Automatischer Coach-Check beim Speichern? Nur das erste Mal mit genau diesen Übungen und nur bei selbst
- * zusammengestellten Workouts.
+ * zusammengestellten Workouts. Steht bei einer Übung eine Notiz, bleibt es bei der Ersten Einordnung: Die beantwortet
+ * Fragen aus der Notiz und bestätigt bewusste Entscheidungen - der Coach-Check sieht keine Notizen (Selbstprüfung 13.11.).
  */
 export function shouldAutoCoachCheck(workout, matchingCount) {
-  return workout?.origin === 'manual' && Number(matchingCount) <= 1;
+  return workout?.origin === 'manual' && Number(matchingCount) <= 1 && !hasExerciseNote(workout);
 }
 
-/** Coach-Check auf Wunsch möglich? (selbst zusammengestellt, abgeschlossen) */
+/**
+ * Coach-Check auf Wunsch möglich? Selbst zusammengestellt, abgeschlossen und das Feedback ist nicht schon selbst ein
+ * Coach-Check (sonst zahlte der Nutzer zweimal für dieselbe Auswertung).
+ */
 export function canRequestCoachCheck(workout) {
-  return workout?.origin === 'manual' && workout?.completed === true;
+  return workout?.origin === 'manual' && workout?.completed === true && workout?.ai_feedback_kind !== 'coach_check';
+}
+
+/**
+ * Hat sich die Zusammenstellung geändert (Übungen, Reihenfolge, Sätze, Wiederholungen)? Dann passt ein gespeicherter
+ * Coach-Check nicht mehr. Notiz- oder Gewichtsänderungen lassen ihn stehen.
+ */
+export function coachCheckInputChanged(before, after) {
+  return JSON.stringify(buildCoachCheckData(before)) !== JSON.stringify(buildCoachCheckData(after));
 }
 
 /**
@@ -59,6 +74,8 @@ export function buildCoachCheckData(workout) {
   return {
     workout_type: WORKOUT_TYPES.has(workout?.type) ? workout.type : 'unknown',
     goal: GOALS.has(workout?.goal) ? workout.goal : 'hypertrophy',
+    // Summe der Arbeitssätze - damit die KI den Umfang mit einer echten Zahl nennen kann
+    total_sets: exercises.reduce((sum, ex) => sum + ex.sets, 0),
     exercises
   };
 }
@@ -66,6 +83,7 @@ export function buildCoachCheckData(workout) {
 /** Zahlen, die in der Antwort vorkommen dürfen (aus dem Datensatz + Wiederholungsbereiche der App). */
 export function allowedCoachCheckNumbers(data) {
   const allowed = new Set(RANGE_NUMBERS);
+  if (Number.isFinite(data?.total_sets)) allowed.add(String(data.total_sets));
   for (const ex of data?.exercises || []) {
     allowed.add(String(ex.position));
     allowed.add(String(ex.sets));
@@ -111,8 +129,8 @@ export function sanitizeCoachCheck(raw, data) {
 }
 
 const FIRST_INTRO = {
-  de: 'Dein erstes Workout mit diesen Übungen. Einen Vergleich gibt es ab dem nächsten Mal, deshalb schaut der Coach heute auf die Zusammenstellung.',
-  en: 'Your first workout with these exercises. Comparisons start next time, so today the coach looks at how it\'s put together.'
+  de: 'Dein erstes Workout mit diesen Übungen. Deshalb schaut der Coach heute auf die Zusammenstellung.',
+  en: 'Your first workout with these exercises, so today the coach looks at how it\'s put together.'
 };
 
 /** Fester Einstieg der App vor dem automatischen Coach-Check beim ersten Mal. */

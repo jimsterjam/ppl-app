@@ -33,3 +33,31 @@ describe('AppModal sperrt den Hintergrund', () => {
     expect(document.body.style.overflow).toBe('')
   })
 })
+
+// Selbstprüfung 13.11.: Bei der Favorit-Frage ist "Nein" eine Antwort (trotzdem speichern), ✕/daneben/Escape heißt zurück.
+describe('AppModal: dismissSeparately', () => {
+  const mountModal = (props) =>
+    mount(AppModal, { props: { modelValue: true, title: 'T', ...props }, global: { plugins: [createI18nInstance()], stubs: { teleport: true } } })
+
+  it('✕, Tippen daneben und Escape melden dismiss, der Abbrechen-Knopf cancel', async () => {
+    const w = mountModal({ dismissSeparately: true })
+    await nextTick()
+    await w.find('button.close').trigger('click')
+    await w.find('.modal-overlay').trigger('click')
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    expect(w.emitted('dismiss')).toHaveLength(3)
+    expect(w.emitted('cancel')).toBeUndefined()
+    await w.find('button.btn.secondary').trigger('click')
+    expect(w.emitted('cancel')).toHaveLength(1)
+    w.unmount()
+  })
+
+  it('Gegenprobe: ohne die Angabe bleibt alles cancel (bestehende Fenster)', async () => {
+    const w = mountModal({})
+    await nextTick()
+    await w.find('button.close').trigger('click')
+    expect(w.emitted('cancel')).toHaveLength(1)
+    expect(w.emitted('dismiss')).toBeUndefined()
+    w.unmount()
+  })
+})

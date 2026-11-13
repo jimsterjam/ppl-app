@@ -727,8 +727,10 @@
       :confirm-text="t('workoutDetail.favoriteAskYes')"
       :cancel-text="t('workoutDetail.favoriteAskNo')"
       type="info"
+      dismiss-separately
       @confirm="onFavoriteAskYes"
       @cancel="onFavoriteAskNo"
+      @dismiss="onFavoriteAskDismiss"
     />
 
     <!-- Name des Favoriten (nach "Ja, merken") -->
@@ -4373,9 +4375,9 @@ function confirmFavoriteSave() {
   }
 }
 
-// Typ-Name wie auf den Kacheln (Push, Pull, Legs, Full Body - in beiden Sprachen gleich)
+// Typ-Name wie auf den Kacheln (Push, Pull, Legs, Full Body)
 function workoutTypeLabel(type) {
-  return { push: 'Push', pull: 'Pull', legs: 'Legs', fullbody: 'Full Body' }[normalizeWorkoutType(type)] || 'Push'
+  return t(`workoutDetail.favoriteAskType.${normalizeWorkoutType(type)}`)
 }
 
 // Favorit-Frage: Ja -> Namensfenster, Nein -> weiter speichern. Das Workout wird in jedem Fall gespeichert.
@@ -4386,9 +4388,13 @@ function onFavoriteAskYes() {
 function onFavoriteAskNo() {
   continueSaveAfterFavoriteAsk()
 }
-// Namensfenster abgebrochen: kein Favorit, das Workout wird trotzdem gespeichert.
+// Fenster geschlossen (✕, daneben tippen, Escape) bzw. Namensfenster abgebrochen: NICHT speichern - der Nutzer wollte
+// zurück. Beim nächsten "Speichern" kommt die Frage wieder.
+function onFavoriteAskDismiss() {
+  favoriteAskDone = false
+}
 function onFavoriteNameCancel() {
-  continueSaveAfterFavoriteAsk()
+  favoriteAskDone = false
 }
 function continueSaveAfterFavoriteAsk() {
   saveWorkout(pendingUpdateFavoriteOnSave)

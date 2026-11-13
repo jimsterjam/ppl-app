@@ -69,7 +69,7 @@ import {
   checkAiBurstLimit
 } from '../utils/aiUtils.js';
 import { z } from 'zod';
-import { shouldAutoCoachCheck, canRequestCoachCheck, firstCoachCheckIntro } from '../utils/coachCheck.js';
+import { shouldAutoCoachCheck, canRequestCoachCheck, firstCoachCheckIntro, coachCheckInputChanged } from '../utils/coachCheck.js';
 import { runCoachCheck } from '../services/coachCheckService.js';
 import { validateQuery } from '../middleware/validateRequest.js';
 
@@ -1555,12 +1555,17 @@ router.put("/:id", firebaseAuthMiddleware, async (req, res) => {
     // models/Workout.js), damit der Client das Ende des Bearbeitungsfensters nicht manipulieren
     // kann.
     const { _id: _bodyId, completedAt: _bodyCompletedAt, ai_coach_check: _bodyCoachCheck, ...updateBody } = req.body;
-    // Übungen geändert: ein früherer Coach-Check passt nicht mehr zur Zusammenstellung (kann neu angefordert werden).
-    if (Array.isArray(updateBody.exercises)) updateBody.ai_coach_check = null;
 
-    const existing = await Workout.findOne({ _id: req.params.id, userId }).select('completed completedAt').lean();
+    const existing = await Workout.findOne({ _id: req.params.id, userId })
+      .select('completed completedAt type goal exercises ai_coach_check').lean();
     if (!existing) {
       return res.status(404).json({ error: "Workout nicht gefunden" });
+    }
+    // Zusammenstellung geändert (Übungen, Reihenfolge, Sätze, Wdh.): ein früherer Coach-Check passt nicht mehr und kann
+    // neu angefordert werden. Nur Notiz/Gewicht geändert: er bleibt (der Nutzer hat dafür eine KI-Anfrage verbraucht).
+    if (existing.ai_coach_check && Array.isArray(updateBody.exercises)
+      && coachCheckInputChanged(existing, { ...existing, ...updateBody })) {
+      updateBody.ai_coach_check = null;
     }
 
     if (existing.completed === true) {
@@ -2073,9 +2078,25 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
     // Auch ein ganz neues Workout bekommt so eine Erste Einordnung.
     const isFirstLookFeedback = matchingCount < AI_FEEDBACK_MIN_REPETITIONS;
 
-    // 2a. Coach-Check statt Erster Einordnung (Absprache Jimmy 13.11., utils/coachCheck.js): erstes Mal mit genau diesen
-    // Übungen UND selbst zusammengestellt. Liefert die KI nichts Verwertbares, geht es unten mit der normalen Ersten
-    // Einordnung weiter (der Platz im Kontingent wird dann zurückgegeben).
+    // 2b'. Ab hier wird wirklich generiert: als "wird erstellt" markieren, damit der
+    // Feedback-Verlauf das Workout auch dann zeigt, wenn diese Anfrage scheitert (z.B.
+    // KI-Relay im Kaltstart) - der Client lädt automatisch nach (feedbackTracker.js).
+    // ai_pending_since nur beim ersten Mal setzen (Basis für "failed" nach 30 Min.) - bzw. neu,
+    // wenn ein bereits als "failed" geltender Eintrag erneut angestoßen wird ("Erneut versuchen").
+    const pendingSinceMs = currentWorkout.ai_pending_since ? new Date(currentWorkout.ai_pending_since).getTime() : 0;
+    const pendingIsStale = currentWorkout.ai_feedback_status === 'pending'
+      && (!pendingSinceMs || Date.now() - pendingSinceMs > FEEDBACK_PENDING_FAILED_AFTER_MS);
+    if (!currentWorkout.ai_feedback && (currentWorkout.ai_feedback_status !== 'pending' || pendingIsStale)) {
+      await Workout.updateOne(
+        { _id: workoutId, userId },
+        { $set: { ai_feedback_status: 'pending', ai_pending_since: new Date() } }
+      ).catch((e) => logger.warn('⚠️ Konnte Feedback-Status "pending" nicht setzen', { requestId, error: e.message }));
+    }
+
+    // 2b''. Coach-Check statt Erster Einordnung (Absprache Jimmy 13.11., utils/coachCheck.js): erstes Mal mit genau
+    // diesen Übungen, selbst zusammengestellt, ohne Notiz. Steht bewusst NACH der "wird erstellt"-Markierung: Scheitert
+    // die Anfrage, zeigt der Feedback-Verlauf den Eintrag trotzdem und bietet "Erneut versuchen" an. Liefert die KI
+    // nichts Verwertbares, geht es unten mit der normalen Ersten Einordnung weiter (der Platz im Kontingent geht zurück).
     if (shouldAutoCoachCheck(currentWorkout, matchingCount)) {
       const language = resolveFeedbackLanguage(req);
       const slot = await withAiQuotaSlot({
@@ -2127,21 +2148,6 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
           metadata: { requestId, timestamp: new Date().toISOString(), aiAvailable: true }
         });
       }
-    }
-
-    // 2b'. Ab hier wird wirklich generiert: als "wird erstellt" markieren, damit der
-    // Feedback-Verlauf das Workout auch dann zeigt, wenn diese Anfrage scheitert (z.B.
-    // KI-Relay im Kaltstart) - der Client lädt automatisch nach (feedbackTracker.js).
-    // ai_pending_since nur beim ersten Mal setzen (Basis für "failed" nach 30 Min.) - bzw. neu,
-    // wenn ein bereits als "failed" geltender Eintrag erneut angestoßen wird ("Erneut versuchen").
-    const pendingSinceMs = currentWorkout.ai_pending_since ? new Date(currentWorkout.ai_pending_since).getTime() : 0;
-    const pendingIsStale = currentWorkout.ai_feedback_status === 'pending'
-      && (!pendingSinceMs || Date.now() - pendingSinceMs > FEEDBACK_PENDING_FAILED_AFTER_MS);
-    if (!currentWorkout.ai_feedback && (currentWorkout.ai_feedback_status !== 'pending' || pendingIsStale)) {
-      await Workout.updateOne(
-        { _id: workoutId, userId },
-        { $set: { ai_feedback_status: 'pending', ai_pending_since: new Date() } }
-      ).catch((e) => logger.warn('⚠️ Konnte Feedback-Status "pending" nicht setzen', { requestId, error: e.message }));
     }
 
     // 2c. Korrektheits-Regel-Engine (Kap. 24-26, Phase 2/3): lade das fachlich geprüfte

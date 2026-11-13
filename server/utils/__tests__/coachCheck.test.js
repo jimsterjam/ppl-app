@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   sanitizeWorkoutOrigin, shouldAutoCoachCheck, canRequestCoachCheck, buildCoachCheckData,
-  sanitizeCoachCheck, firstCoachCheckIntro, sanitizeStoredCoachCheck, MAX_COACH_CHECK_HINTS
+  sanitizeCoachCheck, firstCoachCheckIntro, sanitizeStoredCoachCheck, MAX_COACH_CHECK_HINTS, coachCheckInputChanged
 } from '../coachCheck.js';
 import { runCoachCheck, getCoachCheckSystemPrompt } from '../../services/coachCheckService.js';
 import Workout from '../../models/Workout.js';
@@ -31,6 +31,23 @@ describe('Coach-Check: wann (Absprache Jimmy 13.11.)', () => {
     assert.equal(canRequestCoachCheck({ origin: 'manual', completed: true }), true);
     assert.equal(canRequestCoachCheck({ origin: 'manual', completed: false }), false);
     assert.equal(canRequestCoachCheck({ origin: 'generated', completed: true }), false);
+    // Gegenprobe: Feedback ist schon ein Coach-Check - nicht zweimal bezahlen
+    assert.equal(canRequestCoachCheck({ origin: 'manual', completed: true, ai_feedback_kind: 'coach_check' }), false);
+    assert.equal(canRequestCoachCheck({ origin: 'manual', completed: true, ai_feedback_kind: 'first_look' }), true);
+  });
+  it('nicht automatisch, wenn eine Übung eine Notiz hat (die beantwortet die Erste Einordnung)', () => {
+    assert.equal(shouldAutoCoachCheck({ origin: 'manual', exercises: [{ name: 'A', note: '   ' }] }, 1), true);
+    assert.equal(shouldAutoCoachCheck({ origin: 'manual', exercises: [{ name: 'A' }, { name: 'B', note: 'Ist die Reihenfolge ok?' }] }, 1), false);
+  });
+  it('gespeicherter Coach-Check: nur ungültig, wenn sich die Zusammenstellung ändert', () => {
+    // Notiz und Gewicht geändert: bleibt
+    const edited = { ...workout, exercises: workout.exercises.map((e) => ({ ...e, note: 'neu', setDetails: (e.setDetails || []).map((s) => ({ ...s, weight: 99 })) })) };
+    assert.equal(coachCheckInputChanged(workout, edited), false);
+    // Gegenproben: Reihenfolge, Wiederholungen, weitere Übung, anderes Ziel
+    assert.equal(coachCheckInputChanged(workout, { ...workout, exercises: [...workout.exercises].reverse() }), true);
+    assert.equal(coachCheckInputChanged(workout, { ...workout, exercises: [{ ...workout.exercises[0], setDetails: sets(6, 6, 6) }, ...workout.exercises.slice(1)] }), true);
+    assert.equal(coachCheckInputChanged(workout, { ...workout, exercises: [...workout.exercises, { name: 'Dips', setDetails: sets(8) }] }), true);
+    assert.equal(coachCheckInputChanged(workout, { ...workout, goal: 'strength' }), true);
   });
   it('Herkunft: nur feste Werte, alles andere wird null', () => {
     assert.equal(sanitizeWorkoutOrigin('manual'), 'manual');
@@ -49,6 +66,7 @@ describe('Coach-Check: Daten für die KI', () => {
     assert.ok(!data.exercises[1].name.includes('<'));
     assert.equal(data.exercises[2].timed, true);
     assert.ok(!JSON.stringify(data).includes('geheim'));
+    assert.equal(data.total_sets, 3 + 2 + 1);
   });
 });
 
@@ -75,6 +93,12 @@ describe('Coach-Check: Prüfung der KI-Antwort', () => {
     assert.ok(!text.includes('15') && !text.includes('Kniebeugen'));
     assert.equal(sanitizeCoachCheck({ intro: 'Mit 3 Übungen gut.', hints: [] }, data), null);
     assert.equal(sanitizeCoachCheck(null, data), null);
+  });
+  it('Summe der Arbeitssätze darf genannt werden, eine andere Summe nicht', () => {
+    const ok = sanitizeCoachCheck({ intro: 'Solide.', hints: [{ exercise: '', text: 'Mit 6 Arbeitssätzen ist der Umfang eher klein.' }] }, data);
+    assert.ok(ok.includes('6 Arbeitssätzen'));
+    const bad = sanitizeCoachCheck({ intro: 'Solide.', hints: [{ exercise: '', text: 'Mit 24 Arbeitssätzen ist das viel.' }] }, data);
+    assert.equal(bad, 'Solide.');
   });
 });
 
