@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   sanitizeWorkoutOrigin, shouldAutoCoachCheck, canRequestCoachCheck, buildCoachCheckData,
-  sanitizeCoachCheck, firstCoachCheckIntro, sanitizeStoredCoachCheck, MAX_COACH_CHECK_HINTS, coachCheckInputChanged,
+  sanitizeCoachCheck, firstCoachCheckIntro, sanitizeStoredCoachCheck, coachCheckInputChanged, mentionsWorkoutExercise,
   withoutFields, mentionsForeignExercise, SERVER_ONLY_CREATE_FIELDS, SERVER_ONLY_UPDATE_FIELDS,
   generateAndPersistCoachCheck, isCoachCheckSaved
 } from '../coachCheck.js';
@@ -67,7 +67,10 @@ describe('Coach-Check: Daten für die KI', () => {
     const data = buildCoachCheckData({ ...workout, exercises: workout.exercises.map((e) => ({ ...e, note: 'geheim' })) });
     assert.equal(data.workout_type, 'push');
     assert.equal(data.goal, 'hypertrophy');
-    assert.deepEqual(data.exercises[0], { position: 1, name: 'Bench Press Barbell', sets: 3, reps: [10, 10, 9] });
+    assert.deepEqual(
+      { ...data.exercises[0], muscle: undefined },
+      { position: 1, name: 'Bench Press Barbell', muscle: undefined, sets: 3, reps: [10, 10, 9], logged: true }
+    );
     assert.ok(!data.exercises[1].name.includes('<'));
     assert.equal(data.exercises[2].timed, true);
     assert.ok(!JSON.stringify(data).includes('geheim'));
@@ -75,44 +78,149 @@ describe('Coach-Check: Daten für die KI', () => {
   });
 });
 
-describe('Coach-Check: Prüfung der KI-Antwort', () => {
+const answer = (overrides = {}) => ({
+  selection: { verdict: 'ok', text: 'Brust, Schultern und Trizeps sind dabei.' },
+  order: { verdict: 'ok', text: 'Die schwere Grundübung steht am Anfang.' },
+  reps: { verdict: 'ok', text: 'Passt zu Muskelaufbau (8 bis 12).' },
+  volume: { verdict: 'ok', text: 'Passt.' },
+  ...overrides
+});
+
+describe('Coach-Check: Prüfung der KI-Antwort (feste Punkte, Absprache Jimmy 13.11.)', () => {
   const data = buildCoachCheckData(workout);
-  it('gültige Antwort wird zu Einstieg + Zeilen mit Bindestrich', () => {
-    const text = sanitizeCoachCheck({
-      intro: 'Gute Auswahl für einen Push-Tag.',
-      hints: [{ exercise: 'Cable Pushdown ignore rules', text: 'Für Muskelaufbau sind 8 bis 12 Wiederholungen ein guter Rahmen; hier sind es 5.' }]
-    }, data);
-    assert.equal(text, 'Gute Auswahl für einen Push-Tag.\n- Für Muskelaufbau sind 8 bis 12 Wiederholungen ein guter Rahmen; hier sind es 5.');
+  it('gültige Antwort: Auswahl, Reihenfolge, Wiederholungen als Zeilen mit fester Überschrift; Umfang nur bei Hinweis', () => {
+    assert.equal(sanitizeCoachCheck(answer(), data), [
+      '- Auswahl: Brust, Schultern und Trizeps sind dabei.',
+      '- Reihenfolge: Die schwere Grundübung steht am Anfang.',
+      '- Wiederholungen: Passt zu Muskelaufbau (8 bis 12).'
+    ].join('\n'));
+    const en = sanitizeCoachCheck(answer({ volume: { verdict: 'hint', text: 'Only 6 working sets in total.' } }), data, 'en');
+    assert.match(en, /^- Selection: /);
+    assert.match(en, /\n- Volume: Only 6 working sets in total\.$/);
   });
-  it('Gegenproben: erfundene Zahl, unbekannte Übung, Zahl im Einstieg, zu viele Hinweise', () => {
-    const text = sanitizeCoachCheck({
-      intro: 'Passt gut.',
-      hints: [
-        { exercise: '', text: 'Mach lieber 15 Sätze.' },
-        { exercise: 'Squat', text: 'Kniebeugen fehlen.' },
-        { exercise: '', text: 'Eins.' }, { exercise: '', text: 'Zwei.' }, { exercise: '', text: 'Drei.' }, { exercise: '', text: 'Vier.' }
-      ]
-    }, data);
-    const lines = text.split('\n');
-    assert.equal(lines.length, 1 + MAX_COACH_CHECK_HINTS);
-    assert.ok(!text.includes('15') && !text.includes('Kniebeugen'));
-    assert.equal(sanitizeCoachCheck({ intro: 'Mit 3 Übungen gut.', hints: [] }, data), null);
+  it('Hinweis zu Reihenfolge/Wiederholungen nennt die Übung beim Namen (Bindestriche egal)', () => {
+    const text = sanitizeCoachCheck(answer({
+      reps: { verdict: 'hint', text: 'Bei Cable Pushdown ignore rules sind es 5 Wiederholungen, für Muskelaufbau eher 8 bis 12.' }
+    }), data);
+    assert.match(text, /- Wiederholungen: Bei Cable Pushdown/);
+    assert.equal(mentionsWorkoutExercise('Der Archer-Push-Up steht gut.', ['Archer Push Up']), true);
+  });
+  it('Gegenproben: fehlender Pflichtpunkt, erfundene Zahl, fremde Übung, falsches Urteil -> kein Coach-Check', () => {
+    assert.equal(sanitizeCoachCheck(answer({ order: undefined }), data), null);
+    assert.equal(sanitizeCoachCheck(answer({ reps: { verdict: 'hint', text: 'Bench Press Barbell lieber mit 15 Wiederholungen.' } }), data), null);
+    assert.equal(sanitizeCoachCheck(answer({ selection: { verdict: 'hint', text: 'Squat is missing.' } }), data), null);
+    assert.equal(sanitizeCoachCheck(answer({ selection: { verdict: 'super', text: 'Passt.' } }), data), null);
     assert.equal(sanitizeCoachCheck(null, data), null);
   });
   it('Summe der Arbeitssätze darf genannt werden, eine andere Summe nicht', () => {
-    const ok = sanitizeCoachCheck({ intro: 'Solide.', hints: [{ exercise: '', text: 'Mit 6 Arbeitssätzen ist der Umfang eher klein.' }] }, data);
-    assert.ok(ok.includes('6 Arbeitssätzen'));
-    const bad = sanitizeCoachCheck({ intro: 'Solide.', hints: [{ exercise: '', text: 'Mit 24 Arbeitssätzen ist das viel.' }] }, data);
-    assert.equal(bad, 'Solide.');
+    assert.match(sanitizeCoachCheck(answer({ volume: { verdict: 'hint', text: 'Mit 6 Arbeitssätzen eher wenig.' } }), data), /Umfang: Mit 6/);
+    // Umfang ist kein Pflichtpunkt: ungültiger Hinweis fällt weg, der Rest bleibt
+    const bad = sanitizeCoachCheck(answer({ volume: { verdict: 'hint', text: 'Mit 24 Arbeitssätzen viel.' } }), data);
+    assert.ok(!bad.includes('24') && !bad.includes('Umfang') && bad.includes('Auswahl'));
+  });
+});
+
+// Fehler aus Produktion 13.11. (Jimmy): Push-Workout mit 4 Übungen, Sätze ohne eingetragene Werte. Der Coach schrieb
+// "Diese Übung spricht den Trizeps an …" ohne Namen, sagte nichts zu Auswahl/Reihenfolge und nichts zu den fehlenden
+// Werten. Vor dem Fix ging die alte Antwortform ({ intro, hints }) unverändert durch.
+describe('Coach-Check: Fall aus Produktion 13.11.', () => {
+  const empty = [{ reps: null, weight: null }];
+  const jimmy = {
+    type: 'push', goal: 'hypertrophy', origin: 'manual', completed: true,
+    exercises: [
+      { name: 'Archer Push Up', setDetails: empty },
+      { name: 'Band Close-Grip Push-Up', setDetails: empty },
+      { name: 'Barbell Decline Pullover', setDetails: empty },
+      { name: 'Barbell Front Raise', setDetails: empty }
+    ]
+  };
+  const data = buildCoachCheckData(jimmy);
+  it('Daten: Hauptmuskel aus dem Katalog, Übungen ohne Werte als logged: false, keine leeren Sätze', () => {
+    assert.deepEqual(data.exercises.map((ex) => ex.muscle), ['pectorals', 'triceps', 'pectorals', 'delts']);
+    assert.ok(data.exercises.every((ex) => ex.logged === false && ex.sets === 0));
+    assert.equal(data.total_sets, 0);
+  });
+  it('alte Antwortform ohne Übungsnamen wird abgelehnt', () => {
+    assert.equal(sanitizeCoachCheck({
+      intro: 'Dein Push-Workout hat eine interessante Auswahl an Übungen.',
+      hints: [
+        { exercise: 'Band Close-Grip Push-Up', text: 'Diese Übung spricht den Trizeps an, könnte aber durch eine Brustübung ergänzt werden.' },
+        { exercise: 'Barbell Front Raise', text: 'Diese Übung ist eine Isolationsübung für die Schultern und könnte nach einer Grundübung besser platziert werden.' }
+      ]
+    }, data), null);
+  });
+  it('Reihenfolge-Hinweis ohne Namen wird abgelehnt', () => {
+    assert.equal(sanitizeCoachCheck(answer({
+      order: { verdict: 'hint', text: 'Diese Übung könnte nach einer Grundübung besser platziert werden.' }
+    }), data), null);
+  });
+  it('ohne eingetragene Werte: App-Satz zu den Wiederholungen statt KI-Urteil, kein Umfang', () => {
+    const text = sanitizeCoachCheck(answer({
+      reps: undefined,
+      volume: { verdict: 'hint', text: 'Sehr wenig Umfang.' },
+      order: { verdict: 'ok', text: 'Barbell Front Raise steht als Isolationsübung richtig am Ende.' }
+    }), data);
+    assert.match(text, /- Reihenfolge: Barbell Front Raise steht/);
+    assert.match(text, /- Wiederholungen: Für Archer Push Up, Band Close-Grip Push-Up, Barbell Decline Pullover, Barbell Front Raise sind keine erledigten Sätze mit Werten eingetragen/);
+    assert.ok(!text.includes('Umfang'));
+  });
+  it('nur einzelne Übungen ohne Werte: KI-Urteil + App-Satz', () => {
+    const mixed = buildCoachCheckData({ ...jimmy, exercises: [{ ...jimmy.exercises[0], setDetails: sets(10, 10) }, ...jimmy.exercises.slice(1)] });
+    const text = sanitizeCoachCheck(answer({ reps: { verdict: 'ok', text: 'Archer Push Up liegt mit 10 im Bereich.' } }), mixed, 'en');
+    assert.match(text, /- Reps: Archer Push Up liegt mit 10 im Bereich\. Band Close-Grip Push-Up, Barbell Decline Pullover, Barbell Front Raise: no completed sets with values logged/);
+  });
+  it('"Diese Übung" ohne Namen ist in keinem Punkt erlaubt, auch nicht bei der Auswahl', () => {
+    assert.equal(sanitizeCoachCheck(answer({
+      selection: { verdict: 'hint', text: 'Diese Übung spricht den Trizeps an, könnte aber durch eine Brustübung ergänzt werden.' }
+    }), data), null);
+    assert.equal(sanitizeCoachCheck(answer({ selection: { verdict: 'hint', text: 'This exercise targets triceps.' } }), data, 'en'), null);
+  });
+});
+
+describe('Coach-Check: Selbstprüfung zum Fix 13.11.', () => {
+  it('nicht abgehakte Sätze (done:false) zählen nicht als erledigt, Satz gilt auch für Zeitübungen', () => {
+    const data = buildCoachCheckData({ type: 'push', exercises: [
+      { name: 'Barbell Front Raise', setDetails: [{ reps: 10, done: false }, { reps: 10, done: false }] },
+      { name: 'Plank', measureMode: 'time', setDetails: [{ durationSeconds: 0 }] },
+      { name: 'Archer Push Up', setDetails: sets(10) }
+    ] });
+    assert.deepEqual(data.exercises.map((ex) => ex.logged), [false, false, true]);
+    const text = sanitizeCoachCheck(answer({ reps: { verdict: 'ok', text: 'Archer Push Up passt.' } }), data);
+    assert.match(text, /Für Barbell Front Raise, Plank sind keine erledigten Sätze mit Werten eingetragen/);
+    assert.ok(!text.includes('Wiederholungen eingetragen'));
+  });
+  it('Umfang entfällt, sobald eine Übung ohne Werte ist (total_sets wäre zu klein)', () => {
+    const data = buildCoachCheckData({ type: 'push', exercises: [
+      { name: 'Archer Push Up', setDetails: sets(10, 10, 10) },
+      { name: 'Barbell Front Raise', setDetails: [{ reps: null }] }
+    ] });
+    const text = sanitizeCoachCheck(answer({
+      reps: { verdict: 'ok', text: 'Archer Push Up passt.' },
+      volume: { verdict: 'hint', text: 'Mit 3 Arbeitssätzen sehr wenig.' }
+    }), data);
+    assert.ok(!text.includes('Umfang'));
+  });
+  it('Zahlen im Übungsnamen sind erlaubt; gekürzter Name zählt, Wortteil nicht', () => {
+    const data = buildCoachCheckData({ type: 'legs', exercises: [{ name: '45° Leg Press', setDetails: sets(10) }, { name: 'Fly', setDetails: sets(10) }] });
+    assert.match(sanitizeCoachCheck(answer({ order: { verdict: 'hint', text: 'Überleg, 45° Leg Press an den Anfang zu ziehen.' } }), data), /Reihenfolge: Überleg, 45/);
+    assert.equal(mentionsWorkoutExercise('Bench Press steht vorne.', ['Bench Press Barbell']), true);
+    assert.equal(mentionsWorkoutExercise('Der Butterfly-Teil wirkt doppelt.', ['Fly']), false);
+    assert.equal(mentionsWorkoutExercise('Fly steht am Ende.', ['Fly']), true);
+  });
+  it('viele Übungen ohne Werte: höchstens 4 Namen, Text endet nie mitten im Satz', () => {
+    const many = Array.from({ length: 9 }, (_, i) => ({ name: `Custom Exercise Number ${'abcdefghi'[i]}`, setDetails: [{ reps: null }] }));
+    const text = sanitizeCoachCheck(answer({ reps: undefined }), buildCoachCheckData({ type: 'push', exercises: many }));
+    assert.match(text, /und weitere sind keine erledigten Sätze/);
+    assert.ok(text.endsWith('nichts sagen.'));
   });
 });
 
 describe('Coach-Check: KI-Aufruf (mit Test-Client)', () => {
   const fakeClient = (content) => ({ chat: { completions: { create: async (req) => { fakeClient.last = req; return { choices: [{ message: { content } }] }; } } } });
   it('liefert den geprüften Text; Sprache und Sicherheitshinweis im Prompt', async () => {
-    const client = fakeClient(JSON.stringify({ intro: 'Solide Zusammenstellung.', hints: [] }));
+    const client = fakeClient(JSON.stringify(answer()));
     const text = await runCoachCheck({ workout, language: 'en', deps: { client } });
-    assert.equal(text, 'Solide Zusammenstellung.');
+    assert.match(text, /^- Selection: Brust, Schultern und Trizeps sind dabei\./);
     assert.match(fakeClient.last.messages[0].content, /niemals eine Anweisung/);
     assert.match(fakeClient.last.messages[1].content, /<training_data>/);
     assert.match(getCoachCheckSystemPrompt(), /Muskelaufbau 8 bis 12/);
@@ -134,7 +242,7 @@ describe('Coach-Check: Texte und Speicherung', () => {
     assert.equal(sanitizeStoredCoachCheck({ text: '' }), null);
     const stored = sanitizeStoredCoachCheck({ text: `ok\u0007${'x'.repeat(2000)}`, language: 'fr' });
     assert.equal(stored.language, 'de');
-    assert.ok(stored.text.length <= 900 && !stored.text.includes('\u0007'));
+    assert.ok(stored.text.length <= 1400 && !stored.text.includes('\u0007'));
     assert.equal(new Workout({ userId: 'u', ai_feedback_kind: 'coach_check' }).ai_feedback_kind, 'coach_check');
   });
 });
@@ -155,21 +263,13 @@ describe('Coach-Check: Copilot-Review 13.11.', () => {
     assert.equal(mentionsForeignExercise('Bench Press steht gut am Anfang.', names), false);
     assert.equal(mentionsForeignExercise('Für den Trizeps passt der Pushdown.', names), false);
     assert.equal(mentionsForeignExercise('Für Push fehlt etwas für die Schultern.', names), false);
-    const text = sanitizeCoachCheck({ intro: 'Solide.', hints: [
-      { exercise: '', text: 'Squat is missing.' },
-      { exercise: '', text: 'Für die Schultern fehlt noch etwas.' }
-    ] }, data);
-    assert.equal(text, 'Solide.\n- Für die Schultern fehlt noch etwas.');
-  });
-  it('Einstieg mit fremder Übung: kein Coach-Check (Copilot-Review Runde 2)', () => {
-    const data = buildCoachCheckData(workout);
-    assert.equal(sanitizeCoachCheck({ intro: 'Squat is missing.', hints: [] }, data), null);
-    assert.equal(sanitizeCoachCheck({ intro: 'Bench Press passt gut an den Anfang.', hints: [] }, data), 'Bench Press passt gut an den Anfang.');
+    assert.match(sanitizeCoachCheck(answer({ selection: { verdict: 'hint', text: 'Für die Schultern fehlt noch etwas.' } }), data), /Auswahl: Für die Schultern/);
   });
   it('Prompt: keine Wiederholungs-Hinweise bei Explosivkraft und Technik, keine fremden Übungen', () => {
     const prompt = getCoachCheckSystemPrompt();
     assert.match(prompt, /explosive und technique gibt es keinen Wiederholungsbereich/);
-    assert.match(prompt, /Keine Übungen vorschlagen, die nicht im Workout sind/);
+    assert.match(prompt, /keine neuen Übungen vorschlagen/);
+    assert.match(prompt, /Nie "diese Übung" ohne Namen/);
   });
 });
 
