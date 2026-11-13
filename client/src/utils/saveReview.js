@@ -127,10 +127,41 @@ export function markOpenSetsNotDone(setDetails = []) {
   ))
 }
 
-/** Markiert alle Arbeitssätze als gemacht (Aufwärmsätze bleiben ohne Haken). */
+const setHasValues = (set) => Number(set?.reps) > 0 || Number(set?.durationSeconds) > 0
+
+/**
+ * "Alle abhaken und speichern": hakt alle Arbeitssätze MIT eingetragenen Werten ab. Leere Sätze bleiben offen und
+ * werden beim Speichern zu "nicht gemacht" - sonst stünden Sätze ohne Werte als gemacht in Statistik und Feedback
+ * (Selbstprüfung 13.11., der Knopf ist jetzt der Hauptweg). Aufwärmsätze bleiben ohne Haken.
+ */
 export function markAllSetsDone(exercises = []) {
   return (Array.isArray(exercises) ? exercises : []).map((ex) => ({
     ...ex,
-    setDetails: (Array.isArray(ex?.setDetails) ? ex.setDetails : []).map((set) => (set?.isWarmup ? set : { ...set, done: true }))
+    setDetails: (Array.isArray(ex?.setDetails) ? ex.setDetails : [])
+      .map((set) => (set?.isWarmup || !setHasValues(set) ? set : { ...set, done: true }))
   }))
+}
+
+/**
+ * Was die Knöpfe im "Kurz prüfen"-Fenster tun (Absprache Jimmy 13.11.). Eine Stelle für Texte UND Aktionen, damit
+ * Beschriftung und Verhalten nicht auseinanderlaufen.
+ *   primary: Hauptknopf, secondary: zweiter Knopf, extra: Link darunter; dismiss (✕, daneben, Escape) speichert nie.
+ *   Aktionen: 'markAllAndSave' | 'save' | 'back'
+ */
+export function saveReviewActions(hasOpenSets) {
+  return hasOpenSets
+    ? {
+        primary: { textKey: 'workoutDetail.reviewMarkAllDone', action: 'markAllAndSave' },
+        secondary: { textKey: 'workoutDetail.reviewSaveAsIs', action: 'save' },
+        extra: { textKey: 'workoutDetail.reviewBackToWorkout', action: 'back' },
+        stacked: true,
+        showHint: true
+      }
+    : {
+        primary: { textKey: 'workoutDetail.reviewSaveAnyway', action: 'save' },
+        secondary: { textKey: 'workoutDetail.reviewBack', action: 'back' },
+        extra: null,
+        stacked: false,
+        showHint: false
+      }
 }

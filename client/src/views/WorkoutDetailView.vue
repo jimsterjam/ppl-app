@@ -764,13 +764,18 @@
     <AppModal
       v-model="showSaveReviewModal"
       :title="t('workoutDetail.reviewTitle')"
-      :confirm-text="t('workoutDetail.reviewSaveAnyway')"
-      :cancel-text="t('workoutDetail.reviewBack')"
-      :extra-text="saveReview.hasOpenSets ? t('workoutDetail.reviewMarkAllDone') : ''"
+      :confirm-text="t(reviewActions.primary.textKey)"
+      :cancel-text="t(reviewActions.secondary.textKey)"
+      :extra-text="reviewActions.extra ? t(reviewActions.extra.textKey) : ''"
+      dismiss-separately
+      :stacked-actions="reviewActions.stacked"
       type="warning"
-      @confirm="onReviewConfirm"
-      @extra="onReviewMarkAllDone"
+      @confirm="runReviewAction(reviewActions.primary.action)"
+      @cancel="runReviewAction(reviewActions.secondary.action)"
     >
+      <!-- Offene Sätze (Absprache Jimmy 13.11.): "Alle abhaken und speichern" als Hauptknopf statt kleinem Link,
+           darüber kurz, was nicht abgehakte Sätze bedeuten. ✕/daneben/"Zurück zum Workout" = zurück, nichts gespeichert. -->
+      <p v-if="reviewActions.showHint" class="review-open-hint">{{ t('workoutDetail.reviewOpenSetsHint') }}</p>
       <div v-if="saveReview.forgotten.length" class="review-group">
         <div class="review-group-title">{{ t('workoutDetail.reviewForgotten') }}</div>
         <button
@@ -1153,7 +1158,7 @@ import FocusMode from '@/components/FocusMode.vue'
 import { undoRestSet, findRowPosition } from '@/utils/undoRestSet'
 import { useFocusModeStore } from '@/stores/focusModeStore'
 import { createFocusStateTracker, applyFocusState } from '@/utils/focusStatePersistence'
-import { buildSaveReview, markAllSetsDone } from '@/utils/saveReview'
+import { buildSaveReview, markAllSetsDone, saveReviewActions } from '@/utils/saveReview'
 import { isExerciseNotDone } from '@/utils/notDoneExercises'
 import { showsReps, showsTime, showsWeight, sanitizeMeasureMode, DURATION_MAX_SECONDS, DURATION_STEP_SECONDS } from '@/utils/measureMode'
 import {
@@ -2034,6 +2039,14 @@ function proceedAfterReview() {
 // Speichern, wie es ist: Nicht Abgehaktes bleibt erhalten und wird als "nicht gemacht" gespeichert (nichts wird entfernt).
 function onReviewConfirm() {
   proceedAfterReview()
+}
+
+// Knöpfe im "Kurz prüfen"-Fenster: Texte und Aktionen aus utils/saveReview.js (saveReviewActions). 'back' schließt
+// nur (macht AppModal selbst); ✕/daneben/Escape melden 'dismiss' und speichern nie.
+const reviewActions = computed(() => saveReviewActions(saveReview.value.hasOpenSets))
+function runReviewAction(action) {
+  if (action === 'markAllAndSave') onReviewMarkAllDone()
+  else if (action === 'save') onReviewConfirm()
 }
 
 function onReviewMarkAllDone() {
@@ -5474,6 +5487,7 @@ onBeforeUnmount(() => {
   font-size: 0.95rem;
 }
 /* "Kurz prüfen"-Fenster (Slot-Inhalt von AppModal). */
+.review-open-hint { margin: 0 0 12px; font-size: 0.9rem; line-height: 1.4; color: var(--fg); }
 .review-group + .review-group { margin-top: 14px; }
 .review-group-title {
   font-size: 0.72rem;

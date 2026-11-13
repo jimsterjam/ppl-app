@@ -61,3 +61,24 @@ describe('AppModal: dismissSeparately', () => {
     w.unmount()
   })
 })
+
+// "Kurz prüfen" mit offenen Sätzen (Absprache Jimmy 13.11.): Knöpfe untereinander, Hauptknopf oben, nicht als Link
+describe('AppModal: stackedActions', () => {
+  const mountModal = (props) =>
+    mount(AppModal, { props: { modelValue: true, title: 'T', confirmText: 'Alle abhaken', cancelText: 'So speichern', ...props }, global: { plugins: [createI18nInstance()], stubs: { teleport: true } } })
+
+  it('Bestätigen steht im DOM zuerst (Anzeige oben = Lese-/Tab-Reihenfolge); Lage oben im Browser geprüft', async () => {
+    const w = mountModal({ stackedActions: true })
+    const actions = w.find('.modal-actions')
+    expect(actions.classes()).toContain('actions-stacked')
+    const buttons = actions.findAll('button')
+    expect(buttons.map((b) => b.text())).toEqual(['Alle abhaken', 'So speichern'])
+    w.unmount()
+  })
+
+  it('Gegenprobe: ohne die Angabe nebeneinander wie bisher', async () => {
+    const w = mountModal({})
+    expect(w.find('.modal-actions').classes()).not.toContain('actions-stacked')
+    w.unmount()
+  })
+})
