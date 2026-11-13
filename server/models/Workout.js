@@ -206,7 +206,7 @@ const workoutSchema = new mongoose.Schema({
   ai_coach_check: {
     type: {
       _id: false,
-      text: { type: String, maxlength: 900 },
+      text: { type: String, maxlength: 1400 },
       language: { type: String },
       generated_at: { type: Date }
     },

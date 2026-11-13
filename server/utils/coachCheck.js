@@ -10,10 +10,11 @@
 import { resolveEnglishExerciseName } from './feedbackLocalization.js';
 import { safeExerciseName } from './noteQuestionData.js';
 import { clampText } from './textLimits.js';
+import { findCatalogEntryForName } from './catalogMatch.js';
+import exerciseList from '../data/exercises.js';
 
 export const WORKOUT_ORIGINS = Object.freeze(['manual', 'generated', 'favorite', 'plan']);
-export const MAX_COACH_CHECK_HINTS = 3;
-export const MAX_COACH_CHECK_TEXT = 900;
+export const MAX_COACH_CHECK_TEXT = 1400;
 // Länger als die längste Anfrage (Client wartet bis 150 s, siehe client/src/utils/feedbackRetryRules.js)
 export const COACH_CHECK_LOCK_MS = 3 * 60 * 1000;
 // Felder, die nur der Server setzt - aus POST/PUT-Bodys entfernen. origin nur beim Anlegen (POST), nie beim Bearbeiten:
@@ -62,21 +63,36 @@ export function coachCheckInputChanged(before, after) {
   return JSON.stringify(buildCoachCheckData(before)) !== JSON.stringify(buildCoachCheckData(after));
 }
 
+// Hauptmuskel laut Katalog (englisch, z. B. "pectorals") - damit die KI die Auswahl nicht raten muss (Fund 13.11.:
+// Archer Push Up galt als reine Trizeps-Übung, obwohl sie die Brust trainiert). Eigene Übungen: keine Angabe.
+function targetMuscle(name) {
+  const entry = findCatalogEntryForName(exerciseList, name);
+  const muscle = String(entry?.muscleGroup_en || entry?.target || '').trim().toLowerCase();
+  return /^[a-z ]{2,30}$/.test(muscle) ? muscle : '';
+}
+
+const setHasData = (s) => Number(s?.reps) > 0 || Number(s?.durationSeconds) > 0 || Number(s?.duration) > 0;
+
 /**
- * Begrenzter Datensatz für die KI: Übungen in Reihenfolge mit englischem Namen, Arbeitssätzen und Wiederholungen.
- * Keine Notizen, keine Freitexte außer dem gekürzten, neutralisierten Übungsnamen.
+ * Begrenzter Datensatz für die KI: Übungen in Reihenfolge mit englischem Namen, Hauptmuskel, Arbeitssätzen und
+ * Wiederholungen. Sätze ohne eingetragene Werte zählen nicht; eine Übung ganz ohne Werte bekommt logged: false (dazu
+ * schreibt die App selbst einen Satz, Fund 13.11.). Keine Notizen, keine Freitexte außer dem neutralisierten Namen.
  */
 export function buildCoachCheckData(workout) {
   const exercises = (Array.isArray(workout?.exercises) ? workout.exercises : []).map((ex, index) => {
-    const working = (Array.isArray(ex?.setDetails) ? ex.setDetails : []).filter((s) => s && !s.isWarmup && s.done !== false);
+    const working = (Array.isArray(ex?.setDetails) ? ex.setDetails : [])
+      .filter((s) => s && !s.isWarmup && s.done !== false && setHasData(s));
     const reps = working.map((s) => Number(s.reps)).filter((n) => Number.isFinite(n) && n > 0);
     const timed = ex?.measureMode === 'time' || ex?.measureMode === 'repsTime';
+    const muscle = targetMuscle(ex?.name);
     return {
       position: index + 1,
       name: safeExerciseName(resolveEnglishExerciseName(ex?.name)),
+      ...(muscle ? { muscle } : {}),
       sets: working.length,
       ...(reps.length ? { reps } : {}),
-      ...(timed ? { timed: true } : {})
+      ...(timed ? { timed: true } : {}),
+      logged: working.length > 0
     };
   }).filter((ex) => ex.name);
   return {
@@ -158,30 +174,84 @@ export function mentionsForeignExercise(text, exerciseNames) {
     pattern.test(text) && !names.some((name) => pattern.test(name) || name.includes(word)));
 }
 
+const SECTIONS = ['selection', 'order', 'reps', 'volume'];
+const SECTION_LABELS = {
+  de: { selection: 'Auswahl', order: 'Reihenfolge', reps: 'Wiederholungen', volume: 'Umfang' },
+  en: { selection: 'Selection', order: 'Order', reps: 'Reps', volume: 'Volume' }
+};
+// Diese Punkte muss die KI immer beantworten (Absprache Jimmy 13.11.: feste Punkte statt "nur Auffälliges")
+const REQUIRED_SECTIONS = ['selection', 'order', 'reps'];
+// Hinweise zu diesen Punkten müssen eine Übung aus dem Workout beim Namen nennen (kein "Diese Übung …", Fund 13.11.)
+const NAME_REQUIRED_SECTIONS = new Set(['order', 'reps']);
+
+const UNLOGGED = {
+  de: (names) => `Für ${names} sind keine Wiederholungen eingetragen. Trag sie beim nächsten Mal ein, dann kann der Coach sie einordnen.`,
+  en: (names) => `No reps logged for ${names}. Log them next time so the coach can assess them.`
+};
+
+const normalizeName = (value) => String(value ?? '').toLowerCase().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+
+/** Nennt der Text mindestens eine Übung aus dem Workout? (Bindestriche/Leerzeichen egal) */
+export function mentionsWorkoutExercise(text, exerciseNames) {
+  const haystack = normalizeName(text);
+  return (exerciseNames || []).some((name) => {
+    const needle = normalizeName(name);
+    return needle.length > 0 && haystack.includes(needle);
+  });
+}
+
 /**
- * Antwort der KI prüfen: Einstieg ohne Zahlen, höchstens MAX_COACH_CHECK_HINTS Hinweise, nur erlaubte Zahlen, genannte
- * Übungen müssen im Workout vorkommen. Ungültige Hinweise fallen weg; ohne gültigen Einstieg gibt es keinen Text.
- * @returns {string|null} fertiger Text (Einstieg + Zeilen mit Bindestrich) oder null
+ * Antwort der KI prüfen und als feste Punkte zusammensetzen (Absprache Jimmy 13.11.):
+ *   - Auswahl, Reihenfolge, Wiederholungen müssen da sein (Urteil "ok" oder "hint" + ein Satz), Umfang nur bei "hint";
+ *   - nur erlaubte Zahlen, keine fremden Übungen, Hinweise zu Reihenfolge/Wiederholungen nennen eine Übung beim Namen;
+ *   - Übungen ohne eingetragene Werte: Die App schreibt den Satz zu den Wiederholungen selbst.
+ * Fehlt ein Pflichtpunkt oder ist er ungültig, gibt es keinen Coach-Check (null, dann normale Erste Einordnung).
+ * @returns {string|null} Zeilen "- Auswahl: …" usw.
  */
-export function sanitizeCoachCheck(raw, data) {
+export function sanitizeCoachCheck(raw, data, language = 'de') {
   if (!raw || typeof raw !== 'object') return null;
+  const lang = language === 'en' ? 'en' : 'de';
   const allowed = allowedCoachCheckNumbers(data);
-  const names = (data?.exercises || []).map((ex) => ex.name.toLowerCase());
-  const intro = cleanLine(raw.intro);
-  if (!intro || numbersIn(intro).length || mentionsForeignExercise(intro, names)) return null;
-  const hints = [];
-  for (const entry of Array.isArray(raw.hints) ? raw.hints : []) {
-    if (hints.length >= MAX_COACH_CHECK_HINTS) break;
-    const text = cleanLine(typeof entry === 'string' ? entry : entry?.text);
-    if (!text) continue;
-    if (!numbersIn(text).every((n) => allowed.has(n))) continue;
-    const exercise = cleanLine(entry?.exercise).toLowerCase();
-    if (exercise && !names.includes(exercise)) continue;
-    if (mentionsForeignExercise(text, names)) continue;
-    hints.push(text);
+  const exercises = data?.exercises || [];
+  const names = exercises.map((ex) => ex.name);
+  const lowerNames = names.map((n) => n.toLowerCase());
+  const unlogged = exercises.filter((ex) => ex.logged === false).map((ex) => ex.name);
+  const noneLogged = exercises.length > 0 && unlogged.length === exercises.length;
+
+  const section = (key) => {
+    const entry = raw[key];
+    if (!entry || typeof entry !== 'object') return null;
+    const verdict = entry.verdict === 'hint' ? 'hint' : entry.verdict === 'ok' ? 'ok' : null;
+    const text = cleanLine(entry.text);
+    if (!verdict || !text) return null;
+    if (!numbersIn(text).every((n) => allowed.has(n))) return null;
+    if (mentionsForeignExercise(text, lowerNames)) return null;
+    if (verdict === 'hint' && NAME_REQUIRED_SECTIONS.has(key) && !mentionsWorkoutExercise(text, names)) return null;
+    return { verdict, text };
+  };
+
+  const result = {};
+  for (const key of SECTIONS) result[key] = section(key);
+  // Ohne eingetragene Werte gibt es zu Wiederholungen und Umfang nichts einzuordnen
+  if (noneLogged) {
+    result.reps = null;
+    result.volume = null;
   }
-  const lines = [intro, ...hints.map((h) => `- ${h}`)];
-  return lines.join('\n').slice(0, MAX_COACH_CHECK_TEXT);
+  for (const key of REQUIRED_SECTIONS) {
+    if (key === 'reps' && noneLogged) continue;
+    if (!result[key]) return null;
+  }
+  if (unlogged.length) {
+    const sentence = UNLOGGED[lang](unlogged.join(', '));
+    result.reps = { verdict: 'hint', text: result.reps ? `${result.reps.text} ${sentence}` : sentence };
+  }
+
+  const labels = SECTION_LABELS[lang];
+  return SECTIONS
+    .filter((key) => result[key] && (key !== 'volume' || result[key].verdict === 'hint'))
+    .map((key) => `- ${labels[key]}: ${result[key].text}`)
+    .join('\n')
+    .slice(0, MAX_COACH_CHECK_TEXT);
 }
 
 const FIRST_INTRO = {
