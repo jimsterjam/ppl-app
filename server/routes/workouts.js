@@ -71,6 +71,7 @@ import {
 import { z } from 'zod';
 import {
   shouldAutoCoachCheck, canRequestCoachCheck, firstCoachCheckIntro, coachCheckInputChanged, withoutFields,
+  workoutHasLoggedSets, HAS_LOGGED_SETS_QUERY,
   generateAndPersistCoachCheck, isCoachCheckSaved,
   SERVER_ONLY_CREATE_FIELDS, SERVER_ONLY_UPDATE_FIELDS, COACH_CHECK_LOCK_MS
 } from '../utils/coachCheck.js';
@@ -1103,11 +1104,12 @@ router.get("/feedbacks", firebaseAuthMiddleware, async (req, res) => {
     // models/Workout.js). Diese haben noch kein ai_feedback, sollen aber trotzdem in dieser
     // Liste auftauchen, damit der Nutzer sie über den "Jetzt generieren"-Button (siehe
     // AIFeedbackHistory.vue) wiederfindet.
+    // Offene Einträge nur mit erledigten Sätzen mit Werten - ohne Werte gibt es kein Feedback (Absprache Jimmy 13.11.)
     const query = {
       userId,
       $or: [
         { ai_feedback: { $exists: true, $ne: null } },
-        { ai_feedback_status: { $in: ['deferred', 'pending'] } }
+        { $and: [{ ai_feedback_status: { $in: ['deferred', 'pending'] } }, HAS_LOGGED_SETS_QUERY] }
       ]
     };
 
@@ -2068,6 +2070,20 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
       });
     }
 
+    // 1b'. Ohne erledigte Sätze mit Werten kein KI-Feedback (Absprache Jimmy 13.11.): nichts einzuordnen, kein Platz im
+    // Kontingent. Der Status bleibt unverändert: Kommen die Werte später (Offline-Sync eines PUT), lässt sich das
+    // Feedback noch erzeugen. Der Feedback-Verlauf blendet solche Einträge aus (HAS_LOGGED_SETS_QUERY in GET /feedbacks).
+    if (!workoutHasLoggedSets(currentWorkout)) {
+      logger.info('📭 Workout analysis: keine Sätze mit Werten - kein Feedback', { requestId, workoutId });
+      return res.json({
+        success: true,
+        workoutId: currentWorkout._id,
+        workoutDate: currentWorkout.date,
+        feedback_status: 'no_data',
+        metadata: { requestId, timestamp: new Date().toISOString(), aiAvailable: false }
+      });
+    }
+
     // 1c. Free-Plan-Kontingent (siehe AI_QUOTA_CONFIG oben) - bisher wurde dieser
     // Haupt-Feedback-Endpoint als einziger der drei AI-Endpunkte NICHT gegen das Kontingent
     // geprüft (bekannte Lücke, siehe TESTPHASE-TESTMATRIX.md Blocker #3). Direkt nach dem
@@ -2729,6 +2745,9 @@ router.post("/:id/coach-check", firebaseAuthMiddleware, requireAiConsent, async 
     if (!workout) return res.status(404).json({ error: 'Workout not found', requestId });
     if (!canRequestCoachCheck(workout)) {
       return res.status(400).json({ error: 'Coach check only for completed, self-built workouts', code: 'COACH_CHECK_NOT_AVAILABLE', requestId });
+    }
+    if (!workoutHasLoggedSets(workout)) {
+      return res.status(400).json({ error: 'No completed sets with values', code: 'COACH_CHECK_NO_DATA', requestId });
     }
     if (workout.ai_coach_check?.text) {
       return res.json({ success: true, coach_check: workout.ai_coach_check, cached: true, requestId });

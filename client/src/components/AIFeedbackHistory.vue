@@ -266,7 +266,10 @@ async function requestCoachCheckFor(item) {
     if (code === 'AI_CONSENT_REQUIRED') aiConsent.noteServerRefusal()
     if (code === 'AI_QUOTA_EXHAUSTED' && err?.response?.data?.aiUsage) subscriptionStore.applyAiUsageSnapshot(err.response.data.aiUsage)
     coachCheckError.value = item.workoutId
-    toast.show(code === 'AI_QUOTA_EXHAUSTED' ? t('feedbackHistory.coachCheckQuota') : t('feedbackHistory.coachCheckError'), { type: 'warning', duration: 3500 })
+    const message = code === 'AI_QUOTA_EXHAUSTED'
+      ? t('feedbackHistory.coachCheckQuota')
+      : code === 'COACH_CHECK_NO_DATA' ? t('postWorkout.noDataFeedback') : t('feedbackHistory.coachCheckError')
+    toast.show(message, { type: 'warning', duration: 3500 })
     logDiagnostic('coach-check', { workoutId: item.workoutId, outcome: 'error', code: code || null })
   } finally {
     coachCheckingId.value = null
@@ -324,6 +327,14 @@ async function generateNow(item) {
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent(AI_FEEDBACK_UPDATED_EVENT, { detail: { workoutId: item.workoutId } }))
       }
+    } else if (data?.feedback_status === 'no_data') {
+      // Keine erledigten Sätze mit Werten: es gibt kein Feedback - Eintrag aus der Liste nehmen (der Server listet ihn
+      // ebenfalls nicht mehr, solange keine Werte da sind)
+      items.value = items.value.filter((entry) => entry !== item)
+      // Auch im Zwischenspeicher, sonst taucht der Eintrag offline wieder auf (wie beim Löschen, Copilot-Review #185)
+      cacheFirstPage(items.value.slice(0, FEEDBACK_PAGE_SIZE), hasMore.value)
+      toast.show(t('postWorkout.noDataFeedback'), { type: 'info', duration: 4000 })
+      logDiagnostic('feedback-history-generate-now', { workoutId: item.workoutId, outcome: 'no_data' })
     } else if (data?.feedback_status === 'insufficient_history') {
       // Bleibt "ausstehend" (kein Fehler) - nur noch nicht genug Trainingshistorie für eine
       // wertende Analyse. Gleicher Hinweistext wie in PostWorkoutSummary.vue.

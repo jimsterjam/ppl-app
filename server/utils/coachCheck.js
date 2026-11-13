@@ -71,20 +71,115 @@ function targetMuscle(name) {
   return /^[a-z ]{2,30}$/.test(muscle) ? muscle : '';
 }
 
-const setHasData = (s) => Number(s?.reps) > 0 || Number(s?.durationSeconds) > 0 || Number(s?.duration) > 0;
+// Gleich wie HAS_LOGGED_SETS_QUERY (setDetails kennt nur reps und durationSeconds, siehe models/Workout.js)
+const setHasData = (s) => Number(s?.reps) > 0 || Number(s?.durationSeconds) > 0;
+const isLoggedSet = (s) => s && !s.isWarmup && s.done !== false && setHasData(s);
+const isLegacyExercise = (ex) => !Array.isArray(ex?.setDetails);
+
+/**
+ * Hat das Workout mindestens einen erledigten Arbeitssatz mit Werten? Ohne gibt es kein KI-Feedback (Absprache Jimmy
+ * 13.11.: "Ohne eingetragene Werte kein Feedback") - weder Coach-Check noch Erste Einordnung oder Vergleich.
+ */
+export function workoutHasLoggedSets(workout) {
+  return (Array.isArray(workout?.exercises) ? workout.exercises : []).some((ex) => {
+    // Älteres Format: Feld setDetails fehlt ganz, Sätze/Wiederholungen stehen an der Übung. Eine LEERE Liste ist das
+    // heutige Format ohne Sätze - die Ersatzwerte an der Übung (z. B. reps 10) zählen dann nicht (Copilot-Review #185).
+    if (isLegacyExercise(ex)) return Number(ex?.reps) > 0 || Number(ex?.sets) > 0;
+    return ex.setDetails.some(isLoggedSet);
+  });
+}
+
+/**
+ * Dieselbe Bedingung als MongoDB-Abfrage (Feedback-Verlauf): offene Einträge ohne Werte gar nicht erst listen.
+ * Kein Status wird geändert - kommen die Werte später (Offline-Sync), ist der Eintrag wieder da.
+ */
+export const HAS_LOGGED_SETS_QUERY = Object.freeze({
+  $or: [
+    { exercises: { $elemMatch: { setDetails: { $elemMatch: {
+      isWarmup: { $ne: true }, done: { $ne: false },
+      $or: [{ reps: { $gt: 0 } }, { durationSeconds: { $gt: 0 } }]
+    } } } } },
+    { exercises: { $elemMatch: { setDetails: { $exists: false }, $or: [{ reps: { $gt: 0 } }, { sets: { $gt: 0 } }] } } }
+  ]
+});
+
+// Katalog-Muskeln (englische Fachwörter) in Alltagssprache (Absprache Jimmy 13.11.: "Pectorals und Delts" stand im
+// deutschen Text; Nutzer sind keine Fitness-Experten).
+const MUSCLE_WORDS = {
+  pectorals: { de: 'Brust', en: 'chest' },
+  delts: { de: 'Schultern', en: 'shoulders' },
+  shoulders: { de: 'Schultern', en: 'shoulders' },
+  triceps: { de: 'Trizeps', en: 'triceps' },
+  biceps: { de: 'Bizeps', en: 'biceps' },
+  lats: { de: 'Rücken', en: 'back' },
+  'upper back': { de: 'oberer Rücken', en: 'upper back' },
+  traps: { de: 'Nacken', en: 'neck' },
+  quads: { de: 'vordere Oberschenkel', en: 'front of the thighs' },
+  hamstrings: { de: 'hintere Oberschenkel', en: 'back of the thighs' },
+  glutes: { de: 'Gesäß', en: 'glutes' },
+  calves: { de: 'Waden', en: 'calves' },
+  abs: { de: 'Bauch', en: 'abs' },
+  forearms: { de: 'Unterarme', en: 'forearms' },
+  spine: { de: 'unterer Rücken', en: 'lower back' },
+  adductors: { de: 'Innenseite der Oberschenkel', en: 'inner thighs' },
+  abductors: { de: 'Außenseite der Hüfte', en: 'outer hips' },
+  'serratus anterior': { de: 'seitlicher Brustkorb', en: 'side of the ribcage' },
+  'cardiovascular system': { de: 'Ausdauer', en: 'cardio' }
+};
+const muscleWord = (key, lang) => MUSCLE_WORDS[key]?.[lang] || '';
+
+// Was ein Tag mindestens abdecken soll (Katalog-Muskeln je Gruppe). Ganzkörper wird nicht fest geprüft.
+const DAY_GROUPS = {
+  push: [
+    { muscles: ['pectorals'], label: { de: 'Brust', en: 'chest' } },
+    { muscles: ['delts', 'shoulders'], label: { de: 'Schultern', en: 'shoulders' } },
+    { muscles: ['triceps'], label: { de: 'Trizeps', en: 'triceps' } }
+  ],
+  pull: [
+    { muscles: ['lats', 'upper back', 'traps'], label: { de: 'Rücken', en: 'back' } },
+    { muscles: ['biceps'], label: { de: 'Bizeps', en: 'biceps' } }
+  ],
+  legs: [
+    { muscles: ['quads'], label: { de: 'vordere Oberschenkel', en: 'front of the thighs' } },
+    { muscles: ['hamstrings', 'glutes'], label: {
+      de: `${MUSCLE_WORDS.hamstrings.de} oder ${MUSCLE_WORDS.glutes.de}`,
+      en: `${MUSCLE_WORDS.hamstrings.en} or ${MUSCLE_WORDS.glutes.en}`
+    } }
+  ]
+};
+const DAY_NAMES = { push: 'Push', pull: 'Pull', legs: 'Legs' };
+
+/**
+ * Welche Muskelgruppen des Tages hat keine Übung als Hauptmuskel? Nur, wenn alle Übungen aus dem Katalog stammen
+ * (bei eigenen Übungen ist der Muskel unbekannt - dann keine Aussage). Fund 13.11.: Push ohne Trizeps blieb unerwähnt.
+ */
+function missingDayGroups(type, muscles, lang) {
+  const groups = DAY_GROUPS[type];
+  if (!groups || !muscles.length || muscles.some((m) => !m)) return [];
+  return groups.filter((g) => !g.muscles.some((m) => muscles.includes(m))).map((g) => g.label[lang]);
+}
 
 /**
  * Begrenzter Datensatz für die KI: Übungen in Reihenfolge mit englischem Namen, Hauptmuskel, Arbeitssätzen und
  * Wiederholungen. Sätze ohne eingetragene Werte zählen nicht; eine Übung ganz ohne Werte bekommt logged: false (dazu
  * schreibt die App selbst einen Satz, Fund 13.11.). Keine Notizen, keine Freitexte außer dem neutralisierten Namen.
  */
-export function buildCoachCheckData(workout) {
+export function buildCoachCheckData(workout, language = 'de') {
+  const lang = language === 'en' ? 'en' : 'de';
+  const catalogMuscles = [];
   const exercises = (Array.isArray(workout?.exercises) ? workout.exercises : []).map((ex, index) => {
-    const working = (Array.isArray(ex?.setDetails) ? ex.setDetails : [])
-      .filter((s) => s && !s.isWarmup && s.done !== false && setHasData(s));
+    // Älteres Format (Feld setDetails fehlt, wie in workoutHasLoggedSets): sets/reps der Übung in Sätze umrechnen
+    const legacyReps = Number(ex?.reps) > 0 ? Number(ex.reps) : null;
+    const legacySets = Number(ex?.sets) > 0 ? Math.min(Number(ex.sets), 20) : (legacyReps ? 1 : 0);
+    const working = isLegacyExercise(ex)
+      ? Array.from({ length: legacySets }, () => ({ reps: legacyReps }))
+      : ex.setDetails.filter(isLoggedSet);
     const reps = working.map((s) => Number(s.reps)).filter((n) => Number.isFinite(n) && n > 0);
     const timed = ex?.measureMode === 'time' || ex?.measureMode === 'repsTime';
-    const muscle = targetMuscle(ex?.name);
+    const catalogMuscle = targetMuscle(ex?.name);
+    catalogMuscles.push(catalogMuscle);
+    // In der Sprache der App und in Alltagswörtern (die KI übernimmt die Wörter aus den Daten)
+    const muscle = muscleWord(catalogMuscle, lang);
     return {
       position: index + 1,
       name: safeExerciseName(resolveEnglishExerciseName(ex?.name)),
@@ -95,9 +190,16 @@ export function buildCoachCheckData(workout) {
       logged: working.length > 0
     };
   }).filter((ex) => ex.name);
+  const workoutType = WORKOUT_TYPES.has(workout?.type) ? workout.type : 'unknown';
+  const missingGroups = missingDayGroups(workoutType, catalogMuscles, lang);
+  const coveredGroups = missingGroups.length
+    ? (DAY_GROUPS[workoutType] || []).map((g) => g.label[lang]).filter((label) => !missingGroups.includes(label))
+    : [];
   return {
-    workout_type: WORKOUT_TYPES.has(workout?.type) ? workout.type : 'unknown',
+    workout_type: workoutType,
     goal: GOALS.has(workout?.goal) ? workout.goal : 'hypertrophy',
+    missing_groups: missingGroups,
+    covered_groups: coveredGroups,
     // Summe der Arbeitssätze - damit die KI den Umfang mit einer echten Zahl nennen kann
     total_sets: exercises.reduce((sum, ex) => sum + ex.sets, 0),
     exercises
@@ -196,6 +298,65 @@ const UNLOGGED = {
 // "Diese Übung …" ohne Namen - in keinem Punkt erlaubt (Fall aus Produktion 13.11.)
 const NAMELESS_REFERENCE = /(^|[^\p{L}])(diese[rnms]?\s+übung|this\s+exercise|that\s+exercise)/iu;
 
+// Fachwörter, die trotz Prompt in der Antwort landen, durch Alltagswörter ersetzen (statt die Antwort zu verwerfen).
+// Großschreibung nur am Satzanfang (deutsche Nomen stehen schon groß in der Liste: "Brust", aber "vordere Oberschenkel").
+const bounded = (source) => new RegExp(`(^|[^\\p{L}])(${source})(?=$|[^\\p{L}])`, 'giu');
+const JARGON = {
+  de: [['hypertrophie|hypertrophy', 'Muskelaufbau'], ['pectorals?|pecs|pectoralis', MUSCLE_WORDS.pectorals.de],
+    ['deltoids?|delts', MUSCLE_WORDS.delts.de], ['lats', MUSCLE_WORDS.lats.de], ['quadriceps|quads', MUSCLE_WORDS.quads.de],
+    ['hamstrings', MUSCLE_WORDS.hamstrings.de], ['glutes', MUSCLE_WORDS.glutes.de], ['traps', MUSCLE_WORDS.traps.de]],
+  en: [['hypertrophy', 'muscle growth'], ['pectorals?|pecs|pectoralis', MUSCLE_WORDS.pectorals.en],
+    ['deltoids?|delts', MUSCLE_WORDS.delts.en], ['lats', MUSCLE_WORDS.lats.en], ['quadriceps|quads', MUSCLE_WORDS.quads.en],
+    ['hamstrings', MUSCLE_WORDS.hamstrings.en], ['traps', MUSCLE_WORDS.traps.en]]
+};
+// Einmal beim Laden vorbereiten
+const JARGON_PATTERNS = Object.fromEntries(Object.entries(JARGON)
+  .map(([lang, list]) => [lang, list.map(([source, word]) => [bounded(source), word])]));
+
+const atSentenceStart = (textBefore) => /(^|[.!?:]\s*)$/.test(textBefore.trimEnd() === '' ? '' : textBefore.replace(/\s+$/, ' '));
+
+function replaceJargon(part, lang, prefix) {
+  let out = part;
+  for (const [pattern, word] of JARGON_PATTERNS[lang]) {
+    pattern.lastIndex = 0;
+    out = out.replace(pattern, (_, before, found, offset, whole) => {
+      const start = atSentenceStart(prefix + whole.slice(0, offset) + before);
+      return before + (start ? word.charAt(0).toUpperCase() + word.slice(1) : word);
+    });
+  }
+  return out;
+}
+
+/**
+ * Fachwörter durch Alltagswörter ersetzen. Übungsnamen aus dem Workout bleiben unverändert (eine eigene Übung
+ * "Glutes Kickback" darf nicht zu "Gesäß Kickback" werden - sonst fände die Namensprüfung sie nicht mehr).
+ */
+export function plainWords(text, lang = 'de', exerciseNames = []) {
+  const l = lang === 'en' ? 'en' : 'de';
+  const source = String(text ?? '');
+  const names = (exerciseNames || []).map((n) => String(n)).filter(Boolean)
+    .sort((a, b) => b.length - a.length)
+    .map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+  if (!names.length) return replaceJargon(source, l, '');
+  const keep = new RegExp(`(${names.join('|')})`, 'giu');
+  let out = '';
+  let last = 0;
+  for (const match of source.matchAll(keep)) {
+    out += replaceJargon(source.slice(last, match.index), l, out) + match[0];
+    last = match.index + match[0].length;
+  }
+  return out + replaceJargon(source.slice(last), l, out);
+}
+
+const MISSING_SENTENCE = {
+  de: (day, groups) => `Für einen ${day}-Tag fehlt noch eine Übung für: ${groups}.`,
+  en: (day, groups) => `A ${day} day still needs an exercise for: ${groups}.`
+};
+const COVERED_SENTENCE = {
+  de: (groups) => `Abgedeckt: ${groups}.`,
+  en: (groups) => `Covered: ${groups}.`
+};
+
 const nameTokens = (value) => String(value ?? '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
 
 /**
@@ -235,7 +396,7 @@ export function sanitizeCoachCheck(raw, data, language = 'de') {
     const entry = raw[key];
     if (!entry || typeof entry !== 'object') return null;
     const verdict = entry.verdict === 'hint' ? 'hint' : entry.verdict === 'ok' ? 'ok' : null;
-    const text = cleanLine(entry.text);
+    const text = plainWords(cleanLine(entry.text), lang, names);
     if (!verdict || !text) return null;
     if (!numbersIn(text).every((n) => allowed.has(n))) return null;
     if (mentionsForeignExercise(text, lowerNames)) return null;
@@ -246,6 +407,20 @@ export function sanitizeCoachCheck(raw, data, language = 'de') {
 
   const result = {};
   for (const key of SECTIONS) result[key] = section(key);
+  // Fehlende Muskelgruppe des Tages (aus dem Katalog berechnet): nennt immer die App selbst - die KI soll sie nicht
+  // erwähnen (Prompt). So kann weder ein falsches "ist abgedeckt" noch ein doppelter Satz entstehen.
+  const missing = Array.isArray(data?.missing_groups) ? data.missing_groups : [];
+  if (result.selection && missing.length) {
+    const day = DAY_NAMES[data.workout_type] || '';
+    const missingSentence = MISSING_SENTENCE[lang](day, missing.join(', '));
+    // Erwähnt die KI eine fehlende Gruppe trotzdem (z. B. "Trizeps ist abgedeckt"), gilt nur der Satz der App - sonst
+    // stünde eine falsche Aussage oder dieselbe Gruppe doppelt da (Copilot-Review #185)
+    const lower = result.selection.text.toLowerCase();
+    const conflicting = missing.some((g) => g.toLowerCase().split(/\s+(?:oder|or)\s+/).some((part) => lower.includes(part)));
+    const covered = Array.isArray(data.covered_groups) ? data.covered_groups : [];
+    const appOnly = [covered.length ? COVERED_SENTENCE[lang](covered.join(', ')) : '', missingSentence].filter(Boolean).join(' ');
+    result.selection = { verdict: 'hint', text: conflicting ? appOnly : `${result.selection.text} ${missingSentence}` };
+  }
   // Ohne eingetragene Werte gibt es zu Wiederholungen nichts einzuordnen; der Umfang (total_sets zählt nur Sätze mit
   // Werten) wäre schon bei einer Übung ohne Werte zu klein gerechnet
   if (noneLogged) result.reps = null;

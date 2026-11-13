@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   sanitizeWorkoutOrigin, shouldAutoCoachCheck, canRequestCoachCheck, buildCoachCheckData,
-  sanitizeCoachCheck, firstCoachCheckIntro, sanitizeStoredCoachCheck, coachCheckInputChanged, mentionsWorkoutExercise,
+  sanitizeCoachCheck, firstCoachCheckIntro, sanitizeStoredCoachCheck, coachCheckInputChanged, mentionsWorkoutExercise, plainWords, workoutHasLoggedSets,
   withoutFields, mentionsForeignExercise, SERVER_ONLY_CREATE_FIELDS, SERVER_ONLY_UPDATE_FIELDS,
   generateAndPersistCoachCheck, isCoachCheckSaved
 } from '../coachCheck.js';
@@ -136,7 +136,8 @@ describe('Coach-Check: Fall aus Produktion 13.11.', () => {
   };
   const data = buildCoachCheckData(jimmy);
   it('Daten: Hauptmuskel aus dem Katalog, Übungen ohne Werte als logged: false, keine leeren Sätze', () => {
-    assert.deepEqual(data.exercises.map((ex) => ex.muscle), ['pectorals', 'triceps', 'pectorals', 'delts']);
+    assert.deepEqual(data.exercises.map((ex) => ex.muscle), ['Brust', 'Trizeps', 'Brust', 'Schultern']);
+    assert.deepEqual(buildCoachCheckData(jimmy, 'en').exercises.map((ex) => ex.muscle), ['chest', 'triceps', 'chest', 'shoulders']);
     assert.ok(data.exercises.every((ex) => ex.logged === false && ex.sets === 0));
     assert.equal(data.total_sets, 0);
   });
@@ -299,5 +300,113 @@ describe('Coach-Check: Kontingent nur bei gespeichertem Ergebnis (Copilot-Review
     const empty = await runWith({ text: null, persist: async () => 'ok' });
     assert.equal(empty.slot.result, null);
     assert.equal(empty.released, 1);
+  });
+});
+
+// Fall aus Produktion 13.11. (zweiter Test von Jimmy): Push mit Archer Push Up, Barbell Decline Pullover, Barbell Front
+// Raise (keine Trizeps-Übung). Der Coach schrieb "Pectorals und Delts sind gut vertreten" und "Bereich für
+// Hypertrophie" und nannte den fehlenden Trizeps nicht.
+describe('Coach-Check: Alltagssprache und fehlende Muskelgruppe (Fall aus Produktion 13.11.)', () => {
+  const done = [{ reps: 10, done: true }, { reps: 10, done: true }];
+  const push = {
+    type: 'push', goal: 'hypertrophy',
+    exercises: ['Archer Push Up', 'Barbell Decline Pullover', 'Barbell Front Raise'].map((name) => ({ name, setDetails: done }))
+  };
+  const aiAnswer = {
+    selection: { verdict: 'ok', text: 'Die Übungen decken die Hauptmuskelgruppen für einen Push-Tag ab: Pectorals und Delts sind gut vertreten.' },
+    order: { verdict: 'ok', text: 'Die Reihenfolge passt, da die Grundübung "Archer Push Up" vor den Isolationsübungen steht.' },
+    reps: { verdict: 'ok', text: 'Die Wiederholungen liegen im Bereich für Hypertrophie.' },
+    volume: { verdict: 'ok', text: 'Passt.' }
+  };
+  it('Fachwörter werden zu Alltagswörtern, fehlender Trizeps wird genannt', () => {
+    const data = buildCoachCheckData(push);
+    assert.deepEqual(data.missing_groups, ['Trizeps']);
+    const text = sanitizeCoachCheck(aiAnswer, data);
+    assert.ok(!/pectorals|delts|hypertroph/i.test(text), text);
+    assert.match(text, /- Auswahl: .*Brust und Schultern sind gut vertreten\. Für einen Push-Tag fehlt noch eine Übung für: Trizeps\./);
+    assert.match(text, /- Wiederholungen: Die Wiederholungen liegen im Bereich für Muskelaufbau\./);
+  });
+  it('englisch: chest/shoulders, muscle growth, fehlende Gruppe auf Englisch', () => {
+    const data = buildCoachCheckData(push, 'en');
+    const text = sanitizeCoachCheck({ ...aiAnswer,
+      selection: { verdict: 'ok', text: 'Pectorals and delts are covered.' },
+      reps: { verdict: 'ok', text: 'Reps are in the hypertrophy range.' } }, data, 'en');
+    assert.match(text, /- Selection: Chest and shoulders are covered\. A Push day still needs an exercise for: triceps\./);
+    assert.match(text, /muscle growth range/);
+  });
+  it('Gegenproben: behauptet die KI, der Trizeps sei abgedeckt, nennt die App ihn trotzdem; vollständiger Push ohne Hinweis', () => {
+    const data = buildCoachCheckData(push);
+    const wrong = sanitizeCoachCheck({ ...aiAnswer, selection: { verdict: 'ok', text: 'Brust, Schultern und Trizeps sind gut abgedeckt.' } }, data);
+    // Falsche Aussage der KI fliegt raus, nur der Satz der App bleibt (Copilot-Review #185)
+    assert.match(wrong, /- Auswahl: Abgedeckt: Brust, Schultern\. Für einen Push-Tag fehlt noch eine Übung für: Trizeps\.\n/);
+    assert.ok(!wrong.includes('gut abgedeckt'));
+    // Nennt die KI den Trizeps als fehlend: ebenfalls nur einmal
+    const twice = sanitizeCoachCheck({ ...aiAnswer, selection: { verdict: 'hint', text: 'Für den Trizeps fehlt eine Übung.' } }, data);
+    assert.equal((twice.match(/Trizeps/g) || []).length, 1);
+    const full = buildCoachCheckData({ ...push, exercises: [...push.exercises, { name: 'Band Close-Grip Push-Up', setDetails: done }] });
+    assert.deepEqual(full.missing_groups, []);
+    // Eigene Übung ohne Katalog-Muskel: keine Aussage über Fehlendes
+    assert.deepEqual(buildCoachCheckData({ ...push, exercises: [...push.exercises, { name: 'Meine Spezialübung', setDetails: done }] }).missing_groups, []);
+    // Wortteile werden nicht ersetzt
+    assert.equal(plainWords('Flats und Lattenrost', 'de'), 'Flats und Lattenrost');
+  });
+  it('ohne erledigte Sätze mit Werten: kein Feedback (Absprache 13.11.)', () => {
+    assert.equal(workoutHasLoggedSets(push), true);
+    assert.equal(workoutHasLoggedSets({ exercises: [{ setDetails: [{ reps: null }] }] }), false);
+    assert.equal(workoutHasLoggedSets({ exercises: [{ setDetails: [{ reps: 10, done: false }] }] }), false);
+    assert.equal(workoutHasLoggedSets({ exercises: [{ setDetails: [{ reps: 10, isWarmup: true }] }] }), false);
+    assert.equal(workoutHasLoggedSets({ exercises: [{ measureMode: 'time', setDetails: [{ durationSeconds: 30 }] }] }), true);
+  });
+});
+
+describe('Coach-Check: Selbstprüfung zum Fix Alltagssprache', () => {
+  it('Großschreibung nur am Satzanfang, Übungsnamen bleiben unverändert', () => {
+    assert.equal(plainWords('Die Übungen treffen die quads gut.', 'de'), 'Die Übungen treffen die vordere Oberschenkel gut.');
+    assert.equal(plainWords('Quads sind dabei.', 'de'), 'Vordere Oberschenkel sind dabei.');
+    assert.equal(plainWords('Glutes Kickback steht vorne.', 'de', ['Glutes Kickback']), 'Glutes Kickback steht vorne.');
+    assert.equal(plainWords('The traps work hard.', 'en'), 'The neck work hard.');
+  });
+  it('eigene Übung mit Fachwort im Namen: Namensprüfung findet sie weiter', () => {
+    const data = buildCoachCheckData({ type: 'legs', exercises: [{ name: 'Glutes Kickback', setDetails: sets(10) }] });
+    const text = sanitizeCoachCheck({
+      selection: { verdict: 'ok', text: 'Passt.' },
+      order: { verdict: 'hint', text: 'Glutes Kickback steht allein, überleg eine Grundübung davor.' },
+      reps: { verdict: 'ok', text: 'Passt.' }
+    }, data);
+    assert.match(text, /Reihenfolge: Glutes Kickback steht allein/);
+  });
+  it('älteres Format ohne setDetails zählt als Workout mit Werten und geht mit Sätzen/Wdh. an den Coach-Check', () => {
+    const legacy = { type: 'push', exercises: [{ name: 'Archer Push Up', sets: 3, reps: 10, weight: 60 }] };
+    assert.equal(workoutHasLoggedSets(legacy), true);
+    const ex = buildCoachCheckData(legacy).exercises[0];
+    assert.deepEqual([ex.sets, ex.reps, ex.logged], [3, [10, 10, 10], true]);
+    // Geänderte Wiederholungen im alten Format machen einen gespeicherten Coach-Check ungültig
+    assert.equal(coachCheckInputChanged(legacy, { ...legacy, exercises: [{ ...legacy.exercises[0], reps: 5 }] }), true);
+    // Gegenprobe (Copilot-Review #185): leere Satzliste mit Ersatzwerten an der Übung zählt NICHT
+    assert.equal(workoutHasLoggedSets({ exercises: [{ name: 'Bench', setDetails: [] }] }), false);
+    const emptyModern = { type: 'push', exercises: [{ name: 'Archer Push Up', sets: 3, reps: 10, setDetails: [] }] };
+    assert.equal(workoutHasLoggedSets(emptyModern), false);
+    assert.equal(buildCoachCheckData(emptyModern).exercises[0].logged, false);
+  });
+  it('Abfrage für den Verlauf entspricht workoutHasLoggedSets (MongoDB-Abfrage an Beispielen, ausgewertet mit sift)', async () => {
+    // sift wertet MongoDB-Abfragen in JS aus (kommt mit mongoose) - so prüft der Test die echte Abfrage, nicht nur ihren Text
+    const { default: sift } = await import('sift');
+    const { HAS_LOGGED_SETS_QUERY } = await import('../coachCheck.js');
+    const matches = sift(HAS_LOGGED_SETS_QUERY);
+    const cases = [
+      { exercises: [{ setDetails: [{ reps: 10, done: true }] }] },
+      { exercises: [{ setDetails: [{ reps: 10 }] }] },
+      { exercises: [{ measureMode: 'time', setDetails: [{ durationSeconds: 30 }] }] },
+      { exercises: [{ name: 'Bench', sets: 3, reps: 10 }] },
+      { exercises: [{ setDetails: [{ reps: null }] }] },
+      { exercises: [{ setDetails: [{ reps: 10, done: false }] }] },
+      { exercises: [{ setDetails: [{ reps: 10, isWarmup: true }] }] },
+      { exercises: [{ setDetails: [] }] },
+      { exercises: [{ sets: 3, reps: 10, setDetails: [] }] },
+      { exercises: [] },
+      // Feld "duration" am Satz gibt es im Schema nicht - beide Wege werten es gleich (nicht) aus
+      { exercises: [{ setDetails: [{ duration: 30 }] }] }
+    ];
+    for (const w of cases) assert.equal(matches(w), workoutHasLoggedSets(w), JSON.stringify(w));
   });
 });
