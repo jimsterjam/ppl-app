@@ -6,6 +6,7 @@ import { sanitizeWarmup } from './warmupPlan'
 import { markOpenSetsNotDone } from './saveReview'
 import { measureModeField } from './measureMode'
 import { sanitizePlanRef } from './trainingPlan'
+import { sanitizeWorkoutOrigin } from './favoriteAsk'
 
 export function getExercisesMissingNotes(exercises = [], getNote) {
   const missing = []
@@ -85,7 +86,9 @@ export function normalizeWorkoutForSave({ workout, exerciseNotes, sessionStopwat
     planId: sanitizePlanRef(w.planId) && sanitizePlanRef(w.planDayId) ? sanitizePlanRef(w.planId) : null,
     planDayId: sanitizePlanRef(w.planId) && sanitizePlanRef(w.planDayId) ? sanitizePlanRef(w.planDayId) : null,
     // Warm-up-Karte: je Schritt abgehakt oder nicht (siehe utils/warmupPlan.js) - null bei Workouts ohne Karte.
-    warmup: sanitizeWarmup(w.warmup)
+    warmup: sanitizeWarmup(w.warmup),
+    // Herkunft (selbst zusammengestellt/generiert/Favorit/Plan, siehe utils/favoriteAsk.js) - null bei älteren Workouts.
+    origin: sanitizeWorkoutOrigin(w.origin)
   }
 
   normalized.notes = buildWorkoutNotesSummary(normalized.exercises)

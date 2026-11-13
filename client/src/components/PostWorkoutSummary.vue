@@ -86,7 +86,7 @@
     <!-- Success State -->
     <div v-else-if="feedback" class="summary-content success">
       <div class="feedback-section">
-        <h3>{{ feedbackKind === 'first_look' ? t('postWorkout.feedbackFirstLook') : t('postWorkout.feedback') }}</h3>
+        <h3>{{ feedbackKind === 'coach_check' ? t('feedbackHistory.coachCheckBadge') : feedbackKind === 'first_look' ? t('postWorkout.feedbackFirstLook') : t('postWorkout.feedback') }}</h3>
         <AiFeedbackDeltaSummary v-if="analysisSnapshot.length > 0" :snapshot="analysisSnapshot" :language="feedbackLanguage" />
         <div class="feedback-text">{{ feedback }}</div>
         <AiNoteAnswers v-if="noteAnswers.length > 0" :answers="noteAnswers" :language="feedbackLanguage" />

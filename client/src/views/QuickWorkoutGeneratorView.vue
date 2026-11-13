@@ -399,7 +399,9 @@ async function generate() {
       type: form.requestedType,
       notes: response.notes || '',
       exercises,
-      favoriteSource: false
+      favoriteSource: false,
+      // Herkunft am Workout (Favorit-Frage beim Speichern, kein Coach-Check - siehe utils/favoriteAsk.js)
+      origin: 'generated'
     }
 
     // Vorschau statt direktem Sprung in den Builder (User-Report: Trainingsdauer/Übungsanzahl/

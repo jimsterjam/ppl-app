@@ -3,6 +3,7 @@ import { sanitizeWarmup } from '../utils/workoutWarmup.js';
 import { sanitizePlanRef } from '../utils/trainingPlanValidation.js';
 import { sanitizeFeedbackLanguage } from '../utils/feedbackLanguage.js';
 import { sanitizeStoredNoteAnswers } from '../utils/noteQuestions.js';
+import { sanitizeWorkoutOrigin, sanitizeStoredCoachCheck } from '../utils/coachCheck.js';
 import mongoose from "mongoose";
 
 // Hilfsfunktion zur Kanonisierung des Workout-Typs
@@ -150,6 +151,10 @@ const workoutSchema = new mongoose.Schema({
   // damit eine ungültige ID zu null wird, statt das Speichern scheitern zu lassen.
   planId: { type: String, default: null, set: sanitizePlanRef },
   planDayId: { type: String, default: null, set: sanitizePlanRef },
+  // Herkunft (Absprache Jimmy 13.11., siehe utils/coachCheck.js): 'manual' = selbst zusammengestellt, 'generated' = vom
+  // KI-Generator, 'favorite' = aus einem Favoriten, 'plan' = aus einem Trainingsplan. null = älteres Workout. Steuert den
+  // Coach-Check (nur selbst zusammengestellt). Setter statt Enum, damit ein unbekannter Wert nie das Speichern stoppt.
+  origin: { type: String, default: null, set: sanitizeWorkoutOrigin },
 
   // Warm-up-Karte (Cardio, Gelenke, übungsspezifisch): je Schritt abgehakt oder nicht. null = Workout
   // von vor dieser Funktion (unbekannt). Der Setter lässt nur die drei Booleans durch - kein Freitext
@@ -194,8 +199,24 @@ const workoutSchema = new mongoose.Schema({
   ai_feedback_kind: {
     type: String,
     default: null,
-    set: (v) => (['first_look', 'comparison'].includes(v) ? v : null)
+    set: (v) => (['first_look', 'comparison', 'coach_check'].includes(v) ? v : null)
   },
+  // Coach-Check auf Wunsch (Knopf im Feedback-Verlauf, utils/coachCheck.js) - getrennt vom normalen Feedback, damit es
+  // dieses nicht überschreibt. Wird nur vom Server gesetzt (POST /:id/coach-check), nie aus dem Request-Body.
+  ai_coach_check: {
+    type: {
+      _id: false,
+      text: { type: String, maxlength: 900 },
+      language: { type: String },
+      generated_at: { type: Date }
+    },
+    default: null,
+    set: sanitizeStoredCoachCheck
+  },
+  // Sperre, solange ein Coach-Check läuft (Copilot-Review 13.11.): Zwei gleichzeitige Anfragen sollen nicht zweimal das
+  // Kontingent verbrauchen. Nur der Server setzt sie (routes/workouts.js, claimCoachCheckLock); nach COACH_CHECK_LOCK_MS
+  // gilt sie als verfallen (Server-Absturz mitten in der Anfrage).
+  ai_coach_check_lock_at: { type: Date, default: null },
   // Sprache des gespeicherten Feedback-Texts ('de' | 'en'), null = älteres Feedback ohne Angabe.
   ai_feedback_language: {
     type: String,

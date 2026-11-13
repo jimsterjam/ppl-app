@@ -9,7 +9,7 @@
       >
         <div class="modal-header">
           <h3 v-if="title" id="modal-title">{{ title }}</h3>
-          <button v-if="!persistent && showCancel" class="close" :aria-label="t('common.close')" @click="onCancel">✕</button>
+          <button v-if="!persistent && showCancel" class="close" :aria-label="t('common.close')" @click="onDismiss">✕</button>
         </div>
         <div class="modal-body">
           <slot>
@@ -50,16 +50,24 @@ const props = defineProps({
   // Optionaler dritter Button (siehe modal-actions oben) - leer = wie bisher nur
   // Abbrechen/Bestätigen, kein Verhaltensunterschied für bestehende AppModal-Nutzungen.
   extraText: { type: String, default: '' },
-  closeOnExtra: { type: Boolean, default: true }
+  closeOnExtra: { type: Boolean, default: true },
+  // true: ✕, Tippen neben das Fenster und Escape melden 'dismiss' statt 'cancel' - für Fenster, deren Abbrechen-Knopf
+  // eine eigene Antwort ist (z. B. Favorit-Frage "Nein" = trotzdem speichern, ✕ = zurück). Ohne die Angabe wie bisher.
+  dismissSeparately: { type: Boolean, default: false }
 })
 
-const emit = defineEmits(['update:modelValue', 'confirm', 'cancel', 'extra'])
+const emit = defineEmits(['update:modelValue', 'confirm', 'cancel', 'dismiss', 'extra'])
 const { t } = useI18n()
 
 const confirmBtn = ref(null)
 
 function close() { emit('update:modelValue', false) }
 function onCancel() { emit('cancel'); close() }
+function onDismiss() {
+  if (!props.dismissSeparately) return onCancel()
+  emit('dismiss')
+  close()
+}
 function onConfirm() {
   emit('confirm')
   if (props.closeOnConfirm) close()
@@ -70,11 +78,11 @@ function onExtra() {
 }
 
 function overlayClick() {
-  if (!props.persistent) onCancel()
+  if (!props.persistent) onDismiss()
 }
 
 function onKey(e) {
-  if (e.key === 'Escape' && !props.persistent) { onCancel() }
+  if (e.key === 'Escape' && !props.persistent) { onDismiss() }
 }
 
 const { lock: lockBodyScroll, unlock: unlockBodyScroll } = useScrollLock()

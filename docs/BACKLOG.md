@@ -10,7 +10,7 @@ trägt ihre Backlog-Änderung mit; bis zum Merge steht sie nur dort).
 Kennzeichnung: **[A]** autonom erlaubt · **[F]** Freigabe von Jimmy nötig · **[P]** wartet auf Jimmy
 (Info, Entscheidung oder Handgriff außerhalb des Repos). Priorität: P1 (zuerst) bis P3.
 
-Zuletzt aktualisiert: 2026-11-12
+Zuletzt aktualisiert: 2026-11-13
 
 ---
 
@@ -24,6 +24,7 @@ Zuletzt aktualisiert: 2026-11-12
 | A9 | P3 | Eval-/Qualitäts-Skripte an die FAKTEN-REGEL anpassen | `server/scripts/evalCases/*.js`, `qualityLoopRunner.js`, `regressionTest_aiCoach.js` erwarten noch Texte mit Zahlen/Satzaussagen (alter Prompt). Nicht Teil von CI. Mit echtem KI-Zugang prüfen, wie der neue Prompt wirkt. |
 | A10 | P3 | Startton in `WorkoutSplash.vue` lädt `/sounds/start-long.mp3`, die Datei gibt es nicht | `client/public/sounds/` existiert nicht (nie im Repo). Ton klären (Datei ergänzen oder Synthese wie im Timer) – ohne Ton-Entscheidung von Jimmy nur melden. |
 | A11 | P3 | Intervall-Timer-Mitteilungen (`timerStore.js`) ohne Ton | Gleiches Muster wie beim Pausentimer: ohne `sound` stumm im Hintergrund. Nach dem Test des Pausen-Weckers (P4) mit `restEndSignal.js` angleichen. |
+| A12 | P3 | KI-Feedback: „Wird erstellt“ endet nicht, wenn das Kontingent in einer gleichzeitigen Anfrage aufgebraucht ist | `POST /:id/ai-analysis` setzt `ai_feedback_status: 'pending'` und antwortet danach bei einem verlorenen Kontingent-Wettlauf mit `quota_limited`, ohne den Status zu ändern (bestehender Weg und Coach-Check, Copilot-Review PR #182 Runde 3). Der Verlauf zeigt dann bis zu 30 Min. „Wird erstellt“. Für alle Feedback-Arten gemeinsam einen Endzustand setzen (z. B. Status zurück auf `none`). |
 | A6 | P3 | Tests für Flows aus `TESTPHASE-TESTMATRIX.md` ohne Testabdeckung ergänzen | Erst Lücke benennen, dann je Flow ein kleiner PR. Nur reine Logik (Utils), keine UI-Mount-Tests ohne Infrastruktur. |
 
 ## Offen – Freigabe nötig [F]
@@ -83,6 +84,7 @@ finden sollen und was daran geändert wurde. Regel in `CLAUDE.md` (Cloud-Session
 
 Nur Produkt-/Architekturentscheidungen mit Datum. Dauerhafte Arbeitsregeln gehören in `CLAUDE.md`.
 
+- 2026-11-13 – Favorit-Frage beim Speichern (Absprache Jimmy): selbst zusammengestellte und generierte Workouts fragen beim ersten Speichern „Als Favorit merken?“ (nicht bei Favorit/Plan, Bearbeiten, gleichem Favoriten; Limit -> Hinweis). Coach-Check: automatisch beim ersten selbst zusammengestellten Workout statt Erster Einordnung, sonst auf Wunsch im Feedback-Verlauf (eine KI-Anfrage). „KI-Auswertung erst später“ entfällt: jedes gespeicherte Workout bekommt Feedback, solange Kontingent da ist; leer = kein Feedback (Grund für Pro). Herkunft am Workout: `origin`.
 - 2026-11-12 – Apple-Watch-App zurückgestellt (Absprache Jimmy), siehe F15.
 - 2026-10-11 – Hinweis „Mitteilungen sind aus“ (Absprache Jimmy): iOS fragt nur einmal nach der Erlaubnis. Ist sie verweigert, zeigen Warm-up-Karte und Pausentimer-Einstellungen eine kurze Zeile mit Knopf „Einstellungen öffnen“ (iPhone-Einstellungen der App) und „Ausblenden“ (wird gemerkt). Verschwindet von selbst, wenn die Erlaubnis erteilt ist. Die Wecker-Erlaubnis (AlarmKit, iOS 26) ist davon getrennt und nicht abgedeckt.
 - 2026-10-11 – Hinweis erweitert (Absprache Jimmy): Der Hinweis erscheint auch, wenn iOS noch nie gefragt hat (dann Knopf „Erlauben“ löst die iOS-Frage aus; bei Ablehnung wechselt er auf „Einstellungen öffnen“). Zusätzlich fragt die App beim ersten „Start“ eines Warm-up-Timers zuerst nach der Mitteilungs-Erlaubnis. Grund: iOS listet die App erst unter Einstellungen > Mitteilungen, nachdem sie einmal gefragt hat.

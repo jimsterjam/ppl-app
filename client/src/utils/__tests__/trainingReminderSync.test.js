@@ -71,9 +71,17 @@ describe('syncTrainingReminder', () => {
   })
 
   it('Abmelden vergisst eine noch nicht zugestellte Erinnerung (zählt nicht als zugestellt)', async () => {
-    await syncTrainingReminder({ settings: settings(), workouts, t, now: monday() })
-    await cancelTrainingReminder({ forgetFor: 'uid-a' })
-    expect(readPref('training-reminder-last', 'uid-a')).toBeNull()
+    // cancelTrainingReminder vergleicht mit der echten Uhr - auf denselben Montag stellen. Ohne das schlug der Test
+    // ab dem geplanten Termin (13.11.2026, 12:30) fehl, weil die Erinnerung dann als zugestellt galt (Fund 13.11.).
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(monday())
+    try {
+      await syncTrainingReminder({ settings: settings(), workouts, t, now: monday() })
+      await cancelTrainingReminder({ forgetFor: 'uid-a' })
+      expect(readPref('training-reminder-last', 'uid-a')).toBeNull()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

@@ -38,6 +38,9 @@
               <span v-if="item.ai_feedback_kind === 'first_look' && item.ai_feedback" class="pending-badge">
                 {{ t('feedbackHistory.firstLookBadge') }}
               </span>
+              <span v-else-if="item.ai_feedback_kind === 'coach_check' && item.ai_feedback" class="pending-badge">
+                {{ t('feedbackHistory.coachCheckBadge') }}
+              </span>
               <span v-if="item.ai_feedback_status === 'deferred'" class="pending-badge">
                 {{ t('feedbackHistory.pendingBadge') }}
               </span>
@@ -106,6 +109,28 @@
             :language="resolveFeedbackLanguage(item, locale)"
           />
 
+          <!-- Coach-Check auf Wunsch (Absprache Jimmy 13.11.): nur selbst zusammengestellte Workouts, deren Feedback nicht
+               schon ein Coach-Check ist. Ergebnis bleibt gespeichert (kein zweiter Verbrauch). -->
+          <div v-if="canCoachCheck(item)" class="coach-check" @click.stop>
+            <template v-if="item.ai_coach_check?.text">
+              <p class="coach-check-label">{{ t('feedbackHistory.coachCheckBadge') }}</p>
+              <p class="coach-check-text">{{ item.ai_coach_check.text }}</p>
+            </template>
+            <template v-else>
+              <button
+                class="generate-now-btn"
+                type="button"
+                :disabled="coachCheckingId === item.workoutId"
+                @click.stop="requestCoachCheckFor(item)"
+              >
+                <span v-if="coachCheckingId === item.workoutId" class="generate-spinner spin-indicator" aria-hidden="true"></span>
+                {{ coachCheckingId === item.workoutId ? t('feedbackHistory.coachCheckLoading') : t('feedbackHistory.coachCheckButton') }}
+              </button>
+              <p class="coach-check-hint">{{ t('feedbackHistory.coachCheckHint') }}</p>
+              <p v-if="coachCheckError === item.workoutId" class="generate-error" role="alert">{{ t('feedbackHistory.coachCheckError') }}</p>
+            </template>
+          </div>
+
           <AiFeedbackRatingWidget
             :workout-id="String(item.workoutId)"
             :exercise-names="(item.ai_analysis_snapshot || []).map(e => e.exercise)"
@@ -151,7 +176,7 @@ import AiNoteAnswers from '@/components/AiNoteAnswers.vue'
 import { resolveFeedbackLanguage } from '@/utils/feedbackLanguage'
 import AiFeedbackRatingWidget from '@/components/AiFeedbackRatingWidget.vue'
 import { useFirebaseAuth } from '@/utils/firebaseAuth'
-import { fetchWorkoutFeedbacks, requestAiAnalysis } from '@/api/workouts'
+import { fetchWorkoutFeedbacks, requestAiAnalysis, requestCoachCheck } from '@/api/workouts'
 import { isValidObjectId } from '@/utils/workoutHelpers'
 import { logger } from '@/utils/logger'
 import { getMetadata, setMetadata, AI_FEEDBACK_UPDATED_EVENT, WORKOUT_DELETED_EVENT } from '@/utils/offlineStorage'
@@ -211,6 +236,43 @@ function withoutDeleted(list) {
   if (!deletedWorkoutIds.size) return list
   return list.filter((item) => !deletedWorkoutIds.has(String(item?.workoutId || '')))
 }
+// Coach-Check auf Wunsch (Knopf im aufgeklappten Feedback)
+const coachCheckingId = ref(null)
+const coachCheckError = ref(null)
+
+/** Knopf bzw. Ergebnis nur bei selbst zusammengestellten Workouts, deren Feedback nicht schon ein Coach-Check ist. */
+function canCoachCheck(item) {
+  return item?.origin === 'manual' && item?.ai_feedback_kind !== 'coach_check'
+}
+
+async function requestCoachCheckFor(item) {
+  if (coachCheckingId.value) return
+  if (!isValidObjectId(item.workoutId)) {
+    coachCheckError.value = item.workoutId
+    return
+  }
+  if (!(await aiConsent.request())) return
+  coachCheckingId.value = item.workoutId
+  coachCheckError.value = null
+  try {
+    const token = await getIdToken().catch(() => null)
+    const data = await requestCoachCheck(String(item.workoutId), token, { timeoutMs: REQUEST_TIMEOUT_MS })
+    if (data?.aiUsage) subscriptionStore.applyAiUsageSnapshot(data.aiUsage)
+    if (data?.coach_check?.text) item.ai_coach_check = data.coach_check
+    else coachCheckError.value = item.workoutId
+    logDiagnostic('coach-check', { workoutId: item.workoutId, outcome: data?.coach_check?.text ? 'ok' : 'empty' })
+  } catch (err) {
+    const code = err?.response?.data?.code
+    if (code === 'AI_CONSENT_REQUIRED') aiConsent.noteServerRefusal()
+    if (code === 'AI_QUOTA_EXHAUSTED' && err?.response?.data?.aiUsage) subscriptionStore.applyAiUsageSnapshot(err.response.data.aiUsage)
+    coachCheckError.value = item.workoutId
+    toast.show(code === 'AI_QUOTA_EXHAUSTED' ? t('feedbackHistory.coachCheckQuota') : t('feedbackHistory.coachCheckError'), { type: 'warning', duration: 3500 })
+    logDiagnostic('coach-check', { workoutId: item.workoutId, outcome: 'error', code: code || null })
+  } finally {
+    coachCheckingId.value = null
+  }
+}
+
 // Feature "Feedback später bewerten": Zustand für den manuellen "Jetzt generieren"-Button.
 const generatingId = ref(null)
 const generateError = ref(null)
@@ -253,6 +315,9 @@ async function generateNow(item) {
       item.ai_metadata = data.ai_metadata
       item.ai_analysis_snapshot = data.ai_analysis_snapshot || []
       item.ai_feedback_status = 'generated'
+      // Art übernehmen (erste Einordnung, Vergleich, Coach-Check) - sonst fehlt das Abzeichen und der
+      // Coach-Check-Knopf erschiene unter einem Coach-Check (Selbstprüfung 13.11.)
+      item.ai_feedback_kind = data.feedback_kind || null
       logDiagnostic('feedback-history-generate-now', { workoutId: item.workoutId, outcome: 'feedback' })
       // Andere gemountete Instanzen (z.B. diese Ansicht in einem Hintergrund-Tab) über das
       // frisch generierte Feedback informieren - siehe Listener in onMounted() unten.
@@ -675,6 +740,29 @@ onBeforeUnmount(() => {
   gap: 0.6rem;
 }
 
+.coach-check {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--card-border);
+  white-space: normal;
+}
+.coach-check-label {
+  margin: 0 0 6px;
+  color: var(--accent-text);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.coach-check-text {
+  margin: 0;
+  white-space: pre-line;
+}
+.coach-check-hint {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
 .pending-hint {
   margin: 0;
   color: var(--muted);
