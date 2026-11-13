@@ -161,13 +161,57 @@ describe('Coach-Check: Fall aus Produktion 13.11.', () => {
       order: { verdict: 'ok', text: 'Barbell Front Raise steht als Isolationsübung richtig am Ende.' }
     }), data);
     assert.match(text, /- Reihenfolge: Barbell Front Raise steht/);
-    assert.match(text, /- Wiederholungen: Für Archer Push Up, Band Close-Grip Push-Up, Barbell Decline Pullover, Barbell Front Raise sind keine Wiederholungen eingetragen\./);
+    assert.match(text, /- Wiederholungen: Für Archer Push Up, Band Close-Grip Push-Up, Barbell Decline Pullover, Barbell Front Raise sind keine erledigten Sätze mit Werten eingetragen/);
     assert.ok(!text.includes('Umfang'));
   });
   it('nur einzelne Übungen ohne Werte: KI-Urteil + App-Satz', () => {
     const mixed = buildCoachCheckData({ ...jimmy, exercises: [{ ...jimmy.exercises[0], setDetails: sets(10, 10) }, ...jimmy.exercises.slice(1)] });
     const text = sanitizeCoachCheck(answer({ reps: { verdict: 'ok', text: 'Archer Push Up liegt mit 10 im Bereich.' } }), mixed, 'en');
-    assert.match(text, /- Reps: Archer Push Up liegt mit 10 im Bereich\. No reps logged for Band Close-Grip Push-Up, Barbell Decline Pullover, Barbell Front Raise\./);
+    assert.match(text, /- Reps: Archer Push Up liegt mit 10 im Bereich\. Band Close-Grip Push-Up, Barbell Decline Pullover, Barbell Front Raise: no completed sets with values logged/);
+  });
+  it('"Diese Übung" ohne Namen ist in keinem Punkt erlaubt, auch nicht bei der Auswahl', () => {
+    assert.equal(sanitizeCoachCheck(answer({
+      selection: { verdict: 'hint', text: 'Diese Übung spricht den Trizeps an, könnte aber durch eine Brustübung ergänzt werden.' }
+    }), data), null);
+    assert.equal(sanitizeCoachCheck(answer({ selection: { verdict: 'hint', text: 'This exercise targets triceps.' } }), data, 'en'), null);
+  });
+});
+
+describe('Coach-Check: Selbstprüfung zum Fix 13.11.', () => {
+  it('nicht abgehakte Sätze (done:false) zählen nicht als erledigt, Satz gilt auch für Zeitübungen', () => {
+    const data = buildCoachCheckData({ type: 'push', exercises: [
+      { name: 'Barbell Front Raise', setDetails: [{ reps: 10, done: false }, { reps: 10, done: false }] },
+      { name: 'Plank', measureMode: 'time', setDetails: [{ durationSeconds: 0 }] },
+      { name: 'Archer Push Up', setDetails: sets(10) }
+    ] });
+    assert.deepEqual(data.exercises.map((ex) => ex.logged), [false, false, true]);
+    const text = sanitizeCoachCheck(answer({ reps: { verdict: 'ok', text: 'Archer Push Up passt.' } }), data);
+    assert.match(text, /Für Barbell Front Raise, Plank sind keine erledigten Sätze mit Werten eingetragen/);
+    assert.ok(!text.includes('Wiederholungen eingetragen'));
+  });
+  it('Umfang entfällt, sobald eine Übung ohne Werte ist (total_sets wäre zu klein)', () => {
+    const data = buildCoachCheckData({ type: 'push', exercises: [
+      { name: 'Archer Push Up', setDetails: sets(10, 10, 10) },
+      { name: 'Barbell Front Raise', setDetails: [{ reps: null }] }
+    ] });
+    const text = sanitizeCoachCheck(answer({
+      reps: { verdict: 'ok', text: 'Archer Push Up passt.' },
+      volume: { verdict: 'hint', text: 'Mit 3 Arbeitssätzen sehr wenig.' }
+    }), data);
+    assert.ok(!text.includes('Umfang'));
+  });
+  it('Zahlen im Übungsnamen sind erlaubt; gekürzter Name zählt, Wortteil nicht', () => {
+    const data = buildCoachCheckData({ type: 'legs', exercises: [{ name: '45° Leg Press', setDetails: sets(10) }, { name: 'Fly', setDetails: sets(10) }] });
+    assert.match(sanitizeCoachCheck(answer({ order: { verdict: 'hint', text: 'Überleg, 45° Leg Press an den Anfang zu ziehen.' } }), data), /Reihenfolge: Überleg, 45/);
+    assert.equal(mentionsWorkoutExercise('Bench Press steht vorne.', ['Bench Press Barbell']), true);
+    assert.equal(mentionsWorkoutExercise('Der Butterfly-Teil wirkt doppelt.', ['Fly']), false);
+    assert.equal(mentionsWorkoutExercise('Fly steht am Ende.', ['Fly']), true);
+  });
+  it('viele Übungen ohne Werte: höchstens 4 Namen, Text endet nie mitten im Satz', () => {
+    const many = Array.from({ length: 9 }, (_, i) => ({ name: `Custom Exercise Number ${'abcdefghi'[i]}`, setDetails: [{ reps: null }] }));
+    const text = sanitizeCoachCheck(answer({ reps: undefined }), buildCoachCheckData({ type: 'push', exercises: many }));
+    assert.match(text, /und weitere sind keine erledigten Sätze/);
+    assert.ok(text.endsWith('nichts sagen.'));
   });
 });
 

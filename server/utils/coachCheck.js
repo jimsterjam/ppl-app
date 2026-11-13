@@ -109,6 +109,8 @@ export function allowedCoachCheckNumbers(data) {
   const allowed = new Set(RANGE_NUMBERS);
   if (Number.isFinite(data?.total_sets)) allowed.add(String(data.total_sets));
   for (const ex of data?.exercises || []) {
+    // Zahlen im Übungsnamen ("45° Side Bend", "V. 2"): die KI soll Übungen beim Namen nennen
+    for (const n of numbersIn(ex.name)) allowed.add(n);
     allowed.add(String(ex.position));
     allowed.add(String(ex.sets));
     for (const r of ex.reps || []) allowed.add(String(r));
@@ -184,19 +186,30 @@ const REQUIRED_SECTIONS = ['selection', 'order', 'reps'];
 // Hinweise zu diesen Punkten müssen eine Übung aus dem Workout beim Namen nennen (kein "Diese Übung …", Fund 13.11.)
 const NAME_REQUIRED_SECTIONS = new Set(['order', 'reps']);
 
+// Übungen ohne erledigte Sätze mit Werten (leer, nicht abgehakt oder ausgelassen; auch Zeitübungen): neutral, ohne
+// zu unterstellen, dass etwas vergessen wurde. Höchstens MAX_UNLOGGED_NAMES Namen, damit der Text begrenzt bleibt.
+const MAX_UNLOGGED_NAMES = 4;
 const UNLOGGED = {
-  de: (names) => `Für ${names} sind keine Wiederholungen eingetragen. Trag sie beim nächsten Mal ein, dann kann der Coach sie einordnen.`,
-  en: (names) => `No reps logged for ${names}. Log them next time so the coach can assess them.`
+  de: (names, more) => `Für ${names}${more ? ' und weitere' : ''} sind keine erledigten Sätze mit Werten eingetragen – dazu kann der Coach nichts sagen.`,
+  en: (names, more) => `${names}${more ? ' and others' : ''}: no completed sets with values logged, so the coach can't assess them.`
 };
+// "Diese Übung …" ohne Namen - in keinem Punkt erlaubt (Fall aus Produktion 13.11.)
+const NAMELESS_REFERENCE = /(^|[^\p{L}])(diese[rnms]?\s+übung|this\s+exercise|that\s+exercise)/iu;
 
-const normalizeName = (value) => String(value ?? '').toLowerCase().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+const nameTokens = (value) => String(value ?? '').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
 
-/** Nennt der Text mindestens eine Übung aus dem Workout? (Bindestriche/Leerzeichen egal) */
+/**
+ * Nennt der Text mindestens eine Übung aus dem Workout? Ganze Wörter (kein "Fly" in "Butterfly"); bei mehrteiligen
+ * Namen reichen zwei aufeinanderfolgende Wörter (die KI kürzt "Bench Press Barbell" gern zu "Bench Press").
+ */
 export function mentionsWorkoutExercise(text, exerciseNames) {
-  const haystack = normalizeName(text);
+  const words = nameTokens(text);
+  const pairs = new Set(words.slice(1).map((w, i) => `${words[i]} ${w}`));
   return (exerciseNames || []).some((name) => {
-    const needle = normalizeName(name);
-    return needle.length > 0 && haystack.includes(needle);
+    const tokens = nameTokens(name);
+    if (tokens.length === 0) return false;
+    if (tokens.length === 1) return tokens[0].length >= 3 && words.includes(tokens[0]);
+    return tokens.slice(1).some((t, i) => pairs.has(`${tokens[i]} ${t}`));
   });
 }
 
@@ -226,32 +239,36 @@ export function sanitizeCoachCheck(raw, data, language = 'de') {
     if (!verdict || !text) return null;
     if (!numbersIn(text).every((n) => allowed.has(n))) return null;
     if (mentionsForeignExercise(text, lowerNames)) return null;
+    if (NAMELESS_REFERENCE.test(text)) return null;
     if (verdict === 'hint' && NAME_REQUIRED_SECTIONS.has(key) && !mentionsWorkoutExercise(text, names)) return null;
     return { verdict, text };
   };
 
   const result = {};
   for (const key of SECTIONS) result[key] = section(key);
-  // Ohne eingetragene Werte gibt es zu Wiederholungen und Umfang nichts einzuordnen
-  if (noneLogged) {
-    result.reps = null;
-    result.volume = null;
-  }
+  // Ohne eingetragene Werte gibt es zu Wiederholungen nichts einzuordnen; der Umfang (total_sets zählt nur Sätze mit
+  // Werten) wäre schon bei einer Übung ohne Werte zu klein gerechnet
+  if (noneLogged) result.reps = null;
+  if (unlogged.length) result.volume = null;
   for (const key of REQUIRED_SECTIONS) {
     if (key === 'reps' && noneLogged) continue;
     if (!result[key]) return null;
   }
   if (unlogged.length) {
-    const sentence = UNLOGGED[lang](unlogged.join(', '));
+    const sentence = UNLOGGED[lang](unlogged.slice(0, MAX_UNLOGGED_NAMES).join(', '), unlogged.length > MAX_UNLOGGED_NAMES);
     result.reps = { verdict: 'hint', text: result.reps ? `${result.reps.text} ${sentence}` : sentence };
   }
 
   const labels = SECTION_LABELS[lang];
-  return SECTIONS
-    .filter((key) => result[key] && (key !== 'volume' || result[key].verdict === 'hint'))
-    .map((key) => `- ${labels[key]}: ${result[key].text}`)
-    .join('\n')
-    .slice(0, MAX_COACH_CHECK_TEXT);
+  // Ganze Zeilen statt Abschneiden mitten im Satz (Grenze wird bei 4 Zeilen à 260 + App-Satz praktisch nie erreicht)
+  const lines = [];
+  for (const key of SECTIONS) {
+    if (!result[key] || (key === 'volume' && result[key].verdict !== 'hint')) continue;
+    const line = `- ${labels[key]}: ${result[key].text}`;
+    if ([...lines, line].join('\n').length > MAX_COACH_CHECK_TEXT) break;
+    lines.push(line);
+  }
+  return lines.join('\n');
 }
 
 const FIRST_INTRO = {
