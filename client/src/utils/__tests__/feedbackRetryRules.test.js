@@ -19,6 +19,8 @@ describe('feedbackRetryRules', () => {
     expect(classifyFeedbackResponse({ ai_feedback: 'Text' })).toBe('ready')
     expect(classifyFeedbackResponse({ feedback_status: 'insufficient_history' })).toBe('final')
     expect(classifyFeedbackResponse({ feedback_status: 'quota_limited' })).toBe('final')
+    // Ohne erledigte Sätze mit Werten gibt es kein Feedback - nicht immer wieder nachfragen (Absprache 13.11.)
+    expect(classifyFeedbackResponse({ feedback_status: 'no_data' })).toBe('final')
     expect(classifyFeedbackResponse({ feedback_status: 'network_unavailable' })).toBe('retry')
     expect(classifyFeedbackResponse({})).toBe('retry')
   })

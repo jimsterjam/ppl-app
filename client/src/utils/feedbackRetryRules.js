@@ -15,7 +15,8 @@ export function nextDelayMs(attempts = 0) {
 /** 'ready' = Feedback da, 'final' = kommt nicht (nicht genug Verlauf, Kontingent), 'retry' = später erneut */
 export function classifyFeedbackResponse(data) {
   if (data?.ai_feedback) return 'ready'
-  if (data?.feedback_status === 'insufficient_history' || data?.feedback_status === 'quota_limited') return 'final'
+  // no_data: keine erledigten Sätze mit Werten - es gibt kein Feedback (Absprache Jimmy 13.11.)
+  if (['insufficient_history', 'quota_limited', 'no_data'].includes(data?.feedback_status)) return 'final'
   return 'retry'
 }
 

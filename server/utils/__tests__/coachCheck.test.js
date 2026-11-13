@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   sanitizeWorkoutOrigin, shouldAutoCoachCheck, canRequestCoachCheck, buildCoachCheckData,
-  sanitizeCoachCheck, firstCoachCheckIntro, sanitizeStoredCoachCheck, coachCheckInputChanged, mentionsWorkoutExercise,
+  sanitizeCoachCheck, firstCoachCheckIntro, sanitizeStoredCoachCheck, coachCheckInputChanged, mentionsWorkoutExercise, plainWords, workoutHasLoggedSets,
   withoutFields, mentionsForeignExercise, SERVER_ONLY_CREATE_FIELDS, SERVER_ONLY_UPDATE_FIELDS,
   generateAndPersistCoachCheck, isCoachCheckSaved
 } from '../coachCheck.js';
@@ -136,7 +136,8 @@ describe('Coach-Check: Fall aus Produktion 13.11.', () => {
   };
   const data = buildCoachCheckData(jimmy);
   it('Daten: Hauptmuskel aus dem Katalog, Übungen ohne Werte als logged: false, keine leeren Sätze', () => {
-    assert.deepEqual(data.exercises.map((ex) => ex.muscle), ['pectorals', 'triceps', 'pectorals', 'delts']);
+    assert.deepEqual(data.exercises.map((ex) => ex.muscle), ['Brust', 'Trizeps', 'Brust', 'Schultern']);
+    assert.deepEqual(buildCoachCheckData(jimmy, 'en').exercises.map((ex) => ex.muscle), ['chest', 'triceps', 'chest', 'shoulders']);
     assert.ok(data.exercises.every((ex) => ex.logged === false && ex.sets === 0));
     assert.equal(data.total_sets, 0);
   });
@@ -299,5 +300,56 @@ describe('Coach-Check: Kontingent nur bei gespeichertem Ergebnis (Copilot-Review
     const empty = await runWith({ text: null, persist: async () => 'ok' });
     assert.equal(empty.slot.result, null);
     assert.equal(empty.released, 1);
+  });
+});
+
+// Fall aus Produktion 13.11. (zweiter Test von Jimmy): Push mit Archer Push Up, Barbell Decline Pullover, Barbell Front
+// Raise (keine Trizeps-Übung). Der Coach schrieb "Pectorals und Delts sind gut vertreten" und "Bereich für
+// Hypertrophie" und nannte den fehlenden Trizeps nicht.
+describe('Coach-Check: Alltagssprache und fehlende Muskelgruppe (Fall aus Produktion 13.11.)', () => {
+  const done = [{ reps: 10, done: true }, { reps: 10, done: true }];
+  const push = {
+    type: 'push', goal: 'hypertrophy',
+    exercises: ['Archer Push Up', 'Barbell Decline Pullover', 'Barbell Front Raise'].map((name) => ({ name, setDetails: done }))
+  };
+  const aiAnswer = {
+    selection: { verdict: 'ok', text: 'Die Übungen decken die Hauptmuskelgruppen für einen Push-Tag ab: Pectorals und Delts sind gut vertreten.' },
+    order: { verdict: 'ok', text: 'Die Reihenfolge passt, da die Grundübung "Archer Push Up" vor den Isolationsübungen steht.' },
+    reps: { verdict: 'ok', text: 'Die Wiederholungen liegen im Bereich für Hypertrophie.' },
+    volume: { verdict: 'ok', text: 'Passt.' }
+  };
+  it('Fachwörter werden zu Alltagswörtern, fehlender Trizeps wird genannt', () => {
+    const data = buildCoachCheckData(push);
+    assert.deepEqual(data.missing_groups, ['Trizeps']);
+    const text = sanitizeCoachCheck(aiAnswer, data);
+    assert.ok(!/pectorals|delts|hypertroph/i.test(text), text);
+    assert.match(text, /- Auswahl: .*Brust und Schultern sind gut vertreten\. Für einen Push-Tag fehlt noch eine Übung für: Trizeps\./);
+    assert.match(text, /- Wiederholungen: Die Wiederholungen liegen im Bereich für Muskelaufbau\./);
+  });
+  it('englisch: chest/shoulders, muscle growth, fehlende Gruppe auf Englisch', () => {
+    const data = buildCoachCheckData(push, 'en');
+    const text = sanitizeCoachCheck({ ...aiAnswer,
+      selection: { verdict: 'ok', text: 'Pectorals and delts are covered.' },
+      reps: { verdict: 'ok', text: 'Reps are in the hypertrophy range.' } }, data, 'en');
+    assert.match(text, /- Selection: Chest and shoulders are covered\. A Push day still needs an exercise for: triceps\./);
+    assert.match(text, /muscle growth range/);
+  });
+  it('Gegenproben: kein doppelter Satz, wenn die KI den Trizeps schon nennt; vollständiger Push ohne Hinweis', () => {
+    const data = buildCoachCheckData(push);
+    const named = sanitizeCoachCheck({ ...aiAnswer, selection: { verdict: 'hint', text: 'Brust und Schultern sind dabei, für den Trizeps fehlt eine Übung.' } }, data);
+    assert.ok(!named.includes('fehlt noch eine Übung für'));
+    const full = buildCoachCheckData({ ...push, exercises: [...push.exercises, { name: 'Band Close-Grip Push-Up', setDetails: done }] });
+    assert.deepEqual(full.missing_groups, []);
+    // Eigene Übung ohne Katalog-Muskel: keine Aussage über Fehlendes
+    assert.deepEqual(buildCoachCheckData({ ...push, exercises: [...push.exercises, { name: 'Meine Spezialübung', setDetails: done }] }).missing_groups, []);
+    // Wortteile werden nicht ersetzt
+    assert.equal(plainWords('Flats und Lattenrost', 'de'), 'Flats und Lattenrost');
+  });
+  it('ohne erledigte Sätze mit Werten: kein Feedback (Absprache 13.11.)', () => {
+    assert.equal(workoutHasLoggedSets(push), true);
+    assert.equal(workoutHasLoggedSets({ exercises: [{ setDetails: [{ reps: null }] }] }), false);
+    assert.equal(workoutHasLoggedSets({ exercises: [{ setDetails: [{ reps: 10, done: false }] }] }), false);
+    assert.equal(workoutHasLoggedSets({ exercises: [{ setDetails: [{ reps: 10, isWarmup: true }] }] }), false);
+    assert.equal(workoutHasLoggedSets({ exercises: [{ measureMode: 'time', setDetails: [{ durationSeconds: 30 }] }] }), true);
   });
 });

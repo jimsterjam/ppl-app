@@ -115,6 +115,14 @@
       </div>
     </div>
 
+    <!-- Keine erledigten Sätze mit Werten: kein KI-Feedback (Absprache Jimmy 13.11.) -->
+    <div v-else-if="noData" class="summary-content fallback">
+      <p>{{ t('postWorkout.noDataFeedback') }}</p>
+      <button class="primary" type="button" @click="dismissSummary">
+        {{ t('common.continue') }}
+      </button>
+    </div>
+
     <!-- Insufficient History: eine WERTENDE (vergleichende) Analyse braucht entweder genug
          identische Wiederholungen ODER genug verstrichenen Zeitraum (siehe
          AI_FEEDBACK_MIN_REPETITIONS / AI_FEEDBACK_MIN_HISTORY_DAYS serverseitig). -->
@@ -260,6 +268,7 @@ const analysisSnapshot = ref([])
 const resolvedWorkoutIdForRating = ref('')
 const error = ref(null)
 const insufficientHistory = ref(false)
+const noData = ref(false)
 const remainingCount = ref(0)
 const remainingDays = ref(0)
 const networkUnavailable = ref(false)
@@ -398,6 +407,7 @@ async function loadAIFeedback({ refresh = false } = {}) {
     feedback.value = null
     analysisSnapshot.value = []
     insufficientHistory.value = false
+    noData.value = false
     remainingDays.value = 0
     networkUnavailable.value = false
     syncPending.value = false
@@ -489,6 +499,10 @@ async function loadAIFeedback({ refresh = false } = {}) {
         workoutId: props.workoutId
       })
       logDiagnostic('ai-feedback-result', { workoutId: props.workoutId, outcome: 'network_unavailable' })
+    } else if (response.data?.feedback_status === 'no_data') {
+      untrackFeedback(resolvedWorkoutId)
+      noData.value = true
+      logDiagnostic('ai-feedback-result', { workoutId: props.workoutId, outcome: 'no_data' })
     } else if (response.data?.feedback_status === 'insufficient_history') {
       untrackFeedback(resolvedWorkoutId)
       insufficientHistory.value = true
