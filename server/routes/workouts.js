@@ -69,6 +69,8 @@ import {
   checkAiBurstLimit
 } from '../utils/aiUtils.js';
 import { z } from 'zod';
+import { shouldAutoCoachCheck, canRequestCoachCheck, firstCoachCheckIntro } from '../utils/coachCheck.js';
+import { runCoachCheck } from '../services/coachCheckService.js';
 import { validateQuery } from '../middleware/validateRequest.js';
 
 // Pagination-Schema für GET /api/workouts
@@ -1097,7 +1099,8 @@ router.get("/feedbacks", firebaseAuthMiddleware, async (req, res) => {
         { $project: {
           name: 1, type: 1, date: 1, completed: 1,
           ai_feedback: 1, ai_generated_at: 1, ai_metadata: 1, ai_analysis_snapshot: 1,
-          ai_feedback_status: 1, ai_pending_since: 1, ai_feedback_kind: 1, ai_feedback_language: 1, ai_note_answers: 1
+          ai_feedback_status: 1, ai_pending_since: 1, ai_feedback_kind: 1, ai_feedback_language: 1, ai_note_answers: 1,
+          origin: 1, ai_coach_check: 1
         } }
       ]),
       Workout.countDocuments(query)
@@ -1127,7 +1130,10 @@ router.get("/feedbacks", firebaseAuthMiddleware, async (req, res) => {
         // Sprache, in der der Text erzeugt wurde ('de' | 'en'), null = älteres Feedback (Client erkennt sie am Text).
         ai_feedback_language: w.ai_feedback_language || null,
         // Antworten auf Fragen in den Notizen ([{ kind, text }], leer = keine Frage).
-        ai_note_answers: w.ai_note_answers || []
+        ai_note_answers: w.ai_note_answers || [],
+        // Coach-Check auf Wunsch (Knopf nur bei origin 'manual'): null = noch keiner angefordert.
+        origin: w.origin || null,
+        ai_coach_check: w.ai_coach_check?.text ? w.ai_coach_check : null
       })),
       page,
       limit,
@@ -1510,7 +1516,8 @@ router.post("/", firebaseAuthMiddleware, async (req, res) => {
     // Anlegen eines bereits als "completed" markierten Workouts (Nutzer schließt direkt beim
     // ersten Speichern ab, ohne vorherigen unvollständigen Server-Stand) hier gesetzt, analog
     // zur Logik in PUT /:id.
-    const { completedAt: _bodyCompletedAt, ...bodyRest } = req.body;
+    // ai_coach_check setzt nur der Server (POST /:id/coach-check), nie der Client.
+    const { completedAt: _bodyCompletedAt, ai_coach_check: _bodyCoachCheck, ...bodyRest } = req.body;
     const workout = await Workout.create({
       ...bodyRest,
       userId,
@@ -1547,7 +1554,9 @@ router.put("/:id", firebaseAuthMiddleware, async (req, res) => {
     // completedAt wird ausschließlich server-seitig gesetzt (siehe Kommentar am Feld in
     // models/Workout.js), damit der Client das Ende des Bearbeitungsfensters nicht manipulieren
     // kann.
-    const { _id: _bodyId, completedAt: _bodyCompletedAt, ...updateBody } = req.body;
+    const { _id: _bodyId, completedAt: _bodyCompletedAt, ai_coach_check: _bodyCoachCheck, ...updateBody } = req.body;
+    // Übungen geändert: ein früherer Coach-Check passt nicht mehr zur Zusammenstellung (kann neu angefordert werden).
+    if (Array.isArray(updateBody.exercises)) updateBody.ai_coach_check = null;
 
     const existing = await Workout.findOne({ _id: req.params.id, userId }).select('completed completedAt').lean();
     if (!existing) {
@@ -2064,6 +2073,62 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
     // Auch ein ganz neues Workout bekommt so eine Erste Einordnung.
     const isFirstLookFeedback = matchingCount < AI_FEEDBACK_MIN_REPETITIONS;
 
+    // 2a. Coach-Check statt Erster Einordnung (Absprache Jimmy 13.11., utils/coachCheck.js): erstes Mal mit genau diesen
+    // Übungen UND selbst zusammengestellt. Liefert die KI nichts Verwertbares, geht es unten mit der normalen Ersten
+    // Einordnung weiter (der Platz im Kontingent wird dann zurückgegeben).
+    if (shouldAutoCoachCheck(currentWorkout, matchingCount)) {
+      const language = resolveFeedbackLanguage(req);
+      const slot = await withAiQuotaSlot({
+        claim: () => claimAiSlot(entitlements),
+        release: (claim) => releaseAiSlot(entitlements, claim),
+        run: () => runCoachCheck({ workout: currentWorkout, language, requestId })
+      });
+      // Datenbankfehler beim Beanspruchen: unten normal weiter (dort antwortet der Server wiederholbar)
+      if (slot.limited && !slot.error) {
+        return res.json({
+          success: true,
+          workoutId: currentWorkout._id,
+          workoutDate: currentWorkout.date,
+          feedback_status: 'quota_limited',
+          aiUsage: getAiLimitSnapshot(entitlements),
+          metadata: { requestId, timestamp: new Date().toISOString(), aiAvailable: false }
+        });
+      }
+      if (!slot.limited && slot.result) {
+        const feedback = applyFirstLookOutlook(`${firstCoachCheckIntro(language)}\n\n${slot.result}`, language);
+        const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+        await Workout.updateOne(
+          { _id: workoutId, userId },
+          {
+            $set: {
+              ai_feedback: feedback,
+              ai_generated_at: new Date(),
+              ai_metadata: { provider: 'openai', model },
+              ai_analysis_snapshot: [],
+              ai_feedback_kind: 'coach_check',
+              ai_feedback_language: language,
+              ai_note_answers: [],
+              ai_feedback_status: 'generated'
+            }
+          }
+        ).catch((e) => logger.warn('⚠️ Konnte Coach-Check nicht speichern', { requestId, error: e.message }));
+        logger.info('🧭 Coach-Check (erstes Mal) erzeugt', { requestId, workoutId });
+        return res.json({
+          success: true,
+          workoutId: currentWorkout._id,
+          workoutDate: currentWorkout.date,
+          ai_feedback: feedback,
+          ai_metadata: { provider: 'openai', model },
+          ai_analysis_snapshot: [],
+          feedback_kind: 'coach_check',
+          feedback_language: language,
+          note_answers: [],
+          aiUsage: getAiLimitSnapshot(entitlements),
+          metadata: { requestId, timestamp: new Date().toISOString(), aiAvailable: true }
+        });
+      }
+    }
+
     // 2b'. Ab hier wird wirklich generiert: als "wird erstellt" markieren, damit der
     // Feedback-Verlauf das Workout auch dann zeigt, wenn diese Anfrage scheitert (z.B.
     // KI-Relay im Kaltstart) - der Client lädt automatisch nach (feedbackTracker.js).
@@ -2571,6 +2636,54 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
 });
 
 // 🚀 SIMPLE PROGRESS FEEDBACK: Einfaches Feedback zu einzelner Übung
+// Coach-Check auf Wunsch (Knopf im Feedback-Verlauf, Absprache Jimmy 13.11.): nur selbst zusammengestellte, abgeschlossene
+// Workouts; verbraucht eine KI-Anfrage. Ergebnis wird gespeichert und danach wiederverwendet (kein zweiter Verbrauch).
+router.post("/:id/coach-check", firebaseAuthMiddleware, requireAiConsent, async (req, res) => {
+  const requestId = `coachcheck_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+  try {
+    const { userId } = req.auth;
+    const workoutId = req.params.id;
+    const burst = checkAiBurstLimit(userId);
+    if (!burst.allowed) {
+      return res.status(429).json({ error: 'Too many AI requests in a short timeframe', code: 'AI_RATE_LIMITED', retryAfter: burst.retryAfterSec, requestId });
+    }
+    if (!(await import('mongoose')).default.Types.ObjectId.isValid(workoutId)) {
+      return res.status(400).json({ error: 'Invalid workout ID', requestId });
+    }
+    const workout = await Workout.findOne({ _id: workoutId, userId }).lean();
+    if (!workout) return res.status(404).json({ error: 'Workout not found', requestId });
+    if (!canRequestCoachCheck(workout)) {
+      return res.status(400).json({ error: 'Coach check only for completed, self-built workouts', code: 'COACH_CHECK_NOT_AVAILABLE', requestId });
+    }
+    if (workout.ai_coach_check?.text) {
+      return res.json({ success: true, coach_check: workout.ai_coach_check, cached: true, requestId });
+    }
+    const entitlements = await getEntitlements(userId);
+    const language = resolveFeedbackLanguage(req);
+    const slot = await withAiQuotaSlot({
+      claim: () => claimAiSlot(entitlements),
+      release: (claim) => releaseAiSlot(entitlements, claim),
+      run: () => runCoachCheck({ workout, language, requestId })
+    });
+    if (slot.limited && slot.error) {
+      return res.status(503).json({ error: 'AI quota temporarily unavailable', code: 'AI_QUOTA_UNAVAILABLE', retryAfter: 5, requestId });
+    }
+    if (slot.limited) {
+      return res.status(429).json({ error: 'AI quota exhausted', code: 'AI_QUOTA_EXHAUSTED', aiUsage: getAiLimitSnapshot(entitlements), requestId });
+    }
+    if (!slot.result) {
+      return res.status(502).json({ error: 'Coach check could not be generated', code: 'COACH_CHECK_FAILED', requestId });
+    }
+    const coachCheck = { text: slot.result, language, generated_at: new Date() };
+    await Workout.updateOne({ _id: workoutId, userId }, { $set: { ai_coach_check: coachCheck } });
+    logger.info('🧭 Coach-Check (auf Wunsch) erzeugt', { requestId, workoutId });
+    return res.json({ success: true, coach_check: coachCheck, aiUsage: getAiLimitSnapshot(entitlements), requestId });
+  } catch (error) {
+    logger.error('❌ Coach-Check Fehler', { requestId, message: error.message });
+    return res.status(500).json({ error: 'Coach check failed', requestId });
+  }
+});
+
 router.post("/ai-progress-feedback", firebaseAuthMiddleware, requireAiConsent, async (req, res) => {
   const requestId = `progress_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 

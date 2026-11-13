@@ -270,6 +270,22 @@ export async function requestAiAnalysis(workoutId, token = null, { timeoutMs } =
   }
 }
 
+// Coach-Check auf Wunsch (Absprache Jimmy 13.11.): Passen Auswahl, Reihenfolge, Sätze und Wiederholungen? Nur für selbst
+// zusammengestellte Workouts, verbraucht eine KI-Anfrage. Antwort: { coach_check: { text, language, generated_at } }.
+export async function requestCoachCheck(workoutId, token = null, { timeoutMs } = {}) {
+  try {
+    const config = {
+      ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+      ...(Number.isFinite(timeoutMs) && timeoutMs > 0 ? { timeout: timeoutMs } : {})
+    }
+    const res = await api.post(`/${workoutId}/coach-check`, { language: getAppLanguage() }, config)
+    return res.data
+  } catch (error) {
+    logger.warn('⚠️ Workouts API - requestCoachCheck failed:', error?.message)
+    throw handleAPIError(error, 'Coach-Check anfordern', { showToast: false })
+  }
+}
+
 // Neues Workout erstellen / offline fallback
 export async function createWorkout(workoutData, token = null, options = {}) {
   const skipOfflineQueue = options?.skipOfflineQueue === true

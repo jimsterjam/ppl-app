@@ -68,6 +68,8 @@ const showEquipmentFilter = ref(false)
 const selectedEquipment = ref('')
 const favoriteAutostartTriggered = ref(false)
 const favoriteContext = ref(null)
+// Herkunft aus dem Prefill (Generator: 'generated'); ohne Prefill = selbst zusammengestellt (siehe originForNewWorkout)
+const prefillOrigin = ref(null)
 // Als Favorit speichern, ohne das Workout zu starten (Absprache Jimmy 04.11.)
 const showFavoriteModal = ref(false)
 const favoriteName = ref('')
@@ -122,6 +124,7 @@ function consumeQuickPrefill() {
 	const routeState = readWorkoutBuilderRouteState(route.query)
 	if (!routeState.quick) return
 	const parsed = consumeWorkoutBuilderPrefill()
+	prefillOrigin.value = parsed?.origin === 'generated' ? 'generated' : null
 	const favoriteId = String(parsed?.favoriteId || '').trim()
 	if (parsed?.favoriteSource && favoriteId) {
 		favoriteContext.value = {
@@ -142,6 +145,17 @@ function consumeQuickPrefill() {
 			? exercise.setDetails
 			: []
 	}))
+}
+
+/**
+ * Herkunft des neuen Workouts (Absprache Jimmy 13.11.): Favorit/Plan > generiert > selbst zusammengestellt.
+ * Steuert die Favorit-Frage beim Speichern (utils/favoriteAsk.js) und den Coach-Check (server/utils/coachCheck.js).
+ */
+function originForNewWorkout() {
+	if (planRefFromRoute().planId) return 'plan'
+	if (favoriteContext.value?.favoriteId) return 'favorite'
+	if (prefillOrigin.value === 'generated') return 'generated'
+	return 'manual'
 }
 
 function planRefFromRoute() {
@@ -439,7 +453,8 @@ async function createWorkout() {
 			// Ziel des Workouts (im Dashboard abgefragt, siehe utils/workoutGoal.js) - danach fest.
 			goal: readWorkoutBuilderRouteState(route.query).goal,
 			// Aus einem Trainingsplan gestartet: Plan und Tag mitspeichern (nur beide zusammen).
-			...planRefFromRoute()
+			...planRefFromRoute(),
+			origin: originForNewWorkout()
 		};
 		const tempId = getDraftId();
 		const tempWorkout = {

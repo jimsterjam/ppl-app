@@ -10,7 +10,7 @@ trägt ihre Backlog-Änderung mit; bis zum Merge steht sie nur dort).
 Kennzeichnung: **[A]** autonom erlaubt · **[F]** Freigabe von Jimmy nötig · **[P]** wartet auf Jimmy
 (Info, Entscheidung oder Handgriff außerhalb des Repos). Priorität: P1 (zuerst) bis P3.
 
-Zuletzt aktualisiert: 2026-11-12
+Zuletzt aktualisiert: 2026-11-13
 
 ---
 
@@ -83,6 +83,7 @@ finden sollen und was daran geändert wurde. Regel in `CLAUDE.md` (Cloud-Session
 
 Nur Produkt-/Architekturentscheidungen mit Datum. Dauerhafte Arbeitsregeln gehören in `CLAUDE.md`.
 
+- 2026-11-13 – Favorit-Frage beim Speichern (Absprache Jimmy): selbst zusammengestellte und generierte Workouts fragen beim ersten Speichern „Als Favorit merken?“ (nicht bei Favorit/Plan, Bearbeiten, gleichem Favoriten; Limit -> Hinweis). Coach-Check: automatisch beim ersten selbst zusammengestellten Workout statt Erster Einordnung, sonst auf Wunsch im Feedback-Verlauf (eine KI-Anfrage). „KI-Auswertung erst später“ entfällt: jedes gespeicherte Workout bekommt Feedback, solange Kontingent da ist; leer = kein Feedback (Grund für Pro). Herkunft am Workout: `origin`.
 - 2026-11-12 – Apple-Watch-App zurückgestellt (Absprache Jimmy), siehe F15.
 - 2026-10-11 – Hinweis „Mitteilungen sind aus“ (Absprache Jimmy): iOS fragt nur einmal nach der Erlaubnis. Ist sie verweigert, zeigen Warm-up-Karte und Pausentimer-Einstellungen eine kurze Zeile mit Knopf „Einstellungen öffnen“ (iPhone-Einstellungen der App) und „Ausblenden“ (wird gemerkt). Verschwindet von selbst, wenn die Erlaubnis erteilt ist. Die Wecker-Erlaubnis (AlarmKit, iOS 26) ist davon getrennt und nicht abgedeckt.
 - 2026-10-11 – Hinweis erweitert (Absprache Jimmy): Der Hinweis erscheint auch, wenn iOS noch nie gefragt hat (dann Knopf „Erlauben“ löst die iOS-Frage aus; bei Ablehnung wechselt er auf „Einstellungen öffnen“). Zusätzlich fragt die App beim ersten „Start“ eines Warm-up-Timers zuerst nach der Mitteilungs-Erlaubnis. Grund: iOS listet die App erst unter Einstellungen > Mitteilungen, nachdem sie einmal gefragt hat.

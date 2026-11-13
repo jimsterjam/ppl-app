@@ -719,8 +719,20 @@
       @confirm="confirmLeave"
     />
 
-    <!-- Ursprünglich ein Modal das erscheint wenn man ein favorite speichern will. -->
-    <!-- <AppModal
+    <!-- Favorit-Frage beim ersten Speichern (Absprache Jimmy 13.11., utils/favoriteAsk.js) -->
+    <AppModal
+      v-model="showFavoriteAskModal"
+      :title="t('workoutDetail.favoriteAskTitle')"
+      :message="t('workoutDetail.favoriteAskText')"
+      :confirm-text="t('workoutDetail.favoriteAskYes')"
+      :cancel-text="t('workoutDetail.favoriteAskNo')"
+      type="info"
+      @confirm="onFavoriteAskYes"
+      @cancel="onFavoriteAskNo"
+    />
+
+    <!-- Name des Favoriten (nach "Ja, merken") -->
+    <AppModal
       v-model="showFavoriteNameModal"
       :title="t('workoutDetail.favoriteNameTitle')"
       :confirm-text="favoriteSaving ? t('workoutDetail.saving') : t('common.save')"
@@ -729,6 +741,7 @@
       :persistent="favoriteSaving"
       type="info"
       @confirm="confirmFavoriteSave"
+      @cancel="onFavoriteNameCancel"
     >
       <label class="favorite-modal-field">
         <span>{{ t('workoutDetail.favoriteNamePlaceholder') }}</span>
@@ -740,7 +753,8 @@
           :placeholder="t('workoutDetail.favoriteNamePlaceholder')"
         />
       </label>
-    </AppModal> -->
+      <small v-if="saveError && saveMsg" class="save-msg error">{{ saveMsg }}</small>
+    </AppModal>
 
     <!-- "Kurz prüfen" vor dem finalen Speichern (utils/saveReview.js): vergessene Sätze,
          auffällige Werte, fehlendes Feedback in EINEM Fenster. Blockiert nie. Tipp auf einen
@@ -781,15 +795,6 @@
           <span class="review-item-chevron" aria-hidden="true">›</span>
         </button>
       </div>
-      <!-- Früher eigener Button "Später bewerten" im Feedback-Fenster - jetzt als Häkchen,
-           damit alles in einem Fenster bleibt. Nur sichtbar, wenn Feedback fehlt. -->
-      <label v-if="saveReview.check.some((c) => c.kind === 'missingFeedback')" class="review-defer">
-        <input v-model="reviewDeferAi" type="checkbox" />
-        <span>
-          {{ t('workoutDetail.reviewDeferAi') }}
-          <small>{{ t('workoutDetail.missingNotesDeferHint') }}</small>
-        </span>
-      </label>
     </AppModal>
 
     <AppModal
@@ -1117,8 +1122,11 @@ import {
   getFavoriteNameValidationError,
   normalizeFavoriteName,
   normalizeWorkoutType,
-  buildStartedFavoriteWorkout
+  buildStartedFavoriteWorkout,
+  getFavoritesByType,
+  getFavoriteLimitPerType
 } from '@/utils/workoutFavorites'
+import { decideFavoriteAsk } from '@/utils/favoriteAsk'
 import { getActiveDraft, setActiveDraft, findActiveDraftByWorkoutId } from '@/utils/activeWorkoutDraft'
 import {
   clearAllDetailDraftSnapshots as clearAllDetailDraftSnapshotsUtil,
@@ -1272,6 +1280,9 @@ let viewStatePersistTimer = null
 const favoriteName = ref('')
 const favoriteSaving = ref(false)
 const showFavoriteNameModal = ref(false)
+const showFavoriteAskModal = ref(false)
+// Favorit-Frage wurde für dieses Workout schon gestellt (bzw. war nicht nötig) - nicht erneut fragen.
+let favoriteAskDone = false
 const showTimerActionModal = ref(false)
 const pendingTimerAction = ref(null)
 const bypassTimerLeaveGuard = ref(false)
@@ -1328,7 +1339,6 @@ const oneRepMaxSaving = ref([])
 // zurück zur Übung springen oder trotzdem speichern.
 const showSaveReviewModal = ref(false)
 const saveReview = ref({ forgotten: [], check: [], hasOpenSets: false, isEmpty: true })
-const reviewDeferAi = ref(false)
 let notesCheckAcknowledged = false
 // Merkt sich die gewählte Speicher-Option ("nur speichern" vs. "speichern + Favorit
 // aktualisieren"), während der Prüf-/Timer-Guard-Dialog dazwischenkommt, damit die
@@ -2015,7 +2025,8 @@ function reviewItemText(item) {
 
 function proceedAfterReview() {
   notesCheckAcknowledged = true
-  saveWorkout(pendingUpdateFavoriteOnSave, { deferAiFeedback: reviewDeferAi.value })
+  // "Feedback später" gibt es nicht mehr (Absprache Jimmy 13.11.): jedes gespeicherte Workout bekommt Feedback.
+  saveWorkout(pendingUpdateFavoriteOnSave)
 }
 
 // Speichern, wie es ist: Nicht Abgehaktes bleibt erhalten und wird als "nicht gemacht" gespeichert (nichts wird entfernt).
@@ -2797,7 +2808,7 @@ const coachMarks = computed(() => [
 const coachActive = computed(() => Boolean(workout.value) && !loading.value && !focus.active && !isReordering.value && !isFavoriteAdjustMode.value
   && !showAddExerciseModal.value && !timerOverlayOpen.value && !showExerciseMenu.value && !showSwapModal.value && !showLeaveModal.value
   && !showSaveReviewModal.value && !showRemoveExerciseModal.value && !showTrainingTypeModal.value && !showWeightSuggestionInfo.value
-  && !showTimerActionModal.value && !showDeleteNoteModal.value && !showFavoriteNameModal.value && !restTimer.isVisible)
+  && !showTimerActionModal.value && !showDeleteNoteModal.value && !showFavoriteNameModal.value && !showFavoriteAskModal.value && !restTimer.isVisible)
 
 // --- Übung wechseln (⇄) -------------------------------------------------------------------
 const showSwapModal = ref(false)
@@ -4207,6 +4218,27 @@ async function performSaveWorkout(updateFavorite = false, { deferAiFeedback = fa
 // verknüpfte Favoriten-Template unangetastet, auch wenn diese Session ursprünglich aus einem
 // Favoriten gestartet wurde.
 async function saveWorkout(updateFavorite = false, { deferAiFeedback = false } = {}) {
+  // Favorit-Frage zuerst (Absprache Jimmy 13.11., utils/favoriteAsk.js): einmal pro Workout, danach "Kurz prüfen".
+  if (!favoriteAskDone) {
+    const decision = decideFavoriteAsk({
+      workout: workout.value,
+      fromFavorite: Boolean(String(route.query?.favoriteId || '').trim()),
+      favoriteAdjust: isFavoriteAdjustMode.value,
+      favorites: getFavoritesByType(getFavoriteUserId(), normalizeWorkoutType(workout.value?.type || route.query.type || 'push')),
+      limit: getFavoriteLimitPerType()
+    })
+    favoriteAskDone = true
+    if (decision === 'limit') {
+      toast.show(t('workoutDetail.favoriteAskLimit', {
+        count: getFavoriteLimitPerType(),
+        type: workoutTypeLabel(workout.value?.type)
+      }), { type: 'info', duration: 4000 })
+    } else if (decision === 'ask') {
+      pendingUpdateFavoriteOnSave = updateFavorite
+      showFavoriteAskModal.value = true
+      return
+    }
+  }
   // "Kurz prüfen" zuerst: läuft VOR dem Timer-Guard, damit es auch beim direkten Klick auf
   // "Speichern" greift (der Timer-Guard deferred den eigentlichen Save ohnehin über
   // pendingTimerAction -> performSaveWorkout(), würde die Prüfung also umgehen, wenn sie
@@ -4215,7 +4247,6 @@ async function saveWorkout(updateFavorite = false, { deferAiFeedback = false } =
     const review = computeSaveReview()
     if (!review.isEmpty) {
       saveReview.value = review
-      reviewDeferAi.value = false
       pendingUpdateFavoriteOnSave = updateFavorite
       showSaveReviewModal.value = true
       return
@@ -4338,7 +4369,29 @@ function confirmFavoriteSave() {
   const ok = saveAsFavorite()
   if (ok) {
     showFavoriteNameModal.value = false
+    continueSaveAfterFavoriteAsk()
   }
+}
+
+// Typ-Name wie auf den Kacheln (Push, Pull, Legs, Full Body - in beiden Sprachen gleich)
+function workoutTypeLabel(type) {
+  return { push: 'Push', pull: 'Pull', legs: 'Legs', fullbody: 'Full Body' }[normalizeWorkoutType(type)] || 'Push'
+}
+
+// Favorit-Frage: Ja -> Namensfenster, Nein -> weiter speichern. Das Workout wird in jedem Fall gespeichert.
+function onFavoriteAskYes() {
+  showFavoriteAskModal.value = false
+  openFavoriteNameModal()
+}
+function onFavoriteAskNo() {
+  continueSaveAfterFavoriteAsk()
+}
+// Namensfenster abgebrochen: kein Favorit, das Workout wird trotzdem gespeichert.
+function onFavoriteNameCancel() {
+  continueSaveAfterFavoriteAsk()
+}
+function continueSaveAfterFavoriteAsk() {
+  saveWorkout(pendingUpdateFavoriteOnSave)
 }
 
 /**
