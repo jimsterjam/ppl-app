@@ -71,7 +71,7 @@ import {
 import { z } from 'zod';
 import {
   shouldAutoCoachCheck, canRequestCoachCheck, firstCoachCheckIntro, coachCheckInputChanged, withoutFields,
-  workoutHasLoggedSets,
+  workoutHasLoggedSets, HAS_LOGGED_SETS_QUERY,
   generateAndPersistCoachCheck, isCoachCheckSaved,
   SERVER_ONLY_CREATE_FIELDS, SERVER_ONLY_UPDATE_FIELDS, COACH_CHECK_LOCK_MS
 } from '../utils/coachCheck.js';
@@ -1104,11 +1104,12 @@ router.get("/feedbacks", firebaseAuthMiddleware, async (req, res) => {
     // models/Workout.js). Diese haben noch kein ai_feedback, sollen aber trotzdem in dieser
     // Liste auftauchen, damit der Nutzer sie über den "Jetzt generieren"-Button (siehe
     // AIFeedbackHistory.vue) wiederfindet.
+    // Offene Einträge nur mit erledigten Sätzen mit Werten - ohne Werte gibt es kein Feedback (Absprache Jimmy 13.11.)
     const query = {
       userId,
       $or: [
         { ai_feedback: { $exists: true, $ne: null } },
-        { ai_feedback_status: { $in: ['deferred', 'pending'] } }
+        { $and: [{ ai_feedback_status: { $in: ['deferred', 'pending'] } }, HAS_LOGGED_SETS_QUERY] }
       ]
     };
 
@@ -2070,12 +2071,9 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
     }
 
     // 1b'. Ohne erledigte Sätze mit Werten kein KI-Feedback (Absprache Jimmy 13.11.): nichts einzuordnen, kein Platz im
-    // Kontingent. Status zurück auf 'none', damit der Verlauf keinen offenen Eintrag ("Jetzt generieren") zeigt.
+    // Kontingent. Der Status bleibt unverändert: Kommen die Werte später (Offline-Sync eines PUT), lässt sich das
+    // Feedback noch erzeugen. Der Feedback-Verlauf blendet solche Einträge aus (HAS_LOGGED_SETS_QUERY in GET /feedbacks).
     if (!workoutHasLoggedSets(currentWorkout)) {
-      if (currentWorkout.ai_feedback_status === 'deferred' || currentWorkout.ai_feedback_status === 'pending') {
-        await Workout.updateOne({ _id: workoutId, userId }, { $set: { ai_feedback_status: 'none' } })
-          .catch((e) => logger.warn('⚠️ Konnte Feedback-Status nicht zurücksetzen', { requestId, error: e.message }));
-      }
       logger.info('📭 Workout analysis: keine Sätze mit Werten - kein Feedback', { requestId, workoutId });
       return res.json({
         success: true,

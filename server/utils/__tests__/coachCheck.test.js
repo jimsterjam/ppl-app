@@ -334,10 +334,10 @@ describe('Coach-Check: Alltagssprache und fehlende Muskelgruppe (Fall aus Produk
     assert.match(text, /- Selection: Chest and shoulders are covered\. A Push day still needs an exercise for: triceps\./);
     assert.match(text, /muscle growth range/);
   });
-  it('Gegenproben: kein doppelter Satz, wenn die KI den Trizeps schon nennt; vollständiger Push ohne Hinweis', () => {
+  it('Gegenproben: behauptet die KI, der Trizeps sei abgedeckt, nennt die App ihn trotzdem; vollständiger Push ohne Hinweis', () => {
     const data = buildCoachCheckData(push);
-    const named = sanitizeCoachCheck({ ...aiAnswer, selection: { verdict: 'hint', text: 'Brust und Schultern sind dabei, für den Trizeps fehlt eine Übung.' } }, data);
-    assert.ok(!named.includes('fehlt noch eine Übung für'));
+    const wrong = sanitizeCoachCheck({ ...aiAnswer, selection: { verdict: 'ok', text: 'Brust, Schultern und Trizeps sind gut abgedeckt.' } }, data);
+    assert.match(wrong, /Für einen Push-Tag fehlt noch eine Übung für: Trizeps\./);
     const full = buildCoachCheckData({ ...push, exercises: [...push.exercises, { name: 'Band Close-Grip Push-Up', setDetails: done }] });
     assert.deepEqual(full.missing_groups, []);
     // Eigene Übung ohne Katalog-Muskel: keine Aussage über Fehlendes
@@ -351,5 +351,45 @@ describe('Coach-Check: Alltagssprache und fehlende Muskelgruppe (Fall aus Produk
     assert.equal(workoutHasLoggedSets({ exercises: [{ setDetails: [{ reps: 10, done: false }] }] }), false);
     assert.equal(workoutHasLoggedSets({ exercises: [{ setDetails: [{ reps: 10, isWarmup: true }] }] }), false);
     assert.equal(workoutHasLoggedSets({ exercises: [{ measureMode: 'time', setDetails: [{ durationSeconds: 30 }] }] }), true);
+  });
+});
+
+describe('Coach-Check: Selbstprüfung zum Fix Alltagssprache', () => {
+  it('Großschreibung nur am Satzanfang, Übungsnamen bleiben unverändert', () => {
+    assert.equal(plainWords('Die Übungen treffen die quads gut.', 'de'), 'Die Übungen treffen die vordere Oberschenkel gut.');
+    assert.equal(plainWords('Quads sind dabei.', 'de'), 'Vordere Oberschenkel sind dabei.');
+    assert.equal(plainWords('Glutes Kickback steht vorne.', 'de', ['Glutes Kickback']), 'Glutes Kickback steht vorne.');
+    assert.equal(plainWords('The traps work hard.', 'en'), 'The neck work hard.');
+  });
+  it('eigene Übung mit Fachwort im Namen: Namensprüfung findet sie weiter', () => {
+    const data = buildCoachCheckData({ type: 'legs', exercises: [{ name: 'Glutes Kickback', setDetails: sets(10) }] });
+    const text = sanitizeCoachCheck({
+      selection: { verdict: 'ok', text: 'Passt.' },
+      order: { verdict: 'hint', text: 'Glutes Kickback steht allein, überleg eine Grundübung davor.' },
+      reps: { verdict: 'ok', text: 'Passt.' }
+    }, data);
+    assert.match(text, /Reihenfolge: Glutes Kickback steht allein/);
+  });
+  it('älteres Format ohne setDetails zählt als Workout mit Werten', () => {
+    assert.equal(workoutHasLoggedSets({ exercises: [{ name: 'Bench', sets: 3, reps: 10, weight: 60 }] }), true);
+    assert.equal(workoutHasLoggedSets({ exercises: [{ name: 'Bench', setDetails: [] }] }), false);
+  });
+  it('Abfrage für den Verlauf entspricht workoutHasLoggedSets (MongoDB-Abfrage an Beispielen, ausgewertet mit sift)', async () => {
+    // sift wertet MongoDB-Abfragen in JS aus (kommt mit mongoose) - so prüft der Test die echte Abfrage, nicht nur ihren Text
+    const { default: sift } = await import('sift');
+    const { HAS_LOGGED_SETS_QUERY } = await import('../coachCheck.js');
+    const matches = sift(HAS_LOGGED_SETS_QUERY);
+    const cases = [
+      { exercises: [{ setDetails: [{ reps: 10, done: true }] }] },
+      { exercises: [{ setDetails: [{ reps: 10 }] }] },
+      { exercises: [{ measureMode: 'time', setDetails: [{ durationSeconds: 30 }] }] },
+      { exercises: [{ name: 'Bench', sets: 3, reps: 10 }] },
+      { exercises: [{ setDetails: [{ reps: null }] }] },
+      { exercises: [{ setDetails: [{ reps: 10, done: false }] }] },
+      { exercises: [{ setDetails: [{ reps: 10, isWarmup: true }] }] },
+      { exercises: [{ setDetails: [] }] },
+      { exercises: [] }
+    ];
+    for (const w of cases) assert.equal(matches(w), workoutHasLoggedSets(w), JSON.stringify(w));
   });
 });

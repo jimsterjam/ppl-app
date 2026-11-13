@@ -328,8 +328,9 @@ async function generateNow(item) {
         window.dispatchEvent(new CustomEvent(AI_FEEDBACK_UPDATED_EVENT, { detail: { workoutId: item.workoutId } }))
       }
     } else if (data?.feedback_status === 'no_data') {
-      // Keine erledigten Sätze mit Werten: es gibt kein Feedback, der Eintrag ist nicht mehr offen
-      item.ai_feedback_status = 'none'
+      // Keine erledigten Sätze mit Werten: es gibt kein Feedback - Eintrag aus der Liste nehmen (der Server listet ihn
+      // ebenfalls nicht mehr, solange keine Werte da sind)
+      items.value = items.value.filter((entry) => entry !== item)
       toast.show(t('postWorkout.noDataFeedback'), { type: 'info', duration: 4000 })
       logDiagnostic('feedback-history-generate-now', { workoutId: item.workoutId, outcome: 'no_data' })
     } else if (data?.feedback_status === 'insufficient_history') {
