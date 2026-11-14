@@ -19,7 +19,7 @@ export const MAX_COACH_CHECK_TEXT = 1400;
 export const COACH_CHECK_LOCK_MS = 3 * 60 * 1000;
 // Felder, die nur der Server setzt - aus POST/PUT-Bodys entfernen. origin nur beim Anlegen (POST), nie beim Bearbeiten:
 // Sonst ließe sich ein generiertes Workout nachträglich zu "selbst zusammengestellt" machen (Copilot-Review 13.11.).
-export const SERVER_ONLY_CREATE_FIELDS = Object.freeze(['ai_coach_check', 'ai_coach_check_lock_at']);
+export const SERVER_ONLY_CREATE_FIELDS = Object.freeze(['ai_coach_check', 'ai_coach_check_lock_at', 'athlete_answers']);
 export const SERVER_ONLY_UPDATE_FIELDS = Object.freeze([...SERVER_ONLY_CREATE_FIELDS, 'origin']);
 const MAX_LINE = 260;
 const WORKOUT_TYPES = new Set(['push', 'pull', 'legs', 'fullbody']);

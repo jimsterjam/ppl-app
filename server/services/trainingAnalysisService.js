@@ -739,7 +739,7 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
     return null;
   }
 
-  const { athleteBodyweightKg = null, bodyweightCorrelation = null, notDoneExercises = [], progressionStates = null } = options || {};
+  const { athleteBodyweightKg = null, bodyweightCorrelation = null, notDoneExercises = [], progressionStates = null, athleteAnswers = null } = options || {};
 
   // Statistiken über alle Übungen
   const positiveExercises = exerciseAnalyses.filter(e => e.progression === 'positive');
@@ -822,6 +822,10 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
         ? { set_changes_opposite_directions: true }
         : {}),
 
+      // Antwort des Nutzers auf die Frage nach dem Training (Regel 33) - nur wenn vorhanden.
+      ...(athleteAnswers?.get?.(String(ex.exercise || '').trim().toLowerCase())
+        ? { athlete_answer: athleteAnswers.get(String(ex.exercise || '').trim().toLowerCase()) }
+        : {}),
       // Fortschrittszustand aus der App-Logik (Regel 29), z.B. "almost_there" - nur wenn vorhanden.
       ...(progressionStates?.get?.(String(ex.exercise || '').trim().toLowerCase())
         ? { progression_state: progressionStates.get(String(ex.exercise || '').trim().toLowerCase()) }
@@ -882,6 +886,9 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
         entry: {
           exercise: item.exerciseNameForAI || item.exercise,
           exercise_not_done: true,
+          ...(athleteAnswers?.get?.(String(item.exercise || '').trim().toLowerCase())
+            ? { athlete_answer: athleteAnswers.get(String(item.exercise || '').trim().toLowerCase()) }
+            : {}),
           ...(item.note ? { note: item.note } : {}),
           ...(item.noteContext ? { note_context: item.noteContext } : {})
         }

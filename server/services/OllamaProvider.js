@@ -6,6 +6,7 @@
  * NICHT für Produktion – nur für lokale Entwicklung.
  */
 
+import { describeAthleteAnswer } from '../utils/athleteAnswers.js';
 import { logger } from '../utils/logger.js';
 import AIProvider from './AIProvider.js';
 
@@ -145,6 +146,10 @@ ${exercises
 - Gewicht: ${ex.current_weight}kg
 - Wiederholungen (gesamt über alle Sätze): ${ex.current_reps}`;
 
+    if (ex.athlete_answer) {
+      const sentence = describeAthleteAnswer(ex.athlete_answer);
+      if (sentence) exPrompt += `\n\nAntwort des Nutzers nach dem Training (angetippt, verbindlich): ${sentence}`;
+    }
     if (ex.progression_state) {
       exPrompt += `\n\nFortschrittszustand (App-Logik, verbindlich): ${ex.progression_state} – motivierend einordnen, nicht als Rückschritt (kein "zwar ... aber").`;
     }

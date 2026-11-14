@@ -6,6 +6,7 @@
  * Sendet NUR strukturierte Backend-Daten, keine Rohdaten.
  */
 
+import { describeAthleteAnswer } from '../utils/athleteAnswers.js';
 import { logger } from '../utils/logger.js';
 import AIProvider from './AIProvider.js';
 import { createOpenAIClient, describeAiClientMode, ensureRelayAwake, markRelayContact } from '../utils/aiClientFactory.js';
@@ -413,6 +414,23 @@ KRITISCHE REGELN:
     - Ist der Rückgang stark (deutlich mehr als ein paar Wiederholungen) oder fehlen Sätze, gilt weiter Regel 8
       (neutral nebeneinanderstellen).
 
+33. ANTWORTEN DES NUTZERS NACH DEM TRAINING (athlete_answer, falls angegeben): Der Nutzer hat bei dieser Übung eine
+    kurze Frage per Antippen beantwortet. Das ist seine eigene Aussage, keine Vermutung - du darfst sie aufgreifen
+    und deinen Rat daran ausrichten, aber nichts darüber hinaus erfinden. Keine Zahlen (FAKTEN-REGEL).
+    - Letzter Satz "leicht": Zeit für mehr Gewicht, mutig und konkret sagen. "anstrengend, aber noch Luft": erst
+      mehr Wiederholungen im vorgesehenen Bereich, dann das Gewicht. "am Limit, aber sauber": Gewicht halten und
+      festigen, kein Steigern empfehlen. "am Limit, Ausführung wackelig": Gewicht halten (oder kurz etwas zurück),
+      bis es wieder sauber läuft - nie als Versagen darstellen.
+    - Vergleich mit dem letzten Mal: "sauberer/kontrollierter" zählt als Fortschritt, auch bei gleichen oder
+      etwas niedrigeren Zahlen. "ungefähr gleich": Konsolidierung, kein Grund zur Mahnung. "schwerer als sonst":
+      Pause, Schlaf, Tagesform als mögliche Gründe, nicht jede Einheit ist ein Rekord. "wackeliger": Gewicht halten.
+    - Abweichung "Absicht": bestätigen und den genannten Grund aufgreifen - nie als Rückschritt bezeichnen.
+      "musste anpassen": verständnisvoll einordnen, ein Grund wie müde/Zeit/Gerät belegt ist kein Fehler.
+      Beim Grund "Körper hat nicht mitgemacht" keine Ursache vermuten, keine medizinischen Aussagen (Regel 5).
+    - "weiß nicht" oder kein Grund: nichts hineindeuten.
+    - Die App empfiehlt selbst nie weniger Gewicht; rate nur dann zu etwas weniger Last, wenn die Antwort
+      "wackelig" lautet.
+
 OUTPUT-FORMAT ("Coach statt Protokoll" - Standard):
 Ungefähr 60-130 Wörter. KEINE sichtbaren Überschriften, kein Markdown-Fettdruck - einfache
 Zeilen reichen. Du schreibst ausschließlich die Einordnung - alle Fakten zeigt die App (FAKTEN-
@@ -623,6 +641,15 @@ export class OpenAIProvider extends AIProvider {
    * Baue Prompt aus strukturierten Trainings-Daten
    * Sendeet NUR Mini-Datensatz, nicht Rohdaten
    */
+  // Antwort des Nutzers auf eine Frage nach dem Training (Regel 33). Nur feste Bausteine aus utils/athleteAnswers.js -
+  // kein Nutzertext, deshalb ohne Einkapseln.
+  athleteAnswerBlock(ex) {
+    const sentence = ex?.athlete_answer ? describeAthleteAnswer(ex.athlete_answer) : '';
+    return sentence ? `
+
+**Antwort des Nutzers nach dem Training (angetippt, verbindlich, siehe Regel 33):** ${sentence}` : '';
+  }
+
   buildPrompt(trainingAnalysis) {
     const exercises = trainingAnalysis.exercises || [];
     const topImprovements = trainingAnalysis.top_improvements || [];
@@ -676,6 +703,7 @@ ${exercises
 
 **Notiz zu dieser Session (Grund, falls genannt):** ${this.wrapUserNote(ex.note_context?.session || ex.note)}`;
       }
+      skipped += this.athleteAnswerBlock(ex);
       return skipped;
     }
 
@@ -735,6 +763,8 @@ ${ex.sets_comparison.map(s => {
 
 **Keine Satzdaten erfasst** - zu dieser Übung liegen keine echten Arbeitssätze vor. Triff dazu KEINE Gewichts-/Wiederholungsaussage.`;
     }
+
+    exPrompt += this.athleteAnswerBlock(ex);
 
     // Fortschrittszustand der App (Regel 29): verbindliche Einordnung, ob das Ziel erreicht/knapp verfehlt wurde.
     if (ex.progression_state) {
