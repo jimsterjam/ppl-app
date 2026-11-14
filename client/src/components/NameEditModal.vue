@@ -203,7 +203,7 @@ async function save() {
 
 .save-btn {
   background: var(--accent-color);
-  color: #fff;
+  color: var(--accent-color-contrast);
   border-color: transparent;
 }
 
