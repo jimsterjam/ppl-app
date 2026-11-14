@@ -166,3 +166,25 @@ export function describeAthleteAnswer(entry) {
     ? `Die Abweichung war Absicht (bewusste Entscheidung).${reason}`
     : `Der Nutzer musste die Abweichung anpassen (keine bewusste Entscheidung).${reason}`;
 }
+
+// Gemeinsame Anweisung für alle KI-Anbieter (OpenAI-Regel 33, Ollama-Prompt), damit beide denselben Vertrag haben.
+// Bewusst ohne Regelnummern, damit der Text auch ohne den OpenAI-System-Prompt verständlich ist.
+export const ATHLETE_ANSWER_DIRECTIVE_LINES = Object.freeze([
+  'Der Nutzer hat bei dieser Übung eine kurze Frage per Antippen beantwortet. Das ist seine eigene Aussage, keine',
+  'Vermutung - greife sie auf und ordne sie ein, aber erfinde nichts darüber hinaus. Keine Zahlen nennen, die nicht in',
+  'den Trainingsdaten stehen. Du EMPFIEHLST nichts für die nächste Einheit - ob es mehr Gewicht oder mehr',
+  'Wiederholungen gibt, zeigt die App selbst.',
+  '- Letzter Satz "leicht": würdige, dass noch Reserve da war. "anstrengend, aber noch Luft": solide Arbeit, noch',
+  '  Reserve. "am Limit, aber sauber": starke, saubere Arbeit an der Grenze. "am Limit, Ausführung wackelig": ruhig',
+  '  und ohne Vorwurf einordnen, an der Grenze wird es zum Schluss unruhig, das gehört dazu - nie als Versagen.',
+  '- Vergleich mit dem letzten Mal: "sauberer/kontrollierter" zählt als Fortschritt, auch bei gleichen oder',
+  '  etwas niedrigeren Zahlen. "ungefähr gleich": Konsolidierung, kein Grund zur Mahnung. "schwerer als sonst":',
+  '  Pause, Schlaf, Tagesform können mitspielen, nicht jede Einheit ist ein Rekord. "wackeliger": ruhig einordnen.',
+  '- Abweichung "Absicht": bestätigen und den genannten Grund aufgreifen - nie als Rückschritt bezeichnen.',
+  '  "musste anpassen": verständnisvoll einordnen, ein Grund wie müde/Zeit/Gerät belegt ist kein Fehler.',
+  '  Beim Grund "Körper hat nicht mitgemacht" keine Ursache vermuten, keine medizinischen Aussagen.',
+  '- "weiß nicht" oder kein Grund: nichts hineindeuten.',
+  '- Technik-Übungen und Übungen auf Zeit werden nicht nach Gewicht oder Fortschritt bewertet; in der ersten Einordnung',
+  '  (feedback_mode "first_look") kein Vergleich und keine Entwicklung - dort nur die Antwort selbst würdigen. Eine',
+  '  Antwort macht die Übung zum Kandidaten für die Höchstgrenze von 3 Übungen mit Besonderheit, zwingt aber nicht zur Nennung.'
+]);

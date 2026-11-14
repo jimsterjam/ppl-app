@@ -8,6 +8,7 @@ import { analyzeWorkoutProgression, structureAnalysisForAI } from '../../service
 import OpenAIProvider, { getCoachSystemPromptText } from '../../services/OpenAIProvider.js'
 import { getVerifierChecklistText, RULE_LABELS } from '../../services/feedbackVerificationService.js'
 import { SERVER_ONLY_CREATE_FIELDS, SERVER_ONLY_UPDATE_FIELDS, withoutFields } from '../coachCheck.js'
+import OllamaProvider from '../../services/OllamaProvider.js'
 import Workout from '../../models/Workout.js'
 
 const workout = {
@@ -170,8 +171,43 @@ test('Variante des Vergleichs steht im Satz für die KI', () => {
 test('Regel 33 empfiehlt nichts (Regel 25) und nennt die Ausnahmen Technik, Zeit, first_look', () => {
   const rule = getCoachSystemPromptText().split('33. ANTWORTEN DES NUTZERS')[1].split('OUTPUT-FORMAT')[0]
   assert.match(rule, /EMPFIEHLST nichts/)
-  assert.match(rule, /Regel 31/)
-  assert.match(rule, /Regel 30/)
+  assert.match(rule, /Technik-Übungen und Übungen auf Zeit/)
   assert.match(rule, /first_look/)
   assert.doesNotMatch(rule, /mutig und konkret|Gewicht halten|rate nur/)
+})
+
+const answer = { topic: 'last_set', exerciseIndex: 0, answer: 'limit_clean' }
+const skippedAnswer = { topic: 'intent', exerciseIndex: 1, answer: 'adjusted', reason: 'no_time' }
+
+test('Review-Fund: Antwort steht auch bei Technik- und Zeit-Übungen im OpenAI-Prompt', () => {
+  const provider = Object.create(OpenAIProvider.prototype)
+  const prompt = provider.buildPrompt({
+    total_exercises_analyzed: 2, progression_summary: { positive: 0, stable: 2, negative: 0 },
+    top_improvements: [], top_declines: [],
+    exercises: [
+      { exercise: 'Handstand', training_type: 'technique', athlete_answer: answer },
+      { exercise: 'Plank', measure_mode: 'time', time_trend: 'same', athlete_answer: { topic: 'compare', exerciseIndex: 1, answer: 'cleaner' } }
+    ]
+  })
+  assert.equal((prompt.match(/siehe Regel 33/g) || []).length, 2)
+})
+
+test('Review-Fund: Ollama bekommt Antwort (auch ausgelassene Übung) und dieselbe Anweisung wie OpenAI', () => {
+  const provider = new OllamaProvider()
+  const base = {
+    total_exercises_analyzed: 1, progression_summary: { positive: 0, stable: 1, negative: 0 },
+    top_improvements: [], top_declines: []
+  }
+  const withAnswers = provider.buildPrompt({
+    ...base,
+    exercises: [
+      { exercise: 'Bench Press', progression: 'stable', period_description: 'x', current_weight: 60, current_reps: 25, athlete_answer: answer },
+      { exercise: 'Row', exercise_not_done: true, athlete_answer: skippedAnswer }
+    ]
+  })
+  assert.match(withAnswers, /am Limit, aber sauber/)
+  assert.match(withAnswers, /Zeitmangel/)
+  assert.match(withAnswers, /EMPFIEHLST nichts/)
+  const without = provider.buildPrompt({ ...base, exercises: [{ exercise: 'Bench Press', progression: 'stable', period_description: 'x', current_weight: 60, current_reps: 25 }] })
+  assert.doesNotMatch(without, /EMPFIEHLST nichts|Antwort des Nutzers/)
 })

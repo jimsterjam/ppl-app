@@ -2740,7 +2740,7 @@ router.post("/:id/athlete-answers", firebaseAuthMiddleware, requireAiConsent, as
     if (!(await import('mongoose')).default.Types.ObjectId.isValid(workoutId)) {
       return res.status(400).json({ error: 'Invalid workout ID' });
     }
-    const workout = await Workout.findOne({ _id: workoutId, userId }).select('completed completedAt exercises ai_feedback_status').lean();
+    const workout = await Workout.findOne({ _id: workoutId, userId }).select('completed completedAt exercises ai_feedback ai_feedback_status').lean();
     if (!workout) return res.status(404).json({ error: 'Workout not found' });
     if (workout.completed !== true) {
       return res.status(400).json({ error: 'Answers only for completed workouts', code: 'ATHLETE_ANSWERS_NOT_AVAILABLE' });
@@ -2752,7 +2752,7 @@ router.post("/:id/athlete-answers", firebaseAuthMiddleware, requireAiConsent, as
     const answers = sanitizeAthleteAnswers(req.body?.answers, workout);
     await Workout.updateOne({ _id: workoutId, userId }, { $set: { athlete_answers: answers } });
     // feedbackGenerated: Feedback gab es schon - die Antworten gelten erst für ein neu erzeugtes Feedback (refresh).
-    res.json({ success: true, answers, feedbackGenerated: workout.ai_feedback_status === 'generated' });
+    res.json({ success: true, answers, feedbackGenerated: resolveListFeedbackStatus(workout) === 'generated' });
   } catch (err) {
     logger.error('❌ Athlete answers error', { message: err?.message });
     res.status(500).json({ error: 'Saving answers failed' });
