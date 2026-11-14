@@ -422,7 +422,7 @@ const handleUpgrade = async () => {
 
 .toggle-option.active {
   background: var(--accent-color);
-  color: #fff;
+  color: var(--accent-color-contrast);
   box-shadow: 0 2px 8px rgba(102,126,234,0.08);
 }
 

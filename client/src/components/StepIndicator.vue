@@ -55,7 +55,7 @@ const steps = computed(() => {
 }
 .label { color: var(--muted); font-size: 0.9rem; }
 .bar { width: 28px; height: 2px; background: var(--card-border); margin: 0 6px 0 2px; display: inline-block; }
-.active .dot { background: var(--accent-color); color: #fff; border-color: var(--accent-color); }
+.active .dot { background: var(--accent-color); color: var(--accent-color-contrast); border-color: var(--accent-color); }
 .current .label { color: var(--fg); }
 .active ~ .step .dot { background: var(--surface); color: var(--muted); }
 </style>

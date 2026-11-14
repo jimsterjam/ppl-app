@@ -3,7 +3,9 @@ import { readPref, writePref } from '@/utils/userScopedStorage'
 
 const THEME_KEY = 'theme'
 const THEME_ACCENT_KEY = 'theme-accent'
-const ACCENT_MODES = ['lime', 'ocean', 'violet', 'sunset']
+// Reihenfolge = Reihenfolge in den Einstellungen. Jede Farbe braucht Regeln in style.css (dunkel UND hell) und die
+// Texte settings.colorMode<Name> (DE+EN) - das prüft accentColors.test.js.
+export const ACCENT_MODES = ['lime', 'ocean', 'violet', 'sunset', 'aqua', 'gold', 'chalk']
 
 function getInitialTheme() {
   try {

@@ -167,6 +167,37 @@ html {
   --accent-color-contrast: #2a0d00;
 }
 
+:root[data-accent="aqua"] {
+  --accent: #3fe0d0;
+  --accent-strong: #7cebdf;
+  --accent-contrast: #03211d;
+  --accent-soft: rgba(63, 224, 208, 0.2);
+  --accent-color: #3fe0d0;
+  --accent-color-strong: #7cebdf;
+  --accent-color-contrast: #03211d;
+}
+
+:root[data-accent="gold"] {
+  --accent: #ffc94a;
+  --accent-strong: #ffd980;
+  --accent-contrast: #2a1c00;
+  --accent-soft: rgba(255, 201, 74, 0.22);
+  --accent-color: #ffc94a;
+  --accent-color-strong: #ffd980;
+  --accent-color-contrast: #2a1c00;
+}
+
+/* Chalk: neutrales Weiß/Grau ohne Farbe (dunkel hell-weiß, hell anthrazit) */
+:root[data-accent="chalk"] {
+  --accent: #f1f3f8;
+  --accent-strong: #ffffff;
+  --accent-contrast: #111214;
+  --accent-soft: rgba(241, 243, 248, 0.2);
+  --accent-color: #f1f3f8;
+  --accent-color-strong: #ffffff;
+  --accent-color-contrast: #111214;
+}
+
 [data-theme="light"][data-accent="lime"] {
   --accent: #bede27;
   --accent-strong: #f5ff80;
@@ -206,6 +237,39 @@ html {
   --accent-soft: rgba(184, 79, 39, 0.2);
   --accent-color: #8a3e1e;
   --accent-color-strong: #a44c27;
+  --accent-color-contrast: #ffffff;
+}
+
+[data-theme="light"][data-accent="aqua"] {
+  /* Dunkles Petrol mit weißer Schrift/Icons auf Knöpfen (Kontrast >= 4,5:1, Absprache Jimmy 14.11.). */
+  --accent: #0f7a72;
+  --accent-strong: #12847b;
+  --accent-contrast: #ffffff;
+  --accent-soft: rgba(15, 122, 114, 0.2);
+  --accent-color: #0b5c56;
+  --accent-color-strong: #0f7a72;
+  --accent-color-contrast: #ffffff;
+}
+
+[data-theme="light"][data-accent="gold"] {
+  /* Dunkles Gold mit weißer Schrift/Icons auf Knöpfen (Kontrast >= 4,5:1, Absprache Jimmy 14.11.). */
+  --accent: #8f5f00;
+  --accent-strong: #996600;
+  --accent-contrast: #ffffff;
+  --accent-soft: rgba(143, 95, 0, 0.2);
+  --accent-color: #6e4900;
+  --accent-color-strong: #8f5f00;
+  --accent-color-contrast: #ffffff;
+}
+
+[data-theme="light"][data-accent="chalk"] {
+  /* Anthrazit mit weißer Schrift/Icons auf Knöpfen (Absprache Jimmy 14.11.). */
+  --accent: #2b2e3a;
+  --accent-strong: #353948;
+  --accent-contrast: #ffffff;
+  --accent-soft: rgba(43, 46, 58, 0.2);
+  --accent-color: #2b2e3a;
+  --accent-color-strong: #353948;
   --accent-color-contrast: #ffffff;
 }
 
