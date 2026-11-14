@@ -171,7 +171,7 @@ die Provider-Klassen oder den `/:id/ai-analysis`-Endpoint selbst.
 | Workout abschließen, KI-Feedback wird generiert | Happy Path | Kurzes, direktes Feedback im neuen „Coach-Chat"-Ton erscheint |
 | Feedback mit Daumen hoch/runter bewerten + Korrekturtext | Happy Path | Bewertung wird gespeichert, Korrektur landet erst nach explizitem Opt-in als dauerhafte Notiz |
 | „Feedback später bewerten" wählen | Happy Path | Bestätigung ohne Ladezustand, Eintrag erscheint als „ausstehend" im Feedback-Verlauf, „Jetzt generieren" funktioniert |
-| KI-Provider nicht erreichbar (Health-Check schlägt fehl) | Fehlerfall | `feedback_status: 'network_unavailable'`, kein 500er, `backend_analysis` bleibt sichtbar |
+| KI-Dienst liefert einen Fehler (OpenAI/Relay) | Fehlerfall | kein 500er, `backend_analysis` bleibt sichtbar, kein KI-Text. (`network_unavailable` sendet der Server nicht mehr, der Client zeigt den Status nur für ältere Antworten.) |
 | KI-Provider liefert Fehler/Timeout während Generierung | Fehlerfall | HTTP 200 ohne `ai_feedback`, generische Fehlermeldung im Client, kein automatischer Retry |
 | Wiederholtes schnelles Anfordern (Burst-Limit) | Edge Case | 429 nach 6 Requests/60s – da In-Memory, verloren bei Server-Neustart, ggf. während Testphase weniger wirksam als gedacht |
 | Freier Plan, wöchentliches Kontingent erschöpft, `/:id/ai-analysis` erneut aufrufen | **Edge Case (Bug, siehe Blocker #3)** | Kontingent wird hier aktuell nicht geprüft – Analyse läuft trotzdem durch |
