@@ -548,6 +548,10 @@ Entwurfstext. Du generierst KEIN neues Feedback, du prüfst nur.
     sowie jede Empfehlung zu Gewicht oder Wiederholungen (die hängt die App selbst an). ERLAUBT sind eine würdigende
     Einordnung dieser einen Einheit ohne Zahlen (Struktur, Umfang, Notiz bzw. bewusste Entscheidung des Nutzers) und
     ein kurzer, motivierender Satz. Ein kurzer Text (ca. 30-60 Wörter) ist hier gewollt, Regel 17 gilt entsprechend.
+27. Antwort des Nutzers (athlete_answer, falls im Datensatz vorhanden): der Text darf der angetippten Antwort nicht
+    widersprechen (z.B. Gewicht steigern empfehlen, obwohl der letzte Satz "am Limit" war; eine Abweichung als
+    Rückschritt bezeichnen, obwohl sie Absicht war) und keinen Grund vermuten, den der Nutzer nicht genannt hat. Das
+    Aufgreifen der Antwort ist ausdrücklich ERLAUBT.
 
 Antworte AUSSCHLIESSLICH als valides JSON-Objekt, keine Erklärung davor/danach:
 {
@@ -880,6 +884,7 @@ export const RULE_LABELS = {
   23: 'Vorsichtig/warnend klingende Formulierung genutzt ("achte darauf", "behalte im Blick", "passe an", "sei vorsichtig") statt handlungsorientierter Sprache',
   24: 'Fortschrittszustand (almost_there/ready_to_increase/hold_weight) als Rückschritt, Kompromiss ("zwar ... aber") oder Vorwurf formuliert',
   25: 'Technik-Übung (training_type technique) nach Gewicht/Wiederholungen/Fortschritt bewertet oder mit einer Steigerungsempfehlung versehen',
+  27: 'Antwort des Nutzers nach dem Training (athlete_answer) widersprochen oder überdeutet (z. B. Steigerung trotz "am Limit", Vermutung über den Grund)',
 };
 
 export function getRuleLabel(ruleNumber) {

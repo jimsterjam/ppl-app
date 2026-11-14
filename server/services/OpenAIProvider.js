@@ -6,6 +6,7 @@
  * Sendet NUR strukturierte Backend-Daten, keine Rohdaten.
  */
 
+import { describeAthleteAnswer, ATHLETE_ANSWER_DIRECTIVE_LINES } from '../utils/athleteAnswers.js';
 import { logger } from '../utils/logger.js';
 import AIProvider from './AIProvider.js';
 import { createOpenAIClient, describeAiClientMode, ensureRelayAwake, markRelayContact } from '../utils/aiClientFactory.js';
@@ -413,6 +414,8 @@ KRITISCHE REGELN:
     - Ist der Rückgang stark (deutlich mehr als ein paar Wiederholungen) oder fehlen Sätze, gilt weiter Regel 8
       (neutral nebeneinanderstellen).
 
+33. ANTWORTEN DES NUTZERS NACH DEM TRAINING (athlete_answer, falls angegeben): ${ATHLETE_ANSWER_DIRECTIVE_LINES.join('\n    ')}
+
 OUTPUT-FORMAT ("Coach statt Protokoll" - Standard):
 Ungefähr 60-130 Wörter. KEINE sichtbaren Überschriften, kein Markdown-Fettdruck - einfache
 Zeilen reichen. Du schreibst ausschließlich die Einordnung - alle Fakten zeigt die App (FAKTEN-
@@ -623,6 +626,15 @@ export class OpenAIProvider extends AIProvider {
    * Baue Prompt aus strukturierten Trainings-Daten
    * Sendeet NUR Mini-Datensatz, nicht Rohdaten
    */
+  // Antwort des Nutzers auf eine Frage nach dem Training (Regel 33). Nur feste Bausteine aus utils/athleteAnswers.js -
+  // kein Nutzertext, deshalb ohne Einkapseln.
+  athleteAnswerBlock(ex) {
+    const sentence = ex?.athlete_answer ? describeAthleteAnswer(ex.athlete_answer) : '';
+    return sentence ? `
+
+**Antwort des Nutzers nach dem Training (angetippt, verbindlich, siehe Regel 33):** ${sentence}` : '';
+  }
+
   buildPrompt(trainingAnalysis) {
     const exercises = trainingAnalysis.exercises || [];
     const topImprovements = trainingAnalysis.top_improvements || [];
@@ -676,6 +688,7 @@ ${exercises
 
 **Notiz zu dieser Session (Grund, falls genannt):** ${this.wrapUserNote(ex.note_context?.session || ex.note)}`;
       }
+      skipped += this.athleteAnswerBlock(ex);
       return skipped;
     }
 
@@ -688,6 +701,7 @@ ${exercises
 
 **Notiz zu dieser Session:** ${this.wrapUserNote(ex.note_context?.session || ex.note)}`;
       }
+      technique += this.athleteAnswerBlock(ex);
       return technique;
     }
 
@@ -704,6 +718,7 @@ ${exercises
 
 **Notiz zu dieser Session:** ${this.wrapUserNote(ex.note_context?.session || ex.note)}`;
       }
+      timed += this.athleteAnswerBlock(ex);
       return timed;
     }
 
@@ -735,6 +750,8 @@ ${ex.sets_comparison.map(s => {
 
 **Keine Satzdaten erfasst** - zu dieser Übung liegen keine echten Arbeitssätze vor. Triff dazu KEINE Gewichts-/Wiederholungsaussage.`;
     }
+
+    exPrompt += this.athleteAnswerBlock(ex);
 
     // Fortschrittszustand der App (Regel 29): verbindliche Einordnung, ob das Ziel erreicht/knapp verfehlt wurde.
     if (ex.progression_state) {

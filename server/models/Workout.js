@@ -4,6 +4,7 @@ import { sanitizePlanRef } from '../utils/trainingPlanValidation.js';
 import { sanitizeFeedbackLanguage } from '../utils/feedbackLanguage.js';
 import { sanitizeStoredNoteAnswers } from '../utils/noteQuestions.js';
 import { sanitizeWorkoutOrigin, sanitizeStoredCoachCheck } from '../utils/coachCheck.js';
+import { sanitizeStoredAthleteAnswers } from '../utils/athleteAnswers.js';
 import mongoose from "mongoose";
 
 // Hilfsfunktion zur Kanonisierung des Workout-Typs
@@ -212,6 +213,21 @@ const workoutSchema = new mongoose.Schema({
     },
     default: null,
     set: sanitizeStoredCoachCheck
+  },
+  // Antworten auf die kurzen Fragen nach dem Training (Backlog F16): nur feste Werte, höchstens zwei Einträge. Setzt nur
+  // der Server (POST /:id/athlete-answers), nie der Request-Body (siehe SERVER_ONLY_CREATE_FIELDS).
+  athlete_answers: {
+    type: [{
+      _id: false,
+      topic: { type: String },
+      exercise: { type: String, maxlength: 120 },
+      exerciseIndex: { type: Number },
+      answer: { type: String },
+      reason: { type: String, default: null },
+      variant: { type: String, default: null }
+    }],
+    default: [],
+    set: sanitizeStoredAthleteAnswers
   },
   // Sperre, solange ein Coach-Check läuft (Copilot-Review 13.11.): Zwei gleichzeitige Anfragen sollen nicht zweimal das
   // Kontingent verbrauchen. Nur der Server setzt sie (routes/workouts.js, claimCoachCheckLock); nach COACH_CHECK_LOCK_MS

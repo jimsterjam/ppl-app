@@ -11,6 +11,7 @@
  */
 
 import { logger } from '../utils/logger.js';
+import { isExerciseNotDone } from '../utils/exerciseDone.js';
 import { determineTrendWithProfile, resolveEffectiveProfile, buildNoteContext } from './exerciseAnalysisRules.js';
 
 // Satzgewichte und ihre Änderungen auf 2 Nachkommastellen: 1,25-kg-Scheiben ergeben Werte wie
@@ -87,10 +88,7 @@ export function calculateExerciseStats(exercise) {
  * Nicht gemachte Übungen fließen NICHT in die Zahlen-Analysen ein (calculateExerciseStats -> null), werden
  * der KI aber als "nicht gemacht" samt Notiz mitgegeben (collectNotDoneExercises).
  */
-export function isExerciseNotDone(exercise) {
-  const sets = Array.isArray(exercise?.setDetails) ? exercise.setDetails.filter(set => set && !set.isWarmup) : [];
-  return sets.length > 0 && sets.every(set => set.done === false);
-}
+export { isExerciseNotDone };
 
 /**
  * Nicht gemachte Übungen des aktuellen Workouts für den KI-Kontext (Absprache Jimmy 13.10.):
@@ -739,7 +737,7 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
     return null;
   }
 
-  const { athleteBodyweightKg = null, bodyweightCorrelation = null, notDoneExercises = [], progressionStates = null } = options || {};
+  const { athleteBodyweightKg = null, bodyweightCorrelation = null, notDoneExercises = [], progressionStates = null, athleteAnswers = null } = options || {};
 
   // Statistiken über alle Übungen
   const positiveExercises = exerciseAnalyses.filter(e => e.progression === 'positive');
@@ -822,6 +820,10 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
         ? { set_changes_opposite_directions: true }
         : {}),
 
+      // Antwort des Nutzers auf die Frage nach dem Training (Regel 33) - nur wenn vorhanden.
+      ...(athleteAnswers?.get?.(ex.workoutIndex)
+        ? { athlete_answer: athleteAnswers.get(ex.workoutIndex) }
+        : {}),
       // Fortschrittszustand aus der App-Logik (Regel 29), z.B. "almost_there" - nur wenn vorhanden.
       ...(progressionStates?.get?.(String(ex.exercise || '').trim().toLowerCase())
         ? { progression_state: progressionStates.get(String(ex.exercise || '').trim().toLowerCase()) }
@@ -882,6 +884,9 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
         entry: {
           exercise: item.exerciseNameForAI || item.exercise,
           exercise_not_done: true,
+          ...(athleteAnswers?.get?.(item.workoutIndex)
+            ? { athlete_answer: athleteAnswers.get(item.workoutIndex) }
+            : {}),
           ...(item.note ? { note: item.note } : {}),
           ...(item.noteContext ? { note_context: item.noteContext } : {})
         }

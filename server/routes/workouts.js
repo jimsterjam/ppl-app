@@ -75,6 +75,7 @@ import {
   generateAndPersistCoachCheck, isCoachCheckSaved,
   SERVER_ONLY_CREATE_FIELDS, SERVER_ONLY_UPDATE_FIELDS, COACH_CHECK_LOCK_MS
 } from '../utils/coachCheck.js';
+import { sanitizeAthleteAnswers, activeAthleteAnswerMap } from '../utils/athleteAnswers.js';
 
 // Coach-Check nur einmal gleichzeitig je Workout (Copilot-Review 13.11.): atomar über ai_coach_check_lock_at. Die
 // Bedingung (z. B. "noch kein Feedback") steht in derselben Abfrage, damit eine zweite Anfrage nicht nach einer gerade
@@ -2372,6 +2373,8 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
     const structuredAnalysis = structureAnalysisForAI(exerciseAnalyses, {
       notDoneExercises,
       progressionStates,
+      // Antworten auf die Fragen nach dem Training (F16); nur die, die noch zur Übung an dieser Stelle passen.
+      athleteAnswers: activeAthleteAnswerMap(currentWorkout),
       // Null-Annahmen-Prinzip (Kap. 24): nur ausgeben, wenn für DIESE Session tatsächlich
       // erfasst (siehe optionales Eingabefeld in WorkoutDetailView.vue) - sonst korrekt
       // weggelassen.
@@ -2723,6 +2726,36 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
       message: error.message,
       requestId
     });
+  }
+});
+
+// Antworten auf die kurzen Fragen nach dem Training (Backlog F16): nur feste Werte, der Server baut jeden Eintrag neu
+// auf und verwirft Ungültiges (kein Ablehnen: Offline-Sync würde es endlos wiederholen). Leere Liste = Antworten löschen.
+// Es zählt der zuletzt gespeicherte Stand (der Client schickt immer die komplette Liste).
+// requireAiConsent: ohne KI-Einwilligung gibt es keine Fragen und damit auch nichts zu speichern.
+router.post("/:id/athlete-answers", firebaseAuthMiddleware, requireAiConsent, async (req, res) => {
+  try {
+    const { userId } = req.auth;
+    const workoutId = req.params.id;
+    if (!(await import('mongoose')).default.Types.ObjectId.isValid(workoutId)) {
+      return res.status(400).json({ error: 'Invalid workout ID' });
+    }
+    const workout = await Workout.findOne({ _id: workoutId, userId }).select('completed completedAt exercises ai_feedback ai_feedback_status').lean();
+    if (!workout) return res.status(404).json({ error: 'Workout not found' });
+    if (workout.completed !== true) {
+      return res.status(400).json({ error: 'Answers only for completed workouts', code: 'ATHLETE_ANSWERS_NOT_AVAILABLE' });
+    }
+    // Gleiches Bearbeitungsfenster wie PUT /:id: danach lässt sich ein altes Training nicht mehr verändern.
+    if (isWorkoutEditWindowExpired(workout).expired) {
+      return res.status(409).json({ error: 'Edit window expired', code: 'EDIT_WINDOW_EXPIRED' });
+    }
+    const answers = sanitizeAthleteAnswers(req.body?.answers, workout);
+    await Workout.updateOne({ _id: workoutId, userId }, { $set: { athlete_answers: answers } });
+    // feedbackGenerated: Feedback gab es schon - die Antworten gelten erst für ein neu erzeugtes Feedback (refresh).
+    res.json({ success: true, answers, feedbackGenerated: resolveListFeedbackStatus(workout) === 'generated' });
+  } catch (err) {
+    logger.error('❌ Athlete answers error', { message: err?.message });
+    res.status(500).json({ error: 'Saving answers failed' });
   }
 });
 

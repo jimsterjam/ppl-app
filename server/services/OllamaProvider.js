@@ -6,10 +6,17 @@
  * NICHT für Produktion – nur für lokale Entwicklung.
  */
 
+import { describeAthleteAnswer, ATHLETE_ANSWER_DIRECTIVE_LINES } from '../utils/athleteAnswers.js';
 import { logger } from '../utils/logger.js';
 import AIProvider from './AIProvider.js';
 
 // WICHTIG: Lazy-Load von ENV-Variablen (nicht beim Import)
+
+// Antwort des Nutzers auf eine Frage nach dem Training (nur feste Bausteine, siehe utils/athleteAnswers.js).
+function athleteAnswerLine(ex) {
+  const sentence = ex?.athlete_answer ? describeAthleteAnswer(ex.athlete_answer) : '';
+  return sentence ? `\n\nAntwort des Nutzers nach dem Training (angetippt, verbindlich): ${sentence}` : '';
+}
 
 export class OllamaProvider extends AIProvider {
   constructor() {
@@ -111,6 +118,7 @@ WICHTIG zu Notizen: Wenn eine Übung eine Notiz vom Nutzer hat, erkläre ihre Za
 Licht dieser Notiz, bevor du sie bewertest. Stagnation oder fehlendes Gewicht NICHT als
 negative Entwicklung werten, wenn die Notiz das erklärt (z.B. technikfokussierte Übung,
 bewusstes Deload, Formfokus). Nutze nur, was explizit in der Notiz steht.
+${exercises.some(ex => ex?.athlete_answer) ? `\nWICHTIG zu Antworten des Nutzers nach dem Training (bei einzelnen Übungen angegeben):\n${ATHLETE_ANSWER_DIRECTIVE_LINES.join('\n')}\n` : ''}
 
 # Trainingsfortschritt-Analyse
 
@@ -135,7 +143,7 @@ ${exercises
   .map(ex => {
     if (ex.exercise_not_done) {
       return `### ${ex.exercise}
-- Diese Übung wurde NICHT gemacht (ausgelassen). Keine Zahlen, nichts unterstellen.${ex.note ? `\n- Notiz des Nutzers: ${ex.note}` : ''}`;
+- Diese Übung wurde NICHT gemacht (ausgelassen). Keine Zahlen, nichts unterstellen.${ex.note ? `\n- Notiz des Nutzers: ${ex.note}` : ''}${athleteAnswerLine(ex)}`;
     }
     let exPrompt = `### ${ex.exercise}
 - Progression: ${ex.progression}
@@ -145,6 +153,7 @@ ${exercises
 - Gewicht: ${ex.current_weight}kg
 - Wiederholungen (gesamt über alle Sätze): ${ex.current_reps}`;
 
+    exPrompt += athleteAnswerLine(ex);
     if (ex.progression_state) {
       exPrompt += `\n\nFortschrittszustand (App-Logik, verbindlich): ${ex.progression_state} – motivierend einordnen, nicht als Rückschritt (kein "zwar ... aber").`;
     }
