@@ -148,3 +148,30 @@ test('Server-only: Body kann athlete_answers weder anlegen noch ändern; Modell 
   const doc = new Workout({ userId: 'u', athlete_answers: [{ topic: 'bad', exercise: 'X', exerciseIndex: 0, answer: 'easy' }] })
   assert.equal(doc.athlete_answers.length, 0)
 })
+
+test('Gegenprobe: zwei Themen für dieselbe Übung ergeben nur eine Antwort (Review-Fund)', () => {
+  const list = [
+    { topic: 'last_set', exerciseIndex: 0, answer: 'limit_shaky' },
+    { topic: 'compare', exerciseIndex: 0, answer: 'cleaner' }
+  ]
+  const out = sanitizeAthleteAnswers(list, workout)
+  assert.equal(out.length, 1)
+  assert.equal(out[0].answer, 'limit_shaky')
+  const stored = sanitizeStoredAthleteAnswers(list.map((e) => ({ ...e, exercise: 'Bench Press' })))
+  assert.equal(stored.length, 1)
+})
+
+test('Variante des Vergleichs steht im Satz für die KI', () => {
+  assert.match(describeAthleteAnswer({ topic: 'compare', exerciseIndex: 0, answer: 'cleaner', variant: 'less' }), /etwas weniger.*sauberer/)
+  assert.match(describeAthleteAnswer({ topic: 'compare', exerciseIndex: 0, answer: 'same', variant: 'same' }), /genau wie beim letzten Mal/)
+  assert.doesNotMatch(describeAthleteAnswer({ topic: 'compare', exerciseIndex: 0, answer: 'same' }), /genau wie|etwas weniger/)
+})
+
+test('Regel 33 empfiehlt nichts (Regel 25) und nennt die Ausnahmen Technik, Zeit, first_look', () => {
+  const rule = getCoachSystemPromptText().split('33. ANTWORTEN DES NUTZERS')[1].split('OUTPUT-FORMAT')[0]
+  assert.match(rule, /EMPFIEHLST nichts/)
+  assert.match(rule, /Regel 31/)
+  assert.match(rule, /Regel 30/)
+  assert.match(rule, /first_look/)
+  assert.doesNotMatch(rule, /mutig und konkret|Gewicht halten|rate nur/)
+})

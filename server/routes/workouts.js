@@ -2731,6 +2731,7 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
 
 // Antworten auf die kurzen Fragen nach dem Training (Backlog F16): nur feste Werte, der Server baut jeden Eintrag neu
 // auf und verwirft Ungültiges (kein Ablehnen: Offline-Sync würde es endlos wiederholen). Leere Liste = Antworten löschen.
+// Es zählt der zuletzt gespeicherte Stand (der Client schickt immer die komplette Liste).
 // requireAiConsent: ohne KI-Einwilligung gibt es keine Fragen und damit auch nichts zu speichern.
 router.post("/:id/athlete-answers", firebaseAuthMiddleware, requireAiConsent, async (req, res) => {
   try {
@@ -2739,14 +2740,19 @@ router.post("/:id/athlete-answers", firebaseAuthMiddleware, requireAiConsent, as
     if (!(await import('mongoose')).default.Types.ObjectId.isValid(workoutId)) {
       return res.status(400).json({ error: 'Invalid workout ID' });
     }
-    const workout = await Workout.findOne({ _id: workoutId, userId }).select('completed exercises').lean();
+    const workout = await Workout.findOne({ _id: workoutId, userId }).select('completed completedAt exercises ai_feedback_status').lean();
     if (!workout) return res.status(404).json({ error: 'Workout not found' });
     if (workout.completed !== true) {
       return res.status(400).json({ error: 'Answers only for completed workouts', code: 'ATHLETE_ANSWERS_NOT_AVAILABLE' });
     }
+    // Gleiches Bearbeitungsfenster wie PUT /:id: danach lässt sich ein altes Training nicht mehr verändern.
+    if (isWorkoutEditWindowExpired(workout).expired) {
+      return res.status(409).json({ error: 'Edit window expired', code: 'EDIT_WINDOW_EXPIRED' });
+    }
     const answers = sanitizeAthleteAnswers(req.body?.answers, workout);
     await Workout.updateOne({ _id: workoutId, userId }, { $set: { athlete_answers: answers } });
-    res.json({ success: true, answers });
+    // feedbackGenerated: Feedback gab es schon - die Antworten gelten erst für ein neu erzeugtes Feedback (refresh).
+    res.json({ success: true, answers, feedbackGenerated: workout.ai_feedback_status === 'generated' });
   } catch (err) {
     logger.error('❌ Athlete answers error', { message: err?.message });
     res.status(500).json({ error: 'Saving answers failed' });

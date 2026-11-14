@@ -4,7 +4,7 @@
 // Eintrag aus geprüften Werten neu zusammen. Ungültiges wird verworfen statt abgelehnt (Offline-Sync würde abgelehnte
 // Speichervorgänge endlos wiederholen). Der Übungsname kommt vom Workout, nie vom Client.
 
-import { isExerciseNotDone } from '../services/trainingAnalysisService.js';
+import { isExerciseNotDone } from './exerciseDone.js';
 
 export const ATHLETE_TOPICS = Object.freeze(['last_set', 'compare', 'intent']);
 
@@ -30,7 +30,7 @@ const ANSWERS_BY_TOPIC = Object.freeze({
   intent: INTENT_ANSWERS
 });
 
-function exerciseKey(name) {
+export function exerciseKey(name) {
   return String(name || '').trim().toLowerCase();
 }
 
@@ -55,7 +55,7 @@ export function sanitizeAthleteAnswer(raw) {
 }
 
 /**
- * Prüft die Antworten zu einem Workout: gültige Einträge, je Thema+Übung nur einer (der erste), höchstens zwei.
+ * Prüft die Antworten zu einem Workout: gültige Einträge, je Übung nur ein Thema (das erste), höchstens zwei.
  * Die Übung muss im Workout existieren und tatsächlich gemacht sein; ihr Name wird vom Server eingetragen.
  * @param {*} rawList
  * @param {{exercises?: Array}} workout
@@ -76,9 +76,9 @@ export function sanitizeAthleteAnswers(rawList, workout) {
     // Eine ausgelassene Übung kann nur die Frage "War das Absicht?" bekommen.
     const skipped = isExerciseNotDone(ex);
     if (skipped && entry.topic !== 'intent') continue;
-    const key = `${entry.topic}:${entry.exerciseIndex}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
+    // Je Übung nur ein Thema: die KI bekommt je Übung genau eine Antwort (activeAthleteAnswerMap).
+    if (seen.has(entry.exerciseIndex)) continue;
+    seen.add(entry.exerciseIndex);
     out.push({ ...entry, exercise: name.slice(0, 120) });
     if (out.length >= MAX_ATHLETE_ANSWERS) break;
   }
@@ -91,10 +91,12 @@ export function sanitizeAthleteAnswers(rawList, workout) {
 export function sanitizeStoredAthleteAnswers(value) {
   if (!Array.isArray(value)) return [];
   const out = [];
+  const seen = new Set();
   for (const raw of value.slice(0, 20)) {
     const entry = sanitizeAthleteAnswer(raw);
     const name = typeof raw?.exercise === 'string' ? raw.exercise.trim().slice(0, 120) : '';
-    if (!entry || !name) continue;
+    if (!entry || !name || seen.has(entry.exerciseIndex)) continue;
+    seen.add(entry.exerciseIndex);
     out.push({ ...entry, exercise: name });
     if (out.length >= MAX_ATHLETE_ANSWERS) break;
   }
@@ -154,7 +156,10 @@ export function describeAthleteAnswer(entry) {
   const clean = sanitizeAthleteAnswer(entry);
   if (!clean) return '';
   if (clean.topic === 'last_set') return LAST_SET_TEXT[clean.answer];
-  if (clean.topic === 'compare') return COMPARE_TEXT[clean.answer];
+  if (clean.topic === 'compare') {
+    const base = clean.variant === 'less' ? 'Heute war es etwas weniger als beim letzten Mal. ' : clean.variant === 'same' ? 'Heute war es genau wie beim letzten Mal. ' : '';
+    return `${base}${COMPARE_TEXT[clean.answer]}`;
+  }
   if (clean.answer === 'unsure') return 'Auf die Frage, ob die Abweichung Absicht war, antwortete der Nutzer: weiß nicht.';
   const reason = clean.reason ? ` Grund: ${REASON_TEXT[clean.reason]}.` : '';
   return clean.answer === 'intended'
