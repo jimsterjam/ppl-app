@@ -443,7 +443,10 @@ const colorModeOptions = computed(() => ([
   { value: 'lime', label: $t('settings.colorModeLime') },
   { value: 'ocean', label: $t('settings.colorModeOcean') },
   { value: 'violet', label: $t('settings.colorModeViolet') },
-  { value: 'sunset', label: $t('settings.colorModeSunset') }
+  { value: 'sunset', label: $t('settings.colorModeSunset') },
+  { value: 'aqua', label: $t('settings.colorModeAqua') },
+  { value: 'gold', label: $t('settings.colorModeGold') },
+  { value: 'chalk', label: $t('settings.colorModeChalk') }
 ]))
 
 // Konto-Info: zeigt an, mit welcher E-Mail/Anbieter man gerade eingeloggt ist. Wichtig, weil
