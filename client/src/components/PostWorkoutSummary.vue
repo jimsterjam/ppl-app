@@ -148,8 +148,8 @@
       </button>
     </div>
 
-    <!-- KI-Provider kurz nicht erreichbar (z.B. Ollama im Heimnetz nicht im selben WLAN, oder
-         ein Cold-Start beim OpenAI-Relay) - Workout ist trotzdem gespeichert. -->
+    <!-- KI-Provider nicht erreichbar (Status 'network_unavailable'; der Server sendet ihn derzeit nicht mehr, die
+         Anzeige bleibt für ältere Antworten) - Workout ist trotzdem gespeichert. -->
     <div v-else-if="networkUnavailable" class="summary-content fallback">
       <p>{{ t('postWorkout.feedbackDelayed') }}</p>
       <button class="primary" type="button" @click="dismissSummary">
@@ -453,10 +453,7 @@ async function loadAIFeedback({ refresh = false } = {}) {
       {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         ...(refresh ? { params: { refresh: '1' } } : {}),
-        // Server macht jetzt einen schnellen Erreichbarkeits-Check (max. 3s) vor dem
-        // eigentlichen Generierungs-Aufruf und antwortet bei nicht erreichbarem Provider
-        // sofort mit feedback_status: 'network_unavailable' statt lange zu hängen — der
-        // Client muss also nicht mehr für den "unerreichbar"-Fall auf ein langes Timeout warten.
+        // Die Analyse kann (Relay-Kaltstart) länger dauern, daher das großzügige Timeout.
         timeout: REQUEST_TIMEOUT_MS
       }
     )

@@ -2,7 +2,7 @@
  * AIProvider Interface/Base Class
  *
  * Definiert die Schnittstelle die alle AI-Provider implementieren müssen.
- * Erlaubt austausch zwischen OpenAI, etc. ohne Code-Änderungen.
+ * Erlaubt austausch zwischen verschiedenen KI-Anbietern ohne Code-Änderungen.
  */
 
 export class AIProvider {
