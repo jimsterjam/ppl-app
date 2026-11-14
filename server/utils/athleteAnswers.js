@@ -171,7 +171,7 @@ export function describeAthleteAnswer(entry) {
     : `Der Nutzer musste die Abweichung anpassen (keine bewusste Entscheidung).${reason}`;
 }
 
-// Gemeinsame Anweisung für alle KI-Anbieter (OpenAI-Regel 33, Ollama-Prompt), damit beide denselben Vertrag haben.
+// Gemeinsame Anweisung für alle KI-Anbieter (OpenAI-Regel 33; weitere Anbieter sollen dieselbe Anweisung nutzen).
 // Bewusst ohne Regelnummern, damit der Text auch ohne den OpenAI-System-Prompt verständlich ist.
 export const ATHLETE_ANSWER_DIRECTIVE_LINES = Object.freeze([
   'Der Nutzer hat bei dieser Übung eine kurze Frage per Antippen beantwortet. Das ist seine eigene Aussage, keine',

@@ -7,7 +7,6 @@ import path from "path";
 import { validateEnv } from "./utils/validateEnv.js";
 import { initializeAIService } from "./services/aiService.js";
 import OpenAIProvider from "./services/OpenAIProvider.js";
-import OllamaProvider from "./services/OllamaProvider.js";
 import { logAiClientMode } from "./utils/aiClientFactory.js";
 
 // Lade .env mit absolutem Pfad
@@ -31,17 +30,13 @@ const AI_PROVIDER = String(process.env.AI_PROVIDER || 'openai').toLowerCase();
 
 // Initialize AI Service with selected provider
 try {
-  let aiProvider;
-  if (AI_PROVIDER === 'ollama') {
-    logger.info('🔧 AI Provider: Ollama (local development)');
-    aiProvider = new OllamaProvider();
-  } else {
-    logger.info('🔧 AI Provider: OpenAI (production)');
-    // Ollama läuft nie über den Relay (nur relevant für den OpenAI-Provider + den
-    // KI-Prüfaufruf in feedbackVerificationService.js) - Log hier bewusst nur im OpenAI-Zweig.
-    logAiClientMode('OpenAIProvider');
-    aiProvider = new OpenAIProvider();
+  if (AI_PROVIDER !== 'openai') {
+    // Ollama (lokal im Heimnetz) wurde entfernt - ein alter Wert in Render/.env soll den Start nicht verhindern.
+    logger.warn(`⚠️ AI_PROVIDER="${AI_PROVIDER}" wird nicht mehr unterstützt - es wird OpenAI verwendet`);
   }
+  logger.info('🔧 AI Provider: OpenAI (production)');
+  logAiClientMode('OpenAIProvider');
+  const aiProvider = new OpenAIProvider();
   initializeAIService(aiProvider);
 } catch (error) {
   logger.error('❌ Failed to initialize AI Service:', error.message);

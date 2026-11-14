@@ -2389,33 +2389,18 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
       structuredAnalysis.feedback_mode = isFirstLookFeedback ? 'first_look' : 'comparison';
     }
 
-    // 5. Rufe AI-Service auf (OpenAI oder Ollama, abhängig von Konfiguration)
+    // 5. Rufe AI-Service auf (OpenAI)
     const aiService = getAIService();
     let aiResult = null;
     let aiError = null;
     // Antworten auf Fragen in den Notizen (siehe unten); bleibt leer, wenn keine Frage gestellt wurde.
     let noteAnswers = [];
 
-    // Schneller Erreichbarkeits-Check vor dem eigentlichen (bis zu 120s dauernden) Generierungs-
-    // Aufruf - ursprünglich (User-Report "Speichern dauert sehr lange") NUR für Ollama gedacht:
-    // in der Testphase lief die Analyse über Ollama im Heimnetzwerk - ist das Handy woanders,
-    // ist die IP schlicht nicht erreichbar, und der User starrte bis zu 2 Minuten auf
-    // "Analysiere...", bevor überhaupt der harmlose Fallback ("Workout gespeichert") kam. Mit
-    // einem kurzen Health-Check (max. 3s, siehe Fix in OllamaProvider.healthCheck) lässt sich
-    // das vorher erkennen.
-    //
-    // Bug-Fix (User-Report "Feedback wird nie generiert, obwohl 'Workout gespeichert'
-    // erscheint" - reproduziert mit Server-Logs): dieser Gate lief bisher UNVERÄNDERT auch für
-    // OpenAI, seit OpenAIProvider optional über den geschützten Relay läuft (siehe
-    // utils/aiClientFactory.js). Ein kurz aufwachender Render-Kaltstart des Relays lieferte für
-    // den Health-Check-Request (client.models.list()) Renders eigene 502-Fehlerseite (HTML statt
-    // JSON) zurück - der Health-Check wertete das als "nicht erreichbar" und brach die GESAMTE
-    // Anfrage sofort ab, OBWOHL der eigentliche Generierungs-Call (deutlich längerer Timeout,
-    // siehe OpenAIProvider.js) den Kaltstart locker überstanden hätte. Für OpenAI (Cloud, kein
-    // "falsches WLAN"-Szenario wie bei Ollama) bringt dieser Vorab-Check ohnehin keinen Nutzen,
-    // der die Fehlerquelle rechtfertigt - daher nur noch für Ollama aktiv; für OpenAI greift
-    // direkt der try/catch unten (liefert bei einem echten Fehler weiterhin die
-    // Backend-Analysen ohne KI-Text zurück, statt abzustürzen).
+    // Schneller Erreichbarkeits-Check nur für Anbieter außer OpenAI (z. B. ein später ergänzter lokaler Anbieter): Für
+    // OpenAI darf es ihn NICHT geben (Bug-Fix "Feedback wird nie generiert"): Beim Kaltstart des Relays lieferte Render
+    // für den Check-Request eine 502-HTML-Seite, der Check wertete das als "nicht erreichbar" und brach die ganze
+    // Anfrage ab, obwohl der eigentliche Aufruf (längerer Timeout) den Kaltstart überstanden hätte. Für OpenAI greift
+    // direkt der try/catch unten (liefert bei einem echten Fehler weiterhin die Backend-Analysen ohne KI-Text).
     const providerName = aiService.getProviderName();
     let providerReachable = true;
     if (providerName !== 'OpenAI') {
