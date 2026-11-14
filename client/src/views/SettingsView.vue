@@ -404,7 +404,7 @@
 import HeaderBar from '../components/HeaderBar.vue'
 import { sendFeedbackMail, FEEDBACK_EMAIL } from '../utils/feedbackMail'
 import { storeToRefs } from 'pinia'
-import { useThemeStore } from '@/stores/themeStore'
+import { useThemeStore, ACCENT_MODES } from '@/stores/themeStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useUserStore } from '@/stores/userStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
@@ -439,15 +439,11 @@ const themeStore = useThemeStore()
 const { theme, colorMode } = storeToRefs(themeStore)
 const set = (t) => themeStore.setTheme(t)
 const setColorMode = (mode) => themeStore.setColorMode(mode)
-const colorModeOptions = computed(() => ([
-  { value: 'lime', label: $t('settings.colorModeLime') },
-  { value: 'ocean', label: $t('settings.colorModeOcean') },
-  { value: 'violet', label: $t('settings.colorModeViolet') },
-  { value: 'sunset', label: $t('settings.colorModeSunset') },
-  { value: 'aqua', label: $t('settings.colorModeAqua') },
-  { value: 'gold', label: $t('settings.colorModeGold') },
-  { value: 'chalk', label: $t('settings.colorModeChalk') }
-]))
+// Die Liste kommt aus dem Store (ACCENT_MODES): eine Farbe mehr dort = eine Option mehr hier (Name: settings.colorMode<Name>)
+const colorModeOptions = computed(() => ACCENT_MODES.map((value) => ({
+  value,
+  label: $t(`settings.colorMode${value[0].toUpperCase()}${value.slice(1)}`)
+})))
 
 // Konto-Info: zeigt an, mit welcher E-Mail/Anbieter man gerade eingeloggt ist. Wichtig, weil
 // E-Mail/Passwort-, Google- und Apple-Logins bei Firebase eigenständige Konten ohne

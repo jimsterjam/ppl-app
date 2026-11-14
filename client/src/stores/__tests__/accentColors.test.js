@@ -6,7 +6,8 @@ import { messages } from '../../i18n/index.js'
 
 // Akzentfarben (Absprache Jimmy 14.11.): Jede Farbe braucht dunkle UND helle Regeln in style.css, einen Namen in DE+EN
 // und lesbare Schrift auf Knöpfen. Der Test liest die echten Regeln aus style.css - eine neue Farbe ohne Regeln fällt auf.
-const css = readFileSync(fileURLToPath(new URL('../../style.css', import.meta.url)), 'utf8')
+// Kommentare vorher entfernen: Zeichen wie } darin dürfen die Regeln nicht zerschneiden
+const css = readFileSync(fileURLToPath(new URL('../../style.css', import.meta.url)), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
 
 function block(selectorRegex) {
   const match = css.match(new RegExp(`(?:^|\\n)${selectorRegex}\\s*\\{([^}]*)\\}`))
@@ -14,6 +15,14 @@ function block(selectorRegex) {
 }
 function vars(body) {
   return Object.fromEntries([...body.matchAll(/(--[a-z-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]))
+}
+// Farbe (#rrggbb oder rgba(r, g, b, a)) über einen Untergrund (#rrggbb) legen -> #rrggbb
+function over(color, background) {
+  const rgba = color.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/)
+  if (!rgba) return color
+  const alpha = Number(rgba[4])
+  const bg = [1, 3, 5].map((i) => parseInt(background.slice(i, i + 2), 16))
+  return '#' + [1, 2, 3].map((i, k) => Math.round(Number(rgba[i]) * alpha + bg[k] * (1 - alpha)).toString(16).padStart(2, '0')).join('')
 }
 const lum = (hex) => {
   const c = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
@@ -54,9 +63,17 @@ describe('Akzentfarben', () => {
       const light = lightVars(mode)
       expect(contrast(light['--accent'], light['--accent-contrast'])).toBeGreaterThanOrEqual(4.5)
     })
-    it('Akzentfarbe als Text auf weißem Grund (hell) und auf dunkler Karte (dunkel) lesbar', () => {
-      expect(contrast(lightVars(mode)['--accent-color'], '#ffffff')).toBeGreaterThanOrEqual(4.5)
-      expect(contrast(darkVars(mode)['--accent-color'], '#12141b')).toBeGreaterThanOrEqual(4.5)
+    it('auch --accent-strong (Hover/gedrückt) trägt die Schrift des Knopfs', () => {
+      for (const v of [darkVars(mode), lightVars(mode)]) {
+        expect(contrast(v['--accent-strong'], v['--accent-contrast'])).toBeGreaterThanOrEqual(4.5)
+      }
+    })
+    it('Akzentfarbe als Text auf dem echten Kartenuntergrund und auf der weichen Fläche (--accent-soft) lesbar', () => {
+      for (const v of [darkVars(mode), lightVars(mode)]) {
+        const card = v['--card-bg']
+        expect(contrast(v['--accent-color'], card)).toBeGreaterThanOrEqual(4.5)
+        expect(contrast(v['--accent-color'], over(v['--accent-soft'], card))).toBeGreaterThanOrEqual(4.5)
+      }
     })
   })
 
