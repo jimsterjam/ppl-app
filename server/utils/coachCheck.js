@@ -254,7 +254,11 @@ export const isCoachCheckSaved = (result) => result?.saved === 'ok';
 /** Body ohne die angegebenen Felder (flache Kopie). */
 export function withoutFields(body, fields) {
   const copy = { ...(body && typeof body === 'object' ? body : {}) };
-  for (const field of fields) delete copy[field];
+  for (const key of Object.keys(copy)) {
+    // Mongo-Operatoren ("$set" usw.) darf kein Client einschleusen: Sie würden an Mongoose vorbei das Feld setzen
+    // (Copilot-Review 14.11.). Ebenso Punkt-Pfade wie "athlete_answers.0.answer".
+    if (key.startsWith('$') || fields.some((field) => key === field || key.startsWith(`${field}.`))) delete copy[key];
+  }
   return copy;
 }
 

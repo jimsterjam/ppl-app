@@ -12,7 +12,6 @@
 
 import { logger } from '../utils/logger.js';
 import { isExerciseNotDone } from '../utils/exerciseDone.js';
-import { exerciseKey } from '../utils/athleteAnswers.js';
 import { determineTrendWithProfile, resolveEffectiveProfile, buildNoteContext } from './exerciseAnalysisRules.js';
 
 // Satzgewichte und ihre Änderungen auf 2 Nachkommastellen: 1,25-kg-Scheiben ergeben Werte wie
@@ -822,8 +821,8 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
         : {}),
 
       // Antwort des Nutzers auf die Frage nach dem Training (Regel 33) - nur wenn vorhanden.
-      ...(athleteAnswers?.get?.(exerciseKey(ex.exercise))
-        ? { athlete_answer: athleteAnswers.get(exerciseKey(ex.exercise)) }
+      ...(athleteAnswers?.get?.(ex.workoutIndex)
+        ? { athlete_answer: athleteAnswers.get(ex.workoutIndex) }
         : {}),
       // Fortschrittszustand aus der App-Logik (Regel 29), z.B. "almost_there" - nur wenn vorhanden.
       ...(progressionStates?.get?.(String(ex.exercise || '').trim().toLowerCase())
@@ -885,8 +884,8 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
         entry: {
           exercise: item.exerciseNameForAI || item.exercise,
           exercise_not_done: true,
-          ...(athleteAnswers?.get?.(exerciseKey(item.exercise))
-            ? { athlete_answer: athleteAnswers.get(exerciseKey(item.exercise)) }
+          ...(athleteAnswers?.get?.(item.workoutIndex)
+            ? { athlete_answer: athleteAnswers.get(item.workoutIndex) }
             : {}),
           ...(item.note ? { note: item.note } : {}),
           ...(item.noteContext ? { note_context: item.noteContext } : {})

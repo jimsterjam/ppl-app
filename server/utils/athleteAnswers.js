@@ -106,7 +106,9 @@ export function sanitizeStoredAthleteAnswers(value) {
 /**
  * Gespeicherte Antworten, die noch zum Workout passen: wurde die Übung nach dem Beantworten umbenannt, ersetzt oder
  * verschoben (Bearbeiten), gehört die Antwort nicht mehr dazu und wird nicht mehr an die KI gegeben.
- * @returns {Map<string, object>} Übungsname klein geschrieben → Eintrag (je Übung der erste, Reihenfolge der Liste)
+ * Schlüssel ist die Position der Übung im Workout (derselbe Übungsname kann zweimal vorkommen). Der Eintrag enthält
+ * nur die festen Felder, nie den Übungsnamen (der kann ein eigener Freitext sein und käme sonst ungekapselt in die KI).
+ * @returns {Map<number, {topic, answer, reason, variant}>}
  */
 export function activeAthleteAnswerMap(workout) {
   const map = new Map();
@@ -115,8 +117,10 @@ export function activeAthleteAnswerMap(workout) {
   for (const entry of stored) {
     const current = exercises[entry?.exerciseIndex];
     if (!current || exerciseKey(current.name) !== exerciseKey(entry.exercise)) continue;
-    const key = exerciseKey(entry.exercise);
-    if (!map.has(key)) map.set(key, entry);
+    const clean = sanitizeAthleteAnswer(entry);
+    if (clean && !map.has(clean.exerciseIndex)) {
+      map.set(clean.exerciseIndex, { topic: clean.topic, answer: clean.answer, reason: clean.reason, variant: clean.variant, exerciseIndex: clean.exerciseIndex });
+    }
   }
   return map;
 }
