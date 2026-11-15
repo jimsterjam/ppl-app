@@ -47,7 +47,7 @@ export function isExerciseSkipped(exercise) {
   return sets.length > 0 && sets.every((set) => set.done === false)
 }
 
-/** Hauptsätze einer Session ({ sets, reps (mittlerer Wert), totalReps, weight }) oder null (Pyramide, Körpergewicht, leer). */
+/** Hauptsätze einer Session ({ sets, reps (mittlerer Wert), repsList (je Satz), totalReps, weight }) oder null (Pyramide, Körpergewicht, leer). */
 export function mainSetsSummary(exercise) {
   const working = getWorkingSets(exercise)
   if (!working.length || working.some((set) => set.weight <= 0)) return null
@@ -57,6 +57,7 @@ export function mainSetsSummary(exercise) {
   return {
     sets: split.main.length,
     reps: median(reps),
+    repsList: reps,
     totalReps: reps.reduce((sum, value) => sum + value, 0),
     weight: split.weight
   }
@@ -117,8 +118,10 @@ function detectForExercise({ index, name, info, goal, workoutGoal, exercise, rec
     // Nur Gleiches mit Gleichem vergleichen: gleiche Satzzahl (5x8 und 4x10 haben beide 40 Wdh., sind aber nicht dasselbe).
     const sameShape = now.sets === last.sets
     const identical = weightDrop === 0 && repsDrop === 0
-    // Gleiche Zahlen, aber anders auf die Sätze verteilt (12/12/6 statt 10/10/10): weder "gleich" noch "weniger" - keine Frage.
-    if (sameShape && notBetter && !(identical && now.reps !== last.reps) && round(weightDrop) <= round(weightThreshold(info, last.weight)) && repsDrop <= repsAllowed) {
+    // Gleiche Gesamtzahl, aber Sätze einzeln anders (12/12/6 oder 12/8/10 statt 10/10/10 bzw. 11/9/10): weder "gleich" noch
+    // "weniger" - keine Frage.
+    const sameSetByRep = now.repsList.every((value, i) => value === last.repsList[i])
+    if (sameShape && notBetter && !(identical && !sameSetByRep) && round(weightDrop) <= round(weightThreshold(info, last.weight)) && repsDrop <= repsAllowed) {
       const same = identical
       return {
         topic: 'compare',
