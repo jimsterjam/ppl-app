@@ -96,11 +96,15 @@ test('Zustimmung zum alten Text (ältere App ohne Versionsangabe) gilt nicht fü
   assert.equal(summarizeAiConsent({ aiConsent: { granted: true, version: ok['aiConsent.version'] } }).granted, true)
 })
 
-test('Version aus dem Request wird begrenzt: weder höher als aktuell noch unter 1, keine Nicht-Zahlen', () => {
-  assert.equal(parseConsentInput({ granted: true, version: 99 }).version, CURRENT_AI_CONSENT_VERSION)
-  assert.equal(parseConsentInput({ granted: true, version: 0 }).version, 1)
-  assert.equal(parseConsentInput({ granted: true, version: '2' }).version, 1)
-  assert.equal(parseConsentInput({ granted: true, version: 1.5 }).version, 1)
+test('Gemeldete Version, die es nicht gibt, wird abgelehnt statt angepasst (kein Vortäuschen der aktuellen Zustimmung)', () => {
+  assert.equal(parseConsentInput({ granted: true, version: 99 }), null)
+  assert.equal(parseConsentInput({ granted: true, version: CURRENT_AI_CONSENT_VERSION + 1 }), null)
+  assert.equal(parseConsentInput({ granted: true, version: 0 }), null)
+  assert.equal(parseConsentInput({ granted: true, version: '2' }), null)
+  assert.equal(parseConsentInput({ granted: true, version: 1.5 }), null)
+  assert.equal(parseConsentInput({ granted: true, version: null }).version, 1)
+  assert.equal(parseConsentInput({ granted: true, version: 1 }).version, 1)
+  assert.equal(parseConsentInput({ granted: true, version: CURRENT_AI_CONSENT_VERSION }).version, CURRENT_AI_CONSENT_VERSION)
 })
 
 test('Textversion im Client und Server stimmt überein', async () => {

@@ -2,13 +2,16 @@ import { defineStore } from 'pinia'
 import { fetchAccountProfile, saveAiConsent } from '@/api/account'
 import { getAuthToken } from '@/utils/authToken'
 import { logger } from '@/utils/logger'
+import { AI_CONSENT_TEXT_VERSION } from '@/config/aiConsentVersion'
 
 // Einwilligung zur Weitergabe von Trainingsdaten an den KI-Dienst (OpenAI). Der Server ist die
 // Quelle der Wahrheit (UserProfile.aiConsent) und lehnt KI-Aufrufe ohne Einwilligung ab; der
 // lokale Cache pro UID dient nur dazu, nicht bei jedem Start erneut zu fragen, bevor der
 // Server geantwortet hat. Alle KI-Auslöser rufen request() auf: bei vorhandener Einwilligung
 // sofort true, sonst öffnet sich das Fenster (AiConsentModal.vue) und die Antwort kommt zurück.
-const CACHE_KEY = 'ai-consent'
+// Der Zwischenspeicher trägt die Textversion im Namen: Eine Zustimmung zu einem älteren Einwilligungstext (z. B. Version 1)
+// darf nach einer Textänderung nicht als gültig gelten, bevor der Server geantwortet hat (Copilot-Review F16 Etappe 3).
+const CACHE_KEY = `ai-consent-v${AI_CONSENT_TEXT_VERSION}`
 
 function cacheKey(uid) {
   return `${CACHE_KEY}:${uid}`

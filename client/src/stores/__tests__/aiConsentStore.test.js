@@ -86,4 +86,23 @@ describe('aiConsentStore', () => {
     store.noteServerRefusal()
     expect(store.granted).toBe(false)
   })
+
+  it('Zustimmung zum alten Text (Version 1, alter Zwischenspeicher) gilt nach der Textänderung nicht', () => {
+    localStorage.setItem('ai-consent:u1', '1')
+    const store = useAiConsentStore()
+    store.switchUser('u1')
+    expect(store.granted).toBe(false)
+  })
+
+  it('Zwischenspeicher trägt die Textversion im Namen', () => {
+    const store = useAiConsentStore()
+    store.switchUser('u1')
+    store._setGranted(true)
+    expect(localStorage.getItem('ai-consent-v2:u1')).toBe('1')
+    expect(localStorage.getItem('ai-consent:u1')).toBeNull()
+    const other = useAiConsentStore()
+    other._uid = ''
+    other.switchUser('u1')
+    expect(other.granted).toBe(true)
+  })
 })

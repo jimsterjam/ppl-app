@@ -392,7 +392,10 @@ function regenerate() {
   loadAIFeedback({ refresh: true })
 }
 
-onMounted(() => { subscriptionStore.checkSubscription?.().catch?.(() => {}) })
+// Das Kontingent wird beim Öffnen aufgefrischt; die Fragen warten kurz darauf (siehe startFlow), damit nicht gefragt wird,
+// wenn es danach ohnehin kein Feedback gibt.
+let subscriptionRefresh = Promise.resolve()
+onMounted(() => { subscriptionRefresh = Promise.resolve(subscriptionStore.checkSubscription?.()).catch(() => {}) })
 
 async function loadAIFeedback({ refresh = false } = {}) {
   // DIAGNOSE (User-Report "Feedback hat nicht beim ersten Mal funktioniert"): bisher gab es
@@ -609,9 +612,13 @@ function wakeServer() {
   axios.get(apiUrl('health'), { timeout: 30000 }).catch(() => {})
 }
 
+// Höchstens so lange auf die Kontingent-Antwort warten (Kaltstart des Servers): danach gilt der lokale Stand.
+const QUOTA_WAIT_MS = 2500
+
 async function startFlow() {
   let plan = null
   try {
+    await Promise.race([subscriptionRefresh, sleep(QUOTA_WAIT_MS)])
     plan = await prepareQuestions()
   } catch (err) {
     logger.warn('[PostWorkoutSummary] Fragen konnten nicht vorbereitet werden', err?.message)

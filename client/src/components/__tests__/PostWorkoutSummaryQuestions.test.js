@@ -240,4 +240,18 @@ describe('Zusammenfassung: Fragen nach dem Training', () => {
     expect(w.text()).toContain('War das Absicht?')
     resolveRealIdFromDraftId.mockResolvedValue('')
   })
+
+  it('Kontingent erst nach der Server-Antwort geprüft: meldet der Server "leer", wird nicht gefragt', async () => {
+    setup()
+    const subscription = useSubscriptionStore()
+    subscription.checkSubscription = vi.fn(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20))
+      subscription.applyAiUsageSnapshot({ monthlyCount: 5, monthlyLimit: 5, phase: 'monthly' })
+    })
+    const w = await mountSummary()
+    await new Promise((resolve) => setTimeout(resolve, 60))
+    await flushPromises()
+    expect(w.text()).not.toContain('War das Absicht?')
+    expect(answerCalls()).toHaveLength(0)
+  })
 })
