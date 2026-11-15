@@ -612,13 +612,25 @@ function wakeServer() {
   axios.get(apiUrl('health'), { timeout: 30000 }).catch(() => {})
 }
 
-// Höchstens so lange auf die Kontingent-Antwort warten (Kaltstart des Servers): danach gilt der lokale Stand.
+// Höchstens so lange auf die Server-Antworten zu Kontingent und Einwilligung warten (Kaltstart des Servers): danach gilt der
+// lokale Stand.
 const QUOTA_WAIT_MS = 2500
+
+// Die Einwilligung beim Server abgleichen: Hat der Nutzer sie auf einem anderen Gerät widerrufen, soll der lokale Zwischenspeicher
+// keine Fragen freischalten. Fehler (kein Netz) lassen den lokalen Stand stehen.
+async function refreshConsentFromServer() {
+  try {
+    const token = await getIdToken().catch(() => null)
+    if (token) await aiConsent.syncFromServer(token)
+  } catch (err) {
+    logger.warn('[PostWorkoutSummary] Einwilligung konnte nicht abgeglichen werden', err?.message)
+  }
+}
 
 async function startFlow() {
   let plan = null
   try {
-    await Promise.race([subscriptionRefresh, sleep(QUOTA_WAIT_MS)])
+    await Promise.race([Promise.all([subscriptionRefresh, refreshConsentFromServer()]), sleep(QUOTA_WAIT_MS)])
     plan = await prepareQuestions()
   } catch (err) {
     logger.warn('[PostWorkoutSummary] Fragen konnten nicht vorbereitet werden', err?.message)

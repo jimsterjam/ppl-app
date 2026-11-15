@@ -21,6 +21,11 @@ vi.mock('axios', () => {
     })
   } }
 })
+const consentOnServer = vi.hoisted(() => ({ granted: true }))
+vi.mock('@/api/account', async (importOriginal) => ({
+  ...(await importOriginal()),
+  fetchAccountProfile: vi.fn(async () => ({ aiConsent: { granted: consentOnServer.granted } }))
+}))
 vi.mock('@/utils/firebaseAuth', () => ({ useFirebaseAuth: () => ({ getIdToken: async () => 'token' }) }))
 vi.mock('@/utils/offlineStorage', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -87,6 +92,7 @@ const click = async (w, label) => {
 describe('Zusammenfassung: Fragen nach dem Training', () => {
   beforeEach(() => {
     calls.length = 0
+    consentOnServer.granted = true
     pinia = createPinia()
     setActivePinia(pinia)
     try { localStorage.clear() } catch { /* ohne Speicher */ }
@@ -155,7 +161,7 @@ describe('Zusammenfassung: Fragen nach dem Training', () => {
 
   it.each([
     ['Schalter aus', () => setQuestionsEnabled(false), {}],
-    ['keine KI-Einwilligung', () => {}, { granted: false }],
+    ['keine KI-Einwilligung', () => { consentOnServer.granted = false }, { granted: false }],
     ['kein auffälliges Workout', () => {}, { history: [] }]
   ])('Gegenprobe: %s -> keine Fragen, Auswertung läuft wie bisher', async (_label, prepare, options) => {
     setup(options)
@@ -276,5 +282,24 @@ describe('Zusammenfassung: Fragen nach dem Training', () => {
     await click(w, 'Anderes')
     expect(analysisCalls()).toHaveLength(1)
     expect(analysisCalls()[0][3]?.params).toBeUndefined()
+  })
+
+  it('Einwilligung auf einem anderen Gerät widerrufen: der Abgleich mit dem Server verhindert die Fragen trotz lokalem "erteilt"', async () => {
+    setup() // lokal: erteilt
+    consentOnServer.granted = false
+    const consent = useAiConsentStore()
+    consent.request = vi.fn().mockResolvedValue(false)
+    const w = await mountSummary()
+    await flushPromises()
+    expect(consent.granted).toBe(false)
+    expect(w.text()).not.toContain('War das Absicht?')
+    expect(answerCalls()).toHaveLength(0)
+  })
+
+  it('Gegenprobe: bestätigt der Server die Einwilligung, wird gefragt', async () => {
+    setup()
+    consentOnServer.granted = true
+    const w = await mountSummary()
+    expect(w.text()).toContain('War das Absicht?')
   })
 })
