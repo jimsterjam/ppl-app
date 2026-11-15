@@ -133,4 +133,59 @@ describe('aiConsentStore', () => {
     await store.refreshFromServer()
     expect(store.granted).toBe(true)
   })
+
+  it('Eine ältere Server-Antwort überschreibt eine neuere nicht (Profil sagt "erteilt", später "widerrufen")', async () => {
+    let resolveProfile
+    api.fetchAccountProfile.mockReturnValue(new Promise((resolve) => { resolveProfile = resolve }))
+    api.fetchAiConsent.mockResolvedValue({ granted: false })
+    const store = useAiConsentStore()
+    store.switchUser('u1')
+    store._setGranted(true)
+    const older = store.syncFromServer('token') // startet zuerst, antwortet zuletzt
+    await store.refreshFromServer() // neuer, sagt "widerrufen"
+    expect(store.granted).toBe(false)
+    resolveProfile({ aiConsent: { granted: true } })
+    await older
+    expect(store.granted).toBe(false)
+  })
+
+  it('gilt auch nach Kontowechsel weg und zurück zur selben UID', async () => {
+    let resolveFetch
+    api.fetchAiConsent.mockReturnValue(new Promise((resolve) => { resolveFetch = resolve }))
+    const store = useAiConsentStore()
+    store.switchUser('u1')
+    const pending = store.refreshFromServer()
+    await Promise.resolve()
+    store.switchUser('u2')
+    store.switchUser('u1')
+    resolveFetch({ granted: true })
+    await pending
+    expect(store.granted).toBe(false)
+  })
+
+  it('Entscheidung des Nutzers (Widerruf) ist neuer als eine noch laufende Server-Anfrage', async () => {
+    let resolveFetch
+    api.fetchAiConsent.mockReturnValue(new Promise((resolve) => { resolveFetch = resolve }))
+    api.saveAiConsent.mockResolvedValue({ granted: false })
+    const store = useAiConsentStore()
+    store.switchUser('u1')
+    store._setGranted(true)
+    const pending = store.refreshFromServer()
+    await Promise.resolve()
+    expect(await store.revoke()).toBe(true)
+    resolveFetch({ granted: true })
+    await pending
+    expect(store.granted).toBe(false)
+  })
+
+  it('Gegenprobe: eine spätere Antwort wird übernommen, wenn keine neuere vorlag', async () => {
+    api.fetchAiConsent.mockResolvedValue({ granted: true })
+    const store = useAiConsentStore()
+    store.switchUser('u1')
+    await store.refreshFromServer()
+    expect(store.granted).toBe(true)
+    api.fetchAiConsent.mockResolvedValue({ granted: false })
+    await store.refreshFromServer()
+    expect(store.granted).toBe(false)
+  })
 })

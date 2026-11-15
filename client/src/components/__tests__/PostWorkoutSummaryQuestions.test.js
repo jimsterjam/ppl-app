@@ -342,4 +342,22 @@ describe('Zusammenfassung: Fragen nach dem Training', () => {
     expect(consent.request).toHaveBeenCalled()
     expect(answerCalls()).toHaveLength(0)
   })
+
+  it('Widerruf kommt erst während der Vorbereitung der Fragen an: die Fragen werden trotzdem nicht gezeigt', async () => {
+    setup()
+    consentOnServer.granted = false
+    consentOnServer.delayMs = 2800 // nach der Wartezeit (2,5 s), während der Verlauf noch lädt
+    getAllWorkoutsOffline.mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 700))
+      return [lastSession]
+    })
+    const consent = useAiConsentStore()
+    consent.request = vi.fn().mockResolvedValue(false)
+    const w = await mountSummary()
+    await new Promise((resolve) => setTimeout(resolve, 3800))
+    await flushPromises()
+    expect(w.text()).not.toContain('War das Absicht?')
+    expect(consent.request).toHaveBeenCalled()
+    expect(answerCalls()).toHaveLength(0)
+  })
 })

@@ -633,7 +633,8 @@ async function startFlow() {
   } catch (err) {
     logger.warn('[PostWorkoutSummary] Fragen konnten nicht vorbereitet werden', err?.message)
   }
-  if (plan && showSummary.value) {
+  // Die Einwilligung nach dem Vorbereiten erneut prüfen: ein später Server-Abgleich kann sie währenddessen widerrufen haben.
+  if (plan && showSummary.value && aiConsent.granted) {
     questionTopics.value = plan.topics
     questionPhase.value = plan.phase
     wakeServer()
