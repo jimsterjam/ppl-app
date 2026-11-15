@@ -105,4 +105,32 @@ describe('aiConsentStore', () => {
     other.switchUser('u1')
     expect(other.granted).toBe(true)
   })
+
+  it('refreshFromServer: Antwort eines früheren Kontos wird nach einem Kontowechsel verworfen', async () => {
+    let resolveFetch
+    api.fetchAiConsent.mockReturnValue(new Promise((resolve) => { resolveFetch = resolve }))
+    const store = useAiConsentStore()
+    store.switchUser('u1')
+    const pending = store.refreshFromServer()
+    await Promise.resolve()
+    store.switchUser('u2')
+    resolveFetch({ granted: true })
+    await pending
+    expect(store.granted).toBe(false)
+    expect(localStorage.getItem('ai-consent-v2:u2')).toBeNull()
+    expect(localStorage.getItem('ai-consent-v2:u1')).toBeNull()
+  })
+
+  it('refreshFromServer: übernimmt den Serverstand; bei Fehler bleibt der lokale Stand', async () => {
+    const store = useAiConsentStore()
+    store.switchUser('u1')
+    store._setGranted(true)
+    api.fetchAiConsent.mockResolvedValue({ granted: false })
+    await store.refreshFromServer()
+    expect(store.granted).toBe(false)
+    store._setGranted(true)
+    api.fetchAiConsent.mockRejectedValue(new Error('offline'))
+    await store.refreshFromServer()
+    expect(store.granted).toBe(true)
+  })
 })
