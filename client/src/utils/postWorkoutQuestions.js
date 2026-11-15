@@ -97,7 +97,8 @@ function detectForExercise({ index, name, info, goal, workoutGoal, exercise, rec
   }
 
   // B: die Steigerung steht an. Die Einschätzung kommt aus derselben Logik wie der Hinweis über den Sätzen.
-  const status = getProgressionStatus(info, { ...exercise, __workoutGoal: workoutGoal }, goal, { previousSessions: recent })
+  // Die wirksame Trainingsart der Übung (auch eine eigene Wahl) mitgeben, sonst gilt das Workout-Ziel und die Übung passt nicht zu sich selbst.
+  const status = getProgressionStatus(info, { ...exercise, __workoutGoal: workoutGoal, trainingType: goal }, goal, { previousSessions: recent })
   if (status?.state === 'increase' && !status.aboveScheme) {
     // Schon beim letzten Mal "steigern"? Dann wurde die Frage damals gestellt (oder der Nutzer hat nicht gesteigert).
     const before = recent[0] ? getProgressionStatus(info, recent[0], goal, { previousSessions: recent.slice(1) }) : null

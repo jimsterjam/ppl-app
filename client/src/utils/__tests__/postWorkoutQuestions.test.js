@@ -206,4 +206,11 @@ describe('Gegenannahmen aus dem Selbst-Review', () => {
     const r = one('hypertrophy', bench, 'hypertrophy', sets(19.9, times(3, 10)), [sets(22.4, times(3, 10))])
     expect(r[0]).toMatchObject({ topic: 'compare', kind: 'less' })
   })
+
+  it('Übung mit eigener Trainingsart (Kraft-Workout, Übung auf Muskelaufbau) bekommt die B-Frage', () => {
+    // Workout-Ziel strength, aber diese Übung ist auf Muskelaufbau gestellt; letzte Session trug dieselbe Wahl.
+    const last = { ...sets(50, times(3, 11), 'strength'), trainingType: 'hypertrophy' }
+    const r = one('strength', bench, 'hypertrophy', sets(50, times(3, 12)), [last])
+    expect(r[0]).toMatchObject({ topic: 'last_set', kind: 'range' })
+  })
 })
