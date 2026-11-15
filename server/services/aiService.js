@@ -2,7 +2,7 @@
  * Central AI Service
  *
  * Abstrahiert AI-Aufrufe vom Rest der Anwendung.
- * Nutzt Provider-Pattern um zwischen OpenAI, Ollama, etc. zu wechseln.
+ * Nutzt Provider-Pattern um zwischen verschiedenen KI-Anbietern zu wechseln.
  * Keine direkte Abhängigkeit von spezifischen AI-Providern.
  */
 

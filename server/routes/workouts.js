@@ -2389,60 +2389,17 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
       structuredAnalysis.feedback_mode = isFirstLookFeedback ? 'first_look' : 'comparison';
     }
 
-    // 5. Rufe AI-Service auf (OpenAI oder Ollama, abhängig von Konfiguration)
+    // 5. Rufe AI-Service auf (OpenAI)
     const aiService = getAIService();
     let aiResult = null;
     let aiError = null;
     // Antworten auf Fragen in den Notizen (siehe unten); bleibt leer, wenn keine Frage gestellt wurde.
     let noteAnswers = [];
 
-    // Schneller Erreichbarkeits-Check vor dem eigentlichen (bis zu 120s dauernden) Generierungs-
-    // Aufruf - ursprünglich (User-Report "Speichern dauert sehr lange") NUR für Ollama gedacht:
-    // in der Testphase lief die Analyse über Ollama im Heimnetzwerk - ist das Handy woanders,
-    // ist die IP schlicht nicht erreichbar, und der User starrte bis zu 2 Minuten auf
-    // "Analysiere...", bevor überhaupt der harmlose Fallback ("Workout gespeichert") kam. Mit
-    // einem kurzen Health-Check (max. 3s, siehe Fix in OllamaProvider.healthCheck) lässt sich
-    // das vorher erkennen.
-    //
-    // Bug-Fix (User-Report "Feedback wird nie generiert, obwohl 'Workout gespeichert'
-    // erscheint" - reproduziert mit Server-Logs): dieser Gate lief bisher UNVERÄNDERT auch für
-    // OpenAI, seit OpenAIProvider optional über den geschützten Relay läuft (siehe
-    // utils/aiClientFactory.js). Ein kurz aufwachender Render-Kaltstart des Relays lieferte für
-    // den Health-Check-Request (client.models.list()) Renders eigene 502-Fehlerseite (HTML statt
-    // JSON) zurück - der Health-Check wertete das als "nicht erreichbar" und brach die GESAMTE
-    // Anfrage sofort ab, OBWOHL der eigentliche Generierungs-Call (deutlich längerer Timeout,
-    // siehe OpenAIProvider.js) den Kaltstart locker überstanden hätte. Für OpenAI (Cloud, kein
-    // "falsches WLAN"-Szenario wie bei Ollama) bringt dieser Vorab-Check ohnehin keinen Nutzen,
-    // der die Fehlerquelle rechtfertigt - daher nur noch für Ollama aktiv; für OpenAI greift
-    // direkt der try/catch unten (liefert bei einem echten Fehler weiterhin die
-    // Backend-Analysen ohne KI-Text zurück, statt abzustürzen).
-    const providerName = aiService.getProviderName();
-    let providerReachable = true;
-    if (providerName !== 'OpenAI') {
-      const networkCheckStart = Date.now();
-      providerReachable = await aiService.healthCheck().catch(() => false);
-      logger.debug('🌐 AI provider reachability check', {
-        requestId,
-        provider: providerName,
-        reachable: providerReachable,
-        durationMs: Date.now() - networkCheckStart
-      });
-    }
-
-    if (!providerReachable) {
-      return res.json({
-        success: true,
-        workoutId: currentWorkout._id,
-        workoutDate: currentWorkout.date,
-        feedback_status: 'network_unavailable',
-        metadata: {
-          requestId,
-          timestamp: new Date().toISOString(),
-          aiProvider: aiService.getProviderName(),
-          aiAvailable: false
-        }
-      });
-    }
+    // Bewusst KEIN Erreichbarkeits-Vorab-Check (Bug-Fix "Feedback wird nie generiert"): Beim Kaltstart des Relays lieferte
+    // Render für den Check-Request eine 502-HTML-Seite, der Check brach die ganze Anfrage ab, obwohl der eigentliche
+    // Aufruf (längerer Timeout) den Kaltstart überstanden hätte. Bei einem echten Fehler greift der try/catch unten
+    // (Backend-Analysen ohne KI-Text).
 
     // Platz atomar beanspruchen, bevor der KI-Dienst aufgerufen wird. Ohne Ergebnis (Fehler, leerer Text) geht er zurück.
     const feedbackClaim = await claimAiSlot(entitlements);
@@ -2623,7 +2580,7 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
       });
 
       // Kontingent erst bei tatsächlich erfolgreicher Generierung verbrauchen (nicht bei
-      // Health-Check-Fehlschlag/network_unavailable oben oder einem AI-Fehler unten) - konsistent
+      // einem AI-Fehler unten) - konsistent
       // mit /quick-generator und /ai-suggestion, die ebenfalls nur bei echtem Erfolg zählen.
       // Blieb vom KI-Text nichts übrig, zählt das nicht gegen das Kontingent (Nutzer bekommt keinen KI-Text).
       if (coachText.allDropped) await releaseAiSlot(entitlements, feedbackClaim);

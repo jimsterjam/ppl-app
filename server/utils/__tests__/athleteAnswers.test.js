@@ -8,7 +8,6 @@ import { analyzeWorkoutProgression, structureAnalysisForAI } from '../../service
 import OpenAIProvider, { getCoachSystemPromptText } from '../../services/OpenAIProvider.js'
 import { getVerifierChecklistText, RULE_LABELS } from '../../services/feedbackVerificationService.js'
 import { SERVER_ONLY_CREATE_FIELDS, SERVER_ONLY_UPDATE_FIELDS, withoutFields } from '../coachCheck.js'
-import OllamaProvider from '../../services/OllamaProvider.js'
 import Workout from '../../models/Workout.js'
 
 const workout = {
@@ -190,26 +189,6 @@ test('Review-Fund: Antwort steht auch bei Technik- und Zeit-Übungen im OpenAI-P
     ]
   })
   assert.equal((prompt.match(/siehe Regel 33/g) || []).length, 2)
-})
-
-test('Review-Fund: Ollama bekommt Antwort (auch ausgelassene Übung) und dieselbe Anweisung wie OpenAI', () => {
-  const provider = new OllamaProvider()
-  const base = {
-    total_exercises_analyzed: 1, progression_summary: { positive: 0, stable: 1, negative: 0 },
-    top_improvements: [], top_declines: []
-  }
-  const withAnswers = provider.buildPrompt({
-    ...base,
-    exercises: [
-      { exercise: 'Bench Press', progression: 'stable', period_description: 'x', current_weight: 60, current_reps: 25, athlete_answer: answer },
-      { exercise: 'Row', exercise_not_done: true, athlete_answer: skippedAnswer }
-    ]
-  })
-  assert.match(withAnswers, /am Limit, aber sauber/)
-  assert.match(withAnswers, /Zeitmangel/)
-  assert.match(withAnswers, /EMPFIEHLST nichts/)
-  const without = provider.buildPrompt({ ...base, exercises: [{ exercise: 'Bench Press', progression: 'stable', period_description: 'x', current_weight: 60, current_reps: 25 }] })
-  assert.doesNotMatch(without, /EMPFIEHLST nichts|Antwort des Nutzers/)
 })
 
 test('Review-Fund: Karte nach Position - gleiche Übung zweimal bekommt nur die eigene Antwort', () => {

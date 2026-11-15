@@ -18,7 +18,7 @@ Testergebnis verfälschen oder echte Bugs verdecken/vortäuschen können.
 | 5 | ✅ Erledigt: Bearbeiten abgeschlossener Workouts ist über `WORKOUT_EDIT_WINDOW_HOURS` (Standard 24 h, ab `completedAt`) serverseitig begrenzt | `server/utils/workoutEditWindow.js`, `server/models/Workout.js` | Kein Risiko mehr; Fenster im Test gezielt prüfen |
 | 6 | ✅ Erledigt: Globaler Vue-Error-Handler (`app.config.errorHandler` in `client/src/main.js`) und zentrale Express-Error-Middleware (`server/app.js`) sind vorhanden | `client/src/main.js`, `server/app.js` | Kein Risiko mehr; weiterhin kein Remote-Crash-Reporting (siehe #7) |
 | 7 | Kein Remote-Logging/Crash-Reporting (nur `console.*`, TODO-Kommentar für Sentry etc. vorhanden aber ungenutzt) | `client/src/utils/logger.js`, `server/utils/logger.js` | Fehler bei echten Testpersonen sind ohne aktives Log-Sammeln (`copyDraftDebugLog` in Settings) kaum diagnostizierbar |
-| 8 | Ollama-Provider ist nur „im Heimnetzwerk" erreichbar (Kommentar im Code) | `server/services/OllamaProvider.js` | Falls als aktiver Provider konfiguriert, sehen Tester außerhalb des Netzes durchgehend `network_unavailable` |
+| 8 | ✅ Erledigt: Ollama-Provider entfernt (lief nie in Production); einziger KI-Anbieter ist OpenAI | `server/server.js` | Kein Risiko mehr |
 
 ## 1. Registrierung & Login
 
@@ -156,7 +156,7 @@ ruft nicht die echte Komponente auf).
 ## 6. KI-Feedback
 
 **Dateien:** `server/routes/workouts.js` (`POST /:id/ai-analysis`, `GET /feedbacks`),
-`server/services/AIProvider.js`, `OpenAIProvider.js`, `OllamaProvider.js`,
+`server/services/AIProvider.js`, `OpenAIProvider.js`,
 `server/utils/aiUtils.js`, `server/models/Workout.js`, `server/models/FeedbackRating.js`,
 `server/services/feedbackRatingService.js`, `client/src/components/PostWorkoutSummary.vue`,
 `AIFeedbackHistory.vue`, `AiFeedbackDeltaSummary.vue`, `AiFeedbackRatingWidget.vue`
@@ -171,7 +171,7 @@ die Provider-Klassen oder den `/:id/ai-analysis`-Endpoint selbst.
 | Workout abschließen, KI-Feedback wird generiert | Happy Path | Kurzes, direktes Feedback im neuen „Coach-Chat"-Ton erscheint |
 | Feedback mit Daumen hoch/runter bewerten + Korrekturtext | Happy Path | Bewertung wird gespeichert, Korrektur landet erst nach explizitem Opt-in als dauerhafte Notiz |
 | „Feedback später bewerten" wählen | Happy Path | Bestätigung ohne Ladezustand, Eintrag erscheint als „ausstehend" im Feedback-Verlauf, „Jetzt generieren" funktioniert |
-| KI-Provider nicht erreichbar (Health-Check schlägt fehl) | Fehlerfall | `feedback_status: 'network_unavailable'`, kein 500er, `backend_analysis` bleibt sichtbar |
+| KI-Dienst liefert einen Fehler (OpenAI/Relay) | Fehlerfall | kein 500er, `backend_analysis` bleibt sichtbar, kein KI-Text. (`network_unavailable` sendet der Server nicht mehr, der Client zeigt den Status nur für ältere Antworten.) |
 | KI-Provider liefert Fehler/Timeout während Generierung | Fehlerfall | HTTP 200 ohne `ai_feedback`, generische Fehlermeldung im Client, kein automatischer Retry |
 | Wiederholtes schnelles Anfordern (Burst-Limit) | Edge Case | 429 nach 6 Requests/60s – da In-Memory, verloren bei Server-Neustart, ggf. während Testphase weniger wirksam als gedacht |
 | Freier Plan, wöchentliches Kontingent erschöpft, `/:id/ai-analysis` erneut aufrufen | **Edge Case (Bug, siehe Blocker #3)** | Kontingent wird hier aktuell nicht geprüft – Analyse läuft trotzdem durch |
