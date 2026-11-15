@@ -297,6 +297,10 @@ const pendingLater = ref(false)
 const consentDeclined = ref(false)
 const aiConsent = useAiConsentStore()
 const settingsStore = useSettingsStore()
+// Konto beim Öffnen der Zusammenfassung: Wechselt es (Abmelden/anderes Konto), darf nichts mehr für das alte Workout mit dem Token
+// des neuen Kontos angefragt werden.
+const consentEpochAtOpen = aiConsent._epoch
+const sameAccountAsAtOpen = () => aiConsent._epoch === consentEpochAtOpen
 // Fragen nach dem Training (Backlog F16): Themen aus utils/postWorkoutQuestions.js; Phase 'offer' | 'intro' | 'ask' | '' (keine).
 const questionTopics = ref([])
 const questionPhase = ref('')
@@ -622,7 +626,8 @@ const QUOTA_WAIT_MS = 2500
 watch(() => aiConsent.granted, (granted) => {
   if (granted || !questionPhase.value) return
   questionPhase.value = ''
-  loadAIFeedback()
+  // Kontowechsel ist kein Widerruf: dann nichts anfragen (die Ansicht wird mit dem Konto zurückgesetzt).
+  if (sameAccountAsAtOpen()) loadAIFeedback()
 })
 
 async function startFlow() {
@@ -734,7 +739,7 @@ onBeforeUnmount(() => {
   // Wird die Ansicht mitten in den Fragen entfernt (Zurückwischen, Navigation), läuft die Auswertung trotzdem (ohne Antworten).
   if (questionPhase.value) {
     questionPhase.value = ''
-    loadAIFeedback()
+    if (sameAccountAsAtOpen()) loadAIFeedback()
   }
   window.removeEventListener(OFFLINE_WORKOUTS_UPDATED_EVENT, handleOfflineWorkoutsUpdated)
   window.removeEventListener(AI_FEEDBACK_UPDATED_EVENT, handleFeedbackUpdated)
