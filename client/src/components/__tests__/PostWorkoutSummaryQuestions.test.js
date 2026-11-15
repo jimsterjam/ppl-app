@@ -14,10 +14,10 @@ vi.mock('axios', () => {
   return { default: {
     create: instance,
     get: vi.fn(async (url) => { calls.push(['GET', url]); return { data: {} } }),
-    post: vi.fn(async (url, body) => {
-      calls.push(['POST', url, body])
+    post: vi.fn(async (url, body, config) => {
+      calls.push(['POST', url, body, config])
       if (String(url).endsWith('/ai-analysis')) return { data: { ai_feedback: 'Starker Tag.', feedback_kind: 'comparison' } }
-      return { data: { success: true } }
+      return { data: { success: true, feedbackGenerated: globalThis.__feedbackGenerated === true } }
     })
   } }
 })
@@ -253,5 +253,28 @@ describe('Zusammenfassung: Fragen nach dem Training', () => {
     await flushPromises()
     expect(w.text()).not.toContain('War das Absicht?')
     expect(answerCalls()).toHaveLength(0)
+  })
+
+  it('es gab schon Feedback: die Auswertung wird neu angefordert, damit die Antworten wirken', async () => {
+    globalThis.__feedbackGenerated = true
+    try {
+      setup()
+      const w = await mountSummary()
+      await click(w, 'Ja, bewusst')
+      await click(w, 'Anderes')
+      expect(analysisCalls()).toHaveLength(1)
+      expect(analysisCalls()[0][3]?.params).toEqual({ refresh: '1' })
+    } finally {
+      delete globalThis.__feedbackGenerated
+    }
+  })
+
+  it('Gegenprobe: ohne vorhandenes Feedback keine Neu-Anforderung (kein zusätzlicher Verbrauch)', async () => {
+    setup()
+    const w = await mountSummary()
+    await click(w, 'Ja, bewusst')
+    await click(w, 'Anderes')
+    expect(analysisCalls()).toHaveLength(1)
+    expect(analysisCalls()[0][3]?.params).toBeUndefined()
   })
 })

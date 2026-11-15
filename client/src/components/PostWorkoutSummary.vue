@@ -632,25 +632,26 @@ async function startFlow() {
   loadAIFeedback()
 }
 
-// Rückgabe: 'saved' | 'consent' (Server verlangt die Einwilligung, z. B. neue Textversion) | 'failed'.
+// Rückgabe: { status: 'saved' | 'consent' (Server verlangt die Einwilligung, z. B. neue Textversion) | 'failed',
+// feedbackGenerated }. feedbackGenerated: es gab schon Feedback - die Antworten wirken nur bei einer neuen Auswertung.
 // Ein Fehler ist nicht tödlich: ohne gespeicherte Antworten kommt das Feedback wie bisher.
 async function saveAnswers(answers) {
   try {
     const realId = await resolveWorkoutIdForAnalysis(props.workoutId)
-    if (!realId) return 'failed'
+    if (!realId) return { status: 'failed', feedbackGenerated: false }
     const token = await getIdToken().catch(() => null)
-    await axios.post(`${apiUrl('workouts')}/${realId}/athlete-answers`, { answers }, {
+    const response = await axios.post(`${apiUrl('workouts')}/${realId}/athlete-answers`, { answers }, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       timeout: 20000
     })
-    return 'saved'
+    return { status: 'saved', feedbackGenerated: response?.data?.feedbackGenerated === true }
   } catch (err) {
     if (err?.response?.data?.code === 'AI_CONSENT_REQUIRED') {
       aiConsent.noteServerRefusal()
-      return 'consent'
+      return { status: 'consent', feedbackGenerated: false }
     }
     logger.warn('[PostWorkoutSummary] Antworten konnten nicht gespeichert werden', err?.message)
-    return 'failed'
+    return { status: 'failed', feedbackGenerated: false }
   }
 }
 
@@ -659,9 +660,10 @@ async function onQuestionsDone(result) {
   const answers = Array.isArray(result?.answers) ? result.answers : []
   if (answers.length) resetSkips()
   else if (result?.skipped && !result?.turnedOff) recordSkip()
+  let refresh = false
   if (answers.length) {
-    const status = await saveAnswers(answers)
-    if (status === 'consent') {
+    let saved = await saveAnswers(answers)
+    if (saved.status === 'consent') {
       // Die zwischengespeicherte Einwilligung galt nicht mehr (neue Textversion): jetzt fragen, danach die Antworten
       // noch einmal speichern. Lehnt der Nutzer ab, gibt es kein Feedback (wie sonst auch).
       if (!(await aiConsent.request())) {
@@ -669,10 +671,13 @@ async function onQuestionsDone(result) {
         loading.value = false
         return
       }
-      await saveAnswers(answers)
+      saved = await saveAnswers(answers)
     }
+    // Gab es schon Feedback (z. B. aus einer früheren Auswertung), käme sonst nur der alte Text aus dem Zwischenspeicher
+    // des Servers - die Antworten würden die KI nie erreichen.
+    refresh = saved.status === 'saved' && saved.feedbackGenerated
   }
-  loadAIFeedback()
+  loadAIFeedback(refresh ? { refresh: true } : {})
 }
 
 // Der Tracker hat das Feedback nachgeladen, während diese Ansicht noch offen ist -> anzeigen
