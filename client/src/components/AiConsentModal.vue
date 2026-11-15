@@ -11,6 +11,7 @@
             <li>{{ t('aiConsent.item1') }}</li>
             <li>{{ t('aiConsent.item2') }}</li>
             <li>{{ t('aiConsent.item3') }}</li>
+            <li>{{ t('aiConsent.item4') }}</li>
           </ul>
           <p class="text">{{ t('aiConsent.notSent') }}</p>
           <p class="text">{{ t('aiConsent.disclaimer') }}</p>

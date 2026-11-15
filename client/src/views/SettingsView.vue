@@ -35,6 +35,13 @@
         </ToggleSwitch>
       </SettingsSectionCard>
 
+      <SettingsSectionCard class="card" :title="$t('postQuestions.settingsTitle')">
+        <p class="hint">{{ $t('postQuestions.settingsHint') }}</p>
+        <ToggleSwitch :model-value="postQuestionsEnabled" @update:model-value="togglePostQuestions">
+          {{ $t('postQuestions.settingsToggle') }}
+        </ToggleSwitch>
+      </SettingsSectionCard>
+
       <SettingsSectionCard class="card" :title="$t('settings.progressRulesTitle')">
         <p class="hint">{{ $t('settings.progressRulesSubtitle') }}</p>
         <button class="legal-btn" @click="$router.push({ name: 'faqs', query: { open: 'progressRules' } })">
@@ -412,6 +419,7 @@ import { useOnboardingStore } from '@/stores/onboardingStore'
 import { useCoachMarkStore } from '@/stores/coachMarkStore'
 import { useToastStore } from '@/stores/toastStore'
 import { useAiConsentStore } from '@/stores/aiConsentStore'
+import { isQuestionsEnabled, setQuestionsEnabled } from '@/utils/postWorkoutQuestionPrefs'
 import { useAuthStore } from '@/stores/authStore'
 import { useI18n } from 'vue-i18n'
 import { computed, ref, watch, onBeforeUnmount, onMounted } from 'vue'
@@ -554,6 +562,13 @@ onMounted(async () => {
   } catch { /* Web/Dev: nicht implementiert */ }
 })
 const aiConsent = useAiConsentStore()
+
+// Fragen nach dem Training (Backlog F16): pro Konto, Standard an.
+const postQuestionsEnabled = ref(isQuestionsEnabled())
+function togglePostQuestions(next) {
+  postQuestionsEnabled.value = !!next
+  setQuestionsEnabled(!!next)
+}
 
 async function toggleAiConsent(next) {
   if (next) {

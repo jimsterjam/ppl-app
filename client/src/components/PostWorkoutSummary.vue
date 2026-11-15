@@ -59,6 +59,15 @@
       </div>
     </div>
 
+    <!-- Fragen nach dem Training (Backlog F16): vor der KI-Auswertung, nur wenn etwas Auffälliges zu klären ist.
+         Alles freiwillig; "Überspringen" zeigt sofort das Feedback. -->
+    <PostWorkoutQuestions
+      v-else-if="questionTopics.length && questionPhase"
+      :topics="questionTopics"
+      :initial-phase="questionPhase"
+      @done="onQuestionsDone"
+    />
+
     <!-- Loading State. Dauert es länger (z.B. Kaltstart von Server/KI-Relay), erscheint nach
          SLOW_NOTICE_MS ein ruhiger Hinweis - die App lädt das Feedback danach selbst nach
          (utils/feedbackTracker.js) und meldet sich, sobald es da ist. Nie ein Timeout-Text. -->
@@ -198,6 +207,7 @@ import AiFeedbackDeltaSummary from '@/components/AiFeedbackDeltaSummary.vue'
 import AiNoteAnswers from '@/components/AiNoteAnswers.vue'
 import AiFeedbackRatingWidget from '@/components/AiFeedbackRatingWidget.vue'
 import OneTimeHint from '@/components/OneTimeHint.vue'
+import PostWorkoutQuestions from '@/components/PostWorkoutQuestions.vue'
 import { sendFeedbackMail } from '@/utils/feedbackMail'
 import { resolveFeedbackLanguage } from '@/utils/feedbackLanguage'
 import { useToastStore } from '@/stores/toastStore'
@@ -206,6 +216,12 @@ import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useAiConsentStore } from '@/stores/aiConsentStore'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 import { getNotDoneExercises } from '@/utils/notDoneExercises'
+import { planQuestions } from '@/utils/postWorkoutQuestionsPlan'
+import { isQuestionsEnabled, hasSeenIntro, shouldOfferTurnOff, recordSkip, resetSkips } from '@/utils/postWorkoutQuestionPrefs'
+import { getAllWorkoutsOffline } from '@/utils/offlineStorage'
+import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
+import { resolveActiveWorkoutUserId } from '@/utils/workoutDetailLifecycle'
+import { useSettingsStore } from '@/stores/settingsStore'
 
 const toast = useToastStore()
 function writeFeedbackMail() { sendFeedbackMail({ t, toast }) }
@@ -280,6 +296,10 @@ const pendingLater = ref(false)
 // Nutzer hat der KI-Weitergabe nicht zugestimmt: Hinweis + Möglichkeit, es nachzuholen.
 const consentDeclined = ref(false)
 const aiConsent = useAiConsentStore()
+const settingsStore = useSettingsStore()
+// Fragen nach dem Training (Backlog F16): Themen aus utils/postWorkoutQuestions.js; Phase 'offer' | 'intro' | 'ask' | '' (keine).
+const questionTopics = ref([])
+const questionPhase = ref('')
 let slowTimer = null
 let currentResolvedId = ''
 
@@ -554,6 +574,77 @@ async function loadAIFeedback({ refresh = false } = {}) {
   }
 }
 
+// --- Fragen nach dem Training (Backlog F16) ---------------------------------------------------------------------
+// Keine Fragen ohne Feedback: ohne Einwilligung, bei leerem Kontingent, ausgeschaltetem Schalter oder wenn nichts
+// Auffälliges zu klären ist. Fehler hier dürfen die Auswertung nie verhindern.
+async function prepareQuestions() {
+  const ids = [props.workoutId].filter(Boolean).map(String)
+  const workout = (userStore.workouts || []).find((w) => ids.includes(String(w?._id || w?.id || ''))) || null
+  const enabled = isQuestionsEnabled()
+  // Nur laden, was gebraucht wird: ohne Einwilligung/Schalter/Workout entfällt alles Weitere.
+  if (!enabled || !aiConsent.granted || !workout) return null
+  const userId = resolveActiveWorkoutUserId({ workout, userStore })
+  const history = userId ? await getAllWorkoutsOffline({ userId }).catch(() => []) : []
+  const catalog = await loadDefaultExercises().catch(() => [])
+  return planQuestions({
+    enabled,
+    consentGranted: aiConsent.granted,
+    quotaExhausted: quotaExhausted.value,
+    workout,
+    history,
+    catalog,
+    currentIds: ids,
+    fallbackGoal: settingsStore.lastWorkoutGoal,
+    offerTurnOff: shouldOfferTurnOff(),
+    introSeen: hasSeenIntro()
+  })
+}
+
+// Der Server schläft bei Nichtbenutzung (Render): beim Antworten schon aufwecken, damit die Auswertung danach schneller kommt.
+function wakeServer() {
+  axios.get(apiUrl('health'), { timeout: 30000 }).catch(() => {})
+}
+
+async function startFlow() {
+  let plan = null
+  try {
+    plan = await prepareQuestions()
+  } catch (err) {
+    logger.warn('[PostWorkoutSummary] Fragen konnten nicht vorbereitet werden', err?.message)
+  }
+  if (plan && showSummary.value) {
+    questionTopics.value = plan.topics
+    questionPhase.value = plan.phase
+    wakeServer()
+    return
+  }
+  loadAIFeedback()
+}
+
+async function saveAnswers(answers) {
+  try {
+    const realId = await resolveWorkoutIdForAnalysis(props.workoutId)
+    if (!realId) return
+    const token = await getIdToken().catch(() => null)
+    await axios.post(`${apiUrl('workouts')}/${realId}/athlete-answers`, { answers }, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      timeout: 20000
+    })
+  } catch (err) {
+    // Nicht tödlich: ohne gespeicherte Antworten kommt das Feedback wie bisher.
+    logger.warn('[PostWorkoutSummary] Antworten konnten nicht gespeichert werden', err?.message)
+  }
+}
+
+async function onQuestionsDone(result) {
+  questionPhase.value = ''
+  const answers = Array.isArray(result?.answers) ? result.answers : []
+  if (answers.length) resetSkips()
+  else if (result?.skipped && !result?.turnedOff) recordSkip()
+  if (answers.length) await saveAnswers(answers)
+  loadAIFeedback()
+}
+
 // Der Tracker hat das Feedback nachgeladen, während diese Ansicht noch offen ist -> anzeigen
 // (der Server liefert es jetzt aus dem Cache, kein neuer KI-Aufruf).
 function handleFeedbackUpdated(event) {
@@ -562,7 +653,12 @@ function handleFeedbackUpdated(event) {
   loadAIFeedback()
 }
 
+// Schließt der Nutzer die Zusammenfassung mitten in den Fragen, läuft die Auswertung trotzdem (ohne Antworten).
 function dismissSummary() {
+  if (questionPhase.value) {
+    questionPhase.value = ''
+    loadAIFeedback()
+  }
   showSummary.value = false
   emit('close')
 }
@@ -582,7 +678,7 @@ onMounted(() => {
     // zu laden, das Workout wurde absichtlich ohne Analyse gespeichert (siehe deferred-Prop).
     return
   }
-  loadAIFeedback()
+  startFlow()
   window.addEventListener(OFFLINE_WORKOUTS_UPDATED_EVENT, handleOfflineWorkoutsUpdated)
   window.addEventListener(AI_FEEDBACK_UPDATED_EVENT, handleFeedbackUpdated)
 })

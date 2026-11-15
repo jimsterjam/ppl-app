@@ -76,3 +76,9 @@ test('Middleware: ohne Nutzer-ID (Auth aus, nur Entwicklung) weiter', async () =
   const mw = createRequireAiConsent({ loadProfile: async () => ({}), logger: silent })
   assert.equal((await run(mw, {})).status, 'next')
 })
+
+test('Einwilligung der Textversion 1 gilt nach der Erweiterung um die Fragen nach dem Training nicht mehr (Version 2)', () => {
+  assert.equal(CURRENT_AI_CONSENT_VERSION, 2)
+  assert.equal(summarizeAiConsent({ aiConsent: { granted: true, version: 1, grantedAt: 'x' } }).granted, false)
+  assert.equal(summarizeAiConsent({ aiConsent: { granted: true, version: 2, grantedAt: 'x' } }).granted, true)
+})
