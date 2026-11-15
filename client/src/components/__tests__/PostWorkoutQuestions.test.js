@@ -161,4 +161,13 @@ describe('PostWorkoutQuestions', () => {
     expect(buttons(w)).toContain('Hard, but I had some left')
     expect(buttons(w)).toContain('Skip and show feedback')
   })
+
+  it('Beschriftung der Gruppe passt zur Phase (Angebot statt erster Frage)', async () => {
+    const offer = mountQuestions({ topics: [lastSet], initialPhase: 'offer' })
+    expect(offer.find('[role="group"]').attributes('aria-label')).toBe('Du hast die Fragen dreimal übersprungen. Möchtest du sie ausschalten?')
+    const intro = mountQuestions({ topics: [lastSet], initialPhase: 'intro' })
+    expect(intro.find('[role="group"]').attributes('aria-label')).toBe('Kurz zum Training?')
+    const ask = mountQuestions({ topics: [lastSet], initialPhase: 'ask' })
+    expect(ask.find('[role="group"]').attributes('aria-label')).toContain('Wie war der letzte Satz?')
+  })
 })

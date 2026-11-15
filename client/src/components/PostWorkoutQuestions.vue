@@ -64,7 +64,11 @@ const answers = ref([])
 const pendingIntent = ref('')
 
 const current = computed(() => props.topics[stepIndex.value] || null)
-const heading = computed(() => (phase.value === 'intro' ? t('postQuestions.introTitle') : questionText.value || t('postQuestions.settingsTitle')))
+const heading = computed(() => {
+  if (phase.value === 'intro') return t('postQuestions.introTitle')
+  if (phase.value === 'offer') return t('postQuestions.offerOffText')
+  return questionText.value || t('postQuestions.settingsTitle')
+})
 
 function uniformReps(summary) {
   const list = Array.isArray(summary?.repsList) ? summary.repsList : []

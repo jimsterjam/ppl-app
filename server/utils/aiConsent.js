@@ -16,14 +16,17 @@ export function summarizeAiConsent(profile) {
 }
 
 // Nimmt nur ein echtes Boolean an - nie den Request-Body ungeprüft speichern.
+// Version: die Textversion, die der Nutzer im Fenster gesehen hat (der Client schickt sie mit). Fehlt sie (ältere App-Version),
+// war es Textversion 1 - so gilt eine Zustimmung zum alten Text nicht für den neuen (Selbst-Review F16 Etappe 3).
 export function parseConsentInput(body) {
   if (!body || typeof body.granted !== 'boolean') return null
-  return { granted: body.granted }
+  const shown = Number.isInteger(body.version) ? body.version : 1
+  return { granted: body.granted, version: Math.min(CURRENT_AI_CONSENT_VERSION, Math.max(1, shown)) }
 }
 
-export function buildConsentUpdate(granted, now = new Date()) {
+export function buildConsentUpdate(granted, now = new Date(), version = CURRENT_AI_CONSENT_VERSION) {
   return granted
-    ? { 'aiConsent.granted': true, 'aiConsent.version': CURRENT_AI_CONSENT_VERSION, 'aiConsent.grantedAt': now }
+    ? { 'aiConsent.granted': true, 'aiConsent.version': version, 'aiConsent.grantedAt': now }
     : { 'aiConsent.granted': false, 'aiConsent.revokedAt': now }
 }
 

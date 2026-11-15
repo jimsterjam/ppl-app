@@ -416,7 +416,7 @@ router.put('/ai-consent', firebaseAuthMiddleware, async (req, res) => {
     if (!input) return res.status(400).json({ error: 'granted must be a boolean' });
     const updated = await UserProfile.findOneAndUpdate(
       { uid },
-      { $set: buildConsentUpdate(input.granted) },
+      { $set: buildConsentUpdate(input.granted, new Date(), input.version) },
       { upsert: true, new: true }
     ).lean();
     res.json({ aiConsent: summarizeAiConsent(updated) });

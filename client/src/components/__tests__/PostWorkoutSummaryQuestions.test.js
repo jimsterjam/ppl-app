@@ -184,4 +184,60 @@ describe('Zusammenfassung: Fragen nach dem Training', () => {
     expect(answerCalls()).toHaveLength(1)
     expect(analysisCalls()).toHaveLength(1)
   })
+
+  it('Einwilligung galt nicht mehr (neue Textversion): erst Einwilligung einholen, dann Antworten erneut speichern', async () => {
+    setup()
+    const axios = (await import('axios')).default
+    axios.post.mockImplementationOnce(async (url, body) => {
+      calls.push(['POST', url, body])
+      const error = new Error('forbidden')
+      error.response = { status: 403, data: { code: 'AI_CONSENT_REQUIRED' } }
+      throw error
+    })
+    const consent = useAiConsentStore()
+    consent.request = vi.fn().mockResolvedValue(true)
+    const w = await mountSummary()
+    await click(w, 'Ja, bewusst')
+    await click(w, 'Anderes')
+    expect(consent.request).toHaveBeenCalled()
+    expect(answerCalls()).toHaveLength(2)
+    expect(analysisCalls()).toHaveLength(1)
+  })
+
+  it('Gegenprobe: lehnt der Nutzer die neue Einwilligung ab, gibt es keine Auswertung und keinen zweiten Versuch', async () => {
+    setup()
+    const axios = (await import('axios')).default
+    axios.post.mockImplementationOnce(async (url, body) => {
+      calls.push(['POST', url, body])
+      const error = new Error('forbidden')
+      error.response = { status: 403, data: { code: 'AI_CONSENT_REQUIRED' } }
+      throw error
+    })
+    const consent = useAiConsentStore()
+    consent.request = vi.fn().mockResolvedValue(false)
+    const w = await mountSummary()
+    await click(w, 'Ja, bewusst')
+    await click(w, 'Anderes')
+    expect(answerCalls()).toHaveLength(1)
+    expect(analysisCalls()).toHaveLength(0)
+    expect(w.text()).toContain('keine Trainingsdaten an die KI')
+  })
+
+  it('wird die Ansicht mitten in den Fragen entfernt, läuft die Auswertung trotzdem', async () => {
+    setup()
+    const w = await mountSummary()
+    expect(analysisCalls()).toHaveLength(0)
+    w.unmount()
+    await flushPromises()
+    expect(analysisCalls()).toHaveLength(1)
+  })
+
+  it('temporäre Workout-ID, im Store schon unter der echten ID: es wird trotzdem gefragt', async () => {
+    const { resolveRealIdFromDraftId } = await import('@/utils/workoutHelpers')
+    resolveRealIdFromDraftId.mockResolvedValue(ID)
+    setup()
+    const w = await mountSummary({ workoutId: 'offline_123' })
+    expect(w.text()).toContain('War das Absicht?')
+    resolveRealIdFromDraftId.mockResolvedValue('')
+  })
 })

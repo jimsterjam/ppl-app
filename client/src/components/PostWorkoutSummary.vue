@@ -578,14 +578,18 @@ async function loadAIFeedback({ refresh = false } = {}) {
 // Keine Fragen ohne Feedback: ohne Einwilligung, bei leerem Kontingent, ausgeschaltetem Schalter oder wenn nichts
 // Auffälliges zu klären ist. Fehler hier dürfen die Auswertung nie verhindern.
 async function prepareQuestions() {
-  const ids = [props.workoutId].filter(Boolean).map(String)
+  // Das Workout kann im Store schon unter seiner echten ID stehen, während props.workoutId noch die temporäre ist.
+  const realId = await resolveRealIdFromDraftId(String(props.workoutId || '')).catch(() => '')
+  const ids = [props.workoutId, realId].filter(Boolean).map(String)
   const workout = (userStore.workouts || []).find((w) => ids.includes(String(w?._id || w?.id || ''))) || null
   const enabled = isQuestionsEnabled()
   // Nur laden, was gebraucht wird: ohne Einwilligung/Schalter/Workout entfällt alles Weitere.
   if (!enabled || !aiConsent.granted || !workout) return null
   const userId = resolveActiveWorkoutUserId({ workout, userStore })
-  const history = userId ? await getAllWorkoutsOffline({ userId }).catch(() => []) : []
-  const catalog = await loadDefaultExercises().catch(() => [])
+  const [history, catalog] = await Promise.all([
+    userId ? getAllWorkoutsOffline({ userId }).catch(() => []) : [],
+    loadDefaultExercises().catch(() => [])
+  ])
   return planQuestions({
     enabled,
     consentGranted: aiConsent.granted,
@@ -621,18 +625,25 @@ async function startFlow() {
   loadAIFeedback()
 }
 
+// Rückgabe: 'saved' | 'consent' (Server verlangt die Einwilligung, z. B. neue Textversion) | 'failed'.
+// Ein Fehler ist nicht tödlich: ohne gespeicherte Antworten kommt das Feedback wie bisher.
 async function saveAnswers(answers) {
   try {
     const realId = await resolveWorkoutIdForAnalysis(props.workoutId)
-    if (!realId) return
+    if (!realId) return 'failed'
     const token = await getIdToken().catch(() => null)
     await axios.post(`${apiUrl('workouts')}/${realId}/athlete-answers`, { answers }, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       timeout: 20000
     })
+    return 'saved'
   } catch (err) {
-    // Nicht tödlich: ohne gespeicherte Antworten kommt das Feedback wie bisher.
+    if (err?.response?.data?.code === 'AI_CONSENT_REQUIRED') {
+      aiConsent.noteServerRefusal()
+      return 'consent'
+    }
     logger.warn('[PostWorkoutSummary] Antworten konnten nicht gespeichert werden', err?.message)
+    return 'failed'
   }
 }
 
@@ -641,7 +652,19 @@ async function onQuestionsDone(result) {
   const answers = Array.isArray(result?.answers) ? result.answers : []
   if (answers.length) resetSkips()
   else if (result?.skipped && !result?.turnedOff) recordSkip()
-  if (answers.length) await saveAnswers(answers)
+  if (answers.length) {
+    const status = await saveAnswers(answers)
+    if (status === 'consent') {
+      // Die zwischengespeicherte Einwilligung galt nicht mehr (neue Textversion): jetzt fragen, danach die Antworten
+      // noch einmal speichern. Lehnt der Nutzer ab, gibt es kein Feedback (wie sonst auch).
+      if (!(await aiConsent.request())) {
+        consentDeclined.value = true
+        loading.value = false
+        return
+      }
+      await saveAnswers(answers)
+    }
+  }
   loadAIFeedback()
 }
 
@@ -685,6 +708,11 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   clearTimeout(slowTimer)
+  // Wird die Ansicht mitten in den Fragen entfernt (Zurückwischen, Navigation), läuft die Auswertung trotzdem (ohne Antworten).
+  if (questionPhase.value) {
+    questionPhase.value = ''
+    loadAIFeedback()
+  }
   window.removeEventListener(OFFLINE_WORKOUTS_UPDATED_EVENT, handleOfflineWorkoutsUpdated)
   window.removeEventListener(AI_FEEDBACK_UPDATED_EVENT, handleFeedbackUpdated)
 })
