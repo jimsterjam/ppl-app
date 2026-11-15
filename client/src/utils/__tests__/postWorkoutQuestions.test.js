@@ -213,4 +213,21 @@ describe('Gegenannahmen aus dem Selbst-Review', () => {
     const r = one('strength', bench, 'hypertrophy', sets(50, times(3, 12)), [last])
     expect(r[0]).toMatchObject({ topic: 'last_set', kind: 'range' })
   })
+
+  it('Copilot-Runde 2: gleiche Gesamtzahl bei anderer Satz-/Wiederholungs-Aufteilung ist kein "genau wie beim letzten Mal"', () => {
+    // 5x8 = 40 und 4x10 = 40 Wiederholungen, aber nicht dasselbe Schema (und unter der Schwelle für A).
+    const r = one('hypertrophy', bench, 'hypertrophy', sets(50, times(4, 10)), [sets(50, times(5, 8))])
+    expect(r.find((t) => t.topic === 'compare')).toBeUndefined()
+  })
+
+  it('Copilot-Runde 2: nach einer "Gewicht war zu leicht"-Einschätzung (7+ Wdh.) zählt das nicht als schon gefragt', () => {
+    // Letztes Mal 5x7 (aboveScheme, dort gab es keine B-Frage), vorletztes Mal 5x5; heute 5x5 mit demselben Gewicht.
+    const r = one('strength', bench, 'strength', sets(100, times(5, 5)), [sets(100, times(5, 7)), sets(100, times(5, 5))])
+    expect(r[0]).toMatchObject({ topic: 'last_set', kind: 'fixed' })
+  })
+
+  it('gleiche Gesamtzahl, aber anders auf die Sätze verteilt (12/12/6 statt 10/10/10) -> keine Frage', () => {
+    const r = one('hypertrophy', bench, 'hypertrophy', sets(50, [12, 12, 6]), [sets(50, times(3, 10))])
+    expect(r.find((t) => t.topic === 'compare')).toBeUndefined()
+  })
 })
