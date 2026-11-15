@@ -191,7 +191,7 @@ export function isNoLoadExercise(info = {}) {
   return /speed/i.test(`${info.name_en || ''} ${info.name || ''}`)
 }
 
-function incrementFor(info = {}) {
+export function incrementFor(info = {}) {
   return equipmentValues(info).some((eq) => SMALL_STEP_EQUIPMENT.has(eq)) ? 2 : 2.5
 }
 
