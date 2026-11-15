@@ -102,7 +102,8 @@ function detectForExercise({ index, name, info, goal, workoutGoal, exercise, rec
   if (status?.state === 'increase' && !status.aboveScheme) {
     // Schon beim letzten Mal "steigern"? Dann wurde die Frage damals gestellt (oder der Nutzer hat nicht gesteigert).
     const before = recent[0] ? getProgressionStatus(info, recent[0], goal, { previousSessions: recent.slice(1) }) : null
-    if (before?.state !== 'increase') {
+    // Nur wenn die damalige Steigerung selbst B-tauglich war; "Gewicht klar zu leicht" (aboveScheme) hat keine Frage ausgelöst.
+    if (!(before?.state === 'increase' && !before.aboveScheme)) {
       return { topic: 'last_set', kind: status.mode, exerciseIndex: index, facts: { ...facts, now } }
     }
   }
@@ -113,8 +114,12 @@ function detectForExercise({ index, name, info, goal, workoutGoal, exercise, rec
     const repsDrop = last.totalReps - now.totalReps
     const repsAllowed = Math.max(1, last.totalReps * REPS_THRESHOLD_RATIO)
     const notBetter = weightDrop >= 0 && repsDrop >= 0
-    if (notBetter && round(weightDrop) <= round(weightThreshold(info, last.weight)) && repsDrop <= repsAllowed) {
-      const same = weightDrop === 0 && repsDrop === 0
+    // Nur Gleiches mit Gleichem vergleichen: gleiche Satzzahl (5x8 und 4x10 haben beide 40 Wdh., sind aber nicht dasselbe).
+    const sameShape = now.sets === last.sets
+    const identical = weightDrop === 0 && repsDrop === 0
+    // Gleiche Zahlen, aber anders auf die Sätze verteilt (12/12/6 statt 10/10/10): weder "gleich" noch "weniger" - keine Frage.
+    if (sameShape && notBetter && !(identical && now.reps !== last.reps) && round(weightDrop) <= round(weightThreshold(info, last.weight)) && repsDrop <= repsAllowed) {
+      const same = identical
       return {
         topic: 'compare',
         kind: same ? 'same' : 'less',
