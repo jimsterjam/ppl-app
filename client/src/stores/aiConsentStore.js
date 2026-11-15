@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { fetchAccountProfile, saveAiConsent } from '@/api/account'
+import { fetchAccountProfile, fetchAiConsent, saveAiConsent } from '@/api/account'
 import { getAuthToken } from '@/utils/authToken'
 import { logger } from '@/utils/logger'
 import { AI_CONSENT_TEXT_VERSION } from '@/config/aiConsentVersion'
@@ -46,13 +46,31 @@ export const useAiConsentStore = defineStore('aiConsent', {
     },
 
     async syncFromServer(token) {
+      const uid = this._uid
       try {
         const profile = await fetchAccountProfile(token)
+        // Wechselte das Konto während der Anfrage, gehört die Antwort nicht mehr zum aktiven Konto.
+        if (this._uid !== uid) return
         if (profile?.aiConsent && typeof profile.aiConsent.granted === 'boolean') {
           this._setGranted(profile.aiConsent.granted)
         }
       } catch (error) {
         logger.warn('[aiConsentStore] syncFromServer fehlgeschlagen:', error?.message || error)
+      }
+    },
+
+    // Nur die Einwilligung beim Server abgleichen (leichter Aufruf, holt nicht das ganze Profil). Fehler (kein Netz) lassen den
+    // lokalen Stand stehen. Wird vor den Fragen nach dem Training genutzt (Copilot-Review F16 Etappe 3).
+    async refreshFromServer() {
+      const uid = this._uid
+      if (!uid) return
+      try {
+        const token = await getAuthToken()
+        const consent = await fetchAiConsent(token)
+        if (this._uid !== uid) return
+        if (consent && typeof consent.granted === 'boolean') this._setGranted(consent.granted)
+      } catch (error) {
+        logger.warn('[aiConsentStore] refreshFromServer fehlgeschlagen:', error?.message || error)
       }
     },
 

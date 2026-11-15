@@ -613,24 +613,22 @@ function wakeServer() {
 }
 
 // Höchstens so lange auf die Server-Antworten zu Kontingent und Einwilligung warten (Kaltstart des Servers): danach gilt der
-// lokale Stand.
+// lokale Stand. Meldet der Server später, dass die Einwilligung fehlt, brechen die Fragen ab (Watcher unten).
 const QUOTA_WAIT_MS = 2500
 
-// Die Einwilligung beim Server abgleichen: Hat der Nutzer sie auf einem anderen Gerät widerrufen, soll der lokale Zwischenspeicher
-// keine Fragen freischalten. Fehler (kein Netz) lassen den lokalen Stand stehen.
-async function refreshConsentFromServer() {
-  try {
-    const token = await getIdToken().catch(() => null)
-    if (token) await aiConsent.syncFromServer(token)
-  } catch (err) {
-    logger.warn('[PostWorkoutSummary] Einwilligung konnte nicht abgeglichen werden', err?.message)
-  }
-}
+
+// Die Einwilligung ging verloren, während Fragen gezeigt werden (später Server-Abgleich, anderes Gerät): Fragen beenden, die
+// Auswertung fragt dann nach der Einwilligung.
+watch(() => aiConsent.granted, (granted) => {
+  if (granted || !questionPhase.value) return
+  questionPhase.value = ''
+  loadAIFeedback()
+})
 
 async function startFlow() {
   let plan = null
   try {
-    await Promise.race([Promise.all([subscriptionRefresh, refreshConsentFromServer()]), sleep(QUOTA_WAIT_MS)])
+    await Promise.race([Promise.all([subscriptionRefresh, aiConsent.refreshFromServer()]), sleep(QUOTA_WAIT_MS)])
     plan = await prepareQuestions()
   } catch (err) {
     logger.warn('[PostWorkoutSummary] Fragen konnten nicht vorbereitet werden', err?.message)

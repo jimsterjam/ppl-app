@@ -21,11 +21,17 @@ vi.mock('axios', () => {
     })
   } }
 })
-const consentOnServer = vi.hoisted(() => ({ granted: true }))
+const consentOnServer = vi.hoisted(() => ({ granted: true, fail: false, delayMs: 0 }))
 vi.mock('@/api/account', async (importOriginal) => ({
   ...(await importOriginal()),
-  fetchAccountProfile: vi.fn(async () => ({ aiConsent: { granted: consentOnServer.granted } }))
+  fetchAccountProfile: vi.fn(async () => ({ aiConsent: { granted: consentOnServer.granted } })),
+  fetchAiConsent: vi.fn(async () => {
+    if (consentOnServer.delayMs) await new Promise((resolve) => setTimeout(resolve, consentOnServer.delayMs))
+    if (consentOnServer.fail) throw new Error('offline')
+    return { granted: consentOnServer.granted }
+  })
 }))
+vi.mock('@/utils/authToken', () => ({ getAuthToken: vi.fn().mockResolvedValue('token') }))
 vi.mock('@/utils/firebaseAuth', () => ({ useFirebaseAuth: () => ({ getIdToken: async () => 'token' }) }))
 vi.mock('@/utils/offlineStorage', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -67,6 +73,7 @@ function setup({ granted = true, history = [lastSession], workouts = [today] } =
   user.workouts = workouts
   user.user = { uid: 'uid-a' }
   const consent = useAiConsentStore()
+  consent.switchUser('uid-a')
   consent.granted = granted
   const subscription = useSubscriptionStore()
   subscription.checkSubscription = vi.fn().mockResolvedValue(undefined)
@@ -93,6 +100,8 @@ describe('Zusammenfassung: Fragen nach dem Training', () => {
   beforeEach(() => {
     calls.length = 0
     consentOnServer.granted = true
+    consentOnServer.fail = false
+    consentOnServer.delayMs = 0
     pinia = createPinia()
     setActivePinia(pinia)
     try { localStorage.clear() } catch { /* ohne Speicher */ }
@@ -301,5 +310,36 @@ describe('Zusammenfassung: Fragen nach dem Training', () => {
     consentOnServer.granted = true
     const w = await mountSummary()
     expect(w.text()).toContain('War das Absicht?')
+  })
+
+  it('Gegenprobe: Server nicht erreichbar -> der lokale Stand gilt, es wird gefragt', async () => {
+    setup()
+    consentOnServer.fail = true
+    const w = await mountSummary()
+    expect(w.text()).toContain('War das Absicht?')
+  })
+
+  it('Gegenprobe: lokal noch nichts gespeichert, Server sagt "erteilt" -> es wird gefragt', async () => {
+    setup({ granted: false })
+    consentOnServer.granted = true
+    const w = await mountSummary()
+    expect(w.text()).toContain('War das Absicht?')
+  })
+
+  it('Server antwortet erst spät mit "widerrufen": die Fragen brechen ab und die Auswertung fragt nach der Einwilligung', async () => {
+    setup()
+    consentOnServer.granted = false
+    consentOnServer.delayMs = 3200 // länger als die Wartezeit vor den Fragen
+    const consent = useAiConsentStore()
+    consent.request = vi.fn().mockResolvedValue(false)
+    const w = await mountSummary()
+    await new Promise((resolve) => setTimeout(resolve, 2700))
+    await flushPromises()
+    expect(w.text()).toContain('War das Absicht?') // Wartezeit abgelaufen, lokal noch "erteilt"
+    await new Promise((resolve) => setTimeout(resolve, 900))
+    await flushPromises()
+    expect(w.text()).not.toContain('War das Absicht?')
+    expect(consent.request).toHaveBeenCalled()
+    expect(answerCalls()).toHaveLength(0)
   })
 })
