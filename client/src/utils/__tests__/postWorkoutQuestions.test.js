@@ -8,7 +8,7 @@ const legPress = { name: 'Beinpresse', name_en: 'leg press', category: 'Legs', e
 const dbPress = { name: 'Schulterdrücken Kurzhanteln', name_en: 'dumbbell shoulder press', category: 'Push', equipment: 'Kurzhanteln', aiMetadata: { exerciseType: 'compound' } }
 const plank = { name: 'Plank', name_en: 'plank', category: 'Core', equipment: 'Körpergewicht', measureMode: 'time' }
 
-const sets = (weight, repsList) => ({ setDetails: repsList.map((reps) => ({ weight, reps, done: true })) })
+const sets = (weight, repsList, goal) => ({ ...(goal ? { __workoutGoal: goal } : {}), setDetails: repsList.map((reps) => ({ weight, reps, done: true })) })
 const times = (n, reps) => Array(n).fill(reps)
 const entry = (index, info, goal, exercise, recent = []) => ({ index, name: info.name, info, goal, exercise, recent })
 const detect = (workoutGoal, exercises) => detectQuestionTopics({ workoutGoal, exercises })
@@ -30,7 +30,7 @@ describe('A Absicht', () => {
   })
 
   it('5x5 -> 3x10 (Schema anders) ist A', () => {
-    const r = one('hypertrophy', bench, 'hypertrophy', sets(60, times(3, 10)), [sets(60, times(5, 5))])
+    const r = one('hypertrophy', bench, 'hypertrophy', sets(60, times(3, 10)), [sets(60, times(5, 5), 'hypertrophy')])
     expect(r[0]).toMatchObject({ topic: 'intent', kind: 'scheme' })
   })
 
@@ -54,22 +54,22 @@ describe('A Absicht', () => {
 describe('C Vergleich', () => {
   it('50 -> 47,5 kg (5 %) ist C "weniger"', () => {
     const r = one('hypertrophy', bench, 'hypertrophy', sets(47.5, times(3, 10)), [sets(50, times(3, 10))])
-    expect(r[0]).toMatchObject({ topic: 'compare', variant: 'less' })
+    expect(r[0]).toMatchObject({ topic: 'compare', kind: 'less' })
   })
 
   it('Kurzhantel 8 -> 7 kg ist C wegen des Gewichtsschritts', () => {
     const r = one('hypertrophy', dbPress, 'hypertrophy', sets(7, times(3, 10)), [sets(8, times(3, 10))])
-    expect(r[0]).toMatchObject({ topic: 'compare', variant: 'less' })
+    expect(r[0]).toMatchObject({ topic: 'compare', kind: 'less' })
   })
 
   it('genau wie beim letzten Mal ist C "gleich"', () => {
     const r = one('hypertrophy', bench, 'hypertrophy', sets(50, times(3, 10)), [sets(50, times(3, 10))])
-    expect(r[0]).toMatchObject({ topic: 'compare', variant: 'same' })
+    expect(r[0]).toMatchObject({ topic: 'compare', kind: 'same' })
   })
 
   it('eine Wiederholung weniger in einem Satz ist C "weniger"', () => {
     const r = one('hypertrophy', bench, 'hypertrophy', sets(50, [10, 10, 9]), [sets(50, times(3, 10))])
-    expect(r[0]).toMatchObject({ topic: 'compare', variant: 'less' })
+    expect(r[0]).toMatchObject({ topic: 'compare', kind: 'less' })
   })
 
   it('Gegenprobe: mehr Gewicht, mehr Wiederholungen oder nichts zum Vergleichen -> keine Frage', () => {
@@ -174,5 +174,36 @@ describe('Auswahl und Ausschlüsse', () => {
     expect(detectQuestionTopics()).toEqual([])
     expect(detectQuestionTopics({ exercises: [null, {}, { exercise: null }] })).toEqual([])
     expect(detect('hypertrophy', [{ index: 0, name: 'x', info: bench, goal: 'hypertrophy', exercise: sets(50, [10]), recent: 'x' }])).toEqual([])
+  })
+}
+)
+
+describe('Gegenannahmen aus dem Selbst-Review', () => {
+  it('Steigerung mit weniger Wiederholungen (12 -> 8 bei mehr Gewicht) ist kein "anderes Schema"', () => {
+    const r = one('hypertrophy', bench, 'hypertrophy', sets(52.5, times(3, 8), 'hypertrophy'), [sets(50, times(3, 12), 'hypertrophy')])
+    expect(r).toEqual([])
+  })
+
+  it('bewusster Zielwechsel (Kraft -> Muskelaufbau) löst weder Schema- noch Gewichts-Frage aus', () => {
+    const r = one('hypertrophy', bench, 'hypertrophy', sets(60, times(3, 10), 'hypertrophy'), [sets(80, times(5, 5), 'strength')])
+    expect(r).toEqual([])
+  })
+
+  it('Gegenprobe: gleiche Trainingsart bei gleicher Gewichtssenkung fragt dagegen', () => {
+    const r = one('hypertrophy', bench, 'hypertrophy', sets(60, times(3, 10), 'hypertrophy'), [sets(80, times(3, 10), 'hypertrophy')])
+    expect(r[0]).toMatchObject({ topic: 'intent', kind: 'weight_drop' })
+  })
+
+  it('ausgelassene Zeit-, Technik- und Explosiv-Übung bekommt keine Frage', () => {
+    const skipped = (weight) => ({ setDetails: times(3, 10).map((reps) => ({ weight, reps, done: false })) })
+    expect(one('hypertrophy', plank, 'hypertrophy', skipped(0), [])).toEqual([])
+    expect(one('technique', bench, 'technique', skipped(50), [])).toEqual([])
+    expect(one('hypertrophy', bench, 'explosive', skipped(50), [])).toEqual([])
+  })
+
+  it('Gewichtsgrenze mit Dezimalzahlen: genau an der Schwelle ist C, nicht A', () => {
+    // 22,4 -> 19,9 = 2,5 kg = Schwelle (5 % von 22,4 = 1,12; Gewichtsschritt 2,5)
+    const r = one('hypertrophy', bench, 'hypertrophy', sets(19.9, times(3, 10)), [sets(22.4, times(3, 10))])
+    expect(r[0]).toMatchObject({ topic: 'compare', kind: 'less' })
   })
 })

@@ -7,7 +7,7 @@
 // Bewusst ohne Vue-/Store-Imports, damit alles direkt testbar ist. Wer fragt (Einwilligung, Kontingent, Schalter,
 // Bearbeiten) entscheidet die Oberfläche (Etappe 3), nicht diese Datei.
 import {
-  getProgressionStatus, getWorkingSets, splitMainAndBackoffSets, isNoLoadExercise, incrementFor
+  getProgressionStatus, getWorkingSets, splitMainAndBackoffSets, isNoLoadExercise, incrementFor, compatibleSessions
 } from './weightSuggestion.js'
 
 export const MAX_QUESTION_TOPICS = 2
@@ -68,23 +68,25 @@ export function schemeDiffers(now, last) {
 }
 
 function detectForExercise({ index, name, info, goal, workoutGoal, exercise, recent }) {
-  const lastRaw = recent[0] || null
   const facts = { name }
-
+  // Ohne Wiederholungsziel/Gewicht keine Fragen (Technik, Explosiv, Zeit, Körpergewicht) - auch nicht beim Auslassen.
+  if (isNoLoadExercise(info) || goal === 'technique' || goal === 'explosive') return null
   // A: Übung ausgelassen
   if (isExerciseSkipped(exercise)) {
     return { topic: 'intent', kind: 'skipped', exerciseIndex: index, facts }
   }
-  // Ohne Wiederholungsziel/Gewicht keine Fragen (Technik, Explosiv, Zeit, Körpergewicht).
-  if (isNoLoadExercise(info) || goal === 'technique' || goal === 'explosive') return null
   const now = mainSetsSummary(exercise)
   if (!now) return null
+  // "Beim letzten Mal" = letzte Session derselben Trainingsart (wie beim Hinweis über den Sätzen). Ein bewusster
+  // Wechsel von Kraft auf Muskelaufbau ist über die Zielwahl schon bekannt und braucht keine Frage.
+  const lastRaw = compatibleSessions(info, recent, goal)[0] || null
   const last = lastRaw && !isExerciseSkipped(lastRaw) ? mainSetsSummary(lastRaw) : null
 
   if (last) {
-    const differs = schemeDiffers(now, last)
+    // Mehr Gewicht bei weniger Wiederholungen (12 -> 8 nach einer Steigerung) ist normaler Fortschritt, kein neues Schema.
+    const differs = now.weight <= last.weight && schemeDiffers(now, last)
     const drop = last.weight - now.weight
-    if (differs || drop > weightThreshold(info, last.weight)) {
+    if (differs || round(drop) > round(weightThreshold(info, last.weight))) {
       return {
         topic: 'intent',
         kind: differs ? 'scheme' : 'weight_drop',
@@ -115,7 +117,6 @@ function detectForExercise({ index, name, info, goal, workoutGoal, exercise, rec
       return {
         topic: 'compare',
         kind: same ? 'same' : 'less',
-        variant: same ? 'same' : 'less',
         exerciseIndex: index,
         facts: { ...facts, now, last }
       }
@@ -131,7 +132,7 @@ function detectForExercise({ index, name, info, goal, workoutGoal, exercise, rec
  * @param {Array<{ index:number, name:string, info:object, goal:string, exercise:object, recent:Array }>} input.exercises
  *   je Übung des Workouts: `info` wie bei getProgressionStatus, `goal` = wirksame Trainingsart der Übung, `exercise` = die
  *   Übung dieses Workouts, `recent` = dieselbe Übung aus früheren Sessions, neueste zuerst (ohne dieses Workout)
- * @returns {Array<{ topic:'intent'|'last_set'|'compare', kind:string, variant?:string, exerciseIndex:number, facts:object }>}
+ * @returns {Array<{ topic:'intent'|'last_set'|'compare', kind:string, exerciseIndex:number, facts:object }>}
  *   höchstens MAX_QUESTION_TOPICS, je Übung eins, sortiert nach Vorrang A > B > C, dann Reihenfolge im Workout
  */
 export function detectQuestionTopics({ workoutGoal, exercises = [] } = {}) {
