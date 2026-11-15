@@ -1,6 +1,7 @@
 import { createResourceApi, resolveServerMediaUrl } from './http'
 import { handleAPIError } from './errorHandler'
 import { logger } from '@/utils/logger'
+import { AI_CONSENT_TEXT_VERSION } from '@/config/aiConsentVersion'
 
 const PROFILE_TIMEOUT_MS = Number.parseInt(import.meta.env.VITE_PROFILE_TIMEOUT_MS || '', 10) || 25000
 const PROFILE_RETRY_DELAY_MS = Number.parseInt(import.meta.env.VITE_PROFILE_RETRY_DELAY_MS || '', 10) || 1000
@@ -146,7 +147,7 @@ export async function fetchAiConsent(token) {
 
 export async function saveAiConsent(token, granted) {
   try {
-    const res = await api.put('/ai-consent', { granted: granted === true }, authConfig(token))
+    const res = await api.put('/ai-consent', { granted: granted === true, version: AI_CONSENT_TEXT_VERSION }, authConfig(token))
     return res.data?.aiConsent || null
   } catch (error) {
     throw handleAPIError(error, 'KI-Einwilligung speichern', { showToast: false })

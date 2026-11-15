@@ -34,8 +34,8 @@ test('summarizeAiConsent: erteilt nur mit aktueller Version', () => {
 })
 
 test('parseConsentInput: nur echtes Boolean', () => {
-  assert.deepEqual(parseConsentInput({ granted: true }), { granted: true })
-  assert.deepEqual(parseConsentInput({ granted: false, evil: 1 }), { granted: false })
+  assert.deepEqual(parseConsentInput({ granted: true, version: CURRENT_AI_CONSENT_VERSION }), { granted: true, version: CURRENT_AI_CONSENT_VERSION })
+  assert.deepEqual(parseConsentInput({ granted: false, evil: 1 }), { granted: false, version: 1 })
   assert.equal(parseConsentInput({ granted: 'true' }), null)
   assert.equal(parseConsentInput({}), null)
   assert.equal(parseConsentInput(null), null)
@@ -75,4 +75,39 @@ test('Middleware: Fehler beim Laden sperrt (503), sendet nichts weiter', async (
 test('Middleware: ohne Nutzer-ID (Auth aus, nur Entwicklung) weiter', async () => {
   const mw = createRequireAiConsent({ loadProfile: async () => ({}), logger: silent })
   assert.equal((await run(mw, {})).status, 'next')
+})
+
+test('Einwilligung der Textversion 1 gilt nach der Erweiterung um die Fragen nach dem Training nicht mehr (Version 2)', () => {
+  assert.equal(CURRENT_AI_CONSENT_VERSION, 2)
+  assert.equal(summarizeAiConsent({ aiConsent: { granted: true, version: 1, grantedAt: 'x' } }).granted, false)
+  assert.equal(summarizeAiConsent({ aiConsent: { granted: true, version: 2, grantedAt: 'x' } }).granted, true)
+})
+
+test('Zustimmung zum alten Text (ältere App ohne Versionsangabe) gilt nicht für die neue Version', () => {
+  // Ältere App-Version: schickt keine Version -> Textversion 1
+  const legacy = parseConsentInput({ granted: true })
+  assert.equal(legacy.version, 1)
+  const update = buildConsentUpdate(true, new Date(), legacy.version)
+  assert.equal(update['aiConsent.version'], 1)
+  assert.equal(summarizeAiConsent({ aiConsent: { granted: update['aiConsent.granted'], version: update['aiConsent.version'] } }).granted, false)
+  // Neue App schickt die gesehene Version mit
+  const current = parseConsentInput({ granted: true, version: CURRENT_AI_CONSENT_VERSION })
+  const ok = buildConsentUpdate(true, new Date(), current.version)
+  assert.equal(summarizeAiConsent({ aiConsent: { granted: true, version: ok['aiConsent.version'] } }).granted, true)
+})
+
+test('Gemeldete Version, die es nicht gibt, wird abgelehnt statt angepasst (kein Vortäuschen der aktuellen Zustimmung)', () => {
+  assert.equal(parseConsentInput({ granted: true, version: 99 }), null)
+  assert.equal(parseConsentInput({ granted: true, version: CURRENT_AI_CONSENT_VERSION + 1 }), null)
+  assert.equal(parseConsentInput({ granted: true, version: 0 }), null)
+  assert.equal(parseConsentInput({ granted: true, version: '2' }), null)
+  assert.equal(parseConsentInput({ granted: true, version: 1.5 }), null)
+  assert.equal(parseConsentInput({ granted: true, version: null }).version, 1)
+  assert.equal(parseConsentInput({ granted: true, version: 1 }).version, 1)
+  assert.equal(parseConsentInput({ granted: true, version: CURRENT_AI_CONSENT_VERSION }).version, CURRENT_AI_CONSENT_VERSION)
+})
+
+test('Textversion im Client und Server stimmt überein', async () => {
+  const { AI_CONSENT_TEXT_VERSION } = await import('../../../client/src/config/aiConsentVersion.js')
+  assert.equal(AI_CONSENT_TEXT_VERSION, CURRENT_AI_CONSENT_VERSION)
 })
