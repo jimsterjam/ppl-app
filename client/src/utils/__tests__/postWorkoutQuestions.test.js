@@ -230,4 +230,14 @@ describe('Gegenannahmen aus dem Selbst-Review', () => {
     const r = one('hypertrophy', bench, 'hypertrophy', sets(50, [12, 12, 6]), [sets(50, times(3, 10))])
     expect(r.find((t) => t.topic === 'compare')).toBeUndefined()
   })
+
+  it('Copilot-Runde 3: gleiche Summe und Mitte, aber andere Sätze (11/9/10 -> 12/8/10) -> keine Frage', () => {
+    const r = one('hypertrophy', bench, 'hypertrophy', sets(50, [12, 8, 10]), [sets(50, [11, 9, 10])])
+    expect(r.find((t) => t.topic === 'compare')).toBeUndefined()
+  })
+
+  it('Gegenprobe: genau dieselben Sätze in derselben Reihenfolge bleiben "gleich"', () => {
+    const r = one('hypertrophy', bench, 'hypertrophy', sets(50, [11, 9, 10]), [sets(50, [11, 9, 10])])
+    expect(r[0]).toMatchObject({ topic: 'compare', kind: 'same' })
+  })
 })
