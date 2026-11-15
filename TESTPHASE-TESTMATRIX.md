@@ -18,7 +18,6 @@ Testergebnis verfälschen oder echte Bugs verdecken/vortäuschen können.
 | 5 | ✅ Erledigt: Bearbeiten abgeschlossener Workouts ist über `WORKOUT_EDIT_WINDOW_HOURS` (Standard 24 h, ab `completedAt`) serverseitig begrenzt | `server/utils/workoutEditWindow.js`, `server/models/Workout.js` | Kein Risiko mehr; Fenster im Test gezielt prüfen |
 | 6 | ✅ Erledigt: Globaler Vue-Error-Handler (`app.config.errorHandler` in `client/src/main.js`) und zentrale Express-Error-Middleware (`server/app.js`) sind vorhanden | `client/src/main.js`, `server/app.js` | Kein Risiko mehr; weiterhin kein Remote-Crash-Reporting (siehe #7) |
 | 7 | Kein Remote-Logging/Crash-Reporting (nur `console.*`, TODO-Kommentar für Sentry etc. vorhanden aber ungenutzt) | `client/src/utils/logger.js`, `server/utils/logger.js` | Fehler bei echten Testpersonen sind ohne aktives Log-Sammeln (`copyDraftDebugLog` in Settings) kaum diagnostizierbar |
-| 8 | ✅ Erledigt: Ollama-Provider entfernt (lief nie in Production); einziger KI-Anbieter ist OpenAI | `server/server.js` | Kein Risiko mehr |
 
 ## 1. Registrierung & Login
 

@@ -31,7 +31,7 @@ const AI_PROVIDER = String(process.env.AI_PROVIDER || 'openai').toLowerCase();
 // Initialize AI Service with selected provider
 try {
   if (AI_PROVIDER !== 'openai') {
-    // Ollama (lokal im Heimnetz) wurde entfernt - ein alter Wert in Render/.env soll den Start nicht verhindern.
+    // Es gibt nur noch OpenAI - ein alter Wert in Render/.env soll den Start nicht verhindern.
     logger.warn(`⚠️ AI_PROVIDER="${AI_PROVIDER}" wird nicht mehr unterstützt - es wird OpenAI verwendet`);
   }
   logger.info('🔧 AI Provider: OpenAI (production)');
