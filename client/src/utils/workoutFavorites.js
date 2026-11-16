@@ -6,6 +6,7 @@ import { sanitizeExerciseTrainingType } from './weightSuggestion'
 import { sanitizeCustomRest } from './restTimerRules'
 import { buildWorkoutNotesSummary } from './workoutNotes'
 import { measureModeField } from './measureMode'
+import { stripQuestionsFromNote } from './noteQuestionStrip'
 
 // Favoriten wurden bisher AUSSCHLIESSLICH in localStorage gehalten - bei Geräteverlust,
 // Neuinstallation oder einem Identitätswechsel (z.B. Login über einen anderen Firebase-
@@ -130,14 +131,33 @@ function makeFavoriteId(type) {
   return `fav_${type}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 }
 
+/**
+ * Workout-Notiz ohne Fragesätze. Ist die Notiz die Zusammenfassung der Übungsnotizen (Normalfall beim Speichern),
+ * wird sie aus den bereinigten Übungsnotizen neu gebaut - der Übungsname davor verdeckt sonst eine Fragewendung am
+ * Satzanfang. Eine eigenständige Notiz wird nur um ihre Fragesätze gekürzt.
+ */
+function cleanWorkoutNotes(notes, originalExercises, cleanedExercises) {
+  const original = typeof notes === 'string' ? notes : ''
+  const derived = buildWorkoutNotesSummary(originalExercises)
+  if (derived && original.trim() === derived) return buildWorkoutNotesSummary(cleanedExercises)
+  const stripped = stripQuestionsFromNote(original)
+  if (stripped === original) return original
+  return buildWorkoutNotesSummary(cleanedExercises) || stripped
+}
+
 function buildFavoriteWorkoutPayload(workout, type) {
   const source = workout && typeof workout === 'object' ? workout : {}
   const exercises = Array.isArray(source.exercises) ? source.exercises : []
+  const cleanedExercises = exercises.map((exercise) => (
+    exercise && typeof exercise === 'object'
+      ? { ...exercise, note: stripQuestionsFromNote(String(exercise.note || '').trim()) }
+      : exercise
+  ))
 
   return {
     type: normalizeWorkoutType(source.type || type),
     workoutName: String(source.name || source.workoutName || '').trim(),
-    notes: typeof source.notes === 'string' ? source.notes : '',
+    notes: cleanWorkoutNotes(source.notes, exercises, cleanedExercises),
     // Ziel des Workouts, aus dem der Favorit entstanden ist (siehe utils/workoutGoal.js).
     goal: sanitizeWorkoutGoal(source.goal),
     exercises: exercises.map((exercise, index) => ({
@@ -165,7 +185,8 @@ function buildFavoriteWorkoutPayload(workout, type) {
       // User-Feedback: Notizen sollen mit dem Favoriten gespeichert werden, damit beim nächsten
       // Start dieses Favoriten sichtbar ist, was beim letzten Mal notiert wurde - vorher wurde
       // exercise.note hier stillschweigend nicht übernommen (Feld fehlte in diesem Mapping).
-      note: String(exercise?.note || '').trim(),
+      // Ohne Fragesätze: Fragen gelten nur für das Workout, in dem sie stehen (utils/noteQuestionStrip.js).
+      note: stripQuestionsFromNote(String(exercise?.note || '').trim()),
       ...measureModeField(exercise?.measureMode),
       // Eigene Trainingsart der Übung (z.B. Muskelaufbau im Kraft-Workout) - nur wenn gewählt.
       ...(sanitizeExerciseTrainingType(exercise?.trainingType) ? { trainingType: exercise.trainingType } : {}),
@@ -182,32 +203,57 @@ function buildFavoriteWorkoutPayload(workout, type) {
  */
 export function buildStartedFavoriteWorkout(source) {
   const workout = source && typeof source === 'object' ? source : {}
+  const exercises = (workout.exercises || []).map((exercise) => ({
+    _id: exercise._id || exercise.exerciseId || null,
+    exerciseId: exercise.exerciseId || exercise._id || null,
+    name: exercise.name,
+    muscleGroup: exercise.muscleGroup,
+    category: exercise.category || workout.type,
+    sets: Number(exercise.sets) || Number(exercise.setDetails?.length) || 3,
+    reps: Number(exercise.reps) || Number(exercise.setDetails?.[0]?.reps) || 10,
+    weight: Number(exercise.weight) || Number(exercise.setDetails?.[0]?.weight) || 0,
+    rest: Number(exercise.rest) || 90,
+    note: stripQuestionsFromNote(typeof exercise.note === 'string' ? exercise.note : ''),
+    ...measureModeField(exercise.measureMode),
+    ...(sanitizeExerciseTrainingType(exercise.trainingType) ? { trainingType: exercise.trainingType } : {}),
+    ...(sanitizeCustomRest(exercise.restSeconds) ? { restSeconds: exercise.restSeconds } : {}),
+    setDetails: Array.isArray(exercise.setDetails) && exercise.setDetails.length
+      ? exercise.setDetails
+      : [{
+          reps: Number(exercise.reps) || 10,
+          weight: Number(exercise.weight) || 0
+        }]
+  }))
   return {
     name: workout.name,
     type: workout.type,
-    notes: buildWorkoutNotesSummary(workout.exercises || []),
+    // Zusammenfassung aus den bereits bereinigten Notizen (Fragen gelten nur für das Workout, in dem sie stehen).
+    notes: buildWorkoutNotesSummary(exercises),
     goal: sanitizeWorkoutGoal(workout.goal),
-    exercises: (workout.exercises || []).map((exercise) => ({
-      _id: exercise._id || exercise.exerciseId || null,
-      exerciseId: exercise.exerciseId || exercise._id || null,
-      name: exercise.name,
-      muscleGroup: exercise.muscleGroup,
-      category: exercise.category || workout.type,
-      sets: Number(exercise.sets) || Number(exercise.setDetails?.length) || 3,
-      reps: Number(exercise.reps) || Number(exercise.setDetails?.[0]?.reps) || 10,
-      weight: Number(exercise.weight) || Number(exercise.setDetails?.[0]?.weight) || 0,
-      rest: Number(exercise.rest) || 90,
-      note: typeof exercise.note === 'string' ? exercise.note : '',
-      ...measureModeField(exercise.measureMode),
-      ...(sanitizeExerciseTrainingType(exercise.trainingType) ? { trainingType: exercise.trainingType } : {}),
-      ...(sanitizeCustomRest(exercise.restSeconds) ? { restSeconds: exercise.restSeconds } : {}),
-      setDetails: Array.isArray(exercise.setDetails) && exercise.setDetails.length
-        ? exercise.setDetails
-        : [{
-            reps: Number(exercise.reps) || 10,
-            weight: Number(exercise.weight) || 0
-          }]
-    }))
+    exercises
+  }
+}
+
+/**
+ * Favorit mit bereinigten Notizen: Auch schon gespeicherte Favoriten (und solche vom Server) können noch Fragen in den
+ * Notizen tragen - die Frage wird sonst bei jedem Start erneut beantwortet. Die Daten im Speicher bleiben unverändert und
+ * werden beim nächsten Speichern des Favoriten ohnehin ohne Fragen geschrieben.
+ */
+function withoutQuestionsInNotes(favorite) {
+  const workout = favorite?.workout
+  if (!workout || typeof workout !== 'object') return favorite
+  const exercises = Array.isArray(workout.exercises)
+    ? workout.exercises.map((exercise) => (
+        exercise && typeof exercise.note === 'string' ? { ...exercise, note: stripQuestionsFromNote(exercise.note) } : exercise
+      ))
+    : null
+  return {
+    ...favorite,
+    workout: {
+      ...workout,
+      ...(typeof workout.notes === 'string' ? { notes: cleanWorkoutNotes(workout.notes, workout.exercises, exercises || []) } : {}),
+      ...(exercises ? { exercises } : {})
+    }
   }
 }
 
@@ -215,7 +261,9 @@ export function getFavoritesByType(userId = 'guest', type = 'push') {
   const store = readStore()
   const bucket = getUserBucket(store, userId)
   const key = normalizeWorkoutType(type)
-  return [...bucket[key]].sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
+  return bucket[key]
+    .map(withoutQuestionsInNotes)
+    .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
 }
 
 export function saveFavoriteWorkout({ userId = 'guest', type = 'push', name, workout }) {
