@@ -2372,14 +2372,6 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
     }
     const athleteAnswersByIndex = activeAthleteAnswerMap(currentWorkout);
     // Diagnose (ohne Inhalte): wie viele Antworten gespeichert sind und wie viele davon bei der KI ankommen.
-    // Nur wenn es welche gibt (kein Rauschen für alle anderen); nach der Prüfung der Antworten wieder entfernen.
-    if (Array.isArray(currentWorkout.athlete_answers) && currentWorkout.athlete_answers.length > 0) {
-      logger.info('🧩 Antworten nach dem Training', {
-        requestId,
-        stored: currentWorkout.athlete_answers.length,
-        active: athleteAnswersByIndex.size
-      });
-    }
     const structuredAnalysis = structureAnalysisForAI(exerciseAnalyses, {
       notDoneExercises,
       progressionStates,

@@ -256,7 +256,10 @@ test('Gegenprobe: "weiß nicht" und volle Plätze sind keine übergangene Antwor
   assert.match(rule, /Reichen die 3 Plätze nicht/)
   const checklist = getVerifierChecklistText()
   assert.match(checklist, /Kein Verstoß: answer "unsure"/)
-  assert.match(checklist, /die 3 Plätze\s+sind schon durch Notizen bzw\. andere Antworten belegt/)
+  assert.match(checklist, /die\s+3 Plätze für Übungen mit Besonderheit sind schon durch Notizen bzw\. andere Antworten belegt/)
+  // Auch ein Text ohne genannte Übung (nur Einstieg) darf eine bewusste Antwort nicht übergehen
+  assert.match(checklist, /nur den allgemeinen Einstieg enthält und keine Übung nennt/)
+  assert.doesNotMatch(checklist, /obwohl der Text andere Übungen nennt/)
 })
 
 test('Fund 16.11.: beide Absicht-Antworten (Bankdrücken -30 kg, Militärdrücken -20 kg) stehen im Prompt der KI', () => {
