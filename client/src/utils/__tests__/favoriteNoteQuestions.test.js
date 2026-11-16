@@ -66,4 +66,33 @@ describe('Favoriten nehmen keine Fragen aus Notizen mit', () => {
     saveFavoriteWorkout({ userId: 'u1', type: 'push', name: 'Push Day', workout: live })
     expect(live.exercises[0].note).toBe(`${QUESTION} Knie vorsichtig.`)
   })
+
+  it('Gegenprobe: Aussagen mit "sollte ich" / "ob die" gehen nicht verloren', () => {
+    const note = 'Nächstes Mal sollte ich langsamer absenken. Schauen, ob die Hüfte mitmacht.'
+    saveFavoriteWorkout({ userId: 'u1', type: 'push', name: 'Push Day', workout: workout(note) })
+    expect(getFavoritesByType('u1', 'push')[0].workout.exercises[0].note).toBe(note)
+  })
+
+  it('Zusammenfassung der Notizen wird aus den bereinigten Übungsnotizen gebaut: die Aussage einer anderen Übung bleibt', () => {
+    const started = buildStartedFavoriteWorkout({
+      name: 'Push Day', type: 'push',
+      exercises: [
+        { name: 'Squat', note: 'Knie vorsichtig', setDetails: [{ reps: 5, weight: 100 }] },
+        { name: 'Bench Press', note: QUESTION, setDetails: [{ reps: 5, weight: 100 }] }
+      ]
+    })
+    expect(started.exercises.map((e) => e.note)).toEqual(['Knie vorsichtig', ''])
+    expect(started.notes).toContain('Knie vorsichtig')
+    expect(started.notes).not.toContain('Kann es sein')
+  })
+
+  it('Lesen und wieder Speichern (Favorit anpassen): bereinigte Notiz wird gespeichert, Aussagen bleiben', () => {
+    const raw = { u1: { push: [{ id: 'fav_push_2', type: 'push', name: 'Old', createdAt: '2026-11-01T10:00:00Z', updatedAt: '2026-11-01T10:00:00Z',
+      workout: { type: 'push', notes: '', exercises: [{ name: 'Bench Press', note: `${QUESTION} Ellbogen eng.`, setDetails: [{ reps: 5, weight: 100 }] }] } }], pull: [], legs: [], fullbody: [] } }
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify(raw))
+    const favorite = getFavoritesByType('u1', 'push')[0]
+    updateFavoriteWorkout({ userId: 'u1', type: 'push', id: favorite.id, name: 'Old', workout: favorite.workout })
+    expect(JSON.parse(store[FAVORITES_KEY]).u1.push[0].workout.exercises[0].note).toBe('Ellbogen eng.')
+  })
 })
+

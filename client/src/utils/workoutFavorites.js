@@ -184,32 +184,34 @@ function buildFavoriteWorkoutPayload(workout, type) {
  */
 export function buildStartedFavoriteWorkout(source) {
   const workout = source && typeof source === 'object' ? source : {}
+  const exercises = (workout.exercises || []).map((exercise) => ({
+    _id: exercise._id || exercise.exerciseId || null,
+    exerciseId: exercise.exerciseId || exercise._id || null,
+    name: exercise.name,
+    muscleGroup: exercise.muscleGroup,
+    category: exercise.category || workout.type,
+    sets: Number(exercise.sets) || Number(exercise.setDetails?.length) || 3,
+    reps: Number(exercise.reps) || Number(exercise.setDetails?.[0]?.reps) || 10,
+    weight: Number(exercise.weight) || Number(exercise.setDetails?.[0]?.weight) || 0,
+    rest: Number(exercise.rest) || 90,
+    note: stripQuestionsFromNote(typeof exercise.note === 'string' ? exercise.note : ''),
+    ...measureModeField(exercise.measureMode),
+    ...(sanitizeExerciseTrainingType(exercise.trainingType) ? { trainingType: exercise.trainingType } : {}),
+    ...(sanitizeCustomRest(exercise.restSeconds) ? { restSeconds: exercise.restSeconds } : {}),
+    setDetails: Array.isArray(exercise.setDetails) && exercise.setDetails.length
+      ? exercise.setDetails
+      : [{
+          reps: Number(exercise.reps) || 10,
+          weight: Number(exercise.weight) || 0
+        }]
+  }))
   return {
     name: workout.name,
     type: workout.type,
-    notes: buildWorkoutNotesSummary(workout.exercises || []),
+    // Zusammenfassung aus den bereits bereinigten Notizen (Fragen gelten nur für das Workout, in dem sie stehen).
+    notes: buildWorkoutNotesSummary(exercises),
     goal: sanitizeWorkoutGoal(workout.goal),
-    exercises: (workout.exercises || []).map((exercise) => ({
-      _id: exercise._id || exercise.exerciseId || null,
-      exerciseId: exercise.exerciseId || exercise._id || null,
-      name: exercise.name,
-      muscleGroup: exercise.muscleGroup,
-      category: exercise.category || workout.type,
-      sets: Number(exercise.sets) || Number(exercise.setDetails?.length) || 3,
-      reps: Number(exercise.reps) || Number(exercise.setDetails?.[0]?.reps) || 10,
-      weight: Number(exercise.weight) || Number(exercise.setDetails?.[0]?.weight) || 0,
-      rest: Number(exercise.rest) || 90,
-      note: stripQuestionsFromNote(typeof exercise.note === 'string' ? exercise.note : ''),
-      ...measureModeField(exercise.measureMode),
-      ...(sanitizeExerciseTrainingType(exercise.trainingType) ? { trainingType: exercise.trainingType } : {}),
-      ...(sanitizeCustomRest(exercise.restSeconds) ? { restSeconds: exercise.restSeconds } : {}),
-      setDetails: Array.isArray(exercise.setDetails) && exercise.setDetails.length
-        ? exercise.setDetails
-        : [{
-            reps: Number(exercise.reps) || 10,
-            weight: Number(exercise.weight) || 0
-          }]
-    }))
+    exercises
   }
 }
 
