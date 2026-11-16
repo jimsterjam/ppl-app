@@ -49,7 +49,7 @@ describe('Favoriten nehmen keine Fragen aus Notizen mit', () => {
     localStorage.setItem(FAVORITES_KEY, JSON.stringify(raw))
     const favorite = getFavoritesByType('u1', 'push')[0]
     expect(favorite.workout.exercises[0].note).toBe('Ellbogen eng.')
-    expect(favorite.workout.notes).toBe('')
+    expect(favorite.workout.notes).toBe('Bench Press: Ellbogen eng.')
     expect(JSON.parse(store[FAVORITES_KEY]).u1.push[0].workout.exercises[0].note).toContain('Kann es sein')
   })
 
@@ -94,5 +94,16 @@ describe('Favoriten nehmen keine Fragen aus Notizen mit', () => {
     updateFavoriteWorkout({ userId: 'u1', type: 'push', id: favorite.id, name: 'Old', workout: favorite.workout })
     expect(JSON.parse(store[FAVORITES_KEY]).u1.push[0].workout.exercises[0].note).toBe('Ellbogen eng.')
   })
-})
 
+  it('Zusammenfassung nur aus der Frage (alter Favorit): Aussage der Übungsnotiz bleibt beim Lesen und beim Speichern', () => {
+    const old = {
+      name: 'Push Day', type: 'push', notes: QUESTION,
+      exercises: [{ name: 'Bench Press', note: 'Knie vorsichtig.', setDetails: [{ reps: 5, weight: 100 }] }]
+    }
+    store[FAVORITES_KEY] = JSON.stringify({ u1: { push: [{ id: 'f1', name: 'Push Day', type: 'push', updatedAt: '2026-01-01', workout: old }], pull: [], legs: [], fullbody: [] } })
+    expect(getFavoritesByType('u1', 'push')[0].workout.notes).toBe('Bench Press: Knie vorsichtig.')
+    saveFavoriteWorkout({ userId: 'u1', type: 'push', name: 'Neu', workout: old })
+    const saved = getFavoritesByType('u1', 'push').find((f) => f.name === 'Neu')
+    expect(saved.workout.notes).toBe('Bench Press: Knie vorsichtig.')
+  })
+})

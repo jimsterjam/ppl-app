@@ -131,14 +131,30 @@ function makeFavoriteId(type) {
   return `fav_${type}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 }
 
+/**
+ * Workout-Notiz ohne Fragesätze. Hat das Entfernen etwas verändert, ist die Notiz meist die Zusammenfassung der
+ * Übungsnotizen - dann wird sie aus den bereinigten Übungsnotizen neu gebaut, damit keine Aussage verloren geht.
+ */
+function cleanWorkoutNotes(notes, exercises) {
+  const original = typeof notes === 'string' ? notes : ''
+  const stripped = stripQuestionsFromNote(original)
+  if (stripped === original) return original
+  return buildWorkoutNotesSummary(exercises) || stripped
+}
+
 function buildFavoriteWorkoutPayload(workout, type) {
   const source = workout && typeof workout === 'object' ? workout : {}
   const exercises = Array.isArray(source.exercises) ? source.exercises : []
+  const cleanedExercises = exercises.map((exercise) => (
+    exercise && typeof exercise === 'object'
+      ? { ...exercise, note: stripQuestionsFromNote(String(exercise.note || '').trim()) }
+      : exercise
+  ))
 
   return {
     type: normalizeWorkoutType(source.type || type),
     workoutName: String(source.name || source.workoutName || '').trim(),
-    notes: stripQuestionsFromNote(typeof source.notes === 'string' ? source.notes : ''),
+    notes: cleanWorkoutNotes(source.notes, cleanedExercises),
     // Ziel des Workouts, aus dem der Favorit entstanden ist (siehe utils/workoutGoal.js).
     goal: sanitizeWorkoutGoal(source.goal),
     exercises: exercises.map((exercise, index) => ({
@@ -223,18 +239,17 @@ export function buildStartedFavoriteWorkout(source) {
 function withoutQuestionsInNotes(favorite) {
   const workout = favorite?.workout
   if (!workout || typeof workout !== 'object') return favorite
+  const exercises = Array.isArray(workout.exercises)
+    ? workout.exercises.map((exercise) => (
+        exercise && typeof exercise.note === 'string' ? { ...exercise, note: stripQuestionsFromNote(exercise.note) } : exercise
+      ))
+    : null
   return {
     ...favorite,
     workout: {
       ...workout,
-      ...(typeof workout.notes === 'string' ? { notes: stripQuestionsFromNote(workout.notes) } : {}),
-      ...(Array.isArray(workout.exercises)
-        ? {
-            exercises: workout.exercises.map((exercise) => (
-              exercise && typeof exercise.note === 'string' ? { ...exercise, note: stripQuestionsFromNote(exercise.note) } : exercise
-            ))
-          }
-        : {})
+      ...(typeof workout.notes === 'string' ? { notes: cleanWorkoutNotes(workout.notes, exercises || []) } : {}),
+      ...(exercises ? { exercises } : {})
     }
   }
 }
