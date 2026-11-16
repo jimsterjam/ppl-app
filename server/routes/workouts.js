@@ -2370,11 +2370,13 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
     } catch (e) {
       logger.warn('⚠️ Fortschrittszustände konnten nicht gebaut werden', { requestId, error: e.message });
     }
+    const athleteAnswersByIndex = activeAthleteAnswerMap(currentWorkout);
+    // Diagnose (ohne Inhalte): wie viele Antworten gespeichert sind und wie viele davon bei der KI ankommen.
     const structuredAnalysis = structureAnalysisForAI(exerciseAnalyses, {
       notDoneExercises,
       progressionStates,
       // Antworten auf die Fragen nach dem Training (F16); nur die, die noch zur Übung an dieser Stelle passen.
-      athleteAnswers: activeAthleteAnswerMap(currentWorkout),
+      athleteAnswers: athleteAnswersByIndex,
       // Null-Annahmen-Prinzip (Kap. 24): nur ausgeben, wenn für DIESE Session tatsächlich
       // erfasst (siehe optionales Eingabefeld in WorkoutDetailView.vue) - sonst korrekt
       // weggelassen.

@@ -189,6 +189,15 @@ export const ATHLETE_ANSWER_DIRECTIVE_LINES = Object.freeze([
   '  Beim Grund "Körper hat nicht mitgemacht" keine Ursache vermuten, keine medizinischen Aussagen.',
   '- "weiß nicht" oder kein Grund: nichts hineindeuten.',
   '- Technik-Übungen und Übungen auf Zeit werden nicht nach Gewicht oder Fortschritt bewertet; in der ersten Einordnung',
-  '  (feedback_mode "first_look") kein Vergleich und keine Entwicklung - dort nur die Antwort selbst würdigen. Eine',
-  '  Antwort macht die Übung zum Kandidaten für die Höchstgrenze von 3 Übungen mit Besonderheit, zwingt aber nicht zur Nennung.'
+  '  (feedback_mode "first_look") kein Vergleich und keine Entwicklung - dort nur die Antwort selbst würdigen.',
+  '- PRIORITÄT: Eine Antwort zu "War das Absicht?" mit "bewusst" oder "musste anpassen" ist wie eine Notiz des Nutzers eine',
+  '  bewusste Entscheidung bzw. Anpassung und hat HÖCHSTE Priorität: Die Übung gehört zu den höchstens 3 Übungen mit',
+  '  Besonderheit und wird in ihrer Zeile aufgegriffen - auch bei deutlich weniger Gewicht oder Wiederholungen (Ausnahme von',
+  '  den Regeln zu Gewichtsveränderungen, wie bei einer Notiz: keine Wertung, die Entscheidung des Nutzers geht vor). Bei',
+  '  "bewusst" bestätigen und den Grund fachlich einordnen (z. B. "Zielmuskel besser spüren"), bei "musste anpassen"',
+  '  verständnisvoll und ohne Vorwurf. Sie darf nicht übergangen werden, nur weil eine andere Übung unverändert blieb.',
+  '  Reichen die 3 Plätze nicht (Notizen und Antworten zusammen), gilt die Reihenfolge im Workout; der Rest entfällt.',
+  '  "Weiß nicht" zählt nicht dazu. Antworten zu "letzter Satz" und "Vergleich" haben danach Priorität: nenne sie, wenn Platz ist.',
+  '- Sprich die Antwort natürlich ein, wie ein Coach, der es weiß. Nicht "du hast angegeben/angetippt/geantwortet" und keine',
+  '  Wiedergabe der Antwortwörter wie ein Protokoll.'
 ]);
