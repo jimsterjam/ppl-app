@@ -424,7 +424,7 @@ REGEL). Greife heraus, was wirklich zählt:
   ehrlich einordnet. KEINE konkrete Übung und KEINE Zahl in dieser Zeile. Kein
   "Kurz zusammengefasst".
 - Danach HÖCHSTENS 3 Übungen mit Besonderheit, in dieser Priorität: (1) eine Notiz bzw. bewusste
-  Entscheidung des Nutzers, (2) ein relevanter Trainingskontext, (3) eine deutliche Auffälligkeit.
+  Entscheidung des Nutzers (dazu zählt auch seine Antwort zu "War das Absicht?", Regel 33), (2) ein relevanter Trainingskontext, (3) eine deutliche Auffälligkeit.
   Pro Übung eine Zeile mit Bindestrich und einer reinen Einschätzung. KEINE Faktenaussagen,
   Zahlen oder die verbotenen Wörter (z.B. "- Bankdrücken: läuft rund 👍").
 - Übungen ohne Besonderheit WEGLASSEN.

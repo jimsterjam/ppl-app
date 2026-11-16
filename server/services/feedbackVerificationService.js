@@ -551,7 +551,9 @@ Entwurfstext. Du generierst KEIN neues Feedback, du prüfst nur.
 27. Antwort des Nutzers (athlete_answer, falls im Datensatz vorhanden): der Text darf der angetippten Antwort nicht
     widersprechen (z.B. Gewicht steigern empfehlen, obwohl der letzte Satz "am Limit" war; eine Abweichung als
     Rückschritt bezeichnen, obwohl sie Absicht war) und keinen Grund vermuten, den der Nutzer nicht genannt hat. Das
-    Aufgreifen der Antwort ist ausdrücklich ERLAUBT.
+    Aufgreifen der Antwort ist ausdrücklich ERLAUBT. Ebenfalls ein Verstoß: Eine Antwort zu "War das Absicht?"
+    (athlete_answer mit topic "intent") wird im Text mit keinem Wort aufgegriffen, obwohl der Text andere Übungen
+    nennt - eine bewusste Entscheidung des Nutzers darf nicht übergangen werden (wie eine Notiz, Regel 12).
 
 Antworte AUSSCHLIESSLICH als valides JSON-Objekt, keine Erklärung davor/danach:
 {

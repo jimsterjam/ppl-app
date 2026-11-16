@@ -224,3 +224,53 @@ test('Review-Fund: Mongo-Operatoren und Punkt-Pfade im Body werden entfernt (PUT
   // Gegenprobe: ein Feld, das nur so ähnlich heißt, bleibt
   assert.deepEqual(withoutFields({ athlete_answers_note: 'x', name: 'A' }, SERVER_ONLY_CREATE_FIELDS), { athlete_answers_note: 'x', name: 'A' })
 })
+
+// Fund Jimmy 16.11.: zwei Übungen bewusst mit viel weniger Gewicht, beantwortet als "Absicht" mit Grund - das Feedback ging
+// darauf nicht ein, weil Regel 33 die Übung nur zum "Kandidaten" machte.
+test('Fund 16.11.: Antwort "War das Absicht?" hat höchste Priorität wie eine Notiz und wird nicht übergangen', () => {
+  const system = getCoachSystemPromptText()
+  const rule = system.split('33. ANTWORTEN DES NUTZERS')[1].split('OUTPUT-FORMAT')[0]
+  assert.match(rule, /PRIORITÄT: Eine Antwort zu "War das Absicht\?"/)
+  assert.match(rule, /HÖCHSTE Priorität/)
+  assert.match(rule, /nicht übergangen/)
+  assert.doesNotMatch(rule, /zwingt aber nicht zur Nennung/)
+  // Die Prioritätsliste im Ausgabeformat nennt die Antwort ausdrücklich bei (1)
+  const format = system.split('OUTPUT-FORMAT')[1]
+  assert.match(format, /\(1\) eine Notiz bzw\. bewusste\s+Entscheidung des Nutzers \(dazu zählt auch seine Antwort zu "War das Absicht\?"/)
+})
+
+test('Fund 16.11.: Coach spricht die Antwort natürlich an (kein "du hast angegeben")', () => {
+  const rule = getCoachSystemPromptText().split('33. ANTWORTEN DES NUTZERS')[1].split('OUTPUT-FORMAT')[0]
+  assert.match(rule, /Nicht "du hast angegeben\/angetippt\/geantwortet"/)
+})
+
+test('Fund 16.11.: Verifier meldet übergangene Absicht-Antwort', () => {
+  const checklist = getVerifierChecklistText()
+  assert.match(checklist, /topic "intent"\) wird im Text mit keinem Wort aufgegriffen/)
+})
+
+test('Fund 16.11.: beide Absicht-Antworten (Bankdrücken -30 kg, Militärdrücken -20 kg) stehen im Prompt der KI', () => {
+  const mk = (id, date, bench, press) => ({
+    _id: id, date, completed: true, goal: 'strength',
+    exercises: [
+      { name: 'Bench Press Barbell', setDetails: Array(5).fill(0).map(() => ({ weight: bench, reps: 5, done: true })) },
+      { name: 'Barbell Standing Wide Military Press', setDetails: Array(5).fill(0).map((_, i) => ({ weight: press, reps: i === 4 ? 4 : 5, done: true })) },
+      { name: 'Chest Dip', setDetails: Array(3).fill(0).map(() => ({ weight: 0, reps: 10, done: true })) }
+    ]
+  })
+  const current = mk('b', '2026-11-15T10:00:00Z', 50, 30)
+  current.athlete_answers = [
+    { topic: 'intent', exercise: 'Bench Press Barbell', exerciseIndex: 0, answer: 'intended', reason: 'other_goal', variant: null },
+    { topic: 'intent', exercise: 'Barbell Standing Wide Military Press', exerciseIndex: 1, answer: 'intended', reason: 'feel_muscle', variant: null }
+  ]
+  const analyses = analyzeWorkoutProgression(current, [mk('a', '2026-11-08T10:00:00Z', 80, 50)])
+  const structured = structureAnalysisForAI(analyses, { athleteAnswers: activeAthleteAnswerMap(current) })
+  const provider = Object.create(OpenAIProvider.prototype)
+  provider.wrapExerciseName = (n) => n
+  provider.wrapUserNote = (n) => n
+  const prompt = provider.buildPrompt(structured)
+  assert.equal((prompt.match(/Antwort des Nutzers nach dem Training/g) || []).length, 2)
+  assert.match(prompt, /Grund: ein anderes Ziel als sonst/)
+  assert.match(prompt, /Grund: den Zielmuskel besser zu spüren/)
+})
+
