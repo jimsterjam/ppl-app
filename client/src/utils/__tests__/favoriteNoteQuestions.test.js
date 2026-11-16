@@ -106,4 +106,23 @@ describe('Favoriten nehmen keine Fragen aus Notizen mit', () => {
     const saved = getFavoritesByType('u1', 'push').find((f) => f.name === 'Neu')
     expect(saved.workout.notes).toBe('Bench Press: Knie vorsichtig.')
   })
+
+  it('Frage ohne Fragezeichen in der Übungsnotiz: auch die Zusammenfassung enthält sie nach dem Speichern nicht mehr', () => {
+    const w = {
+      name: 'Push Day', type: 'push', notes: 'Bench Press: Warum fällt mir das schwer',
+      exercises: [{ name: 'Bench Press', note: 'Warum fällt mir das schwer', setDetails: [{ reps: 5, weight: 100 }] }]
+    }
+    saveFavoriteWorkout({ userId: 'u1', type: 'push', name: 'Push Day', workout: w })
+    expect(getFavoritesByType('u1', 'push')[0].workout.notes).toBe('')
+    expect(JSON.parse(store[FAVORITES_KEY]).u1.push[0].workout.notes).toBe('')
+  })
+
+  it('Gegenprobe: eigenständige Workout-Notiz ohne Frage bleibt, auch wenn Übungsnotizen Fragen hatten', () => {
+    const w = {
+      name: 'Push Day', type: 'push', notes: 'Heute Fokus auf Technik.',
+      exercises: [{ name: 'Bench Press', note: QUESTION, setDetails: [{ reps: 5, weight: 100 }] }]
+    }
+    saveFavoriteWorkout({ userId: 'u1', type: 'push', name: 'Push Day', workout: w })
+    expect(getFavoritesByType('u1', 'push')[0].workout.notes).toBe('Heute Fokus auf Technik.')
+  })
 })

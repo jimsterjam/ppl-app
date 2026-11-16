@@ -132,14 +132,17 @@ function makeFavoriteId(type) {
 }
 
 /**
- * Workout-Notiz ohne Fragesätze. Hat das Entfernen etwas verändert, ist die Notiz meist die Zusammenfassung der
- * Übungsnotizen - dann wird sie aus den bereinigten Übungsnotizen neu gebaut, damit keine Aussage verloren geht.
+ * Workout-Notiz ohne Fragesätze. Ist die Notiz die Zusammenfassung der Übungsnotizen (Normalfall beim Speichern),
+ * wird sie aus den bereinigten Übungsnotizen neu gebaut - der Übungsname davor verdeckt sonst eine Fragewendung am
+ * Satzanfang. Eine eigenständige Notiz wird nur um ihre Fragesätze gekürzt.
  */
-function cleanWorkoutNotes(notes, exercises) {
+function cleanWorkoutNotes(notes, originalExercises, cleanedExercises) {
   const original = typeof notes === 'string' ? notes : ''
+  const derived = buildWorkoutNotesSummary(originalExercises)
+  if (derived && original.trim() === derived) return buildWorkoutNotesSummary(cleanedExercises)
   const stripped = stripQuestionsFromNote(original)
   if (stripped === original) return original
-  return buildWorkoutNotesSummary(exercises) || stripped
+  return buildWorkoutNotesSummary(cleanedExercises) || stripped
 }
 
 function buildFavoriteWorkoutPayload(workout, type) {
@@ -154,7 +157,7 @@ function buildFavoriteWorkoutPayload(workout, type) {
   return {
     type: normalizeWorkoutType(source.type || type),
     workoutName: String(source.name || source.workoutName || '').trim(),
-    notes: cleanWorkoutNotes(source.notes, cleanedExercises),
+    notes: cleanWorkoutNotes(source.notes, exercises, cleanedExercises),
     // Ziel des Workouts, aus dem der Favorit entstanden ist (siehe utils/workoutGoal.js).
     goal: sanitizeWorkoutGoal(source.goal),
     exercises: exercises.map((exercise, index) => ({
@@ -248,7 +251,7 @@ function withoutQuestionsInNotes(favorite) {
     ...favorite,
     workout: {
       ...workout,
-      ...(typeof workout.notes === 'string' ? { notes: cleanWorkoutNotes(workout.notes, exercises || []) } : {}),
+      ...(typeof workout.notes === 'string' ? { notes: cleanWorkoutNotes(workout.notes, workout.exercises, exercises || []) } : {}),
       ...(exercises ? { exercises } : {})
     }
   }
