@@ -236,7 +236,7 @@ test('Fund 16.11.: Antwort "War das Absicht?" hat höchste Priorität wie eine N
   assert.doesNotMatch(rule, /zwingt aber nicht zur Nennung/)
   // Die Prioritätsliste im Ausgabeformat nennt die Antwort ausdrücklich bei (1)
   const format = system.split('OUTPUT-FORMAT')[1]
-  assert.match(format, /\(1\) eine Notiz bzw\. bewusste\s+Entscheidung des Nutzers \(dazu zählt auch seine Antwort zu "War das Absicht\?"/)
+  assert.match(format, /Notiz bzw\.\s+bewusste\s+Entscheidung des Nutzers \(dazu zählt auch seine Antwort zu "War das Absicht\?"/)
 })
 
 test('Fund 16.11.: Coach spricht die Antwort natürlich an (kein "du hast angegeben")', () => {
@@ -246,7 +246,17 @@ test('Fund 16.11.: Coach spricht die Antwort natürlich an (kein "du hast angege
 
 test('Fund 16.11.: Verifier meldet übergangene Absicht-Antwort', () => {
   const checklist = getVerifierChecklistText()
-  assert.match(checklist, /topic "intent"\) wird im Text mit keinem Wort aufgegriffen/)
+  assert.match(checklist, /topic "intent" und answer "intended" oder "adjusted"\) wird im Text mit keinem Wort aufgegriffen/)
+  assert.match(RULE_LABELS[27], /Absicht-Antwort \(intended\/adjusted\) übergangen/)
+})
+
+test('Gegenprobe: "weiß nicht" und volle Plätze sind keine übergangene Antwort (Prompt und Prüfung)', () => {
+  const rule = getCoachSystemPromptText().split('33. ANTWORTEN DES NUTZERS')[1].split('OUTPUT-FORMAT')[0]
+  assert.match(rule, /"Weiß nicht" zählt nicht dazu/)
+  assert.match(rule, /Reichen die 3 Plätze nicht/)
+  const checklist = getVerifierChecklistText()
+  assert.match(checklist, /Kein Verstoß: answer "unsure"/)
+  assert.match(checklist, /die 3 Plätze\s+sind schon durch Notizen bzw\. andere Antworten belegt/)
 })
 
 test('Fund 16.11.: beide Absicht-Antworten (Bankdrücken -30 kg, Militärdrücken -20 kg) stehen im Prompt der KI', () => {

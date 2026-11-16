@@ -552,8 +552,10 @@ Entwurfstext. Du generierst KEIN neues Feedback, du prüfst nur.
     widersprechen (z.B. Gewicht steigern empfehlen, obwohl der letzte Satz "am Limit" war; eine Abweichung als
     Rückschritt bezeichnen, obwohl sie Absicht war) und keinen Grund vermuten, den der Nutzer nicht genannt hat. Das
     Aufgreifen der Antwort ist ausdrücklich ERLAUBT. Ebenfalls ein Verstoß: Eine Antwort zu "War das Absicht?"
-    (athlete_answer mit topic "intent") wird im Text mit keinem Wort aufgegriffen, obwohl der Text andere Übungen
-    nennt - eine bewusste Entscheidung des Nutzers darf nicht übergangen werden (wie eine Notiz, Regel 12).
+    (athlete_answer mit topic "intent" und answer "intended" oder "adjusted") wird im Text mit keinem Wort aufgegriffen,
+    obwohl der Text andere Übungen nennt und höchstens 3 Übungen genannt sind - eine bewusste Entscheidung des Nutzers
+    darf nicht übergangen werden (wie eine Notiz, Regel 12). Kein Verstoß: answer "unsure" (weiß nicht), oder die 3 Plätze
+    sind schon durch Notizen bzw. andere Antworten belegt.
 
 Antworte AUSSCHLIESSLICH als valides JSON-Objekt, keine Erklärung davor/danach:
 {
@@ -886,7 +888,7 @@ export const RULE_LABELS = {
   23: 'Vorsichtig/warnend klingende Formulierung genutzt ("achte darauf", "behalte im Blick", "passe an", "sei vorsichtig") statt handlungsorientierter Sprache',
   24: 'Fortschrittszustand (almost_there/ready_to_increase/hold_weight) als Rückschritt, Kompromiss ("zwar ... aber") oder Vorwurf formuliert',
   25: 'Technik-Übung (training_type technique) nach Gewicht/Wiederholungen/Fortschritt bewertet oder mit einer Steigerungsempfehlung versehen',
-  27: 'Antwort des Nutzers nach dem Training (athlete_answer) widersprochen oder überdeutet (z. B. Steigerung trotz "am Limit", Vermutung über den Grund)',
+  27: 'Antwort des Nutzers nach dem Training (athlete_answer) widersprochen, überdeutet (z. B. Steigerung trotz "am Limit", Vermutung über den Grund) oder eine bewusste Absicht-Antwort (intended/adjusted) übergangen',
 };
 
 export function getRuleLabel(ruleNumber) {
