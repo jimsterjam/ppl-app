@@ -1,0 +1,69 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest'
+
+vi.mock('../logger', () => ({
+  logger: { debug: vi.fn(), warn: vi.fn(), info: vi.fn(), error: vi.fn() }
+}))
+
+import { saveFavoriteWorkout, updateFavoriteWorkout, getFavoritesByType, buildStartedFavoriteWorkout } from '../workoutFavorites.js'
+
+const store = {}
+vi.stubGlobal('localStorage', {
+  getItem: (k) => store[k] ?? null,
+  setItem: (k, v) => { store[k] = String(v) },
+  removeItem: (k) => { delete store[k] }
+})
+beforeEach(() => { for (const k of Object.keys(store)) delete store[k] })
+
+const FAVORITES_KEY = 'bro_split_favorite_workouts_v1'
+const QUESTION = 'Kann es sein, dass die Schulter müde ist?'
+const workout = (note, notes = '') => ({
+  name: 'Push Day', type: 'push', notes,
+  exercises: [{ name: 'Bench Press', note, setDetails: [{ reps: 5, weight: 100 }] }]
+})
+
+// Absprache Jimmy 16.11.: Fragen in Notizen gelten nur für das Workout, in dem sie stehen - nicht für den Favoriten.
+describe('Favoriten nehmen keine Fragen aus Notizen mit', () => {
+  it('Speichern: Frage fällt weg, Aussage bleibt', () => {
+    saveFavoriteWorkout({ userId: 'u1', type: 'push', name: 'Push Day', workout: workout(`${QUESTION} Knie vorsichtig.`) })
+    expect(getFavoritesByType('u1', 'push')[0].workout.exercises[0].note).toBe('Knie vorsichtig.')
+  })
+
+  it('"Speichern + Favorit aktualisieren" (buildStartedFavoriteWorkout): Frage fällt weg', () => {
+    saveFavoriteWorkout({ userId: 'u1', type: 'push', name: 'Push Day', workout: workout('Knie vorsichtig.') })
+    const id = getFavoritesByType('u1', 'push')[0].id
+    updateFavoriteWorkout({ userId: 'u1', type: 'push', id, name: 'Push Day', workout: buildStartedFavoriteWorkout(workout(`${QUESTION} Knie vorsichtig.`)) })
+    expect(getFavoritesByType('u1', 'push')[0].workout.exercises[0].note).toBe('Knie vorsichtig.')
+  })
+
+  it('Notiz des ganzen Workouts: auch dort fällt die Frage weg', () => {
+    saveFavoriteWorkout({ userId: 'u1', type: 'push', name: 'Push Day', workout: workout('', `${QUESTION} Heute Fokus auf Technik.`) })
+    expect(getFavoritesByType('u1', 'push')[0].workout.notes).toBe('Heute Fokus auf Technik.')
+  })
+
+  it('schon gespeicherter Favorit mit Frage in der Notiz: beim Lesen (Start) ohne Frage, Speicher bleibt unverändert', () => {
+    const id = 'fav_push_1'
+    const raw = {
+      u1: { push: [{ id, type: 'push', name: 'Old', createdAt: '2026-11-01T10:00:00Z', updatedAt: '2026-11-01T10:00:00Z',
+        workout: { type: 'push', notes: QUESTION, exercises: [{ name: 'Bench Press', note: `${QUESTION} Ellbogen eng.`, setDetails: [{ reps: 5, weight: 100 }] }] } }], pull: [], legs: [], fullbody: [] }
+    }
+    localStorage.setItem(FAVORITES_KEY, JSON.stringify(raw))
+    const favorite = getFavoritesByType('u1', 'push')[0]
+    expect(favorite.workout.exercises[0].note).toBe('Ellbogen eng.')
+    expect(favorite.workout.notes).toBe('')
+    expect(JSON.parse(store[FAVORITES_KEY]).u1.push[0].workout.exercises[0].note).toContain('Kann es sein')
+  })
+
+  it('Gegenprobe: Notizen ohne Frage bleiben unverändert, ebenso alle anderen Felder', () => {
+    saveFavoriteWorkout({ userId: 'u1', type: 'push', name: 'Push Day', workout: { ...workout('Schulter tat weh'), notes: 'Technik zuerst' } })
+    const stored = getFavoritesByType('u1', 'push')[0].workout
+    expect(stored.exercises[0].note).toBe('Schulter tat weh')
+    expect(stored.notes).toBe('Technik zuerst')
+    expect(stored.exercises[0].setDetails).toEqual([{ reps: 5, weight: 100 }])
+  })
+
+  it('Gegenprobe: das übergebene Workout (laufende Einheit) wird nicht verändert', () => {
+    const live = workout(`${QUESTION} Knie vorsichtig.`)
+    saveFavoriteWorkout({ userId: 'u1', type: 'push', name: 'Push Day', workout: live })
+    expect(live.exercises[0].note).toBe(`${QUESTION} Knie vorsichtig.`)
+  })
+})

@@ -6,6 +6,7 @@ import { sanitizeExerciseTrainingType } from './weightSuggestion'
 import { sanitizeCustomRest } from './restTimerRules'
 import { buildWorkoutNotesSummary } from './workoutNotes'
 import { measureModeField } from './measureMode'
+import { stripQuestionsFromNote } from './noteQuestionStrip'
 
 // Favoriten wurden bisher AUSSCHLIESSLICH in localStorage gehalten - bei Geräteverlust,
 // Neuinstallation oder einem Identitätswechsel (z.B. Login über einen anderen Firebase-
@@ -137,7 +138,7 @@ function buildFavoriteWorkoutPayload(workout, type) {
   return {
     type: normalizeWorkoutType(source.type || type),
     workoutName: String(source.name || source.workoutName || '').trim(),
-    notes: typeof source.notes === 'string' ? source.notes : '',
+    notes: stripQuestionsFromNote(typeof source.notes === 'string' ? source.notes : ''),
     // Ziel des Workouts, aus dem der Favorit entstanden ist (siehe utils/workoutGoal.js).
     goal: sanitizeWorkoutGoal(source.goal),
     exercises: exercises.map((exercise, index) => ({
@@ -165,7 +166,8 @@ function buildFavoriteWorkoutPayload(workout, type) {
       // User-Feedback: Notizen sollen mit dem Favoriten gespeichert werden, damit beim nächsten
       // Start dieses Favoriten sichtbar ist, was beim letzten Mal notiert wurde - vorher wurde
       // exercise.note hier stillschweigend nicht übernommen (Feld fehlte in diesem Mapping).
-      note: String(exercise?.note || '').trim(),
+      // Ohne Fragesätze: Fragen gelten nur für das Workout, in dem sie stehen (utils/noteQuestionStrip.js).
+      note: stripQuestionsFromNote(String(exercise?.note || '').trim()),
       ...measureModeField(exercise?.measureMode),
       // Eigene Trainingsart der Übung (z.B. Muskelaufbau im Kraft-Workout) - nur wenn gewählt.
       ...(sanitizeExerciseTrainingType(exercise?.trainingType) ? { trainingType: exercise.trainingType } : {}),
@@ -197,7 +199,7 @@ export function buildStartedFavoriteWorkout(source) {
       reps: Number(exercise.reps) || Number(exercise.setDetails?.[0]?.reps) || 10,
       weight: Number(exercise.weight) || Number(exercise.setDetails?.[0]?.weight) || 0,
       rest: Number(exercise.rest) || 90,
-      note: typeof exercise.note === 'string' ? exercise.note : '',
+      note: stripQuestionsFromNote(typeof exercise.note === 'string' ? exercise.note : ''),
       ...measureModeField(exercise.measureMode),
       ...(sanitizeExerciseTrainingType(exercise.trainingType) ? { trainingType: exercise.trainingType } : {}),
       ...(sanitizeCustomRest(exercise.restSeconds) ? { restSeconds: exercise.restSeconds } : {}),
@@ -211,11 +213,37 @@ export function buildStartedFavoriteWorkout(source) {
   }
 }
 
+/**
+ * Favorit mit bereinigten Notizen: Auch schon gespeicherte Favoriten (und solche vom Server) können noch Fragen in den
+ * Notizen tragen - die Frage wird sonst bei jedem Start erneut beantwortet. Die Daten im Speicher bleiben unverändert und
+ * werden beim nächsten Speichern des Favoriten ohnehin ohne Fragen geschrieben.
+ */
+function withoutQuestionsInNotes(favorite) {
+  const workout = favorite?.workout
+  if (!workout || typeof workout !== 'object') return favorite
+  return {
+    ...favorite,
+    workout: {
+      ...workout,
+      ...(typeof workout.notes === 'string' ? { notes: stripQuestionsFromNote(workout.notes) } : {}),
+      ...(Array.isArray(workout.exercises)
+        ? {
+            exercises: workout.exercises.map((exercise) => (
+              exercise && typeof exercise.note === 'string' ? { ...exercise, note: stripQuestionsFromNote(exercise.note) } : exercise
+            ))
+          }
+        : {})
+    }
+  }
+}
+
 export function getFavoritesByType(userId = 'guest', type = 'push') {
   const store = readStore()
   const bucket = getUserBucket(store, userId)
   const key = normalizeWorkoutType(type)
-  return [...bucket[key]].sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
+  return bucket[key]
+    .map(withoutQuestionsInNotes)
+    .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
 }
 
 export function saveFavoriteWorkout({ userId = 'guest', type = 'push', name, workout }) {

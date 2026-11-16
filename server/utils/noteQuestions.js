@@ -13,7 +13,7 @@ export const MAX_ANSWER_LENGTH = 700;
 export const MAX_NOTE_CONTEXT_LENGTH = 400;
 export const NOTE_ANSWER_KINDS = Object.freeze(['training', 'health', 'other']);
 
-const QUESTION_CUES = [
+export const QUESTION_CUES = [
   'kann es sein', 'könnte es', 'koennte es', 'liegt es', 'liegt das', 'woran liegt', 'warum', 'wieso', 'weshalb',
   'wie kommt', 'soll ich', 'sollte ich', 'ist es normal', 'ich frage mich', 'ob es', 'ob das', 'ob die', 'ob der',
   'is it possible', 'could it be', 'could this be', 'why ', 'how come', 'should i', 'is it normal', 'i wonder',
@@ -24,7 +24,7 @@ function cleanText(value) {
   return String(value ?? '').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim();
 }
 
-function isQuestionSentence(sentence) {
+export function isQuestionSentence(sentence) {
   if (sentence.includes('?')) return true;
   const lower = ` ${sentence.toLowerCase()} `;
   return QUESTION_CUES.some((cue) => lower.includes(` ${cue}`));
