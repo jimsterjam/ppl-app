@@ -65,7 +65,7 @@ export function migrateTemplateFavoritesToPlans({ userId, catalog = [] } = {}) {
       if (!favorite || !template) return day
       const exercises = normalizePlanExercises((favorite.workout?.exercises || []).map((ex) => {
         const entry = byId.get(ex.exerciseId || ex._id)
-        return { exerciseId: ex.exerciseId || ex._id, name: entry?.name_en || ex.name, muscleGroup: ex.muscleGroup, sets: ex.sets }
+        return { exerciseId: ex.exerciseId || ex._id, name: entry?.name_en || ex.name, muscleGroup: ex.muscleGroup, sets: ex.sets, measureMode: ex.measureMode }
       }))
       if (!exercises.length) return day
       templateId = template

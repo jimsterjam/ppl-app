@@ -1,4 +1,5 @@
 import { PLAN_LIMITS, cleanPlanText, normalizePlanExercises } from './trainingPlan'
+import { measureModeField } from './measureMode'
 
 // Eigener Plan (Absprache Jimmy 29.10.): freier Entwurf aus Name, Tagen und Übungen. Reine Funktionen auf einem Entwurf,
 // damit sich Bauen und Bearbeiten ohne Oberfläche testen lässt. Entwurf:
@@ -80,7 +81,7 @@ export function addExercisesTo(draft, dayIndex, entries) {
         const exerciseId = String(entry?.exerciseId || '').trim()
         if (!exerciseId || known.has(exerciseId)) continue
         known.add(exerciseId)
-        added.push({ exerciseId, name: entry.name, muscleGroup: entry.muscleGroup || '', category: entry.category || '', sets: clampSets(entry.sets ?? DEFAULT_SETS) })
+        added.push({ exerciseId, name: entry.name, muscleGroup: entry.muscleGroup || '', category: entry.category || '', sets: clampSets(entry.sets ?? DEFAULT_SETS), ...measureModeField(entry.measureMode) })
       }
       return added.length ? { ...day, exercises: [...day.exercises, ...added] } : day
     })

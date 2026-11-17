@@ -176,7 +176,8 @@ function confirmPicker() {
     exerciseId: entryId(entry),
     name: getEnglishExerciseName(entry),
     muscleGroup: entry.muscleGroup || '',
-    category: entry.category || ''
+    category: entry.category || '',
+    measureMode: entry.measureMode
   }))
   draft.value = addExercisesTo(draft.value, pickerDay.value, entries)
 }

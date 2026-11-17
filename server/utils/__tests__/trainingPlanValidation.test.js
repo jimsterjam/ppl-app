@@ -115,3 +115,48 @@ describe('Plan-Tage mit eigenen Übungen und Stufe', () => {
     assert.equal(value.days[0].goal, 'hypertrophy')
   })
 })
+
+// F17: Messart (Zeit) einer Plan-Übung wird gesichert; nur feste Werte.
+describe('Messart der Plan-Übungen', () => {
+  const withExercises = (exercises) => sanitizePlanPayload(body({ days: [{ id: 'd1', label: 'Core', exercises }] }))
+  const exercise = (extra = {}) => ({ exerciseId: 'ex_1', name: 'plank', muscleGroup: 'Core', sets: 3, ...extra })
+
+  test('time und repsTime bleiben erhalten', () => {
+    const { value } = withExercises([exercise({ measureMode: 'time' }), exercise({ exerciseId: 'ex_2', measureMode: 'repsTime' })])
+    assert.deepEqual(value.days[0].exercises.map((e) => e.measureMode), ['time', 'repsTime'])
+  })
+
+  test('Gegenprobe: weight, Unbekanntes, Objekte und Operatoren bekommen kein Feld; ältere Pläne unverändert', () => {
+    const { value } = withExercises([
+      exercise({ measureMode: 'weight' }),
+      exercise({ exerciseId: 'ex_2', measureMode: 'quatsch' }),
+      exercise({ exerciseId: 'ex_3', measureMode: { $ne: 'time' } }),
+      exercise({ exerciseId: 'ex_4', measureMode: ['time'] }),
+      exercise({ exerciseId: 'ex_5' })
+    ])
+    assert.equal(value.days[0].exercises.length, 5)
+    for (const e of value.days[0].exercises) assert.equal('measureMode' in e, false)
+  })
+})
+
+
+// F17: Mongoose-Modell sichert die Messart ebenfalls (sonst ginge sie beim Sichern auf dem Server verloren).
+describe('TrainingPlan-Modell: Messart der Übung', () => {
+  const planWith = async (measureMode) => {
+    const { default: TrainingPlan } = await import('../../models/TrainingPlan.js')
+    return new TrainingPlan({ userId: 'u', clientId: 'p1', name: 'P', days: [{ id: 'd1', exercises: [{ exerciseId: 'ex_1', name: 'plank', ...(measureMode === undefined ? {} : { measureMode }) }] }] })
+  }
+
+  test('time bleibt erhalten und ist gültig', async () => {
+    const plan = await planWith('time')
+    assert.equal(plan.days[0].exercises[0].measureMode, 'time')
+    assert.equal(plan.validateSync(), undefined)
+  })
+
+  test('Gegenprobe: ohne Feld gültig (ältere Pläne), unbekannter Wert ungültig', async () => {
+    const plain = await planWith(undefined)
+    assert.equal(plain.days[0].exercises[0].measureMode, undefined)
+    assert.equal(plain.validateSync(), undefined)
+    assert.ok((await planWith('quatsch')).validateSync())
+  })
+})
