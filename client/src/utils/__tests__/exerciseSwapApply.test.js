@@ -25,6 +25,12 @@ describe('buildSwappedExercise', () => {
     expect(result.replacedFrom).toBe('bench press barbell')
   })
 
+  it('Zeit-Übung als Ziel: Messart übernommen, Sätze ohne Gewicht (gleicher Fehler wie beim Hinzufügen)', () => {
+    const result = buildSwappedExercise(bench, { ...entry, measureMode: 'time' })
+    expect(result.measureMode).toBe('time')
+    expect(result.setDetails).toEqual(Array(3).fill({ reps: null, weight: null, durationSeconds: null }))
+  })
+
   it('ohne Sätze: mindestens einer', () => {
     expect(buildSwappedExercise({ name: 'x' }, entry).setDetails).toHaveLength(1)
   })
@@ -65,6 +71,16 @@ describe('replaceExerciseInFavorite', () => {
     expect(saved.workout.exercises.map((e) => e.name)).toEqual(['lever chest press (weight stack)', 'dumbbell incline bench press'])
     expect(saved.workout.exercises[0].setDetails).toHaveLength(4)
     expect(saved.name).toBe('Push A')
+  })
+
+  it('Zeit-Übung als Ziel: Favorit behält die Messart und erfindet keine 10 Wiederholungen/kg (älterer Plan über favoriteId)', () => {
+    const fav = makeFavorite()
+    const result = replaceExerciseInFavorite({ userId: 'u1', favoriteId: fav.id, oldExercise: bench, entry: { ...entry, measureMode: 'time' } })
+    expect(result).toEqual({ ok: true })
+    const swapped = getFavoritesByType('u1', 'push')[0].workout.exercises[0]
+    expect(swapped.measureMode).toBe('time')
+    expect(swapped.setDetails).toHaveLength(4)
+    expect(swapped.setDetails.every((row) => row.reps === 0 && row.weight === 0)).toBe(true)
   })
 
   it('Favorit oder Übung nicht gefunden', () => {

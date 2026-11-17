@@ -2,6 +2,7 @@ import { buildTemplateExercise, getAllFavorites } from './planFromTemplate'
 import { updateFavoriteWorkout } from './workoutFavorites'
 import { getTrainingPlans, updateTrainingPlan } from './trainingPlanStorage'
 import { replaceDayExercise } from './trainingPlan'
+import { measureModeField, blankSetForMode } from './measureMode'
 
 // Übung wechseln: die neue Übung übernimmt die Satzanzahl der alten, alles andere (Wiederholungen, Gewicht, Notiz,
 // Pause, Trainingsart, Aufwärmsätze) gehört zur alten Übung und wird nicht mitgenommen.
@@ -41,7 +42,8 @@ export function buildSwappedExercise(oldExercise, entry) {
     imageUrl: entry.imageUrl || '',
     thumbnailUrl: entry.thumbnailUrl || '',
     thumbnailStaticUrl: entry.thumbnailStaticUrl || '',
-    setDetails: Array.from({ length: workingSetCount(oldExercise) }, () => ({ reps: 10, weight: 0 })),
+    ...measureModeField(entry.measureMode),
+    setDetails: Array.from({ length: workingSetCount(oldExercise) }, () => blankSetForMode(entry.measureMode)),
     note: '',
     replacedFrom: originalExerciseName(oldExercise)
   }
