@@ -2357,9 +2357,11 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
     // Fortschrittszustand je Übung (z. B. "almost_there") aus derselben Logik wie Workout-Hinweis und "Nächstes Mal"-Zeile
     // - die KI bekommt ihn als Tatsache (Regel 29). Fehler dabei dürfen die Auswertung nie stoppen.
     let progressionStates = null;
+    const athleteAnswersByIndex = activeAthleteAnswerMap(currentWorkout);
     try {
       progressionStates = buildProgressionStates({
         workout: currentWorkout,
+        athleteAnswers: athleteAnswersByIndex,
         profileHintByName: new Map(
           exerciseAnalyses.filter((ex) => ex?.profileHint).map((ex) => [String(ex.exercise || '').trim().toLowerCase(), ex.profileHint])
         ),
@@ -2370,7 +2372,6 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
     } catch (e) {
       logger.warn('⚠️ Fortschrittszustände konnten nicht gebaut werden', { requestId, error: e.message });
     }
-    const athleteAnswersByIndex = activeAthleteAnswerMap(currentWorkout);
     // Diagnose (ohne Inhalte): wie viele Antworten gespeichert sind und wie viele davon bei der KI ankommen.
     const structuredAnalysis = structureAnalysisForAI(exerciseAnalyses, {
       notDoneExercises,
@@ -2549,6 +2550,7 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
           language: structuredAnalysis?.response_language,
           profileHintByName,
           englishNameByName: enNameByExerciseName,
+          athleteAnswers: athleteAnswersByIndex,
           // Frühere abgeschlossene Workouts (neueste zuerst) - Schema, Singles-Regel, Plateau.
           history: allWorkouts.filter((w) => String(w._id) !== String(currentWorkout._id)
             && isFinishedWorkout(w)

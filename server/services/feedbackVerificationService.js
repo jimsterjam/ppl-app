@@ -540,6 +540,8 @@ Entwurfstext. Du generierst KEIN neues Feedback, du prüfst nur.
     "dafür weniger Wiederholungen") - der Fortschritt ist eindeutig und soll motivierend eingeordnet werden. Eine
     Formulierung wie "du arbeitest an deiner Grenze, da fehlt nur noch ein kleines Stück" ist ausdrücklich ERLAUBT.
     Bei "ready_to_increase" gilt dasselbe für Erfolg, bei "hold_weight" darf kein Vorwurf entstehen.
+    Bei "strong_drop" darf die Übung weder fehlen (sie gehört zu den höchstens 3 Übungen mit Besonderheit) noch als
+    "bereit zum Steigern" oder mit einem Vorwurf formuliert sein.
 25. Technik-Übungen (training_type "technique"): keine Bewertung von Gewicht, Wiederholungen oder Fortschritt und keine
     Empfehlung, wann der Nutzer steigern soll - er entscheidet selbst. Eine bloße Notiz-Bestätigung oder ein
     neutraler Halbsatz ist erlaubt.
@@ -886,7 +888,7 @@ export const RULE_LABELS = {
   21: 'Mehr Gewicht/weniger Wiederholungen anhand des Gesamtvolumens statt der Zielerreichung bewertet, oder eine deutlich verfehlte Wiederholungszahl als Rückschritt statt als vorsichtigen Verdacht (Gewicht evtl. zu hoch) formuliert',
   22: 'Identische Zahlen wie letzte Session fälschlich als Stagnation statt Konsolidierung gewertet, oder Plateau-Hinweis ohne 3+ unveränderte Sessions',
   23: 'Vorsichtig/warnend klingende Formulierung genutzt ("achte darauf", "behalte im Blick", "passe an", "sei vorsichtig") statt handlungsorientierter Sprache',
-  24: 'Fortschrittszustand (almost_there/ready_to_increase/hold_weight) als Rückschritt, Kompromiss ("zwar ... aber") oder Vorwurf formuliert',
+  24: 'Fortschrittszustand (almost_there/ready_to_increase/hold_weight/strong_drop) als Rückschritt, Kompromiss ("zwar ... aber") oder Vorwurf formuliert, oder ein starker Einbruch (strong_drop) übergangen bzw. als Steigerungsreife gelobt',
   25: 'Technik-Übung (training_type technique) nach Gewicht/Wiederholungen/Fortschritt bewertet oder mit einer Steigerungsempfehlung versehen',
   27: 'Antwort des Nutzers nach dem Training (athlete_answer) widersprochen, überdeutet (z. B. Steigerung trotz "am Limit", Vermutung über den Grund) oder eine bewusste Absicht-Antwort (intended/adjusted) übergangen',
 };

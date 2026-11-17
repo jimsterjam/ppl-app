@@ -108,7 +108,9 @@ const TEXTS = {
     climb: (n, p) => `Nächstes Mal – ${n}: ${p.nextReps} Wdh. pro Satz mit ${p.weight} kg versuchen. Bei ${p.max} in allen Sätzen gibt es mehr Gewicht.`,
     confirm: (n, p) => `Nächstes Mal – ${n}: ${p.sets}×${p.reps} mit ${p.weight} kg noch einmal bestätigen, dann mehr Gewicht.`,
     plateau: (n, p) => `Hinweis – ${n}: seit ${p.sessions} Einheiten bei ${p.weight} kg. Ein kleinerer Steigerungsschritt oder etwas längere Pausen können helfen.`,
-    below: (n, p) => `Hinweis – ${n}: unter ${p.min} Wdh. ist ${p.weight} kg für Muskelaufbau eher zu schwer. Etwas weniger Gewicht kann besser passen.`
+    below: (n, p) => `Hinweis – ${n}: unter ${p.min} Wdh. ist ${p.weight} kg für Muskelaufbau eher zu schwer. Etwas weniger Gewicht kann besser passen.`,
+    restore: (n, p) => `Nächstes Mal – ${n}: Letztes Mal waren es ${p.last} kg, heute ${p.weight} kg. Wenn nichts dagegenspricht (z. B. eine Verletzung), starte wieder bei ${p.last} kg. Sonst taste dich von ${p.weight} kg Schritt für Schritt heran.`,
+    rebuild: (n, p) => `Nächstes Mal – ${n}: gleiches Gewicht (${p.weight} kg), dann Schritt für Schritt wieder steigern.`
   },
   en: {
     increase: (n, p) => `Next time – ${n}: try ${p.weight} kg.`,
@@ -118,14 +120,16 @@ const TEXTS = {
     climb: (n, p) => `Next time – ${n}: try ${p.nextReps} reps per set at ${p.weight} kg. Once every set hits ${p.max}, add weight.`,
     confirm: (n, p) => `Next time – ${n}: confirm ${p.sets}×${p.reps} at ${p.weight} kg once more, then add weight.`,
     plateau: (n, p) => `Note – ${n}: ${p.sessions} sessions at ${p.weight} kg. A smaller increase step or slightly longer rests can help.`,
-    below: (n, p) => `Note – ${n}: below ${p.min} reps, ${p.weight} kg is rather heavy for muscle building. A little less weight may suit you better.`
+    below: (n, p) => `Note – ${n}: below ${p.min} reps, ${p.weight} kg is rather heavy for muscle building. A little less weight may suit you better.`,
+    restore: (n, p) => `Next time – ${n}: last time it was ${p.last} kg, today ${p.weight} kg. If nothing speaks against it (e.g. an injury), start at ${p.last} kg again. Otherwise work back up from ${p.weight} kg step by step.`,
+    rebuild: (n, p) => `Next time – ${n}: same weight (${p.weight} kg), then build back up step by step.`
   }
 };
 
 // Keine Senkung, nur ein Hinweis (Absprache Jimmy): nach PLATEAU_SESSIONS Einheiten mit demselben
 // Hauptgewicht ohne Steigerung.
 export const PLATEAU_SESSIONS = 3;
-const PRIORITY = { increase: 1, plateau: 2, below: 2, speed: 3, confirm: 4, close: 5, climb: 6, hold: 7 };
+const PRIORITY = { restore: 0, rebuild: 0, increase: 1, plateau: 2, below: 2, speed: 3, confirm: 4, close: 5, climb: 6, hold: 7 };
 
 // Dieselbe Übung aus früheren Workouts (neueste zuerst), passend über den Namen.
 function previousSessionsOf(ex, history, limit) {
@@ -146,8 +150,31 @@ function mainWeightOf(sessionExercise) {
   return split ? split.weight : null;
 }
 
+// Starker Einbruch (Absprache Jimmy 17.11.): Das Hauptgewicht liegt mindestens 20 % unter dem der letzten passenden
+// Einheit. Dann steigert die App nicht auf dem reduzierten Gewicht weiter (das wäre aus 75 kg -> 40 kg -> "42,5 kg
+// probieren"), sondern weist auf das frühere Gewicht hin - es sei denn, es gibt einen Grund (Antwort "Absicht" oder Notiz).
+export const STRONG_DROP_RATIO = 0.2;
+const STRONG_DROP_LOOKBACK = 12;
+
+function strongDropOf(ex, compatible) {
+  const lastSession = Array.isArray(compatible) ? compatible[0] : null;
+  if (!lastSession) return null;
+  const last = mainWeightOf(lastSession);
+  const now = mainWeightOf(ex);
+  if (!(last > 0) || !(now > 0)) return null;
+  // kleine Rundungstoleranz, damit genau 20 % sicher zählen
+  return (last - now) / last >= STRONG_DROP_RATIO - 1e-9 ? { last, now } : null;
+}
+
+// Bewusste Entscheidung des Nutzers: "Absicht"-Antwort (bewusst/musste anpassen) oder eine Notiz an der Übung.
+function hasDeliberateReason(ex, answer) {
+  if (answer?.topic === 'intent' && (answer.answer === 'intended' || answer.answer === 'adjusted')) return true;
+  if (typeof ex?.note === 'string' && ex.note.trim()) return true;
+  return (Array.isArray(ex?.setDetails) ? ex.setDetails : []).some((set) => typeof set?.notes === 'string' && set.notes.trim());
+}
+
 // Einordnung EINER Übung nach der Progressionslogik (wie im Workout-Hinweis): { kind, params } oder null.
-function resolveCandidate({ ex, info, hint, goal, history, lang }) {
+function resolveCandidate({ ex, info, hint, goal, history, lang, answer = null }) {
   let candidate = null;
   const exGoal = exerciseGoal(info, ex, goal, hint);
   if (exGoal === 'explosive') {
@@ -164,6 +191,21 @@ function resolveCandidate({ ex, info, hint, goal, history, lang }) {
     nextReps: status?.nextReps,
     max: status?.max
   };
+  // Technik, Zeit und Übungen ohne Last haben keine Gewichtsprogression (wie bei den Fragen im Client).
+  const noProgression = exGoal === 'technique' || ex?.measureMode === 'time' || ex?.measureMode === 'repsTime'
+    || (engine.isNoLoadExercise ? engine.isNoLoadExercise(info) : false);
+  // Für den Einbruch genügt ein längerer Blick zurück: die letzten Sessions können eine andere Trainingsart haben und
+  // fallen beim Filtern weg, die passende steht dann weiter hinten.
+  const dropSessions = noProgression ? [] : (engine.compatibleSessions
+    ? engine.compatibleSessions(info, previousSessionsOf(ex, history, STRONG_DROP_LOOKBACK), exGoal)
+    : previousSessions);
+  const drop = strongDropOf(ex, dropSessions);
+  if (drop) {
+    return {
+      kind: hasDeliberateReason(ex, answer) ? 'rebuild' : 'restore',
+      params: { last: formatKg(drop.last, lang), weight: formatKg(drop.now, lang) }
+    };
+  }
   if (status?.state === 'increase' && status.suggestion?.suggestedWeights?.length) {
     candidate = { kind: 'increase', params: { weight: formatKg(status.suggestion.suggestedWeights[0], lang) } };
   } else if (status?.state === 'climb' && status.belowRange) {
@@ -185,7 +227,10 @@ const AI_PROGRESSION_STATES = {
   increase: 'ready_to_increase',
   hold: 'hold_weight',
   climb: 'build_reps',
-  confirm: 'confirm_once_more'
+  confirm: 'confirm_once_more',
+  // Starker Einbruch gegenüber dem letzten Mal (Regel 29): nie als "bereit zum Steigern" melden.
+  restore: 'strong_drop',
+  rebuild: 'strong_drop'
 };
 
 /**
@@ -193,21 +238,21 @@ const AI_PROGRESSION_STATES = {
  * verfehlt (ein Satz genau 1 Wdh. zu wenig). Nur Zustände, die dem Nutzer etwas sagen; sonst kein Eintrag.
  * @returns {Map<string, string>} Übungsname (lowercase) -> Zustand
  */
-export function buildProgressionStates({ workout, profileHintByName = new Map(), history = [] } = {}) {
+export function buildProgressionStates({ workout, profileHintByName = new Map(), history = [], athleteAnswers = new Map() } = {}) {
   const states = new Map();
   if (!engine?.getProgressionStatus) return states;
   const goal = workout?.goal || 'hypertrophy';
-  for (const ex of Array.isArray(workout?.exercises) ? workout.exercises : []) {
+  (Array.isArray(workout?.exercises) ? workout.exercises : []).forEach((ex, index) => {
     try {
       const key = String(ex?.name || '').trim().toLowerCase();
       const info = exerciseInfo(ex);
-      const candidate = resolveCandidate({ ex, info, hint: profileHintByName.get(key) || null, goal, history, lang: 'de' });
+      const candidate = resolveCandidate({ ex, info, hint: profileHintByName.get(key) || null, goal, history, lang: 'de', answer: athleteAnswers.get(index) || null });
       const state = candidate ? AI_PROGRESSION_STATES[candidate.kind] : null;
       if (state) states.set(key, state);
     } catch {
       // eine Übung ohne Einordnung darf die Auswertung nie stoppen
     }
-  }
+  });
   return states;
 }
 
@@ -223,7 +268,7 @@ export function buildProgressionStates({ workout, profileHintByName = new Map(),
  *   für Schema-Erkennung, Bestätigungs-Regel bei Singles und den Plateau-Hinweis
  * @returns {null | { kind, exercise, text }}
  */
-export function buildNextSessionFocus({ workout, language = 'de', profileHintByName = new Map(), englishNameByName = new Map(), history = [] } = {}) {
+export function buildNextSessionFocus({ workout, language = 'de', profileHintByName = new Map(), englishNameByName = new Map(), history = [], athleteAnswers = new Map() } = {}) {
   if (!engine?.getProgressionStatus) return null;
   const lang = language === 'en' ? 'en' : 'de';
   const goal = workout?.goal || 'hypertrophy';
@@ -232,7 +277,7 @@ export function buildNextSessionFocus({ workout, language = 'de', profileHintByN
   (Array.isArray(workout?.exercises) ? workout.exercises : []).forEach((ex, order) => {
     const info = exerciseInfo(ex);
     const hint = profileHintByName.get(String(ex?.name || '').trim().toLowerCase()) || null;
-    const candidate = resolveCandidate({ ex, info, hint, goal, history, lang });
+    const candidate = resolveCandidate({ ex, info, hint, goal, history, lang, answer: athleteAnswers.get(order) || null });
 
     if (!candidate) return;
     if (!best || PRIORITY[candidate.kind] < PRIORITY[best.kind] ||

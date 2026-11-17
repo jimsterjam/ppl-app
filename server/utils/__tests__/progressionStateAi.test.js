@@ -57,3 +57,21 @@ test('Prüf-KI kennt Regel 24', () => {
   assert.match(getVerifierChecklistText(), /24\. Fortschrittszustand/)
   assert.ok(RULE_LABELS[24])
 })
+
+// Fund Jimmy 17.11.: starker Einbruch (>= 20 %) darf nie als "bereit zum Steigern" gelten und nie übergangen werden.
+test('strong_drop: Prompt (Regel 29), Prüfliste (Regel 24) und Label kennen den Zustand; kein Zahlen-/Gewichtswort-Zwang bricht', () => {
+  const prompt = getCoachSystemPromptText()
+  assert.match(prompt, /strong_drop:/)
+  assert.match(prompt, /KEINE\s+Zahlen und keine Wörter zu Gewicht/)
+  assert.match(getVerifierChecklistText(), /strong_drop/)
+  assert.match(RULE_LABELS[24], /strong_drop/)
+})
+
+test('strong_drop kommt als Fortschrittszustand der Übung beim KI-Prompt an', () => {
+  const before = session(100, [5, 5, 5, 5, 5], '2026-10-07T10:00:00Z', 'w0')
+  const now = session(60, [5, 5, 5, 5, 5], '2026-10-14T10:00:00Z', 'w1')
+  assert.equal(buildProgressionStates({ workout: now, history: [before] }).get('bench press'), 'strong_drop')
+  // Gegenprobe: 10 % weniger ist kein starker Einbruch.
+  const slight = session(90, [5, 5, 5, 5, 5], '2026-10-14T10:00:00Z', 'w2')
+  assert.notEqual(buildProgressionStates({ workout: slight, history: [before] }).get('bench press'), 'strong_drop')
+})

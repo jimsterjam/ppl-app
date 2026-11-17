@@ -1,6 +1,6 @@
 import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildNextSessionFocus, stripAiFocusLines, applyNextSessionFocus, __setFocusCatalogForTests } from '../nextSessionFocus.js'
+import { buildNextSessionFocus, buildProgressionStates, STRONG_DROP_RATIO, stripAiFocusLines, applyNextSessionFocus, __setFocusCatalogForTests } from '../nextSessionFocus.js'
 
 __setFocusCatalogForTests([
   { name: 'Kniebeugen mit der Langhantel', name_en: 'barbell high bar squat', category: 'Legs', equipment: 'Langhantel', aiMetadata: { exerciseType: 'compound' } },
@@ -165,3 +165,145 @@ describe('Trainingsart-passende Historie und Übergang 7', () => {
     assert.notEqual(focus.kind, 'plateau')
   })
 })
+
+// Fund Jimmy 17.11.: 75 kg -> 40 kg bei der Wadenpresse, trotzdem "42,5 kg probieren".
+describe('starker Einbruch gegenüber dem letzten Mal (mindestens 20 %)', () => {
+  const calf = (weight) => ({ name: 'Beinbeuger liegend', setDetails: sets([10, 10, 10], weight) })
+  const history = (weight) => [{ goal: 'hypertrophy', exercises: [calf(weight)] }]
+  const focus = (nowWeight, lastWeight, extra = {}) => buildNextSessionFocus({
+    workout: { goal: 'hypertrophy', exercises: [{ ...calf(nowWeight), ...(extra.exercise || {}) }] },
+    language: 'de',
+    history: history(lastWeight),
+    athleteAnswers: extra.answers || new Map()
+  })
+
+  test('Schwelle ist 20 %', () => {
+    assert.equal(STRONG_DROP_RATIO, 0.2)
+  })
+
+  test('ohne Grund: kein Steigern auf dem reduzierten Gewicht, Hinweis auf das frühere Gewicht', () => {
+    const f = focus(40, 75)
+    assert.equal(f.kind, 'restore')
+    assert.match(f.text, /Letztes Mal waren es 75 kg, heute 40 kg/)
+    assert.match(f.text, /starte wieder bei 75 kg/)
+    assert.doesNotMatch(f.text, /probieren/)
+  })
+
+  test('genau 20 % zählt, knapp darunter nicht', () => {
+    assert.equal(focus(80, 100).kind, 'restore')
+    assert.notEqual(focus(81, 100)?.kind, 'restore')
+  })
+
+  test('Gegenprobe: normales Training (kleine Änderung) bleibt unverändert', () => {
+    for (const now of [100, 95, 90]) {
+      const f = focus(now, 100)
+      assert.ok(!f || !['restore', 'rebuild'].includes(f.kind), `nicht bei ${now} kg`)
+    }
+  })
+
+  test('Gegenprobe: mehr Gewicht als beim letzten Mal ist kein Einbruch', () => {
+    const f = focus(100, 60)
+    assert.ok(!f || !['restore', 'rebuild'].includes(f.kind))
+  })
+
+  test('Gegenprobe: ohne frühere Einheit kein Einbruch', () => {
+    const f = buildNextSessionFocus({ workout: { goal: 'hypertrophy', exercises: [calf(40)] }, language: 'de', history: [] })
+    assert.ok(!f || !['restore', 'rebuild'].includes(f.kind))
+  })
+
+  test('mit Antwort "Absicht" (bewusst) oder "musste anpassen": nicht zurückdrängen, gleiches Gewicht, dann schrittweise', () => {
+    for (const answer of ['intended', 'adjusted']) {
+      const f = focus(40, 75, { answers: new Map([[0, { topic: 'intent', answer }]]) })
+      assert.equal(f.kind, 'rebuild')
+      assert.match(f.text, /gleiches Gewicht \(40 kg\), dann Schritt für Schritt wieder steigern/)
+      assert.doesNotMatch(f.text, /75 kg/)
+    }
+  })
+
+  test('Notiz an der Übung zählt wie eine bewusste Entscheidung', () => {
+    const f = focus(40, 75, { exercise: { note: 'Knie schonen' } })
+    assert.equal(f.kind, 'rebuild')
+  })
+
+  test('Gegenprobe: "weiß nicht" ist kein Grund, ebenso eine leere Notiz oder eine Antwort zu einem anderen Thema', () => {
+    assert.equal(focus(40, 75, { answers: new Map([[0, { topic: 'intent', answer: 'unsure' }]]) }).kind, 'restore')
+    assert.equal(focus(40, 75, { exercise: { note: '   ' } }).kind, 'restore')
+    assert.equal(focus(40, 75, { answers: new Map([[0, { topic: 'compare', answer: 'same' }]]) }).kind, 'restore')
+  })
+
+  test('Antwort einer anderen Übung gilt nicht für diese', () => {
+    assert.equal(focus(40, 75, { answers: new Map([[1, { topic: 'intent', answer: 'intended' }]]) }).kind, 'restore')
+  })
+
+  test('englischer Text', () => {
+    const f = buildNextSessionFocus({ workout: { goal: 'hypertrophy', exercises: [calf(40)] }, language: 'en', history: history(75) })
+    assert.match(f.text, /last time it was 75 kg, today 40 kg/)
+  })
+
+  test('der Einbruch hat Vorrang vor dem Steigern einer anderen Übung', () => {
+    const f = buildNextSessionFocus({
+      workout: { goal: 'strength', exercises: [
+        { name: 'Kniebeugen mit der Langhantel', setDetails: sets([5, 5, 5, 5, 5], 100) },
+        { ...calf(40), setDetails: sets([5, 5, 5], 40) }
+      ] },
+      language: 'de',
+      history: [{ goal: 'strength', exercises: [
+        { name: 'Kniebeugen mit der Langhantel', setDetails: sets([5, 5, 5, 5, 5], 100) },
+        { ...calf(75), setDetails: sets([5, 5, 5], 75) }
+      ] }]
+    })
+    assert.equal(f.kind, 'restore')
+  })
+
+  test('KI-Zustand: strong_drop statt ready_to_increase; ohne Einbruch weiter ready_to_increase', () => {
+    const states = buildProgressionStates({ workout: { goal: 'hypertrophy', exercises: [calf(40)] }, history: history(75) })
+    assert.equal(states.get('beinbeuger liegend'), 'strong_drop')
+    const normal = buildProgressionStates({ workout: { goal: 'hypertrophy', exercises: [calf(100)] }, history: history(100) })
+    assert.notEqual(normal.get('beinbeuger liegend'), 'strong_drop')
+  })
+
+  test('KI-Zustand auch mit Absicht-Antwort strong_drop (die Antwort wird über Regel 33 aufgegriffen)', () => {
+    const states = buildProgressionStates({ workout: { goal: 'hypertrophy', exercises: [calf(40)] }, history: history(75), athleteAnswers: new Map([[0, { topic: 'intent', answer: 'intended' }]]) })
+    assert.equal(states.get('beinbeuger liegend'), 'strong_drop')
+  })
+
+  test('Technik-Übung und Übung ohne Last: kein Hinweis auf frühere Gewichte', () => {
+    const technique = buildNextSessionFocus({
+      workout: { goal: 'technique', exercises: [calf(40)] }, language: 'de',
+      history: [{ goal: 'technique', exercises: [calf(75)] }]
+    })
+    assert.ok(!technique || !['restore', 'rebuild'].includes(technique.kind))
+    const timed = buildNextSessionFocus({
+      workout: { goal: 'hypertrophy', exercises: [{ ...calf(40), measureMode: 'time' }] }, language: 'de', history: history(75)
+    })
+    assert.ok(!timed || !['restore', 'rebuild'].includes(timed.kind))
+    const states = buildProgressionStates({ workout: { goal: 'technique', exercises: [calf(40)] }, history: [{ goal: 'technique', exercises: [calf(75)] }] })
+    assert.notEqual(states.get('beinbeuger liegend'), 'strong_drop')
+  })
+
+  test('passende Einheit steht hinter mehreren Einheiten anderer Trainingsart: Einbruch wird trotzdem erkannt', () => {
+    const other = (w) => ({ goal: 'strength', exercises: [calf(w)] })
+    const f = buildNextSessionFocus({
+      workout: { goal: 'hypertrophy', exercises: [calf(40)] }, language: 'de',
+      history: [other(80), other(80), other(80), other(80), other(80), { goal: 'hypertrophy', exercises: [calf(75)] }]
+    })
+    assert.equal(f.kind, 'restore')
+    assert.match(f.text, /Letztes Mal waren es 75 kg/)
+  })
+
+  test('auch mit Grund (rebuild) hat der Einbruch Vorrang vor dem Steigern einer anderen Übung', () => {
+    const f = buildNextSessionFocus({
+      workout: { goal: 'strength', exercises: [
+        { name: 'Kniebeugen mit der Langhantel', setDetails: sets([5, 5, 5, 5, 5], 100) },
+        { ...calf(40), note: 'Knie schonen', setDetails: sets([5, 5, 5], 40) }
+      ] },
+      language: 'de',
+      history: [{ goal: 'strength', exercises: [
+        { name: 'Kniebeugen mit der Langhantel', setDetails: sets([5, 5, 5, 5, 5], 100) },
+        { ...calf(75), setDetails: sets([5, 5, 5], 75) }
+      ] }]
+    })
+    assert.equal(f.kind, 'rebuild')
+  })
+})
+

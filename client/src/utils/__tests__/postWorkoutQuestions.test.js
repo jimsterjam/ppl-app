@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  detectQuestionTopics, weightThreshold, schemeDiffers, mainSetsSummary, isExerciseSkipped, MAX_QUESTION_TOPICS
+  detectQuestionTopics, deviationMagnitude, weightThreshold, schemeDiffers, mainSetsSummary, isExerciseSkipped, MAX_QUESTION_TOPICS
 } from '../postWorkoutQuestions.js'
 
 const bench = { name: 'Bankdrücken', name_en: 'barbell bench press', category: 'Push', equipment: 'Langhantel', aiMetadata: { exerciseType: 'compound' } }
@@ -241,3 +241,46 @@ describe('Gegenannahmen aus dem Selbst-Review', () => {
     expect(r[0]).toMatchObject({ topic: 'compare', kind: 'same' })
   })
 })
+
+// Fund Jimmy 17.11.: drei "Absicht"-Fälle, aber nur zwei Fragen - die dritte (größte) Abweichung blieb ohne Frage.
+describe('A: größte Abweichung zuerst', () => {
+  const drop = (index, info, now, last) => entry(index, info, 'hypertrophy', sets(now, times(3, 10)), [sets(last, times(3, 10))])
+
+  it('drei Fälle: Gewicht -45 % bekommt die Frage, auch wenn es als Dritte im Workout kommt', () => {
+    const r = detect('hypertrophy', [
+      drop(0, bench, 80, 100), // -20 %
+      drop(1, legPress, 160, 200), // -20 %
+      drop(2, dbPress, 40, 73) // -45 %
+    ])
+    expect(r).toHaveLength(2)
+    expect(r[0].exerciseIndex).toBe(2)
+    expect(r.map((t) => t.exerciseIndex).sort()).toEqual([0, 2])
+  })
+
+  it('Gegenprobe: gleiche Abweichung -> weiter Reihenfolge im Workout', () => {
+    const r = detect('hypertrophy', [drop(0, bench, 80, 100), drop(1, legPress, 160, 200), drop(2, dbPress, 80, 100)])
+    expect(r.map((t) => t.exerciseIndex)).toEqual([0, 1])
+  })
+
+  it('Gegenprobe: eine ausgelassene Übung (1,0) steht vor Gewichtsabfällen; B und C bleiben nach A', () => {
+    const skipped = { setDetails: times(3, 10).map((reps) => ({ weight: 50, reps, done: false })) }
+    const r = detect('hypertrophy', [drop(0, bench, 60, 100), entry(1, legPress, 'hypertrophy', skipped, []), entry(2, dbPress, 'hypertrophy', sets(20, times(3, 12)), [sets(20, times(3, 11))])])
+    expect(r.map((t) => [t.exerciseIndex, t.topic])).toEqual([[1, 'intent'], [0, 'intent']])
+  })
+
+  it('deviationMagnitude: Gewichtsabfall bzw. Gesamtlast, begrenzt auf 1, ohne Vergleich 0', () => {
+    expect(deviationMagnitude({ weight: 40, totalReps: 30 }, { weight: 73, totalReps: 30 })).toBeCloseTo(0.452, 2)
+    expect(deviationMagnitude({ weight: 100, totalReps: 15 }, { weight: 100, totalReps: 30 })).toBeCloseTo(0.5, 5)
+    expect(deviationMagnitude(null, { weight: 100, totalReps: 30 })).toBe(0)
+  })
+
+  it('Gegenprobe: mehr Last (3x10 -> 5x10 bei gleichem Gewicht) zählt 0 und verdrängt keinen Gewichtsabfall', () => {
+    expect(deviationMagnitude({ weight: 100, totalReps: 50 }, { weight: 100, totalReps: 30 })).toBe(0)
+    const more = entry(0, bench, 'hypertrophy', sets(100, times(5, 10)), [sets(100, times(3, 10))]) // Schema anders, mehr Last
+    const dropped = entry(1, legPress, 'hypertrophy', sets(80, times(3, 10)), [sets(100, times(3, 10))]) // -20 %
+    const second = entry(2, dbPress, 'hypertrophy', sets(60, times(3, 10)), [sets(100, times(3, 10))]) // -40 %
+    const r = detect('hypertrophy', [more, dropped, second])
+    expect(r.map((x) => x.exerciseIndex)).toEqual([2, 1])
+  })
+})
+
