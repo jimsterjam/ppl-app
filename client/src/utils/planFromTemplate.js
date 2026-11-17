@@ -2,6 +2,7 @@ import { PLAN_TEMPLATES, PLAN_TEMPLATE_GOAL, PLAN_TEMPLATE_LEVELS, DEFAULT_PLAN_
 import { getFavoritesByType } from './workoutFavorites'
 import { createTrainingPlan, getTrainingPlans } from './trainingPlanStorage'
 import { canCreatePlan, normalizePlanLevel } from './trainingPlan'
+import { blankSetForMode } from './measureMode'
 
 // Plan aus einer Vorlage anlegen (Absprache Jimmy 28.10.): die Übungen jedes Trainingstages werden direkt im Plan
 // gespeichert, es entstehen keine Favoriten (der Favoritenbereich bleibt das, was der Nutzer selbst ablegt).
@@ -25,7 +26,7 @@ export function buildTemplateExercise(entry, sets) {
     reps: 10,
     weight: 0,
     rest: 90,
-    setDetails: Array.from({ length: count }, () => ({ reps: 10, weight: 0 }))
+    setDetails: Array.from({ length: count }, () => blankSetForMode(entry.measureMode))
   }
 }
 

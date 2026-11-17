@@ -73,6 +73,16 @@ describe('replaceExerciseInFavorite', () => {
     expect(saved.name).toBe('Push A')
   })
 
+  it('Zeit-Übung als Ziel: Favorit behält die Messart und erfindet keine 10 Wiederholungen/kg (älterer Plan über favoriteId)', () => {
+    const fav = makeFavorite()
+    const result = replaceExerciseInFavorite({ userId: 'u1', favoriteId: fav.id, oldExercise: bench, entry: { ...entry, measureMode: 'time' } })
+    expect(result).toEqual({ ok: true })
+    const swapped = getFavoritesByType('u1', 'push')[0].workout.exercises[0]
+    expect(swapped.measureMode).toBe('time')
+    expect(swapped.setDetails).toHaveLength(4)
+    expect(swapped.setDetails.every((row) => row.reps === 0 && row.weight === 0)).toBe(true)
+  })
+
   it('Favorit oder Übung nicht gefunden', () => {
     const fav = makeFavorite()
     expect(replaceExerciseInFavorite({ userId: 'u1', favoriteId: 'nope', oldExercise: bench, entry })).toEqual({ ok: false, error: 'favoriteNotFound' })
