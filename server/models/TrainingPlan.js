@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import { PLAN_LIMITS, PLAN_LEVELS, PLAN_DAY_TYPES, PLAN_GOALS } from "../utils/trainingPlanValidation.js";
+import { PLAN_LIMITS, PLAN_LEVELS, PLAN_DAY_TYPES, PLAN_GOALS, PLAN_MEASURE_MODES } from "../utils/trainingPlanValidation.js";
 
 // Server-Sicherung der Trainingspläne (client/src/utils/trainingPlanStorage.js). Wie bei den Favoriten ist der Client
 // die primäre Quelle; der Server spiegelt nur (Restore nach Neuinstallation, Gerätewechsel). `clientId` ist die lokal
@@ -9,7 +9,9 @@ const exerciseSchema = new mongoose.Schema({
   exerciseId: { type: String, required: true, maxlength: PLAN_LIMITS.maxId },
   name: { type: String, required: true, maxlength: PLAN_LIMITS.maxExerciseName },
   muscleGroup: { type: String, default: "", maxlength: PLAN_LIMITS.maxMuscleGroup },
-  sets: { type: Number, default: 3, min: 1, max: PLAN_LIMITS.maxSets }
+  sets: { type: Number, default: 3, min: 1, max: PLAN_LIMITS.maxSets },
+  // Nur Zeit-Übungen ('time'/'repsTime'); ohne Feld = Gewicht (ältere Pläne).
+  measureMode: { type: String, enum: PLAN_MEASURE_MODES }
 }, { _id: false });
 
 const daySchema = new mongoose.Schema({

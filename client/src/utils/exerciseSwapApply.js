@@ -63,7 +63,7 @@ export function replaceExerciseInPlanDay({ userId, planId, dayId, oldExercise, e
   const day = plan?.days.find((d) => d.id === dayId)
   if (!day) return { ok: false, error: 'dayNotFound' }
   if (!day.exercises?.length) return replaceExerciseInFavorite({ userId, favoriteId: day.favoriteId, oldExercise, entry })
-  const next = { exerciseId: entry._id || entry.id, name: entry.name_en || entry.name, muscleGroup: entry.muscleGroup || '' }
+  const next = { exerciseId: entry._id || entry.id, name: entry.name_en || entry.name, muscleGroup: entry.muscleGroup || '', ...measureModeField(entry.measureMode) }
   const result = updateTrainingPlan({ userId, planId, updater: (p) => replaceDayExercise(p, dayId, oldExercise, next) })
   if (!result.ok) return { ok: false, error: 'storage' }
   const changed = result.plan.days.find((d) => d.id === dayId)?.exercises.some((ex) => ex.exerciseId === next.exerciseId)

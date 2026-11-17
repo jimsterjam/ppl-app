@@ -1,5 +1,6 @@
 import { getTrainingPlans, getActiveTrainingPlan, updateTrainingPlan } from './trainingPlanStorage'
 import { completeDay, getActiveDay } from './trainingPlan'
+import { measureModeField } from './measureMode'
 import { getAllFavorites, buildTemplateExercise } from './planFromTemplate'
 
 // Plan im Alltag: welcher Tag ist heute dran, und was passiert nach dem Speichern eines Plan-Trainings.
@@ -44,7 +45,9 @@ export function buildDayStartFavorite(info, catalog) {
   const byId = new Map((Array.isArray(catalog) ? catalog : []).map((entry) => [entry._id, entry]))
   const exercises = info.day.exercises.map((item) => {
     const entry = byId.get(item.exerciseId)
-    return entry ? buildTemplateExercise(entry, item.sets) : buildTemplateExercise({ _id: item.exerciseId, name_en: item.name, name: item.name, muscleGroup: item.muscleGroup }, item.sets)
+    // Die Messart des Plans gilt (eigene Zeit-Übungen stehen nicht im Katalog und kennen sie nur dort).
+    const mode = measureModeField(item.measureMode)
+    return entry ? buildTemplateExercise({ ...entry, ...mode }, item.sets) : buildTemplateExercise({ _id: item.exerciseId, name_en: item.name, name: item.name, muscleGroup: item.muscleGroup, ...mode }, item.sets)
   })
   const name = planDayTitle(info) || info.plan.name
   return { id: null, type: info.day.type, name, workout: { name, type: info.day.type, goal: info.day.goal, notes: '', exercises } }

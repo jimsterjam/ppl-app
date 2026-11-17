@@ -6,6 +6,7 @@
 //
 // Plan: { id, name, level, templateId, days: [{ id, label, type, goal, exercises: [{ exerciseId, name, muscleGroup, sets }],
 //         favoriteId, lastDoneAt }], activeDayIndex, active, createdAt, updatedAt }
+import { measureModeField } from './measureMode'
 
 export const PLAN_LIMITS = Object.freeze({
   maxPlans: 3, maxDays: 7, maxName: 40, maxLabel: 24, maxExercises: 12, maxSets: 10, maxExerciseName: 80, maxMuscleGroup: 40
@@ -69,7 +70,9 @@ export function normalizePlanExercises(value) {
       exerciseId,
       name,
       muscleGroup: cleanPlanText(raw.muscleGroup, PLAN_LIMITS.maxMuscleGroup),
-      sets: Number.isInteger(sets) ? Math.min(PLAN_LIMITS.maxSets, Math.max(1, sets)) : 3
+      sets: Number.isInteger(sets) ? Math.min(PLAN_LIMITS.maxSets, Math.max(1, sets)) : 3,
+      // Messart nur bei Zeit-Übungen ('time'/'repsTime'); Gewicht (Standard) bleibt ohne Feld, alte Pläne ändern sich nicht.
+      ...measureModeField(raw.measureMode)
     })
   }
   return out

@@ -204,3 +204,65 @@ describe('Übrig gebliebene Vorlagen-Favoriten', () => {
     expect(getFavoritesByType('u1', 'push')).toHaveLength(1)
   })
 })
+
+// F17 (Fund aus Review #197): Eine eigene Zeit-Übung im Plan startete beim nächsten Plan-Tag wieder als Gewicht-Übung.
+describe('Messart im Plan (Zeit-Übungen)', () => {
+  const plank = (extra = {}) => ex(7, { name: 'plank hold', muscleGroup: 'Core', measureMode: 'time', ...extra })
+
+  it('Planformat: Zeit und Wiederholungen in Zeit bleiben, Gewicht/Unbekanntes bekommt kein Feld', () => {
+    const list = normalizePlanExercises([plank(), plank({ exerciseId: 'ex_8', measureMode: 'repsTime' }), plank({ exerciseId: 'ex_9', measureMode: 'weight' }), plank({ exerciseId: 'ex_10', measureMode: 'quatsch' }), ex(11)])
+    expect(list.map((e) => e.measureMode)).toEqual(['time', 'repsTime', undefined, undefined, undefined])
+    expect(list.slice(2).every((e) => !('measureMode' in e))).toBe(true)
+  })
+
+  it('Plan speichern und laden: Messart überlebt, alter Plan ohne Feld bleibt wie er ist', () => {
+    createTrainingPlan({ userId: 'u1', name: 'P', days: [ownDay('Core', [plank(), ex(1)])] })
+    const saved = getTrainingPlans('u1')[0].days[0].exercises
+    expect(saved[0].measureMode).toBe('time')
+    expect('measureMode' in saved[1]).toBe(false)
+  })
+
+  it('Plan-Start: Zeit-Übung (auch ohne Katalogeintrag) kommt mit Messart und ohne erfundenes Gewicht', () => {
+    createTrainingPlan({ userId: 'u1', name: 'P', days: [ownDay('Core', [plank({ sets: 2 }), ex(1)])] })
+    const favorite = buildDayStartFavorite(getTodayPlanInfo('u1'), [])
+    const [timed, normal] = favorite.workout.exercises
+    expect(timed.measureMode).toBe('time')
+    expect(timed.setDetails).toEqual([{ reps: null, weight: null, durationSeconds: null }, { reps: null, weight: null, durationSeconds: null }])
+    // Gegenprobe: Gewicht-Übung wie bisher
+    expect('measureMode' in normal).toBe(false)
+    expect(normal.setDetails[0]).toEqual({ reps: 10, weight: 0 })
+  })
+
+  it('Plan-Start: die Messart aus dem Plan gilt auch, wenn die Übung im Katalog steht', () => {
+    createTrainingPlan({ userId: 'u1', name: 'P', days: [ownDay('Core', [plank({ exerciseId: 'ex_1' })])] })
+    const favorite = buildDayStartFavorite(getTodayPlanInfo('u1'), [{ _id: 'ex_1', name_en: 'plank', name: 'Unterarmstütz', muscleGroup: 'Core' }])
+    expect(favorite.workout.exercises[0]).toMatchObject({ name: 'plank', measureMode: 'time' })
+  })
+
+  it('Übungswechsel "auch im Plan" auf eine Zeit-Übung: Messart landet im Plan; Gegenprobe: Gewicht-Übung ohne Feld', () => {
+    createTrainingPlan({ userId: 'u1', name: 'P', days: [ownDay('Push A')] })
+    const plan = getTrainingPlans('u1')[0]
+    const swap = (entry, oldName) => replaceExerciseInPlanDay({ userId: 'u1', planId: plan.id, dayId: plan.days[0].id, oldExercise: { name: oldName }, entry })
+    expect(swap({ _id: 'ex_9', name_en: 'plank', name: 'Plank', muscleGroup: 'Core', measureMode: 'time' }, 'exercise 1')).toEqual({ ok: true })
+    expect(swap({ _id: 'ex_10', name_en: 'lever chest press', name: 'Brustpresse', muscleGroup: 'Brust' }, 'exercise 2')).toEqual({ ok: true })
+    const saved = getTrainingPlans('u1')[0].days[0].exercises
+    expect(saved[0].measureMode).toBe('time')
+    expect('measureMode' in saved[1]).toBe(false)
+  })
+
+  it('Plan bauen: Zeit-Übung hinzufügen übernimmt die Messart', async () => {
+    const { addExercisesTo } = await import('../planBuilder.js')
+    const draft = { days: [{ label: 'A', type: 'push', goal: 'hypertrophy', exercises: [] }] }
+    const next = addExercisesTo(draft, 0, [{ exerciseId: 'c1', name: 'plank', muscleGroup: 'Core', measureMode: 'time' }, { exerciseId: 'c2', name: 'bench', muscleGroup: 'Brust' }])
+    expect(next.days[0].exercises[0].measureMode).toBe('time')
+    expect('measureMode' in next.days[0].exercises[1]).toBe(false)
+  })
+
+  it('Umstellung alter Vorlagen-Pläne: Messart der Favoriten-Übung wird übernommen', () => {
+    const fav = saveFavoriteWorkout({ userId: 'u1', type: 'push', name: 'PPL 3 Tage Push A', workout: { name: 'PPL 3 Tage Push A', type: 'push', goal: 'hypertrophy', exercises: [{ exerciseId: 'ex_1', name: 'x', muscleGroup: 'Core', sets: 3, measureMode: 'time' }] } }).favorite
+    createTrainingPlan({ userId: 'u1', name: 'Alt', days: [{ favoriteId: fav.id, label: 'Push A' }] })
+    migrateTemplateFavoritesToPlans({ userId: 'u1', catalog: [] })
+    expect(getTrainingPlans('u1')[0].days[0].exercises?.[0]?.measureMode).toBe('time')
+  })
+})
+

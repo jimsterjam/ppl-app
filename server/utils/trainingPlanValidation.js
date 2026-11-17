@@ -11,6 +11,8 @@ export const PLAN_LIMITS = Object.freeze({
 export const PLAN_LEVELS = Object.freeze(['beginner', 'advanced']);
 export const PLAN_DAY_TYPES = Object.freeze(['push', 'pull', 'legs', 'fullbody']);
 export const PLAN_GOALS = Object.freeze(['hypertrophy', 'strength']);
+// Messart einer Plan-Übung (wie client/src/utils/measureMode.js); Gewicht ist der Standard und wird nicht gespeichert.
+export const PLAN_MEASURE_MODES = Object.freeze(['time', 'repsTime']);
 
 function cleanLine(value, max) {
   // Erst Steuerzeichen/Leerraum bereinigen, dann kürzen - sonst zählen führende Leerzeichen gegen die Länge.
@@ -42,7 +44,9 @@ export function sanitizePlanExercises(value) {
       exerciseId,
       name,
       muscleGroup: cleanLine(raw.muscleGroup, PLAN_LIMITS.maxMuscleGroup),
-      sets: Number.isInteger(sets) ? Math.min(PLAN_LIMITS.maxSets, Math.max(1, sets)) : 3
+      sets: Number.isInteger(sets) ? Math.min(PLAN_LIMITS.maxSets, Math.max(1, sets)) : 3,
+      // Messart nur bei Zeit-Übungen; sonst kein Feld (Gewicht ist der Standard, ältere Pläne haben es nie).
+      ...(PLAN_MEASURE_MODES.includes(raw.measureMode) ? { measureMode: raw.measureMode } : {})
     });
   }
   return out;
