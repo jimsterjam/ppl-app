@@ -129,7 +129,7 @@ const TEXTS = {
 // Keine Senkung, nur ein Hinweis (Absprache Jimmy): nach PLATEAU_SESSIONS Einheiten mit demselben
 // Hauptgewicht ohne Steigerung.
 export const PLATEAU_SESSIONS = 3;
-const PRIORITY = { restore: 0, rebuild: 3, increase: 1, plateau: 2, below: 2, speed: 3, confirm: 4, close: 5, climb: 6, hold: 7 };
+const PRIORITY = { restore: 0, rebuild: 0, increase: 1, plateau: 2, below: 2, speed: 3, confirm: 4, close: 5, climb: 6, hold: 7 };
 
 // Dieselbe Übung aus früheren Workouts (neueste zuerst), passend über den Namen.
 function previousSessionsOf(ex, history, limit) {

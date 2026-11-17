@@ -290,5 +290,20 @@ describe('starker Einbruch gegenüber dem letzten Mal (mindestens 20 %)', () => 
     assert.equal(f.kind, 'restore')
     assert.match(f.text, /Letztes Mal waren es 75 kg/)
   })
+
+  test('auch mit Grund (rebuild) hat der Einbruch Vorrang vor dem Steigern einer anderen Übung', () => {
+    const f = buildNextSessionFocus({
+      workout: { goal: 'strength', exercises: [
+        { name: 'Kniebeugen mit der Langhantel', setDetails: sets([5, 5, 5, 5, 5], 100) },
+        { ...calf(40), note: 'Knie schonen', setDetails: sets([5, 5, 5], 40) }
+      ] },
+      language: 'de',
+      history: [{ goal: 'strength', exercises: [
+        { name: 'Kniebeugen mit der Langhantel', setDetails: sets([5, 5, 5, 5, 5], 100) },
+        { ...calf(75), setDetails: sets([5, 5, 5], 75) }
+      ] }]
+    })
+    assert.equal(f.kind, 'rebuild')
+  })
 })
 
