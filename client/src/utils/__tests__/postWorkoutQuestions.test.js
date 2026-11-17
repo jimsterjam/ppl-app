@@ -273,5 +273,14 @@ describe('A: größte Abweichung zuerst', () => {
     expect(deviationMagnitude({ weight: 100, totalReps: 15 }, { weight: 100, totalReps: 30 })).toBeCloseTo(0.5, 5)
     expect(deviationMagnitude(null, { weight: 100, totalReps: 30 })).toBe(0)
   })
+
+  it('Gegenprobe: mehr Last (3x10 -> 5x10 bei gleichem Gewicht) zählt 0 und verdrängt keinen Gewichtsabfall', () => {
+    expect(deviationMagnitude({ weight: 100, totalReps: 50 }, { weight: 100, totalReps: 30 })).toBe(0)
+    const more = entry(0, bench, 'hypertrophy', sets(100, times(5, 10)), [sets(100, times(3, 10))]) // Schema anders, mehr Last
+    const dropped = entry(1, legPress, 'hypertrophy', sets(80, times(3, 10)), [sets(100, times(3, 10))]) // -20 %
+    const second = entry(2, dbPress, 'hypertrophy', sets(60, times(3, 10)), [sets(100, times(3, 10))]) // -40 %
+    const r = detect('hypertrophy', [more, dropped, second])
+    expect(r.map((x) => x.exerciseIndex)).toEqual([2, 1])
+  })
 })
 

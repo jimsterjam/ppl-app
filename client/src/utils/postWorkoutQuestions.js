@@ -29,14 +29,15 @@ const TOPIC_PRIORITY = { intent: 0, last_set: 1, compare: 2 }
 /**
  * Wie stark weicht die Übung vom letzten Mal ab (0 bis 1)? Nur zum Sortieren der "Absicht"-Fragen: Gibt es mehr
  * Fälle als Plätze (2), kommt die größte Abweichung zuerst - nicht die erste in der Reihenfolge des Workouts.
- * Ausgelassen = 1. Sonst der größere Wert aus Gewichtsabfall und Abfall der Gesamtlast (Sätze x Wdh. x Gewicht).
+ * Ausgelassen = 1. Sonst der größere Wert aus Gewichtsabfall und Abfall der Gesamtlast (Sätze x Wdh. x Gewicht); Zunahmen zählen 0.
  */
 export function deviationMagnitude(now, last) {
   if (!now || !last || !(last.weight > 0)) return 0
   const weightDrop = Math.max(0, last.weight - now.weight) / last.weight
   const load = (summary) => summary.weight * summary.totalReps
   const lastLoad = load(last)
-  const loadChange = lastLoad > 0 ? Math.abs(lastLoad - load(now)) / lastLoad : 0
+  // Nur ein Rückgang zählt: mehr Last (z. B. 3x10 -> 5x10 bei gleichem Gewicht) ist keine Einbuße und darf keinen Gewichtsabfall verdrängen.
+  const loadChange = lastLoad > 0 ? Math.max(0, lastLoad - load(now)) / lastLoad : 0
   return Math.min(1, Math.max(weightDrop, loadChange))
 }
 

@@ -266,5 +266,29 @@ describe('starker Einbruch gegenüber dem letzten Mal (mindestens 20 %)', () => 
     const states = buildProgressionStates({ workout: { goal: 'hypertrophy', exercises: [calf(40)] }, history: history(75), athleteAnswers: new Map([[0, { topic: 'intent', answer: 'intended' }]]) })
     assert.equal(states.get('beinbeuger liegend'), 'strong_drop')
   })
+
+  test('Technik-Übung und Übung ohne Last: kein Hinweis auf frühere Gewichte', () => {
+    const technique = buildNextSessionFocus({
+      workout: { goal: 'technique', exercises: [calf(40)] }, language: 'de',
+      history: [{ goal: 'technique', exercises: [calf(75)] }]
+    })
+    assert.ok(!technique || !['restore', 'rebuild'].includes(technique.kind))
+    const timed = buildNextSessionFocus({
+      workout: { goal: 'hypertrophy', exercises: [{ ...calf(40), measureMode: 'time' }] }, language: 'de', history: history(75)
+    })
+    assert.ok(!timed || !['restore', 'rebuild'].includes(timed.kind))
+    const states = buildProgressionStates({ workout: { goal: 'technique', exercises: [calf(40)] }, history: [{ goal: 'technique', exercises: [calf(75)] }] })
+    assert.notEqual(states.get('beinbeuger liegend'), 'strong_drop')
+  })
+
+  test('passende Einheit steht hinter mehreren Einheiten anderer Trainingsart: Einbruch wird trotzdem erkannt', () => {
+    const other = (w) => ({ goal: 'strength', exercises: [calf(w)] })
+    const f = buildNextSessionFocus({
+      workout: { goal: 'hypertrophy', exercises: [calf(40)] }, language: 'de',
+      history: [other(80), other(80), other(80), other(80), other(80), { goal: 'hypertrophy', exercises: [calf(75)] }]
+    })
+    assert.equal(f.kind, 'restore')
+    assert.match(f.text, /Letztes Mal waren es 75 kg/)
+  })
 })
 

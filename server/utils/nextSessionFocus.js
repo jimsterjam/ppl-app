@@ -154,6 +154,7 @@ function mainWeightOf(sessionExercise) {
 // Einheit. Dann steigert die App nicht auf dem reduzierten Gewicht weiter (das wäre aus 75 kg -> 40 kg -> "42,5 kg
 // probieren"), sondern weist auf das frühere Gewicht hin - es sei denn, es gibt einen Grund (Antwort "Absicht" oder Notiz).
 export const STRONG_DROP_RATIO = 0.2;
+const STRONG_DROP_LOOKBACK = 12;
 
 function strongDropOf(ex, compatible) {
   const lastSession = Array.isArray(compatible) ? compatible[0] : null;
@@ -190,7 +191,15 @@ function resolveCandidate({ ex, info, hint, goal, history, lang, answer = null }
     nextReps: status?.nextReps,
     max: status?.max
   };
-  const drop = strongDropOf(ex, compatible);
+  // Technik, Zeit und Übungen ohne Last haben keine Gewichtsprogression (wie bei den Fragen im Client).
+  const noProgression = exGoal === 'technique' || ex?.measureMode === 'time' || ex?.measureMode === 'repsTime'
+    || (engine.isNoLoadExercise ? engine.isNoLoadExercise(info) : false);
+  // Für den Einbruch genügt ein längerer Blick zurück: die letzten Sessions können eine andere Trainingsart haben und
+  // fallen beim Filtern weg, die passende steht dann weiter hinten.
+  const dropSessions = noProgression ? [] : (engine.compatibleSessions
+    ? engine.compatibleSessions(info, previousSessionsOf(ex, history, STRONG_DROP_LOOKBACK), exGoal)
+    : previousSessions);
+  const drop = strongDropOf(ex, dropSessions);
   if (drop) {
     return {
       kind: hasDeliberateReason(ex, answer) ? 'rebuild' : 'restore',
