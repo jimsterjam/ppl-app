@@ -384,6 +384,14 @@ KRITISCHE REGELN:
       klappt Schritt für Schritt. Kein Vorwurf.
     - build_reps: Erst die Wiederholungen aufbauen, dann kommt mehr Gewicht.
     - confirm_once_more: Das Schema noch einmal bestätigen, dann mehr Gewicht.
+    - strong_drop: Das Gewicht lag heute deutlich (mindestens ein Fünftel) unter dem vom letzten Mal. Das ist die
+      auffälligste Abweichung der Einheit und darf NICHT übergangen werden: Die Übung gehört immer zu den höchstens 3
+      Übungen mit Besonderheit (nach Notizen und "Absicht"-Antworten, Regel 12 und 33). Schreibe eine ruhige Zeile
+      ohne Vorwurf und ohne Lob für das Steigern; ein "bereit zum Steigern" gibt es hier nie. Die Zeile enthält KEINE
+      Zahlen und keine Wörter zu Gewicht, Wiederholungen, Sätzen oder Richtung (mehr/weniger/reduziert/gesenkt) -
+      solche Zeilen werden entfernt (FAKTEN-REGEL). Formuliere z. B. "Heute war ein ganz anderer Tag als sonst, das
+      ordnen wir ruhig ein." Liegt eine Antwort oder Notiz des Nutzers vor, bestätige sie (Regel 33/12), sonst keine
+      Ursache vermuten. Was beim nächsten Mal geschieht, schreibt die App selbst (Regel 25).
     Eine Notiz des Nutzers (Regel 12) hat weiter Vorrang. Die Übung zählt zur Höchstgrenze von 3 Übungen
     mit Besonderheit; almost_there und ready_to_increase gehören dort zu den bevorzugten Kandidaten.
     Keine Empfehlungszeile für die nächste Einheit schreiben (Regel 25) - nur die motivierende Einordnung.

@@ -26,6 +26,20 @@ export const SCHEME_REPS_DIFF = 3
 
 const TOPIC_PRIORITY = { intent: 0, last_set: 1, compare: 2 }
 
+/**
+ * Wie stark weicht die Übung vom letzten Mal ab (0 bis 1)? Nur zum Sortieren der "Absicht"-Fragen: Gibt es mehr
+ * Fälle als Plätze (2), kommt die größte Abweichung zuerst - nicht die erste in der Reihenfolge des Workouts.
+ * Ausgelassen = 1. Sonst der größere Wert aus Gewichtsabfall und Abfall der Gesamtlast (Sätze x Wdh. x Gewicht).
+ */
+export function deviationMagnitude(now, last) {
+  if (!now || !last || !(last.weight > 0)) return 0
+  const weightDrop = Math.max(0, last.weight - now.weight) / last.weight
+  const load = (summary) => summary.weight * summary.totalReps
+  const lastLoad = load(last)
+  const loadChange = lastLoad > 0 ? Math.abs(lastLoad - load(now)) / lastLoad : 0
+  return Math.min(1, Math.max(weightDrop, loadChange))
+}
+
 /** Gewichtsschwelle in kg für eine Übung, bezogen auf das Gewicht beim letzten Mal. */
 export function weightThreshold(info, referenceWeight) {
   return Math.max((Number(referenceWeight) || 0) * WEIGHT_THRESHOLD_RATIO, incrementFor(info))
@@ -74,7 +88,7 @@ function detectForExercise({ index, name, info, goal, workoutGoal, exercise, rec
   if (isNoLoadExercise(info) || goal === 'technique' || goal === 'explosive') return null
   // A: Übung ausgelassen
   if (isExerciseSkipped(exercise)) {
-    return { topic: 'intent', kind: 'skipped', exerciseIndex: index, facts }
+    return { topic: 'intent', kind: 'skipped', exerciseIndex: index, magnitude: 1, facts }
   }
   const now = mainSetsSummary(exercise)
   if (!now) return null
@@ -92,6 +106,7 @@ function detectForExercise({ index, name, info, goal, workoutGoal, exercise, rec
         topic: 'intent',
         kind: differs ? 'scheme' : 'weight_drop',
         exerciseIndex: index,
+        magnitude: deviationMagnitude(now, last),
         facts: { ...facts, now, last }
       }
     }
@@ -142,7 +157,7 @@ function detectForExercise({ index, name, info, goal, workoutGoal, exercise, rec
  *   je Übung des Workouts: `info` wie bei getProgressionStatus, `goal` = wirksame Trainingsart der Übung, `exercise` = die
  *   Übung dieses Workouts, `recent` = dieselbe Übung aus früheren Sessions, neueste zuerst (ohne dieses Workout)
  * @returns {Array<{ topic:'intent'|'last_set'|'compare', kind:string, exerciseIndex:number, facts:object }>}
- *   höchstens MAX_QUESTION_TOPICS, je Übung eins, sortiert nach Vorrang A > B > C, dann Reihenfolge im Workout
+ *   höchstens MAX_QUESTION_TOPICS, je Übung eins, sortiert nach Vorrang A > B > C; bei A die größte Abweichung zuerst, sonst Reihenfolge im Workout
  */
 export function detectQuestionTopics({ workoutGoal, exercises = [] } = {}) {
   const found = []
@@ -151,6 +166,9 @@ export function detectQuestionTopics({ workoutGoal, exercises = [] } = {}) {
     const topic = detectForExercise({ ...entry, workoutGoal, recent: Array.isArray(entry.recent) ? entry.recent : [] })
     if (topic) found.push(topic)
   }
-  found.sort((a, b) => TOPIC_PRIORITY[a.topic] - TOPIC_PRIORITY[b.topic] || a.exerciseIndex - b.exerciseIndex)
+  // Innerhalb von A: größte Abweichung zuerst (Fund Jimmy 17.11.: die dritte, größte Abweichung bekam keine Frage).
+  found.sort((a, b) => TOPIC_PRIORITY[a.topic] - TOPIC_PRIORITY[b.topic]
+    || (a.topic === 'intent' ? (b.magnitude || 0) - (a.magnitude || 0) : 0)
+    || a.exerciseIndex - b.exerciseIndex)
   return found.slice(0, MAX_QUESTION_TOPICS)
 }
