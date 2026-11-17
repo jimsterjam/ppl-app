@@ -1051,19 +1051,12 @@ function onAddExerciseConfirm() {
     selectedExerciseToAdd.value = null
     return
   }
-  workout.value.exercises.push({
+  // Immer den englischen Namen speichern, auch bei deutscher App-Sprache (User-Feedback: deutsche Namen klingen
+  // z.T. sehr merkwürdig, z.B. "Hebel-Wadenpresse"). Siehe getEnglishExerciseName() in exerciseTranslation.js.
+  workout.value.exercises.push(buildAddedExercise(selectedExerciseToAdd.value, {
     exerciseId: selectedId,
-    // Immer den englischen Namen speichern, auch bei deutscher App-Sprache (User-Feedback:
-    // deutsche Namen klingen z.T. sehr merkwürdig, z.B. "Hebel-Wadenpresse"). Siehe
-    // getEnglishExerciseName() in exerciseTranslation.js.
-    name: getEnglishExerciseName(selectedExerciseToAdd.value),
-    muscleGroup: selectedExerciseToAdd.value.muscleGroup,
-    imageUrl: selectedExerciseToAdd.value.imageUrl || '',
-    thumbnailUrl: selectedExerciseToAdd.value.thumbnailUrl || '',
-    thumbnailStaticUrl: selectedExerciseToAdd.value.thumbnailStaticUrl || '',
-    setDetails: [{ reps: 10, weight: 0 }],
-    note: ''
-  })
+    name: getEnglishExerciseName(selectedExerciseToAdd.value)
+  }))
   showAddExerciseModal.value = false
   selectedExerciseToAdd.value = null
   ensureSetDetailsStructure()
@@ -1160,7 +1153,7 @@ import { useFocusModeStore } from '@/stores/focusModeStore'
 import { createFocusStateTracker, applyFocusState } from '@/utils/focusStatePersistence'
 import { buildSaveReview, markAllSetsDone, saveReviewActions } from '@/utils/saveReview'
 import { isExerciseNotDone } from '@/utils/notDoneExercises'
-import { showsReps, showsTime, showsWeight, sanitizeMeasureMode, DURATION_MAX_SECONDS, DURATION_STEP_SECONDS } from '@/utils/measureMode'
+import { showsReps, showsTime, showsWeight, sanitizeMeasureMode, buildAddedExercise, DURATION_MAX_SECONDS, DURATION_STEP_SECONDS } from '@/utils/measureMode'
 import {
   shouldKeepAsDraft as shouldKeepAsDraftUtil,
   clearActiveDraftForCurrentUser as clearActiveDraftForCurrentUserUtil,

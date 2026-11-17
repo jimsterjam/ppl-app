@@ -29,3 +29,30 @@ export function measureModeField(value) {
   const mode = sanitizeMeasureMode(value)
   return mode === 'weight' ? {} : { measureMode: mode }
 }
+
+/**
+ * Erster Satz einer neu hinzugefügten Übung. Zeit-Übungen starten ohne Gewicht und ohne erfundene Wiederholungen
+ * (leer statt 10 / 0 kg), die Zeit wird in der Satzzeile eingetragen.
+ */
+export function blankSetForMode(value) {
+  return sanitizeMeasureMode(value) === 'weight'
+    ? { reps: 10, weight: 0 }
+    : { reps: null, weight: null, durationSeconds: null }
+}
+
+/** Neue Übung für „Übung hinzufügen“ im laufenden Workout; `selected` ist der gewählte Listeneintrag. */
+export function buildAddedExercise(selected, { exerciseId, name }) {
+  const entry = selected && typeof selected === 'object' ? selected : {}
+  return {
+    exerciseId,
+    name,
+    muscleGroup: entry.muscleGroup,
+    imageUrl: entry.imageUrl || '',
+    thumbnailUrl: entry.thumbnailUrl || '',
+    thumbnailStaticUrl: entry.thumbnailStaticUrl || '',
+    // Messart der Übung (z. B. eigene Übung mit "Zeit"): sonst zeigt das Workout Wiederholungen + Gewicht.
+    ...measureModeField(entry.measureMode),
+    setDetails: [blankSetForMode(entry.measureMode)],
+    note: ''
+  }
+}

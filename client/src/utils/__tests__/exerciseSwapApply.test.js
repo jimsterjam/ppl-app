@@ -25,6 +25,12 @@ describe('buildSwappedExercise', () => {
     expect(result.replacedFrom).toBe('bench press barbell')
   })
 
+  it('Zeit-Übung als Ziel: Messart übernommen, Sätze ohne Gewicht (gleicher Fehler wie beim Hinzufügen)', () => {
+    const result = buildSwappedExercise(bench, { ...entry, measureMode: 'time' })
+    expect(result.measureMode).toBe('time')
+    expect(result.setDetails).toEqual(Array(3).fill({ reps: null, weight: null, durationSeconds: null }))
+  })
+
   it('ohne Sätze: mindestens einer', () => {
     expect(buildSwappedExercise({ name: 'x' }, entry).setDetails).toHaveLength(1)
   })
