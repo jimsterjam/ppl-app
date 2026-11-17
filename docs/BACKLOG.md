@@ -61,6 +61,7 @@ Zuletzt aktualisiert: 2026-11-15
 
 ## Bekannte Probleme
 
+- `@capacitor/filesystem` ist bewusst auf **7.1.8 festgenagelt** (17.11.): 7.1.9 braucht `IONFilesystemLib ~> 1.1.4`, CocoaPods meldet dafür eine höhere Mindest-iOS-Version als das Podfile (17.0) und `npx cap sync ios` bricht ab. Podfile.lock passt zu 7.1.8 (IONFilesystemLib 1.1.2). Erst aufheben, wenn bewusst entschieden ist, ob die Mindest-iOS-Version steigt (Absprache nötig) und `pod install` danach durchläuft.
 - KI-Feedback-Schwellen stehen auf Testwerten (siehe F6).
 - KI-Feedback bleibt bis zu 30 Min. auf „Wird erstellt…“, wenn der Relay nicht erreichbar ist (429), erst dann „Nicht erstellt“ – siehe F10.
 - Render baut den Relay vom Branch `ai-relay`, nicht von `main`; dort fehlt u. a. `trust proxy` aus `main`.
