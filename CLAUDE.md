@@ -153,8 +153,8 @@ die lokale Cowork-Sandbox. In Cloud-Sessions gilt stattdessen:
   anfordern (GitHub-MCP-Werkzeug `request_copilot_review` der Cloud-Session; fehlt es, Jimmy bitten,
   ihn in GitHub anzufordern), Ergebnis abwarten (nicht mit `sleep` pollen: PR-Ereignisse abonnieren
   bzw. eine Rückmeldung planen, soweit die Session das anbietet) und die Funde abarbeiten.
-  Erst wenn Copilot nichts Blockierendes mehr findet (höchstens drei Runden, siehe unten), Jimmy den
-  PR als fertig melden – mit Zahl der Copilot-Runden und -Funde. Findet Copilot nach drei Runden
+  Erst wenn Copilot nichts Blockierendes mehr findet (höchstens zwei Runden, siehe unten), Jimmy den
+  PR als fertig melden – mit Zahl der Copilot-Runden und -Funde. Findet Copilot nach zwei Runden
   noch etwas, Jimmy den Stand zeigen statt weiter zu flicken.
 - **Vor jedem Push auf einen PR-Branch prüfen, ob der PR noch offen ist** – maßgeblich ist der
   PR-Status in GitHub (`pull_request_read` → `state`/`merged`), nicht Git allein: nach einem
@@ -165,7 +165,7 @@ die lokale Cowork-Sandbox. In Cloud-Sessions gilt stattdessen:
   „Risiko" und „Wie zurücknehmen".
 - **Review-Funde** (Copilot, Jimmy): jeden beantworten – beheben oder mit Begründung ablehnen.
   Kommt dieselbe Fehlerart wieder, an der Ursache beheben: Test, Lint-Regel, `CLAUDE.md` oder die
-  Review-Regeln in `.github/copilot-instructions.md`. **Höchstens drei Review-Runden** pro PR; danach
+  Review-Regeln in `.github/copilot-instructions.md`. **Höchstens zwei Review-Runden** pro PR; danach
   anhalten, Jimmy den Stand zeigen und den Ansatz überdenken statt weiter einzeln zu flicken.
 - **Bug in Produktion:** bekommt einen Regressionstest, der vor dem Fix fehlschlägt, und in
   `docs/BACKLOG.md` (Abschnitt „Fehler aus Produktion") eine Zeile, welche Prüfung ihn hätte finden sollen (Test, Lint, Review-Regel,
