@@ -16,7 +16,7 @@ import AppFeedback from '../models/AppFeedback.js';
 import UserProfile from '../models/UserProfile.js';
 import { firebaseAuthMiddleware } from '../middleware/firebaseAuth.js';
 import { requireAdminKey } from '../middleware/adminAuth.js';
-import { summarizeAiConsent, parseConsentInput, buildConsentUpdate } from '../utils/aiConsent.js';
+import { summarizeAiConsent, parseConsentInput, buildConsentUpdate, declaredConsentVersion } from '../utils/aiConsent.js';
 import multer from 'multer';
 import sharp from 'sharp';
 
@@ -380,7 +380,7 @@ router.get('/profile', firebaseAuthMiddleware, async (req, res) => {
       // Additiv: bestehende Konsumenten von GET /profile (settingsStore.js) lesen nur
       // username/avatarUrl und ignorieren unbekannte Felder - kein Breaking Change.
       onboarding: summarizeOnboarding(profile),
-      aiConsent: summarizeAiConsent(profile)
+      aiConsent: summarizeAiConsent(profile, declaredConsentVersion(req))
     });
   } catch (e) {
     res.status(500).json({ error: 'Failed to load profile', message: e?.message || String(e) });
@@ -402,7 +402,7 @@ router.get('/ai-consent', firebaseAuthMiddleware, async (req, res) => {
     const uid = req.auth?.userId;
     if (!uid) return res.status(401).json({ error: 'Unauthenticated' });
     const profile = await UserProfile.findOne({ uid }).select('aiConsent').lean();
-    res.json({ aiConsent: summarizeAiConsent(profile) });
+    res.json({ aiConsent: summarizeAiConsent(profile, declaredConsentVersion(req)) });
   } catch (e) {
     res.status(500).json({ error: 'Failed to load AI consent' });
   }
@@ -419,7 +419,8 @@ router.put('/ai-consent', firebaseAuthMiddleware, async (req, res) => {
       { $set: buildConsentUpdate(input.granted, new Date(), input.version) },
       { upsert: true, new: true }
     ).lean();
-    res.json({ aiConsent: summarizeAiConsent(updated) });
+    // Maßstab ist die Textversion, der der Nutzer gerade zugestimmt hat (ältere App ohne Angabe: Text 1).
+    res.json({ aiConsent: summarizeAiConsent(updated, input.version) });
   } catch (e) {
     res.status(500).json({ error: 'Failed to save AI consent' });
   }

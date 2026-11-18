@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  sanitizeAthleteAnswer, sanitizeAthleteAnswers, sanitizeStoredAthleteAnswers, activeAthleteAnswerMap,
+  sanitizeAthleteAnswer, sanitizeAthleteAnswers, sanitizeStoredAthleteAnswers, activeAthleteAnswerMap, activeAthleteAnswerMapForConsent,
   describeAthleteAnswer, MAX_ATHLETE_ANSWERS
 } from '../athleteAnswers.js'
 import { analyzeWorkoutProgression, structureAnalysisForAI } from '../../services/trainingAnalysisService.js'
@@ -285,5 +285,20 @@ test('Fund 16.11.: beide Absicht-Antworten (Bankdrücken -30 kg, Militärdrücke
   assert.equal((prompt.match(/Antwort des Nutzers nach dem Training/g) || []).length, 2)
   assert.match(prompt, /Grund: ein anderes Ziel als sonst/)
   assert.match(prompt, /Grund: den Zielmuskel besser zu spüren/)
+})
+
+// Antworten gehen nur an die KI, wenn dem Text zugestimmt wurde, der sie nennt (Version 2).
+test('Antworten für die KI nur bei Zustimmung ab Textversion 2; ältere Zustimmung oder keine Angabe: keine', () => {
+  const workout = {
+    exercises: [{ name: 'Bench Press', setDetails: [{ reps: 5, weight: 60, done: true }] }],
+    athlete_answers: [{ topic: 'last_set', exerciseIndex: 0, exercise: 'Bench Press', answer: 'easy' }]
+  }
+  assert.equal(activeAthleteAnswerMapForConsent(workout, 2).get(0).answer, 'easy')
+  assert.equal(activeAthleteAnswerMapForConsent(workout, 3).size, 1)
+  for (const version of [1, 0, undefined, null, '', 'x']) {
+    assert.equal(activeAthleteAnswerMapForConsent(workout, version).size, 0, `Version ${String(version)}`)
+  }
+  // Gegenprobe: ohne gespeicherte Antworten bleibt es leer, auch mit Version 2
+  assert.equal(activeAthleteAnswerMapForConsent({ ...workout, athlete_answers: [] }, 2).size, 0)
 })
 
