@@ -5,6 +5,7 @@
 // Speichervorgänge endlos wiederholen). Der Übungsname kommt vom Workout, nie vom Client.
 
 import { isExerciseNotDone } from './exerciseDone.js';
+import { ANSWERS_CONSENT_VERSION } from './aiConsent.js';
 
 export const ATHLETE_TOPICS = Object.freeze(['last_set', 'compare', 'intent']);
 
@@ -123,6 +124,14 @@ export function activeAthleteAnswerMap(workout) {
     }
   }
   return map;
+}
+
+/**
+ * Antworten für die KI nur, wenn der Nutzer dem Einwilligungstext zugestimmt hat, der sie nennt (Version 2). Bei der älteren
+ * Zustimmung (Text 1, z. B. ältere App-Version) werden gespeicherte Antworten nicht verwendet, auch wenn sie vorliegen.
+ */
+export function activeAthleteAnswerMapForConsent(workout, consentVersion) {
+  return Number(consentVersion) >= ANSWERS_CONSENT_VERSION ? activeAthleteAnswerMap(workout) : new Map();
 }
 
 const LAST_SET_TEXT = Object.freeze({

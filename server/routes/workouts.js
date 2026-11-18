@@ -12,7 +12,7 @@ import FeedbackQualitySignal from '../models/FeedbackQualitySignal.js';
 import { logger } from '../utils/logger.js';
 import { isWorkoutEditWindowExpired } from '../utils/workoutEditWindow.js';
 import { getAIService } from '../services/aiService.js';
-import { requireAiConsent } from '../middleware/requireAiConsent.js';
+import { requireAiConsent, requireAiConsentForAnswers } from '../middleware/requireAiConsent.js';
 import { runVerificationLoop, getVerifierMode } from '../services/feedbackVerificationService.js';
 import {
   analyzeWorkoutProgression,
@@ -75,7 +75,7 @@ import {
   generateAndPersistCoachCheck, isCoachCheckSaved,
   SERVER_ONLY_CREATE_FIELDS, SERVER_ONLY_UPDATE_FIELDS, COACH_CHECK_LOCK_MS
 } from '../utils/coachCheck.js';
-import { sanitizeAthleteAnswers, activeAthleteAnswerMap } from '../utils/athleteAnswers.js';
+import { sanitizeAthleteAnswers, activeAthleteAnswerMapForConsent } from '../utils/athleteAnswers.js';
 
 // Coach-Check nur einmal gleichzeitig je Workout (Copilot-Review 13.11.): atomar über ai_coach_check_lock_at. Die
 // Bedingung (z. B. "noch kein Feedback") steht in derselben Abfrage, damit eine zweite Anfrage nicht nach einer gerade
@@ -2357,7 +2357,8 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
     // Fortschrittszustand je Übung (z. B. "almost_there") aus derselben Logik wie Workout-Hinweis und "Nächstes Mal"-Zeile
     // - die KI bekommt ihn als Tatsache (Regel 29). Fehler dabei dürfen die Auswertung nie stoppen.
     let progressionStates = null;
-    const athleteAnswersByIndex = activeAthleteAnswerMap(currentWorkout);
+    // Antworten nur, wenn dem Text zugestimmt wurde, der sie nennt (Version 2); ältere Zustimmung: keine Antworten an die KI.
+    const athleteAnswersByIndex = activeAthleteAnswerMapForConsent(currentWorkout, req.aiConsentVersion);
     try {
       progressionStates = buildProgressionStates({
         workout: currentWorkout,
@@ -2693,8 +2694,8 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
 // Antworten auf die kurzen Fragen nach dem Training (Backlog F16): nur feste Werte, der Server baut jeden Eintrag neu
 // auf und verwirft Ungültiges (kein Ablehnen: Offline-Sync würde es endlos wiederholen). Leere Liste = Antworten löschen.
 // Es zählt der zuletzt gespeicherte Stand (der Client schickt immer die komplette Liste).
-// requireAiConsent: ohne KI-Einwilligung gibt es keine Fragen und damit auch nichts zu speichern.
-router.post("/:id/athlete-answers", firebaseAuthMiddleware, requireAiConsent, async (req, res) => {
+// requireAiConsentForAnswers: ohne Zustimmung zum Text, der die Antworten nennt (Version 2), wird nichts gespeichert.
+router.post("/:id/athlete-answers", firebaseAuthMiddleware, requireAiConsentForAnswers, async (req, res) => {
   try {
     const { userId } = req.auth;
     const workoutId = req.params.id;

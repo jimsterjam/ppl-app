@@ -20,6 +20,13 @@ function authConfig(token) {
   return token ? { headers: { Authorization: `Bearer ${token}` } } : {}
 }
 
+// Beim Abfragen der Einwilligung die Textversion nennen, die diese App zeigt: Der Server wertet eine ältere Zustimmung (Text 1)
+// für diese App als "noch nicht erteilt" (sie fragt dann einmal nach Text 2), für ältere Apps ohne Angabe aber als erteilt.
+// Als Query statt als eigener Header: ein zusätzlicher Header bräuchte eine CORS-Freigabe.
+function consentConfig(token) {
+  return { ...authConfig(token), params: { consentVersion: AI_CONSENT_TEXT_VERSION } }
+}
+
 function normalizeProfileData(data) {
   if (!data) return {}
   const out = { ...data }
@@ -39,7 +46,7 @@ export async function fetchAccountProfile(token) {
   let lastError = null
   for (let attempt = 0; attempt <= PROFILE_RETRY_DELAYS_MS.length; attempt += 1) {
     try {
-      const res = await api.get('/profile', authConfig(token))
+      const res = await api.get('/profile', consentConfig(token))
       return normalizeProfileData(res.data)
     } catch (error) {
       lastError = error
@@ -138,7 +145,7 @@ export async function exportAccountData(token) {
 // KI-Einwilligung (Server: routes/account.js, utils/aiConsent.js)
 export async function fetchAiConsent(token) {
   try {
-    const res = await api.get('/ai-consent', authConfig(token))
+    const res = await api.get('/ai-consent', consentConfig(token))
     return res.data?.aiConsent || null
   } catch (error) {
     throw handleAPIError(error, 'KI-Einwilligung laden', { showToast: false })
