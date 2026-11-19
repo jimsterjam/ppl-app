@@ -5219,7 +5219,8 @@ onBeforeUnmount(() => {
 .ex-title-row { grid-column: 2; grid-row: 1; min-width: 0; }
 .ex-meta-row { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
 .ex-meta-row small { margin-top: 0; }
-.ex-info .ex-description, .ex-info .one-rep-max-field { grid-column: 1 / -1; }
+/* Alle Zeilen unter dem Kopf über die ganze Breite: ohne Angabe landet ein Element in der schmalen 56-px-Spalte des Vorschaubilds (Hinweis "Ersetzt" wurde dort Zeichen für Zeichen umgebrochen, Fund Jimmy 19.11.). */
+.ex-info .ex-description, .ex-info .one-rep-max-field, .ex-info .ex-replaced { grid-column: 1 / -1; }
 .ex-title-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .exercise-menu-field { display: grid; gap: 6px; font-size: 0.88rem; color: var(--muted); }
 .exercise-menu-field select { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--card-border); background-color: var(--surface); color: var(--fg); font-size: 0.95rem; }
