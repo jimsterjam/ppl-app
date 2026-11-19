@@ -48,6 +48,11 @@ export function prepareHistoryCandidates(historyWorkouts = [], currentWorkoutId 
  * Dieselbe Übung aus den neuesten passenden Sessions (neueste zuerst), höchstens `limit` Stück -
  * Grundlage für die Schema-Erkennung (5x5, 6x1 ...) und die Bestätigungs-Regel bei Singles.
  */
+// So weit zurück schaut die Einschätzung "starker Einbruch" (Workout-Kasten, Fragen nach dem Training) nach der letzten Einheit derselben
+// Trainingsart - wie "Nächstes Mal" auf dem Server (LOOKBACK_SESSIONS in server/utils/nextSessionFocus.js). Die letzten Einheiten können
+// eine andere Trainingsart haben und fallen beim Vergleich weg.
+export const COMPATIBLE_LOOKBACK_SESSIONS = 12
+
 export function findRecentSessionExercises(currentExercise = {}, candidates = [], limit = 3) {
   const found = []
   for (const workout of candidates) {

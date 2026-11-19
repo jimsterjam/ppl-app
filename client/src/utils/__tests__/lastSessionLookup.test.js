@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { prepareHistoryCandidates, findLastSessionExercise, findRecentSessionExercises } from '../lastSessionLookup.js'
+import { prepareHistoryCandidates, findLastSessionExercise, findRecentSessionExercises, COMPATIBLE_LOOKBACK_SESSIONS } from '../lastSessionLookup.js'
 
 const sets = (weight) => [{ reps: 10, weight }]
 
@@ -59,3 +59,13 @@ describe('findRecentSessionExercises', () => {
     expect(findRecentSessionExercises({ name: 'X' }, candidates, 1)).toHaveLength(1)
   })
 })
+
+describe('COMPATIBLE_LOOKBACK_SESSIONS', () => {
+  it('12 Einheiten (wie "Nächstes Mal" auf dem Server); findRecentSessionExercises liefert höchstens so viele', () => {
+    expect(COMPATIBLE_LOOKBACK_SESSIONS).toBe(12)
+    const candidates = Array.from({ length: 15 }, (_, i) => ({ _id: `w${i}`, goal: 'hypertrophy', exercises: [{ name: 'Bench Press', setDetails: sets(50 + i) }] }))
+    expect(findRecentSessionExercises({ name: 'Bench Press' }, candidates, COMPATIBLE_LOOKBACK_SESSIONS)).toHaveLength(12)
+    expect(findRecentSessionExercises({ name: 'Bench Press' }, candidates)).toHaveLength(3)
+  })
+})
+

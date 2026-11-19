@@ -1074,7 +1074,7 @@ import NumberPicker from '@/components/NumberPicker.vue'
 import { useExerciseTranslation, getEnglishExerciseName } from '@/utils/exerciseTranslation'
 import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
 import { getRepTarget, getProgressionStatus, isNoLoadExercise, resolveExerciseGoal, sanitizeExerciseTrainingType, classifyExercise, compatibleSessions, splitMainAndBackoffSets, getWorkingSets } from '@/utils/weightSuggestion'
-import { prepareHistoryCandidates, findRecentSessionExercises } from '@/utils/lastSessionLookup'
+import { prepareHistoryCandidates, findRecentSessionExercises, COMPATIBLE_LOOKBACK_SESSIONS } from '@/utils/lastSessionLookup'
 import { sanitizeWorkoutGoal } from '@/utils/workoutGoal'
 import { findPendingWarmup } from '@/utils/focusWarmup'
 import WorkoutGoalPicker from '@/components/WorkoutGoalPicker.vue'
@@ -2944,11 +2944,21 @@ const lastSessionByIndex = computed(() => recentSessionsByIndex.value.map((list)
 // Leere Sätze neuer Workouts aus einer passenden früheren Session füllen, sobald der Verlauf da ist.
 watch(recentSessionsByIndex, () => prefillEmptyExercisesFromHistory())
 
-// Steigern / Knapp dran / Halten (utils/weightSuggestion.js getProgressionStatus), null = nur Ziel.
+// Für den Kasten weiter zurück schauen (starker Einbruch, wie "Nächstes Mal"): die letzten Einheiten können eine andere Trainingsart haben.
+const statusSessionsByIndex = computed(() => {
+  const candidates = progressionHistory.value
+  return (workout.value?.exercises || []).map((ex) => findRecentSessionExercises(
+    { name: ex?.name, exerciseId: ex?.exerciseId, _id: ex?._id, muscleGroup: ex?.muscleGroup },
+    candidates,
+    COMPATIBLE_LOOKBACK_SESSIONS
+  ))
+})
+
+// Steigern / Knapp dran / Halten / Einbruch (utils/weightSuggestion.js getProgressionStatus), null = nur Ziel.
 const progressionStatusByIndex = computed(() =>
-  lastSessionByIndex.value.map((last, index) =>
-    getProgressionStatus(progressionInfoByIndex.value[index], last, goalByIndex.value[index], {
-      previousSessions: (recentSessionsByIndex.value[index] || []).slice(1)
+  statusSessionsByIndex.value.map((sessions, index) =>
+    getProgressionStatus(progressionInfoByIndex.value[index], sessions[0] || null, goalByIndex.value[index], {
+      previousSessions: sessions.slice(1)
     })
   )
 )

@@ -1,7 +1,7 @@
 // Baut die Eingabe für detectQuestionTopics (utils/postWorkoutQuestions.js) aus einem gespeicherten Workout, dem Verlauf
 // und dem Übungskatalog - dieselbe Aufbereitung wie der Hinweis über den Sätzen im laufenden Workout (WorkoutDetailView).
 // Reine Funktion, ohne Vue-/Store-Imports.
-import { prepareHistoryCandidates, findRecentSessionExercises } from '@/utils/lastSessionLookup'
+import { prepareHistoryCandidates, findRecentSessionExercises, COMPATIBLE_LOOKBACK_SESSIONS } from '@/utils/lastSessionLookup'
 import { buildCatalogIndex, findCatalogEntry } from '@/utils/exerciseMatch'
 import { resolveExerciseGoal, sanitizeExerciseTrainingType } from '@/utils/weightSuggestion'
 import { sanitizeWorkoutGoal } from '@/utils/workoutGoal'
@@ -41,7 +41,8 @@ export function buildQuestionInput({ workout, history = [], catalog = [], curren
     const recent = findRecentSessionExercises(
       { name: ex?.name, exerciseId: ex?.exerciseId, _id: ex?._id, muscleGroup: ex?.muscleGroup },
       candidates,
-      3
+      // Wie der Kasten und "Nächstes Mal": bis zur letzten Einheit derselben Trainingsart zurückschauen.
+      COMPATIBLE_LOOKBACK_SESSIONS
     )
     const override = sanitizeExerciseTrainingType(ex?.trainingType) || sanitizeExerciseTrainingType(recent[0]?.trainingType) || null
     return {

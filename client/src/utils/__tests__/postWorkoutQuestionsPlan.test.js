@@ -77,3 +77,30 @@ describe('buildQuestionInput', () => {
     expect(buildQuestionInput({ workout: noGoal }).workoutGoal).toBe('hypertrophy')
   })
 })
+
+// Review #204: Die letzten Einheiten können eine andere Trainingsart haben; die passende Einheit steht dann weiter hinten.
+describe('Fragen: Vergleich mit der letzten Einheit derselben Trainingsart auch bei längerem Abstand', () => {
+  const strengthSession = (n) => workout(`s${n}`, `2026-11-${String(10 + n).padStart(2, '0')}T10:00:00Z`, 100, [5, 5, 5, 5, 5], { goal: 'strength' })
+  const oldHypertrophy = workout('h0', '2026-10-01T10:00:00Z', 80, [10, 10, 10])
+  const history = [strengthSession(1), strengthSession(2), strengthSession(3), strengthSession(4), oldHypertrophy]
+
+  it('4 neuere Kraft-Einheiten dahinter: die Muskelaufbau-Einheit wird gefunden, 80 -> 60 kg ist A', () => {
+    const input = buildQuestionInput({ workout: today, history: [...history, today], catalog, currentIds: ['w1'] })
+    expect(input.exercises[0].recent.length).toBe(5)
+    const plan = planQuestions({ ...base, history: [...history, today] })
+    expect(plan.topics).toHaveLength(1)
+    expect(plan.topics[0]).toMatchObject({ topic: 'intent', kind: 'weight_drop' })
+  })
+
+  it('Gegenprobe: nur Kraft-Einheiten im Verlauf (keine passende Einheit): keine Frage zum Gewicht', () => {
+    const plan = planQuestions({ ...base, history: [strengthSession(1), strengthSession(2), strengthSession(3), strengthSession(4), today] })
+    expect((plan?.topics || []).filter((topic) => topic.kind === 'weight_drop')).toHaveLength(0)
+  })
+
+  it('Gegenprobe: weiter als 12 Einheiten zurück wird nicht mehr gesucht', () => {
+    const many = Array.from({ length: 13 }, (_, i) => workout(`m${i}`, `2026-11-${String(1 + i).padStart(2, '0')}T11:00:00Z`, 100, [5, 5, 5, 5, 5], { goal: 'strength' }))
+    const plan = planQuestions({ ...base, history: [...many, oldHypertrophy, today] })
+    expect((plan?.topics || []).filter((topic) => topic.kind === 'weight_drop')).toHaveLength(0)
+  })
+})
+
