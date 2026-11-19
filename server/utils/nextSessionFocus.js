@@ -75,7 +75,9 @@ export function exerciseInfo(ex = {}) {
     category: cat.category_raw || cat.category || ex?.category,
     equipment: cat.equipment || ex?.equipment,
     equipment_en: cat.equipment_en || ex?.equipment_en,
-    aiMetadata: cat.aiMetadata || ex?.aiMetadata
+    aiMetadata: cat.aiMetadata || ex?.aiMetadata,
+    // Zeit-Übungen haben kein Gewicht (Engine: isNoLoadExercise).
+    measureMode: ex?.measureMode
   };
 }
 
@@ -129,6 +131,7 @@ const TEXTS = {
 // Keine Senkung, nur ein Hinweis (Absprache Jimmy): nach PLATEAU_SESSIONS Einheiten mit demselben
 // Hauptgewicht ohne Steigerung.
 export const PLATEAU_SESSIONS = 3;
+const LOOKBACK_SESSIONS = 12;
 const PRIORITY = { restore: 0, rebuild: 0, increase: 1, plateau: 2, below: 2, speed: 3, confirm: 4, close: 5, climb: 6, hold: 7 };
 
 // Dieselbe Übung aus früheren Workouts (neueste zuerst), passend über den Namen.
@@ -150,21 +153,9 @@ function mainWeightOf(sessionExercise) {
   return split ? split.weight : null;
 }
 
-// Starker Einbruch (Absprache Jimmy 17.11.): Das Hauptgewicht liegt mindestens 20 % unter dem der letzten passenden
-// Einheit. Dann steigert die App nicht auf dem reduzierten Gewicht weiter (das wäre aus 75 kg -> 40 kg -> "42,5 kg
-// probieren"), sondern weist auf das frühere Gewicht hin - es sei denn, es gibt einen Grund (Antwort "Absicht" oder Notiz).
-export const STRONG_DROP_RATIO = 0.2;
-const STRONG_DROP_LOOKBACK = 12;
-
-function strongDropOf(ex, compatible) {
-  const lastSession = Array.isArray(compatible) ? compatible[0] : null;
-  if (!lastSession) return null;
-  const last = mainWeightOf(lastSession);
-  const now = mainWeightOf(ex);
-  if (!(last > 0) || !(now > 0)) return null;
-  // kleine Rundungstoleranz, damit genau 20 % sicher zählen
-  return (last - now) / last >= STRONG_DROP_RATIO - 1e-9 ? { last, now } : null;
-}
+// Starker Einbruch (Absprache Jimmy 17.11./19.11.): Die Regel steckt in der gemeinsamen Engine (client/src/utils/weightSuggestion.js,
+// getProgressionStatus: Zustände 'restore'/'rebuild'), damit Workout-Kasten, "Nächstes Mal"-Zeile und Coach-Zustand dasselbe sagen.
+export const STRONG_DROP_RATIO = engine?.STRONG_DROP_RATIO ?? 0.2;
 
 // Bewusste Entscheidung des Nutzers: "Absicht"-Antwort (bewusst/musste anpassen) oder eine Notiz an der Übung.
 function hasDeliberateReason(ex, answer) {
@@ -181,8 +172,9 @@ function resolveCandidate({ ex, info, hint, goal, history, lang, answer = null }
     if (hasLoad(ex)) candidate = { kind: 'speed', params: {} };
     return candidate;
   }
-  const previousSessions = previousSessionsOf(ex, history, PLATEAU_SESSIONS + 1);
-  const status = engine.getProgressionStatus(info, ex, exGoal, { previousSessions });
+  // Genug Einheiten zurück, damit auch bei wechselnder Trainingsart (beim Filtern fallen andere weg) die passende gefunden wird.
+  const previousSessions = previousSessionsOf(ex, history, LOOKBACK_SESSIONS);
+  const status = engine.getProgressionStatus(info, ex, exGoal, { previousSessions, deliberate: hasDeliberateReason(ex, answer) });
   const compatible = engine.compatibleSessions ? engine.compatibleSessions(info, previousSessions, exGoal) : previousSessions;
   const params = {
     weight: formatKg(status?.weight, lang),
@@ -191,20 +183,9 @@ function resolveCandidate({ ex, info, hint, goal, history, lang, answer = null }
     nextReps: status?.nextReps,
     max: status?.max
   };
-  // Technik, Zeit und Übungen ohne Last haben keine Gewichtsprogression (wie bei den Fragen im Client).
-  const noProgression = exGoal === 'technique' || ex?.measureMode === 'time' || ex?.measureMode === 'repsTime'
-    || (engine.isNoLoadExercise ? engine.isNoLoadExercise(info) : false);
-  // Für den Einbruch genügt ein längerer Blick zurück: die letzten Sessions können eine andere Trainingsart haben und
-  // fallen beim Filtern weg, die passende steht dann weiter hinten.
-  const dropSessions = noProgression ? [] : (engine.compatibleSessions
-    ? engine.compatibleSessions(info, previousSessionsOf(ex, history, STRONG_DROP_LOOKBACK), exGoal)
-    : previousSessions);
-  const drop = strongDropOf(ex, dropSessions);
-  if (drop) {
-    return {
-      kind: hasDeliberateReason(ex, answer) ? 'rebuild' : 'restore',
-      params: { last: formatKg(drop.last, lang), weight: formatKg(drop.now, lang) }
-    };
+  // Starker Einbruch gegenüber der Einheit davor (Engine): nicht weitersteigern, Hinweis aufs frühere Gewicht bzw. schrittweise zurück.
+  if (status?.state === 'restore' || status?.state === 'rebuild') {
+    return { kind: status.state, params: { last: formatKg(status.previousWeight, lang), weight: formatKg(status.weight, lang) } };
   }
   if (status?.state === 'increase' && status.suggestion?.suggestedWeights?.length) {
     candidate = { kind: 'increase', params: { weight: formatKg(status.suggestion.suggestedWeights[0], lang) } };

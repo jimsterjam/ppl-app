@@ -104,6 +104,17 @@ export const DEFAULT_STRENGTH_REPS = 5
 // Kraft 7+ in allen Hauptsätzen, ist das Gewicht zu leicht; bei Muskelaufbau unter 8 eher zu schwer.
 export const TRANSITION_REPS = 7
 
+// Starker Einbruch (Absprache Jimmy 17.11./19.11.): Liegt das Hauptgewicht der letzten Einheit mindestens so weit (20 %) unter dem
+// der Einheit davor, wird auf dem reduzierten Gewicht nicht weiter gesteigert (aus 75 kg -> 40 kg würde sonst "42,5 kg probieren").
+// Ein Wert für Workout-Kasten, "Nächstes Mal"-Zeile und Coach-Zustand (der Server nutzt diese Datei als Engine).
+export const STRONG_DROP_RATIO = 0.2
+
+/** Hat der Nutzer zur Übung etwas notiert (Übung oder Satz)? Dann gilt eine Gewichtsänderung als bewusste Entscheidung. */
+export function hasDeliberateNote(exercise) {
+  if (typeof exercise?.note === 'string' && exercise.note.trim()) return true
+  return (Array.isArray(exercise?.setDetails) ? exercise.setDetails : []).some((set) => typeof set?.notes === 'string' && set.notes.trim())
+}
+
 /** 'fixed' (Kraft-Grundübung, festes Schema) oder 'range' (8-12) - null = kein Wdh.-Ziel. */
 export function progressionModeFor(info = {}, goal = DEFAULT_TRAINING_GOAL) {
   if (goal === 'explosive' || goal === 'technique') return null
@@ -256,12 +267,16 @@ function schemeAchieved(sessionExercise, weight, reps) {
  *   'climb'    - Bereich 8-12: noch nicht überall 12 -> nächstes Mal eine Wdh. mehr (nextReps)
  *   'close'    - festes Schema, knapp dran: genau ein Satz 1 Wdh. zu wenig -> gleiches Gewicht
  *   'hold'     - festes Schema, sonst -> gleiches Gewicht
+ *   'restore'  - starker Einbruch (STRONG_DROP_RATIO) ohne erkennbaren Grund -> wieder beim früheren Gewicht starten (previousWeight)
+ *   'rebuild'  - starker Einbruch mit Grund (Notiz oder options.deliberate) -> gleiches Gewicht, dann Schritt für Schritt steigern
  * null = keine Einschätzung (keine Historie, Körpergewicht, Pyramide, ...). Nie Senkungen.
  * @param {object} [options]
  * @param {Array} [options.previousSessions] - dieselbe Übung aus den Sessions VOR der letzten,
- *   neueste zuerst (für Schema-Erkennung und die Bestätigungs-Regel bei festen Kraft-Schemata)
+ *   neueste zuerst (für Schema-Erkennung, die Bestätigungs-Regel bei festen Kraft-Schemata und den starken Einbruch)
+ * @param {boolean} [options.deliberate] - der Nutzer hat die Abweichung bewusst gewählt (z. B. Antwort "Absicht"); eine Notiz an der
+ *   Übung zählt immer
  */
-export function getProgressionStatus(info = {}, lastSessionExerciseRaw = null, goal = DEFAULT_TRAINING_GOAL, { previousSessions: previousRaw = [] } = {}) {
+export function getProgressionStatus(info = {}, lastSessionExerciseRaw = null, goal = DEFAULT_TRAINING_GOAL, { previousSessions: previousRaw = [], deliberate = false } = {}) {
   if (!lastSessionExerciseRaw || isNoLoadExercise(info)) return null
   // Nur Sessions derselben Trainingsart (siehe isSessionCompatible).
   const [lastSessionExercise = null, ...previousSessions] = compatibleSessions(info, [lastSessionExerciseRaw, ...previousRaw], goal)
@@ -295,6 +310,12 @@ export function getProgressionStatus(info = {}, lastSessionExerciseRaw = null, g
     minReps
   }
 
+  // Starker Einbruch gegenüber der Einheit davor: nicht auf dem reduzierten Gewicht weitersteigern (nie Senkung, nur Hinweis).
+  const previousWeight = previousSessions[0] ? mainWeightOfSession(previousSessions[0]) : null
+  if (previousWeight > 0 && (previousWeight - split.weight) / previousWeight >= STRONG_DROP_RATIO - 1e-9) {
+    return { ...base, state: deliberate === true || hasDeliberateNote(lastSessionExercise) ? 'rebuild' : 'restore', previousWeight, suggestion: null }
+  }
+
   if (!below.length) {
     // Festes Kraft-Schema (5x5, 6x1, ...): erst nach zweimal Schaffen mit demselben Gewicht steigern (Absprache Jimmy
     // 21.10.) - beim ersten Mal festigen. Ausnahme: 7+ Wdh. in allen Hauptsätzen = Gewicht war klar zu leicht.
@@ -322,6 +343,13 @@ export function getProgressionStatus(info = {}, lastSessionExerciseRaw = null, g
   }
   const state = below.length === 1 && below[0].reps === target.target - 1 ? 'close' : 'hold'
   return { ...base, state, suggestion: null }
+}
+
+// Hauptgewicht einer Session (null bei Körpergewicht, Pyramide, leer).
+function mainWeightOfSession(session) {
+  const working = getWorkingSets(session)
+  if (!working.length || working.some((set) => set.weight <= 0)) return null
+  return splitMainAndBackoffSets(working)?.weight ?? null
 }
 
 /**

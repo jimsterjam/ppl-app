@@ -240,19 +240,16 @@ describe('starker Einbruch gegenüber dem letzten Mal (mindestens 20 %)', () => 
     assert.match(f.text, /last time it was 75 kg, today 40 kg/)
   })
 
+  // Muskelaufbau-Workout: Kniebeugen auf 12/12/12 wie beim letzten Mal (steigern), die Wadenübung mit starkem Einbruch.
+  const squat12 = (weight) => ({ name: 'Kniebeugen mit der Langhantel', setDetails: sets([12, 12, 12], weight) })
+  const withDrop = (extra = {}) => buildNextSessionFocus({
+    workout: { goal: 'hypertrophy', exercises: [squat12(100), { ...calf(40), ...extra }] },
+    language: 'de',
+    history: [{ goal: 'hypertrophy', exercises: [squat12(100), calf(75)] }]
+  })
+
   test('der Einbruch hat Vorrang vor dem Steigern einer anderen Übung', () => {
-    const f = buildNextSessionFocus({
-      workout: { goal: 'strength', exercises: [
-        { name: 'Kniebeugen mit der Langhantel', setDetails: sets([5, 5, 5, 5, 5], 100) },
-        { ...calf(40), setDetails: sets([5, 5, 5], 40) }
-      ] },
-      language: 'de',
-      history: [{ goal: 'strength', exercises: [
-        { name: 'Kniebeugen mit der Langhantel', setDetails: sets([5, 5, 5, 5, 5], 100) },
-        { ...calf(75), setDetails: sets([5, 5, 5], 75) }
-      ] }]
-    })
-    assert.equal(f.kind, 'restore')
+    assert.equal(withDrop().kind, 'restore')
   })
 
   test('KI-Zustand: strong_drop statt ready_to_increase; ohne Einbruch weiter ready_to_increase', () => {
@@ -292,18 +289,15 @@ describe('starker Einbruch gegenüber dem letzten Mal (mindestens 20 %)', () => 
   })
 
   test('auch mit Grund (rebuild) hat der Einbruch Vorrang vor dem Steigern einer anderen Übung', () => {
+    assert.equal(withDrop({ note: 'Knie schonen' }).kind, 'rebuild')
+  })
+
+  test('Gegenprobe: ohne Einbruch steigert die andere Übung wie bisher', () => {
     const f = buildNextSessionFocus({
-      workout: { goal: 'strength', exercises: [
-        { name: 'Kniebeugen mit der Langhantel', setDetails: sets([5, 5, 5, 5, 5], 100) },
-        { ...calf(40), note: 'Knie schonen', setDetails: sets([5, 5, 5], 40) }
-      ] },
+      workout: { goal: 'hypertrophy', exercises: [squat12(100), calf(70)] },
       language: 'de',
-      history: [{ goal: 'strength', exercises: [
-        { name: 'Kniebeugen mit der Langhantel', setDetails: sets([5, 5, 5, 5, 5], 100) },
-        { ...calf(75), setDetails: sets([5, 5, 5], 75) }
-      ] }]
+      history: [{ goal: 'hypertrophy', exercises: [squat12(100), calf(75)] }]
     })
-    assert.equal(f.kind, 'rebuild')
+    assert.equal(f.kind, 'increase')
   })
 })
-

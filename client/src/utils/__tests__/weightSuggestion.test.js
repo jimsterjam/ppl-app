@@ -5,6 +5,8 @@ import {
   getWeightSuggestion as rawGetWeightSuggestion,
   getSuggestionForSet,
   getProgressionStatus,
+  STRONG_DROP_RATIO,
+  hasDeliberateNote,
   normalizeTrainingGoal,
   isExplosiveExercise,
   resolveExerciseGoal
@@ -321,3 +323,53 @@ describe('Bestätigen vor dem Steigern (Absprache Jimmy 21.10.)', () => {
     expect(getProgressionStatus(squat, at([12, 12, 12], 60), 'hypertrophy').state).toBe('increase')
   })
 })
+
+// Fund Jimmy 17.11./19.11.: Nach 75 kg -> 40 kg zeigte der Kasten im nächsten Workout "Steigern auf 42,5 kg". Die Regel steckt jetzt in
+// der gemeinsamen Engine (Workout-Kasten, "Nächstes Mal" und Coach-Zustand nutzen sie).
+describe('starker Einbruch gegenüber der Einheit davor', () => {
+  const wadenpresse = { name: 'Lever Calf Press', name_en: 'lever calf press', category: 'Legs', equipment: 'Maschine', aiMetadata: { exerciseType: 'isolation' } }
+  const at = (weight, reps = [12, 12, 12], extra = {}) => ({ setDetails: reps.map((r) => ({ reps: r, weight, done: true })), ...extra })
+  const status = (last, previous, options = {}) => getProgressionStatus(wadenpresse, last, 'hypertrophy', { previousSessions: previous, ...options })
+
+  it('Schwelle ist 20 %', () => {
+    expect(STRONG_DROP_RATIO).toBe(0.2)
+  })
+
+  it('75 -> 40 kg ohne Grund: "restore" mit dem früheren Gewicht, kein Steigerungsvorschlag', () => {
+    const s = status(at(40), [at(75)])
+    expect(s).toMatchObject({ state: 'restore', weight: 40, previousWeight: 75, suggestion: null })
+    expect(rawGetWeightSuggestion(wadenpresse, at(40), 'hypertrophy', { previousSessions: [at(75)] })).toBeNull()
+  })
+
+  it('mit Notiz an der Übung, am Satz oder ausdrücklich bewusst: "rebuild" (gleiches Gewicht, dann schrittweise)', () => {
+    expect(status(at(40, [12, 12, 12], { note: 'Knie schonen' }), [at(75)]).state).toBe('rebuild')
+    expect(status({ setDetails: [{ reps: 12, weight: 40, done: true, notes: 'Erholungswoche' }, { reps: 12, weight: 40, done: true }, { reps: 12, weight: 40, done: true }] }, [at(75)]).state).toBe('rebuild')
+    expect(status(at(40), [at(75)], { deliberate: true }).state).toBe('rebuild')
+  })
+
+  it('genau 20 % zählt, knapp darunter nicht (dann wie bisher)', () => {
+    expect(status(at(80), [at(100)]).state).toBe('restore')
+    expect(status(at(81), [at(100)]).state).toBe('increase')
+  })
+
+  it('Gegenproben: leere Notiz, deliberate=false oder Truthy ohne true zählen nicht; mehr Gewicht, gleiches Gewicht und ohne Vorgänger sind kein Einbruch', () => {
+    expect(status(at(40, [12, 12, 12], { note: '   ' }), [at(75)]).state).toBe('restore')
+    expect(status(at(40), [at(75)], { deliberate: 'ja' }).state).toBe('restore')
+    expect(hasDeliberateNote({ note: '' })).toBe(false)
+    expect(hasDeliberateNote(null)).toBe(false)
+    for (const previous of [[at(30)], [at(40)], []]) expect(status(at(40), previous).state).not.toMatch(/restore|rebuild/)
+  })
+
+  it('Gegenprobe: Einheit davor mit anderer Trainingsart, Körpergewicht oder Pyramide gilt nicht als Vergleich', () => {
+    const strength = at(75, [5, 5, 5], { __workoutGoal: 'strength' })
+    expect(status(at(40), [strength]).state).not.toMatch(/restore|rebuild/)
+    expect(status(at(40), [{ setDetails: [{ reps: 12, weight: 0, done: true }] }])?.state ?? 'increase').not.toMatch(/restore|rebuild/)
+    expect(status(at(40), [{ setDetails: [{ reps: 12, weight: 60, done: true }, { reps: 10, weight: 70, done: true }, { reps: 8, weight: 80, done: true }] }])?.state ?? 'x').not.toMatch(/restore|rebuild/)
+  })
+
+  it('Gegenprobe: Übung ohne Gewicht-Ziel (Körpergewicht, Zeit) bekommt keine Einschätzung', () => {
+    expect(getProgressionStatus(crunch, at(40), 'hypertrophy', { previousSessions: [at(75)] })).toBeNull()
+    expect(getProgressionStatus({ ...wadenpresse, measureMode: 'time' }, at(40), 'hypertrophy', { previousSessions: [at(75)] })).toBeNull()
+  })
+})
+
