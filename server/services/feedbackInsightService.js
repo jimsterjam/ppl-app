@@ -12,6 +12,7 @@
  */
 
 import { logger } from '../utils/logger.js';
+import { logAiUsage } from '../utils/aiUsageLog.js';
 import { withAiRetry, parseJsonSafely } from '../utils/aiUtils.js';
 import { getCoachSystemPromptText } from './OpenAIProvider.js';
 import { createOpenAIClient, ensureRelayAwake, markRelayContact } from '../utils/aiClientFactory.js';
@@ -312,6 +313,7 @@ export async function generateInsightProposal(ratings, options = {}) {
   });
 
   markRelayContact();
+  logAiUsage('feedback-insight', response.usage, { model, requestId });
 
   const raw = response.choices?.[0]?.message?.content?.trim();
   const parsed = parseJsonSafely(raw, { requestId, context: 'feedback-insight' });

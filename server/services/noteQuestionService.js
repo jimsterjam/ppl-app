@@ -2,6 +2,7 @@
 // Ein zusätzlicher, kurzer KI-Aufruf - nur wenn die Notizen dieser Einheit eine Frage enthalten. Läuft über denselben
 // Relay-fähigen Client wie Feedback und Prüfer (utils/aiClientFactory.js) und zählt nicht zusätzlich gegen das Kontingent.
 import { logger } from '../utils/logger.js';
+import { logAiUsage } from '../utils/aiUsageLog.js';
 import { withAiRetry, parseJsonSafely } from '../utils/aiUtils.js';
 import { createOpenAIClient, ensureRelayAwake, markRelayContact } from '../utils/aiClientFactory.js';
 import { languageDirective } from '../utils/feedbackLocalization.js';
@@ -68,6 +69,7 @@ export async function answerNoteQuestions({ questions, structuredAnalysis, exerc
       response_format: { type: 'json_object' }
     }));
     if (!deps.client) markRelayContact();
+    logAiUsage('note-questions', response.usage, { model, requestId });
     const raw = response.choices?.[0]?.message?.content?.trim();
     const parsed = parseJsonSafely(raw, { requestId, context: 'note-questions' });
     return sanitizeNoteAnswers(parsed?.answers, questions, {

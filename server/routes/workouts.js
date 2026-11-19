@@ -10,6 +10,7 @@ import UserProfile from '../models/UserProfile.js';
 import FeedbackRating from '../models/FeedbackRating.js';
 import FeedbackQualitySignal from '../models/FeedbackQualitySignal.js';
 import { logger } from '../utils/logger.js';
+import { logAiUsage } from '../utils/aiUsageLog.js';
 import { isWorkoutEditWindowExpired } from '../utils/workoutEditWindow.js';
 import { getAIService } from '../services/aiService.js';
 import { requireAiConsent, requireAiConsentForAnswers } from '../middleware/requireAiConsent.js';
@@ -3026,6 +3027,7 @@ async function generateGPT4Suggestion(workoutContext, openaiClient, options = {}
   }));
 
   markRelayContact();
+  logAiUsage('ai-suggestion', completion?.usage, { model: 'gpt-4o-mini' });
 
   const response = completion?.choices?.[0]?.message?.content || '';
   const parsed = parseJsonSafely(response, { requestId, context: 'ai-suggestion' });
@@ -3101,6 +3103,7 @@ Fallback auf sinnvolle Standardwerte bei fehlenden Parametern.`
   }));
 
   markRelayContact();
+  logAiUsage('quick-generator', completion?.usage, { model: 'gpt-4o-mini', requestId });
 
   const raw = completion?.choices?.[0]?.message?.content || '{}';
   const parsed = parseJsonSafely(raw, { requestId, context: 'quick-generator' });
@@ -4533,6 +4536,7 @@ Generiere jetzt 45 ${category}-Übungen:`;
           timeout: 30000
         });
 
+        logAiUsage('admin-populate', completion?.usage, { model: 'gpt-4o-mini' });
         const responseText = completion.choices[0].message.content;
         logger.debug(`📝 KI-Response Länge: ${responseText.length} Zeichen`);
         

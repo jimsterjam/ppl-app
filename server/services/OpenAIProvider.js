@@ -8,6 +8,7 @@
 
 import { describeAthleteAnswer, ATHLETE_ANSWER_DIRECTIVE_LINES } from '../utils/athleteAnswers.js';
 import { logger } from '../utils/logger.js';
+import { logAiUsage } from '../utils/aiUsageLog.js';
 import AIProvider from './AIProvider.js';
 import { createOpenAIClient, describeAiClientMode, ensureRelayAwake, markRelayContact } from '../utils/aiClientFactory.js';
 import { withAiRetry } from '../utils/aiUtils.js';
@@ -542,6 +543,9 @@ export class OpenAIProvider extends AIProvider {
       }, {
         timeout: this.timeout
       }));
+
+      // Gleich nach dem (kostenpflichtigen) Aufruf, vor jeder Prüfung der Antwort: auch eine leere oder unbrauchbare Antwort kostet Token.
+      logAiUsage('coach', response.usage, { model: this.model, requestId });
 
       markRelayContact();
 
