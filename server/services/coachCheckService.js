@@ -1,6 +1,7 @@
 // Coach-Check (siehe utils/coachCheck.js): ein kurzer, eigener KI-Aufruf über denselben Relay-fähigen Client wie Feedback
 // und Notiz-Fragen (utils/aiClientFactory.js). Das Kontingent prüft und verbraucht der Aufrufer (routes/workouts.js).
 import { logger } from '../utils/logger.js';
+import { logAiUsage } from '../utils/aiUsageLog.js';
 import { withAiRetry, parseJsonSafely } from '../utils/aiUtils.js';
 import { createOpenAIClient, ensureRelayAwake, markRelayContact } from '../utils/aiClientFactory.js';
 import { languageDirective } from '../utils/feedbackLocalization.js';
@@ -55,6 +56,7 @@ export async function runCoachCheck({ workout, language = 'de', requestId = 'coa
       response_format: { type: 'json_object' }
     }));
     if (!deps.client) markRelayContact();
+    logAiUsage('coach-check', response.usage, { model, requestId });
     const raw = response.choices?.[0]?.message?.content?.trim();
     return sanitizeCoachCheck(parseJsonSafely(raw, { requestId, context: 'coach-check' }), data, language === 'en' ? 'en' : 'de');
   } catch (error) {

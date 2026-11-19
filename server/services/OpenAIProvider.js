@@ -8,6 +8,7 @@
 
 import { describeAthleteAnswer, ATHLETE_ANSWER_DIRECTIVE_LINES } from '../utils/athleteAnswers.js';
 import { logger } from '../utils/logger.js';
+import { logAiUsage } from '../utils/aiUsageLog.js';
 import AIProvider from './AIProvider.js';
 import { createOpenAIClient, describeAiClientMode, ensureRelayAwake, markRelayContact } from '../utils/aiClientFactory.js';
 import { withAiRetry } from '../utils/aiUtils.js';
@@ -556,6 +557,7 @@ export class OpenAIProvider extends AIProvider {
         throw new Error('OpenAI returned empty response');
       }
 
+      logAiUsage('coach', response.usage, { model: this.model, requestId });
       logger.debug('✅ OpenAI request completed', {
         requestId,
         model: this.model,

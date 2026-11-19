@@ -27,6 +27,7 @@
  */
 
 import { logger } from '../utils/logger.js';
+import { logAiUsage } from '../utils/aiUsageLog.js';
 import { withAiRetry, parseJsonSafely } from '../utils/aiUtils.js';
 import { createOpenAIClient, ensureRelayAwake, markRelayContact } from '../utils/aiClientFactory.js';
 import { getCoachSystemPromptText } from './OpenAIProvider.js';
@@ -646,6 +647,7 @@ export async function verifyFeedbackWithAI(structuredAnalysis, feedbackText, opt
   });
 
   markRelayContact();
+  logAiUsage('verifier', response.usage, { model, requestId });
 
   const raw = response.choices?.[0]?.message?.content?.trim();
   if (typeof onRawResponse === 'function') {
@@ -843,6 +845,7 @@ export async function reviseFeedback(structuredAnalysis, feedbackText, violation
   }));
 
   markRelayContact();
+  logAiUsage('revision', response.usage, { model, requestId });
 
   const revised = response.choices?.[0]?.message?.content?.trim();
   if (!revised) {
