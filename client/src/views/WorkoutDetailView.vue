@@ -2960,6 +2960,8 @@ function progressionHintText(index) {
     ? { next: formatKg(status.suggestion?.suggestedWeights?.[0] ?? status.weight), weight: formatKg(status.weight), reps: status.targetReps, sets: status.sets, done: status.totalReps, total: status.targetTotal, missing: status.missingReps, nextReps: status.nextReps, min: status.min, max: status.max, minReps: status.minReps }
     : null
   // Bereich 8-12: "3x12 geschafft" statt "3x12" aus dem Ziel - Wiederholungen = erreichte Zahl.
+  if (status?.state === 'restore') return t('workoutDetail.progressionRestore', { ...params, last: formatKg(status.previousWeight) })
+  if (status?.state === 'rebuild') return t('workoutDetail.progressionRebuild', params)
   if (status?.state === 'increase' && status.aboveScheme) return t('workoutDetail.weightSuggestionReasonAbove', params)
   if (status?.state === 'increase') return t('workoutDetail.weightSuggestionReason', { ...params, reps: status.mode === 'range' ? status.max : status.targetReps })
   if (status?.state === 'climb' && status.belowRange) return t('workoutDetail.progressionBelowRange', params)
