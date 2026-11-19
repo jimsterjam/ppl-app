@@ -544,6 +544,9 @@ export class OpenAIProvider extends AIProvider {
         timeout: this.timeout
       }));
 
+      // Gleich nach dem (kostenpflichtigen) Aufruf, vor jeder Prüfung der Antwort: auch eine leere oder unbrauchbare Antwort kostet Token.
+      logAiUsage('coach', response.usage, { model: this.model, requestId });
+
       markRelayContact();
 
       // Aufzählungszeilen in Workout-Reihenfolge bringen (User-Report: Zusammenfassung begann mit
@@ -557,7 +560,6 @@ export class OpenAIProvider extends AIProvider {
         throw new Error('OpenAI returned empty response');
       }
 
-      logAiUsage('coach', response.usage, { model: this.model, requestId });
       logger.debug('✅ OpenAI request completed', {
         requestId,
         model: this.model,

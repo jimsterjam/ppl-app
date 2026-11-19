@@ -2,6 +2,7 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
 import { summarizeAiUsage, logAiUsage } from '../aiUsageLog.js'
 import { runCoachCheck } from '../../services/coachCheckService.js'
+import OpenAIProvider from '../../services/OpenAIProvider.js'
 
 const usageWithCache = { prompt_tokens: 10400, completion_tokens: 220, total_tokens: 10620, prompt_tokens_details: { cached_tokens: 9984 } }
 
@@ -19,6 +20,16 @@ describe('summarizeAiUsage', () => {
     const summary = summarizeAiUsage({ prompt_tokens: 2000, prompt_tokens_details: { cached_tokens: 0 } })
     assert.equal(summary.cachedTokens, 0)
     assert.equal(summary.cachedShare, 0)
+  })
+  it('Gegenprobe: null, leerer Text, false und true sind unbekannt (null), nie 0 - sonst sähe "unbekannt" wie "kein Treffer" aus', () => {
+    for (const bad of [null, undefined, '', ' ', false, true, '123', [], {}]) {
+      const summary = summarizeAiUsage({ prompt_tokens: 1000, prompt_tokens_details: { cached_tokens: bad }, completion_tokens: bad })
+      assert.equal(summary.cachedTokens, null, `cached ${JSON.stringify(bad)}`)
+      assert.equal(summary.cachedShare, null, `Anteil ${JSON.stringify(bad)}`)
+      assert.equal(summary.completionTokens, null, `completion ${JSON.stringify(bad)}`)
+    }
+    assert.equal(summarizeAiUsage({ prompt_tokens: null }).promptTokens, null)
+    assert.equal(summarizeAiUsage({ prompt_tokens: 0, prompt_tokens_details: { cached_tokens: 0 } }).cachedTokens, 0)
   })
   it('Gegenprobe: ungültige Werte werden zu null, nie zu NaN oder Text; Anteil höchstens 1', () => {
     assert.equal(summarizeAiUsage(null), null)
@@ -92,3 +103,23 @@ describe('Dienst schreibt die Zeile', () => {
     assert.equal(parsed.cachedTokens, 9984)
   })
 })
+
+// Auch eine unbrauchbare (leere) Antwort kostet Token: die Zeile muss VOR der Antwortprüfung stehen (Copilot-Review #203).
+describe('Coach-Entwurf', () => {
+  it('schreibt die Zeile auch dann, wenn die Antwort leer ist und der Aufruf danach scheitert', async () => {
+    const lines = []
+    const original = console.log
+    console.log = (...args) => lines.push(args.join(' '))
+    const provider = new OpenAIProvider({ apiKey: 'test-key' })
+    provider.client = { chat: { completions: { create: async () => ({ choices: [{ message: { content: '' } }], usage: usageWithCache }) } } }
+    try {
+      await assert.rejects(() => provider.generateTrainingAnalysis({ total_exercises_analyzed: 0, exercises: [] }, { requestId: 'req_leer' }), /empty response/)
+    } finally {
+      console.log = original
+    }
+    const usageLines = lines.filter((line) => line.startsWith('[ai-usage]'))
+    assert.equal(usageLines.length, 1)
+    assert.equal(JSON.parse(usageLines[0].slice('[ai-usage] '.length)).call, 'coach')
+  })
+})
+

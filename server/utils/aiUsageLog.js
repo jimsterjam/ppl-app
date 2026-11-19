@@ -8,9 +8,10 @@
 // Logger gibt in Production nur warn/error aus). Abschalten: Umgebungsvariable AI_USAGE_LOG=0.
 // In Render: Logs von `ppl-app-server`, Suche nach `[ai-usage]`.
 
+// Nur echte nichtnegative Zahlen zählen. Alles andere (null, '', false, Text, Objekte) bleibt "unbekannt" (null): Number(null) und
+// Number('') wären 0 und sähen sonst wie "kein Treffer im Zwischenspeicher" aus (Copilot-Review #203).
 function count(value) {
-  const number = Number(value)
-  return Number.isFinite(number) && number >= 0 ? Math.round(number) : null
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.round(value) : null
 }
 
 /**
