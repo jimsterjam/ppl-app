@@ -20,6 +20,8 @@ const DE = {
   deltaRepsLess: '{n} Wiederholungen weniger geschafft',
   deltaRepsMoreInSet: '{n} Wdh. mehr (Satz {sets})',
   deltaRepsLessInSet: '{n} Wdh. weniger (Satz {sets})',
+  deltaSetOneMore: '1 Satz mehr gemacht',
+  deltaSetOneLess: '1 Satz weniger gemacht',
   deltaSetsMore: '{n} Sätze mehr gemacht',
   deltaSetsLess: '{n} Sätze weniger gemacht',
   deltaSuffixWeightChanged: 'bei gleicher Satz- und Wiederholungszahl',
@@ -81,7 +83,7 @@ describe('buildDeltaSentence', () => {
     expect(buildDeltaSentence({ weight_change_scope: 'partial', weight_change_kg: 4, weight_change_set_numbers: [1] }, t, fmt))
       .toBe('4 kg mehr gestemmt (Satz 1), bei gleicher Satz- und Wiederholungszahl – eine klare Steigerung.')
     expect(buildDeltaSentence({ weight_change_scope: 'mixed', top_weight_kg: 60, top_weight_change_kg: 0, volume_change_percent: 12, reps_change: 3, sets_change: 1 }, t, fmt))
-      .toBe('schwerster Satz gleich (60 kg), insgesamt 12 % mehr Gewicht bewegt und 3 Wiederholungen mehr geschafft und 1 Sätze mehr gemacht – eine klare Steigerung.')
+      .toBe('schwerster Satz gleich (60 kg), insgesamt 12 % mehr Gewicht bewegt und 3 Wiederholungen mehr geschafft und 1 Satz mehr gemacht – eine klare Steigerung.')
     expect(buildDeltaSentence({}, t, fmt)).toBe('Keine Veränderung zur letzten Session.')
   })
 })
@@ -131,7 +133,7 @@ describe('buildDeltaSentence: Wiederholungen je Satz', () => {
 
   it('zusätzlicher Satz verändert nur die Summe -> Gesamt-Differenz und Satzzahl bleiben sichtbar', () => {
     const item = { weight_change_scope: 'none', reps_change: 5, sets_change: 1, reps_set_changes: [] }
-    expect(buildDeltaSentence(item, t, fmt)).toBe('5 Wiederholungen mehr geschafft und 1 Sätze mehr gemacht, bei gleichem Gewicht – eine klare Steigerung.')
+    expect(buildDeltaSentence(item, t, fmt)).toBe('5 Wiederholungen mehr geschafft und 1 Satz mehr gemacht, bei gleichem Gewicht – eine klare Steigerung.')
   })
 
   describe('mehr Gewicht, leicht weniger Wiederholungen (Absprache Jimmy 29.10.)', () => {
@@ -185,7 +187,7 @@ describe('buildDeltaSentence: Zeit-Übungen', () => {
   })
 
   it('Zeit halten: kürzer gehalten ist keine Steigerung; nur Sekunden ohne Sätze', () => {
-    expect(buildDeltaSentence({ measure_mode: 'time', time_change_seconds: -20, sets_change: 1 }, t, fmt)).toBe('20 Sek. kürzer gehalten und 1 Sätze mehr gemacht.')
+    expect(buildDeltaSentence({ measure_mode: 'time', time_change_seconds: -20, sets_change: 1 }, t, fmt)).toBe('20 Sek. kürzer gehalten und 1 Satz mehr gemacht.')
     expect(buildDeltaSentence({ measure_mode: 'time', time_change_seconds: 90 }, t, fmt)).toBe('1 Min. 30 Sek. länger gehalten – eine klare Steigerung.')
   })
 
@@ -204,5 +206,11 @@ describe('buildDeltaSentence: Zeit-Übungen', () => {
   it('Gegenprobe: ohne Messart (Gewicht) bleibt der Satz mit Gewicht und Nachsatz', () => {
     const item = { reps_change: 20, sets_change: 2, weight_change_kg: 0 }
     expect(buildDeltaSentence(item, t, fmt)).toBe('20 Wiederholungen mehr geschafft und 2 Sätze mehr gemacht, bei gleichem Gewicht – eine klare Steigerung.')
+  })
+
+  it('Eine Satzänderung steht im Singular, mehrere im Plural (auch ohne Messart)', () => {
+    expect(buildDeltaSentence({ measure_mode: 'time', sets_change: -1 }, t, fmt)).toBe('1 Satz weniger gemacht.')
+    expect(buildDeltaSentence({ sets_change: -1 }, t, fmt)).toContain('1 Satz weniger gemacht')
+    expect(buildDeltaSentence({ measure_mode: 'time', sets_change: 3 }, t, fmt)).toContain('3 Sätze mehr gemacht')
   })
 })

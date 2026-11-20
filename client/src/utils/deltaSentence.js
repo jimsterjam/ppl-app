@@ -122,7 +122,7 @@ export function buildDeltaSentence(item = {}, t, fmt) {
   if (weightClauses.length) parts.push(weightClauses.join(', '))
   if (repsClauses.length) parts.push(repsClauses.join(', '))
   if (setsChange !== 0) {
-    parts.push(t(setsChange > 0 ? 'feedbackHistory.deltaSetsMore' : 'feedbackHistory.deltaSetsLess', { n: fmt(setsChange) }))
+    parts.push(setsPhrase(setsChange, t, fmt))
     signals.push(setsChange)
   }
 
@@ -164,7 +164,7 @@ function buildTimedSentence(item, t, fmt) {
     signals.push(seconds)
   }
   if (setsChange !== 0) {
-    parts.push(t(setsChange > 0 ? 'feedbackHistory.deltaSetsMore' : 'feedbackHistory.deltaSetsLess', { n: fmt(setsChange) }))
+    parts.push(setsPhrase(setsChange, t, fmt))
     signals.push(setsChange)
   }
   if (!parts.length) return t('feedbackHistory.deltaNoChange')
@@ -179,6 +179,12 @@ export function formatDuration(totalSeconds, t, fmt) {
   if (minutes === 0) return t('feedbackHistory.deltaDurationSec', { n: fmt(rest) })
   if (rest === 0) return t('feedbackHistory.deltaDurationMin', { m: fmt(minutes) })
   return t('feedbackHistory.deltaDurationMinSec', { m: fmt(minutes), s: fmt(rest) })
+}
+
+// "1 Satz mehr gemacht" statt "1 Sätze mehr gemacht"
+function setsPhrase(setsChange, t, fmt) {
+  if (Math.abs(setsChange) === 1) return t(setsChange > 0 ? 'feedbackHistory.deltaSetOneMore' : 'feedbackHistory.deltaSetOneLess')
+  return t(setsChange > 0 ? 'feedbackHistory.deltaSetsMore' : 'feedbackHistory.deltaSetsLess', { n: fmt(setsChange) })
 }
 
 // Gleiche Änderung zusammenfassen: [{set_number:1,change:1},{set_number:2,change:1},{set_number:7,change:-1}]

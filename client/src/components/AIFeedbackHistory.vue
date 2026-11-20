@@ -392,7 +392,12 @@ async function shareFeedback(item) {
   // schlägt die Erzeugung fehl, bleibt es beim bisherigen Text-Only-Share, kein Fehler sichtbar.
   const imageUri = await generateFeedbackShareImage(item, {
     dateLabel,
-    footerText: t('feedbackHistory.shareFooter')
+    footerText: t('feedbackHistory.shareFooter'),
+    units: {
+      sets: t('feedbackHistory.shareUnitSets'),
+      reps: t('feedbackHistory.shareUnitReps'),
+      seconds: t('feedbackHistory.shareUnitSeconds')
+    }
   }).catch((err) => {
     logger.debug('[AIFeedbackHistory] Share-Bild-Erzeugung fehlgeschlagen', err?.message)
     return null

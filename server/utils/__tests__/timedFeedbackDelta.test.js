@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert/strict'
-import { analyzeExercise, withoutUnusedMeasureFields, timeChangeSeconds, timedSnapshotFields, resolveRepsSetChanges, resolveSatzgenauWeightChange } from '../../services/trainingAnalysisService.js'
+import { compareTimedExercise, analyzeExercise, withoutUnusedMeasureFields, timeChangeSeconds, timedSnapshotFields, resolveRepsSetChanges, resolveSatzgenauWeightChange } from '../../services/trainingAnalysisService.js'
 
 // Fund Jimmy 20.11.: "Handhop Position Hold" (Zeit halten) stand im Feedback als "20 Wiederholungen mehr und 2 Sätze mehr, bei gleichem
 // Gewicht". In den Sätzen standen Wdh./kg, die der Nutzer nie gesehen hat (Standard 10 Wdh./0 kg), Zähler und Gewicht gehören dort nicht hin.
@@ -67,5 +67,15 @@ describe('Zeit halten: keine Wiederholungen und kein Gewicht in der Auswertung',
     const normal = { name: 'x', setDetails: [{ reps: 5, weight: 50 }] }
     assert.equal(withoutUnusedMeasureFields(normal), normal)
     assert.equal(withoutUnusedMeasureFields(null), null)
+  })
+
+  it('Gegenprobe: frühere Session in anderer Messart liefert keinen Zeitvergleich (alte durationSeconds bleiben stehen)', () => {
+    const staleWeight = { name: 'x', setDetails: [{ reps: 8, weight: 20, durationSeconds: 30, done: true }] }
+    const staleRepsTime = { name: 'x', measureMode: 'repsTime', setDetails: [{ reps: 8, weight: 0, durationSeconds: 30, done: true }] }
+    assert.equal(timeChangeSeconds(timed([60]), staleWeight), null)
+    assert.equal(timeChangeSeconds(timed([60]), staleRepsTime), null)
+    assert.equal(compareTimedExercise(timed([60]), staleWeight), null)
+    assert.equal(compareTimedExercise(timed([60]), staleRepsTime), null)
+    assert.equal(compareTimedExercise(timed([60]), timed([30])), 'more')
   })
 })

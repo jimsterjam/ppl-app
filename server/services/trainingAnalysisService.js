@@ -359,7 +359,8 @@ export function withoutUnusedMeasureFields(exercise) {
 
 /** Zeitänderung (Sekunden) einer "Zeit halten"-Übung gegenüber der letzten Session, sonst null (kein Vergleich möglich). */
 export function timeChangeSeconds(currentEx, previousEx) {
-  if (getMeasureMode(currentEx) !== 'time' || !previousEx) return null;
+  // Nur gegen eine frühere Zeit-Session vergleichen: nach einem Wechsel der Messart bleiben alte durationSeconds stehen.
+  if (getMeasureMode(currentEx) !== 'time' || getMeasureMode(previousEx) !== 'time') return null;
   const before = totalSeconds(previousEx);
   if (!before) return null;
   return totalSeconds(currentEx) - before;
@@ -377,7 +378,7 @@ export function timedSnapshotFields(analysis) {
 /** Zeit-/Wiederholungsverlauf einer Zeit-Übung gegenüber der letzten Session: 'more' | 'less' | 'same' | null (kein Vergleich). */
 export function compareTimedExercise(currentEx, previousEx) {
   const mode = getMeasureMode(currentEx);
-  if (!mode || !previousEx) return null;
+  if (!mode || getMeasureMode(previousEx) !== mode) return null;
   const pick = mode === 'time' ? totalSeconds : totalReps;
   const now = pick(currentEx);
   const before = pick(previousEx);

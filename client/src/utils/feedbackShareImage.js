@@ -102,7 +102,11 @@ function formatSigned(value) {
  * @returns {Promise<string|null>} file://-URI des erzeugten PNGs, oder null bei Fehler
  */
 export async function generateFeedbackShareImage(item, options = {}) {
-  const { dateLabel = '', footerText = 'ppl', brandLabel = 'ppl' } = options
+  const { dateLabel = '', footerText = 'ppl', brandLabel = 'ppl', units = {} } = options
+  // Einheiten kommen übersetzt vom Aufrufer (Share-Bild folgt der App-Sprache).
+  const unitSets = units.sets || 'sets'
+  const unitReps = units.reps || 'reps'
+  const unitSeconds = units.seconds || 'sec'
 
   try {
     if (typeof document === 'undefined') return null
@@ -173,7 +177,8 @@ export async function generateFeedbackShareImage(item, options = {}) {
         // Zeit halten: nur Sätze und Sekunden; Wiederholungen in Zeit: ohne kg (siehe deltaSentence.js).
         const isTimed = row.measure_mode === 'time'
         const noWeight = isTimed || row.measure_mode === 'repsTime'
-        const secondsChange = Number(row.time_change_seconds) || 0
+        const hasSeconds = typeof row.time_change_seconds === 'number'
+        const secondsChange = hasSeconds ? row.time_change_seconds : 0
         const primaryChange = isTimed ? (secondsChange !== 0 ? secondsChange : setsChange) : (weightChange !== 0 && !noWeight ? weightChange : (setsChange !== 0 ? setsChange : repsChange))
         const isUp = primaryChange > 0
         const isDown = primaryChange < 0
@@ -181,8 +186,8 @@ export async function generateFeedbackShareImage(item, options = {}) {
         const chipBg = isUp ? COLORS.infoBg : isDown ? COLORS.warningBg : 'rgba(255,255,255,0.08)'
 
         const label = isTimed
-          ? `${row.exercise} · ${formatSigned(setsChange)} Sätze · ${formatSigned(secondsChange)} Sek.`
-          : `${row.exercise} · ${formatSigned(setsChange)} Sätze · ${formatSigned(repsChange)} Wdh.${noWeight ? '' : ` · ${formatSigned(weightChange)} kg`}`
+          ? `${row.exercise} · ${formatSigned(setsChange)} ${unitSets}${hasSeconds ? ` · ${formatSigned(secondsChange)} ${unitSeconds}` : ''}`
+          : `${row.exercise} · ${formatSigned(setsChange)} ${unitSets} · ${formatSigned(repsChange)} ${unitReps}${noWeight ? '' : ` · ${formatSigned(weightChange)} kg`}`
         const maxChipWidth = CARD_WIDTH - marginX * 2
         const textWidth = Math.min(ctx.measureText(label).width, maxChipWidth - 48)
         const chipHeight = 58
