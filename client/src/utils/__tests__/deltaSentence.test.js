@@ -30,7 +30,12 @@ const DE = {
   deltaSuffixOnlySetsUnchanged: 'bei gleicher Satzzahl',
   deltaImprovement: 'eine klare Steigerung',
   deltaNormalDrop: 'bei mehr Gewicht ganz normal',
-  deltaAnd: 'und'
+  deltaAnd: 'und',
+  deltaTimeMore: '{time} länger gehalten',
+  deltaTimeLess: '{time} kürzer gehalten',
+  deltaDurationSec: '{n} Sek.',
+  deltaDurationMin: '{m} Min.',
+  deltaDurationMinSec: '{m} Min. {s} Sek.'
 }
 const t = (key, params = {}) => DE[key.replace('feedbackHistory.', '')].replace(/\{(\w+)\}/g, (_, k) => params[k])
 const fmt = (v) => String(Math.round(Math.abs(v) * 10) / 10).replace('.', ',')
@@ -167,5 +172,37 @@ describe('buildDeltaSentence: Wiederholungen je Satz', () => {
       const sameTop = { weight_change_scope: 'mixed', top_weight_kg: 100, top_weight_change_kg: 0, volume_change_percent: -4 }
       expect(buildDeltaSentence(sameTop, t, fmt)).toContain('weniger Gewicht bewegt')
     })
+  })
+})
+
+// Fund Jimmy 20.11.: "Handhop Position Hold" (Zeit halten) stand als "20 Wiederholungen mehr und 2 Sätze mehr, bei gleichem Gewicht".
+describe('buildDeltaSentence: Zeit-Übungen', () => {
+  it('Zeit halten: nur Zeit und Sätze, nie Wiederholungen oder Gewicht', () => {
+    const item = { measure_mode: 'time', time_change_seconds: 60, sets_change: 2, reps_change: 20, weight_change_kg: 0, weight_change_scope: 'uniform' }
+    const sentence = buildDeltaSentence(item, t, fmt)
+    expect(sentence).toBe('1 Min. länger gehalten und 2 Sätze mehr gemacht – eine klare Steigerung.')
+    expect(sentence).not.toMatch(/Wiederholung|Wdh|Gewicht|kg/)
+  })
+
+  it('Zeit halten: kürzer gehalten ist keine Steigerung; nur Sekunden ohne Sätze', () => {
+    expect(buildDeltaSentence({ measure_mode: 'time', time_change_seconds: -20, sets_change: 1 }, t, fmt)).toBe('20 Sek. kürzer gehalten und 1 Sätze mehr gemacht.')
+    expect(buildDeltaSentence({ measure_mode: 'time', time_change_seconds: 90 }, t, fmt)).toBe('1 Min. 30 Sek. länger gehalten – eine klare Steigerung.')
+  })
+
+  it('Zeit halten ohne Änderung oder ohne Zeitvergleich: keine Veränderung', () => {
+    expect(buildDeltaSentence({ measure_mode: 'time', time_change_seconds: 0, reps_change: 20 }, t, fmt)).toBe('Keine Veränderung zur letzten Session.')
+    expect(buildDeltaSentence({ measure_mode: 'time', reps_change: 20 }, t, fmt)).toBe('Keine Veränderung zur letzten Session.')
+  })
+
+  it('Wiederholungen in Zeit: Wiederholungen ja, Gewicht und Gewichts-Nachsatz nein', () => {
+    const item = { measure_mode: 'repsTime', reps_change: 4, reps_set_changes: [{ set_number: 1, change: 2 }, { set_number: 2, change: 2 }], weight_change_kg: 5, weight_change_scope: 'uniform' }
+    const sentence = buildDeltaSentence(item, t, fmt)
+    expect(sentence).toBe('2 Wdh. mehr (Satz 1 und 2) – eine klare Steigerung.')
+    expect(sentence).not.toMatch(/Gewicht|kg|gestemmt/)
+  })
+
+  it('Gegenprobe: ohne Messart (Gewicht) bleibt der Satz mit Gewicht und Nachsatz', () => {
+    const item = { reps_change: 20, sets_change: 2, weight_change_kg: 0 }
+    expect(buildDeltaSentence(item, t, fmt)).toBe('20 Wiederholungen mehr geschafft und 2 Sätze mehr gemacht, bei gleichem Gewicht – eine klare Steigerung.')
   })
 })

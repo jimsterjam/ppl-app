@@ -277,6 +277,9 @@ const workoutSchema = new mongoose.Schema({
     // Wiederholungsänderung je Satz (nur Sätze mit Änderung != 0), siehe resolveRepsSetChanges.
     // Fehlt bei älteren Einträgen -> die App fällt auf die Gesamt-Differenz (reps_change) zurück.
     reps_set_changes: [{ _id: false, set_number: Number, change: Number }],
+    // Zeit-Übungen ('time' = Zeit halten, 'repsTime' = Wdh. in fester Zeit): Wdh./kg zählen dort nicht, die App zeigt Sekunden.
+    measure_mode: { type: String, enum: ['time', 'repsTime'] },
+    time_change_seconds: { type: Number },
     is_first_session: { type: Boolean, default: false },
     // Nur gesetzt, wenn die Übung eine tatsächlich auffällige Veränderung zeigt (siehe
     // routes/workouts.js) - "history" enthält dann bis zu 4 Volumen-Werte (älteste zuerst,

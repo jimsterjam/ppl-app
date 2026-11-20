@@ -1270,6 +1270,11 @@ export const messages = {
       // Sätze, damit eine Änderung nie dem falschen Satz zugeordnet wird.
       deltaRepsMoreInSet: '{n} Wdh. mehr (Satz {sets})',
       deltaRepsLessInSet: '{n} Wdh. weniger (Satz {sets})',
+      deltaTimeMore: '{time} länger gehalten',
+      deltaTimeLess: '{time} kürzer gehalten',
+      deltaDurationSec: '{n} Sek.',
+      deltaDurationMin: '{m} Min.',
+      deltaDurationMinSec: '{m} Min. {s} Sek.',
       deltaSetsMore: '{n} Sätze mehr gemacht',
       deltaSetsLess: '{n} Sätze weniger gemacht',
       // Nachsätze für den Fall, dass nur EIN Wert sich verändert hat - benennen explizit, dass
@@ -3108,6 +3113,11 @@ export const messages = {
       deltaRepsLess: 'did {n} fewer reps',
       deltaRepsMoreInSet: 'reps +{n} (set {sets})',
       deltaRepsLessInSet: 'reps −{n} (set {sets})',
+      deltaTimeMore: 'held {time} longer',
+      deltaTimeLess: 'held {time} shorter',
+      deltaDurationSec: '{n} sec',
+      deltaDurationMin: '{m} min',
+      deltaDurationMinSec: '{m} min {s} sec',
       deltaSetsMore: 'did {n} more sets',
       deltaSetsLess: 'did {n} fewer sets',
       deltaSuffixWeightChanged: 'with the same number of sets and reps',

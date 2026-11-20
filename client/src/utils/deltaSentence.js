@@ -34,13 +34,17 @@ export const VOLUME_MENTION_MIN_PERCENT = 1
  * @param {(value:number)=>string} fmt - Zahl formatieren (Betrag, Locale)
  */
 export function buildDeltaSentence(item = {}, t, fmt) {
+  // Zeit halten: nur Zeit und Sätze, nie Wiederholungen oder Gewicht (auch nicht "bei gleichem Gewicht").
+  if (item.measure_mode === 'time') return buildTimedSentence(item, t, fmt)
+  // Wiederholungen in Zeit: Gewicht gibt es dort nicht.
+  const noWeight = item.measure_mode === 'repsTime'
   const setsChange = Number(item.sets_change) || 0
   const repsChange = Number(item.reps_change) || 0
-  const weightChangeKg = Number(item.weight_change_kg) || 0
-  const scope = item.weight_change_scope || 'unknown'
+  const weightChangeKg = noWeight ? 0 : Number(item.weight_change_kg) || 0
+  const scope = noWeight ? 'unknown' : item.weight_change_scope || 'unknown'
   const setNumbers = Array.isArray(item.weight_change_set_numbers) ? item.weight_change_set_numbers : []
   const volumePct = Number(item.volume_change_percent) || 0
-  const hasTop = typeof item.top_weight_kg === 'number'
+  const hasTop = !noWeight && typeof item.top_weight_kg === 'number'
   const topChange = Number(item.top_weight_change_kg) || 0
 
   // null = älterer Eintrag ohne Satz-Daten zu den Wiederholungen
@@ -127,7 +131,10 @@ export function buildDeltaSentence(item = {}, t, fmt) {
   // Nachsatz: was gleich geblieben ist (nach Kategorien Gewicht / Wdh. / Sätze).
   const changedCount = [weightChanged, repsChanged, setsChange !== 0].filter(Boolean).length
   let suffix = ''
-  if (changedCount === 1) {
+  // Ohne Gewicht (Wdh. in Zeit) passt keiner der Nachsätze, sie nennen alle Gewicht.
+  if (noWeight) {
+    suffix = ''
+  } else if (changedCount === 1) {
     if (weightChanged) suffix = t('feedbackHistory.deltaSuffixWeightChanged')
     else if (repsChanged) suffix = t('feedbackHistory.deltaSuffixRepsChanged')
     else suffix = t('feedbackHistory.deltaSuffixSetsChanged')
@@ -144,6 +151,34 @@ export function buildDeltaSentence(item = {}, t, fmt) {
   else if (normalDrop) sentence += ` – ${t('feedbackHistory.deltaNormalDrop')}.`
   else sentence += '.'
   return sentence
+}
+
+// Zeit halten: "30 Sek. länger gehalten und 2 Sätze mehr gemacht". Ohne Zeitvergleich (frühere Session ohne Zeiten) nur die Sätze.
+function buildTimedSentence(item, t, fmt) {
+  const setsChange = Number(item.sets_change) || 0
+  const seconds = typeof item.time_change_seconds === 'number' ? Math.round(item.time_change_seconds) : 0
+  const parts = []
+  const signals = []
+  if (seconds !== 0) {
+    parts.push(t(seconds > 0 ? 'feedbackHistory.deltaTimeMore' : 'feedbackHistory.deltaTimeLess', { time: formatDuration(Math.abs(seconds), t, fmt) }))
+    signals.push(seconds)
+  }
+  if (setsChange !== 0) {
+    parts.push(t(setsChange > 0 ? 'feedbackHistory.deltaSetsMore' : 'feedbackHistory.deltaSetsLess', { n: fmt(setsChange) }))
+    signals.push(setsChange)
+  }
+  if (!parts.length) return t('feedbackHistory.deltaNoChange')
+  const improvement = signals.every((v) => v > 0)
+  return `${parts.join(` ${t('feedbackHistory.deltaAnd')} `)}${improvement ? ` – ${t('feedbackHistory.deltaImprovement')}` : ''}.`
+}
+
+// 45 -> "45 Sek.", 90 -> "1 Min. 30 Sek.", 120 -> "2 Min."
+export function formatDuration(totalSeconds, t, fmt) {
+  const minutes = Math.floor(totalSeconds / 60)
+  const rest = totalSeconds % 60
+  if (minutes === 0) return t('feedbackHistory.deltaDurationSec', { n: fmt(rest) })
+  if (rest === 0) return t('feedbackHistory.deltaDurationMin', { m: fmt(minutes) })
+  return t('feedbackHistory.deltaDurationMinSec', { m: fmt(minutes), s: fmt(rest) })
 }
 
 // Gleiche Änderung zusammenfassen: [{set_number:1,change:1},{set_number:2,change:1},{set_number:7,change:-1}]

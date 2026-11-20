@@ -170,13 +170,19 @@ export async function generateFeedbackShareImage(item, options = {}) {
         const weightChange = Number(row.weight_change_kg) || 0
         const setsChange = Number(row.sets_change) || 0
         const repsChange = Number(row.reps_change) || 0
-        const primaryChange = weightChange !== 0 ? weightChange : (setsChange !== 0 ? setsChange : repsChange)
+        // Zeit halten: nur Sätze und Sekunden; Wiederholungen in Zeit: ohne kg (siehe deltaSentence.js).
+        const isTimed = row.measure_mode === 'time'
+        const noWeight = isTimed || row.measure_mode === 'repsTime'
+        const secondsChange = Number(row.time_change_seconds) || 0
+        const primaryChange = isTimed ? (secondsChange !== 0 ? secondsChange : setsChange) : (weightChange !== 0 && !noWeight ? weightChange : (setsChange !== 0 ? setsChange : repsChange))
         const isUp = primaryChange > 0
         const isDown = primaryChange < 0
         const chipColor = isUp ? COLORS.info : isDown ? COLORS.warning : COLORS.muted
         const chipBg = isUp ? COLORS.infoBg : isDown ? COLORS.warningBg : 'rgba(255,255,255,0.08)'
 
-        const label = `${row.exercise} · ${formatSigned(setsChange)} Sätze · ${formatSigned(repsChange)} Wdh. · ${formatSigned(weightChange)} kg`
+        const label = isTimed
+          ? `${row.exercise} · ${formatSigned(setsChange)} Sätze · ${formatSigned(secondsChange)} Sek.`
+          : `${row.exercise} · ${formatSigned(setsChange)} Sätze · ${formatSigned(repsChange)} Wdh.${noWeight ? '' : ` · ${formatSigned(weightChange)} kg`}`
         const maxChipWidth = CARD_WIDTH - marginX * 2
         const textWidth = Math.min(ctx.measureText(label).width, maxChipWidth - 48)
         const chipHeight = 58

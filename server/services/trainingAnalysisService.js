@@ -340,6 +340,40 @@ function totalReps(exercise) {
     .reduce((sum, set) => sum + (Number(set.reps) || 0), 0);
 }
 
+/**
+ * Zeit-Übungen haben kein Gewicht, "Zeit halten" auch keine Wiederholungen. In den Sätzen können trotzdem Werte stehen, die der
+ * Nutzer nie gesehen hat (Standardwerte 10 Wdh./0 kg einer neu hinzugefügten Übung, Rest aus der Zeit vor einem Wechsel der Messart).
+ * Für die Auswertung zählen sie nicht: sonst steht im Feedback "20 Wiederholungen mehr bei gleichem Gewicht" (Fund Jimmy 20.11.).
+ * Gibt eine Kopie ohne diese Felder zurück (Zeit halten: ohne Wdh. und kg, Wiederholungen in Zeit: ohne kg); andere Übungen unverändert.
+ */
+export function withoutUnusedMeasureFields(exercise) {
+  const mode = getMeasureMode(exercise);
+  if (!mode || !Array.isArray(exercise?.setDetails)) return exercise;
+  return {
+    ...exercise,
+    setDetails: exercise.setDetails.map((set) => (set
+      ? { ...set, weight: 0, ...(mode === 'time' ? { reps: 0 } : {}) }
+      : set))
+  };
+}
+
+/** Zeitänderung (Sekunden) einer "Zeit halten"-Übung gegenüber der letzten Session, sonst null (kein Vergleich möglich). */
+export function timeChangeSeconds(currentEx, previousEx) {
+  if (getMeasureMode(currentEx) !== 'time' || !previousEx) return null;
+  const before = totalSeconds(previousEx);
+  if (!before) return null;
+  return totalSeconds(currentEx) - before;
+}
+
+/** Felder der Zeit-Übung für den Vergleichs-Eintrag der Feedback-Übersicht (ai_analysis_snapshot); leer bei normalen Übungen. */
+export function timedSnapshotFields(analysis) {
+  if (!analysis?.measureMode) return {};
+  return {
+    measure_mode: analysis.measureMode,
+    ...(typeof analysis.timeChangeSeconds === 'number' ? { time_change_seconds: analysis.timeChangeSeconds } : {})
+  };
+}
+
 /** Zeit-/Wiederholungsverlauf einer Zeit-Übung gegenüber der letzten Session: 'more' | 'less' | 'same' | null (kein Vergleich). */
 export function compareTimedExercise(currentEx, previousEx) {
   const mode = getMeasureMode(currentEx);
@@ -366,7 +400,10 @@ export function compareTimedExercise(currentEx, previousEx) {
  * @param {Object|null} [options.userNote] - UserExerciseNote-Dokument (Rang 1/2)
  * @returns {Object} Analysis-Objekt
  */
-export function analyzeExercise(exerciseName, currentEx, previousEx = null, daysDiff = 0, options = {}) {
+export function analyzeExercise(exerciseName, currentExRaw, previousExRaw = null, daysDiff = 0, options = {}) {
+  // Zeit-Übungen ohne Wdh./kg rechnen (siehe withoutUnusedMeasureFields); die Zeit selbst bleibt in den Sätzen.
+  const currentEx = withoutUnusedMeasureFields(currentExRaw);
+  const previousEx = previousExRaw ? withoutUnusedMeasureFields(previousExRaw) : previousExRaw;
   const currentStats = calculateExerciseStats(currentEx);
 
   if (!currentStats) {
@@ -416,7 +453,7 @@ export function analyzeExercise(exerciseName, currentEx, previousEx = null, days
     progression: 'first_session',
     period_days: daysDiff,
     // Zeit-Übung (Absprache Jimmy 15.10.): keine kg-Analyse, nur Messart + Verlauf (Regel 30).
-    ...(getMeasureMode(currentEx) ? { measureMode: getMeasureMode(currentEx), timeTrend: compareTimedExercise(currentEx, previousEx) } : {}),
+    ...(getMeasureMode(currentEx) ? { measureMode: getMeasureMode(currentEx), timeTrend: compareTimedExercise(currentEx, previousEx), timeChangeSeconds: timeChangeSeconds(currentEx, previousEx) } : {}),
     note: note || null,
     noteContext,
     oneRepMax,
