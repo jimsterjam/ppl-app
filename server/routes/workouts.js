@@ -24,6 +24,7 @@ import {
   resolveSatzgenauWeightChange,
   resolveBodyweightCorrelation,
   resolveRepsSetChanges,
+  timedSnapshotFields,
   isFinishedWorkout,
   isExerciseNotDone,
   collectNotDoneExercises
@@ -2480,6 +2481,8 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
         // Wiederholungsänderung je Satz (nur Sätze mit Änderung) - die App zeigt sie selbst an.
         reps_set_changes: resolveRepsSetChanges(ex.setsComparison),
         volume_change_percent: ex.changes?.volume_change_percent ?? 0,
+        // Zeit-Übung: Messart und Zeitänderung, damit die App Sekunden statt Wdh./kg zeigt.
+        ...timedSnapshotFields(ex),
         is_first_session: ex.progression === 'first_session',
         is_notable: isNotable,
         history: isNotable ? buildVolumeHistory(ex.exercise, currentWorkout, allWorkouts, 4) : []
