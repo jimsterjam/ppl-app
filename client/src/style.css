@@ -273,63 +273,77 @@ html {
   --accent-color-contrast: #ffffff;
 }
 
-/* Kartenfarben (siehe config/cardTones.js): färben nur Karten und Kacheln (--card-bg, --card-soft), nicht den Seitenhintergrund
-   und nicht --surface-strong (das nutzen unabhängige Bedienelemente wie Toast, Bewertung, Schließen-Knöpfe). */
+/* Kartenfarben (siehe config/cardTones.js): färben nur Karten und Kacheln (--card-bg, --card-soft) und die Flächen der Timer
+   (--tone-panel, mit Rückfall auf --bg-panel), nicht den Seitenhintergrund und nicht --surface-strong (das nutzen unabhängige Bedienelemente wie Toast, Bewertung, Schließen-Knöpfe). */
 :root[data-theme="dark"][data-card-tone="schwarz"] {
   --card-bg: #000000;
   --card-soft: #090909;
+  --tone-panel: #000000;
 }
 :root[data-theme="light"][data-card-tone="schwarz"] {
   --card-bg: #e4e6eb;
   --card-soft: #f2f2f5;
+  --tone-panel: #e4e6eb;
 }
 :root[data-theme="dark"][data-card-tone="nacht"] {
   --card-bg: #0e1e3d;
   --card-soft: #162644;
+  --tone-panel: #0e1e3d;
 }
 :root[data-theme="light"][data-card-tone="nacht"] {
   --card-bg: #d6e4fb;
   --card-soft: #eaf2fd;
+  --tone-panel: #d6e4fb;
 }
 :root[data-theme="dark"][data-card-tone="wald"] {
   --card-bg: #0c251b;
   --card-soft: #152d23;
+  --tone-panel: #0c251b;
 }
 :root[data-theme="light"][data-card-tone="wald"] {
   --card-bg: #d3eedf;
   --card-soft: #e9f6ef;
+  --tone-panel: #d3eedf;
 }
 :root[data-theme="dark"][data-card-tone="beere"] {
   --card-bg: #2a1142;
   --card-soft: #311949;
+  --tone-panel: #2a1142;
 }
 :root[data-theme="light"][data-card-tone="beere"] {
   --card-bg: #e7ddf7;
   --card-soft: #f3eefb;
+  --tone-panel: #e7ddf7;
 }
 :root[data-theme="dark"][data-card-tone="bordeaux"] {
   --card-bg: #3a121c;
   --card-soft: #411a24;
+  --tone-panel: #3a121c;
 }
 :root[data-theme="light"][data-card-tone="bordeaux"] {
   --card-bg: #f8dce2;
   --card-soft: #fceef0;
+  --tone-panel: #f8dce2;
 }
 :root[data-theme="dark"][data-card-tone="petrol"] {
   --card-bg: #082327;
   --card-soft: #112b2f;
+  --tone-panel: #082327;
 }
 :root[data-theme="light"][data-card-tone="petrol"] {
   --card-bg: #cdeef0;
   --card-soft: #e6f6f8;
+  --tone-panel: #cdeef0;
 }
 :root[data-theme="dark"][data-card-tone="schiefer"] {
   --card-bg: #1b1e25;
   --card-soft: #23262d;
+  --tone-panel: #1b1e25;
 }
 :root[data-theme="light"][data-card-tone="schiefer"] {
   --card-bg: #dde1eb;
   --card-soft: #eef0f5;
+  --tone-panel: #dde1eb;
 }
 
 html {

@@ -117,7 +117,7 @@ function preview(id) {
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  background: color-mix(in srgb, var(--bg-panel) 94%, transparent);
+  background: color-mix(in srgb, var(--tone-panel, var(--bg-panel)) 94%, transparent);
   border: 1px solid color-mix(in srgb, var(--card-border) 65%, transparent);
   border-radius: 20px;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
