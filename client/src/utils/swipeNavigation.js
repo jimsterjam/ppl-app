@@ -74,7 +74,7 @@ export function createSwipeTracker({ getPaths, getCurrentPath, getViewportWidth,
     end() {
       const g = gesture
       gesture = null
-      if (!g || now() - g.at > SWIPE_MAX_DURATION_MS) return null
+      if (!g || now() - g.at >= SWIPE_MAX_DURATION_MS) return null
       return resolveSwipeTarget({ ...g, viewportWidth: getViewportWidth(), paths: getPaths(), currentPath: getCurrentPath() })
     },
     cancel() {

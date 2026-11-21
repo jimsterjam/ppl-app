@@ -91,6 +91,13 @@ describe('createSwipeTracker', () => {
     expect(swipe(tracker, clock, 1200)).toBeNull()
   })
 
+  it('Grenze: genau 700 ms zählt nicht mehr, 699 ms noch', () => {
+    const a = make()
+    expect(swipe(a.tracker, a.clock, 700)).toBeNull()
+    const b = make()
+    expect(swipe(b.tracker, b.clock, 699)).toBe('/exercises')
+  })
+
   it('Gegenprobe: schräge Bewegung (70 px quer, 30 px senkrecht) wechselt nicht', () => {
     const { tracker, clock } = make()
     expect(swipe(tracker, clock, 150, null, touch(200, 400), touch(130, 430))).toBeNull()
