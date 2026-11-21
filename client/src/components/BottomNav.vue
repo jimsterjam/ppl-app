@@ -79,6 +79,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from 'vue'
 import { useUserStore } from '@/stores/userStore'
 import { useAuthStore } from '@/stores/authStore'
+import { createSwipeTracker } from '@/utils/swipeNavigation'
 import {
   hasActiveDraft,
   getActiveDraft,
@@ -157,7 +158,28 @@ function onNavClick(key, path) {
   if (rect) {
     pillPosition.value = computePillRect(rect)
   }
-  router.push(path)
+  return router.push(path)
+}
+
+// Wischen zwischen den Hauptseiten (nur die Seiten der Leiste, ohne Workout-Tab; Regeln in utils/swipeNavigation.js).
+// Wechselt nur die Seite, beendet nichts (Stoppuhr und Workout laufen weiter).
+let navigating = false
+const swipeTracker = createSwipeTracker({
+  getPaths: () => visibleLinks.value.map((link) => link.path),
+  getCurrentPath: () => route.path,
+  getViewportWidth: () => window.innerWidth,
+  isBusy: () => navigating
+})
+
+function onSwipeTouchStart(event) { swipeTracker.start(event, document.activeElement) }
+function onSwipeTouchMove(event) { swipeTracker.move(event) }
+function resetSwipe() { swipeTracker.cancel() }
+
+function onSwipeTouchEnd() {
+  const target = swipeTracker.end()
+  if (!target) return
+  navigating = true
+  Promise.resolve(onNavClick(target, target)).finally(() => { navigating = false })
 }
 
 function onActiveDraftUpdated() {
@@ -189,6 +211,10 @@ function remeasurePillAfterResume() {
 let capAppStateListener = null
 
 onMounted(async () => {
+  document.addEventListener('touchstart', onSwipeTouchStart, { passive: true })
+  document.addEventListener('touchmove', onSwipeTouchMove, { passive: true })
+  document.addEventListener('touchend', onSwipeTouchEnd, { passive: true })
+  document.addEventListener('touchcancel', resetSwipe, { passive: true })
   document.addEventListener('visibilitychange', onVisibilityChangeForPill)
   try {
     const { App: CapApp } = await import('@capacitor/app')
@@ -205,6 +231,10 @@ function onVisibilityChangeForPill() {
 }
 
 onBeforeUnmount(() => {
+  document.removeEventListener('touchstart', onSwipeTouchStart)
+  document.removeEventListener('touchmove', onSwipeTouchMove)
+  document.removeEventListener('touchend', onSwipeTouchEnd)
+  document.removeEventListener('touchcancel', resetSwipe)
   window.removeEventListener(ACTIVE_DRAFT_UPDATED_EVENT, onActiveDraftUpdated)
   window.removeEventListener('resize', updatePillPosition)
   window.removeEventListener('pointermove', onPillPointerMove)

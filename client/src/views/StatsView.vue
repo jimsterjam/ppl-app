@@ -83,6 +83,7 @@
               </div>
               <div
                 class="calendar-shell"
+                data-no-swipe-nav
                 @touchstart.passive="onCalendarTouchStart"
                 @touchend.passive="onCalendarTouchEnd"
               >
