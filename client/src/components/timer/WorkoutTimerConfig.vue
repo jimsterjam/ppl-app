@@ -471,7 +471,7 @@ function saveAndStart() {
   display: flex;
   gap: 12px;
   justify-content: flex-end;
-  background: color-mix(in srgb, var(--tone-panel, var(--bg-elevated)) 94%, transparent);
+  background: color-mix(in srgb, var(--tone-panel-raised, var(--bg-elevated)) 94%, transparent);
   border-top: 1px solid color-mix(in srgb, var(--card-border) 70%, transparent);
   border-radius: 0 0 20px 20px;
 }

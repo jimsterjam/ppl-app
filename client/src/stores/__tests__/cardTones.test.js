@@ -152,6 +152,8 @@ describe('Kartenfarben', () => {
       expect(source('WorkoutTimerBar')).toContain('--tone-panel')
       expect(source('RestTimerBar')).toContain('--tone-panel')
       expect(source('TransitionTimer')).toContain('--tone-panel')
+      // der Dialog-Fuß ist eine zweite Ebene (heller als der Dialog), nicht dieselbe Fläche
+      expect(source('WorkoutTimerConfig')).toContain('var(--tone-panel-raised, var(--bg-elevated))')
     })
   })
 
