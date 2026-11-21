@@ -82,6 +82,23 @@
         </div>
       </SettingsSectionCard>
 
+      <SettingsSectionCard class="card card--app" :title="$t('settings.cardTone')">
+        <p class="hint">{{ $t('settings.cardToneHint') }}</p>
+        <div class="theme-options">
+          <label v-for="tone in cardToneOptions" :key="tone.value" class="opt">
+            <input
+              type="radio"
+              name="card-tone"
+              :value="tone.value"
+              :checked="cardTone === tone.value"
+              @change="setCardTone(tone.value)"
+            />
+            <span class="tone-dot" :style="{ background: tone.swatch }" aria-hidden="true"></span>
+            <span>{{ tone.label }}</span>
+          </label>
+        </div>
+      </SettingsSectionCard>
+
       <SettingsSectionCard class="card card--app" :title="$t('trainingReminder.settingsTitle')">
         <TrainingReminderSettings />
       </SettingsSectionCard>
@@ -412,6 +429,7 @@ import HeaderBar from '../components/HeaderBar.vue'
 import { sendFeedbackMail, FEEDBACK_EMAIL } from '../utils/feedbackMail'
 import { storeToRefs } from 'pinia'
 import { useThemeStore, ACCENT_MODES } from '@/stores/themeStore'
+import { CARD_TONES, CARD_TONE_COLORS } from '@/config/cardTones'
 import { useSettingsStore } from '@/stores/settingsStore'
 import { useUserStore } from '@/stores/userStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
@@ -444,9 +462,17 @@ import VerifierAuditPanel from '../components/VerifierAuditPanel.vue'
 import { KEEP_AWAKE_MODES, getKeepAwakeMode, setKeepAwakeMode } from '../utils/keepAwakeGuard'
 
 const themeStore = useThemeStore()
-const { theme, colorMode } = storeToRefs(themeStore)
+const { theme, colorMode, cardTone } = storeToRefs(themeStore)
 const set = (t) => themeStore.setTheme(t)
 const setColorMode = (mode) => themeStore.setColorMode(mode)
+const setCardTone = (tone) => themeStore.setCardTone(tone)
+// Kartenfarben (config/cardTones.js): eine Farbe mehr dort = eine Option mehr hier (Name: settings.cardTone<Name>).
+// Der Farbpunkt zeigt den Ton des gerade aktiven Modus.
+const cardToneOptions = computed(() => CARD_TONES.map((value) => ({
+  value,
+  label: $t(`settings.cardTone${value[0].toUpperCase()}${value.slice(1)}`),
+  swatch: CARD_TONE_COLORS[value][theme.value === 'light' ? 'light' : 'dark'].card
+})))
 // Die Liste kommt aus dem Store (ACCENT_MODES): eine Farbe mehr dort = eine Option mehr hier (Name: settings.colorMode<Name>)
 const colorModeOptions = computed(() => ACCENT_MODES.map((value) => ({
   value,
@@ -1110,6 +1136,7 @@ async function confirmDeleteAccount() {
 }
 
 .theme-options { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+.tone-dot { width: 14px; height: 14px; border-radius: 50%; border: 1px solid var(--line-strong); flex: none; }
 .opt { display: inline-flex; gap: 8px; align-items: center; background: var(--surface); border: 1px solid var(--card-border); padding: 8px 10px; border-radius: 10px; }
 .toggle { margin-left: auto; background: var(--accent); color: var(--accent-contrast, #060606); border: none; border-radius: 10px; padding: 10px 12px; }
 
