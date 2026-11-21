@@ -243,6 +243,7 @@ onBeforeUnmount(unlock)
 .rest-overlay.ending { --ro-color: #ff9f1a; }
 .rest-overlay.finished {
   --ro-color: #2fbf71;
+  /* Vollbild-Hintergrund: bleibt wie auf allen Seiten (Kartenfarbe färbt nur die Flächen). */
   background: color-mix(in srgb, #2fbf71 35%, var(--bg, #08090b));
 }
 .ro-inner {

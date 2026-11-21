@@ -349,7 +349,7 @@ function updateOrientation() {
   --timer-glyph-primary-size: 42px;
   --timer-controls-gap: 12px;
   --timer-surface: color-mix(in srgb, var(--tone-panel, var(--bg-panel)) 92%, black 8%);
-  --timer-surface-strong: color-mix(in srgb, var(--tone-panel, var(--bg)) 95%, black 5%);
+  --timer-surface-strong: color-mix(in srgb, var(--tone-panel-raised, var(--bg)) 95%, black 5%);
   --timer-icon-fg: var(--fg-strong, #ffffff);
   --timer-icon-bg: transparent;
   --timer-icon-border: color-mix(in srgb, var(--accent) 85%, transparent);
@@ -740,6 +740,7 @@ function updateOrientation() {
 }
 
 :global(body.timer-landscape-fullscreen) {
+  /* Seitenhintergrund bleibt wie auf allen Seiten (Kartenfarbe färbt nur die Flächen des Timers). */
   background: var(--bg);
   overflow: hidden;
 }

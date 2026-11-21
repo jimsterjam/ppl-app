@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { setActivePinia, createPinia } from 'pinia'
 import { useThemeStore, ACCENT_MODES } from '../themeStore.js'
@@ -63,7 +63,7 @@ describe('Kartenfarben', () => {
         expect([s['--card-bg'], s['--card-soft']]).toEqual([CARD_TONE_COLORS[tone][side].card, CARD_TONE_COLORS[tone][side].soft])
       }
       if (tone === 'graphit') expect(toneRules('graphit', 'dark')).toEqual({})
-      else expect(Object.keys(toneRules(tone, 'dark')).sort()).toEqual([...SURFACES, '--tone-panel'].sort())
+      else expect(Object.keys(toneRules(tone, 'dark')).sort()).toEqual([...SURFACES, '--tone-panel', '--tone-panel-raised'].sort())
     })
 
     it('jeder Ton hat in style.css je eine Regel für dunkel und hell (Graphit nicht)', () => {
@@ -77,8 +77,13 @@ describe('Kartenfarben', () => {
     it('--tone-panel (Timer-Flächen) ist die Kartenfarbe des Tons, Graphit setzt ihn nicht', () => {
       for (const side of ['dark', 'light']) {
         const rules = toneRules(tone, side)
-        if (tone === 'graphit') expect(rules['--tone-panel']).toBeUndefined()
-        else expect(rules['--tone-panel']).toBe(CARD_TONE_COLORS[tone][side].card)
+        if (tone === 'graphit') {
+          expect(rules['--tone-panel']).toBeUndefined()
+          expect(rules['--tone-panel-raised']).toBeUndefined()
+        } else {
+          expect(rules['--tone-panel']).toBe(CARD_TONE_COLORS[tone][side].card)
+          expect(rules['--tone-panel-raised']).toBe(CARD_TONE_COLORS[tone][side].soft)
+        }
       }
     })
 
@@ -92,7 +97,7 @@ describe('Kartenfarben', () => {
 
     it('der Seitenhintergrund bleibt unberührt: nur Karten-, Kachel- und Timer-Flächen werden gesetzt', () => {
       for (const side of ['dark', 'light']) {
-        for (const key of Object.keys(toneRules(tone, side))) expect([...SURFACES, '--tone-panel']).toContain(key)
+        for (const key of Object.keys(toneRules(tone, side))) expect([...SURFACES, '--tone-panel', '--tone-panel-raised']).toContain(key)
       }
     })
 
@@ -115,13 +120,23 @@ describe('Kartenfarben', () => {
 
   describe('Timer folgen der Kartenfarbe (Absprache Jimmy 21.11.)', () => {
     const dir = resolve(import.meta.dirname, '../../components/timer')
-    const files = ['WorkoutTimerBar', 'RestTimerBar', 'TransitionTimer', 'RestTimerSettings', 'TimerMenu', 'WorkoutTimerConfig', 'TimerPortal']
+    // Alle Timer-Dateien (neue Dateien werden automatisch mitgeprüft)
+    const files = readdirSync(dir).filter((f) => f.endsWith('.vue')).map((f) => f.replace('.vue', ''))
     const source = (name) => readFileSync(resolve(dir, `${name}.vue`), 'utf8')
 
     it('jede Verwendung von --tone-panel hat einen Rückfall (Graphit sieht aus wie bisher)', () => {
       for (const name of files) {
         const uses = source(name).match(/var\(--tone-panel[^)]*\)?/g) || []
-        for (const use of uses) expect(use, `${name}: ${use}`).toMatch(/--tone-panel,\s*var\(--bg/)
+        for (const use of uses) expect(use, `${name}: ${use}`).toMatch(/--tone-panel(?:-raised)?,\s*var\(--bg/)
+      }
+    })
+
+    it('Gegenprobe: in den Timer-Dateien steht keine Tonfläche mehr ohne Rückfall auf --bg-panel/--bg/--bg-elevated', () => {
+      for (const name of files) {
+        for (const line of source(name).split('\n')) {
+          if (!/--tone-panel/.test(line)) continue
+          expect(line, `${name}: ${line}`).toMatch(/--tone-panel(?:-raised)?,\s*var\(--bg(?:-panel|-elevated)?[,)]/)
+        }
       }
     })
 
