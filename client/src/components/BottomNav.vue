@@ -79,6 +79,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from 'vue'
 import { useUserStore } from '@/stores/userStore'
 import { useAuthStore } from '@/stores/authStore'
+import { resolveSwipeTarget, isSwipeBlockedTarget } from '@/utils/swipeNavigation'
 import {
   hasActiveDraft,
   getActiveDraft,
@@ -160,6 +161,45 @@ function onNavClick(key, path) {
   router.push(path)
 }
 
+// Wischen zwischen den Hauptseiten (nur die Seiten der Leiste, ohne Workout-Tab; Regeln in utils/swipeNavigation.js).
+// Wechselt nur die Seite, beendet nichts (Stoppuhr und Workout laufen weiter).
+let swipe = null
+
+function resetSwipe() {
+  swipe = null
+}
+
+function onSwipeTouchStart(event) {
+  swipe = null
+  if (event.touches.length !== 1) return
+  if (!visibleLinks.value.some((link) => link.path === route.path)) return
+  const active = document.activeElement
+  if (active && active.matches?.('input, textarea, select, [contenteditable="true"]')) return // Tastatur offen
+  if (isSwipeBlockedTarget(event.target)) return
+  const touch = event.touches[0]
+  swipe = { startX: touch.clientX, startY: touch.clientY, endX: touch.clientX, endY: touch.clientY }
+}
+
+function onSwipeTouchMove(event) {
+  if (!swipe) return
+  if (event.touches.length !== 1) return resetSwipe() // zweiter Finger (Zoom) bricht ab
+  swipe.endX = event.touches[0].clientX
+  swipe.endY = event.touches[0].clientY
+}
+
+function onSwipeTouchEnd() {
+  const gesture = swipe
+  swipe = null
+  if (!gesture) return
+  const target = resolveSwipeTarget({
+    ...gesture,
+    viewportWidth: window.innerWidth,
+    paths: visibleLinks.value.map((link) => link.path),
+    currentPath: route.path
+  })
+  if (target) onNavClick(target, target)
+}
+
 function onActiveDraftUpdated() {
   draftUpdateTrigger.value++
 }
@@ -189,6 +229,10 @@ function remeasurePillAfterResume() {
 let capAppStateListener = null
 
 onMounted(async () => {
+  document.addEventListener('touchstart', onSwipeTouchStart, { passive: true })
+  document.addEventListener('touchmove', onSwipeTouchMove, { passive: true })
+  document.addEventListener('touchend', onSwipeTouchEnd, { passive: true })
+  document.addEventListener('touchcancel', resetSwipe, { passive: true })
   document.addEventListener('visibilitychange', onVisibilityChangeForPill)
   try {
     const { App: CapApp } = await import('@capacitor/app')
@@ -205,6 +249,10 @@ function onVisibilityChangeForPill() {
 }
 
 onBeforeUnmount(() => {
+  document.removeEventListener('touchstart', onSwipeTouchStart)
+  document.removeEventListener('touchmove', onSwipeTouchMove)
+  document.removeEventListener('touchend', onSwipeTouchEnd)
+  document.removeEventListener('touchcancel', resetSwipe)
   window.removeEventListener(ACTIVE_DRAFT_UPDATED_EVENT, onActiveDraftUpdated)
   window.removeEventListener('resize', updatePillPosition)
   window.removeEventListener('pointermove', onPillPointerMove)
