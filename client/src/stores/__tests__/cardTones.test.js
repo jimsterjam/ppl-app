@@ -8,7 +8,7 @@ import { CARD_TONES, DEFAULT_CARD_TONE, CARD_TONE_COLORS } from '../../config/ca
 import { messages } from '../../i18n/index.js'
 import { setActiveUid, __resetUserScopedStorageForTests } from '../../utils/userScopedStorage.js'
 
-// Kartenfarben (Absprache Jimmy 21.11.): färben nur Karten und Kacheln, der Seitenhintergrund bleibt. Der Test liest die
+// Kartenfarben (Absprache Jimmy 21.11.): färben nur Karten und Kacheln (--card-bg, --card-soft; nie --surface-strong, das nutzen unabhängige Bedienelemente), der Seitenhintergrund bleibt. Der Test liest die
 // echten Regeln aus style.css und prüft sie gegen config/cardTones.js und gegen ALLE Akzentfarben in dunkel und hell.
 const css = readFileSync(resolve(import.meta.dirname, '../../style.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
 
@@ -38,7 +38,7 @@ const baseLight = { ...baseDark, ...vars(block('\\[data-theme="light"\\]')) }
 const accentDark = (mode) => (mode === 'lime' ? baseDark : { ...baseDark, ...vars(block(`:root\\[data-accent="${mode}"\\]`)) })
 const accentLight = (mode) => ({ ...baseLight, ...vars(block(`\\[data-theme="light"\\]\\[data-accent="${mode}"\\]`)) })
 const toneRules = (tone, side) => vars(block(`:root\\[data-theme="${side}"\\]\\[data-card-tone="${tone}"\\]`))
-const SURFACES = ['--card-bg', '--card-soft', '--surface-strong']
+const SURFACES = ['--card-bg', '--card-soft']
 const toneSurfaces = (tone, side) => {
   const base = side === 'dark' ? baseDark : baseLight
   return { ...Object.fromEntries(SURFACES.map((k) => [k, base[k]])), ...toneRules(tone, side) }
@@ -60,9 +60,7 @@ describe('Kartenfarben', () => {
     it('Regeln in style.css stimmen mit config/cardTones.js überein (Graphit: Grundwerte, keine eigene Regel)', () => {
       for (const side of ['dark', 'light']) {
         const s = toneSurfaces(tone, side)
-        expect([s['--card-bg'], s['--card-soft'], s['--surface-strong']]).toEqual([
-          CARD_TONE_COLORS[tone][side].card, CARD_TONE_COLORS[tone][side].soft, CARD_TONE_COLORS[tone][side].strong
-        ])
+        expect([s['--card-bg'], s['--card-soft']]).toEqual([CARD_TONE_COLORS[tone][side].card, CARD_TONE_COLORS[tone][side].soft])
       }
       if (tone === 'graphit') expect(toneRules('graphit', 'dark')).toEqual({})
       else expect(Object.keys(toneRules(tone, 'dark')).sort()).toEqual([...SURFACES].sort())
@@ -73,6 +71,14 @@ describe('Kartenfarben', () => {
         const rule = block(`:root\\[data-theme="${side}"\\]\\[data-card-tone="${tone}"\\]`)
         if (tone === 'graphit') expect(rule).toBeNull()
         else expect(rule).toBeTruthy()
+      }
+    })
+
+    it('Gegenprobe: --surface-strong und --bg werden nie überschrieben (unabhängige Bedienelemente bleiben)', () => {
+      for (const side of ['dark', 'light']) {
+        const keys = Object.keys(toneRules(tone, side))
+        expect(keys).not.toContain('--surface-strong')
+        expect(keys).not.toContain('--bg')
       }
     })
 
