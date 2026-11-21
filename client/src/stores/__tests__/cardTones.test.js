@@ -2,7 +2,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { cwd } from 'node:process'
 import { setActivePinia, createPinia } from 'pinia'
 import { useThemeStore, ACCENT_MODES } from '../themeStore.js'
 import { CARD_TONES, DEFAULT_CARD_TONE, CARD_TONE_COLORS } from '../../config/cardTones.js'
@@ -11,13 +10,13 @@ import { setActiveUid, __resetUserScopedStorageForTests } from '../../utils/user
 
 // Kartenfarben (Absprache Jimmy 21.11.): färben nur Karten und Kacheln, der Seitenhintergrund bleibt. Der Test liest die
 // echten Regeln aus style.css und prüft sie gegen config/cardTones.js und gegen ALLE Akzentfarben in dunkel und hell.
-const css = readFileSync(resolve(cwd(), 'src/style.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
+const css = readFileSync(resolve(import.meta.dirname, '../../style.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '')
 
 function block(selectorRegex) {
   const match = css.match(new RegExp(`(?:^|\\n)${selectorRegex}\\s*\\{([^}]*)\\}`))
   return match ? match[1] : null
 }
-const vars = (body) => Object.fromEntries([...(body || '').matchAll(/(--[a-z-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]))
+const vars = (body) => Object.fromEntries([...(body || '').matchAll(/(--[a-z0-9-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]))
 function over(color, background) {
   const rgba = color.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/)
   if (!rgba) return color
@@ -67,6 +66,14 @@ describe('Kartenfarben', () => {
       }
       if (tone === 'graphit') expect(toneRules('graphit', 'dark')).toEqual({})
       else expect(Object.keys(toneRules(tone, 'dark')).sort()).toEqual([...SURFACES].sort())
+    })
+
+    it('jeder Ton hat in style.css je eine Regel für dunkel und hell (Graphit nicht)', () => {
+      for (const side of ['dark', 'light']) {
+        const rule = block(`:root\\[data-theme="${side}"\\]\\[data-card-tone="${tone}"\\]`)
+        if (tone === 'graphit') expect(rule).toBeNull()
+        else expect(rule).toBeTruthy()
+      }
     })
 
     it('der Seitenhintergrund bleibt unberührt: nur Karten- und Kachelflächen werden gesetzt', () => {

@@ -2,6 +2,8 @@
 // der Seitenhintergrund bleibt. Eine Wahl für beide Modi: dunkel ein dunkler Ton, hell die Pastellvariante.
 // Graphit ist der Standard und braucht keine Regeln (die Werte aus style.css). Die Werte hier und die Regeln in style.css
 // müssen übereinstimmen - das prüft cardTones.test.js (inkl. Lesbarkeit mit allen Akzentfarben).
+// Die Kennungen sind historische Arbeitstitel; angezeigt wird (settings.cardTone<Kennung>): nacht = Blau, wald = Grün,
+// beere = Violett, bordeaux = Rot. Neue Töne: Kennung + Regeln in style.css + Namen DE/EN (prüft cardTones.test.js).
 export const CARD_TONES = ['graphit', 'schwarz', 'nacht', 'wald', 'beere', 'bordeaux', 'petrol', 'schiefer']
 export const DEFAULT_CARD_TONE = 'graphit'
 
