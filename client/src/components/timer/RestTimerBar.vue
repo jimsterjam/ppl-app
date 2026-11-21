@@ -243,6 +243,7 @@ onBeforeUnmount(unlock)
 .rest-overlay.ending { --ro-color: #ff9f1a; }
 .rest-overlay.finished {
   --ro-color: #2fbf71;
+  /* Vollbild-Hintergrund: bleibt wie auf allen Seiten (Kartenfarbe färbt nur die Flächen). */
   background: color-mix(in srgb, #2fbf71 35%, var(--bg, #08090b));
 }
 .ro-inner {
@@ -411,12 +412,12 @@ onBeforeUnmount(unlock)
   padding: 10px 12px;
   border-radius: 16px;
   border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
-  background: color-mix(in srgb, var(--bg-panel, #0c0d10) 94%, var(--accent) 6%);
+  background: color-mix(in srgb, var(--tone-panel, var(--bg-panel, #0c0d10)) 94%, var(--accent) 6%);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
   color: var(--fg);
 }
 .rest-bar.finished {
-  background: color-mix(in srgb, var(--accent) 22%, var(--bg-panel, #0c0d10));
+  background: color-mix(in srgb, var(--accent) 22%, var(--tone-panel, var(--bg-panel, #0c0d10)));
 }
 .rest-info { display: flex; flex-direction: column; min-width: 0; }
 .rest-label {

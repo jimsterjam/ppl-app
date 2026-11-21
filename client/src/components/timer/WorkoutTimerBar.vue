@@ -348,14 +348,14 @@ function updateOrientation() {
   --timer-glyph-size: 36px;
   --timer-glyph-primary-size: 42px;
   --timer-controls-gap: 12px;
-  --timer-surface: color-mix(in srgb, var(--bg-panel) 92%, black 8%);
-  --timer-surface-strong: color-mix(in srgb, var(--bg) 95%, black 5%);
+  --timer-surface: color-mix(in srgb, var(--tone-panel, var(--bg-panel)) 92%, black 8%);
+  --timer-surface-strong: color-mix(in srgb, var(--tone-panel-raised, var(--bg)) 95%, black 5%);
   --timer-icon-fg: var(--fg-strong, #ffffff);
   --timer-icon-bg: transparent;
   --timer-icon-border: color-mix(in srgb, var(--accent) 85%, transparent);
   --timer-primary-bg: var(--accent);
   --timer-primary-fg: var(--accent-contrast, #060606);
-  --timer-primary-active-bg: color-mix(in srgb, var(--bg-panel) 92%, black 8%);
+  --timer-primary-active-bg: color-mix(in srgb, var(--tone-panel, var(--bg-panel)) 92%, black 8%);
   --timer-progress-track: color-mix(in srgb, var(--fg) 16%, transparent);
   --timer-paused-fill: color-mix(in srgb, var(--fg) 42%, transparent);
   display: grid;
@@ -740,6 +740,7 @@ function updateOrientation() {
 }
 
 :global(body.timer-landscape-fullscreen) {
+  /* Seitenhintergrund bleibt wie auf allen Seiten (Kartenfarbe färbt nur die Flächen des Timers). */
   background: var(--bg);
   overflow: hidden;
 }
@@ -844,11 +845,11 @@ function updateOrientation() {
 }
 
 :global([data-theme="light"]) .timer-bar {
-  --timer-surface: color-mix(in srgb, var(--bg) 96%, #e6ebf5 4%);
-  --timer-surface-strong: color-mix(in srgb, var(--bg-panel) 96%, #e6ebf5 4%);
+  --timer-surface: color-mix(in srgb, var(--tone-panel, var(--bg)) 96%, #e6ebf5 4%);
+  --timer-surface-strong: color-mix(in srgb, var(--tone-panel, var(--bg-panel)) 96%, #e6ebf5 4%);
   --timer-icon-fg: var(--fg);
   --timer-icon-border: color-mix(in srgb, var(--accent) 70%, var(--card-border) 30%);
-  --timer-primary-active-bg: color-mix(in srgb, var(--bg-elevated) 90%, white 10%);
+  --timer-primary-active-bg: color-mix(in srgb, var(--tone-panel, var(--bg-elevated)) 90%, white 10%);
   --timer-progress-track: color-mix(in srgb, var(--fg) 14%, transparent);
   --timer-paused-fill: color-mix(in srgb, var(--fg) 35%, transparent);
 }

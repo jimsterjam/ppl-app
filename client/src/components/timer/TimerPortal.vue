@@ -48,7 +48,7 @@ const restoreStatus = computed(() => {
   border: 1px solid color-mix(in srgb, var(--card-border) 70%, transparent);
   border-radius: 999px;
   padding: 8px 12px;
-  background: color-mix(in srgb, var(--bg-panel) 95%, black 5%);
+  background: color-mix(in srgb, var(--tone-panel, var(--bg-panel)) 95%, black 5%);
   color: var(--fg);
   font-size: 0.82rem;
   font-weight: 700;
