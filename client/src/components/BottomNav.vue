@@ -79,7 +79,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ref, onMounted, onBeforeUnmount, computed, watch, nextTick } from 'vue'
 import { useUserStore } from '@/stores/userStore'
 import { useAuthStore } from '@/stores/authStore'
-import { resolveSwipeTarget, isSwipeBlockedTarget } from '@/utils/swipeNavigation'
+import { createSwipeTracker } from '@/utils/swipeNavigation'
 import {
   hasActiveDraft,
   getActiveDraft,
@@ -158,46 +158,28 @@ function onNavClick(key, path) {
   if (rect) {
     pillPosition.value = computePillRect(rect)
   }
-  router.push(path)
+  return router.push(path)
 }
 
 // Wischen zwischen den Hauptseiten (nur die Seiten der Leiste, ohne Workout-Tab; Regeln in utils/swipeNavigation.js).
 // Wechselt nur die Seite, beendet nichts (Stoppuhr und Workout laufen weiter).
-let swipe = null
+let navigating = false
+const swipeTracker = createSwipeTracker({
+  getPaths: () => visibleLinks.value.map((link) => link.path),
+  getCurrentPath: () => route.path,
+  getViewportWidth: () => window.innerWidth,
+  isBusy: () => navigating
+})
 
-function resetSwipe() {
-  swipe = null
-}
-
-function onSwipeTouchStart(event) {
-  swipe = null
-  if (event.touches.length !== 1) return
-  if (!visibleLinks.value.some((link) => link.path === route.path)) return
-  const active = document.activeElement
-  if (active && active.matches?.('input, textarea, select, [contenteditable="true"]')) return // Tastatur offen
-  if (isSwipeBlockedTarget(event.target)) return
-  const touch = event.touches[0]
-  swipe = { startX: touch.clientX, startY: touch.clientY, endX: touch.clientX, endY: touch.clientY }
-}
-
-function onSwipeTouchMove(event) {
-  if (!swipe) return
-  if (event.touches.length !== 1) return resetSwipe() // zweiter Finger (Zoom) bricht ab
-  swipe.endX = event.touches[0].clientX
-  swipe.endY = event.touches[0].clientY
-}
+function onSwipeTouchStart(event) { swipeTracker.start(event, document.activeElement) }
+function onSwipeTouchMove(event) { swipeTracker.move(event) }
+function resetSwipe() { swipeTracker.cancel() }
 
 function onSwipeTouchEnd() {
-  const gesture = swipe
-  swipe = null
-  if (!gesture) return
-  const target = resolveSwipeTarget({
-    ...gesture,
-    viewportWidth: window.innerWidth,
-    paths: visibleLinks.value.map((link) => link.path),
-    currentPath: route.path
-  })
-  if (target) onNavClick(target, target)
+  const target = swipeTracker.end()
+  if (!target) return
+  navigating = true
+  Promise.resolve(onNavClick(target, target)).finally(() => { navigating = false })
 }
 
 function onActiveDraftUpdated() {

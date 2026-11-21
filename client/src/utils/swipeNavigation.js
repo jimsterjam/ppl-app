@@ -5,9 +5,11 @@
 
 // Mindestweg in Pixeln und Verhältnis waagerecht : senkrecht.
 export const SWIPE_MIN_DISTANCE = 60
-export const SWIPE_DIRECTION_RATIO = 2
+export const SWIPE_DIRECTION_RATIO = 3
 // Wische, die so nah am linken/rechten Rand beginnen, gehören dem System.
 export const SWIPE_EDGE_ZONE = 24
+// Längere, langsame Bewegungen sind Scrollen oder Ziehen, kein Wisch.
+export const SWIPE_MAX_DURATION_MS = 700
 
 /**
  * Zielseite eines Wischs, oder null (kein gültiger Wisch, Rand der Reihe erreicht, aktuelle Seite nicht in der Reihe).
@@ -26,7 +28,8 @@ export function resolveSwipeTarget({ startX, startY, endX, endY, viewportWidth, 
   return next >= 0 && next < paths.length ? paths[next] : null
 }
 
-const INTERACTIVE = 'input, textarea, select, [contenteditable="true"], [data-no-swipe-nav]'
+// Eigene Wischgesten markieren sich mit data-no-swipe-nav (z. B. der Kalender in der Statistik); offene Auswahllisten sperren ebenfalls.
+const INTERACTIVE = 'input, textarea, select, [contenteditable="true"], [data-no-swipe-nav], [role="listbox"], [role="menu"], [aria-expanded="true"]'
 
 /**
  * Liegt der Wisch auf etwas, das selbst wischt oder scrollt? Eingabefelder, markierte Bereiche (Kalender),
@@ -43,4 +46,39 @@ export function isSwipeBlockedTarget(target) {
     if (/(auto|scroll)/.test(style.overflowX) && el.scrollWidth > el.clientWidth) return true
   }
   return false
+}
+
+/**
+ * Verfolgt eine Wischgeste über touchstart/-move/-end. Gibt beim Ende die Zielseite oder null zurück.
+ * @param {{getPaths:()=>string[], getCurrentPath:()=>string, getViewportWidth:()=>number, isBusy?:()=>boolean, now?:()=>number}} deps
+ */
+export function createSwipeTracker({ getPaths, getCurrentPath, getViewportWidth, isBusy = () => false, now = () => Date.now() }) {
+  let gesture = null
+  return {
+    start(event, activeElement = null) {
+      gesture = null
+      if (event.touches.length !== 1) return
+      if (isBusy()) return // eine Navigation läuft noch
+      if (!getPaths().includes(getCurrentPath())) return
+      if (activeElement?.matches?.('input, textarea, select, [contenteditable="true"]')) return // Tastatur offen
+      if (isSwipeBlockedTarget(event.target)) return
+      const touch = event.touches[0]
+      gesture = { startX: touch.clientX, startY: touch.clientY, endX: touch.clientX, endY: touch.clientY, at: now() }
+    },
+    move(event) {
+      if (!gesture) return
+      if (event.touches.length !== 1) { gesture = null; return } // zweiter Finger (Zoom) bricht ab
+      gesture.endX = event.touches[0].clientX
+      gesture.endY = event.touches[0].clientY
+    },
+    end() {
+      const g = gesture
+      gesture = null
+      if (!g || now() - g.at > SWIPE_MAX_DURATION_MS) return null
+      return resolveSwipeTarget({ ...g, viewportWidth: getViewportWidth(), paths: getPaths(), currentPath: getCurrentPath() })
+    },
+    cancel() {
+      gesture = null
+    }
+  }
 }

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, beforeEach } from 'vitest'
-import { resolveSwipeTarget, isSwipeBlockedTarget } from '../swipeNavigation.js'
+import { resolveSwipeTarget, isSwipeBlockedTarget, createSwipeTracker } from '../swipeNavigation.js'
 
 const paths = ['/dashboard', '/stats', '/exercises', '/faqs', '/settings']
 const base = { startX: 200, startY: 400, endX: 100, endY: 410, viewportWidth: 390, paths, currentPath: '/stats' }
@@ -63,5 +63,71 @@ describe('isSwipeBlockedTarget', () => {
 
   it('ohne Ziel gesperrt', () => {
     expect(isSwipeBlockedTarget(null)).toBe(true)
+  })
+})
+
+describe('createSwipeTracker', () => {
+  const touch = (x, y, count = 1) => ({ target: document.body, touches: Array.from({ length: count }, () => ({ clientX: x, clientY: y })) })
+  function make(over = {}) {
+    let t = 0
+    const clock = { advance: (ms) => { t += ms } }
+    const tracker = createSwipeTracker({ getPaths: () => paths, getCurrentPath: () => '/stats', getViewportWidth: () => 390, now: () => t, ...over })
+    return { tracker, clock }
+  }
+  const swipe = (tracker, clock, ms = 150, activeElement = null, from = touch(200, 400), to = touch(100, 405)) => {
+    tracker.start(from, activeElement)
+    clock.advance(ms)
+    tracker.move(to)
+    return tracker.end()
+  }
+
+  it('gültiger schneller Wisch liefert die Zielseite', () => {
+    const { tracker, clock } = make()
+    expect(swipe(tracker, clock)).toBe('/exercises')
+  })
+
+  it('Gegenprobe: zu langsam (Scrollen/Ziehen) wechselt nicht', () => {
+    const { tracker, clock } = make()
+    expect(swipe(tracker, clock, 1200)).toBeNull()
+  })
+
+  it('Gegenprobe: schräge Bewegung (70 px quer, 30 px senkrecht) wechselt nicht', () => {
+    const { tracker, clock } = make()
+    expect(swipe(tracker, clock, 150, null, touch(200, 400), touch(130, 430))).toBeNull()
+  })
+
+  it('Gegenprobe: zwei Finger (Zoom), auch erst während der Bewegung, wechseln nicht', () => {
+    const { tracker, clock } = make()
+    expect(swipe(tracker, clock, 150, null, touch(200, 400, 2))).toBeNull()
+    tracker.start(touch(200, 400))
+    tracker.move(touch(100, 400, 2))
+    expect(tracker.end()).toBeNull()
+  })
+
+  it('Gegenprobe: abgebrochene Geste (touchcancel) wechselt nicht', () => {
+    const { tracker } = make()
+    tracker.start(touch(200, 400))
+    tracker.move(touch(100, 400))
+    tracker.cancel()
+    expect(tracker.end()).toBeNull()
+  })
+
+  it('Gegenprobe: offene Tastatur (Eingabefeld hat Fokus) wechselt nicht', () => {
+    const { tracker, clock } = make()
+    const input = document.createElement('input')
+    expect(swipe(tracker, clock, 150, input)).toBeNull()
+  })
+
+  it('Gegenprobe: laufende Navigation (zweiter Wisch zu früh) wird ignoriert', () => {
+    const { tracker, clock } = make({ isBusy: () => true })
+    expect(swipe(tracker, clock)).toBeNull()
+  })
+
+  it('Gegenprobe: Unterseite und offene Auswahlliste wechseln nicht', () => {
+    const { tracker, clock } = make({ getCurrentPath: () => '/plans/1' })
+    expect(swipe(tracker, clock)).toBeNull()
+    document.body.innerHTML = '<div role="listbox"><span id="o"></span></div>'
+    const { tracker: t2, clock: c2 } = make()
+    expect(swipe(t2, c2, 150, null, { target: document.getElementById('o'), touches: [{ clientX: 200, clientY: 400 }] })).toBeNull()
   })
 })
