@@ -273,6 +273,78 @@ html {
   --accent-color-contrast: #ffffff;
 }
 
+/* Kartenfarben (siehe config/cardTones.js): färben nur Karten und Kacheln, nicht den Seitenhintergrund. */
+:root[data-theme="dark"][data-card-tone="schwarz"] {
+  --card-bg: #000000;
+  --card-soft: #090909;
+  --surface-strong: #0f0f0f;
+}
+:root[data-theme="light"][data-card-tone="schwarz"] {
+  --card-bg: #e4e6eb;
+  --card-soft: #f2f2f5;
+  --surface-strong: #dddfe4;
+}
+:root[data-theme="dark"][data-card-tone="nacht"] {
+  --card-bg: #0e1e3d;
+  --card-soft: #162644;
+  --surface-strong: #1c2c49;
+}
+:root[data-theme="light"][data-card-tone="nacht"] {
+  --card-bg: #d6e4fb;
+  --card-soft: #eaf2fd;
+  --surface-strong: #d0ddf3;
+}
+:root[data-theme="dark"][data-card-tone="wald"] {
+  --card-bg: #0c251b;
+  --card-soft: #152d23;
+  --surface-strong: #1b3229;
+}
+:root[data-theme="light"][data-card-tone="wald"] {
+  --card-bg: #d3eedf;
+  --card-soft: #e9f6ef;
+  --surface-strong: #cde7d8;
+}
+:root[data-theme="dark"][data-card-tone="beere"] {
+  --card-bg: #2a1142;
+  --card-soft: #311949;
+  --surface-strong: #371f4d;
+}
+:root[data-theme="light"][data-card-tone="beere"] {
+  --card-bg: #e7ddf7;
+  --card-soft: #f3eefb;
+  --surface-strong: #e0d6f0;
+}
+:root[data-theme="dark"][data-card-tone="bordeaux"] {
+  --card-bg: #3a121c;
+  --card-soft: #411a24;
+  --surface-strong: #46202a;
+}
+:root[data-theme="light"][data-card-tone="bordeaux"] {
+  --card-bg: #f8dce2;
+  --card-soft: #fceef0;
+  --surface-strong: #f1d5db;
+}
+:root[data-theme="dark"][data-card-tone="petrol"] {
+  --card-bg: #082327;
+  --card-soft: #112b2f;
+  --surface-strong: #173034;
+}
+:root[data-theme="light"][data-card-tone="petrol"] {
+  --card-bg: #cdeef0;
+  --card-soft: #e6f6f8;
+  --surface-strong: #c7e7e9;
+}
+:root[data-theme="dark"][data-card-tone="schiefer"] {
+  --card-bg: #1b1e25;
+  --card-soft: #23262d;
+  --surface-strong: #292c32;
+}
+:root[data-theme="light"][data-card-tone="schiefer"] {
+  --card-bg: #dde1eb;
+  --card-soft: #eef0f5;
+  --surface-strong: #d6dae4;
+}
+
 html {
   /* overflow-x:hidden on html (not body) avoids the iOS WebKit bug where
      overflow-x:hidden on body creates a scroll container that breaks
