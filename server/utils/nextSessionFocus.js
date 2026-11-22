@@ -164,6 +164,11 @@ function hasDeliberateReason(ex, answer) {
   return (Array.isArray(ex?.setDetails) ? ex.setDetails : []).some((set) => typeof set?.notes === 'string' && set.notes.trim());
 }
 
+// Antwort auf "Wie war der letzte Satz?" (F16, Thema B): nach "Am Limit" (sauber oder wackelig) nicht steigern bzw. nur bestätigen,
+// sondern das Gewicht halten (Absprache Jimmy 14.11., Etappe 5b). Die App schlägt dabei nie weniger Gewicht vor. "Leicht" und
+// "anstrengend, aber noch Luft" ändern nichts. Gilt nur für die Übung, zu der die Antwort gehört (Schlüssel: Position im Workout).
+export const HOLD_AFTER_LAST_SET_ANSWERS = Object.freeze(['limit_clean', 'limit_shaky']);
+
 // Einordnung EINER Übung nach der Progressionslogik (wie im Workout-Hinweis): { kind, params } oder null.
 function resolveCandidate({ ex, info, hint, goal, history, lang, answer = null }) {
   let candidate = null;
@@ -199,6 +204,13 @@ function resolveCandidate({ ex, info, hint, goal, history, lang, answer = null }
   } else if (['confirm', 'close', 'climb', 'hold'].includes(status?.state)) {
     candidate = { kind: status.state, params };
   }
+  // Am Limit: Steigern bzw. Bestätigen wird zum Halten (gleiches Gewicht, gleiches Ziel). Andere Zustände bleiben.
+  if ((candidate?.kind === 'increase' || candidate?.kind === 'confirm') && answer?.topic === 'last_set'
+    && HOLD_AFTER_LAST_SET_ANSWERS.includes(answer.answer)) {
+    // aiKind: Für die KI bleibt es beim Erfolg ("Ziel in allen Sätzen geschafft", Regel 29). hold_weight würde ihr sagen,
+    // das Ziel sei noch nicht erreicht - das stimmt hier nicht, nur die Empfehlung unten (Halten) ändert sich.
+    candidate = { kind: 'hold', params, aiKind: candidate.kind };
+  }
   return candidate;
 }
 
@@ -228,7 +240,7 @@ export function buildProgressionStates({ workout, profileHintByName = new Map(),
       const key = String(ex?.name || '').trim().toLowerCase();
       const info = exerciseInfo(ex);
       const candidate = resolveCandidate({ ex, info, hint: profileHintByName.get(key) || null, goal, history, lang: 'de', answer: athleteAnswers.get(index) || null });
-      const state = candidate ? AI_PROGRESSION_STATES[candidate.kind] : null;
+      const state = candidate ? AI_PROGRESSION_STATES[candidate.aiKind || candidate.kind] : null;
       if (state) states.set(key, state);
     } catch {
       // eine Übung ohne Einordnung darf die Auswertung nie stoppen
@@ -261,8 +273,11 @@ export function buildNextSessionFocus({ workout, language = 'de', profileHintByN
     const candidate = resolveCandidate({ ex, info, hint, goal, history, lang, answer: athleteAnswers.get(order) || null });
 
     if (!candidate) return;
-    if (!best || PRIORITY[candidate.kind] < PRIORITY[best.kind] ||
-      (PRIORITY[candidate.kind] === PRIORITY[best.kind] && order < best.order)) {
+    // Auswahl nach der ursprünglichen Einordnung (aiKind): Eine Übung, deren Steigern zum Halten wurde, behält ihren Rang
+    // und verliert nicht gegen andere (Rang des Halten wäre der niedrigste). Angezeigt wird sie trotzdem als Halten.
+    const rank = (c) => PRIORITY[c.aiKind || c.kind];
+    if (!best || rank(candidate) < rank(best) ||
+      (rank(candidate) === rank(best) && order < best.order)) {
       // Übungsnamen immer englisch: DB-Name > Katalog dieser Datei > allgemeine Auflösung.
       const key = String(ex?.name || '').trim().toLowerCase();
       const name = englishNameByName.get(key) || (info.name_en ? toTitleCase(info.name_en) : resolveEnglishExerciseName(ex?.name));
