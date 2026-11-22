@@ -360,11 +360,22 @@ describe('Antwort zum letzten Satz steuert "Nächstes Mal"', () => {
     assert.equal(run([close], { answers: answer('limit_clean') }).kind, 'close')
   })
 
-  test('KI-Zustand folgt: hold_weight statt ready_to_increase (gleiche Einordnung wie die Zeile)', () => {
+  test('KI-Zustand bleibt Erfolg (nicht hold_weight = "Ziel nicht erreicht"), auch wenn die Zeile Halten sagt', () => {
     const workout = { goal: 'strength', exercises: [squat(100)] }
-    assert.equal(buildProgressionStates({ workout, history: strengthHistory }).get('kniebeugen mit der langhantel'), 'ready_to_increase')
-    assert.equal(buildProgressionStates({ workout, history: strengthHistory, athleteAnswers: answer('limit_shaky') }).get('kniebeugen mit der langhantel'), 'hold_weight')
-    assert.equal(buildProgressionStates({ workout, history: strengthHistory, athleteAnswers: answer('easy') }).get('kniebeugen mit der langhantel'), 'ready_to_increase')
+    const key = 'kniebeugen mit der langhantel'
+    assert.equal(buildProgressionStates({ workout, history: strengthHistory }).get(key), 'ready_to_increase')
+    assert.equal(buildProgressionStates({ workout, history: strengthHistory, athleteAnswers: answer('limit_shaky') }).get(key), 'ready_to_increase')
+    // erstes Schaffen (Bestätigen): bleibt confirm_once_more
+    assert.equal(buildProgressionStates({ workout, history: [], athleteAnswers: answer('limit_clean') }).get(key), 'confirm_once_more')
+    assert.equal(buildProgressionStates({ workout, history: strengthHistory, athleteAnswers: answer('easy') }).get(key), 'ready_to_increase')
+  })
+
+  test('Muskelaufbau (Bereich): oberes Ende in allen Sätzen + am Limit -> Halten mit Ziel = oberes Ende', () => {
+    const curl = { name: 'Beinbeuger liegend', setDetails: sets([12, 12, 12], 40) }
+    const f = buildNextSessionFocus({ workout: { goal: 'hypertrophy', exercises: [curl] }, language: 'de', history: [], athleteAnswers: answer('limit_clean') })
+    assert.equal(f.kind, 'hold')
+    assert.match(f.text, /gleiches Gewicht \(40 kg\)\. Ziel: 12 Wdh\./)
+    assert.equal(buildNextSessionFocus({ workout: { goal: 'hypertrophy', exercises: [curl] }, language: 'de', history: [] }).kind, 'increase')
   })
 
   test('EN-Text: gleicher Hinweis zum Halten', () => {

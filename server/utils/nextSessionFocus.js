@@ -207,7 +207,9 @@ function resolveCandidate({ ex, info, hint, goal, history, lang, answer = null }
   // Am Limit: Steigern bzw. Bestätigen wird zum Halten (gleiches Gewicht, gleiches Ziel). Andere Zustände bleiben.
   if ((candidate?.kind === 'increase' || candidate?.kind === 'confirm') && answer?.topic === 'last_set'
     && HOLD_AFTER_LAST_SET_ANSWERS.includes(answer.answer)) {
-    candidate = { kind: 'hold', params };
+    // aiKind: Für die KI bleibt es beim Erfolg ("Ziel in allen Sätzen geschafft", Regel 29). hold_weight würde ihr sagen,
+    // das Ziel sei noch nicht erreicht - das stimmt hier nicht, nur die Empfehlung unten (Halten) ändert sich.
+    candidate = { kind: 'hold', params, aiKind: candidate.kind };
   }
   return candidate;
 }
@@ -238,7 +240,7 @@ export function buildProgressionStates({ workout, profileHintByName = new Map(),
       const key = String(ex?.name || '').trim().toLowerCase();
       const info = exerciseInfo(ex);
       const candidate = resolveCandidate({ ex, info, hint: profileHintByName.get(key) || null, goal, history, lang: 'de', answer: athleteAnswers.get(index) || null });
-      const state = candidate ? AI_PROGRESSION_STATES[candidate.kind] : null;
+      const state = candidate ? AI_PROGRESSION_STATES[candidate.aiKind || candidate.kind] : null;
       if (state) states.set(key, state);
     } catch {
       // eine Übung ohne Einordnung darf die Auswertung nie stoppen
