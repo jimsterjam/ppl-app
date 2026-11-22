@@ -164,6 +164,11 @@ function hasDeliberateReason(ex, answer) {
   return (Array.isArray(ex?.setDetails) ? ex.setDetails : []).some((set) => typeof set?.notes === 'string' && set.notes.trim());
 }
 
+// Antwort auf "Wie war der letzte Satz?" (F16, Thema B): nach "Am Limit" (sauber oder wackelig) nicht steigern bzw. nur bestätigen,
+// sondern das Gewicht halten (Absprache Jimmy 14.11., Etappe 5b). Die App schlägt dabei nie weniger Gewicht vor. "Leicht" und
+// "anstrengend, aber noch Luft" ändern nichts. Gilt nur für die Übung, zu der die Antwort gehört (Schlüssel: Position im Workout).
+export const HOLD_AFTER_LAST_SET_ANSWERS = Object.freeze(['limit_clean', 'limit_shaky']);
+
 // Einordnung EINER Übung nach der Progressionslogik (wie im Workout-Hinweis): { kind, params } oder null.
 function resolveCandidate({ ex, info, hint, goal, history, lang, answer = null }) {
   let candidate = null;
@@ -198,6 +203,11 @@ function resolveCandidate({ ex, info, hint, goal, history, lang, answer = null }
     candidate = { kind: 'plateau', params: { ...params, sessions: PLATEAU_SESSIONS } };
   } else if (['confirm', 'close', 'climb', 'hold'].includes(status?.state)) {
     candidate = { kind: status.state, params };
+  }
+  // Am Limit: Steigern bzw. Bestätigen wird zum Halten (gleiches Gewicht, gleiches Ziel). Andere Zustände bleiben.
+  if ((candidate?.kind === 'increase' || candidate?.kind === 'confirm') && answer?.topic === 'last_set'
+    && HOLD_AFTER_LAST_SET_ANSWERS.includes(answer.answer)) {
+    candidate = { kind: 'hold', params };
   }
   return candidate;
 }

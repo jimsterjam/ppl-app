@@ -1,6 +1,6 @@
 import { describe, test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildNextSessionFocus, buildProgressionStates, STRONG_DROP_RATIO, stripAiFocusLines, applyNextSessionFocus, __setFocusCatalogForTests } from '../nextSessionFocus.js'
+import { buildNextSessionFocus, buildProgressionStates, HOLD_AFTER_LAST_SET_ANSWERS, STRONG_DROP_RATIO, stripAiFocusLines, applyNextSessionFocus, __setFocusCatalogForTests } from '../nextSessionFocus.js'
 
 __setFocusCatalogForTests([
   { name: 'Kniebeugen mit der Langhantel', name_en: 'barbell high bar squat', category: 'Legs', equipment: 'Langhantel', aiMetadata: { exerciseType: 'compound' } },
@@ -299,5 +299,76 @@ describe('starker Einbruch gegenüber dem letzten Mal (mindestens 20 %)', () => 
       history: [{ goal: 'hypertrophy', exercises: [squat12(100), calf(75)] }]
     })
     assert.equal(f.kind, 'increase')
+  })
+})
+
+// F16 Etappe 5b: Antwort "Am Limit" beim letzten Satz -> Gewicht halten statt steigern/bestätigen (nie weniger Gewicht).
+describe('Antwort zum letzten Satz steuert "Nächstes Mal"', () => {
+  const squat = (weight) => ({ name: 'Kniebeugen mit der Langhantel', setDetails: sets([5, 5, 5, 5, 5], weight) })
+  const strengthHistory = [{ goal: 'strength', exercises: [squat(100)] }]
+  const answer = (value, topic = 'last_set') => new Map([[0, { topic, answer: value }]])
+  const run = (workoutExercises, extra = {}) => buildNextSessionFocus({
+    workout: { goal: 'strength', exercises: workoutExercises }, language: 'de', history: extra.history ?? strengthHistory, athleteAnswers: extra.answers || new Map()
+  })
+
+  test('Konstante: nur "am Limit" (sauber oder wackelig) hält das Gewicht', () => {
+    assert.deepEqual([...HOLD_AFTER_LAST_SET_ANSWERS].sort(), ['limit_clean', 'limit_shaky'])
+  })
+
+  test('ohne Antwort: steigern (Ausgangslage)', () => {
+    assert.equal(run([squat(100)]).kind, 'increase')
+  })
+
+  test('am Limit (sauber und wackelig): Steigern wird zum Halten, mit bisherigem Text und Gewicht', () => {
+    for (const value of ['limit_clean', 'limit_shaky']) {
+      const f = run([squat(100)], { answers: answer(value) })
+      assert.equal(f.kind, 'hold', value)
+      assert.equal(f.text, 'Nächstes Mal – Barbell High Bar Squat: gleiches Gewicht (100 kg). Ziel: 5 Wdh. in jedem Satz.')
+    }
+  })
+
+  test('am Limit beim ersten Schaffen (Bestätigen): ebenfalls Halten', () => {
+    const f = run([squat(100)], { history: [], answers: answer('limit_clean') })
+    assert.equal(f.kind, 'hold')
+    assert.equal(run([squat(100)], { history: [] }).kind, 'confirm')
+  })
+
+  test('Gegenprobe: "leicht" und "anstrengend, aber noch Luft" ändern nichts', () => {
+    for (const value of ['easy', 'hard_air']) assert.equal(run([squat(100)], { answers: answer(value) }).kind, 'increase', value)
+  })
+
+  test('Gegenprobe: Antwort eines anderen Themas (Vergleich, Absicht) hält das Gewicht nicht', () => {
+    assert.equal(run([squat(100)], { answers: answer('shakier', 'compare') }).kind, 'increase')
+    assert.equal(run([squat(100)], { answers: answer('intended', 'intent') }).kind, 'increase')
+  })
+
+  test('Gegenprobe: die Antwort gilt nur für ihre Übung (Position im Workout)', () => {
+    const other = { name: 'Beinbeuger liegend', setDetails: sets([12, 12, 12], 40) }
+    const f = run([squat(100), other], { answers: new Map([[1, { topic: 'last_set', answer: 'limit_clean' }]]) })
+    // Antwort gehört zur zweiten Übung: die Kniebeuge steigert weiter
+    assert.equal(f.kind, 'increase')
+    assert.equal(f.exercise, 'Barbell High Bar Squat')
+  })
+
+  test('Gegenprobe: starker Einbruch bleibt starker Einbruch (restore), Halten ersetzt ihn nicht', () => {
+    const f = run([squat(70)], { answers: answer('limit_clean') })
+    assert.equal(f.kind, 'restore')
+  })
+
+  test('Gegenprobe: knapp dran (close) und Aufbau (climb) bleiben unverändert', () => {
+    const close = { name: 'Kniebeugen mit der Langhantel', setDetails: sets([5, 5, 5, 5, 4], 100) }
+    assert.equal(run([close], { answers: answer('limit_clean') }).kind, 'close')
+  })
+
+  test('KI-Zustand folgt: hold_weight statt ready_to_increase (gleiche Einordnung wie die Zeile)', () => {
+    const workout = { goal: 'strength', exercises: [squat(100)] }
+    assert.equal(buildProgressionStates({ workout, history: strengthHistory }).get('kniebeugen mit der langhantel'), 'ready_to_increase')
+    assert.equal(buildProgressionStates({ workout, history: strengthHistory, athleteAnswers: answer('limit_shaky') }).get('kniebeugen mit der langhantel'), 'hold_weight')
+    assert.equal(buildProgressionStates({ workout, history: strengthHistory, athleteAnswers: answer('easy') }).get('kniebeugen mit der langhantel'), 'ready_to_increase')
+  })
+
+  test('EN-Text: gleicher Hinweis zum Halten', () => {
+    const f = buildNextSessionFocus({ workout: { goal: 'strength', exercises: [squat(100)] }, language: 'en', history: strengthHistory, athleteAnswers: answer('limit_clean') })
+    assert.equal(f.text, 'Next time – Barbell High Bar Squat: same weight (100 kg). Goal: 5 reps in every set.')
   })
 })
