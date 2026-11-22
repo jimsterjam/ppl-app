@@ -212,6 +212,7 @@ import { sendFeedbackMail } from '@/utils/feedbackMail'
 import { resolveFeedbackLanguage } from '@/utils/feedbackLanguage'
 import { useToastStore } from '@/stores/toastStore'
 import { useUserStore } from '@/stores/userStore'
+import { useAuthStore } from '@/stores/authStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useAiConsentStore } from '@/stores/aiConsentStore'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
@@ -252,6 +253,7 @@ const emit = defineEmits(['close'])
 const { t, locale } = useI18n()
 const { getTranslatedExerciseName } = useExerciseTranslation()
 const userStore = useUserStore()
+const authStore = useAuthStore()
 const subscriptionStore = useSubscriptionStore()
 const router = useRouter()
 const { getIdToken } = useFirebaseAuth()
@@ -662,7 +664,7 @@ async function saveAnswers(answers) {
       timeout: 20000
     })
     // Gleich lokal vermerken, was der Server bestätigt hat (der Kasten im nächsten Workout liest es von dort); Fehler sind nie tödlich.
-    await noteAnswersLocally([realId, props.workoutId], response?.data?.answers, { patch: (id, changes) => patchOwnedWorkout(db.workouts, resolveActiveWorkoutUserId({ userStore }), id, changes) })
+    await noteAnswersLocally([realId, props.workoutId], response?.data?.answers, { patch: (id, changes) => patchOwnedWorkout(db.workouts, resolveActiveWorkoutUserId({ userStore, authStore }), id, changes) })
     return { status: 'saved', feedbackGenerated: response?.data?.feedbackGenerated === true }
   } catch (err) {
     if (err?.response?.data?.code === 'AI_CONSENT_REQUIRED') {

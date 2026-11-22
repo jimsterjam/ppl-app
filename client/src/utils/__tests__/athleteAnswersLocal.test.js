@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
+import { resolveActiveWorkoutUserId } from '../workoutDetailLifecycle.js'
 import { pickConfirmedAnswers, noteAnswersLocally, patchOwnedWorkout } from '../athleteAnswersLocal.js'
 
 const confirmed = [{ topic: 'last_set', exercise: 'Squat', exerciseIndex: 0, answer: 'limit_clean', reason: null, variant: null }]
@@ -94,5 +95,15 @@ describe('patchOwnedWorkout: nur der Eintrag des angemeldeten Kontos', () => {
   it('Gegenprobe: Eintrag ohne userId (alter Stand) wird nicht angefasst', async () => {
     const records = [{ _id: 'w2' }]
     expect(await patchOwnedWorkout(fakeTable(records), 'A', 'w2', { athlete_answers: answers })).toBe(0)
+  })
+})
+
+describe('angemeldetes Konto für das lokale Vermerken', () => {
+  it('kommt im normalen Ablauf aus dem authStore (userStore.user ist dort leer)', () => {
+    expect(resolveActiveWorkoutUserId({ userStore: { user: null }, authStore: { user: { uid: 'A' } } })).toBe('A')
+  })
+
+  it('Gegenprobe: ohne Anmeldung kein Konto (dann wird nichts geschrieben)', () => {
+    expect(resolveActiveWorkoutUserId({ userStore: { user: null }, authStore: { user: null } })).toBe('')
   })
 })
