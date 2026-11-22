@@ -311,6 +311,11 @@ describe('Antwort zum letzten Satz steuert "Nächstes Mal"', () => {
     workout: { goal: 'strength', exercises: workoutExercises }, language: 'de', history: extra.history ?? strengthHistory, athleteAnswers: extra.answers || new Map()
   })
 
+  test('Liste stimmt mit dem Workout-Kasten (gemeinsame Engine) überein', async () => {
+    const { getProgressionEngine } = await import('../nextSessionFocus.js')
+    assert.deepEqual([...HOLD_AFTER_LAST_SET_ANSWERS], [...getProgressionEngine().HOLD_AFTER_LAST_SET_ANSWERS])
+  })
+
   test('Konstante: nur "am Limit" (sauber oder wackelig) hält das Gewicht', () => {
     assert.deepEqual([...HOLD_AFTER_LAST_SET_ANSWERS].sort(), ['limit_clean', 'limit_shaky'])
   })

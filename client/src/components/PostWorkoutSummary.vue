@@ -218,8 +218,8 @@ import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 import { getNotDoneExercises } from '@/utils/notDoneExercises'
 import { planQuestions } from '@/utils/postWorkoutQuestionsPlan'
 import { isQuestionsEnabled, hasSeenIntro, shouldOfferTurnOff, recordSkip, resetSkips } from '@/utils/postWorkoutQuestionPrefs'
-import { getAllWorkoutsOffline, getWorkoutOffline, saveWorkoutOffline } from '@/utils/offlineStorage'
-import { buildLocalAthleteAnswers } from '@/utils/athleteAnswersLocal'
+import { getAllWorkoutsOffline, db } from '@/utils/offlineStorage'
+import { noteAnswersLocally } from '@/utils/athleteAnswersLocal'
 import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
 import { resolveActiveWorkoutUserId } from '@/utils/workoutDetailLifecycle'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -652,19 +652,6 @@ async function startFlow() {
 // Rückgabe: { status: 'saved' | 'consent' (Server verlangt die Einwilligung, z. B. neue Textversion) | 'failed',
 // feedbackGenerated }. feedbackGenerated: es gab schon Feedback - die Antworten wirken nur bei einer neuen Auswertung.
 // Ein Fehler ist nicht tödlich: ohne gespeicherte Antworten kommt das Feedback wie bisher.
-// Antworten gleich am lokalen Workout vermerken (der Server hat sie bestätigt): Der Kasten über den Sätzen im nächsten Workout liest
-// sie von dort, ohne auf das nächste Laden der Workout-Liste zu warten. Ein Fehler hier ist nie tödlich (der Server hat sie).
-async function noteAnswersLocally(workoutId, answers) {
-  try {
-    const local = await getWorkoutOffline(workoutId)
-    const athleteAnswers = buildLocalAthleteAnswers(local, answers)
-    if (!local || !athleteAnswers.length) return
-    await saveWorkoutOffline({ ...local, athlete_answers: athleteAnswers })
-  } catch (err) {
-    logger.debug('[PostWorkoutSummary] Antworten lokal nicht vermerkt', err?.message)
-  }
-}
-
 async function saveAnswers(answers) {
   try {
     const realId = await resolveWorkoutIdForAnalysis(props.workoutId)
@@ -674,7 +661,8 @@ async function saveAnswers(answers) {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       timeout: 20000
     })
-    await noteAnswersLocally(realId, answers)
+    // Gleich lokal vermerken, was der Server bestätigt hat (der Kasten im nächsten Workout liest es von dort); Fehler sind nie tödlich.
+    await noteAnswersLocally([realId, props.workoutId], response?.data?.answers, { patch: (id, changes) => db.workouts.update(id, changes) })
     return { status: 'saved', feedbackGenerated: response?.data?.feedbackGenerated === true }
   } catch (err) {
     if (err?.response?.data?.code === 'AI_CONSENT_REQUIRED') {

@@ -260,6 +260,20 @@ function schemeAchieved(sessionExercise, weight, reps) {
   return !!split && split.weight === weight && split.main.every((set) => set.reps >= reps)
 }
 
+// Antworten auf die Fragen nach dem Training (F16, Etappe 5b), wie auf dem Server (server/utils/nextSessionFocus.js):
+// "Am Limit" beim letzten Satz -> nicht steigern bzw. nur bestätigen, sondern das Gewicht halten (nie weniger Gewicht);
+// "Absicht"-Antwort (bewusst/musste anpassen) zählt wie eine Notiz als bewusste Entscheidung. Die Antwort hängt an der Übung der
+// letzten Session (__athleteAnswer, siehe lastSessionLookup.js athleteAnswerFor).
+export const HOLD_AFTER_LAST_SET_ANSWERS = Object.freeze(['limit_clean', 'limit_shaky'])
+function holdAfterAnswer(exercise) {
+  const answer = exercise?.__athleteAnswer
+  return answer?.topic === 'last_set' && HOLD_AFTER_LAST_SET_ANSWERS.includes(answer.answer)
+}
+function deliberateAnswer(exercise) {
+  const answer = exercise?.__athleteAnswer
+  return answer?.topic === 'intent' && (answer.answer === 'intended' || answer.answer === 'adjusted')
+}
+
 /**
  * Einschätzung der letzten Session für Hinweis, Vorschlag und "Nächstes Mal":
  *   'increase' - alle Hauptsätze am Ziel -> mehr Gewicht (suggestion gesetzt)
@@ -276,20 +290,6 @@ function schemeAchieved(sessionExercise, weight, reps) {
  * @param {boolean} [options.deliberate] - der Nutzer hat die Abweichung bewusst gewählt (z. B. Antwort "Absicht"); eine Notiz an der
  *   Übung zählt immer
  */
-// Antworten auf die Fragen nach dem Training (F16, Etappe 5b), wie auf dem Server (server/utils/nextSessionFocus.js):
-// "Am Limit" beim letzten Satz -> nicht steigern bzw. nur bestätigen, sondern das Gewicht halten (nie weniger Gewicht);
-// "Absicht"-Antwort (bewusst/musste anpassen) zählt wie eine Notiz als bewusste Entscheidung. Die Antwort hängt an der Übung der
-// letzten Session (__athleteAnswer, siehe lastSessionLookup.js athleteAnswerFor).
-export const HOLD_AFTER_LAST_SET_ANSWERS = Object.freeze(['limit_clean', 'limit_shaky'])
-function holdAfterAnswer(exercise) {
-  const answer = exercise?.__athleteAnswer
-  return answer?.topic === 'last_set' && HOLD_AFTER_LAST_SET_ANSWERS.includes(answer.answer)
-}
-function deliberateAnswer(exercise) {
-  const answer = exercise?.__athleteAnswer
-  return answer?.topic === 'intent' && (answer.answer === 'intended' || answer.answer === 'adjusted')
-}
-
 export function getProgressionStatus(info = {}, lastSessionExerciseRaw = null, goal = DEFAULT_TRAINING_GOAL, { previousSessions: previousRaw = [], deliberate = false } = {}) {
   if (!lastSessionExerciseRaw || isNoLoadExercise(info)) return null
   // Nur Sessions derselben Trainingsart (siehe isSessionCompatible).
