@@ -273,8 +273,11 @@ export function buildNextSessionFocus({ workout, language = 'de', profileHintByN
     const candidate = resolveCandidate({ ex, info, hint, goal, history, lang, answer: athleteAnswers.get(order) || null });
 
     if (!candidate) return;
-    if (!best || PRIORITY[candidate.kind] < PRIORITY[best.kind] ||
-      (PRIORITY[candidate.kind] === PRIORITY[best.kind] && order < best.order)) {
+    // Auswahl nach der ursprünglichen Einordnung (aiKind): Eine Übung, deren Steigern zum Halten wurde, behält ihren Rang
+    // und verliert nicht gegen andere (Rang des Halten wäre der niedrigste). Angezeigt wird sie trotzdem als Halten.
+    const rank = (c) => PRIORITY[c.aiKind || c.kind];
+    if (!best || rank(candidate) < rank(best) ||
+      (rank(candidate) === rank(best) && order < best.order)) {
       // Übungsnamen immer englisch: DB-Name > Katalog dieser Datei > allgemeine Auflösung.
       const key = String(ex?.name || '').trim().toLowerCase();
       const name = englishNameByName.get(key) || (info.name_en ? toTitleCase(info.name_en) : resolveEnglishExerciseName(ex?.name));

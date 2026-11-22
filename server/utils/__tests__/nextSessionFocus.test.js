@@ -378,6 +378,26 @@ describe('Antwort zum letzten Satz steuert "Nächstes Mal"', () => {
     assert.equal(buildNextSessionFocus({ workout: { goal: 'hypertrophy', exercises: [curl] }, language: 'de', history: [] }).kind, 'increase')
   })
 
+  test('Auswahl: die beantwortete Übung behält ihren Rang und verliert nicht gegen eine andere Übung (Steigern vs. Halten)', () => {
+    const other = { name: 'Beinbeuger liegend', setDetails: sets([12, 12, 12], 40) }
+    const exercises = [squat(100), other]
+    assert.equal(run(exercises).kind, 'increase')
+    // Antwort bei der ersten Übung: bliebe Rang 7 (Halten), würde die zweite Übung (Steigern, Rang 1) gewinnen und die
+    // Zeile nie Halten zeigen. Mit dem ursprünglichen Rang gewinnt die Kniebeuge und wird als Halten gezeigt.
+    const f = run(exercises, { answers: answer('limit_clean') })
+    assert.equal(f.exercise, 'Barbell High Bar Squat')
+    assert.equal(f.kind, 'hold')
+  })
+
+  test('Gegenprobe: eine echte höhere Priorität (Rückbau nach starkem Einbruch) schlägt weiter das Halten', () => {
+    const drop = { name: 'Beinbeuger liegend', setDetails: sets([10, 10, 10], 40) }
+    const f = run([squat(100), drop], {
+      history: [{ goal: 'strength', exercises: [squat(100), { ...drop, setDetails: sets([10, 10, 10], 75) }] }],
+      answers: answer('limit_clean')
+    })
+    assert.equal(f.kind, 'restore')
+  })
+
   test('EN-Text: gleicher Hinweis zum Halten', () => {
     const f = buildNextSessionFocus({ workout: { goal: 'strength', exercises: [squat(100)] }, language: 'en', history: strengthHistory, athleteAnswers: answer('limit_clean') })
     assert.equal(f.text, 'Next time – Barbell High Bar Squat: same weight (100 kg). Goal: 5 reps in every set.')
