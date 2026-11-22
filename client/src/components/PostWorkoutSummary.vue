@@ -219,7 +219,7 @@ import { getNotDoneExercises } from '@/utils/notDoneExercises'
 import { planQuestions } from '@/utils/postWorkoutQuestionsPlan'
 import { isQuestionsEnabled, hasSeenIntro, shouldOfferTurnOff, recordSkip, resetSkips } from '@/utils/postWorkoutQuestionPrefs'
 import { getAllWorkoutsOffline, db } from '@/utils/offlineStorage'
-import { noteAnswersLocally } from '@/utils/athleteAnswersLocal'
+import { noteAnswersLocally, patchOwnedWorkout } from '@/utils/athleteAnswersLocal'
 import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
 import { resolveActiveWorkoutUserId } from '@/utils/workoutDetailLifecycle'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -662,7 +662,7 @@ async function saveAnswers(answers) {
       timeout: 20000
     })
     // Gleich lokal vermerken, was der Server bestätigt hat (der Kasten im nächsten Workout liest es von dort); Fehler sind nie tödlich.
-    await noteAnswersLocally([realId, props.workoutId], response?.data?.answers, { patch: (id, changes) => db.workouts.update(id, changes) })
+    await noteAnswersLocally([realId, props.workoutId], response?.data?.answers, { patch: (id, changes) => patchOwnedWorkout(db.workouts, resolveActiveWorkoutUserId({ userStore }), id, changes) })
     return { status: 'saved', feedbackGenerated: response?.data?.feedbackGenerated === true }
   } catch (err) {
     if (err?.response?.data?.code === 'AI_CONSENT_REQUIRED') {

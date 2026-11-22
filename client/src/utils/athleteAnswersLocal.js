@@ -21,6 +21,19 @@ export function pickConfirmedAnswers(list) {
 }
 
 /**
+ * Ändert den lokalen Workout-Eintrag NUR, wenn er zum angemeldeten Konto gehört (Feld userId). Ohne Konto oder bei einem Eintrag
+ * eines anderen Kontos auf diesem Gerät wird nichts geschrieben (ein zweites Konto darf nie etwas vom ersten sehen oder ändern).
+ * @param {{where: Function}} table Dexie-Tabelle (db.workouts), Primärschlüssel _id
+ * @returns {Promise<number>} Zahl geänderter Einträge
+ */
+export async function patchOwnedWorkout(table, userId, id, changes) {
+  const owner = String(userId || '').trim()
+  const key = String(id || '').trim()
+  if (!owner || !key) return 0
+  return table.where(':id').equals(key).filter((w) => String(w?.userId || '') === owner).modify(changes)
+}
+
+/**
  * Trägt die bestätigten Antworten in den lokalen Workout-Eintrag ein - nur dieses Feld, in einem Schritt (kein Zurückschreiben des
  * ganzen Workouts, das eine gleichzeitige Änderung überschreiben könnte). Probiert die Kennungen der Reihe nach (echte ID, dann
  * die vorläufige), weil der lokale Eintrag je nach Sync-Stand unter einer von beiden liegt. Wirft nie.

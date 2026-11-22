@@ -103,4 +103,13 @@ describe('Antwort des Nutzers an der Übung der letzten Session', () => {
     const w = workout([{ ...limit, exercise: 'squat' }])
     expect(athleteAnswerFor(w, w.exercises[0])).toEqual({ topic: 'last_set', answer: 'limit_clean' })
   })
+
+  it('Gegenprobe Konten: Antworten stehen nur an den übergebenen Workouts - ein anderes Konto liefert dem Kasten nichts', () => {
+    // Die Historie wird je Konto geladen (getAllWorkoutsOffline({ userId }), ohne Konto leer); hier die Gegenprobe der Zuordnung:
+    const otherAccountsWorkout = workout([limit])
+    const mine = { _id: 'm', date: '2026-10-02', completed: true, goal: 'strength', exercises: [squat], athlete_answers: [] }
+    const [match] = findRecentSessionExercises({ name: 'Squat' }, prepareHistoryCandidates([mine], 'x'), 3)
+    expect(match.__athleteAnswer).toBeUndefined()
+    expect(otherAccountsWorkout.athlete_answers).toHaveLength(1)
+  })
 })

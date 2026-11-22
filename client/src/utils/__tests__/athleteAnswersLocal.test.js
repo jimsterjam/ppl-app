@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { pickConfirmedAnswers, noteAnswersLocally } from '../athleteAnswersLocal.js'
+import { pickConfirmedAnswers, noteAnswersLocally, patchOwnedWorkout } from '../athleteAnswersLocal.js'
 
 const confirmed = [{ topic: 'last_set', exercise: 'Squat', exerciseIndex: 0, answer: 'limit_clean', reason: null, variant: null }]
 
@@ -48,5 +48,51 @@ describe('noteAnswersLocally', () => {
     const patch = vi.fn()
     expect(await noteAnswersLocally(['real1'], undefined, { patch })).toBe(false)
     expect(patch).not.toHaveBeenCalled()
+  })
+})
+
+// Ein zweites Konto auf demselben Gerät darf nichts vom ersten sehen oder ändern (Absprache Jimmy, CLAUDE.md).
+describe('patchOwnedWorkout: nur der Eintrag des angemeldeten Kontos', () => {
+  // Minimale Nachbildung der Dexie-Kette where().equals().filter().modify() über Einträge im Arbeitsspeicher
+  function fakeTable(records) {
+    return {
+      where: () => ({
+        equals: (key) => ({
+          filter: (predicate) => ({
+            modify: async (changes) => {
+              const hits = records.filter((r) => r._id === key && predicate(r))
+              hits.forEach((r) => Object.assign(r, changes))
+              return hits.length
+            }
+          })
+        })
+      })
+    }
+  }
+  const answers = [{ topic: 'last_set', exercise: 'Squat', exerciseIndex: 0, answer: 'limit_clean', reason: null, variant: null }]
+
+  it('schreibt beim eigenen Eintrag', async () => {
+    const records = [{ _id: 'w1', userId: 'A' }]
+    expect(await patchOwnedWorkout(fakeTable(records), 'A', 'w1', { athlete_answers: answers })).toBe(1)
+    expect(records[0].athlete_answers).toEqual(answers)
+  })
+
+  it('Gegenprobe: Eintrag eines anderen Kontos bleibt unverändert', async () => {
+    const records = [{ _id: 'w1', userId: 'B' }]
+    expect(await patchOwnedWorkout(fakeTable(records), 'A', 'w1', { athlete_answers: answers })).toBe(0)
+    expect(records[0]).not.toHaveProperty('athlete_answers')
+  })
+
+  it('Gegenprobe: ohne angemeldetes Konto oder ohne Kennung wird nichts geschrieben', async () => {
+    const records = [{ _id: 'w1', userId: '' }, { _id: 'w2' }]
+    expect(await patchOwnedWorkout(fakeTable(records), '', 'w1', { athlete_answers: answers })).toBe(0)
+    expect(await patchOwnedWorkout(fakeTable(records), 'A', '', { athlete_answers: answers })).toBe(0)
+    expect(await patchOwnedWorkout(fakeTable(records), undefined, 'w2', { athlete_answers: answers })).toBe(0)
+    expect(records.some((r) => 'athlete_answers' in r)).toBe(false)
+  })
+
+  it('Gegenprobe: Eintrag ohne userId (alter Stand) wird nicht angefasst', async () => {
+    const records = [{ _id: 'w2' }]
+    expect(await patchOwnedWorkout(fakeTable(records), 'A', 'w2', { athlete_answers: answers })).toBe(0)
   })
 })
