@@ -45,6 +45,23 @@ export function prepareHistoryCandidates(historyWorkouts = [], currentWorkoutId 
 }
 
 /**
+ * Antwort des Nutzers (Fragen nach dem Training, F16) zu GENAU dieser Übung des Workouts, oder null. Wie auf dem Server
+ * (activeAthleteAnswerMap in server/utils/athleteAnswers.js) zählt sie nur, wenn Position UND Name noch passen: wurde die Übung
+ * danach ersetzt oder verschoben, gehört die Antwort nicht mehr dazu. Die Antworten stehen im Workout selbst (kommen vom Server mit).
+ * @returns {{topic:string, answer:string}|null}
+ */
+export function athleteAnswerFor(workout, exercise) {
+  const stored = Array.isArray(workout?.athlete_answers) ? workout.athlete_answers : []
+  if (!stored.length || !exercise) return null
+  const exercises = Array.isArray(workout?.exercises) ? workout.exercises : []
+  const index = exercises.indexOf(exercise)
+  if (index < 0) return null
+  const name = String(exercise?.name || '').trim().toLowerCase()
+  const entry = stored.find((item) => item && item.exerciseIndex === index && String(item.exercise || '').trim().toLowerCase() === name)
+  return entry && typeof entry.topic === 'string' && typeof entry.answer === 'string' ? { topic: entry.topic, answer: entry.answer } : null
+}
+
+/**
  * Dieselbe Übung aus den neuesten passenden Sessions (neueste zuerst), höchstens `limit` Stück -
  * Grundlage für die Schema-Erkennung (5x5, 6x1 ...) und die Bestätigungs-Regel bei Singles.
  */
@@ -59,8 +76,13 @@ export function findRecentSessionExercises(currentExercise = {}, candidates = []
     if (found.length >= limit) break
     const match = findLastSessionExercise(currentExercise, [workout])
     // Workout-Ziel der Session mitgeben: Hinweise vergleichen nur Sessions derselben Trainingsart
-    // (isSessionCompatible in weightSuggestion.js).
-    if (match) found.push(workout?.goal ? { ...match, __workoutGoal: workout.goal } : match)
+    // (isSessionCompatible in weightSuggestion.js). Ebenso die Antwort des Nutzers zu dieser Übung (Fragen nach dem Training).
+    if (match) {
+      const answer = athleteAnswerFor(workout, match)
+      found.push(workout?.goal || answer
+        ? { ...match, ...(workout?.goal ? { __workoutGoal: workout.goal } : {}), ...(answer ? { __athleteAnswer: answer } : {}) }
+        : match)
+    }
   }
   return found
 }

@@ -373,3 +373,55 @@ describe('starker Einbruch gegenüber der Einheit davor', () => {
   })
 })
 
+// F16 Etappe 5b: Antwort "Am Limit" beim letzten Satz -> Halten statt Steigern/Bestätigen (wie "Nächstes Mal" auf dem Server).
+describe('Antwort zum letzten Satz im Hinweis über den Sätzen', () => {
+  const at100 = (reps, answer) => ({ ...session(reps.map((r) => ({ reps: r, weight: 100, done: true }))), ...(answer ? { __athleteAnswer: answer } : {}) })
+  const limit = (value) => ({ topic: 'last_set', answer: value })
+  const confirmed = [at100([5, 5, 5, 5, 5])]
+
+  it('Ausgangslage: ohne Antwort steigern, beim ersten Schaffen bestätigen', () => {
+    expect(getProgressionStatus(squat, at100([5, 5, 5, 5, 5]), 'strength', { previousSessions: confirmed }).state).toBe('increase')
+    expect(getProgressionStatus(squat, at100([5, 5, 5, 5, 5]), 'strength').state).toBe('confirm')
+  })
+
+  it('am Limit (sauber und wackelig): Steigern wird zum Halten, ohne Vorschlag', () => {
+    for (const value of ['limit_clean', 'limit_shaky']) {
+      const s = getProgressionStatus(squat, at100([5, 5, 5, 5, 5], limit(value)), 'strength', { previousSessions: confirmed })
+      expect(s).toMatchObject({ state: 'hold', heldByAnswer: true, suggestion: null, weight: 100 })
+    }
+  })
+
+  it('am Limit beim ersten Schaffen (Bestätigen): ebenfalls Halten', () => {
+    expect(getProgressionStatus(squat, at100([5, 5, 5, 5, 5], limit('limit_clean')), 'strength')).toMatchObject({ state: 'hold', heldByAnswer: true })
+  })
+
+  it('Muskelaufbau (Bereich): oberes Ende überall + am Limit -> Halten', () => {
+    const calf = { name: 'Wadenheben', setDetails: [12, 12, 12].map((r) => ({ reps: r, weight: 40, done: true })) }
+    expect(getProgressionStatus(lateralRaise, calf, 'hypertrophy').state).toBe('increase')
+    expect(getProgressionStatus(lateralRaise, { ...calf, __athleteAnswer: limit('limit_clean') }, 'hypertrophy')).toMatchObject({ state: 'hold', heldByAnswer: true })
+  })
+
+  it('Gegenprobe: "leicht", "noch Luft", andere Themen und Antworten ohne Wert ändern nichts', () => {
+    for (const a of [limit('easy'), limit('hard_air'), { topic: 'compare', answer: 'shakier' }, { topic: 'intent', answer: 'intended' }, null]) {
+      expect(getProgressionStatus(squat, at100([5, 5, 5, 5, 5], a), 'strength', { previousSessions: confirmed }).state).toBe('increase')
+    }
+  })
+
+  it('Gegenprobe: andere Zustände bleiben (knapp dran, Aufbau) und der starke Einbruch geht vor', () => {
+    expect(getProgressionStatus(squat, at100([5, 5, 5, 5, 4], limit('limit_clean')), 'strength').state).toBe('close')
+    const drop = getProgressionStatus(squat, { ...session([5, 5, 5, 5, 5].map((r) => ({ reps: r, weight: 70, done: true }))), __athleteAnswer: limit('limit_clean') }, 'strength', { previousSessions: confirmed })
+    expect(drop.state).toBe('restore')
+  })
+
+  it('Absicht-Antwort (bewusst/musste anpassen) macht aus dem Einbruch "rebuild", "weiß nicht" nicht', () => {
+    const weak = (a) => ({ ...session([5, 5, 5, 5, 5].map((r) => ({ reps: r, weight: 70, done: true }))), __athleteAnswer: a })
+    expect(getProgressionStatus(squat, weak({ topic: 'intent', answer: 'intended' }), 'strength', { previousSessions: confirmed }).state).toBe('rebuild')
+    expect(getProgressionStatus(squat, weak({ topic: 'intent', answer: 'adjusted' }), 'strength', { previousSessions: confirmed }).state).toBe('rebuild')
+    expect(getProgressionStatus(squat, weak({ topic: 'intent', answer: 'unsure' }), 'strength', { previousSessions: confirmed }).state).toBe('restore')
+  })
+
+  it('der Gewichtsvorschlag für die Sätze folgt: nach "Am Limit" kein höheres Gewicht vorbelegt', () => {
+    expect(rawGetWeightSuggestion(squat, at100([5, 5, 5, 5, 5]), 'strength', { previousSessions: confirmed })).toBeTruthy()
+    expect(rawGetWeightSuggestion(squat, at100([5, 5, 5, 5, 5], limit('limit_clean')), 'strength', { previousSessions: confirmed })).toBeNull()
+  })
+})

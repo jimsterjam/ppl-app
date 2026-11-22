@@ -266,7 +266,7 @@ function schemeAchieved(sessionExercise, weight, reps) {
  *   'confirm'  - festes Kraft-Schema geschafft, aber erst einmal -> nochmal bestätigen
  *   'climb'    - Bereich 8-12: noch nicht überall 12 -> nächstes Mal eine Wdh. mehr (nextReps)
  *   'close'    - festes Schema, knapp dran: genau ein Satz 1 Wdh. zu wenig -> gleiches Gewicht
- *   'hold'     - festes Schema, sonst -> gleiches Gewicht
+ *   'hold'     - festes Schema, sonst -> gleiches Gewicht; auch nach der Antwort "Am Limit" statt Steigern/Bestätigen (heldByAnswer)
  *   'restore'  - starker Einbruch (STRONG_DROP_RATIO) ohne erkennbaren Grund -> wieder beim früheren Gewicht starten (previousWeight)
  *   'rebuild'  - starker Einbruch mit Grund (Notiz oder options.deliberate) -> gleiches Gewicht, dann Schritt für Schritt steigern
  * null = keine Einschätzung (keine Historie, Körpergewicht, Pyramide, ...). Nie Senkungen.
@@ -276,6 +276,20 @@ function schemeAchieved(sessionExercise, weight, reps) {
  * @param {boolean} [options.deliberate] - der Nutzer hat die Abweichung bewusst gewählt (z. B. Antwort "Absicht"); eine Notiz an der
  *   Übung zählt immer
  */
+// Antworten auf die Fragen nach dem Training (F16, Etappe 5b), wie auf dem Server (server/utils/nextSessionFocus.js):
+// "Am Limit" beim letzten Satz -> nicht steigern bzw. nur bestätigen, sondern das Gewicht halten (nie weniger Gewicht);
+// "Absicht"-Antwort (bewusst/musste anpassen) zählt wie eine Notiz als bewusste Entscheidung. Die Antwort hängt an der Übung der
+// letzten Session (__athleteAnswer, siehe lastSessionLookup.js athleteAnswerFor).
+export const HOLD_AFTER_LAST_SET_ANSWERS = Object.freeze(['limit_clean', 'limit_shaky'])
+function holdAfterAnswer(exercise) {
+  const answer = exercise?.__athleteAnswer
+  return answer?.topic === 'last_set' && HOLD_AFTER_LAST_SET_ANSWERS.includes(answer.answer)
+}
+function deliberateAnswer(exercise) {
+  const answer = exercise?.__athleteAnswer
+  return answer?.topic === 'intent' && (answer.answer === 'intended' || answer.answer === 'adjusted')
+}
+
 export function getProgressionStatus(info = {}, lastSessionExerciseRaw = null, goal = DEFAULT_TRAINING_GOAL, { previousSessions: previousRaw = [], deliberate = false } = {}) {
   if (!lastSessionExerciseRaw || isNoLoadExercise(info)) return null
   // Nur Sessions derselben Trainingsart (siehe isSessionCompatible).
@@ -313,7 +327,7 @@ export function getProgressionStatus(info = {}, lastSessionExerciseRaw = null, g
   // Starker Einbruch gegenüber der Einheit davor: nicht auf dem reduzierten Gewicht weitersteigern (nie Senkung, nur Hinweis).
   const previousWeight = previousSessions[0] ? mainWeightOfSession(previousSessions[0]) : null
   if (previousWeight > 0 && (previousWeight - split.weight) / previousWeight >= STRONG_DROP_RATIO - 1e-9) {
-    return { ...base, state: deliberate === true || hasDeliberateNote(lastSessionExercise) ? 'rebuild' : 'restore', previousWeight, suggestion: null }
+    return { ...base, state: deliberate === true || hasDeliberateNote(lastSessionExercise) || deliberateAnswer(lastSessionExercise) ? 'rebuild' : 'restore', previousWeight, suggestion: null }
   }
 
   if (!below.length) {
@@ -321,8 +335,10 @@ export function getProgressionStatus(info = {}, lastSessionExerciseRaw = null, g
     // 21.10.) - beim ersten Mal festigen. Ausnahme: 7+ Wdh. in allen Hauptsätzen = Gewicht war klar zu leicht.
     if (target.mode === 'fixed' && minReps < TRANSITION_REPS &&
       !schemeAchieved(previousSessions[0], split.weight, target.target)) {
+      if (holdAfterAnswer(lastSessionExercise)) return { ...base, state: 'hold', heldByAnswer: true, suggestion: null }
       return { ...base, state: 'confirm', suggestion: null }
     }
+    if (holdAfterAnswer(lastSessionExercise)) return { ...base, state: 'hold', heldByAnswer: true, suggestion: null }
     return {
       ...base,
       state: 'increase',
