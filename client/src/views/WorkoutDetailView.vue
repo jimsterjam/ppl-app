@@ -2978,6 +2978,7 @@ function progressionHintText(index) {
   if (status?.state === 'confirm') return t('workoutDetail.progressionConfirm', params)
   if (status?.state === 'climb') return t('workoutDetail.progressionClimb', params)
   if (status?.state === 'close') return t('workoutDetail.progressionClose', params)
+  if (status?.state === 'hold' && status.heldByAnswer) return t('workoutDetail.progressionHoldLimit', params)
   if (status?.state === 'hold') return t('workoutDetail.progressionHold', params)
   if (goalByIndex.value[index] === 'explosive') return t('workoutDetail.explosiveExplain')
   if (goalByIndex.value[index] === 'technique') return t('workoutDetail.techniqueHint')

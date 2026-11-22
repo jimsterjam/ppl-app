@@ -212,13 +212,15 @@ import { sendFeedbackMail } from '@/utils/feedbackMail'
 import { resolveFeedbackLanguage } from '@/utils/feedbackLanguage'
 import { useToastStore } from '@/stores/toastStore'
 import { useUserStore } from '@/stores/userStore'
+import { useAuthStore } from '@/stores/authStore'
 import { useSubscriptionStore } from '@/stores/subscriptionStore'
 import { useAiConsentStore } from '@/stores/aiConsentStore'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
 import { getNotDoneExercises } from '@/utils/notDoneExercises'
 import { planQuestions } from '@/utils/postWorkoutQuestionsPlan'
 import { isQuestionsEnabled, hasSeenIntro, shouldOfferTurnOff, recordSkip, resetSkips } from '@/utils/postWorkoutQuestionPrefs'
-import { getAllWorkoutsOffline } from '@/utils/offlineStorage'
+import { getAllWorkoutsOffline, db } from '@/utils/offlineStorage'
+import { noteAnswersLocally, patchOwnedWorkout } from '@/utils/athleteAnswersLocal'
 import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
 import { resolveActiveWorkoutUserId } from '@/utils/workoutDetailLifecycle'
 import { useSettingsStore } from '@/stores/settingsStore'
@@ -251,6 +253,7 @@ const emit = defineEmits(['close'])
 const { t, locale } = useI18n()
 const { getTranslatedExerciseName } = useExerciseTranslation()
 const userStore = useUserStore()
+const authStore = useAuthStore()
 const subscriptionStore = useSubscriptionStore()
 const router = useRouter()
 const { getIdToken } = useFirebaseAuth()
@@ -660,6 +663,8 @@ async function saveAnswers(answers) {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
       timeout: 20000
     })
+    // Gleich lokal vermerken, was der Server bestätigt hat (der Kasten im nächsten Workout liest es von dort); Fehler sind nie tödlich.
+    await noteAnswersLocally([realId, props.workoutId], response?.data?.answers, { patch: (id, changes) => patchOwnedWorkout(db.workouts, resolveActiveWorkoutUserId({ userStore, authStore }), id, changes) })
     return { status: 'saved', feedbackGenerated: response?.data?.feedbackGenerated === true }
   } catch (err) {
     if (err?.response?.data?.code === 'AI_CONSENT_REQUIRED') {

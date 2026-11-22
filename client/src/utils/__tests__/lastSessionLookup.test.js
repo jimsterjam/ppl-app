@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { prepareHistoryCandidates, findLastSessionExercise, findRecentSessionExercises, COMPATIBLE_LOOKBACK_SESSIONS } from '../lastSessionLookup.js'
+import { prepareHistoryCandidates, findLastSessionExercise, findRecentSessionExercises, athleteAnswerFor, COMPATIBLE_LOOKBACK_SESSIONS } from '../lastSessionLookup.js'
 
 const sets = (weight) => [{ reps: 10, weight }]
 
@@ -69,3 +69,47 @@ describe('COMPATIBLE_LOOKBACK_SESSIONS', () => {
   })
 })
 
+// F16 Etappe 5b: Die Antwort gehört zu Position UND Name der Übung (wie auf dem Server).
+describe('Antwort des Nutzers an der Übung der letzten Session', () => {
+  const squat = { name: 'Squat', setDetails: sets(100) }
+  const curl = { name: 'Curl', setDetails: sets(20) }
+  const workout = (answers, exercises = [squat, curl]) => ({ _id: 'w', date: '2026-10-01', completed: true, goal: 'strength', exercises, athlete_answers: answers })
+  const limit = { topic: 'last_set', exercise: 'Squat', exerciseIndex: 0, answer: 'limit_clean', reason: null, variant: null }
+
+  it('wird an die passende Übung gehängt (nur Thema und Antwort), das Ziel bleibt erhalten', () => {
+    const w = workout([limit])
+    const [match] = findRecentSessionExercises({ name: 'Squat' }, prepareHistoryCandidates([w], 'x'), 3)
+    expect(match.__athleteAnswer).toEqual({ topic: 'last_set', answer: 'limit_clean' })
+    expect(match.__workoutGoal).toBe('strength')
+    expect(findRecentSessionExercises({ name: 'Curl' }, prepareHistoryCandidates([w], 'x'), 3)[0].__athleteAnswer).toBeUndefined()
+  })
+
+  it('Gegenprobe: Übung ersetzt oder verschoben -> keine Antwort (Position oder Name passt nicht mehr)', () => {
+    const replaced = workout([limit], [{ name: 'Front Squat', setDetails: sets(100) }, curl])
+    expect(athleteAnswerFor(replaced, replaced.exercises[0])).toBeNull()
+    const moved = workout([limit], [curl, squat])
+    expect(athleteAnswerFor(moved, moved.exercises[1])).toBeNull()
+  })
+
+  it('Gegenprobe: ohne Antworten, ungültige Einträge oder fremde Übung -> null', () => {
+    expect(athleteAnswerFor(workout([]), squat)).toBeNull()
+    expect(athleteAnswerFor({ exercises: [squat] }, squat)).toBeNull()
+    expect(athleteAnswerFor(workout([{ ...limit, answer: 5 }]), squat)).toBeNull()
+    expect(athleteAnswerFor(workout([limit]), { name: 'Squat' })).toBeNull()
+    expect(athleteAnswerFor(null, squat)).toBeNull()
+  })
+
+  it('Namensabgleich ohne Groß-/Kleinschreibung', () => {
+    const w = workout([{ ...limit, exercise: 'squat' }])
+    expect(athleteAnswerFor(w, w.exercises[0])).toEqual({ topic: 'last_set', answer: 'limit_clean' })
+  })
+
+  it('Gegenprobe Konten: Antworten stehen nur an den übergebenen Workouts - ein anderes Konto liefert dem Kasten nichts', () => {
+    // Die Historie wird je Konto geladen (getAllWorkoutsOffline({ userId }), ohne Konto leer); hier die Gegenprobe der Zuordnung:
+    const otherAccountsWorkout = workout([limit])
+    const mine = { _id: 'm', date: '2026-10-02', completed: true, goal: 'strength', exercises: [squat], athlete_answers: [] }
+    const [match] = findRecentSessionExercises({ name: 'Squat' }, prepareHistoryCandidates([mine], 'x'), 3)
+    expect(match.__athleteAnswer).toBeUndefined()
+    expect(otherAccountsWorkout.athlete_answers).toHaveLength(1)
+  })
+})
