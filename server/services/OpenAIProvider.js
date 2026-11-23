@@ -425,6 +425,15 @@ KRITISCHE REGELN:
 
 33. ANTWORTEN DES NUTZERS NACH DEM TRAINING (athlete_answer, falls angegeben): ${ATHLETE_ANSWER_DIRECTIVE_LINES.join('\n    ')}
 
+34. TRAININGSZIEL GEWECHSELT (training_goal_changed, falls angegeben; Absprache Jimmy 23.11.): Der Nutzer hat bei dieser Übung
+    das Ziel gewechselt (z. B. von Kraft auf Muskelaufbau). Der Vergleich mit der letzten Einheit ist dann NICHT
+    gleichwertig: weniger Gewicht mit mehr Wiederholungen (oder umgekehrt) ist die erwartete Folge des neuen Ziels, kein
+    Rückschritt, keine Schwäche, kein Fortschritt und kein "bereit zum Steigern".
+    - Bewerte die Änderung von Gewicht, Wiederholungen und Sätzen bei dieser Übung nicht als besser oder schlechter.
+    - Schreibe höchstens eine ruhige Zeile ohne Zahlen und ohne Richtungswörter (FAKTEN-REGEL), z. B. "Mit dem neuen
+      Schwerpunkt läuft diese Übung anders - das passt." Den Wechsel selbst nennt die App in einer festen Zeile
+      (Trainingsfokus gewechselt), wiederhole sie nicht.
+
 OUTPUT-FORMAT ("Coach statt Protokoll" - Standard):
 Ungefähr 60-130 Wörter. KEINE sichtbaren Überschriften, kein Markdown-Fettdruck - einfache
 Zeilen reichen. Du schreibst ausschließlich die Einordnung - alle Fakten zeigt die App (FAKTEN-
@@ -432,6 +441,8 @@ REGEL). Greife heraus, was wirklich zählt:
 - Kurzer, direkter Einstieg (1 Zeile, gern mit einem passenden Emoji), der die Session GESAMT
   ehrlich einordnet. KEINE konkrete Übung und KEINE Zahl in dieser Zeile. Kein
   "Kurz zusammengefasst".
+  Der Einstieg KÜNDIGT NICHTS AN (nicht "es gibt einiges zu besprechen", "schauen wir uns an", "dazu gleich mehr"): Zeilen zu
+  einzelnen Übungen können von der App entfernt werden, dann stünde die Ankündigung ohne Inhalt da.
 - Danach HÖCHSTENS 3 Übungen mit Besonderheit, in dieser Priorität: (1) eine Notiz bzw. bewusste
   Entscheidung des Nutzers (dazu zählt auch seine Antwort zu "War das Absicht?", Regel 33), (2) ein relevanter Trainingskontext, (3) eine deutliche Auffälligkeit.
   Pro Übung eine Zeile mit Bindestrich und einer reinen Einschätzung. KEINE Faktenaussagen,
@@ -764,6 +775,13 @@ ${ex.sets_comparison.map(s => {
     }
 
     exPrompt += this.athleteAnswerBlock(ex);
+
+    // Trainingsziel gewechselt (Regel 34): die Daten sind nicht gleichwertig vergleichbar.
+    if (ex.training_goal_changed) {
+      exPrompt += `
+
+**Trainingsziel gewechselt (App-Logik, verbindlich, siehe Regel 34):** von "${ex.training_goal_changed.from}" auf "${ex.training_goal_changed.to}"`;
+    }
 
     // Fortschrittszustand der App (Regel 29): verbindliche Einordnung, ob das Ziel erreicht/knapp verfehlt wurde.
     if (ex.progression_state) {
