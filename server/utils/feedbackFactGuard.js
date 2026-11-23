@@ -88,12 +88,30 @@ export function findFactClaim(line, exerciseNames = []) {
   return null;
 }
 
-// Nennt der Text mindestens eine der Übungen (Groß-/Kleinschreibung egal)? Ohne bekannte Übungsnamen kann das nicht beurteilt werden: true.
+// Namen für den Abgleich: Kleinschreibung, Bindestriche wie Leerzeichen ("T-Bar Row" = "T Bar Row").
+function normalizeForMatch(value) {
+  return String(value || '').toLowerCase().replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+// Namensteile ab einer Wortgrenze bis zum Ende, mindestens 5 Zeichen ("lever t bar row" -> "t bar row", "bar row"): die KI kürzt
+// Namen gern ("Pull-Up" statt "Weighted Pull-Up", "T-Bar Row").
+function nameVariants(name) {
+  const words = normalizeForMatch(name).split(' ').filter(Boolean);
+  const variants = new Set();
+  for (let i = 0; i < words.length; i += 1) {
+    const variant = words.slice(i).join(' ');
+    if (variant.length >= 5) variants.add(variant);
+  }
+  return [...variants];
+}
+
+// Nennt der Text (oder die Zeile) mindestens eine der Übungen, auch gekürzt? Ohne bekannte Namen kann das nicht beurteilt werden: true.
+// Großzügig gemessen: im Zweifel "genannt", dann bleibt der Text wie bisher.
 function mentionsAnyExercise(text, exerciseNames = []) {
-  const names = [...new Set((exerciseNames || []).map((n) => String(n || '').trim().toLowerCase()).filter((n) => n.length >= 3))];
+  const names = [...new Set((exerciseNames || []).map((n) => String(n || '').trim()).filter((n) => n.length >= 3))];
   if (!names.length) return true;
-  const haystack = String(text || '').toLowerCase();
-  return names.some((name) => haystack.includes(name));
+  const haystack = normalizeForMatch(text);
+  return names.some((name) => nameVariants(name).some((variant) => haystack.includes(variant)));
 }
 
 const FALLBACK_TEXT = {
@@ -119,6 +137,7 @@ export function sanitizeCoachText(feedbackText, { language = 'de', exerciseNames
   const reasons = [];
   let droppedLines = 0;
   let contentLines = 0;
+  let droppedExerciseLines = 0;
 
   for (const line of lines) {
     if (!line.trim()) {
@@ -130,6 +149,7 @@ export function sanitizeCoachText(feedbackText, { language = 'de', exerciseNames
     if (reason) {
       droppedLines += 1;
       reasons.push(reason);
+      if (mentionsAnyExercise(line, exerciseNames) && exerciseNames.length) droppedExerciseLines += 1;
     } else {
       kept.push(line);
     }
@@ -143,10 +163,10 @@ export function sanitizeCoachText(feedbackText, { language = 'de', exerciseNames
   if (!text) {
     return { text: fallbackFeedbackText(language), droppedLines, reasons, allDropped: contentLines > 0 };
   }
-  // Wurden Zeilen entfernt und nennt KEINE der übrigen Zeilen eine Übung, bleiben nur Einstieg und Abschluss ("Heute war ein
+  // Wurden Zeilen zu Übungen entfernt und nennt KEINE der übrigen Zeilen eine Übung, bleiben nur Einstieg und Abschluss ("Heute war ein
   // interessanter Tag, es gibt einiges zu besprechen ... Mach weiter so"): eine Ankündigung ohne Inhalt (Fund Jimmy 23.11.).
   // Dann gilt der Text als ganz entfernt und es erscheint der feste Hinweis.
-  if (droppedLines > 0 && !mentionsAnyExercise(text, exerciseNames)) {
+  if (droppedExerciseLines > 0 && !mentionsAnyExercise(text, exerciseNames)) {
     return { text: fallbackFeedbackText(language), droppedLines, reasons: [...reasons, 'no_exercise_left'], allDropped: true };
   }
   return { text, droppedLines, reasons, allDropped: false };

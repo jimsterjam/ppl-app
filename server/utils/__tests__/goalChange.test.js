@@ -120,6 +120,21 @@ test('Gegenprobe: ohne bekannte Übungsnamen wird die neue Regel nicht angewandt
   assert.match(result.text, /Guter Tag/)
 })
 
+test('Gegenprobe: nur ein Einstieg mit Zahl wurde entfernt (keine Übungszeile betroffen): der übrige Text bleibt', () => {
+  const text = 'Starker Start nach 3 Tagen Pause 💪\nMach weiter so!'
+  const result = sanitizeCoachText(text, { language: 'de', exerciseNames: names })
+  assert.equal(result.droppedLines, 1)
+  assert.equal(result.allDropped, false)
+  assert.match(result.text, /Mach weiter so/)
+})
+
+test('gekürzte Übungsnamen zählen als genannt (Pull-Up, T-Bar Row), der Text bleibt', () => {
+  const text = ['Starker Tag 💪', '- Pull-Up: starke Einordnung 👍', '- T-Bar Row: 10 kg weniger gestemmt'].join('\n')
+  const result = sanitizeCoachText(text, { language: 'de', exerciseNames: names })
+  assert.equal(result.allDropped, false)
+  assert.match(result.text, /Pull-Up: starke Einordnung/)
+})
+
 test('Prompt: der Einstieg kündigt nichts an', () => {
   assert.match(getCoachSystemPromptText(), /KÜNDIGT NICHTS AN/)
 })

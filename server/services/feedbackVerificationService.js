@@ -563,6 +563,7 @@ Entwurfstext. Du generierst KEIN neues Feedback, du prüfst nur.
     gleichwertig. Ein Verstoß ist JEDE Bewertung der Änderung von Gewicht, Wiederholungen oder Sätzen dieser Übung als
     Rückschritt, Schwäche, Fortschritt oder "bereit zum Steigern". ERLAUBT ist eine ruhige Einordnung ohne Zahlen ("mit dem
     neuen Schwerpunkt läuft diese Übung anders").
+    Liegt zugleich "strong_drop" vor (Regel 24), gilt dessen ruhige Einordnung; die Änderung selbst bleibt unbewertet.
 
 Antworte AUSSCHLIESSLICH als valides JSON-Objekt, keine Erklärung davor/danach:
 {
@@ -897,8 +898,8 @@ export const RULE_LABELS = {
   23: 'Vorsichtig/warnend klingende Formulierung genutzt ("achte darauf", "behalte im Blick", "passe an", "sei vorsichtig") statt handlungsorientierter Sprache',
   24: 'Fortschrittszustand (almost_there/ready_to_increase/hold_weight/strong_drop) als Rückschritt, Kompromiss ("zwar ... aber") oder Vorwurf formuliert, oder ein starker Einbruch (strong_drop) übergangen bzw. als Steigerungsreife gelobt',
   25: 'Technik-Übung (training_type technique) nach Gewicht/Wiederholungen/Fortschritt bewertet oder mit einer Steigerungsempfehlung versehen',
-  28: 'Trainingsziel gewechselt (training_goal_changed): die Änderung von Gewicht/Wiederholungen/Sätzen als Rückschritt, Schwäche, Fortschritt oder Steigerungsreife bewertet, oder der Wechsel mit Zahlen/Richtungswörtern beschrieben',
   27: 'Antwort des Nutzers nach dem Training (athlete_answer) widersprochen, überdeutet (z. B. Steigerung trotz "am Limit", Vermutung über den Grund) oder eine bewusste Absicht-Antwort (intended/adjusted) übergangen',
+  28: 'Trainingsziel gewechselt (training_goal_changed): die Änderung von Gewicht/Wiederholungen/Sätzen als Rückschritt, Schwäche, Fortschritt oder Steigerungsreife bewertet, oder der Wechsel mit Zahlen/Richtungswörtern beschrieben',
 };
 
 export function getRuleLabel(ruleNumber) {
