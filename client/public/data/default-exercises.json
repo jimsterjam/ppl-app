@@ -42766,7 +42766,10 @@
         "gym_plus_bodyweight",
         "bodyweight_only"
       ]
-    }
+    },
+    "aliases": [
+      "L-Sit"
+    ]
   },
   {
     "_id": "ex_0562",
@@ -42907,7 +42910,11 @@
         "gym_plus_bodyweight",
         "bodyweight_only"
       ]
-    }
+    },
+    "aliases": [
+      "Lean Push-Up Position Hold",
+      "Lean Planche Hold"
+    ]
   },
   {
     "_id": "ex_2271",
@@ -60804,6 +60811,353 @@
       "disallowedGoals": [],
       "allowedEquipmentModes": [
         "gym_only"
+      ]
+    }
+  },
+  {
+    "_id": "ex_9012",
+    "id": "9012",
+    "name": "Pseudo Planche Push-Up",
+    "name_en": "pseudo planche push-up",
+    "category": "Push",
+    "category_raw": "strength",
+    "muscleGroup": "Brust",
+    "muscleGroup_en": "pectorals",
+    "equipment": "Körpergewicht",
+    "equipment_en": "body weight",
+    "description": "Der Pseudo Planche Push-Up ist ein Liegestütz, bei dem die Hände weit unten auf Höhe der Hüfte stehen und der Körper nach vorne gelehnt wird. Das legt viel Last auf Schultern, Brust und Trizeps und bereitet die Planche vor.",
+    "description_en": "The pseudo planche push-up is a push-up with the hands placed low, near the hips, and the body leaned far forward. It loads the shoulders, chest and triceps heavily and prepares the planche.",
+    "imageUrl": "",
+    "thumbnailUrl": "",
+    "bodyPart": "chest",
+    "target": "pectorals",
+    "secondaryMuscles": [
+      "shoulders",
+      "triceps",
+      "core"
+    ],
+    "instructions": [
+      "Gehen Sie in die Liegestützposition und drehen Sie die Finger leicht nach außen. Die Hände stehen auf Höhe der Hüfte.",
+      "Lehnen Sie den Körper nach vorne, bis die Schultern deutlich vor den Händen sind. Spannen Sie Bauch und Gesäß an.",
+      "Beugen Sie die Ellbogen und senken Sie den Körper kontrolliert ab, ohne die Vorlehne zu verlieren.",
+      "Drücken Sie sich mit der Vorlehne wieder nach oben und wiederholen Sie die Bewegung."
+    ],
+    "instructions_en": [
+      "Get into a push-up position and turn your fingers slightly outward. Place your hands level with your hips.",
+      "Lean your body forward until your shoulders are clearly ahead of your hands. Brace your abs and glutes.",
+      "Bend your elbows and lower your body under control without losing the forward lean.",
+      "Press back up while keeping the lean and repeat."
+    ],
+    "difficulty": "advanced",
+    "aiMetadata": {
+      "exerciseType": "compound",
+      "primaryPhase": "main",
+      "minDifficulty": "advanced",
+      "disallowedGoals": [],
+      "allowedEquipmentModes": [
+        "gym_only",
+        "gym_plus_bodyweight",
+        "bodyweight_only"
+      ]
+    },
+    "aliases": [
+      "Pseudo Planche Push-Ups"
+    ]
+  },
+  {
+    "_id": "ex_9013",
+    "id": "9013",
+    "name": "Tuck Planche",
+    "name_en": "tuck planche",
+    "category": "Core",
+    "category_raw": "strength",
+    "muscleGroup": "Bauch",
+    "muscleGroup_en": "abs",
+    "equipment": "Körpergewicht",
+    "equipment_en": "body weight",
+    "description": "Die Tuck Planche ist ein Haltegriff auf den Händen, bei dem die Knie angezogen sind und der Körper waagerecht über dem Boden schwebt. Sie trainiert Schultern, Rumpf und Handgelenke und ist die Einstiegsstufe zur vollen Planche.",
+    "description_en": "The tuck planche is a hold on the hands with the knees pulled in and the body floating horizontally above the floor. It trains the shoulders, trunk and wrists and is the entry step towards the full planche.",
+    "imageUrl": "",
+    "thumbnailUrl": "",
+    "bodyPart": "waist",
+    "target": "abs",
+    "secondaryMuscles": [
+      "shoulders",
+      "chest",
+      "triceps"
+    ],
+    "instructions": [
+      "Stützen Sie sich auf den Boden oder Parallettes, die Finger zeigen nach vorne oder leicht nach außen.",
+      "Lehnen Sie sich weit nach vorne und ziehen Sie die Knie an die Brust.",
+      "Heben Sie die Füße vom Boden ab, bis der Rücken rund und waagerecht ist, und die Arme bleiben gestreckt.",
+      "Halten Sie die Position für die geplante Zeit und setzen Sie die Füße kontrolliert wieder ab."
+    ],
+    "instructions_en": [
+      "Support yourself on the floor or parallettes with your fingers pointing forward or slightly outward.",
+      "Lean far forward and pull your knees towards your chest.",
+      "Lift your feet off the floor until your back is rounded and horizontal, keeping your arms straight.",
+      "Hold the position for the planned time and lower your feet back down under control."
+    ],
+    "difficulty": "advanced",
+    "aiMetadata": {
+      "exerciseType": "core",
+      "primaryPhase": "core",
+      "minDifficulty": "advanced",
+      "disallowedGoals": [],
+      "allowedEquipmentModes": [
+        "gym_only",
+        "gym_plus_bodyweight",
+        "bodyweight_only"
+      ]
+    },
+    "aliases": [
+      "Tuck Planche Hold"
+    ]
+  },
+  {
+    "_id": "ex_9014",
+    "id": "9014",
+    "name": "Tuck Front Lever",
+    "name_en": "tuck front lever",
+    "category": "Core",
+    "category_raw": "strength",
+    "muscleGroup": "Bauch",
+    "muscleGroup_en": "abs",
+    "equipment": "Körpergewicht",
+    "equipment_en": "body weight",
+    "description": "Der Tuck Front Lever ist ein Haltegriff an der Stange, bei dem der Körper mit angezogenen Knien waagerecht unter den Händen hängt. Er trainiert Latissimus, Rumpf und Griffkraft und ist die Einstiegsstufe zum Front Lever.",
+    "description_en": "The tuck front lever is a hold on a bar with the body hanging horizontally below the hands and the knees pulled in. It trains the lats, trunk and grip strength and is the entry step towards the front lever.",
+    "imageUrl": "",
+    "thumbnailUrl": "",
+    "bodyPart": "waist",
+    "target": "abs",
+    "secondaryMuscles": [
+      "lats",
+      "shoulders",
+      "forearms"
+    ],
+    "instructions": [
+      "Greifen Sie die Stange im Obergriff und hängen Sie sich mit gestreckten Armen daran.",
+      "Ziehen Sie die Knie an die Brust und drücken Sie die Stange mit gestreckten Armen nach unten.",
+      "Heben Sie die Hüfte, bis der Rücken waagerecht ist und die Knie nahe an der Brust bleiben.",
+      "Halten Sie die Position für die geplante Zeit und kommen Sie kontrolliert zurück in den Hang."
+    ],
+    "instructions_en": [
+      "Grab the bar with an overhand grip and hang with straight arms.",
+      "Pull your knees to your chest and push the bar down with straight arms.",
+      "Raise your hips until your back is horizontal while keeping the knees close to your chest.",
+      "Hold the position for the planned time and return to the hang under control."
+    ],
+    "difficulty": "advanced",
+    "aiMetadata": {
+      "exerciseType": "core",
+      "primaryPhase": "core",
+      "minDifficulty": "advanced",
+      "disallowedGoals": [],
+      "allowedEquipmentModes": [
+        "gym_only",
+        "gym_plus_bodyweight",
+        "bodyweight_only"
+      ]
+    },
+    "aliases": [
+      "Tuck Front Lever Hold"
+    ]
+  },
+  {
+    "_id": "ex_9015",
+    "id": "9015",
+    "name": "Advanced Tuck Front Lever",
+    "name_en": "advanced tuck front lever",
+    "category": "Core",
+    "category_raw": "strength",
+    "muscleGroup": "Bauch",
+    "muscleGroup_en": "abs",
+    "equipment": "Körpergewicht",
+    "equipment_en": "body weight",
+    "description": "Der Advanced Tuck Front Lever ist die nächste Stufe nach dem Tuck Front Lever: Der Rücken ist waagerecht und die Hüfte ist weiter geöffnet, die Knie bleiben aber gebeugt. Das erhöht die Last auf Latissimus und Rumpf.",
+    "description_en": "The advanced tuck front lever is the next step after the tuck front lever: the back is horizontal and the hips are opened further while the knees stay bent. This increases the load on the lats and trunk.",
+    "imageUrl": "",
+    "thumbnailUrl": "",
+    "bodyPart": "waist",
+    "target": "abs",
+    "secondaryMuscles": [
+      "lats",
+      "shoulders",
+      "forearms"
+    ],
+    "instructions": [
+      "Greifen Sie die Stange im Obergriff und hängen Sie sich mit gestreckten Armen daran.",
+      "Gehen Sie in den Tuck Front Lever mit waagerechtem Rücken.",
+      "Öffnen Sie die Hüfte etwas weiter, sodass Oberschenkel und Rücken fast eine Linie bilden, die Knie bleiben gebeugt.",
+      "Halten Sie die Position für die geplante Zeit und kommen Sie kontrolliert zurück in den Hang."
+    ],
+    "instructions_en": [
+      "Grab the bar with an overhand grip and hang with straight arms.",
+      "Move into the tuck front lever with a horizontal back.",
+      "Open your hips a little further so thighs and back form almost one line while the knees stay bent.",
+      "Hold the position for the planned time and return to the hang under control."
+    ],
+    "difficulty": "advanced",
+    "aiMetadata": {
+      "exerciseType": "core",
+      "primaryPhase": "core",
+      "minDifficulty": "advanced",
+      "disallowedGoals": [],
+      "allowedEquipmentModes": [
+        "gym_only",
+        "gym_plus_bodyweight",
+        "bodyweight_only"
+      ]
+    },
+    "aliases": [
+      "Advanced Tuck Front Lever Hold"
+    ]
+  },
+  {
+    "_id": "ex_9016",
+    "id": "9016",
+    "name": "Tuck Front Lever Raise",
+    "name_en": "tuck front lever raise",
+    "category": "Pull",
+    "category_raw": "strength",
+    "muscleGroup": "Rücken",
+    "muscleGroup_en": "back",
+    "equipment": "Körpergewicht",
+    "equipment_en": "body weight",
+    "description": "Der Tuck Front Lever Raise ist eine dynamische Übung an der Stange: Aus dem Hang wird der Körper mit angezogenen Knien bis in den Tuck Front Lever angehoben und kontrolliert wieder abgesenkt. Sie trainiert Latissimus, Rumpf und Griffkraft.",
+    "description_en": "The tuck front lever raise is a dynamic bar exercise: from a hang, the body is raised with the knees tucked into the tuck front lever and lowered again under control. It trains the lats, trunk and grip strength.",
+    "imageUrl": "",
+    "thumbnailUrl": "",
+    "bodyPart": "back",
+    "target": "lats",
+    "secondaryMuscles": [
+      "biceps",
+      "forearms",
+      "core"
+    ],
+    "instructions": [
+      "Greifen Sie die Stange im Obergriff und hängen Sie sich mit gestreckten Armen daran.",
+      "Ziehen Sie die Knie an die Brust und heben Sie die Hüfte, bis der Rücken waagerecht ist.",
+      "Halten Sie oben kurz an, die Arme bleiben gestreckt.",
+      "Senken Sie den Körper kontrolliert zurück in den Hang und wiederholen Sie die Bewegung."
+    ],
+    "instructions_en": [
+      "Grab the bar with an overhand grip and hang with straight arms.",
+      "Pull your knees to your chest and raise your hips until your back is horizontal.",
+      "Pause briefly at the top with your arms straight.",
+      "Lower your body back into the hang under control and repeat."
+    ],
+    "difficulty": "advanced",
+    "aiMetadata": {
+      "exerciseType": "compound",
+      "primaryPhase": "main",
+      "minDifficulty": "advanced",
+      "disallowedGoals": [],
+      "allowedEquipmentModes": [
+        "gym_only",
+        "gym_plus_bodyweight",
+        "bodyweight_only"
+      ]
+    },
+    "aliases": [
+      "Tuck-FL-Raises",
+      "Tuck FL Raises",
+      "Tuck Front Lever Raises"
+    ]
+  },
+  {
+    "_id": "ex_9017",
+    "id": "9017",
+    "name": "Archer Row",
+    "name_en": "archer row",
+    "category": "Pull",
+    "category_raw": "strength",
+    "muscleGroup": "Rücken",
+    "muscleGroup_en": "back",
+    "equipment": "Körpergewicht",
+    "equipment_en": "body weight",
+    "description": "Der Archer Row ist ein Rudern mit dem eigenen Körpergewicht an Ringen oder einer Stange. Ein Arm zieht, der andere bleibt gestreckt und stützt nur leicht. So steigt die Last auf dem ziehenden Arm schrittweise bis zum Einarm-Rudern.",
+    "description_en": "The archer row is a bodyweight row on rings or a bar. One arm pulls while the other stays straight and only assists lightly. This shifts more load onto the pulling arm step by step towards a one-arm row.",
+    "imageUrl": "",
+    "thumbnailUrl": "",
+    "bodyPart": "back",
+    "target": "lats",
+    "secondaryMuscles": [
+      "biceps",
+      "forearms",
+      "core"
+    ],
+    "instructions": [
+      "Greifen Sie die Ringe oder die Stange mit weitem Griff und lehnen Sie sich mit gestrecktem Körper nach hinten.",
+      "Ziehen Sie sich zu einer Hand hin, während der andere Arm gestreckt bleibt.",
+      "Halten Sie oben kurz an und spannen Sie Rücken und Rumpf an.",
+      "Lassen Sie sich kontrolliert zurück und wechseln Sie die Seite."
+    ],
+    "instructions_en": [
+      "Grab the rings or bar with a wide grip and lean back with your body straight.",
+      "Pull yourself towards one hand while the other arm stays straight.",
+      "Pause briefly at the top and brace your back and trunk.",
+      "Lower yourself under control and switch sides."
+    ],
+    "difficulty": "advanced",
+    "aiMetadata": {
+      "exerciseType": "compound",
+      "primaryPhase": "main",
+      "minDifficulty": "advanced",
+      "disallowedGoals": [],
+      "allowedEquipmentModes": [
+        "gym_only",
+        "gym_plus_bodyweight",
+        "bodyweight_only"
+      ]
+    },
+    "aliases": [
+      "Archer Rows"
+    ]
+  },
+  {
+    "_id": "ex_9018",
+    "id": "9018",
+    "name": "Hollow Body Rock",
+    "name_en": "hollow body rock",
+    "category": "Core",
+    "category_raw": "strength",
+    "muscleGroup": "Bauch",
+    "muscleGroup_en": "abs",
+    "equipment": "Körpergewicht",
+    "equipment_en": "body weight",
+    "description": "Der Hollow Body Rock ist eine Rumpfübung aus der Hollow-Body-Position: Der Körper bleibt gespannt und schaukelt als Ganzes vor und zurück. Sie trainiert die Bauchmuskeln und die Körperspannung.",
+    "description_en": "The hollow body rock is a core exercise from the hollow body position: the body stays tense and rocks back and forth as one unit. It trains the abs and full-body tension.",
+    "imageUrl": "",
+    "thumbnailUrl": "",
+    "bodyPart": "waist",
+    "target": "abs",
+    "secondaryMuscles": [
+      "hip flexors"
+    ],
+    "instructions": [
+      "Legen Sie sich auf den Rücken, die Arme sind über dem Kopf gestreckt.",
+      "Heben Sie Schultern und Beine leicht vom Boden ab, der untere Rücken bleibt am Boden (Hollow-Position).",
+      "Schaukeln Sie den Körper als Ganzes vor und zurück, ohne die Spannung zu verlieren.",
+      "Wiederholen Sie die Bewegung ruhig und kontrolliert."
+    ],
+    "instructions_en": [
+      "Lie on your back with your arms stretched overhead.",
+      "Lift your shoulders and legs slightly off the floor while keeping your lower back pressed down (hollow position).",
+      "Rock your body back and forth as one unit without losing tension.",
+      "Repeat the movement calmly and under control."
+    ],
+    "difficulty": "intermediate",
+    "aiMetadata": {
+      "exerciseType": "core",
+      "primaryPhase": "core",
+      "minDifficulty": "intermediate",
+      "disallowedGoals": [],
+      "allowedEquipmentModes": [
+        "gym_only",
+        "gym_plus_bodyweight",
+        "bodyweight_only"
       ]
     }
   }
