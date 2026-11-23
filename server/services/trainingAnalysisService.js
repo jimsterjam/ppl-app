@@ -618,7 +618,8 @@ export function analyzeWorkoutProgression(currentWorkout, allWorkouts, profileMa
       if (analysis?.previous && previousWorkout) {
         const goalChange = detectGoalChange({
           exercise, previousExercise: previousEx, currentGoal: currentWorkout.goal, previousGoal: previousWorkout.goal,
-          profileHint: profileByExerciseName.get(lookupKey) || null
+          // Wirksames Profil der Übung (inkl. eigener Überschreibung durch den Nutzer), wie bei "Nächstes Mal"
+          profileHint: analysis.profileHint || null
         });
         if (goalChange) analysis.goalChange = goalChange;
       }
