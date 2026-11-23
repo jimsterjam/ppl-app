@@ -24,6 +24,10 @@ describe('Katalog: Calisthenics-Übungen (Planche, Front Lever, Core)', () => {
     expect(e.aiMetadata.allowedEquipmentModes).toContain('bodyweight_only')
   })
 
+  it('Haltepositionen werden als Halteübung beschrieben (nicht "Haltegriff", das wäre ein Griff)', () => {
+    for (const id of ['ex_9013', 'ex_9014']) expect(byId.get(id).description).not.toMatch(/Haltegriff/)
+  })
+
   it('Gegenprobe: keine doppelten IDs und keine doppelten englischen Namen im Katalog', () => {
     const ids = catalog.map((e) => e._id)
     expect(new Set(ids).size).toBe(ids.length)
@@ -52,6 +56,9 @@ describe('Katalog: Calisthenics-Übungen (Planche, Front Lever, Core)', () => {
   it('Gegenprobe: ähnlich klingende Übungen bleiben getrennt (Tuck Front Lever ist nicht der volle Front Lever)', () => {
     expect(matchExerciseName('Front Lever', { catalog }).name_en).toBe('front lever')
     expect(matchExerciseName('Tuck Front Lever', { catalog }).name_en).toBe('tuck front lever')
-    expect(matchExerciseName('Planche', { catalog }).name_en).not.toBe('tuck planche')
+    const plain = matchExerciseName('Planche', { catalog })
+    expect(plain.name_en).not.toBe('tuck planche')
+    // und die Prüfung ist nicht leer: entweder eine Planche-Variante oder eine Rückfrage/Vorschläge, aber nie "nichts"
+    expect(plain.status === 'matched' ? plain.name_en : [...(plain.candidates || []), ...(plain.suggestions || [])].map((c) => c.name_en).join(' ')).toMatch(/planche/)
   })
 })
