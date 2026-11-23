@@ -135,6 +135,30 @@ test('gekürzte Übungsnamen zählen als genannt (Pull-Up, T-Bar Row), der Text 
   assert.match(result.text, /Pull-Up: starke Einordnung/)
 })
 
+test('Namen nur an Wortgrenzen: "Pressing" ist keine Übung "Chest Press"', () => {
+  const chest = ['Chest Press']
+  const text = ['Hey 💪 es gibt einiges zu besprechen. Pressing fühlte sich stark an.', '- Chest Press: 5 kg weniger Gewicht'].join('\n')
+  const result = sanitizeCoachText(text, { language: 'de', exerciseNames: chest })
+  assert.equal(result.allDropped, true)
+  // echte Nennung, auch gekürzt oder in der Mehrzahl, zählt
+  assert.equal(sanitizeCoachText('Hey 💪\n- Chest Press: läuft rund\n- Dips: 5 kg mehr', { language: 'de', exerciseNames: [...chest, 'Dips'] }).allDropped, false)
+  assert.equal(sanitizeCoachText('Hey 💪\n- Dips: starke Einordnung\n- Chest Press: 5 kg mehr', { language: 'de', exerciseNames: [...chest, 'Dips'] }).allDropped, false)
+  assert.equal(sanitizeCoachText('Hey 💪\n- Alle Dips liefen rund\n- Chest Press: 5 kg mehr', { language: 'de', exerciseNames: [...chest, 'Dip'] }).allDropped, false)
+})
+
+test('Zielwechsel nur mit vergleichbarer früherer Einheit (keine erledigten Sätze dort: keine Aussage)', () => {
+  const previous = session('strength', [5, 5], 60, '2026-11-10T10:00:00Z', 'w0')
+  previous.exercises[0].setDetails = previous.exercises[0].setDetails.map((set) => ({ ...set, done: false }))
+  const current = session('hypertrophy', [8, 8, 8], 40, '2026-11-17T10:00:00Z', 'w1')
+  const analyses = analyzeWorkoutProgression(current, [current, previous])
+  assert.equal(analyses[0].goalChange, undefined)
+})
+
+test('Übungsprofil "power" zählt wie in "Nächstes Mal" als explosiv: kein Wechsel Kraft -> Muskelaufbau', () => {
+  assert.equal(detectGoalChange({ exercise: pullUp, previousExercise: pullUp, currentGoal: 'hypertrophy', previousGoal: 'strength', profileHint: { exerciseType: 'power' } }), null)
+  assert.deepEqual(detectGoalChange({ exercise: pullUp, previousExercise: pullUp, currentGoal: 'hypertrophy', previousGoal: 'strength', profileHint: { exerciseType: 'compound' } }), { from: 'strength', to: 'hypertrophy' })
+})
+
 test('Prompt: der Einstieg kündigt nichts an', () => {
   assert.match(getCoachSystemPromptText(), /KÜNDIGT NICHTS AN/)
 })

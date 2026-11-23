@@ -614,9 +614,11 @@ export function analyzeWorkoutProgression(currentWorkout, allWorkouts, profileMa
       if (analysis) analysis.exerciseNameForAI = exerciseNameForAI;
       if (analysis) analysis.workoutIndex = workoutIndex;
       // Trainingsziel gegenüber der letzten Einheit gewechselt (z. B. Kraft -> Muskelaufbau)? Dann ist der Vergleich nicht gleichwertig.
-      if (analysis && previousWorkout) {
+      // Nur mit vergleichbarer früherer Einheit (analysis.previous): ohne erledigte Arbeitssätze dort gibt es nichts zu vergleichen.
+      if (analysis?.previous && previousWorkout) {
         const goalChange = detectGoalChange({
-          exercise, previousExercise: previousEx, currentGoal: currentWorkout.goal, previousGoal: previousWorkout.goal
+          exercise, previousExercise: previousEx, currentGoal: currentWorkout.goal, previousGoal: previousWorkout.goal,
+          profileHint: profileByExerciseName.get(lookupKey) || null
         });
         if (goalChange) analysis.goalChange = goalChange;
       }
