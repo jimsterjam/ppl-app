@@ -159,6 +159,18 @@ test('Übungsprofil "power" zählt wie in "Nächstes Mal" als explosiv: kein Wec
   assert.deepEqual(detectGoalChange({ exercise: pullUp, previousExercise: pullUp, currentGoal: 'hypertrophy', previousGoal: 'strength', profileHint: { exerciseType: 'compound' } }), { from: 'strength', to: 'hypertrophy' })
 })
 
+test('Auswertung: eigene Überschreibung "power" des Nutzers zählt (wirksames Profil), kein falscher Wechsel', () => {
+  const previous = session('strength', [5, 5, 5, 5, 5], 60, '2026-11-10T10:00:00Z', 'w0')
+  const current = session('hypertrophy', [8, 8, 8], 40, '2026-11-17T10:00:00Z', 'w1')
+  const withOverride = analyzeWorkoutProgression(current, [current, previous], {
+    userNoteByExerciseName: new Map([['weighted pull-up', { overrides: { exerciseType: 'power' } }]])
+  })
+  assert.equal(withOverride[0].profileHint?.exerciseType, 'power')
+  assert.equal(withOverride[0].goalChange, undefined)
+  // ohne Überschreibung bleibt der Wechsel
+  assert.deepEqual(analyzeWorkoutProgression(current, [current, previous])[0].goalChange, { from: 'strength', to: 'hypertrophy' })
+})
+
 test('Prompt: der Einstieg kündigt nichts an', () => {
   assert.match(getCoachSystemPromptText(), /KÜNDIGT NICHTS AN/)
 })
