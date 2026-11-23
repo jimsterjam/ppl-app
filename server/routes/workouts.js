@@ -1094,7 +1094,8 @@ router.post("/ai-warmup", firebaseAuthMiddleware, (req, res) => {
   res.status(202).json({ success: true });
 });
 
-// 📋 Liste aller Workouts mit gespeichertem AI-Feedback (chronologisch, neueste zuerst)
+// 📋 Liste aller Workouts mit gespeichertem AI-Feedback, neueste zuerst; ausstehende Einträge werden nach dem Datum des Workouts
+// eingereiht, nicht oben angepinnt (Reihenfolge: utils/feedbackListSort.js)
 router.get("/feedbacks", firebaseAuthMiddleware, async (req, res) => {
   try {
     const { userId } = req.auth;
