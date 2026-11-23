@@ -24,13 +24,15 @@ function hasKnownGoal(exercise, workoutGoal) {
 /**
  * @returns {{from: string, to: string}|null} null = kein Wechsel oder nicht sicher bekannt
  */
-export function detectGoalChange({ exercise, previousExercise, currentGoal, previousGoal } = {}) {
+export function detectGoalChange({ exercise, previousExercise, currentGoal, previousGoal, profileHint = null } = {}) {
   const engine = getProgressionEngine();
   if (!engine?.resolveExerciseGoal || !exercise || !previousExercise) return null;
   if (!hasKnownGoal(exercise, currentGoal) || !hasKnownGoal(previousExercise, previousGoal)) return null;
   const info = exerciseInfo(exercise);
-  const to = engine.resolveExerciseGoal(info, currentGoal, exercise.trainingType);
-  const from = engine.resolveExerciseGoal(info, previousGoal, previousExercise.trainingType);
+  // Übungsprofil "power" zählt wie in "Nächstes Mal" als explosiv, solange keine eigene Wahl vorliegt (nextSessionFocus.js exerciseGoal).
+  const resolve = (goal, ownType) => (!ownType && profileHint?.exerciseType === 'power' ? 'explosive' : engine.resolveExerciseGoal(info, goal, ownType));
+  const to = resolve(currentGoal, exercise.trainingType);
+  const from = resolve(previousGoal, previousExercise.trainingType);
   return KNOWN_GOALS.has(to) && KNOWN_GOALS.has(from) && to !== from ? { from, to } : null;
 }
 

@@ -98,7 +98,9 @@ function normalizeForMatch(value) {
 function nameVariants(name) {
   const words = normalizeForMatch(name).split(' ').filter(Boolean);
   const variants = new Set();
-  for (let i = 0; i < words.length; i += 1) {
+  // Der volle Name zählt immer (auch kurze wie "Dips", "Row"), gekürzte Formen erst ab 5 Zeichen.
+  if (words.length) variants.add(words.join(' '));
+  for (let i = 1; i < words.length; i += 1) {
     const variant = words.slice(i).join(' ');
     if (variant.length >= 5) variants.add(variant);
   }
@@ -111,7 +113,10 @@ function mentionsAnyExercise(text, exerciseNames = []) {
   const names = [...new Set((exerciseNames || []).map((n) => String(n || '').trim()).filter((n) => n.length >= 3))];
   if (!names.length) return true;
   const haystack = normalizeForMatch(text);
-  return names.some((name) => nameVariants(name).some((variant) => haystack.includes(variant)));
+  // Nur an Wortgrenzen ("press" in "Pressing" ist keine Übung); eine Mehrzahl-Endung ("Dips", "Pull-Ups") ist erlaubt.
+  return names.some((name) => nameVariants(name).some((variant) => (
+    new RegExp(`(?<![${WORD_CHAR}])${escapeRegExp(variant)}(?:e?s)?(?![${WORD_CHAR}])`, 'i').test(haystack)
+  )));
 }
 
 const FALLBACK_TEXT = {
