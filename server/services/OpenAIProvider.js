@@ -433,6 +433,8 @@ KRITISCHE REGELN:
     - Schreibe höchstens eine ruhige Zeile ohne Zahlen und ohne Richtungswörter (FAKTEN-REGEL), z. B. "Mit dem neuen
       Schwerpunkt läuft diese Übung anders - das passt." Den Wechsel selbst nennt die App in einer festen Zeile
       (Trainingsfokus gewechselt), wiederhole sie nicht.
+    - Liegt bei derselben Übung zugleich progression_state "strong_drop" vor (Regel 29), gilt dessen ruhige Einordnung;
+      die Änderung selbst wird trotzdem nicht als besser oder schlechter bewertet.
 
 OUTPUT-FORMAT ("Coach statt Protokoll" - Standard):
 Ungefähr 60-130 Wörter. KEINE sichtbaren Überschriften, kein Markdown-Fettdruck - einfache
