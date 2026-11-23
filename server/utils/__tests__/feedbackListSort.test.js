@@ -10,10 +10,13 @@ function applySort(docs) {
   const keyOf = (doc) => expr.map((ref) => doc[ref.slice(1)]).find((v) => v !== undefined && v !== null)
   const withKey = docs.map((d) => ({ ...d, _sortAt: keyOf(d) }))
   const fields = Object.keys(sort.$sort)
+  // Wie Mongo: absteigend je Feld; Datumsfelder als Zeitpunkt, _id (ObjectId, hier Text) als Zeichenfolge
+  const compare = (field, x, y) => (field === '_id' ? String(y).localeCompare(String(x)) : new Date(y).getTime() - new Date(x).getTime())
   return withKey.sort((a, b) => {
     for (const f of fields) {
-      const diff = new Date(b[f]).getTime() - new Date(a[f]).getTime()
-      if (sort.$sort[f] < 0 && diff !== 0) return diff
+      if (sort.$sort[f] >= 0) throw new Error('nur absteigende Schlüssel nachgebildet')
+      const diff = compare(f, a[f], b[f])
+      if (diff !== 0) return diff
     }
     return 0
   })
@@ -46,6 +49,15 @@ describe('Feedback-Liste: Reihenfolge', () => {
       { id: 'b-neu-erzeugt', ai_generated_at: d('21'), date: d('05') }
     ])
     assert.equal(list[0].id, 'b-neu-erzeugt')
+  })
+
+  it('Gleichstand bei Zeit und Workout-Datum: die ID entscheidet, in beiden Eingabereihenfolgen gleich (stabiles "Mehr laden")', () => {
+    const a = { _id: '65a000000000000000000001', ai_feedback_status: 'deferred', date: d('10') }
+    const b = { _id: '65a000000000000000000002', ai_feedback_status: 'deferred', date: d('10') }
+    const first = applySort([a, b]).map((x) => x._id)
+    const second = applySort([b, a]).map((x) => x._id)
+    assert.deepEqual(first, [b._id, a._id])
+    assert.deepEqual(second, first)
   })
 
   it('die Stufen: kein Anpinnen mehr, Zeit zuerst (ai_generated_at, sonst Workout-Datum), Workout-Datum und ID als Gleichstand', () => {
