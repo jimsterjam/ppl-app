@@ -59,6 +59,7 @@ import { buildNextSessionFocus, buildProgressionStates, applyNextSessionFocus } 
 import { FIRST_LOOK_COMPARISON_MIN, applyFirstLookOutlook } from '../utils/firstLookOutlook.js';
 import { applyRestLine } from '../utils/restLine.js';
 import { sanitizeCoachText, buildBodyweightFactLine } from '../utils/feedbackFactGuard.js';
+import { FEEDBACK_LIST_SORT_STAGES } from '../utils/feedbackListSort.js';
 import { resolveListFeedbackStatus, FEEDBACK_PENDING_FAILED_AFTER_MS } from '../utils/feedbackStatus.js';
 import { findCatalogEntryForName, catalogReference } from '../utils/catalogMatch.js';
 import { resolveEnglishExerciseName, resolveFeedbackLanguage } from '../utils/feedbackLocalization.js';
@@ -1119,11 +1120,8 @@ router.get("/feedbacks", firebaseAuthMiddleware, async (req, res) => {
     const [items, total] = await Promise.all([
       Workout.aggregate([
         { $match: query },
-        // Zurückgestellte Workouts oben anpinnen (sie haben kein ai_generated_at, würden bei
-        // einer reinen Sortierung danach sonst je nach Sortierrichtung ganz oben oder unten
-        // "verschwinden" statt als klar sichtbare, offene Aufgabe aufzufallen).
-        { $addFields: { _pendingFirst: { $cond: [{ $in: ['$ai_feedback_status', ['deferred', 'pending']] }, 0, 1] } } },
-        { $sort: { _pendingFirst: 1, ai_generated_at: -1, date: -1 } },
+        // Ausstehende Einträge werden ganz normal eingereiht (Absprache Jimmy 23.11., siehe utils/feedbackListSort.js).
+        ...FEEDBACK_LIST_SORT_STAGES,
         { $skip: skip },
         { $limit: limit },
         { $project: {
