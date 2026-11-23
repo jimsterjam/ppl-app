@@ -48,9 +48,11 @@ describe('Feedback-Liste: Reihenfolge', () => {
     assert.equal(list[0].id, 'b-neu-erzeugt')
   })
 
-  it('die Stufen: kein Anpinnen mehr, Sortierung nach Zeit, Workout-Datum als Gleichstand', () => {
+  it('die Stufen: kein Anpinnen mehr, Zeit zuerst (ai_generated_at, sonst Workout-Datum), Workout-Datum und ID als Gleichstand', () => {
     const text = JSON.stringify(FEEDBACK_LIST_SORT_STAGES)
     assert.ok(!text.includes('_pendingFirst'))
-    assert.deepEqual(FEEDBACK_LIST_SORT_STAGES[1], { $sort: { _sortAt: -1, date: -1 } })
+    assert.deepEqual(FEEDBACK_LIST_SORT_STAGES[0].$addFields._sortAt, { $ifNull: ['$ai_generated_at', '$date'] })
+    assert.deepEqual(Object.keys(FEEDBACK_LIST_SORT_STAGES[1].$sort), ['_sortAt', 'date', '_id'])
+    assert.ok(Object.values(FEEDBACK_LIST_SORT_STAGES[1].$sort).every((dir) => dir === -1))
   })
 })
