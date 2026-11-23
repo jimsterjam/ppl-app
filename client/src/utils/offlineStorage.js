@@ -649,7 +649,8 @@ export async function cacheCustomExercises(exercises) {
 // v3: Dubletten-Bereinigung (30.09.): 1731 in 0296 zusammengeführt, gleich benannte Varianten
 //     eindeutig benannt (z.B. Brustpresse Scheiben/Steckgewicht), alte Namen als "aliases".
 // v4: 3533 "quads (bodyweight squat)" heißt jetzt "bodyweight squat" (Suche nach Squat mit Körpergewicht-Filter), alte Namen als "aliases".
-const DEFAULT_EXERCISES_SEED_VERSION = 4
+// v5: Calisthenics-Übungen (ids 9012-9018) ergänzt, damit bestehende Installationen sie erhalten.
+const DEFAULT_EXERCISES_SEED_VERSION = 5
 const DEFAULT_EXERCISES_SEED_VERSION_KEY = 'default_exercises_seed_version'
 
 /**
