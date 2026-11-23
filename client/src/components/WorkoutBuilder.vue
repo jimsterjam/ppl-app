@@ -50,7 +50,9 @@ const canRenderBuilder = computed(() => initialReady.value || loadingUser.value 
 // Eigene Übungen sind userId-gebunden - nur für echte (angemeldete) User anbieten, nicht für 'guest'.
 const customExerciseUserId = computed(() => isSignedIn.value ? userIdComputed.value : '')
 
-const selectedType = ref('push')
+// Tagesart sofort aus der Route lesen: Ladevorgänge, die vor onMounted starten (z.B. durch die Anmeldung),
+// dürfen nicht mit der Standardart "push" laufen (Fund 23.11.: Full Body zeigte nur Push-Übungen).
+const selectedType = ref(readWorkoutBuilderRouteState(route.query).type)
 const selectedExercises = ref([])
 const exercises = ref([])
 const loading = ref(false)
@@ -270,7 +272,12 @@ onMounted(async () => {
 })
 
 // --- Exercises ---
+// Nur das Ergebnis des zuletzt gestarteten Ladevorgangs gilt: ein langsamer, älterer Aufruf (z.B. mit der
+// vorherigen Tagesart) darf die Liste nicht überschreiben.
+let loadSeq = 0
 async function loadExercises() {
+	const seq = ++loadSeq
+	const isStale = () => seq !== loadSeq
 	loading.value = true
 	try {
 		const categoryMap = { push: 'Push', pull: 'Pull', legs: 'Legs', fullbody: null }
@@ -279,6 +286,7 @@ async function loadExercises() {
 		if (categoryKey) params.category = categoryKey
 		logger.debug('[Builder] loadExercises start — type:', selectedType.value, 'category:', categoryKey, 'equipment:', selectedEquipment.value)
 		let list = await getMergedSortedExercises({ ...params, includeRemote: false })
+		if (isStale()) return
 		logger.debug('[Builder] getMergedSortedExercises returned:', list?.length || 0)
 		// Fallback: wenn merge leer, lade Defaults direkt
 		if (!list || list.length === 0) {
@@ -287,6 +295,7 @@ async function loadExercises() {
 				const defaults = normalizedExercises.value?.length
 					? normalizedExercises.value
 					: await loadDefaultExercises()
+				if (isStale()) return
 				logger.debug('[Builder] Defaults fallback count:', defaults?.length || 0)
 				list = categoryKey
 					? (defaults || []).filter(ex => (ex.category || '') === categoryKey)
@@ -298,6 +307,7 @@ async function loadExercises() {
 		exercises.value = Array.isArray(list) ? list : []
 		logger.debug('[Builder] exercises.value set to:', exercises.value.length)
 	} catch {
+		if (isStale()) return
 		// Letzter Fallback: normalizedExercises (schon in onMounted geladen)
 		const categoryMap = { push: 'Push', pull: 'Pull', legs: 'Legs', fullbody: null }
 		const categoryKey = categoryMap[selectedType.value]
@@ -306,7 +316,7 @@ async function loadExercises() {
 			? defaults.filter(ex => (ex.category || '') === categoryKey)
 			: defaults
 	} finally {
-		loading.value = false
+		if (!isStale()) loading.value = false
 	}
 }
 const filteredExercises = computed(() => {
