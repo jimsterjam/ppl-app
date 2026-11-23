@@ -55,6 +55,7 @@ import { extractNoteQuestions } from '../utils/noteQuestions.js';
 import { answerNoteQuestions } from '../services/noteQuestionService.js';
 import { selectExercisesForTotalTime, resolveTimeSelectionOptions, BUFFER_SECONDS } from '../utils/workoutTimeModel.js';
 import { applyGeneratorRule } from '../utils/repTargets.js';
+import { applyGoalChangeLine } from '../utils/goalChange.js';
 import { buildNextSessionFocus, buildProgressionStates, applyNextSessionFocus } from '../utils/nextSessionFocus.js';
 import { FIRST_LOOK_COMPARISON_MIN, applyFirstLookOutlook } from '../utils/firstLookOutlook.js';
 import { applyRestLine } from '../utils/restLine.js';
@@ -2539,6 +2540,8 @@ router.post("/:id/ai-analysis", firebaseAuthMiddleware, requireAiConsent, async 
       }
       // Sammelzeile "Der Rest lief stabil": von der App, nur wenn es wirklich weitere stabile Übungen gibt (utils/restLine.js).
       aiResult.feedback = coachText.allDropped ? coachText.text : applyRestLine(coachText.text, { exerciseAnalyses, language: feedbackLanguage });
+      // Trainingsziel gewechselt (z. B. Kraft -> Muskelaufbau): feste Zeile der App, damit der Grund der geänderten Zahlen sichtbar ist.
+      aiResult.feedback = applyGoalChangeLine(aiResult.feedback, exerciseAnalyses, feedbackLanguage);
       // Körpergewicht-Gegenüberstellung als feste Zeile (früher schrieb sie die KI).
       const bodyweightLine = buildBodyweightFactLine(bodyweightCorrelation, feedbackLanguage);
       if (bodyweightLine) aiResult.feedback = `${aiResult.feedback}\n\n${bodyweightLine}`;

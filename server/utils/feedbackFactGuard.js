@@ -88,6 +88,14 @@ export function findFactClaim(line, exerciseNames = []) {
   return null;
 }
 
+// Nennt der Text mindestens eine der Übungen (Groß-/Kleinschreibung egal)? Ohne bekannte Übungsnamen kann das nicht beurteilt werden: true.
+function mentionsAnyExercise(text, exerciseNames = []) {
+  const names = [...new Set((exerciseNames || []).map((n) => String(n || '').trim().toLowerCase()).filter((n) => n.length >= 3))];
+  if (!names.length) return true;
+  const haystack = String(text || '').toLowerCase();
+  return names.some((name) => haystack.includes(name));
+}
+
 const FALLBACK_TEXT = {
   de: 'Deine Auswertung steht oben: Dort siehst du, was sich zur letzten Session verändert hat.',
   en: 'Your summary is above: it shows what changed since your last session.'
@@ -134,6 +142,12 @@ export function sanitizeCoachText(feedbackText, { language = 'de', exerciseNames
 
   if (!text) {
     return { text: fallbackFeedbackText(language), droppedLines, reasons, allDropped: contentLines > 0 };
+  }
+  // Wurden Zeilen entfernt und nennt KEINE der übrigen Zeilen eine Übung, bleiben nur Einstieg und Abschluss ("Heute war ein
+  // interessanter Tag, es gibt einiges zu besprechen ... Mach weiter so"): eine Ankündigung ohne Inhalt (Fund Jimmy 23.11.).
+  // Dann gilt der Text als ganz entfernt und es erscheint der feste Hinweis.
+  if (droppedLines > 0 && !mentionsAnyExercise(text, exerciseNames)) {
+    return { text: fallbackFeedbackText(language), droppedLines, reasons: [...reasons, 'no_exercise_left'], allDropped: true };
   }
   return { text, droppedLines, reasons, allDropped: false };
 }

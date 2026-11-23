@@ -12,6 +12,7 @@
 
 import { logger } from '../utils/logger.js';
 import { isExerciseNotDone } from '../utils/exerciseDone.js';
+import { detectGoalChange } from '../utils/goalChange.js';
 import { determineTrendWithProfile, resolveEffectiveProfile, buildNoteContext } from './exerciseAnalysisRules.js';
 
 // Satzgewichte und ihre Änderungen auf 2 Nachkommastellen: 1,25-kg-Scheiben ergeben Werte wie
@@ -612,6 +613,13 @@ export function analyzeWorkoutProgression(currentWorkout, allWorkouts, profileMa
       // KI-Eingabe) liest exerciseNameForAI.
       if (analysis) analysis.exerciseNameForAI = exerciseNameForAI;
       if (analysis) analysis.workoutIndex = workoutIndex;
+      // Trainingsziel gegenüber der letzten Einheit gewechselt (z. B. Kraft -> Muskelaufbau)? Dann ist der Vergleich nicht gleichwertig.
+      if (analysis && previousWorkout) {
+        const goalChange = detectGoalChange({
+          exercise, previousExercise: previousEx, currentGoal: currentWorkout.goal, previousGoal: previousWorkout.goal
+        });
+        if (goalChange) analysis.goalChange = goalChange;
+      }
 
       if (analysis) {
         analysisResults.push(analysis);
@@ -822,6 +830,7 @@ export function structureAnalysisForAI(exerciseAnalyses, options = {}) {
       // routes/workouts.js. Fällt ohne Katalog-Match (z.B. eigene Übung) auf ex.exercise zurück.
       exercise: ex.exerciseNameForAI || ex.exercise,
       ...(ex.measureMode ? { measure_mode: ex.measureMode, ...(ex.timeTrend ? { time_trend: ex.timeTrend } : {}) } : {}),
+      ...(ex.goalChange ? { training_goal_changed: { from: ex.goalChange.from, to: ex.goalChange.to } } : {}),
       current_weight: ex.current?.weight || 0,
       current_reps: ex.current?.reps || 0,
       current_sets: ex.current?.sets || 0,
