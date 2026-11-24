@@ -48,6 +48,7 @@ import {
 } from '../utils/workoutSanitizer.js';
 import { decideExerciseMatch } from '../utils/exerciseMatching.js';
 import { getMaxExerciseCount } from '../utils/exerciseCountTarget.js';
+import { isTimedCatalogEntry } from '../utils/timedCatalogEntry.js';
 import { readAiQuotaConfig, getAiQuotaState, canUseAi, aiQuotaSnapshot } from '../utils/aiQuota.js';
 import { claimAiQuotaSlot, releaseAiQuotaSlot, withAiQuotaSlot } from '../utils/aiQuotaClaim.js';
 import { ensureAccountCreatedAt } from '../utils/accountCreation.js';
@@ -3847,6 +3848,8 @@ function getCatalogRemainderCandidates(requestedType, equipmentMode, goal, level
 
   const candidates = exerciseCatalog.filter((entry) => {
     if (!entry || !wantedCategories.includes(entry.category)) return false;
+    // Halteübungen (Messart Zeit) passen nicht zu den Wdh.-×-kg-Vorschlägen des Generators.
+    if (isTimedCatalogEntry(entry)) return false;
     const meta = entry.aiMetadata;
     if (!meta) return false;
     if (meta.primaryPhase === 'warmup' || meta.exerciseType === 'mobility') return false;

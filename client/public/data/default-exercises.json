@@ -1420,6 +1420,7 @@
   {
     "_id": "ex_3297",
     "id": "3297",
+    "measureMode": "time",
     "name": "Hinterer Hebel",
     "name_en": "back lever",
     "category": "Pull",
@@ -11342,6 +11343,7 @@
   {
     "_id": "ex_3544",
     "id": "3544",
+    "measureMode": "time",
     "name": "Seitliche Planke mit Körpergewicht neigen",
     "name_en": "bodyweight incline side plank",
     "category": "Core",
@@ -37499,6 +37501,7 @@
   {
     "_id": "ex_3301",
     "id": "3301",
+    "measureMode": "time",
     "name": "Froschplanche",
     "name_en": "frog planche",
     "category": "Core",
@@ -37548,6 +37551,7 @@
   {
     "_id": "ex_3296",
     "id": "3296",
+    "measureMode": "time",
     "name": "vorderer Hebel",
     "name_en": "front lever",
     "category": "Core",
@@ -37751,6 +37755,7 @@
   {
     "_id": "ex_3299",
     "id": "3299",
+    "measureMode": "time",
     "name": "volle Planche",
     "name_en": "full planche",
     "category": "Core",
@@ -38398,6 +38403,7 @@
   {
     "_id": "ex_3302",
     "id": "3302",
+    "measureMode": "time",
     "name": "Handstand",
     "name_en": "handstand",
     "category": "Push",
@@ -42670,6 +42676,7 @@
   {
     "_id": "ex_3418",
     "id": "3418",
+    "measureMode": "time",
     "name": "Klimmzug l-sit",
     "name_en": "pull-up l-sit",
     "category": "Pull",
@@ -42720,6 +42727,7 @@
   {
     "_id": "ex_3419",
     "id": "3419",
+    "measureMode": "time",
     "name": "l-setze mich auf den Boden",
     "name_en": "l-sit on floor",
     "category": "Core",
@@ -42866,6 +42874,7 @@
   {
     "_id": "ex_3300",
     "id": "3300",
+    "measureMode": "time",
     "name": "magere Planche",
     "name_en": "lean planche",
     "category": "Core",
@@ -48821,6 +48830,7 @@
   {
     "_id": "ex_3665",
     "id": "3665",
+    "measureMode": "time",
     "name": "Power-Point-Planke",
     "name_en": "power point plank",
     "category": "Core",
@@ -51928,6 +51938,7 @@
   {
     "_id": "ex_0705",
     "id": "0705",
+    "measureMode": "time",
     "name": "Seitenbrücke v. 2",
     "name_en": "side bridge v. 2",
     "category": "Core",
@@ -56722,6 +56733,7 @@
   {
     "_id": "ex_3298",
     "id": "3298",
+    "measureMode": "time",
     "name": "Spreizplanche",
     "name_en": "straddle planche",
     "category": "Core",
@@ -57818,6 +57830,7 @@
   {
     "_id": "ex_3420",
     "id": "3420",
+    "measureMode": "time",
     "name": "V-auf dem Boden sitzen",
     "name_en": "v-sit on floor",
     "category": "Core",
@@ -60867,6 +60880,7 @@
   {
     "_id": "ex_9013",
     "id": "9013",
+    "measureMode": "time",
     "name": "Tuck Planche",
     "name_en": "tuck planche",
     "category": "Core",
@@ -60917,6 +60931,7 @@
   {
     "_id": "ex_9014",
     "id": "9014",
+    "measureMode": "time",
     "name": "Tuck Front Lever",
     "name_en": "tuck front lever",
     "category": "Core",
@@ -60967,6 +60982,7 @@
   {
     "_id": "ex_9015",
     "id": "9015",
+    "measureMode": "time",
     "name": "Advanced Tuck Front Lever",
     "name_en": "advanced tuck front lever",
     "category": "Core",
