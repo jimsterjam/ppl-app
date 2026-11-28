@@ -61176,5 +61176,630 @@
         "bodyweight_only"
       ]
     }
+  },
+  {
+    "_id": "ex_9019",
+    "id": "9019",
+    "measureMode": "time",
+    "name": "Plank",
+    "name_en": "plank",
+    "category": "Core",
+    "category_raw": "strength",
+    "muscleGroup": "Bauch",
+    "muscleGroup_en": "abs",
+    "equipment": "Körpergewicht",
+    "equipment_en": "body weight",
+    "description": "Die Plank ist eine Halteübung im Unterarmstütz: Der Körper bildet eine gerade Linie von Kopf bis Ferse. Sie trainiert die gesamte Rumpfmuskulatur und ist die Grundübung für Körperspannung.",
+    "description_en": "The plank is a hold in the forearm support position: the body forms a straight line from head to heels. It trains the entire trunk and is the basic exercise for body tension.",
+    "imageUrl": "",
+    "thumbnailUrl": "",
+    "bodyPart": "waist",
+    "target": "abs",
+    "secondaryMuscles": [
+      "shoulders",
+      "glutes"
+    ],
+    "instructions": [
+      "Stützen Sie sich auf Unterarme und Fußspitzen, die Ellbogen stehen direkt unter den Schultern.",
+      "Spannen Sie Bauch und Gesäß an, der Körper bildet eine gerade Linie.",
+      "Der Blick geht zum Boden, der Rücken hängt nicht durch und das Gesäß ragt nicht nach oben.",
+      "Halten Sie die Position für die geplante Zeit und atmen Sie ruhig weiter."
+    ],
+    "instructions_en": [
+      "Support yourself on your forearms and toes with your elbows directly under your shoulders.",
+      "Tighten your abs and glutes so your body forms a straight line.",
+      "Look at the floor; do not let your back sag or your hips pike up.",
+      "Hold the position for the planned time and keep breathing calmly."
+    ],
+    "difficulty": "beginner",
+    "aiMetadata": {
+      "exerciseType": "core",
+      "primaryPhase": "core",
+      "minDifficulty": "beginner",
+      "disallowedGoals": [],
+      "allowedEquipmentModes": [
+        "gym_only",
+        "gym_plus_bodyweight",
+        "bodyweight_only"
+      ]
+    },
+    "aliases": [
+      "Forearm Plank",
+      "Elbow Plank",
+      "Unterarmstütz"
+    ]
+  },
+  {
+    "_id": "ex_9020",
+    "id": "9020",
+    "measureMode": "time",
+    "name": "Hollow Body Hold",
+    "name_en": "hollow body hold",
+    "category": "Core",
+    "category_raw": "strength",
+    "muscleGroup": "Bauch",
+    "muscleGroup_en": "abs",
+    "equipment": "Körpergewicht",
+    "equipment_en": "body weight",
+    "description": "Der Hollow Body Hold ist eine Halteübung in Rückenlage: Schultern und gestreckte Beine sind leicht vom Boden abgehoben, der untere Rücken bleibt am Boden. Er trainiert die gerade Bauchmuskulatur und ist die Grundposition für viele Calisthenics-Skills.",
+    "description_en": "The hollow body hold is a hold on your back: shoulders and straight legs are lifted slightly off the floor while the lower back stays pressed into the floor. It trains the abs and is the base position for many calisthenics skills.",
+    "imageUrl": "",
+    "thumbnailUrl": "",
+    "bodyPart": "waist",
+    "target": "abs",
+    "secondaryMuscles": [
+      "hip flexors",
+      "obliques"
+    ],
+    "instructions": [
+      "Legen Sie sich auf den Rücken und strecken Sie die Arme über den Kopf.",
+      "Drücken Sie den unteren Rücken fest in den Boden.",
+      "Heben Sie Schultern und gestreckte Beine einige Zentimeter vom Boden ab, der Körper bildet eine flache Schale.",
+      "Halten Sie die Position für die geplante Zeit. Wird es zu schwer, beugen Sie die Knie oder legen Sie die Arme an den Körper."
+    ],
+    "instructions_en": [
+      "Lie on your back with your arms stretched overhead.",
+      "Press your lower back firmly into the floor.",
+      "Lift your shoulders and straight legs a few centimetres off the floor so your body forms a shallow bowl.",
+      "Hold the position for the planned time. If it gets too hard, bend your knees or bring your arms to your sides."
+    ],
+    "difficulty": "intermediate",
+    "aiMetadata": {
+      "exerciseType": "core",
+      "primaryPhase": "core",
+      "minDifficulty": "intermediate",
+      "disallowedGoals": [],
+      "allowedEquipmentModes": [
+        "gym_only",
+        "gym_plus_bodyweight",
+        "bodyweight_only"
+      ]
+    },
+    "aliases": [
+      "Hollow Hold",
+      "Hollow Body Position",
+      "Hollow Position"
+    ]
+  },
+  {
+    "_id": "ex_9021",
+    "id": "9021",
+    "measureMode": "time",
+    "name": "Arch Body Hold",
+    "name_en": "arch body hold",
+    "category": "Pull",
+    "category_raw": "strength",
+    "muscleGroup": "Rücken",
+    "muscleGroup_en": "back",
+    "equipment": "Körpergewicht",
+    "equipment_en": "body weight",
+    "description": "Der Arch Body Hold ist eine Halteübung in Bauchlage: Arme, Brust und Beine sind vom Boden abgehoben und der Körper bildet einen flachen Bogen. Er trainiert den unteren Rücken und das Gesäß und ist der Gegenpart zum Hollow Body Hold.",
+    "description_en": "The arch body hold is a hold on your stomach: arms, chest and legs are lifted off the floor so the body forms a shallow arch. It trains the lower back and glutes and is the counterpart of the hollow body hold.",
+    "imageUrl": "",
+    "thumbnailUrl": "",
+    "bodyPart": "back",
+    "target": "spine",
+    "secondaryMuscles": [
+      "glutes",
+      "hamstrings",
+      "shoulders"
+    ],
+    "instructions": [
+      "Legen Sie sich auf den Bauch und strecken Sie die Arme nach vorne.",
+      "Heben Sie Arme, Brust und gestreckte Beine gleichzeitig vom Boden ab.",
+      "Spannen Sie Gesäß und Rücken an, der Blick geht zum Boden, der Nacken bleibt lang.",
+      "Halten Sie die Position für die geplante Zeit und senken Sie sich kontrolliert ab."
+    ],
+    "instructions_en": [
+      "Lie on your stomach with your arms stretched forward.",
+      "Lift your arms, chest and straight legs off the floor at the same time.",
+      "Tighten your glutes and back, look at the floor and keep your neck long.",
+      "Hold the position for the planned time and lower yourself under control."
+    ],
+    "difficulty": "beginner",
+    "aiMetadata": {
+      "exerciseType": "compound",
+      "primaryPhase": "main",
+      "minDifficulty": "beginner",
+      "disallowedGoals": [],
+      "allowedEquipmentModes": [
+        "gym_only",
+        "gym_plus_bodyweight",
+        "bodyweight_only"
+      ]
+    },
+    "aliases": [
+      "Arch Hold",
+      "Superman Hold"
+    ]
+  },
+  {
+    "_id": "ex_9022",
+    "id": "9022",
+    "measureMode": "time",
+    "name": "Dead Hang",
+    "name_en": "dead hang",
+    "category": "Pull",
+    "category_raw": "strength",
+    "muscleGroup": "Rücken",
+    "muscleGroup_en": "back",
+    "equipment": "Körpergewicht",
+    "equipment_en": "body weight",
+    "description": "Der Dead Hang ist ein freies Hängen an der Stange mit gestreckten Armen. Er trainiert die Griffkraft, dehnt Schultern und Rücken und bereitet auf Klimmzüge vor.",
+    "description_en": "The dead hang is a passive hang from a bar with straight arms. It trains grip strength, stretches the shoulders and back and prepares you for pull-ups.",
+    "imageUrl": "",
+    "thumbnailUrl": "",
+    "bodyPart": "back",
+    "target": "lats",
+    "secondaryMuscles": [
+      "forearms",
+      "shoulders"
+    ],
+    "instructions": [
+      "Greifen Sie die Stange im Obergriff, etwa schulterbreit.",
+      "Lassen Sie sich mit gestreckten Armen hängen, die Füße berühren den Boden nicht.",
+      "Lassen Sie die Schultern locker, der Körper schwingt nicht.",
+      "Halten Sie die Position für die geplante Zeit und steigen Sie kontrolliert wieder ab."
+    ],
+    "instructions_en": [
+      "Grab the bar with an overhand grip, about shoulder-width apart.",
+      "Hang with straight arms and your feet off the floor.",
+      "Keep your shoulders relaxed and do not swing.",
+      "Hold the position for the planned time and step down under control."
+    ],
+    "difficulty": "beginner",
+    "aiMetadata": {
+      "exerciseType": "isolation",
+      "primaryPhase": "main",
+      "minDifficulty": "beginner",
+      "disallowedGoals": [],
+      "allowedEquipmentModes": [
+        "gym_only",
+        "gym_plus_bodyweight",
+        "bodyweight_only"
+      ]
+    },
+    "aliases": [
+      "Passive Hang",
+      "Bar Hang"
+    ]
+  },
+  {
+    "_id": "ex_9023",
+    "id": "9023",
+    "measureMode": "time",
+    "name": "Flexed Arm Hang",
+    "name_en": "flexed arm hang",
+    "category": "Pull",
+    "category_raw": "strength",
+    "muscleGroup": "Rücken",
+    "muscleGroup_en": "back",
+    "equipment": "Körpergewicht",
+    "equipment_en": "body weight",
+    "description": "Der Flexed Arm Hang ist eine Halteübung an der Stange: Das Kinn bleibt oberhalb der Stange, die Arme sind gebeugt. Er trainiert Latissimus, Bizeps und Griffkraft und ist eine gute Vorstufe zum Klimmzug.",
+    "description_en": "The flexed arm hang is a hold on a bar: your chin stays above the bar with your arms bent. It trains the lats, biceps and grip strength and is a good step towards the pull-up.",
+    "imageUrl": "",
+    "thumbnailUrl": "",
+    "bodyPart": "back",
+    "target": "lats",
+    "secondaryMuscles": [
+      "biceps",
+      "forearms"
+    ],
+    "instructions": [
+      "Greifen Sie die Stange im Obergriff und steigen oder springen Sie so hoch, dass das Kinn über der Stange ist.",
+      "Beugen Sie die Arme und ziehen Sie die Schulterblätter nach unten und hinten.",
+      "Halten Sie das Kinn über der Stange, der Körper schwingt nicht.",
+      "Halten Sie die Position für die geplante Zeit und lassen Sie sich danach langsam ab."
+    ],
+    "instructions_en": [
+      "Grab the bar with an overhand grip and step or jump up so your chin is above the bar.",
+      "Bend your arms and pull your shoulder blades down and back.",
+      "Keep your chin above the bar and do not swing.",
+      "Hold the position for the planned time and lower yourself slowly afterwards."
+    ],
+    "difficulty": "intermediate",
+    "aiMetadata": {
+      "exerciseType": "compound",
+      "primaryPhase": "main",
+      "minDifficulty": "intermediate",
+      "disallowedGoals": [],
+      "allowedEquipmentModes": [
+        "gym_only",
+        "gym_plus_bodyweight",
+        "bodyweight_only"
+      ]
+    },
+    "aliases": [
+      "Chin Over Bar Hold",
+      "Chin-Up Hold",
+      "Top Position Hold"
+    ]
+  },
+  {
+    "_id": "ex_9024",
+    "id": "9024",
+    "measureMode": "time",
+    "name": "Wall Sit",
+    "name_en": "wall sit",
+    "category": "Legs",
+    "category_raw": "strength",
+    "muscleGroup": "Quadrizeps",
+    "muscleGroup_en": "quads",
+    "equipment": "Körpergewicht",
+    "equipment_en": "body weight",
+    "description": "Der Wall Sit ist eine Halteübung für die Beine: Der Rücken lehnt an der Wand, Hüfte und Knie sind im rechten Winkel gebeugt, als würden Sie auf einem unsichtbaren Stuhl sitzen. Er trainiert vor allem den Quadrizeps.",
+    "description_en": "The wall sit is a leg hold: your back leans against the wall with hips and knees bent at a right angle, as if sitting on an invisible chair. It mainly trains the quads.",
+    "imageUrl": "",
+    "thumbnailUrl": "",
+    "bodyPart": "upper legs",
+    "target": "quads",
+    "secondaryMuscles": [
+      "glutes",
+      "hamstrings"
+    ],
+    "instructions": [
+      "Stellen Sie sich mit dem Rücken an eine Wand, die Füße etwa einen Schritt von der Wand entfernt.",
+      "Rutschen Sie an der Wand nach unten, bis Hüfte und Knie im rechten Winkel gebeugt sind.",
+      "Die Knie stehen über den Füßen, der Rücken bleibt an der Wand, die Hände liegen nicht auf den Oberschenkeln.",
+      "Halten Sie die Position für die geplante Zeit und rutschen Sie dann wieder nach oben."
+    ],
+    "instructions_en": [
+      "Stand with your back against a wall and your feet about one step away from it.",
+      "Slide down the wall until your hips and knees are bent at a right angle.",
+      "Keep your knees over your feet, your back against the wall and your hands off your thighs.",
+      "Hold the position for the planned time and then slide back up."
+    ],
+    "difficulty": "beginner",
+    "aiMetadata": {
+      "exerciseType": "compound",
+      "primaryPhase": "main",
+      "minDifficulty": "beginner",
+      "disallowedGoals": [],
+      "allowedEquipmentModes": [
+        "gym_only",
+        "gym_plus_bodyweight",
+        "bodyweight_only"
+      ]
+    },
+    "aliases": [
+      "Wall Squat Hold",
+      "Wandsitzen"
+    ]
+  },
+  {
+    "_id": "ex_9025",
+    "id": "9025",
+    "measureMode": "time",
+    "name": "Crow Pose",
+    "name_en": "crow pose",
+    "category": "Push",
+    "category_raw": "strength",
+    "muscleGroup": "Schultern",
+    "muscleGroup_en": "shoulders",
+    "equipment": "Körpergewicht",
+    "equipment_en": "body weight",
+    "description": "Die Crow Pose (Krähe) ist eine Balance auf den Händen: Die Knie liegen auf den Oberarmen, die Füße sind vom Boden abgehoben. Sie trainiert Schultern, Handgelenke und Rumpf und ist die Einstiegsübung für Handstand und Planche.",
+    "description_en": "The crow pose is a balance on the hands: your knees rest on your upper arms and your feet are off the floor. It trains the shoulders, wrists and trunk and is the entry exercise for the handstand and planche.",
+    "imageUrl": "",
+    "thumbnailUrl": "",
+    "bodyPart": "shoulders",
+    "target": "delts",
+    "secondaryMuscles": [
+      "triceps",
+      "forearms",
+      "core"
+    ],
+    "instructions": [
+      "Gehen Sie in die tiefe Hocke und setzen Sie die Hände schulterbreit auf den Boden, die Finger sind gespreizt.",
+      "Legen Sie die Knie auf die Oberarme, möglichst nah an die Achseln.",
+      "Verlagern Sie das Gewicht langsam nach vorne und heben Sie erst einen, dann beide Füße vom Boden ab.",
+      "Halten Sie die Position für die geplante Zeit, die Arme sind leicht gebeugt oder gestreckt. Legen Sie zur Sicherheit ein Kissen vor sich."
+    ],
+    "instructions_en": [
+      "Go into a deep squat and place your hands shoulder-width apart on the floor with your fingers spread.",
+      "Rest your knees on your upper arms, as close to your armpits as possible.",
+      "Slowly shift your weight forward and lift first one, then both feet off the floor.",
+      "Hold the position for the planned time with your arms slightly bent or straight. Place a cushion in front of you for safety."
+    ],
+    "difficulty": "intermediate",
+    "aiMetadata": {
+      "exerciseType": "compound",
+      "primaryPhase": "main",
+      "minDifficulty": "intermediate",
+      "disallowedGoals": [],
+      "allowedEquipmentModes": [
+        "gym_only",
+        "gym_plus_bodyweight",
+        "bodyweight_only"
+      ]
+    },
+    "aliases": [
+      "Crow Stand",
+      "Crow Hold",
+      "Frog Stand",
+      "Krähe"
+    ]
+  },
+  {
+    "_id": "ex_9026",
+    "id": "9026",
+    "measureMode": "time",
+    "name": "Parallel Bar Support Hold",
+    "name_en": "parallel bar support hold",
+    "category": "Push",
+    "category_raw": "strength",
+    "muscleGroup": "Trizeps",
+    "muscleGroup_en": "triceps",
+    "equipment": "Körpergewicht",
+    "equipment_en": "body weight",
+    "description": "Der Parallel Bar Support Hold ist ein Stütz auf Barren: Der Körper hängt mit gestreckten Armen zwischen den Holmen. Er trainiert Trizeps, Schultern und Rumpf und ist die Grundposition für Dips und Skills am Barren.",
+    "description_en": "The parallel bar support hold is a support on parallel bars: the body is held between the bars with straight arms. It trains the triceps, shoulders and trunk and is the base position for dips and bar skills.",
+    "imageUrl": "",
+    "thumbnailUrl": "",
+    "bodyPart": "upper arms",
+    "target": "triceps",
+    "secondaryMuscles": [
+      "shoulders",
+      "chest",
+      "core"
+    ],
+    "instructions": [
+      "Greifen Sie die Holme, steigen Sie auf und strecken Sie die Arme.",
+      "Drücken Sie die Schultern nach unten, weg von den Ohren, die Ellbogen bleiben gestreckt.",
+      "Spannen Sie den Bauch an, die Beine bleiben leicht vor dem Körper.",
+      "Halten Sie die Position für die geplante Zeit und steigen Sie kontrolliert ab."
+    ],
+    "instructions_en": [
+      "Grab the bars, step up and straighten your arms.",
+      "Press your shoulders down, away from your ears, and keep your elbows locked.",
+      "Tighten your abs and keep your legs slightly in front of your body.",
+      "Hold the position for the planned time and step down under control."
+    ],
+    "difficulty": "intermediate",
+    "aiMetadata": {
+      "exerciseType": "compound",
+      "primaryPhase": "main",
+      "minDifficulty": "intermediate",
+      "disallowedGoals": [],
+      "allowedEquipmentModes": [
+        "gym_only",
+        "gym_plus_bodyweight",
+        "bodyweight_only"
+      ]
+    },
+    "aliases": [
+      "Dip Support Hold",
+      "Support Hold",
+      "Parallettes Support Hold"
+    ]
+  },
+  {
+    "_id": "ex_9027",
+    "id": "9027",
+    "measureMode": "time",
+    "name": "Straddle Front Lever",
+    "name_en": "straddle front lever",
+    "category": "Core",
+    "category_raw": "strength",
+    "muscleGroup": "Bauch",
+    "muscleGroup_en": "abs",
+    "equipment": "Körpergewicht",
+    "equipment_en": "body weight",
+    "description": "Der Straddle Front Lever ist eine Halteübung an der Stange: Der Körper hängt waagerecht, die gestreckten Beine sind gespreizt. Er ist die Stufe zwischen Advanced Tuck und vollem Front Lever und trainiert Latissimus, Rumpf und Griffkraft.",
+    "description_en": "The straddle front lever is a hold on a bar: the body hangs horizontally with the straight legs spread apart. It is the step between the advanced tuck and the full front lever and trains the lats, trunk and grip strength.",
+    "imageUrl": "",
+    "thumbnailUrl": "",
+    "bodyPart": "waist",
+    "target": "abs",
+    "secondaryMuscles": [
+      "lats",
+      "shoulders",
+      "forearms"
+    ],
+    "instructions": [
+      "Greifen Sie die Stange im Obergriff und gehen Sie aus dem Hang in den Advanced Tuck Front Lever.",
+      "Strecken Sie die Hüfte und die Beine nach hinten und spreizen Sie die Beine, bis der Körper waagerecht ist.",
+      "Halten Sie die Arme gestreckt, ziehen Sie die Schulterblätter nach unten und spannen Sie den Rumpf an.",
+      "Halten Sie die Position für die geplante Zeit und kehren Sie kontrolliert in den Hang zurück."
+    ],
+    "instructions_en": [
+      "Grab the bar with an overhand grip and move from the hang into the advanced tuck front lever.",
+      "Extend your hips and legs backwards and spread your legs until your body is horizontal.",
+      "Keep your arms straight, pull your shoulder blades down and tighten your trunk.",
+      "Hold the position for the planned time and return to the hang under control."
+    ],
+    "difficulty": "advanced",
+    "aiMetadata": {
+      "exerciseType": "core",
+      "primaryPhase": "core",
+      "minDifficulty": "advanced",
+      "disallowedGoals": [],
+      "allowedEquipmentModes": [
+        "gym_only",
+        "gym_plus_bodyweight",
+        "bodyweight_only"
+      ]
+    },
+    "aliases": [
+      "Straddle FL",
+      "Straddle Front Lever Hold"
+    ]
+  },
+  {
+    "_id": "ex_9028",
+    "id": "9028",
+    "measureMode": "time",
+    "name": "Tuck Back Lever",
+    "name_en": "tuck back lever",
+    "category": "Pull",
+    "category_raw": "strength",
+    "muscleGroup": "Rücken",
+    "muscleGroup_en": "back",
+    "equipment": "Körpergewicht",
+    "equipment_en": "body weight",
+    "description": "Der Tuck Back Lever ist eine Halteübung an der Stange: Aus dem Umgedrehten Hang (Skin the Cat) wird der Körper mit angezogenen Knien waagerecht, das Gesicht zeigt zum Boden. Er ist die Einstiegsstufe zum vollen Back Lever und trainiert Rücken, Schultern und Rumpf.",
+    "description_en": "The tuck back lever is a hold on a bar: from an inverted hang (skin the cat) the body is held horizontally with the knees tucked and the face towards the floor. It is the entry step towards the full back lever and trains the back, shoulders and trunk.",
+    "imageUrl": "",
+    "thumbnailUrl": "",
+    "bodyPart": "back",
+    "target": "lats",
+    "secondaryMuscles": [
+      "shoulders",
+      "biceps",
+      "core"
+    ],
+    "instructions": [
+      "Greifen Sie die Stange im Obergriff, ziehen Sie die Knie an und drehen Sie sich nach hinten in den umgedrehten Hang.",
+      "Senken Sie die Hüfte, bis der Körper waagerecht und das Gesicht zum Boden gerichtet ist.",
+      "Halten Sie die Arme gestreckt und die Knie an die Brust gezogen.",
+      "Halten Sie die Position für die geplante Zeit und drehen Sie sich kontrolliert zurück."
+    ],
+    "instructions_en": [
+      "Grab the bar with an overhand grip, pull your knees up and rotate backwards into the inverted hang.",
+      "Lower your hips until your body is horizontal and your face points towards the floor.",
+      "Keep your arms straight and your knees pulled to your chest.",
+      "Hold the position for the planned time and rotate back under control."
+    ],
+    "difficulty": "advanced",
+    "aiMetadata": {
+      "exerciseType": "compound",
+      "primaryPhase": "main",
+      "minDifficulty": "advanced",
+      "disallowedGoals": [],
+      "allowedEquipmentModes": [
+        "gym_only",
+        "gym_plus_bodyweight",
+        "bodyweight_only"
+      ]
+    },
+    "aliases": [
+      "Tuck BL",
+      "Tuck Back Lever Hold"
+    ]
+  },
+  {
+    "_id": "ex_9029",
+    "id": "9029",
+    "measureMode": "time",
+    "name": "Advanced Tuck Back Lever",
+    "name_en": "advanced tuck back lever",
+    "category": "Pull",
+    "category_raw": "strength",
+    "muscleGroup": "Rücken",
+    "muscleGroup_en": "back",
+    "equipment": "Körpergewicht",
+    "equipment_en": "body weight",
+    "description": "Der Advanced Tuck Back Lever ist eine Halteübung an der Stange: Wie beim Tuck Back Lever, aber die Hüfte ist weiter geöffnet und der Rücken gerade. Er ist die Zwischenstufe auf dem Weg zum Straddle und zum vollen Back Lever.",
+    "description_en": "The advanced tuck back lever is a hold on a bar: like the tuck back lever, but with the hips opened further and the back straight. It is the intermediate step towards the straddle and the full back lever.",
+    "imageUrl": "",
+    "thumbnailUrl": "",
+    "bodyPart": "back",
+    "target": "lats",
+    "secondaryMuscles": [
+      "shoulders",
+      "biceps",
+      "core"
+    ],
+    "instructions": [
+      "Gehen Sie in den Tuck Back Lever mit gestreckten Armen.",
+      "Öffnen Sie die Hüfte, bis der Rücken gerade ist, die Knie bleiben gebeugt und zeigen zur Brust.",
+      "Der Körper bleibt waagerecht, die Schultern sind aktiv und die Arme gestreckt.",
+      "Halten Sie die Position für die geplante Zeit und kehren Sie kontrolliert in den umgedrehten Hang zurück."
+    ],
+    "instructions_en": [
+      "Move into the tuck back lever with straight arms.",
+      "Open your hips until your back is straight; your knees stay bent and point towards your chest.",
+      "Keep your body horizontal with active shoulders and straight arms.",
+      "Hold the position for the planned time and return to the inverted hang under control."
+    ],
+    "difficulty": "advanced",
+    "aiMetadata": {
+      "exerciseType": "compound",
+      "primaryPhase": "main",
+      "minDifficulty": "advanced",
+      "disallowedGoals": [],
+      "allowedEquipmentModes": [
+        "gym_only",
+        "gym_plus_bodyweight",
+        "bodyweight_only"
+      ]
+    },
+    "aliases": [
+      "Adv Tuck Back Lever",
+      "Advanced Tuck BL"
+    ]
+  },
+  {
+    "_id": "ex_9030",
+    "id": "9030",
+    "measureMode": "time",
+    "name": "Straddle Back Lever",
+    "name_en": "straddle back lever",
+    "category": "Pull",
+    "category_raw": "strength",
+    "muscleGroup": "Rücken",
+    "muscleGroup_en": "back",
+    "equipment": "Körpergewicht",
+    "equipment_en": "body weight",
+    "description": "Der Straddle Back Lever ist eine Halteübung an der Stange: Der Körper ist waagerecht und gestreckt, die Beine sind gespreizt. Er ist die Stufe zwischen Advanced Tuck und vollem Back Lever.",
+    "description_en": "The straddle back lever is a hold on a bar: the body is horizontal and extended with the legs spread apart. It is the step between the advanced tuck and the full back lever.",
+    "imageUrl": "",
+    "thumbnailUrl": "",
+    "bodyPart": "back",
+    "target": "lats",
+    "secondaryMuscles": [
+      "shoulders",
+      "biceps",
+      "core"
+    ],
+    "instructions": [
+      "Gehen Sie in den Advanced Tuck Back Lever.",
+      "Strecken Sie die Beine nach hinten und spreizen Sie sie, bis der Körper waagerecht ist.",
+      "Halten Sie die Arme gestreckt, die Schultern aktiv und den Rumpf angespannt.",
+      "Halten Sie die Position für die geplante Zeit und kehren Sie kontrolliert in den umgedrehten Hang zurück."
+    ],
+    "instructions_en": [
+      "Move into the advanced tuck back lever.",
+      "Extend your legs backwards and spread them until your body is horizontal.",
+      "Keep your arms straight, your shoulders active and your trunk tight.",
+      "Hold the position for the planned time and return to the inverted hang under control."
+    ],
+    "difficulty": "advanced",
+    "aiMetadata": {
+      "exerciseType": "compound",
+      "primaryPhase": "main",
+      "minDifficulty": "advanced",
+      "disallowedGoals": [],
+      "allowedEquipmentModes": [
+        "gym_only",
+        "gym_plus_bodyweight",
+        "bodyweight_only"
+      ]
+    },
+    "aliases": [
+      "Straddle BL",
+      "Straddle Back Lever Hold"
+    ]
   }
 ]
