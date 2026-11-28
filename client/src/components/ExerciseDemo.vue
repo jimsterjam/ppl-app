@@ -75,6 +75,9 @@ function start() {
   rafId = requestAnimationFrame(tick)
 }
 
+// Standbild: ohne Wandhalterung (Boden und Stange bleiben als Hinweis, was gehalten wird)
+const sceneLines = computed(() => (props.still ? frame.value.scene.lines.filter((l) => l.cls !== 'wall') : frame.value.scene.lines))
+
 const viewBox = computed(() => {
   if (!props.still) return `0 0 ${lay.value.width} ${lay.value.height}`
   const b = frameBounds(frame.value)
@@ -100,16 +103,19 @@ watch(() => [props.demo, props.still], start)
     class="exercise-demo"
     :class="{ 'is-still': still }"
     :viewBox="viewBox"
-    role="img"
-    :aria-label="title"
+    :role="still ? undefined : 'img'"
+    :aria-label="still ? undefined : title"
+    :aria-hidden="still ? 'true' : undefined"
     preserveAspectRatio="xMidYMid meet"
   >
     <g class="ed-scene">
-      <line v-for="(l, i) in frame.scene.lines" :key="`l${i}`" :class="l.cls" :x1="l.x1" :y1="l.y1" :x2="l.x2" :y2="l.y2" />
-      <rect v-for="(r, i) in frame.scene.rects" :key="`r${i}`" :class="r.cls" :x="r.x" :y="r.y" :width="r.w" :height="r.h" rx="3" />
-      <circle v-for="(c, i) in frame.scene.circles" :key="`c${i}`" :class="c.cls" :cx="c.cx" :cy="c.cy" :r="c.r" />
+      <line v-for="(l, i) in sceneLines" :key="`l${i}`" :class="l.cls" :x1="l.x1" :y1="l.y1" :x2="l.x2" :y2="l.y2" />
+      <template v-if="!still">
+        <rect v-for="(r, i) in frame.scene.rects" :key="`r${i}`" :class="r.cls" :x="r.x" :y="r.y" :width="r.w" :height="r.h" rx="3" />
+        <circle v-for="(c, i) in frame.scene.circles" :key="`c${i}`" :class="c.cls" :cx="c.cx" :cy="c.cy" :r="c.r" />
+      </template>
     </g>
-    <g class="ed-halo" :class="{ on: frame.holding }">
+    <g v-if="!still" class="ed-halo" :class="{ on: frame.holding }">
       <line v-for="(s, i) in frame.near" :key="`h${i}`" class="halo-seg" :x1="s.x1" :y1="s.y1" :x2="s.x2" :y2="s.y2" />
     </g>
     <g class="ed-figure">
@@ -122,7 +128,9 @@ watch(() => [props.demo, props.still], start)
         :x1="s.x1" :y1="s.y1" :x2="s.x2" :y2="s.y2"
       />
       <circle class="head" :cx="frame.head.cx" :cy="frame.head.cy" :r="frame.head.r" />
-      <circle v-for="(j, i) in frame.joints" :key="`j${i}`" class="joint" :cx="j.cx" :cy="j.cy" :r="j.r" />
+      <template v-if="!still">
+        <circle v-for="(j, i) in frame.joints" :key="`j${i}`" class="joint" :cx="j.cx" :cy="j.cy" :r="j.r" />
+      </template>
     </g>
   </svg>
 </template>
@@ -155,7 +163,6 @@ watch(() => [props.demo, props.still], start)
 .is-still .limb { stroke-width: 3px; vector-effect: non-scaling-stroke; }
 .is-still .limb.torso.hot { stroke-width: 3.6px; }
 .is-still .head { stroke-width: 2.6px; vector-effect: non-scaling-stroke; }
-.is-still .joint, .is-still .ed-halo, .is-still .wall, .is-still .box { display: none; }
 .is-still .floor, .is-still .bar { stroke-width: 2px; vector-effect: non-scaling-stroke; }
 @media (prefers-reduced-motion: reduce) {
   .ed-halo.on { animation: none; opacity: 0.3; }

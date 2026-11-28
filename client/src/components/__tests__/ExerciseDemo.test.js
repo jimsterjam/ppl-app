@@ -4,6 +4,7 @@ import { mount } from '@vue/test-utils'
 import { nextTick } from 'vue'
 import ExerciseDemo from '../ExerciseDemo.vue'
 import { EXERCISE_DEMOS } from '@/utils/exerciseDemo/demos'
+import { buildFrame, layout } from '@/utils/exerciseDemo/engine'
 
 const plank = EXERCISE_DEMOS.find((d) => d.id === '9019')
 const tuck = EXERCISE_DEMOS.find((d) => d.id === '9013')
@@ -140,16 +141,28 @@ describe('ExerciseDemo', () => {
     expect(motionListeners.length).toBe(0)
   })
 
-  it('Standbild (still): keine Animation, kein Leuchten, quadratischer Ausschnitt um die Figur', async () => {
+  it('Standbild (still): keine Animation, Endhaltung, dekorativ, ohne unsichtbare Teile', async () => {
     const w = mount(ExerciseDemo, { props: { demo: hang, title: 'dead hang', still: true } })
     await nextTick()
     expect(rafCallbacks.size).toBe(0)
-    expect(w.find('svg').classes()).toContain('is-still')
-    expect(w.find('.ed-halo').classes()).not.toContain('on')
-    const vb = w.find('svg').attributes('viewBox').split(' ').map(Number)
+    const svg = w.find('svg')
+    expect(svg.classes()).toContain('is-still')
+    expect(svg.attributes('aria-hidden')).toBe('true')
+    expect(svg.attributes('role')).toBeUndefined()
+    expect(svg.attributes('aria-label')).toBeUndefined()
+    const vb = svg.attributes('viewBox').split(' ').map(Number)
     expect(vb[2]).toBe(vb[3])
-    // Endhaltung: der Dead Hang hängt (Hang-Haltung), nicht auf der Kiste: Füße liegen rechts neben der Kiste
-    expect(w.find('.box').exists()).toBe(true)
+    // nichts, was CSS verstecken müsste: kein Leuchten, keine Gelenkpunkte, keine Kiste/Wand
+    for (const sel of ['.ed-halo', '.joint', '.box', '.wall']) expect(w.find(sel).exists(), sel).toBe(false)
+    // gezeichnet wird genau die Endhaltung (t = 1), nicht der Anfang
+    const expected = buildFrame(hang, layout(hang), 1, false)
+    const first = w.findAll('line.limb:not(.far)')[0].attributes()
+    expect(Number(first.x1)).toBeCloseTo(expected.near[0].x1, 5)
+    expect(Number(first.y2)).toBeCloseTo(expected.near[0].y2, 5)
+    const start = buildFrame(hang, layout(hang), 0, false)
+    expect(Math.abs(expected.near[1].x2 - start.near[1].x2)).toBeGreaterThan(1) // Anfang und Ende unterscheiden sich
+    const knee = w.findAll('line.limb:not(.far)')[1].attributes()
+    expect(Number(knee.x2)).toBeCloseTo(expected.near[1].x2, 5)
   })
 
   it('Gegenprobe: ohne still bleibt der volle Zeichenbereich und die Animation läuft', async () => {

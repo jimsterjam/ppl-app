@@ -92,6 +92,7 @@
               v-if="findExerciseDemo(ex)"
               type="button"
               class="thumb thumb--demo"
+              :aria-label="getTranslatedExerciseName(ex.name_en || ex.name)"
               @click.stop="openMedia(ex)"
             >
               <ExerciseDemo :demo="findExerciseDemo(ex)" still :title="getTranslatedExerciseName(ex.name_en || ex.name)" />

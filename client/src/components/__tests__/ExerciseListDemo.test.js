@@ -108,11 +108,16 @@ describe('ExerciseList: Medien-Fenster', () => {
     expect(overlay().querySelector('svg.exercise-demo:not(.is-still)')).toBeTruthy()
     overlay().querySelector('.close-btn').click()
     await flushPromises()
-    const still = w.find('button.thumb--demo svg.exercise-demo.is-still')
+    const btn = w.find('button.thumb--demo')
+    const still = btn.find('svg.exercise-demo.is-still')
     expect(still.exists()).toBe(true)
-    expect(still.attributes('aria-label')).toBe('Plank')
-    // das Standbild bewegt sich nicht und hat kein Leuchten
-    expect(w.find('button.thumb--demo .ed-halo').classes()).not.toContain('on')
+    // der Knopf trägt den Namen, das Bild darin ist dekorativ (sonst liest VoiceOver den Namen doppelt)
+    expect(btn.attributes('aria-label')).toBe('Plank')
+    expect(still.attributes('aria-hidden')).toBe('true')
+    expect(still.attributes('role')).toBeUndefined()
+    // das Standbild bewegt sich nicht und hat weder Leuchten noch Gelenkpunkte
+    expect(btn.find('.ed-halo').exists()).toBe(false)
+    expect(btn.find('.joint').exists()).toBe(false)
     const vb = still.attributes('viewBox').split(' ').map(Number)
     expect(vb[2]).toBe(vb[3]) // quadratischer Ausschnitt
   })
