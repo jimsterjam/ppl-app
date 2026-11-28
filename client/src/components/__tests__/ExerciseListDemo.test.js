@@ -17,8 +17,8 @@ import { resolveExerciseMedia } from '@/utils/assetResolver'
 import { __resetScrollLockForTests } from '@/composables/useScrollLock'
 
 const PLANK = { _id: 'ex_9019', id: '9019', name: 'Plank', name_en: 'plank', category: 'Core', muscleGroup: 'Bauch', equipment: 'Körpergewicht', description: 'd', description_en: 'd', imageUrl: '', thumbnailUrl: '' }
-// ältere Übung ohne Foto/Video und ohne Demo (Snatch, ID 9009)
-const CROW = { _id: 'ex_9009', id: '9009', name: 'Snatch', name_en: 'snatch', category: 'Legs', muscleGroup: 'Quadrizeps', equipment: 'Langhantel', description: 'd', description_en: 'd', imageUrl: '/exercises/static/180/9009.jpg', thumbnailUrl: '' }
+// ältere Übung ohne Foto/Video und ohne Demo (Tuck Jumps, ID 9004)
+const CROW = { _id: 'ex_9004', id: '9004', name: 'Tuck Jumps', name_en: 'tuck jumps', category: 'Legs', muscleGroup: 'Quadrizeps', equipment: 'Körpergewicht', description: 'd', description_en: 'd', imageUrl: '/exercises/static/180/9004.jpg', thumbnailUrl: '' }
 const BENCH = { _id: 'ex_0025', id: '0025', name: 'Bankdrücken', name_en: 'bench press', category: 'Push', muscleGroup: 'Brust', equipment: 'Langhantel', description: 'd', description_en: 'd', imageUrl: '/exercises/static/180/0025.jpg', thumbnailUrl: '' }
 
 let wrapper
