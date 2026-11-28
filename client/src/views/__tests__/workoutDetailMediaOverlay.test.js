@@ -54,6 +54,13 @@ describe('WorkoutDetailView: Großansicht-Fenster', () => {
     expect(source).not.toMatch(/findExerciseDemo\(mediaExercise\.value\)/)
   })
 
+  it('Vorschaubild im Workout: Standbild bei Demo-Übung, sonst Foto; defektes Großbild fällt auf den Platzhalter zurück', () => {
+    expect(source).toMatch(/class="ex-thumb ex-thumb--demo"/)
+    expect(source).toMatch(/<ExerciseDemo :demo="findExerciseDemo\(ex\)" still/)
+    expect(source).toMatch(/@error="onMediaImageError"/)
+    expect(source).toMatch(/import \{ onMediaImageError \} from '@\/utils\/mediaFallback'/)
+  })
+
   it('zeigt die Demo, sonst Video oder Foto', () => {
     const [overlay] = overlays(source)
     expect(overlay.tags).toEqual(expect.arrayContaining(['ExerciseDemo', 'video', 'img', 'button']))

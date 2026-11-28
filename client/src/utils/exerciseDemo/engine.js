@@ -163,3 +163,19 @@ export function buildFrame(demo, lay, t, holding = false) {
 export function jointUnits(demo, t, name) {
   return relativeToAnchor(poseAt(demo.keys, t), anchorOf(demo))[name]
 }
+
+/**
+ * Quadratischer Ausschnitt (viewBox) um die Figur für das kleine Standbild: nur Figur und Kopf, nicht die ganze Szene.
+ * margin: Rand in Zeicheneinheiten.
+ */
+export function frameBounds(frame, margin = 12) {
+  const xs = []
+  const ys = []
+  for (const s of [...frame.near, ...frame.far]) { xs.push(s.x1, s.x2); ys.push(s.y1, s.y2) }
+  xs.push(frame.head.cx - frame.head.r, frame.head.cx + frame.head.r)
+  ys.push(frame.head.cy - frame.head.r, frame.head.cy + frame.head.r)
+  const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys)
+  const size = Math.max(maxX - minX, maxY - minY) + 2 * margin
+  const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2
+  return { x: cx - size / 2, y: cy - size / 2, size }
+}

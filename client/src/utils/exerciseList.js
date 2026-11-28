@@ -1,6 +1,7 @@
 import { getAllExercisesOffline, getAllCustomExercisesOffline } from '@/utils/offlineStorage'
 import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
 import { fetchExercises } from '@/api/exercises'
+import { compareExerciseNames } from '@/utils/exerciseSort'
 
 // Merge offline exercises with JSON defaults, dedupe by name+equipment, optional equipment filter,
 // and sort alphabetically by first three letters, then full name.
@@ -134,13 +135,7 @@ export async function getMergedSortedExercises({ category = '', equipment = '', 
   }
 
   // Sort by displayName (locale-aware), then by raw name as tiebreaker
-  const sorted = unique.slice().sort((a, b) => {
-    const an = normalize(a.displayName || a.name)
-    const bn = normalize(b.displayName || b.name)
-    const pref = an.slice(0,3).localeCompare(bn.slice(0,3))
-    if (pref !== 0) return pref
-    return an.localeCompare(bn)
-  })
+  const sorted = unique.slice().sort((a, b) => compareExerciseNames(a.displayName || a.name, b.displayName || b.name))
 
   console.debug('[ExerciseList] final sorted result:', sorted.length, '| unique:', unique.length, '| custom:', sorted.filter(e => e._isCustom).length)
   return sorted

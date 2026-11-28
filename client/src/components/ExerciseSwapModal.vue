@@ -14,7 +14,8 @@
       <div v-for="item in suggestions" :key="item.entry._id || item.entry.name_en" class="swap-row">
         <!-- Vorschaubild: Tippen zeigt Bild/Video groß (Einsteiger kennen die Übung oft nur dem Namen nach nicht). -->
         <button type="button" class="swap-thumb-btn" :aria-label="t('swap.preview', { name: getTranslatedExerciseName(item.entry.name_en) })" @click="openPreview(item.entry)">
-          <img :src="thumbOf(item.entry)" alt="" class="swap-thumb" @error="onThumbError" />
+          <ExerciseDemo v-if="findExerciseDemo(item.entry)" :demo="findExerciseDemo(item.entry)" still :title="getTranslatedExerciseName(item.entry.name_en)" class="swap-thumb swap-thumb--demo" />
+          <img v-else :src="thumbOf(item.entry)" alt="" class="swap-thumb" @error="onThumbError" />
         </button>
         <button type="button" class="swap-item" @click="choose(item.entry)">
           <span class="swap-name">{{ getTranslatedExerciseName(item.entry.name_en) }}</span>
@@ -33,7 +34,7 @@
         <strong>{{ getTranslatedExerciseName(previewEntry.name_en) }}</strong>
         <ExerciseDemo v-if="previewDemo" :demo="previewDemo" :title="getTranslatedExerciseName(previewEntry.name_en || previewEntry.name)" />
         <video v-else-if="isVideoUrl(previewUrl)" :src="previewUrl" class="swap-preview-media" autoplay muted loop playsinline @error="onPreviewVideoError"></video>
-        <img v-else :src="previewUrl" :alt="getTranslatedExerciseName(previewEntry.name_en)" class="swap-preview-media" />
+        <img v-else :src="previewUrl" :alt="getTranslatedExerciseName(previewEntry.name_en)" class="swap-preview-media" @error="onMediaImageError" />
         <p class="swap-hint">{{ t('workoutDetail.mediaDisclaimer') }}</p>
         <button type="button" class="swap-preview-close" @click="closePreview">{{ t('common.close') }}</button>
       </div>
@@ -87,6 +88,7 @@ import AppModal from '@/components/AppModal.vue'
 import ExerciseList from '@/components/ExerciseList.vue'
 import ExerciseDemo from '@/components/ExerciseDemo.vue'
 import { findExerciseDemo } from '@/utils/exerciseDemo/demos'
+import { onMediaImageError } from '@/utils/mediaFallback'
 import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
 import { getSwapSuggestions } from '@/utils/exerciseSwaps'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
@@ -249,6 +251,7 @@ function finish(scope) {
 .swap-list { display: grid; gap: 8px; }
 .swap-row { display: flex; align-items: stretch; gap: 8px; }
 .swap-thumb-btn { flex: 0 0 auto; width: 56px; padding: 0; border-radius: 12px; border: 1px solid var(--card-border); background: var(--surface); overflow: hidden; cursor: pointer; }
+.swap-thumb--demo { padding: 4px; box-sizing: border-box; }
 .swap-thumb { width: 100%; height: 100%; min-height: 52px; object-fit: cover; display: block; }
 .swap-item { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 52px; padding: 8px 12px; border-radius: 12px; border: 1px solid var(--card-border); background: var(--surface); color: var(--fg); font: inherit; font-weight: 600; text-align: left; cursor: pointer; }
 .swap-name { min-width: 0; overflow-wrap: anywhere; }
