@@ -84,6 +84,113 @@ describe('Demos: Körperkontakt (Haltung stimmt rechnerisch)', () => {
   })
 })
 
+const J = (id, t, name) => jointUnits(demo(id), t, name)
+const FLOOR_DEMOS = EXERCISE_DEMOS.filter((d) => !d.props?.bar)
+const BAR_DEMOS = EXERCISE_DEMOS.filter((d) => d.props?.bar)
+
+describe('Demos: allgemeine Regeln für alle Haltungen', () => {
+  it.each(FLOOR_DEMOS.map((d) => [d.name_en, d]))('Bodenübung "%s": in keinem Bild geht ein Gelenk durch den Boden', (_n, d) => {
+    for (let i = 0; i <= 100; i++) {
+      for (const name of ['hip', 'shoulder', 'elbow', 'wrist', 'knee', 'ankle', 'toe']) {
+        expect(jointUnits(d, i / 100, name)[1], `${name} t=${i / 100}`).toBeLessThanOrEqual(0.03)
+      }
+    }
+  })
+
+  it.each(BAR_DEMOS.map((d) => [d.name_en, d]))('Hang "%s": Hände bleiben an der Stange, Füße in jedem Bild über dem Boden', (_n, d) => {
+    const lay = layout(d)
+    for (let i = 0; i <= 100; i++) {
+      expect(jointUnits(d, i / 100, 'wrist')).toEqual([0, 0])
+      for (const name of ['toe', 'ankle', 'knee', 'hip']) expect(jointUnits(d, i / 100, name)[1], `${name} t=${i / 100}`).toBeLessThan(lay.floorUnits - 0.05)
+    }
+    expect(lay.floorY).toBeLessThanOrEqual(lay.height)
+  })
+})
+
+describe('Demos: Haltungen der weiteren Halteübungen', () => {
+  it('Hollow Body Hold: Start flach am Boden, Halten mit abgehobenen Schultern und Beinen, Hüfte bleibt am Boden', () => {
+    expect(J('9020', 0, 'shoulder')[1]).toBeCloseTo(0, 1)
+    expect(J('9020', 0, 'ankle')[1]).toBeCloseTo(0, 1)
+    expect(J('9020', 1, 'hip')).toEqual([0, 0])
+    expect(J('9020', 1, 'shoulder')[1]).toBeLessThan(-0.15)
+    expect(J('9020', 1, 'ankle')[1]).toBeLessThan(-0.25)
+    // Arme in Verlängerung des Körpers über dem Kopf (rechts vom Kopf)
+    expect(J('9020', 1, 'wrist')[0]).toBeGreaterThan(J('9020', 1, 'shoulder')[0])
+  })
+
+  it('Arch Body Hold: Start flach, Halten mit angehobener Brust, Armen und Beinen; höherer Arm- und Kopfwinkel als beim Hollow Hold', () => {
+    expect(J('9021', 0, 'ankle')[1]).toBeCloseTo(0, 1)
+    expect(J('9021', 1, 'shoulder')[1]).toBeLessThan(-0.15)
+    expect(J('9021', 1, 'ankle')[1]).toBeLessThan(-0.15)
+    expect(J('9021', 1, 'wrist')[1]).toBeLessThan(J('9020', 1, 'wrist')[1]) // Arme höher gehoben
+    expect(J('9021', 1, 'head')[1]).toBeLessThan(J('9020', 1, 'head')[1])
+  })
+
+  it('Wall Sit: Füße am Boden, Hüfte bleibt an der Wand, am Ende Oberschenkel waagerecht und Unterschenkel senkrecht', () => {
+    const d = demo('9024')
+    expect(layout(d).wallX).not.toBeNull()
+    const x0 = J('9024', 0, 'hip')[0]
+    for (let i = 0; i <= 100; i++) expect(Math.abs(J('9024', i / 100, 'hip')[0] - x0), `t=${i / 100}`).toBeLessThan(0.2)
+    expect(Math.abs(J('9024', 1, 'knee')[1] - J('9024', 1, 'hip')[1])).toBeLessThan(0.05)
+    expect(Math.abs(J('9024', 1, 'ankle')[0] - J('9024', 1, 'knee')[0])).toBeLessThan(0.05)
+    expect(J('9024', 1, 'hip')[1]).toBeLessThan(J('9024', 0, 'hip')[1] + 0.8) // Hüfte ist abgesunken
+    expect(J('9024', 0, 'hip')[1]).toBeLessThan(J('9024', 1, 'hip')[1]) // Start: Hüfte höher (kleineres y)
+  })
+
+  it('Crow Pose: Start Hände und Füße am Boden, Haltung Füße oben, Knie auf den Oberarmen, Arme gebeugt', () => {
+    const d = demo('9025')
+    expect(Math.abs(J('9025', 0, 'toe')[1])).toBeLessThan(0.05)
+    for (const n of ['toe', 'ankle']) expect(J('9025', 1, n)[1], n).toBeLessThan(-0.6)
+    // Knie nahe am Oberarm (Strecke Ellbogen-Schulter)
+    const [e, s, k] = [J('9025', 1, 'elbow'), J('9025', 1, 'shoulder'), J('9025', 1, 'knee')]
+    const dx = s[0] - e[0], dy = s[1] - e[1]
+    const u = Math.max(0, Math.min(1, ((k[0] - e[0]) * dx + (k[1] - e[1]) * dy) / (dx * dx + dy * dy)))
+    expect(Math.hypot(k[0] - (e[0] + u * dx), k[1] - (e[1] + u * dy))).toBeLessThan(0.45)
+    // Ellbogen gebeugt: Schulter-Handgelenk kürzer als beide Armsegmente zusammen
+    const w = J('9025', 1, 'wrist')
+    expect(Math.hypot(w[0] - s[0], w[1] - s[1])).toBeLessThan(1.35)
+    expect(d.keys).toHaveLength(2)
+  })
+
+  it('Barren-Stütz: Arme gestreckt neben dem Körper, Beine hängen frei', () => {
+    const [s, e, w] = ['shoulder', 'elbow', 'wrist'].map((n) => J('9026', 1, n))
+    expect(Math.abs((e[0] - s[0]) * (w[1] - s[1]) - (e[1] - s[1]) * (w[0] - s[0]))).toBeLessThan(0.01) // gestreckt
+    expect(s[1]).toBeLessThan(0) // Schultern über den Händen
+    expect(J('9026', 1, 'hip')[1]).toBeGreaterThan(s[1])
+    // Arm und Rumpf liegen nicht aufeinander (sonst unleserlich)
+    expect(Math.abs(w[0] - J('9026', 1, 'hip')[0])).toBeGreaterThan(0.12)
+  })
+
+  it('Flexed Arm Hang: Start gestreckter Hang, Ende Kinn über der Stange mit gebeugten Armen', () => {
+    expect(J('9023', 0, 'shoulder')[1]).toBeGreaterThan(1.3)
+    // Kopfmitte plus Radius (Kinn) liegt über der Stange (y < 0)
+    expect(J('9023', 1, 'head')[1] + 0.25).toBeLessThan(0)
+    expect(J('9023', 1, 'shoulder')[1]).toBeLessThan(0.6)
+    const s = J('9023', 1, 'shoulder'), w = J('9023', 1, 'wrist')
+    expect(Math.hypot(w[0] - s[0], w[1] - s[1])).toBeLessThan(1.1) // Arme stark gebeugt
+  })
+
+  it('Straddle Front Lever: Körper waagerecht auf Schulterhöhe, Arme senkrecht gestreckt, Beine gestreckt und gespreizt', () => {
+    expect(Math.abs(J('9027', 1, 'hip')[1] - J('9027', 1, 'shoulder')[1])).toBeLessThan(0.02)
+    expect(Math.abs(J('9027', 1, 'shoulder')[0])).toBeLessThan(0.02)
+    expect(Math.abs(J('9027', 1, 'ankle')[1] - J('9027', 1, 'hip')[1])).toBeLessThan(0.02)
+    expect(demo('9027').keys.at(-1).spread).toBeGreaterThan(0)
+    expect(J('9027', 1, 'head')[1]).toBeLessThan(J('9027', 1, 'shoulder')[1]) // Gesicht nach oben
+  })
+
+  it('Back-Lever-Stufen: Körper waagerecht; Tuck angezogen, Advanced Tuck Oberschenkel senkrecht, Straddle gestreckt (Beinlänge nimmt zu)', () => {
+    const reach = (id) => Math.abs(J(id, 1, 'ankle')[0] - J(id, 1, 'hip')[0])
+    for (const id of ['9028', '9029', '9030']) {
+      expect(Math.abs(J(id, 1, 'hip')[1] - J(id, 1, 'shoulder')[1]), id).toBeLessThan(0.02)
+      expect(J(id, 1, 'head')[1], id).toBeGreaterThan(J(id, 1, 'shoulder')[1]) // Gesicht nach unten
+    }
+    expect(reach('9028')).toBeLessThan(reach('9029'))
+    expect(reach('9029')).toBeLessThan(reach('9030'))
+    expect(Math.abs(J('9029', 1, 'knee')[0] - J('9029', 1, 'hip')[0])).toBeLessThan(0.05) // Oberschenkel senkrecht
+    expect(demo('9030').keys.at(-1).spread).toBeGreaterThan(0)
+  })
+})
+
 describe('findExerciseDemo', () => {
   it('findet über ID (auch mit ex_ und exerciseId) und über den englischen Namen', () => {
     expect(findExerciseDemo({ id: '9019' })?.name_en).toBe('plank')
