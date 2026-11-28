@@ -140,6 +140,25 @@ describe('ExerciseDemo', () => {
     expect(motionListeners.length).toBe(0)
   })
 
+  it('Standbild (still): keine Animation, kein Leuchten, quadratischer Ausschnitt um die Figur', async () => {
+    const w = mount(ExerciseDemo, { props: { demo: hang, title: 'dead hang', still: true } })
+    await nextTick()
+    expect(rafCallbacks.size).toBe(0)
+    expect(w.find('svg').classes()).toContain('is-still')
+    expect(w.find('.ed-halo').classes()).not.toContain('on')
+    const vb = w.find('svg').attributes('viewBox').split(' ').map(Number)
+    expect(vb[2]).toBe(vb[3])
+    // Endhaltung: der Dead Hang hängt (Hang-Haltung), nicht auf der Kiste: Füße liegen rechts neben der Kiste
+    expect(w.find('.box').exists()).toBe(true)
+  })
+
+  it('Gegenprobe: ohne still bleibt der volle Zeichenbereich und die Animation läuft', async () => {
+    const w = mount(ExerciseDemo, { props: { demo: tuck, title: 'tuck planche' } })
+    expect(w.find('svg').classes()).not.toContain('is-still')
+    expect(w.find('svg').attributes('viewBox')).toMatch(/^0 0 320 \d+$/)
+    expect(rafCallbacks.size).toBe(1)
+  })
+
   it('Wechsel der Demo startet neu und zeigt die neue Übung', async () => {
     const w = mount(ExerciseDemo, { props: { demo: plank, title: 'plank' } })
     expect(w.find('.box').exists()).toBe(false)

@@ -3,16 +3,22 @@
 // Haltungen in utils/exerciseDemo/demos.js. Den Hinweis "nur zur Orientierung" zeigt der umgebende Dialog
 // (exercises.mediaDisclaimer bzw. workoutDetail.mediaDisclaimer), nicht diese Komponente.
 import { shallowRef, computed, onMounted, onBeforeUnmount, watch } from 'vue'
-import { layout, buildFrame, timelineAt } from '@/utils/exerciseDemo/engine'
+import { layout, buildFrame, timelineAt, frameBounds } from '@/utils/exerciseDemo/engine'
 
 const props = defineProps({
   demo: { type: Object, required: true },
   // Zugänglicher Name der Grafik (Übungsname, kein neuer Text)
-  title: { type: String, default: '' }
+  title: { type: String, default: '' },
+  // Kleines Standbild (Endhaltung, ohne Bewegung und Leuchten) für Vorschaubilder in Listen
+  still: { type: Boolean, default: false }
 })
 
 const lay = computed(() => layout(props.demo))
 const animated = computed(() => Array.isArray(props.demo.phases) && props.demo.phases.length > 0)
+
+function stillFrame() {
+  return buildFrame(props.demo, lay.value, 1, false)
+}
 
 // Bild zum Zeitpunkt seconds: statische Demo = Endhaltung mit Leuchten, animierte = Ablauf an dieser Stelle
 function frameAt(seconds) {
@@ -20,7 +26,7 @@ function frameAt(seconds) {
   return buildFrame(props.demo, lay.value, t, holding)
 }
 // shallowRef: das Bild wird als Ganzes ersetzt (nie einzeln verändert), spart bei 60 Bildern pro Sekunde das tiefe Beobachten
-const frame = shallowRef(frameAt(0))
+const frame = shallowRef(props.still ? stillFrame() : frameAt(0))
 
 let rafId = 0
 let startedAt = 0
@@ -57,6 +63,10 @@ function stop() {
 
 function start() {
   stop()
+  if (props.still) {
+    frame.value = stillFrame()
+    return
+  }
   frame.value = frameAt(0) // sofort das richtige Bild, nicht erst nach dem ersten Animationsschritt
   if (!animated.value || prefersReducedMotion()) {
     showResting()
@@ -64,6 +74,12 @@ function start() {
   }
   rafId = requestAnimationFrame(tick)
 }
+
+const viewBox = computed(() => {
+  if (!props.still) return `0 0 ${lay.value.width} ${lay.value.height}`
+  const b = frameBounds(frame.value)
+  return `${b.x.toFixed(1)} ${b.y.toFixed(1)} ${b.size.toFixed(1)} ${b.size.toFixed(1)}`
+})
 
 onMounted(() => {
   start()
@@ -76,13 +92,14 @@ onBeforeUnmount(() => {
   motionQuery?.removeEventListener?.('change', start)
   motionQuery = null
 })
-watch(() => props.demo, start)
+watch(() => [props.demo, props.still], start)
 </script>
 
 <template>
   <svg
     class="exercise-demo"
-    :viewBox="`0 0 ${lay.width} ${lay.height}`"
+    :class="{ 'is-still': still }"
+    :viewBox="viewBox"
     role="img"
     :aria-label="title"
     preserveAspectRatio="xMidYMid meet"
@@ -133,6 +150,13 @@ watch(() => props.demo, start)
 .ed-halo { opacity: 0; }
 .ed-halo.on { animation: ed-pulse 1.2s ease-in-out infinite; }
 @keyframes ed-pulse { 0%, 100% { opacity: 0.05; } 50% { opacity: 0.5; } }
+/* Standbild in Vorschaubildern: Linien in Bildschirmpixeln (unabhängig vom Ausschnitt), Gelenkpunkte weglassen */
+.is-still { border: 0; border-radius: 0; background: transparent; width: 100%; height: 100%; }
+.is-still .limb { stroke-width: 3px; vector-effect: non-scaling-stroke; }
+.is-still .limb.torso.hot { stroke-width: 3.6px; }
+.is-still .head { stroke-width: 2.6px; vector-effect: non-scaling-stroke; }
+.is-still .joint, .is-still .ed-halo, .is-still .wall, .is-still .box { display: none; }
+.is-still .floor, .is-still .bar { stroke-width: 2px; vector-effect: non-scaling-stroke; }
 @media (prefers-reduced-motion: reduce) {
   .ed-halo.on { animation: none; opacity: 0.3; }
 }

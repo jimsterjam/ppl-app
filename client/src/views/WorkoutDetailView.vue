@@ -200,7 +200,17 @@
                      und Entfernen liegen im Menü (openExerciseMenu), "Dein Feedback" unten neben
                      "+ Satz" (wird meist nach der Übung ausgefüllt). Das Vorschaubild bleibt
                      (Wunsch Jimmy: gerade für Einsteiger hilfreich), Tippen öffnet Bild/Video. -->
+                <button
+                  v-if="findExerciseDemo(ex)"
+                  type="button"
+                  class="ex-thumb ex-thumb--demo"
+                  :aria-label="getTranslatedExerciseName(ex.name)"
+                  @click="openExerciseMedia(ex)"
+                >
+                  <ExerciseDemo :demo="findExerciseDemo(ex)" still :title="getTranslatedExerciseName(ex.name)" />
+                </button>
                 <img
+                  v-else
                   :src="getExerciseImage(ex)"
                   :alt="getTranslatedExerciseName(ex.name)"
                   class="ex-thumb"
@@ -648,6 +658,7 @@
                   :src="mediaUrl || getExerciseLargeImage(mediaExercise)"
                   :alt="mediaExercise.name"
                   class="media-image"
+                  @error="onMediaImageError"
                 />
                 <p class="media-disclaimer">{{ t('workoutDetail.mediaDisclaimer') }}</p>
                 <button class="close-btn" @click="closeExerciseMedia">OK</button>
@@ -3460,6 +3471,13 @@ function onMediaVideoError() {
   mediaUrl.value = getExerciseLargeImage(mediaExercise.value)
 }
 
+// Weder Video noch Foto vorhanden (Übung ohne Medien): Platzhalter statt eines defekten Bildes
+function onMediaImageError(evt) {
+  const img = evt?.target
+  if (!img || String(img.src).includes('play.svg')) return
+  img.src = '/exercises/play.svg'
+}
+
 function closeExerciseMedia() {
   mediaExercise.value = null
   mediaDemoSource.value = null
@@ -5235,6 +5253,7 @@ onBeforeUnmount(() => {
 .ex-info { display: grid; grid-template-columns: 56px minmax(0, 1fr); column-gap: 10px; row-gap: 8px; align-items: center; margin-bottom: 8px; }
 .ex-info.minimal { display: flex; align-items: center; gap: 12px; min-height: 48px; }
 .ex-name-only { font-size: 1rem; font-weight: 600; }
+.ex-thumb--demo { padding: 2px; display: block; }
 .ex-thumb { width: 56px; height: 56px; flex-shrink: 0; object-fit: contain; background: var(--surface); border: 1px solid var(--card-border); border-radius: 8px; padding: 4px; cursor: pointer; }
 .ex-text { display: contents; }
 .ex-info > .ex-thumb { grid-column: 1; grid-row: 1; }

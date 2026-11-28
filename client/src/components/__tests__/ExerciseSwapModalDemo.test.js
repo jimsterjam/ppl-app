@@ -80,6 +80,15 @@ describe('ExerciseSwapModal: Vorschau', () => {
     expect(resolveExerciseMedia).toHaveBeenCalledTimes(1)
   })
 
+  it('Kleine Vorschau in der Liste: Standbild bei Demo-Übung, Foto bei Übung mit Foto', async () => {
+    await openPreview(0)
+    const btns = document.querySelectorAll('.swap-thumb-btn')
+    expect(btns[0].querySelector('svg.exercise-demo.is-still')).toBeTruthy()
+    expect(btns[0].querySelector('img')).toBeNull()
+    expect(btns[1].querySelector('img.swap-thumb')).toBeTruthy()
+    expect(btns[1].querySelector('svg')).toBeNull()
+  })
+
   it('Schließen entfernt die Vorschau (und damit die Animation)', async () => {
     await openPreview(0)
     document.querySelector('.swap-preview-close').click()

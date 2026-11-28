@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { joints, mixPose, poseAt, timelineAt, layout, buildFrame, LIMB, POSE_KEYS, DEMO_WIDTH } from '../engine'
+import { joints, mixPose, poseAt, timelineAt, layout, buildFrame, frameBounds, LIMB, POSE_KEYS, DEMO_WIDTH } from '../engine'
 import { EXERCISE_DEMOS } from '../demos'
 
 const POSE = { torso: 0, head: 0, uarm: 90, farm: 0, thigh: 90, shin: 90, foot: 0 }
@@ -108,6 +108,22 @@ describe.each(EXERCISE_DEMOS.map((d) => [d.name_en, d]))('engine: Demo "%s"', (_
   it('"holding" wird an das Bild weitergegeben', () => {
     expect(buildFrame(demo, lay, 1, true).holding).toBe(true)
     expect(buildFrame(demo, lay, 1, false).holding).toBe(false)
+  })
+})
+
+describe.each(EXERCISE_DEMOS.map((d) => [d.name_en, d]))('engine: Standbild-Ausschnitt "%s"', (_name, demo) => {
+  it('quadratisch und die ganze Figur liegt darin', () => {
+    const frame = buildFrame(demo, layout(demo), 1, false)
+    const b = frameBounds(frame)
+    expect(b.size).toBeGreaterThan(20)
+    const pts = [...frame.near, ...frame.far].flatMap((s) => [[s.x1, s.y1], [s.x2, s.y2]])
+    pts.push([frame.head.cx - frame.head.r, frame.head.cy], [frame.head.cx + frame.head.r, frame.head.cy], [frame.head.cx, frame.head.cy - frame.head.r], [frame.head.cx, frame.head.cy + frame.head.r])
+    for (const [x, y] of pts) {
+      expect(x).toBeGreaterThanOrEqual(b.x)
+      expect(x).toBeLessThanOrEqual(b.x + b.size)
+      expect(y).toBeGreaterThanOrEqual(b.y)
+      expect(y).toBeLessThanOrEqual(b.y + b.size)
+    }
   })
 })
 

@@ -17,14 +17,19 @@ import { resolveExerciseMedia } from '@/utils/assetResolver'
 import { __resetScrollLockForTests } from '@/composables/useScrollLock'
 
 const PLANK = { _id: 'ex_9019', id: '9019', name: 'Plank', name_en: 'plank', category: 'Core', muscleGroup: 'Bauch', equipment: 'Körpergewicht', description: 'd', description_en: 'd', imageUrl: '', thumbnailUrl: '' }
+const CROW = { _id: 'ex_9025', id: '9025', name: 'Crow Pose', name_en: 'crow pose', category: 'Push', muscleGroup: 'Schultern', equipment: 'Körpergewicht', description: 'd', description_en: 'd', imageUrl: '/exercises/static/180/9025.jpg', thumbnailUrl: '' }
 const BENCH = { _id: 'ex_0025', id: '0025', name: 'Bankdrücken', name_en: 'bench press', category: 'Push', muscleGroup: 'Brust', equipment: 'Langhantel', description: 'd', description_en: 'd', imageUrl: '/exercises/static/180/0025.jpg', thumbnailUrl: '' }
 
 let wrapper
-async function open(items, index) {
+// Die Liste ist alphabetisch sortiert: die Karte wird über den Namen gesucht, nicht über die Position
+async function open(items, exercise) {
   const i18n = createI18nInstance(); i18n.global.locale.value = 'de'
   wrapper = mount(ExerciseList, { props: { showTitle: false, showControls: false, items, selectable: false, selectedIds: [] }, global: { plugins: [createPinia(), i18n] } })
   await flushPromises(); await new Promise((r) => setTimeout(r, 30)); await flushPromises()
-  await wrapper.findAll('img.thumb')[index].trigger('click')
+  const titles = wrapper.findAll('.exercise-card .title').map((t) => t.text().trim().toLowerCase())
+  const index = titles.findIndex((t) => t.includes(exercise.name.toLowerCase()) || t.includes(exercise.name_en))
+  expect(index, `Karte für ${exercise.name} gefunden`).toBeGreaterThanOrEqual(0)
+  await wrapper.findAll('.thumb')[index].trigger('click')
   await flushPromises()
   return { w: wrapper, i18n }
 }
@@ -41,7 +46,7 @@ afterEach(() => { wrapper?.unmount(); wrapper = null; __resetScrollLockForTests(
 
 describe('ExerciseList: Medien-Fenster', () => {
   it('Übung ohne Foto/Video: Demo statt Bild, mit dem bestehenden Hinweistext', async () => {
-    const { i18n } = await open([PLANK, BENCH], 0)
+    const { i18n } = await open([PLANK, BENCH], PLANK)
     const o = overlay()
     expect(o).toBeTruthy()
     expect(o.querySelector('svg.exercise-demo')).toBeTruthy()
@@ -52,7 +57,7 @@ describe('ExerciseList: Medien-Fenster', () => {
   })
 
   it('Gegenprobe: Übung mit Foto/Video zeigt keine Demo', async () => {
-    await open([PLANK, BENCH], 1)
+    await open([PLANK, BENCH], BENCH)
     const o = overlay()
     expect(o).toBeTruthy()
     expect(o.querySelector('svg.exercise-demo')).toBeNull()
@@ -60,20 +65,20 @@ describe('ExerciseList: Medien-Fenster', () => {
   })
 
   it('Review 28.11.: Beschriftung der Grafik ist der angezeigte Name, nicht der Katalogschlüssel', async () => {
-    await open([PLANK, BENCH], 0)
+    await open([PLANK, BENCH], PLANK)
     const label = overlay().querySelector('svg.exercise-demo').getAttribute('aria-label')
     expect(label).toBe('Plank')
     expect(label).not.toBe('plank')
   })
 
   it('Review 28.11.: das Fenster hängt am body, nicht im Listen-Baustein', async () => {
-    const { w } = await open([PLANK, BENCH], 0)
+    const { w } = await open([PLANK, BENCH], PLANK)
     expect(overlay().parentElement).toBe(document.body)
     expect(w.find('.media-overlay').exists()).toBe(false)
   })
 
   it('Review 28.11.: solange die Großansicht offen ist, ist das Scrollen des Hintergrunds gesperrt; danach wieder frei', async () => {
-    const { w } = await open([PLANK, BENCH], 0)
+    const { w } = await open([PLANK, BENCH], PLANK)
     expect(document.body.style.overflow).toBe('hidden')
     overlay().querySelector('.close-btn').click()
     await flushPromises()
@@ -83,17 +88,59 @@ describe('ExerciseList: Medien-Fenster', () => {
   })
 
   it('Review 28.11.: wird die Liste bei offener Großansicht entfernt, ist die Sperre trotzdem weg', async () => {
-    const { w } = await open([PLANK, BENCH], 0)
+    const { w } = await open([PLANK, BENCH], PLANK)
     expect(document.body.style.overflow).toBe('hidden')
     w.unmount(); wrapper = null
     expect(document.body.style.overflow).not.toBe('hidden')
   })
 
   it('Review 28.11.: für Demo-Übungen werden keine Medien nachgeladen, für Übungen mit Video schon', async () => {
-    await open([PLANK, BENCH], 0)
+    await open([PLANK, BENCH], PLANK)
     expect(resolveExerciseMedia).not.toHaveBeenCalled()
     wrapper.unmount()
-    await open([PLANK, BENCH], 1)
+    await open([PLANK, BENCH], BENCH)
     expect(resolveExerciseMedia).toHaveBeenCalledTimes(1)
+  })
+
+  it('Kleine Vorschau: Übung mit Demo zeigt ein Standbild statt des Platzhalters, Tippen öffnet die Animation', async () => {
+    const { w } = await open([PLANK, BENCH], PLANK)
+    // geöffnet über das Standbild
+    expect(overlay().querySelector('svg.exercise-demo:not(.is-still)')).toBeTruthy()
+    overlay().querySelector('.close-btn').click()
+    await flushPromises()
+    const still = w.find('button.thumb--demo svg.exercise-demo.is-still')
+    expect(still.exists()).toBe(true)
+    expect(still.attributes('aria-label')).toBe('Plank')
+    // das Standbild bewegt sich nicht und hat kein Leuchten
+    expect(w.find('button.thumb--demo .ed-halo').classes()).not.toContain('on')
+    const vb = still.attributes('viewBox').split(' ').map(Number)
+    expect(vb[2]).toBe(vb[3]) // quadratischer Ausschnitt
+  })
+
+  it('Gegenprobe: Übung mit Foto/Video behält ihr Vorschaubild', async () => {
+    const { w } = await open([PLANK, BENCH], BENCH)
+    const cards = w.findAll('.exercise-card')
+    const byTitle = (name) => cards.find((c) => c.find('.title').text().toLowerCase().includes(name))
+    expect(byTitle('plank').find('.thumb').element.tagName).toBe('BUTTON')
+    expect(byTitle('bank').find('.thumb').element.tagName).toBe('IMG')
+    expect(w.findAll('.is-still')).toHaveLength(1)
+  })
+
+  it('Fund 28.11.: Übung ohne Demo und ohne Medien zeigt in der Großansicht den Platzhalter statt eines defekten Bildes', async () => {
+    await open([PLANK, CROW], CROW)
+    const o = overlay()
+    expect(o.querySelector('svg.exercise-demo')).toBeNull()
+    // erst Video (nicht vorhanden) -> Foto (nicht vorhanden) -> Platzhalter
+    const video = o.querySelector('video')
+    if (video) { video.dispatchEvent(new Event('error')); await flushPromises() }
+    const img = overlay().querySelector('img.media-image')
+    expect(img).toBeTruthy()
+    img.dispatchEvent(new Event('error'))
+    await flushPromises()
+    expect(overlay().querySelector('img.media-image').getAttribute('src')).toBe('/exercises/play.svg')
+    // und keine Endlosschleife: der Platzhalter selbst löst nichts mehr aus
+    overlay().querySelector('img.media-image').dispatchEvent(new Event('error'))
+    await flushPromises()
+    expect(overlay().querySelector('img.media-image').getAttribute('src')).toBe('/exercises/play.svg')
   })
 })

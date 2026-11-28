@@ -87,7 +87,17 @@
           @click="onCardClick(ex)"
         >
           <div class="thumb-row">
+            <!-- Übung ohne Foto/Video, aber mit Demo: Standbild der Haltung statt Platzhalter (Tippen öffnet die Animation) -->
+            <button
+              v-if="findExerciseDemo(ex)"
+              type="button"
+              class="thumb thumb--demo"
+              @click.stop="openMedia(ex)"
+            >
+              <ExerciseDemo :demo="findExerciseDemo(ex)" still :title="getTranslatedExerciseName(ex.name_en || ex.name)" />
+            </button>
             <img
+              v-else
               :src="getExerciseListImage(ex)"
               :alt="t('common.image')"
               class="thumb"
@@ -158,6 +168,7 @@
             :src="mediaUrl || getExerciseLargeImage(mediaExercise)"
             :alt="mediaExercise.name"
             class="media-image"
+            @error="onMediaImageError"
           />
           <p class="media-disclaimer">{{ t('exercises.mediaDisclaimer') }}</p>
           <button class="close-btn" @click="closeMedia">{{ t('common.close') }}</button>
@@ -196,6 +207,7 @@ import AppModal from '@/components/AppModal.vue'
 import ExerciseDemo from '@/components/ExerciseDemo.vue'
 import { findExerciseDemo } from '@/utils/exerciseDemo/demos'
 import { useScrollLock } from '@/composables/useScrollLock'
+import { compareExerciseNames } from '@/utils/exerciseSort'
 import FilterDropdown from '@/components/FilterDropdown.vue'
 import { RotateCcw } from 'lucide-vue-next'
 import { deleteCustomExercise } from '@/api/customExercises'
@@ -494,7 +506,8 @@ const preparedExercises = computed(() => {
     unique.push(exercise)
   }
 
-  return unique
+  // Alphabetisch nach angezeigtem Namen (Übungen-Tab liefert den Katalog in ID-Reihenfolge; neue Übungen mit hoher ID standen sonst am Ende)
+  return unique.sort((a, b) => compareExerciseNames(a.renderedName || a.name, b.renderedName || b.name))
 })
 
 const filteredExercises = computed(() => {
@@ -623,6 +636,13 @@ function onMediaVideoError() {
   // Spätere Ergebnisse von resolveExerciseMedia für diese Anfrage verwerfen (sonst käme das Video zurück).
   mediaRequestId.value += 1
   mediaUrl.value = getExerciseLargeImage(mediaExercise.value)
+}
+
+// Weder Video noch Foto vorhanden (Übung ohne Medien): Platzhalter statt eines defekten Bildes
+function onMediaImageError(evt) {
+  const img = evt?.target
+  if (!img || String(img.src).includes('play.svg')) return
+  img.src = '/exercises/play.svg'
 }
 
 function closeMedia() {
@@ -951,6 +971,7 @@ onBeforeUnmount(() => mediaLock.unlock())
 .thumb:active {
   transform: scale(0.92);
 }
+.thumb--demo { padding: 4px; display: block; cursor: pointer; }
 .thumb-fallback {
   padding: 0;
   display: grid;
