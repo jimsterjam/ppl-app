@@ -94,8 +94,16 @@ export function layout(demo) {
   let wallUnits = null
   const samples = keys.length === 1 ? [0] : Array.from({ length: 21 }, (_, i) => i / 20)
   for (const t of samples) {
-    const j = relativeToAnchor(poseAt(keys, t), anchor)
-    for (const p of Object.values(j)) {
+    const pose = poseAt(keys, t)
+    const j = relativeToAnchor(pose, anchor)
+    const points = Object.values(j)
+    // gespreiztes hinteres Bein (spread) gehört ebenfalls in die Zeichenfläche und zum Bodenabstand
+    if (pose.spread) {
+      const base = joints(pose)[anchor]
+      const far = joints({ ...pose, thigh: pose.thigh + pose.spread, shin: pose.shin + pose.spread, foot: pose.foot + pose.spread })
+      points.push(...['knee', 'ankle', 'toe'].map((k) => [far[k][0] - base[0], far[k][1] - base[1]]))
+    }
+    for (const p of points) {
       minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]); minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1])
     }
     // Wand: hinter dem Rücken (kleinster x-Wert von Hüfte und Schulter) in allen Bildern

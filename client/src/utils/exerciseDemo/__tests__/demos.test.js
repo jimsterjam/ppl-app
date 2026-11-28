@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import catalog from '@/data/default-exercises.json'
 import { EXERCISE_DEMOS, findExerciseDemo } from '../demos'
-import { jointUnits, layout, BOX_HEIGHT, BOX_HALF_WIDTH } from '../engine'
+import { jointUnits, layout, buildFrame, BOX_HEIGHT, BOX_HALF_WIDTH } from '../engine'
 
 const byId = new Map(catalog.map((e) => [e.id, e]))
 const demo = (id) => EXERCISE_DEMOS.find((d) => d.id === id)
@@ -104,6 +104,37 @@ describe('Demos: allgemeine Regeln für alle Haltungen', () => {
       for (const name of ['toe', 'ankle', 'knee', 'hip']) expect(jointUnits(d, i / 100, name)[1], `${name} t=${i / 100}`).toBeLessThan(lay.floorUnits - 0.05)
     }
     expect(lay.floorY).toBeLessThanOrEqual(lay.height)
+  })
+})
+
+describe('Demos: gespreiztes Bein (spread)', () => {
+  it('das hintere Bein bleibt in jedem Bild im Zeichenbereich und (bei Hang-Übungen) über dem Boden', () => {
+    for (const id of ['9027', '9030']) {
+      const d = demo(id)
+      const lay = layout(d)
+      for (let i = 0; i <= 40; i++) {
+        const f = buildFrame(d, lay, i / 40, false)
+        for (const l of f.far) {
+          for (const [x, y] of [[l.x1, l.y1], [l.x2, l.y2]]) {
+            expect(x, `${id} x t=${i / 40}`).toBeGreaterThanOrEqual(0)
+            expect(x, `${id} x t=${i / 40}`).toBeLessThanOrEqual(lay.width)
+            expect(y, `${id} y t=${i / 40}`).toBeGreaterThanOrEqual(0)
+            expect(y, `${id} y t=${i / 40}`).toBeLessThan(lay.floorY)
+          }
+        }
+      }
+    }
+  })
+
+  it('Layout rechnet das gespreizte Bein mit: ein stark nach oben gespreiztes Bein wird nicht oben abgeschnitten', () => {
+    const base = demo('9027')
+    // statische Haltung mit Straddle-Pose (waagerechter Körper), das hintere Bein 60 Grad nach oben gespreizt
+    const wide = { ...base, phases: undefined, keys: [{ ...base.keys.at(-1), spread: 60 }] }
+    const lay = layout(wide)
+    const f = buildFrame(wide, lay, 1, false)
+    const ys = f.far.flatMap((l) => [l.y1, l.y2])
+    expect(Math.min(...ys)).toBeGreaterThanOrEqual(0)
+    for (const l of f.far) for (const x of [l.x1, l.x2]) { expect(x).toBeGreaterThanOrEqual(0); expect(x).toBeLessThanOrEqual(lay.width) }
   })
 })
 
