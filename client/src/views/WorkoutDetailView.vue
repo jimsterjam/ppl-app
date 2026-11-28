@@ -271,30 +271,6 @@
                     <small v-if="isOneRepMaxAddedWeightExercise(ex)" class="one-rep-max-hint">{{ t('workoutDetail.oneRepMaxHintAddedWeight') }}</small>
                     <small v-else class="one-rep-max-hint">{{ t('workoutDetail.oneRepMaxHint') }}</small>
                   </div>
-
-                  <div v-if="mediaExercise" class="media-overlay" @click.self="closeExerciseMedia">
-                    <div class="media-content">
-                      <ExerciseDemo v-if="mediaDemo" :demo="mediaDemo" :title="mediaExercise.name_en || mediaExercise.name" />
-                      <video
-                        v-else-if="isVideoUrl(mediaUrl)"
-                        :src="mediaUrl"
-                        class="media-image"
-                        autoplay
-                        muted
-                        loop
-                        playsinline
-                        @error="onMediaVideoError"
-                      ></video>
-                      <img
-                        v-else
-                        :src="mediaUrl || getExerciseLargeImage(mediaExercise)"
-                        :alt="mediaExercise.name"
-                        class="media-image"
-                      />
-                      <p class="media-disclaimer">{{ t('workoutDetail.mediaDisclaimer') }}</p>
-                      <button class="close-btn" @click="closeExerciseMedia">OK</button>
-                    </div>
-                  </div>
                 </div>
               </template>
             </div>
@@ -648,6 +624,32 @@
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <!-- Großansicht (Bild/Video/Demo) einmal für das ganze Workout. Früher stand sie in der Übungsschleife: bei n Übungen
+               entstanden n gleiche Fenster und n Videos liefen gleichzeitig (Fund 28.11.). -->
+          <div v-if="mediaExercise" class="media-overlay" @click.self="closeExerciseMedia">
+            <div class="media-content">
+              <ExerciseDemo v-if="mediaDemo" :demo="mediaDemo" :title="mediaExercise.name_en || mediaExercise.name" />
+              <video
+                v-else-if="isVideoUrl(mediaUrl)"
+                :src="mediaUrl"
+                class="media-image"
+                autoplay
+                muted
+                loop
+                playsinline
+                @error="onMediaVideoError"
+              ></video>
+              <img
+                v-else
+                :src="mediaUrl || getExerciseLargeImage(mediaExercise)"
+                :alt="mediaExercise.name"
+                class="media-image"
+              />
+              <p class="media-disclaimer">{{ t('workoutDetail.mediaDisclaimer') }}</p>
+              <button class="close-btn" @click="closeExerciseMedia">OK</button>
             </div>
           </div>
 
