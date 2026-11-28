@@ -17,7 +17,7 @@ const HANG_STAND = { torso: -78, head: -60, uarm: -72, farm: -72, thigh: 90, shi
 const HANG_STEP = { torso: -85, head: -62, uarm: -76, farm: -76, thigh: 50, shin: 115, foot: 0 }
 const HANG = { torso: -90, head: -62, uarm: -90, farm: -90, thigh: 90, shin: 92, foot: 15 }
 
-// --- Weitere Halteübungen (Entwurf, Haltungen mit Vorschaubild zur Freigabe) ---
+// --- Weitere Halteübungen (Haltungen von Jimmy per Vorschaubild freizugeben, bevor der PR gemergt wird) ---
 // Liegestütz-Start für Hollow/Arch: flach auf dem Boden (Anker: Hüfte am Boden)
 const LIE_SUPINE = { torso: 0, head: -35, uarm: 0, farm: 0, thigh: 180, shin: 180, foot: -80 }
 // foot -169 = 191 Grad, aber auf kurzem Weg vom flachen Start (-80): sonst dreht sich der Fuß beim Übergang einmal um und taucht durch den Boden

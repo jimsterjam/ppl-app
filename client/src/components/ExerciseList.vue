@@ -87,7 +87,7 @@
           @click="onCardClick(ex)"
         >
           <div class="thumb-row">
-            <!-- Übung ohne Foto/Video, aber mit Demo: Standbild der Haltung statt Platzhalter (Tippen öffnet die Animation) -->
+            <!-- Übung mit Demo: Standbild der Haltung (die Demo hat Vorrang vor Foto/Video; Demos gibt es nur für Übungen ohne Medien). Tippen öffnet die Animation. -->
             <button
               v-if="findExerciseDemo(ex)"
               type="button"
@@ -209,7 +209,7 @@ import ExerciseDemo from '@/components/ExerciseDemo.vue'
 import { findExerciseDemo } from '@/utils/exerciseDemo/demos'
 import { useScrollLock } from '@/composables/useScrollLock'
 import { compareExerciseNames } from '@/utils/exerciseSort'
-import { onMediaImageError } from '@/utils/mediaFallback'
+import { onMediaImageError, MEDIA_PLACEHOLDER } from '@/utils/mediaFallback'
 import FilterDropdown from '@/components/FilterDropdown.vue'
 import { RotateCcw } from 'lucide-vue-next'
 import { deleteCustomExercise } from '@/api/customExercises'
@@ -588,14 +588,14 @@ function slugify(name) {
 // Kategorie-Icons werden in der Liste nicht mehr verwendet; Play-Button ist der generische Placeholder
 
 function getExerciseListImage(ex) {
-  if (!ex) return '/exercises/play.svg'
+  if (!ex) return MEDIA_PLACEHOLDER
   const id = ex._id
-  if (id != null && brokenImageIds.value.has(id)) return '/exercises/play.svg'
+  if (id != null && brokenImageIds.value.has(id)) return MEDIA_PLACEHOLDER
   const imageUrl = typeof ex?.imageUrl === 'string' ? resolveServerMediaUrl(ex.imageUrl) : ''
   const mediaUrl = typeof ex?.mediaUrl === 'string' ? ex.mediaUrl : ''
   const safeImage = /\.gif($|[?#])/i.test(imageUrl) ? '' : imageUrl
   const safeMedia = /\.gif($|[?#])/i.test(mediaUrl) ? '' : mediaUrl
-  return ex?.thumbnailStaticUrl || ex?.thumbnailUrl || safeImage || safeMedia || '/exercises/play.svg'
+  return ex?.thumbnailStaticUrl || ex?.thumbnailUrl || safeImage || safeMedia || MEDIA_PLACEHOLDER
 }
 
 function getExerciseLargeImage(ex) {
@@ -603,7 +603,7 @@ function getExerciseLargeImage(ex) {
   const mediaUrl = typeof ex?.mediaUrl === 'string' ? ex.mediaUrl : ''
   const safeImage = /\.gif($|[?#])/i.test(imageUrl) ? '' : imageUrl
   const safeMedia = /\.gif($|[?#])/i.test(mediaUrl) ? '' : mediaUrl
-  return safeImage || ex?.thumbnailStaticUrl || ex?.thumbnailUrl || safeMedia || '/exercises/play.svg'
+  return safeImage || ex?.thumbnailStaticUrl || ex?.thumbnailUrl || safeMedia || MEDIA_PLACEHOLDER
 }
 
 function onImgError(evt, ex) {
