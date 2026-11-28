@@ -191,7 +191,7 @@ describe('createExerciseMatcher: Rückfrage bei echter Mehrdeutigkeit', () => {
 
 // --- Nicht gefunden / nie raten ----------------------------------------------------------------------------------
 describe('createExerciseMatcher: nicht gefunden statt Raten', () => {
-  const NOT_FOUND = ['Face Pulls', 'Plank', 'Zauberübung 3000', '???', '', 'asdfghjkl', 'Trizeps Extension']
+  const NOT_FOUND = ['Face Pulls', 'Sled Push', 'Zauberübung 3000', '???', '', 'asdfghjkl', 'Trizeps Extension']
 
   for (const input of NOT_FOUND) {
     it(`"${input}" -> not_found, keine stille Zuordnung`, () => {
@@ -200,6 +200,12 @@ describe('createExerciseMatcher: nicht gefunden statt Raten', () => {
       expect(r.exercise_id ?? null).toBeNull()
     })
   }
+
+  it('Plank ist seit 28.11. im Katalog (Calisthenics-Halteübungen): wird zugeordnet, nicht mehr als fehlend gemeldet', () => {
+    const r = match('Plank')
+    expect(r.status).toBe('matched')
+    expect(r.name_en).toBe('plank')
+  })
 
   it('Hip Thrust fehlt im Katalog: nur Vorschlag (Glute Bridge), nie automatisch gleichgesetzt', () => {
     const r = match('Hip Thrust')
