@@ -34,7 +34,7 @@
         <strong>{{ getTranslatedExerciseName(previewEntry.name_en) }}</strong>
         <ExerciseDemo v-if="previewDemo" :demo="previewDemo" :title="getTranslatedExerciseName(previewEntry.name_en || previewEntry.name)" />
         <video v-else-if="isVideoUrl(previewUrl)" :src="previewUrl" class="swap-preview-media" autoplay muted loop playsinline @error="onPreviewVideoError"></video>
-        <img v-else :src="previewUrl" :alt="getTranslatedExerciseName(previewEntry.name_en)" class="swap-preview-media" @error="onThumbError" />
+        <img v-else :src="previewUrl" :alt="getTranslatedExerciseName(previewEntry.name_en)" class="swap-preview-media" @error="onMediaImageError" />
         <p class="swap-hint">{{ t('workoutDetail.mediaDisclaimer') }}</p>
         <button type="button" class="swap-preview-close" @click="closePreview">{{ t('common.close') }}</button>
       </div>
@@ -88,6 +88,7 @@ import AppModal from '@/components/AppModal.vue'
 import ExerciseList from '@/components/ExerciseList.vue'
 import ExerciseDemo from '@/components/ExerciseDemo.vue'
 import { findExerciseDemo } from '@/utils/exerciseDemo/demos'
+import { onMediaImageError } from '@/utils/mediaFallback'
 import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
 import { getSwapSuggestions } from '@/utils/exerciseSwaps'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'

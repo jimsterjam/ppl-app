@@ -58,7 +58,7 @@ describe('WorkoutDetailView: Großansicht-Fenster', () => {
     expect(source).toMatch(/class="ex-thumb ex-thumb--demo"/)
     expect(source).toMatch(/<ExerciseDemo :demo="findExerciseDemo\(ex\)" still/)
     expect(source).toMatch(/@error="onMediaImageError"/)
-    expect(source).toMatch(/function onMediaImageError/)
+    expect(source).toMatch(/import \{ onMediaImageError \} from '@\/utils\/mediaFallback'/)
   })
 
   it('zeigt die Demo, sonst Video oder Foto', () => {

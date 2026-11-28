@@ -208,6 +208,7 @@ import ExerciseDemo from '@/components/ExerciseDemo.vue'
 import { findExerciseDemo } from '@/utils/exerciseDemo/demos'
 import { useScrollLock } from '@/composables/useScrollLock'
 import { compareExerciseNames } from '@/utils/exerciseSort'
+import { onMediaImageError } from '@/utils/mediaFallback'
 import FilterDropdown from '@/components/FilterDropdown.vue'
 import { RotateCcw } from 'lucide-vue-next'
 import { deleteCustomExercise } from '@/api/customExercises'
@@ -636,13 +637,6 @@ function onMediaVideoError() {
   // Spätere Ergebnisse von resolveExerciseMedia für diese Anfrage verwerfen (sonst käme das Video zurück).
   mediaRequestId.value += 1
   mediaUrl.value = getExerciseLargeImage(mediaExercise.value)
-}
-
-// Weder Video noch Foto vorhanden (Übung ohne Medien): Platzhalter statt eines defekten Bildes
-function onMediaImageError(evt) {
-  const img = evt?.target
-  if (!img || String(img.src).includes('play.svg')) return
-  img.src = '/exercises/play.svg'
 }
 
 function closeMedia() {

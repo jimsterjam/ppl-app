@@ -1111,6 +1111,7 @@ import ExerciseList from '@/components/ExerciseList.vue'
 import ExerciseDemo from '@/components/ExerciseDemo.vue'
 import { findExerciseDemo } from '@/utils/exerciseDemo/demos'
 import { useScrollLock } from '@/composables/useScrollLock'
+import { onMediaImageError } from '@/utils/mediaFallback'
 import ExerciseSwapModal from '@/components/ExerciseSwapModal.vue'
 import CoachMarks from '@/components/CoachMarks.vue'
 import { buildSwappedExercise, canSwapExercise, replaceExerciseInPlanDay, resolveSwapScope } from '@/utils/exerciseSwapApply'
@@ -3471,13 +3472,6 @@ function onMediaVideoError() {
   mediaUrl.value = getExerciseLargeImage(mediaExercise.value)
 }
 
-// Weder Video noch Foto vorhanden (Übung ohne Medien): Platzhalter statt eines defekten Bildes
-function onMediaImageError(evt) {
-  const img = evt?.target
-  if (!img || String(img.src).includes('play.svg')) return
-  img.src = '/exercises/play.svg'
-}
-
 function closeExerciseMedia() {
   mediaExercise.value = null
   mediaDemoSource.value = null
@@ -5253,8 +5247,8 @@ onBeforeUnmount(() => {
 .ex-info { display: grid; grid-template-columns: 56px minmax(0, 1fr); column-gap: 10px; row-gap: 8px; align-items: center; margin-bottom: 8px; }
 .ex-info.minimal { display: flex; align-items: center; gap: 12px; min-height: 48px; }
 .ex-name-only { font-size: 1rem; font-weight: 600; }
-.ex-thumb--demo { padding: 2px; display: block; }
 .ex-thumb { width: 56px; height: 56px; flex-shrink: 0; object-fit: contain; background: var(--surface); border: 1px solid var(--card-border); border-radius: 8px; padding: 4px; cursor: pointer; }
+.ex-thumb--demo { padding: 2px; display: block; } /* nach .ex-thumb, sonst gewinnt dessen padding */
 .ex-text { display: contents; }
 .ex-info > .ex-thumb { grid-column: 1; grid-row: 1; }
 .ex-title-row { grid-column: 2; grid-row: 1; min-width: 0; }

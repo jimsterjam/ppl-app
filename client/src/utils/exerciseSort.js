@@ -5,9 +5,12 @@ export function sortKey(name) {
   return String(name || '').trim().toLowerCase()
 }
 
+// Ein Collator für alle Vergleiche (schneller als String.localeCompare bei rund 1200 Einträgen, gleiche Reihenfolge)
+const collator = typeof Intl !== 'undefined' && Intl.Collator ? new Intl.Collator() : { compare: (x, y) => x.localeCompare(y) }
+
 export function compareExerciseNames(a, b) {
   const an = sortKey(a)
   const bn = sortKey(b)
-  const prefix = an.slice(0, 3).localeCompare(bn.slice(0, 3))
-  return prefix !== 0 ? prefix : an.localeCompare(bn)
+  const prefix = collator.compare(an.slice(0, 3), bn.slice(0, 3))
+  return prefix !== 0 ? prefix : collator.compare(an, bn)
 }
