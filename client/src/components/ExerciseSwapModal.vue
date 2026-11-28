@@ -31,7 +31,8 @@
     <div v-if="previewEntry" class="swap-preview-overlay" role="presentation" @click.self="closePreview">
       <div class="swap-preview" role="dialog" aria-modal="true" :aria-label="getTranslatedExerciseName(previewEntry.name_en)">
         <strong>{{ getTranslatedExerciseName(previewEntry.name_en) }}</strong>
-        <video v-if="isVideoUrl(previewUrl)" :src="previewUrl" class="swap-preview-media" autoplay muted loop playsinline @error="onPreviewVideoError"></video>
+        <ExerciseDemo v-if="previewDemo" :demo="previewDemo" :title="getTranslatedExerciseName(previewEntry.name_en || previewEntry.name)" />
+        <video v-else-if="isVideoUrl(previewUrl)" :src="previewUrl" class="swap-preview-media" autoplay muted loop playsinline @error="onPreviewVideoError"></video>
         <img v-else :src="previewUrl" :alt="getTranslatedExerciseName(previewEntry.name_en)" class="swap-preview-media" />
         <p class="swap-hint">{{ t('workoutDetail.mediaDisclaimer') }}</p>
         <button type="button" class="swap-preview-close" @click="closePreview">{{ t('common.close') }}</button>
@@ -84,6 +85,8 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppModal from '@/components/AppModal.vue'
 import ExerciseList from '@/components/ExerciseList.vue'
+import ExerciseDemo from '@/components/ExerciseDemo.vue'
+import { findExerciseDemo } from '@/utils/exerciseDemo/demos'
 import { loadDefaultExercises } from '@/utils/defaultExercisesLoader'
 import { getSwapSuggestions } from '@/utils/exerciseSwaps'
 import { useExerciseTranslation } from '@/utils/exerciseTranslation'
@@ -159,6 +162,8 @@ function onThumbError(evt) {
 }
 
 const previewEntry = ref(null)
+// Übungen ohne Foto/Video zeigen eine Strichfiguren-Demo (utils/exerciseDemo)
+const previewDemo = computed(() => findExerciseDemo(previewEntry.value))
 const previewUrl = ref('')
 let previewRequest = 0
 const { lock, unlock } = useScrollLock()
@@ -168,6 +173,7 @@ function openPreview(entry) {
   previewEntry.value = entry
   previewUrl.value = buildExerciseMediaUrl(entry, 360, 'mp4') || largeImageOf(entry)
   lock()
+  if (findExerciseDemo(entry)) return // Demo statt Video/Foto: keine Anfrage nach nicht vorhandenen Medien
   resolveExerciseMedia(entry, {
     size: 360,
     fallbackUrl: previewUrl.value,

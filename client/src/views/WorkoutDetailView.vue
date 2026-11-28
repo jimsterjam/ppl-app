@@ -271,29 +271,6 @@
                     <small v-if="isOneRepMaxAddedWeightExercise(ex)" class="one-rep-max-hint">{{ t('workoutDetail.oneRepMaxHintAddedWeight') }}</small>
                     <small v-else class="one-rep-max-hint">{{ t('workoutDetail.oneRepMaxHint') }}</small>
                   </div>
-
-                  <div v-if="mediaExercise" class="media-overlay" @click.self="closeExerciseMedia">
-                    <div class="media-content">
-                      <video
-                        v-if="isVideoUrl(mediaUrl)"
-                        :src="mediaUrl"
-                        class="media-image"
-                        autoplay
-                        muted
-                        loop
-                        playsinline
-                        @error="onMediaVideoError"
-                      ></video>
-                      <img
-                        v-else
-                        :src="mediaUrl || getExerciseLargeImage(mediaExercise)"
-                        :alt="mediaExercise.name"
-                        class="media-image"
-                      />
-                      <p class="media-disclaimer">{{ t('workoutDetail.mediaDisclaimer') }}</p>
-                      <button class="close-btn" @click="closeExerciseMedia">OK</button>
-                    </div>
-                  </div>
                 </div>
               </template>
             </div>
@@ -649,6 +626,34 @@
               </div>
             </div>
           </div>
+
+          <!-- Großansicht (Bild/Video/Demo) einmal für das ganze Workout. Früher stand sie in der Übungsschleife: bei n Übungen
+               entstanden n gleiche Fenster und n Videos liefen gleichzeitig (Fund 28.11.). -->
+          <Teleport to="body">
+            <div v-if="mediaExercise" class="media-overlay" @click.self="closeExerciseMedia">
+              <div class="media-content">
+                <ExerciseDemo v-if="mediaDemo" :demo="mediaDemo" :title="getTranslatedExerciseName(mediaExercise.name_en || mediaExercise.name)" />
+                <video
+                  v-else-if="isVideoUrl(mediaUrl)"
+                  :src="mediaUrl"
+                  class="media-image"
+                  autoplay
+                  muted
+                  loop
+                  playsinline
+                  @error="onMediaVideoError"
+                ></video>
+                <img
+                  v-else
+                  :src="mediaUrl || getExerciseLargeImage(mediaExercise)"
+                  :alt="mediaExercise.name"
+                  class="media-image"
+                />
+                <p class="media-disclaimer">{{ t('workoutDetail.mediaDisclaimer') }}</p>
+                <button class="close-btn" @click="closeExerciseMedia">OK</button>
+              </div>
+            </div>
+          </Teleport>
 
           <div class="actions">
             <button
@@ -1092,6 +1097,9 @@ import HeaderBar from '@/components/HeaderBar.vue'
 import OneTimeHint from '@/components/OneTimeHint.vue'
 import AppModal from '@/components/AppModal.vue'
 import ExerciseList from '@/components/ExerciseList.vue'
+import ExerciseDemo from '@/components/ExerciseDemo.vue'
+import { findExerciseDemo } from '@/utils/exerciseDemo/demos'
+import { useScrollLock } from '@/composables/useScrollLock'
 import ExerciseSwapModal from '@/components/ExerciseSwapModal.vue'
 import CoachMarks from '@/components/CoachMarks.vue'
 import { buildSwappedExercise, canSwapExercise, replaceExerciseInPlanDay, resolveSwapScope } from '@/utils/exerciseSwapApply'
@@ -1294,6 +1302,12 @@ const suppressDraftPersistence = ref(false)
 const favoritePrefillApplied = ref(false)
 const favoriteLastPerformanceByIndex = ref({})
 const mediaExercise = ref(null)
+// Übungen ohne Foto/Video zeigen eine Strichfiguren-Demo (utils/exerciseDemo)
+// Die Demo richtet sich nach der Übung im Workout selbst (ID zuerst). Die Quelle für Bild/Video ist mit dem Katalogeintrag gemischt,
+// darüber würde eine eigene Übung "Plank" die Demo der Katalog-Übung bekommen.
+const mediaDemoSource = ref(null)
+const mediaDemo = computed(() => findExerciseDemo(mediaDemoSource.value))
+const mediaLock = useScrollLock() // Hintergrund bleibt stehen, solange die Großansicht offen ist
 const REAL_ID_RESOLVE_RETRIES = Number.parseInt(import.meta.env.VITE_REAL_ID_RESOLVE_RETRIES || '', 10) || 12
 const REAL_ID_RESOLVE_DELAY_MS = Number.parseInt(import.meta.env.VITE_REAL_ID_RESOLVE_DELAY_MS || '', 10) || 500
 const mediaUrl = ref('')
@@ -3422,6 +3436,9 @@ function openExerciseMedia(exercise) {
     Object.entries({ ...mapped, ...exercise }).filter(([, value]) => value != null && value !== '')
   ) : exercise
   mediaExercise.value = source
+  mediaDemoSource.value = exercise
+  mediaLock.lock()
+  if (findExerciseDemo(exercise)) return // Demo statt Video/Foto: keine Anfrage nach nicht vorhandenen Medien
   const fallbackMp4 = buildExerciseMediaUrl(source, 360, 'mp4')
   mediaUrl.value = fallbackMp4 || getExerciseLargeImage(source)
   resolveExerciseMedia(source, {
@@ -3445,8 +3462,12 @@ function onMediaVideoError() {
 
 function closeExerciseMedia() {
   mediaExercise.value = null
+  mediaDemoSource.value = null
   mediaUrl.value = ''
+  mediaLock.unlock() // schließt nur die Großansicht, laufende Stoppuhr/Timer bleiben unberührt
 }
+
+onBeforeUnmount(() => mediaLock.unlock())
 
 function onImgError(evt) {
   const img = evt?.target

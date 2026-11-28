@@ -138,28 +138,32 @@
       {{ t('exercises.none') }}
     </div>
 
-    <div v-if="mediaExercise" class="media-overlay" @click.self="closeMedia">
-      <div class="media-content">
-        <video
-          v-if="isVideoUrl(mediaUrl)"
-          :src="mediaUrl"
-          class="media-image"
-          autoplay
-          muted
-          loop
-          playsinline
-          @error="onMediaVideoError"
-        ></video>
-        <img
-          v-else
-          :src="mediaUrl || getExerciseLargeImage(mediaExercise)"
-          :alt="mediaExercise.name"
-          class="media-image"
-        />
-        <p class="media-disclaimer">{{ t('exercises.mediaDisclaimer') }}</p>
-        <button class="close-btn" @click="closeMedia">{{ t('common.close') }}</button>
+    <!-- Am body, damit die Großansicht auch im Fenster "Übung hinzufügen" vollflächig ist (auch im hellen Modus). -->
+    <Teleport to="body">
+      <div v-if="mediaExercise" class="media-overlay" @click.self="closeMedia">
+        <div class="media-content">
+          <ExerciseDemo v-if="mediaDemo" :demo="mediaDemo" :title="getTranslatedExerciseName(mediaExercise.name_en || mediaExercise.name)" />
+          <video
+            v-else-if="isVideoUrl(mediaUrl)"
+            :src="mediaUrl"
+            class="media-image"
+            autoplay
+            muted
+            loop
+            playsinline
+            @error="onMediaVideoError"
+          ></video>
+          <img
+            v-else
+            :src="mediaUrl || getExerciseLargeImage(mediaExercise)"
+            :alt="mediaExercise.name"
+            class="media-image"
+          />
+          <p class="media-disclaimer">{{ t('exercises.mediaDisclaimer') }}</p>
+          <button class="close-btn" @click="closeMedia">{{ t('common.close') }}</button>
+        </div>
       </div>
-    </div>
+    </Teleport>
   </div>
   <AddCustomExerciseModal
     v-model="showAddCustomModal"
@@ -189,6 +193,9 @@ import { loadDefaultExercises, getCachedDefaultExercises } from '@/utils/default
 import { searchAndRankExercises } from '@/utils/exerciseSearch'
 import AddCustomExerciseModal from '@/components/AddCustomExerciseModal.vue'
 import AppModal from '@/components/AppModal.vue'
+import ExerciseDemo from '@/components/ExerciseDemo.vue'
+import { findExerciseDemo } from '@/utils/exerciseDemo/demos'
+import { useScrollLock } from '@/composables/useScrollLock'
 import FilterDropdown from '@/components/FilterDropdown.vue'
 import { RotateCcw } from 'lucide-vue-next'
 import { deleteCustomExercise } from '@/api/customExercises'
@@ -300,6 +307,9 @@ const selectedCategory = ref('');
 const selectedMuscleGroup = ref('');
 const brokenImageIds = ref(new Set())
 const mediaExercise = ref(null)
+// Übungen ohne Foto/Video zeigen eine Strichfiguren-Demo (utils/exerciseDemo)
+const mediaDemo = computed(() => findExerciseDemo(mediaExercise.value))
+const mediaLock = useScrollLock() // Hintergrund bleibt stehen, solange die Großansicht offen ist
 const mediaUrl = ref('')
 const mediaRequestId = ref(0)
 const isVideoUrl = (url) => typeof url === 'string' && /\.mp4($|[?#])/i.test(url)
@@ -592,6 +602,8 @@ function openMedia(exercise) {
   if (!exercise) return
   const requestId = ++mediaRequestId.value
   mediaExercise.value = exercise
+  mediaLock.lock()
+  if (findExerciseDemo(exercise)) return // Demo statt Video/Foto: keine Anfrage nach nicht vorhandenen Medien
   const fallbackMp4 = buildExerciseMediaUrl(exercise, 360, 'mp4')
   mediaUrl.value = fallbackMp4 || getExerciseLargeImage(exercise) || getExerciseThumb(exercise)
   resolveExerciseMedia(exercise, {
@@ -616,7 +628,10 @@ function onMediaVideoError() {
 function closeMedia() {
   mediaExercise.value = null
   mediaUrl.value = ''
+  mediaLock.unlock()
 }
+
+onBeforeUnmount(() => mediaLock.unlock())
 </script>
 
 <style scoped>
@@ -993,7 +1008,8 @@ function closeMedia() {
   position: fixed;
   inset: 0;
   background: rgba(8, 13, 22, 0.72);
-  z-index: 50;
+  /* Über Fenstern (AppModal 1300) und der Navigation (1200): die Großansicht wird am body eingehängt */
+  z-index: 1400;
   display: flex;
   align-items: center;
   justify-content: center;
