@@ -31,6 +31,10 @@ export function joints(pose) {
 export function mixPose(a, b, t) {
   const out = {}
   for (const k of POSE_KEYS) out[k] = a[k] + (b[k] - a[k]) * t
+  // Optional: Spreizwinkel des hinteren Beins (Seitenansicht zeigt gespreizte Beine nur angedeutet, z. B. Straddle)
+  const sa = a.spread || 0
+  const sb = b.spread || 0
+  if (sa || sb) out.spread = sa + (sb - sa) * t
   return out
 }
 
@@ -84,37 +88,60 @@ export const BOX_HALF_WIDTH = 0.55
 export function layout(demo) {
   const anchor = anchorOf(demo)
   const bar = !!demo.props?.bar
+  const wall = !!demo.props?.wall
   const keys = demo.keys
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
+  let wallUnits = null
   const samples = keys.length === 1 ? [0] : Array.from({ length: 21 }, (_, i) => i / 20)
   for (const t of samples) {
-    const j = relativeToAnchor(poseAt(keys, t), anchor)
-    for (const p of Object.values(j)) {
+    const pose = poseAt(keys, t)
+    const j = relativeToAnchor(pose, anchor)
+    const points = Object.values(j)
+    // gespreiztes hinteres Bein (spread) gehört ebenfalls in die Zeichenfläche und zum Bodenabstand
+    if (pose.spread) {
+      const base = joints(pose)[anchor]
+      const far = joints({ ...pose, thigh: pose.thigh + pose.spread, shin: pose.shin + pose.spread, foot: pose.foot + pose.spread })
+      points.push(...['knee', 'ankle', 'toe'].map((k) => [far[k][0] - base[0], far[k][1] - base[1]]))
+    }
+    for (const p of points) {
       minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]); minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1])
     }
+    // Wand: hinter dem Rücken (kleinster x-Wert von Hüfte und Schulter) in allen Bildern
+    wallUnits = Math.min(wallUnits ?? Infinity, j.hip[0], j.shoulder[0])
   }
   let floorUnits = 0
   let boxRect = null
-  if (bar && demo.props.box) {
-    const start = relativeToAnchor(keys[0], anchor)
-    const top = start.toe[1]
-    floorUnits = top + BOX_HEIGHT
-    boxRect = { x: start.ankle[0] - BOX_HALF_WIDTH, y: top, w: 2 * BOX_HALF_WIDTH, h: BOX_HEIGHT }
-    minX = Math.min(minX, boxRect.x)
-    maxX += 1.4 // Platz für die Wandhalterung rechts
+  if (bar) {
+    if (demo.props.box) {
+      const start = relativeToAnchor(keys[0], anchor)
+      const top = start.toe[1]
+      floorUnits = top + BOX_HEIGHT
+      boxRect = { x: start.ankle[0] - BOX_HALF_WIDTH, y: top, w: 2 * BOX_HALF_WIDTH, h: BOX_HEIGHT }
+      minX = Math.min(minX, boxRect.x)
+      maxX += 1.4 // Platz für die Wandhalterung rechts
+    } else {
+      floorUnits = maxY + 0.45 // Boden unter den Füßen
+      maxX += 1.4
+    }
     maxY = Math.max(maxY, floorUnits)
+  }
+  if (wall) {
+    wallUnits -= 0.12
+    minX = Math.min(minX, wallUnits - 0.15)
   }
   minX -= 0.3; maxX += 0.3; minY -= 0.3
   const width = DEMO_WIDTH
   const height = bar ? BAR_HEIGHT : FLOOR_HEIGHT
   const bw = maxX - minX
   const bh = maxY - minY
-  const top = bar ? 24 : 0
-  const availH = bar ? height - 8 - top : height - 14 - 14
+  const topPad = bar ? 10 : 0
+  const availH = bar ? height - 8 - topPad : height - 14 - 14
   const scale = Math.min((width - 56) / bw, availH / (bar ? bh : bh + 0.1))
-  const floorY = bar ? top + floorUnits * scale : height - 14
-  const origin = [width / 2 - ((minX + maxX) / 2) * scale, bar ? top : floorY - 0.02 * scale]
-  return { width, height, scale, origin, floorY, bar, boxRect, floorUnits }
+  // Stange: Handgelenk liegt an der Stange; die Figur wird senkrecht so verschoben, dass sie in den Zeichenbereich passt
+  const originY = bar ? topPad + -minY * scale : height - 14 - 0.02 * scale
+  const origin = [width / 2 - ((minX + maxX) / 2) * scale, originY]
+  const floorY = bar ? originY + floorUnits * scale : height - 14
+  return { width, height, scale, origin, floorY, bar, boxRect, floorUnits, wallX: wall ? origin[0] + wallUnits * scale : null }
 }
 
 const toPx = (p, lay) => [lay.origin[0] + p[0] * lay.scale, lay.origin[1] + p[1] * lay.scale]
@@ -134,9 +161,16 @@ export function buildFrame(demo, lay, t, holding = false) {
     seg('hip', 'knee', 'limb', legs), seg('knee', 'ankle', 'limb', legs), seg('ankle', 'toe', 'limb', false),
     seg('shoulder', 'elbow', 'limb', arms), seg('elbow', 'wrist', 'limb', arms)
   ]
-  const far = [['shoulder', 'elbow'], ['elbow', 'wrist'], ['hip', 'knee'], ['knee', 'ankle'], ['ankle', 'toe']].map(([a, b]) => ({
-    x1: P[a][0] + farDx, y1: P[a][1], x2: P[b][0] + farDx, y2: P[b][1], kind: 'far', hot: false
-  }))
+  const farLine = (a, b, src) => ({ x1: src[a][0] + farDx, y1: src[a][1], x2: src[b][0] + farDx, y2: src[b][1], kind: 'far', hot: false })
+  const far = [['shoulder', 'elbow'], ['elbow', 'wrist']].map(([a, b]) => farLine(a, b, P))
+  // hinteres Bein: bei Spreizwinkel (spread) leicht abweichend, sonst deckungsgleich
+  let legSrc = P
+  if (pose.spread) {
+    const spreadJoints = joints({ ...pose, thigh: pose.thigh + pose.spread, shin: pose.shin + pose.spread, foot: pose.foot + pose.spread })
+    const base = joints(pose)[anchor]
+    legSrc = Object.fromEntries(Object.entries(spreadJoints).map(([k, p]) => [k, toPx([p[0] - base[0], p[1] - base[1]], lay)]))
+  }
+  far.push(...[['hip', 'knee'], ['knee', 'ankle'], ['ankle', 'toe']].map(([a, b]) => farLine(a, b, legSrc)))
   const scene = { lines: [], rects: [], circles: [] }
   if (lay.bar) {
     const wx = lay.origin[0]
@@ -150,6 +184,7 @@ export function buildFrame(demo, lay, t, holding = false) {
     }
   } else {
     scene.lines.push({ cls: 'floor', x1: 20, y1: lay.floorY + 4, x2: lay.width - 20, y2: lay.floorY + 4 })
+    if (lay.wallX != null) scene.lines.push({ cls: 'wall', x1: lay.wallX, y1: 6, x2: lay.wallX, y2: lay.floorY + 4 })
   }
   return {
     far, near,
