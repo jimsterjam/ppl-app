@@ -78,6 +78,11 @@ function start() {
 // Standbild: ohne Wandhalterung (Boden und Stange bleiben als Hinweis, was gehalten wird)
 const sceneLines = computed(() => (props.still ? frame.value.scene.lines.filter((l) => l.cls !== 'wall') : frame.value.scene.lines))
 
+const sceneRects = computed(() => (props.still ? [] : frame.value.scene.rects))
+
+// Standbild: nur die Hantelscheibe (gehört zur Haltung); Stangenenden und Ähnliches entfallen
+const sceneCircles = computed(() => (props.still ? frame.value.scene.circles.filter((c) => c.cls.startsWith('plate')) : frame.value.scene.circles))
+
 const viewBox = computed(() => {
   if (!props.still) return `0 0 ${lay.value.width} ${lay.value.height}`
   const b = frameBounds(frame.value)
@@ -110,10 +115,8 @@ watch(() => [props.demo, props.still], start)
   >
     <g class="ed-scene">
       <line v-for="(l, i) in sceneLines" :key="`l${i}`" :class="l.cls" :x1="l.x1" :y1="l.y1" :x2="l.x2" :y2="l.y2" />
-      <template v-if="!still">
-        <rect v-for="(r, i) in frame.scene.rects" :key="`r${i}`" :class="r.cls" :x="r.x" :y="r.y" :width="r.w" :height="r.h" rx="3" />
-        <circle v-for="(c, i) in frame.scene.circles" :key="`c${i}`" :class="c.cls" :cx="c.cx" :cy="c.cy" :r="c.r" />
-      </template>
+      <rect v-for="(r, i) in sceneRects" :key="`r${i}`" :class="r.cls" :x="r.x" :y="r.y" :width="r.w" :height="r.h" rx="3" />
+      <circle v-for="(c, i) in sceneCircles" :key="`c${i}`" :class="c.cls" :cx="c.cx" :cy="c.cy" :r="c.r" />
     </g>
     <g v-if="!still" class="ed-halo" :class="{ on: frame.holding }">
       <line v-for="(s, i) in frame.near" :key="`h${i}`" class="halo-seg" :x1="s.x1" :y1="s.y1" :x2="s.x2" :y2="s.y2" />
@@ -152,6 +155,9 @@ watch(() => [props.demo, props.still], start)
 .joint { fill: var(--card-soft, #1c1f28); }
 .floor, .wall { stroke: var(--line-strong, rgba(255, 255, 255, 0.2)); stroke-width: 3; stroke-linecap: round; }
 .bar { stroke: var(--muted, #9aa3b8); stroke-width: 6; stroke-linecap: round; }
+.plate { fill: none; stroke: var(--muted, #9aa3b8); stroke-width: 6; }
+.plate-hub { fill: var(--muted, #9aa3b8); }
+.is-still .plate { stroke-width: 2.5px; vector-effect: non-scaling-stroke; }
 .bar-end { fill: var(--muted, #9aa3b8); }
 .box { fill: var(--surface-strong, #2b2f3b); stroke: var(--line-strong, rgba(255, 255, 255, 0.2)); stroke-width: 2; }
 .halo-seg { stroke: var(--accent-text, var(--accent, #d7ff1f)); stroke-width: 13; stroke-linecap: round; fill: none; }

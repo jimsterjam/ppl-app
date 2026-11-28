@@ -42,6 +42,19 @@ const BL_STRADDLE = { torso: 0, head: 28, uarm: -106, farm: -106, thigh: 180, sh
 
 const HOLD_PHASES = [{ d: 1.0, from: 0, to: 0 }, { d: 1.5, from: 0, to: 1 }, { d: 2.8, from: 1, to: 1, hold: true }, { d: 1.3, from: 1, to: 0 }]
 
+
+// --- Clean (Langhantel; Füße am Boden, Anker Zehen; Hantel = Scheibe am Handgelenk) ---
+// Schlüsselhaltungen: Ausgangsposition, erster Zug, Hang über dem Knie, Streckung, Unterziehen, Fangen (Frontkniebeuge), Aufstehen, Ablegen.
+// Arme in den ersten drei und im Ablegen gestreckt (Hantel nah am Körper), beim Zug und Fangen gebeugt (Ellbogen hoch).
+const CLEAN_SETUP = { torso: -42, head: -52, uarm: 82.3, farm: 107.8, thigh: 8, shin: 112, foot: 0 }
+const CLEAN_FIRST_PULL = { torso: -38, head: -54, uarm: 83.8, farm: 109.1, thigh: 42, shin: 100, foot: 0 }
+const CLEAN_HANG = { torso: -61, head: -72, uarm: 81.6, farm: 105.6, thigh: 84, shin: 93, foot: 0 }
+const CLEAN_EXTENSION = { torso: -90, head: -84, uarm: 25.4, farm: 98.2, thigh: 88, shin: 92, foot: 38 }
+const CLEAN_PULL_UNDER = { torso: -88, head: -82, uarm: -12.7, farm: 29.6, thigh: 40, shin: 105, foot: 15 }
+const CLEAN_CATCH = { torso: -84, head: -80, uarm: 15, farm: -135, thigh: -8, shin: 108, foot: 0 }
+const CLEAN_STAND = { torso: -88, head: -86, uarm: 15, farm: -135, thigh: 84, shin: 94, foot: 0 }
+const CLEAN_LOWER = { torso: -88, head: -80, uarm: 88.4, farm: 68.3, thigh: 86, shin: 93, foot: 0 }
+
 export const EXERCISE_DEMOS = Object.freeze([
   { id: '9019', name_en: 'plank', hot: ['torso'], keys: [PLANK] },
   {
@@ -61,7 +74,13 @@ export const EXERCISE_DEMOS = Object.freeze([
   { id: '9027', name_en: 'straddle front lever', hot: ['torso'], keys: [HANG, FL_STRADDLE], props: { bar: true }, phases: HOLD_PHASES },
   { id: '9028', name_en: 'tuck back lever', hot: ['torso'], keys: [HANG, BL_TUCK], props: { bar: true }, phases: HOLD_PHASES },
   { id: '9029', name_en: 'advanced tuck back lever', hot: ['torso'], keys: [HANG, BL_ADV_TUCK], props: { bar: true }, phases: HOLD_PHASES },
-  { id: '9030', name_en: 'straddle back lever', hot: ['torso'], keys: [HANG, BL_STRADDLE], props: { bar: true }, phases: HOLD_PHASES }
+  { id: '9030', name_en: 'straddle back lever', hot: ['torso'], keys: [HANG, BL_STRADDLE], props: { bar: true }, phases: HOLD_PHASES },
+  {
+    id: '9009', name_en: 'clean', kind: 'dynamic', hot: ['legs'], anchor: 'toe', props: { barbell: true, tall: true },
+    keys: [CLEAN_SETUP, CLEAN_FIRST_PULL, CLEAN_HANG, CLEAN_EXTENSION, CLEAN_PULL_UNDER, CLEAN_CATCH, CLEAN_STAND, CLEAN_LOWER, CLEAN_FIRST_PULL, CLEAN_SETUP],
+    // Bewegung ohne Haltephase: gleichmäßig durch alle Haltungen, kurze Pause am Anfang
+    phases: [{ d: 0.8, from: 0, to: 0 }, { d: 8.0, from: 0, to: 1, linear: true }]
+  }
 ])
 
 const BY_ID = new Map(EXERCISE_DEMOS.map((d) => [d.id, d]))

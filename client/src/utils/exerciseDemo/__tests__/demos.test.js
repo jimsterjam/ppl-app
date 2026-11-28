@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import catalog from '@/data/default-exercises.json'
 import { EXERCISE_DEMOS, findExerciseDemo } from '../demos'
-import { jointUnits, layout, buildFrame, BOX_HEIGHT, BOX_HALF_WIDTH } from '../engine'
+import { jointUnits, layout, buildFrame, BOX_HEIGHT, BOX_HALF_WIDTH, PLATE_RADIUS } from '../engine'
 
 const byId = new Map(catalog.map((e) => [e.id, e]))
 const demo = (id) => EXERCISE_DEMOS.find((d) => d.id === id)
@@ -14,7 +14,9 @@ describe('Demos: Abgleich mit dem Katalog', () => {
     // Demos nur dort, wo es kein echtes Foto/Video gibt
     expect(entry.imageUrl).toBe('')
     expect(entry.thumbnailUrl).toBe('')
-    expect(entry.measureMode).toBe('time')
+    // Halteübungen werden in Sekunden erfasst, Bewegungen (kind 'dynamic', z. B. Clean) mit Wdh. und kg
+    if (d.kind === 'dynamic') expect(entry.measureMode).toBeUndefined()
+    else expect(entry.measureMode).toBe('time')
   })
 
   it('jede Demo-ID und jeder Name kommt nur einmal vor', () => {
@@ -24,9 +26,16 @@ describe('Demos: Abgleich mit dem Katalog', () => {
 
   it('Ablauf: genau eine Haltephase, Werte 0..1, Anfang und Ende passen zusammen', () => {
     for (const d of EXERCISE_DEMOS.filter((x) => x.phases)) {
-      expect(d.phases.filter((p) => p.hold)).toHaveLength(1)
+      // Bewegungen ohne Halten (kind 'dynamic') laufen als Schleife durch die Haltungen
+      expect(d.phases.filter((p) => p.hold)).toHaveLength(d.kind === 'dynamic' ? 0 : 1)
       for (const p of d.phases) { expect(p.from).toBeGreaterThanOrEqual(0); expect(p.to).toBeLessThanOrEqual(1); expect(p.d).toBeGreaterThan(0) }
       expect(d.phases[0].from).toBe(0)
+      if (d.kind === 'dynamic') {
+        // die Bewegung endet in der Haltung, mit der sie beginnt (Schleife ohne Sprung)
+        expect(d.phases.at(-1).to).toBe(1)
+        for (const k of ['torso', 'thigh', 'shin', 'foot']) expect(d.keys.at(-1)[k], k).toBe(d.keys[0][k])
+        continue
+      }
       expect(d.phases.at(-1).to).toBe(d.phases[0].from) // Schleife schließt sich
       const hold = d.phases.find((p) => p.hold)
       expect(hold.from).toBe(1); expect(hold.to).toBe(1)
@@ -95,6 +104,10 @@ describe('Demos: allgemeine Regeln für alle Haltungen', () => {
         expect(jointUnits(d, i / 100, name)[1], `${name} t=${i / 100}`).toBeLessThanOrEqual(0.03)
       }
     }
+  })
+
+  it.each(FLOOR_DEMOS.filter((d) => d.props?.barbell).map((d) => [d.name_en, d]))('Hantel "%s": die Scheibe geht in keinem Bild durch den Boden', (_n, d) => {
+    for (let i = 0; i <= 200; i++) expect(jointUnits(d, i / 200, 'wrist')[1] + PLATE_RADIUS, `t=${i / 200}`).toBeLessThanOrEqual(0.03)
   })
 
   it.each(BAR_DEMOS.map((d) => [d.name_en, d]))('Hang "%s": Hände bleiben an der Stange, Füße in jedem Bild über dem Boden', (_n, d) => {
@@ -222,6 +235,64 @@ describe('Demos: Haltungen der weiteren Halteübungen', () => {
     expect(reach('9029')).toBeLessThan(reach('9030'))
     expect(Math.abs(J('9029', 1, 'knee')[0] - J('9029', 1, 'hip')[0])).toBeLessThan(0.05) // Oberschenkel senkrecht
     expect(demo('9030').keys.at(-1).spread).toBeGreaterThan(0)
+  })
+})
+
+describe('Demos: Clean (Langhantel)', () => {
+  const clean = () => demo('9009')
+  const at = (i) => i / (clean().keys.length - 1) // Schlüsselhaltung i
+
+  it('Start: Hantel liegt am Boden (Scheibe berührt den Boden), Füße flach, Arme gestreckt, Rücken geneigt', () => {
+    expect(J('9009', 0, 'wrist')[1]).toBeCloseTo(-PLATE_RADIUS, 1)
+    expect(J('9009', 0, 'ankle')[1]).toBeCloseTo(0, 1)
+    const [s, w] = [J('9009', 0, 'shoulder'), J('9009', 0, 'wrist')]
+    expect(Math.hypot(s[0] - w[0], s[1] - w[1])).toBeGreaterThan(1.3) // Arme gestreckt
+    expect(s[0]).toBeGreaterThan(w[0]) // Schultern vor der Hantel
+  })
+
+  it('Füße bleiben die ganze Bewegung am Boden (nur die Ferse hebt sich bei der Streckung)', () => {
+    let heel = 0
+    for (let i = 0; i <= 200; i++) {
+      expect(J('9009', i / 200, 'toe')[1]).toBeCloseTo(0, 5)
+      heel = Math.min(heel, J('9009', i / 200, 'ankle')[1])
+    }
+    expect(heel).toBeLessThan(-0.15) // bei der Streckung auf den Zehen
+  })
+
+  it('Hantel bleibt nah am Körper: über dem Fuß beim Anheben, nie weiter als 0,9 Einheiten vor den Zehen', () => {
+    for (let i = 0; i <= 200; i++) {
+      const w = J('9009', i / 200, 'wrist')
+      expect(w[0], `t=${i / 200}`).toBeLessThan(0.9)
+      expect(w[0], `t=${i / 200}`).toBeGreaterThan(-0.9)
+    }
+    // erster Zug und Hang: Hantel vor dem Knie, nicht dahinter durch die Beine
+    for (const i of [1, 2]) expect(J('9009', at(i), 'wrist')[0]).toBeGreaterThan(J('9009', at(i), 'knee')[0] - 0.7)
+  })
+
+  it('Hantel steigt in der Reihenfolge Boden < Knie < Oberschenkel < Brust und liegt beim Fangen auf den Schultern', () => {
+    const y = (i) => J('9009', at(i), 'wrist')[1]
+    expect(y(0)).toBeGreaterThan(y(1)) // höher = kleineres y
+    expect(y(1)).toBeGreaterThan(y(2))
+    expect(y(2)).toBeGreaterThan(y(3))
+    for (const i of [5, 6]) {
+      const [s, w] = [J('9009', at(i), 'shoulder'), J('9009', at(i), 'wrist')]
+      expect(Math.hypot(s[0] - w[0], s[1] - w[1]), `Haltung ${i}`).toBeLessThan(0.6)
+    }
+  })
+
+  it('Fangen: tiefe Hocke (Hüfte tiefer als beim Aufstehen), Oberkörper aufrecht; Streckung: Beine gestreckt', () => {
+    expect(J('9009', at(5), 'hip')[1]).toBeGreaterThan(J('9009', at(6), 'hip')[1] + 0.8)
+    const [h, s] = [J('9009', at(5), 'hip'), J('9009', at(5), 'shoulder')]
+    expect(Math.abs(s[0] - h[0])).toBeLessThan(0.3) // Oberkörper annähernd senkrecht
+    const reach = Math.hypot(J('9009', at(3), 'hip')[0] - J('9009', at(3), 'ankle')[0], J('9009', at(3), 'hip')[1] - J('9009', at(3), 'ankle')[1])
+    expect(reach).toBeGreaterThan(1.9) // Hüfte und Knöchel fast so weit auseinander wie die Beinlänge
+  })
+
+  it('Arme überstrecken nie: Schulter-Handgelenk ist höchstens so lang wie beide Armsegmente', () => {
+    for (let i = 0; i <= 200; i++) {
+      const [s, w] = [J('9009', i / 200, 'shoulder'), J('9009', i / 200, 'wrist')]
+      expect(Math.hypot(s[0] - w[0], s[1] - w[1]), `t=${i / 200}`).toBeLessThanOrEqual(1.46)
+    }
   })
 })
 

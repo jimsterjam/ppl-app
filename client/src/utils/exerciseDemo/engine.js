@@ -9,6 +9,8 @@ export const POSE_KEYS = Object.freeze(['torso', 'head', 'uarm', 'farm', 'thigh'
 export const DEMO_WIDTH = 320
 export const FLOOR_HEIGHT = 150
 export const BAR_HEIGHT = 200
+/** Höhere Zeichenfläche für stehende Bewegungen am Boden (props.tall), z. B. Clean. */
+export const TALL_HEIGHT = 230
 
 const rad = (deg) => (deg * Math.PI) / 180
 const step = (p, len, deg) => [p[0] + len * Math.cos(rad(deg)), p[1] + len * Math.sin(rad(deg))]
@@ -60,7 +62,7 @@ export function timelineAt(phases, seconds) {
   if (!total) return { t: 1, holding: true }
   let x = ((Number(seconds) || 0) % total + total) % total
   for (const p of phases) {
-    if (x < p.d) return { t: p.from + (p.to - p.from) * ease(x / p.d), holding: !!p.hold }
+    if (x < p.d) return { t: p.from + (p.to - p.from) * (p.linear ? x / p.d : ease(x / p.d)), holding: !!p.hold }
     x -= p.d
   }
   return { t: phases[0].from, holding: false }
@@ -78,6 +80,8 @@ function relativeToAnchor(pose, anchor) {
 }
 
 /** Höhe der Kiste (Einheiten) bei Hang-Übungen mit Einstiegskiste. */
+/** Radius der Hantelscheibe in Einheiten (Hantel folgt dem Handgelenk, props.barbell). */
+export const PLATE_RADIUS = 0.5
 export const BOX_HEIGHT = 0.5
 export const BOX_HALF_WIDTH = 0.55
 
@@ -102,6 +106,11 @@ export function layout(demo) {
       const base = joints(pose)[anchor]
       const far = joints({ ...pose, thigh: pose.thigh + pose.spread, shin: pose.shin + pose.spread, foot: pose.foot + pose.spread })
       points.push(...['knee', 'ankle', 'toe'].map((k) => [far[k][0] - base[0], far[k][1] - base[1]]))
+    }
+    // Hantel: die Scheibe sitzt am Handgelenk und gehört in die Zeichenfläche
+    if (demo.props?.barbell) {
+      const w = j.wrist
+      points.push([w[0] - PLATE_RADIUS, w[1] - PLATE_RADIUS], [w[0] + PLATE_RADIUS, w[1] + PLATE_RADIUS])
     }
     for (const p of points) {
       minX = Math.min(minX, p[0]); maxX = Math.max(maxX, p[0]); minY = Math.min(minY, p[1]); maxY = Math.max(maxY, p[1])
@@ -131,7 +140,7 @@ export function layout(demo) {
   }
   minX -= 0.3; maxX += 0.3; minY -= 0.3
   const width = DEMO_WIDTH
-  const height = bar ? BAR_HEIGHT : FLOOR_HEIGHT
+  const height = bar ? BAR_HEIGHT : demo.props?.tall ? TALL_HEIGHT : FLOOR_HEIGHT
   const bw = maxX - minX
   const bh = maxY - minY
   const topPad = bar ? 10 : 0
@@ -184,6 +193,10 @@ export function buildFrame(demo, lay, t, holding = false) {
     }
   } else {
     scene.lines.push({ cls: 'floor', x1: 20, y1: lay.floorY + 4, x2: lay.width - 20, y2: lay.floorY + 4 })
+    if (demo.props?.barbell) {
+      scene.circles.push({ cls: 'plate', cx: P.wrist[0], cy: P.wrist[1], r: PLATE_RADIUS * lay.scale })
+      scene.circles.push({ cls: 'plate-hub', cx: P.wrist[0], cy: P.wrist[1], r: 0.09 * lay.scale })
+    }
     if (lay.wallX != null) scene.lines.push({ cls: 'wall', x1: lay.wallX, y1: 6, x2: lay.wallX, y2: lay.floorY + 4 })
   }
   return {
@@ -209,6 +222,9 @@ export function frameBounds(frame, margin = 12) {
   for (const s of [...frame.near, ...frame.far]) { xs.push(s.x1, s.x2); ys.push(s.y1, s.y2) }
   xs.push(frame.head.cx - frame.head.r, frame.head.cx + frame.head.r)
   ys.push(frame.head.cy - frame.head.r, frame.head.cy + frame.head.r)
+  for (const c of frame.scene.circles) {
+    if (c.cls === 'plate') { xs.push(c.cx - c.r, c.cx + c.r); ys.push(c.cy - c.r, c.cy + c.r) }
+  }
   const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys)
   const size = Math.max(maxX - minX, maxY - minY) + 2 * margin
   const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2
