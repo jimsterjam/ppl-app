@@ -140,8 +140,9 @@
 
     <div v-if="mediaExercise" class="media-overlay" @click.self="closeMedia">
       <div class="media-content">
+        <ExerciseDemo v-if="mediaDemo" :demo="mediaDemo" :title="mediaExercise.name_en || mediaExercise.name" />
         <video
-          v-if="isVideoUrl(mediaUrl)"
+          v-else-if="isVideoUrl(mediaUrl)"
           :src="mediaUrl"
           class="media-image"
           autoplay
@@ -189,6 +190,8 @@ import { loadDefaultExercises, getCachedDefaultExercises } from '@/utils/default
 import { searchAndRankExercises } from '@/utils/exerciseSearch'
 import AddCustomExerciseModal from '@/components/AddCustomExerciseModal.vue'
 import AppModal from '@/components/AppModal.vue'
+import ExerciseDemo from '@/components/ExerciseDemo.vue'
+import { findExerciseDemo } from '@/utils/exerciseDemo/demos'
 import FilterDropdown from '@/components/FilterDropdown.vue'
 import { RotateCcw } from 'lucide-vue-next'
 import { deleteCustomExercise } from '@/api/customExercises'
@@ -300,6 +303,8 @@ const selectedCategory = ref('');
 const selectedMuscleGroup = ref('');
 const brokenImageIds = ref(new Set())
 const mediaExercise = ref(null)
+// Übungen ohne Foto/Video zeigen eine Strichfiguren-Demo (utils/exerciseDemo)
+const mediaDemo = computed(() => findExerciseDemo(mediaExercise.value))
 const mediaUrl = ref('')
 const mediaRequestId = ref(0)
 const isVideoUrl = (url) => typeof url === 'string' && /\.mp4($|[?#])/i.test(url)

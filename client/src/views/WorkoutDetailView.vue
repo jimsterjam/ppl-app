@@ -274,8 +274,9 @@
 
                   <div v-if="mediaExercise" class="media-overlay" @click.self="closeExerciseMedia">
                     <div class="media-content">
+                      <ExerciseDemo v-if="mediaDemo" :demo="mediaDemo" :title="mediaExercise.name_en || mediaExercise.name" />
                       <video
-                        v-if="isVideoUrl(mediaUrl)"
+                        v-else-if="isVideoUrl(mediaUrl)"
                         :src="mediaUrl"
                         class="media-image"
                         autoplay
@@ -1092,6 +1093,8 @@ import HeaderBar from '@/components/HeaderBar.vue'
 import OneTimeHint from '@/components/OneTimeHint.vue'
 import AppModal from '@/components/AppModal.vue'
 import ExerciseList from '@/components/ExerciseList.vue'
+import ExerciseDemo from '@/components/ExerciseDemo.vue'
+import { findExerciseDemo } from '@/utils/exerciseDemo/demos'
 import ExerciseSwapModal from '@/components/ExerciseSwapModal.vue'
 import CoachMarks from '@/components/CoachMarks.vue'
 import { buildSwappedExercise, canSwapExercise, replaceExerciseInPlanDay, resolveSwapScope } from '@/utils/exerciseSwapApply'
@@ -1294,6 +1297,8 @@ const suppressDraftPersistence = ref(false)
 const favoritePrefillApplied = ref(false)
 const favoriteLastPerformanceByIndex = ref({})
 const mediaExercise = ref(null)
+// Übungen ohne Foto/Video zeigen eine Strichfiguren-Demo (utils/exerciseDemo)
+const mediaDemo = computed(() => findExerciseDemo(mediaExercise.value))
 const REAL_ID_RESOLVE_RETRIES = Number.parseInt(import.meta.env.VITE_REAL_ID_RESOLVE_RETRIES || '', 10) || 12
 const REAL_ID_RESOLVE_DELAY_MS = Number.parseInt(import.meta.env.VITE_REAL_ID_RESOLVE_DELAY_MS || '', 10) || 500
 const mediaUrl = ref('')
