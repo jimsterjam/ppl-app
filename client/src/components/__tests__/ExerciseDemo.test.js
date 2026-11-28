@@ -9,6 +9,7 @@ import { buildFrame, layout } from '@/utils/exerciseDemo/engine'
 const plank = EXERCISE_DEMOS.find((d) => d.id === '9019')
 const tuck = EXERCISE_DEMOS.find((d) => d.id === '9013')
 const hang = EXERCISE_DEMOS.find((d) => d.id === '9022')
+const clean = EXERCISE_DEMOS.find((d) => d.id === '9009')
 
 let rafCallbacks
 let nextRafId
@@ -170,6 +171,34 @@ describe('ExerciseDemo', () => {
     expect(w.find('svg').classes()).not.toContain('is-still')
     expect(w.find('svg').attributes('viewBox')).toMatch(/^0 0 320 \d+$/)
     expect(rafCallbacks.size).toBe(1)
+  })
+
+  it('Standbild: nur die Hantelscheibe als Szenenteil; Stangenenden und Kiste entfallen (Gegenprobe Hang ohne Scheibe)', () => {
+    const c = mount(ExerciseDemo, { props: { demo: clean, title: 'clean', still: true } })
+    expect(c.findAll('circle.plate').length).toBe(1)
+    expect(c.find('circle.plate-hub').exists()).toBe(true)
+    const h = mount(ExerciseDemo, { props: { demo: hang, title: 'dead hang', still: true } })
+    for (const sel of ['circle.plate', 'circle.bar-end', 'rect.box']) expect(h.find(sel).exists(), sel).toBe(false)
+    // nicht im Standbild: laufend sind Stangenende und Kiste dabei
+    const live = mount(ExerciseDemo, { props: { demo: hang, title: 'dead hang' } })
+    expect(live.find('circle.bar-end').exists()).toBe(true)
+    expect(live.find('rect.box').exists()).toBe(true)
+  })
+
+  it('Review: Standbild und "Bewegung reduzieren" zeigen beim Clean den Fang (restT), nicht den Start, ohne Leuchten', async () => {
+    setReducedMotion(true)
+    const w = mount(ExerciseDemo, { props: { demo: clean, title: 'clean' } })
+    await nextTick()
+    expect(rafCallbacks.size).toBe(0)
+    expect(w.find('.ed-halo').classes()).not.toContain('on')
+    const lay = layout(clean)
+    const catchFrame = buildFrame(clean, lay, 5 / 9, false)
+    const startFrame = buildFrame(clean, lay, 0, false)
+    const plate = w.find('circle.plate')
+    expect(Number(plate.attributes('cy'))).toBeCloseTo(catchFrame.scene.circles.find((c) => c.cls === 'plate').cy, 3)
+    expect(Math.abs(catchFrame.scene.circles.find((c) => c.cls === 'plate').cy - startFrame.scene.circles.find((c) => c.cls === 'plate').cy)).toBeGreaterThan(30)
+    const s = mount(ExerciseDemo, { props: { demo: clean, title: 'clean', still: true } })
+    expect(Number(s.find('circle.plate').attributes('cy'))).toBeCloseTo(catchFrame.scene.circles.find((c) => c.cls === 'plate').cy, 3)
   })
 
   it('Wechsel der Demo startet neu und zeigt die neue Übung', async () => {

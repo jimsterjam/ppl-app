@@ -16,8 +16,11 @@ const props = defineProps({
 const lay = computed(() => layout(props.demo))
 const animated = computed(() => Array.isArray(props.demo.phases) && props.demo.phases.length > 0)
 
+// Zeitpunkt des Ruhebilds (Standbild, "Bewegung reduzieren"): Endhaltung, bei Bewegungen eine aussagekräftige Haltung (restT, z. B. der Fang beim Clean)
+const restT = () => props.demo.restT ?? 1
+
 function stillFrame() {
-  return buildFrame(props.demo, lay.value, 1, false)
+  return buildFrame(props.demo, lay.value, restT(), false)
 }
 
 // Bild zum Zeitpunkt seconds: statische Demo = Endhaltung mit Leuchten, animierte = Ablauf an dieser Stelle
@@ -45,7 +48,8 @@ const prefersReducedMotion = () => Boolean(reducedMotionQuery()?.matches)
 
 // Ruhebild: bei bewegungsempfindlichen Einstellungen und für statische Demos die Endhaltung mit Leuchten.
 function showResting() {
-  frame.value = buildFrame(props.demo, lay.value, 1, true)
+  // Bewegungen (kind 'dynamic') haben keine Haltephase: kein Leuchten
+  frame.value = buildFrame(props.demo, lay.value, restT(), props.demo.kind !== 'dynamic')
 }
 
 function tick(now) {

@@ -79,9 +79,9 @@ function relativeToAnchor(pose, anchor) {
   return out
 }
 
-/** Höhe der Kiste (Einheiten) bei Hang-Übungen mit Einstiegskiste. */
 /** Radius der Hantelscheibe in Einheiten (Hantel folgt dem Handgelenk, props.barbell). */
 export const PLATE_RADIUS = 0.5
+/** Höhe der Kiste (Einheiten) bei Hang-Übungen mit Einstiegskiste. */
 export const BOX_HEIGHT = 0.5
 export const BOX_HALF_WIDTH = 0.55
 
@@ -96,7 +96,8 @@ export function layout(demo) {
   const keys = demo.keys
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity
   let wallUnits = null
-  const samples = keys.length === 1 ? [0] : Array.from({ length: 21 }, (_, i) => i / 20)
+  // gleichmäßig verteilte Zeitpunkte plus jede Schlüsselhaltung exakt (dort liegen die Extreme)
+  const samples = keys.length === 1 ? [0] : [...Array.from({ length: 21 }, (_, i) => i / 20), ...keys.map((_, i) => i / (keys.length - 1))]
   for (const t of samples) {
     const pose = poseAt(keys, t)
     const j = relativeToAnchor(pose, anchor)
@@ -193,11 +194,13 @@ export function buildFrame(demo, lay, t, holding = false) {
     }
   } else {
     scene.lines.push({ cls: 'floor', x1: 20, y1: lay.floorY + 4, x2: lay.width - 20, y2: lay.floorY + 4 })
-    if (demo.props?.barbell) {
-      scene.circles.push({ cls: 'plate', cx: P.wrist[0], cy: P.wrist[1], r: PLATE_RADIUS * lay.scale })
-      scene.circles.push({ cls: 'plate-hub', cx: P.wrist[0], cy: P.wrist[1], r: 0.09 * lay.scale })
-    }
+
     if (lay.wallX != null) scene.lines.push({ cls: 'wall', x1: lay.wallX, y1: 6, x2: lay.wallX, y2: lay.floorY + 4 })
+  }
+  // Hantel: Scheibe am Handgelenk (für alle Szenen, auch mit Stange)
+  if (demo.props?.barbell) {
+    scene.circles.push({ cls: 'plate', cx: P.wrist[0], cy: P.wrist[1], r: PLATE_RADIUS * lay.scale })
+    scene.circles.push({ cls: 'plate-hub', cx: P.wrist[0], cy: P.wrist[1], r: 0.09 * lay.scale })
   }
   return {
     far, near,

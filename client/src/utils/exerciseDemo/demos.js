@@ -1,10 +1,16 @@
 // Haltungen der Strichfiguren-Demos (siehe engine.js). Nur für Übungen OHNE Foto/Video im Katalog; Schlüssel ist die Katalog-ID.
 // Aufbau einer Demo:
 //   id, name_en   Katalogeintrag (Test gleicht beides mit default-exercises.json ab)
-//   hot           arbeitende Zone: 'torso' | 'arms' | 'legs'
+//   hot           arbeitende Zone: 'torso' | 'arms' | 'legs' (genau eine Gruppe)
 //   keys          Schlüsselhaltungen, gleichmäßig auf t = 0..1 verteilt (eine = statisch)
-//   phases        Ablauf [{ d, from, to, hold? }]; hold = am Endpunkt wird gehalten (Leuchten). Fehlt = statisch.
-//   props         { bar: true, box: true } = Hang an der Stange mit Einstiegskiste; sonst Bodenübung (Handgelenk am Boden)
+//   phases        Ablauf [{ d, from, to, hold?, linear? }]; hold = am Endpunkt wird gehalten (Leuchten); linear = gleichmäßige
+//                 Geschwindigkeit statt weichem Anfahren/Bremsen. Fehlt phases = statisch.
+//   anchor        fester Punkt der Figur (Standard 'wrist'; 'hip' für Liegen, 'toe' für Stehen am Boden)
+//   props         { bar: true, box: true } Hang an der Stange (mit Einstiegskiste) | { wall: true } Wand hinter dem Rücken |
+//                 { barbell: true } Hantelscheibe am Handgelenk | { tall: true } höhere Zeichenfläche für stehende Bewegungen
+//   kind          'dynamic' = Bewegung mit Wdh./kg (kein Halten, keine Zeitmessung): Schleife ohne Haltephase, die letzte Haltung
+//                 muss der ersten entsprechen (Test), sonst springt die Schleife
+//   restT         Zeitpunkt (0..1) des Ruhebilds für Standbild und "Bewegung reduzieren" (Standard 1 = Endhaltung)
 // Winkel: 0 = nach rechts, 90 = nach unten. Neue Demos nur mit Vorschaubild zur Freigabe (Genauigkeit der Haltung).
 
 const PLANK = { torso: -7, head: -12, uarm: 90, farm: 0, thigh: 173, shin: 173, foot: 83 }
@@ -76,7 +82,7 @@ export const EXERCISE_DEMOS = Object.freeze([
   { id: '9029', name_en: 'advanced tuck back lever', hot: ['torso'], keys: [HANG, BL_ADV_TUCK], props: { bar: true }, phases: HOLD_PHASES },
   { id: '9030', name_en: 'straddle back lever', hot: ['torso'], keys: [HANG, BL_STRADDLE], props: { bar: true }, phases: HOLD_PHASES },
   {
-    id: '9009', name_en: 'clean', kind: 'dynamic', hot: ['legs'], anchor: 'toe', props: { barbell: true, tall: true },
+    id: '9009', name_en: 'clean', kind: 'dynamic', restT: 5 / 9, hot: ['legs'], anchor: 'toe', props: { barbell: true, tall: true },
     keys: [CLEAN_SETUP, CLEAN_FIRST_PULL, CLEAN_HANG, CLEAN_EXTENSION, CLEAN_PULL_UNDER, CLEAN_CATCH, CLEAN_STAND, CLEAN_LOWER, CLEAN_FIRST_PULL, CLEAN_SETUP],
     // Bewegung ohne Haltephase: gleichmäßig durch alle Haltungen, kurze Pause am Anfang
     phases: [{ d: 0.8, from: 0, to: 0 }, { d: 8.0, from: 0, to: 1, linear: true }]

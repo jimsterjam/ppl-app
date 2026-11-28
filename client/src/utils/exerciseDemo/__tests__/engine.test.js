@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { joints, mixPose, poseAt, timelineAt, layout, buildFrame, frameBounds, LIMB, POSE_KEYS, DEMO_WIDTH } from '../engine'
+import { joints, mixPose, poseAt, timelineAt, layout, buildFrame, frameBounds, LIMB, POSE_KEYS, DEMO_WIDTH, TALL_HEIGHT, FLOOR_HEIGHT, PLATE_RADIUS } from '../engine'
 import { EXERCISE_DEMOS } from '../demos'
 
 const POSE = { torso: 0, head: 0, uarm: 90, farm: 0, thigh: 90, shin: 90, foot: 0 }
@@ -64,6 +64,69 @@ describe('engine: Ablauf', () => {
   it('ohne Phasen (statisch): Endhaltung, immer "halten"', () => {
     expect(timelineAt(undefined, 5)).toEqual({ t: 1, holding: true })
     expect(timelineAt([], 5)).toEqual({ t: 1, holding: true })
+  })
+})
+
+describe('engine: Bewegung (linear) und Hantel', () => {
+  const eased = [{ d: 4, from: 0, to: 1 }]
+  const linear = [{ d: 4, from: 0, to: 1, linear: true }]
+
+  it('linear: gleichmäßige Geschwindigkeit; ohne linear weiches Anfahren (Gegenprobe)', () => {
+    expect(timelineAt(linear, 1).t).toBeCloseTo(0.25, 5)
+    expect(timelineAt(linear, 3).t).toBeCloseTo(0.75, 5)
+    expect(timelineAt(eased, 1).t).toBeLessThan(0.2) // smoothstep: am Anfang langsamer als linear
+    expect(timelineAt(eased, 2).t).toBeCloseTo(0.5, 5)
+    expect(timelineAt(linear, 1).holding).toBe(false)
+  })
+
+  const CLEAN = EXERCISE_DEMOS.find((d) => d.id === '9009')
+  const BASE = EXERCISE_DEMOS.find((d) => d.id === '9019')
+
+  it('Hantel: Scheibe und Nabe am Handgelenk, Radius nach Maßstab; ohne barbell keine Scheibe (Gegenprobe)', () => {
+    const lay = layout(CLEAN)
+    const f = buildFrame(CLEAN, lay, 0.3, false)
+    const plate = f.scene.circles.find((c) => c.cls === 'plate')
+    const hub = f.scene.circles.find((c) => c.cls === 'plate-hub')
+    expect(plate.r).toBeCloseTo(PLATE_RADIUS * lay.scale, 5)
+    expect(hub.r).toBeLessThan(plate.r)
+    const wrist = f.joints.find((j, i) => i === 2) // Reihenfolge: shoulder, elbow, wrist, …
+    expect(plate.cx).toBeCloseTo(wrist.cx, 5)
+    expect(plate.cy).toBeCloseTo(wrist.cy, 5)
+    expect(buildFrame(BASE, layout(BASE), 1, false).scene.circles.some((c) => c.cls.startsWith('plate'))).toBe(false)
+  })
+
+  it('Hantel mit Stange (bar + barbell): Scheibe wird auch dann gezeichnet', () => {
+    const hang = EXERCISE_DEMOS.find((d) => d.id === '9022')
+    const demo = { ...hang, props: { ...hang.props, barbell: true } }
+    expect(buildFrame(demo, layout(demo), 1, false).scene.circles.some((c) => c.cls === 'plate')).toBe(true)
+  })
+
+  it('stehende Bewegungen (tall) bekommen die höhere Zeichenfläche, flache nicht', () => {
+    expect(layout(CLEAN).height).toBe(TALL_HEIGHT)
+    expect(layout(BASE).height).toBe(FLOOR_HEIGHT)
+    expect(TALL_HEIGHT).toBeGreaterThan(FLOOR_HEIGHT)
+  })
+
+  it('Ausschnitt fürs Standbild enthält die Hantelscheibe', () => {
+    const lay = layout(CLEAN)
+    const f = buildFrame(CLEAN, lay, 0, false)
+    const b = frameBounds(f)
+    const plate = f.scene.circles.find((c) => c.cls === 'plate')
+    expect(plate.cx - plate.r).toBeGreaterThanOrEqual(b.x - 0.01)
+    expect(plate.cx + plate.r).toBeLessThanOrEqual(b.x + b.size + 0.01)
+    expect(plate.cy + plate.r).toBeLessThanOrEqual(b.y + b.size + 0.01)
+  })
+
+  it('Layout misst jede Schlüsselhaltung exakt: Kopf und Scheibe liegen in jeder Haltung im Zeichenbereich', () => {
+    const lay = layout(CLEAN)
+    CLEAN.keys.forEach((_, i) => {
+      const f = buildFrame(CLEAN, lay, i / (CLEAN.keys.length - 1), false)
+      const plate = f.scene.circles.find((c) => c.cls === 'plate')
+      expect(f.head.cy - f.head.r, `Kopf ${i}`).toBeGreaterThanOrEqual(0)
+      expect(plate.cy - plate.r, `Scheibe oben ${i}`).toBeGreaterThanOrEqual(0)
+      expect(plate.cx - plate.r, `Scheibe links ${i}`).toBeGreaterThanOrEqual(0)
+      expect(plate.cx + plate.r, `Scheibe rechts ${i}`).toBeLessThanOrEqual(lay.width)
+    })
   })
 })
 
