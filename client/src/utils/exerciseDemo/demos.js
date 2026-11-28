@@ -30,7 +30,8 @@ const WALL_SIT = { torso: -90, head: -82, uarm: 64, farm: 70, thigh: 0, shin: 90
 // Crow Pose: Start = Hocke (wie Tuck Planche), Haltung = Knie auf den Oberarmen
 const CROW = { torso: 25, head: 15, uarm: 160, farm: 80, thigh: 45, shin: 192, foot: 190 }
 // Barren-Stütz (Anker: Handgelenk an den Holmen, Körper hängt darunter)
-const SUPPORT = { torso: -95, head: -88, uarm: 80, farm: 80, thigh: 55, shin: 92, foot: 15 }
+// Oberkörper leicht nach vorn geneigt (Schulter vor der Hüfte), Arme senkrecht gestreckt, Knie leicht nach vorn gebeugt
+const SUPPORT = { torso: -78, head: -68, uarm: 90, farm: 90, thigh: 60, shin: 95, foot: 15 }
 // Flexed Arm Hang: Start = Hang, Ende = Kinn über der Stange
 const FLEXED = { torso: -90, head: -68, uarm: 112, farm: -112, thigh: 94, shin: 95, foot: 15 }
 // Front Lever (Straddle) und Back-Lever-Stufen: Start = Hang an gestreckten Armen

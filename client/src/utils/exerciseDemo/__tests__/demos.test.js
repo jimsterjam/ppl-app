@@ -157,6 +157,9 @@ describe('Demos: Haltungen der weiteren Halteübungen', () => {
     expect(Math.abs((e[0] - s[0]) * (w[1] - s[1]) - (e[1] - s[1]) * (w[0] - s[0]))).toBeLessThan(0.01) // gestreckt
     expect(s[1]).toBeLessThan(0) // Schultern über den Händen
     expect(J('9026', 1, 'hip')[1]).toBeGreaterThan(s[1])
+    // Fund Jimmy 28.11.: Oberkörper nach VORN geneigt (Schulter vor der Hüfte, Blickrichtung nach rechts), nicht nach hinten
+    expect(s[0]).toBeGreaterThan(J('9026', 1, 'hip')[0] + 0.15)
+    expect(J('9026', 1, 'head')[0]).toBeGreaterThan(s[0])
     // Arm und Rumpf liegen nicht aufeinander (sonst unleserlich)
     expect(Math.abs(w[0] - J('9026', 1, 'hip')[0])).toBeGreaterThan(0.12)
   })
