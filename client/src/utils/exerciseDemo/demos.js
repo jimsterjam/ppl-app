@@ -36,15 +36,18 @@ const stripPrefix = (value) => String(value || '').trim().replace(/^ex_/, '')
 
 /**
  * Demo zu einer Übung (Katalogeintrag oder Übung im Workout) oder null.
- * Erst über die ID (id, _id, exerciseId, auch mit Präfix "ex_"), dann über den englischen Namen.
- * Eigene Übungen des Nutzers bekommen nie eine Demo (gleicher Name heißt nicht gleiche Übung).
+ * Die ID ist maßgeblich (id, _id, exerciseId, auch mit Präfix "ex_"): Gibt es eine ID, die nicht zu einer Demo gehört, gibt es keine Demo,
+ * auch wenn der Name passt (eigene Übung "Plank" mit eigenem Foto/Video). Nur ohne jede ID entscheidet der englische Name
+ * (ältere Workouts nur mit Namen). Eigene Übungen des Nutzers (_isCustom) bekommen nie eine Demo.
  */
 export function findExerciseDemo(exercise) {
   if (!exercise || typeof exercise !== 'object' || exercise._isCustom) return null
-  for (const candidate of [exercise.id, exercise._id, exercise.exerciseId]) {
-    const demo = BY_ID.get(stripPrefix(candidate))
+  const ids = [exercise.id, exercise._id, exercise.exerciseId].map(stripPrefix).filter(Boolean)
+  for (const id of ids) {
+    const demo = BY_ID.get(id)
     if (demo) return demo
   }
+  if (ids.length) return null
   for (const candidate of [exercise.name_en, exercise.displayName, exercise.name]) {
     const demo = BY_NAME.get(clean(candidate))
     if (demo) return demo

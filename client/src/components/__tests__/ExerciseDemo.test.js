@@ -13,9 +13,27 @@ let rafCallbacks
 let nextRafId
 let cancelSpy
 
+let motionListeners = []
+let motionState = { on: false }
+
 function setReducedMotion(on) {
-  vi.stubGlobal('matchMedia', (q) => ({ matches: on && /reduce/.test(q), media: q, addEventListener() {}, removeEventListener() {} }))
+  motionState = { on }
+  motionListeners = []
+  const query = {
+    get matches() { return motionState.on },
+    media: '(prefers-reduced-motion: reduce)',
+    addEventListener: (type, fn) => { if (type === 'change') motionListeners.push(fn) },
+    removeEventListener: (type, fn) => { motionListeners = motionListeners.filter((f) => f !== fn) }
+  }
+  vi.stubGlobal('matchMedia', () => query)
   window.matchMedia = globalThis.matchMedia
+}
+
+// iOS-Einstellung "Bewegung reduzieren" bei offener Demo umstellen
+async function switchReducedMotion(on) {
+  motionState.on = on
+  motionListeners.forEach((fn) => fn())
+  await nextTick()
 }
 
 // Zeit von Hand vorrücken: ruft den zuletzt registrierten Rückruf mit der gewünschten Zeit auf
@@ -102,6 +120,24 @@ describe('ExerciseDemo', () => {
   it('erstes Bild einer animierten Übung ist der Start, nicht die Endhaltung (kein Sprung beim Öffnen)', () => {
     const w = mount(ExerciseDemo, { props: { demo: tuck, title: 'tuck planche' } })
     expect(w.find('.ed-halo').classes()).not.toContain('on')
+  })
+
+  it('Review 28.11.: "Bewegung reduzieren" bei offener Demo einschalten stoppt die Animation sofort, ausschalten startet sie', async () => {
+    const w = mount(ExerciseDemo, { props: { demo: tuck, title: 'tuck planche' } })
+    expect(rafCallbacks.size).toBe(1)
+    await switchReducedMotion(true)
+    expect(rafCallbacks.size).toBe(0)
+    expect(w.find('.ed-halo').classes()).toContain('on') // Ruhebild
+    await switchReducedMotion(false)
+    expect(rafCallbacks.size).toBe(1)
+    expect(w.find('.ed-halo').classes()).not.toContain('on') // wieder am Anfang des Ablaufs
+  })
+
+  it('beim Entfernen wird auch die Beobachtung der Einstellung beendet', () => {
+    const w = mount(ExerciseDemo, { props: { demo: tuck, title: 'tuck planche' } })
+    expect(motionListeners.length).toBe(1)
+    w.unmount()
+    expect(motionListeners.length).toBe(0)
   })
 
   it('Wechsel der Demo startet neu und zeigt die neue Übung', async () => {

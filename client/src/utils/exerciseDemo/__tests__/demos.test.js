@@ -106,6 +106,21 @@ describe('findExerciseDemo', () => {
     expect(findExerciseDemo({ id: '9019', _isCustom: true })).toBeNull()
   })
 
+  it('Review 28.11.: die ID ist maßgeblich - eigene Übung mit gleichem Namen und eigener ID bekommt keine Demo', () => {
+    // Übung im Workout (nicht als _isCustom markiert), eigene ID, Name wie im Katalog
+    expect(findExerciseDemo({ exerciseId: 'custom_abc123', name: 'Plank', name_en: 'plank' })).toBeNull()
+    expect(findExerciseDemo({ exerciseId: '65f1c2a9e4b0a1d2c3e4f5a6', name: 'Dead Hang' })).toBeNull()
+    // Katalog-ID ohne Demo, aber Name einer Demo-Übung: ebenfalls keine Demo
+    expect(findExerciseDemo({ id: '0025', name: 'Plank', name_en: 'plank' })).toBeNull()
+    expect(findExerciseDemo({ _id: 'ex_0025', exerciseId: 'ex_0025', name_en: 'tuck planche' })).toBeNull()
+  })
+
+  it('Review 28.11.: ohne jede ID entscheidet der Name (ältere Workouts), mit Demo-ID gewinnt die ID', () => {
+    expect(findExerciseDemo({ name: 'Plank' })?.id).toBe('9019')
+    expect(findExerciseDemo({ exerciseId: 'ex_9013', name: 'Etwas anderes' })?.id).toBe('9013')
+    expect(findExerciseDemo({ exerciseId: 'custom_x', _id: 'ex_9022' })?.id).toBe('9022')
+  })
+
   it('keine Übung mit echtem Foto/Video bekommt eine Demo (ID- oder Namenstreffer nur bei den Demo-Übungen selbst)', () => {
     const demoIds = new Set(EXERCISE_DEMOS.map((d) => d.id))
     for (const e of catalog) {

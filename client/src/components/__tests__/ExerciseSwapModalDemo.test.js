@@ -9,12 +9,17 @@ const BENCH = { _id: 'ex_0025', id: '0025', name: 'Bankdrücken', name_en: 'benc
 
 vi.mock('@/utils/firebaseAuth', () => ({ useFirebaseAuth: () => ({ getIdToken: async () => null, user: { value: null } }), getCurrentUser: () => null, getIdToken: async () => null }))
 vi.mock('@/utils/defaultExercisesLoader', () => ({ loadDefaultExercises: async () => [PLANK, BENCH], getCachedDefaultExercises: () => [PLANK, BENCH] }))
+vi.mock('@/utils/assetResolver', async (importOriginal) => ({
+  ...(await importOriginal()),
+  resolveExerciseMedia: vi.fn(() => Promise.resolve())
+}))
 vi.mock('@/utils/exerciseSwaps', () => ({
   getSwapSuggestions: () => [{ entry: PLANK, kind: 'similar' }, { entry: BENCH, kind: 'similar' }]
 }))
 
 import ExerciseSwapModal from '../ExerciseSwapModal.vue'
 import { createI18nInstance } from '@/i18n'
+import { resolveExerciseMedia } from '@/utils/assetResolver'
 
 let wrapper
 async function openPreview(index) {
@@ -34,6 +39,7 @@ async function openPreview(index) {
 }
 
 beforeEach(() => {
+  resolveExerciseMedia.mockClear()
   vi.stubGlobal('requestAnimationFrame', () => 1)
   vi.stubGlobal('cancelAnimationFrame', () => {})
 })
@@ -56,6 +62,22 @@ describe('ExerciseSwapModal: Vorschau', () => {
     expect(preview).toBeTruthy()
     expect(preview.querySelector('svg.exercise-demo')).toBeNull()
     expect(preview.querySelector('img.swap-preview-media, video.swap-preview-media')).toBeTruthy()
+  })
+
+  it('Review 28.11.: Beschriftung der Grafik ist der angezeigte Name wie in der Überschrift', async () => {
+    await openPreview(0)
+    const preview = document.querySelector('.swap-preview')
+    const label = preview.querySelector('svg.exercise-demo').getAttribute('aria-label')
+    expect(label).toBe(preview.querySelector('strong').textContent)
+    expect(label).not.toBe('plank')
+  })
+
+  it('Review 28.11.: für Demo-Übungen werden keine Medien nachgeladen, für Übungen mit Video schon', async () => {
+    await openPreview(0)
+    expect(resolveExerciseMedia).not.toHaveBeenCalled()
+    wrapper.unmount()
+    await openPreview(1)
+    expect(resolveExerciseMedia).toHaveBeenCalledTimes(1)
   })
 
   it('Schließen entfernt die Vorschau (und damit die Animation)', async () => {

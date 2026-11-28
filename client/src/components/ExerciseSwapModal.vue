@@ -31,7 +31,7 @@
     <div v-if="previewEntry" class="swap-preview-overlay" role="presentation" @click.self="closePreview">
       <div class="swap-preview" role="dialog" aria-modal="true" :aria-label="getTranslatedExerciseName(previewEntry.name_en)">
         <strong>{{ getTranslatedExerciseName(previewEntry.name_en) }}</strong>
-        <ExerciseDemo v-if="previewDemo" :demo="previewDemo" :title="previewEntry.name_en || previewEntry.name" />
+        <ExerciseDemo v-if="previewDemo" :demo="previewDemo" :title="getTranslatedExerciseName(previewEntry.name_en || previewEntry.name)" />
         <video v-else-if="isVideoUrl(previewUrl)" :src="previewUrl" class="swap-preview-media" autoplay muted loop playsinline @error="onPreviewVideoError"></video>
         <img v-else :src="previewUrl" :alt="getTranslatedExerciseName(previewEntry.name_en)" class="swap-preview-media" />
         <p class="swap-hint">{{ t('workoutDetail.mediaDisclaimer') }}</p>
@@ -173,6 +173,7 @@ function openPreview(entry) {
   previewEntry.value = entry
   previewUrl.value = buildExerciseMediaUrl(entry, 360, 'mp4') || largeImageOf(entry)
   lock()
+  if (findExerciseDemo(entry)) return // Demo statt Video/Foto: keine Anfrage nach nicht vorhandenen Medien
   resolveExerciseMedia(entry, {
     size: 360,
     fallbackUrl: previewUrl.value,

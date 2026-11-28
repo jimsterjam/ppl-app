@@ -2,7 +2,7 @@
 // Strichfiguren-Demo für Übungen ohne Video (Absprache Jimmy 28.11.). Rechnet in utils/exerciseDemo/engine.js,
 // Haltungen in utils/exerciseDemo/demos.js. Den Hinweis "nur zur Orientierung" zeigt der umgebende Dialog
 // (exercises.mediaDisclaimer bzw. workoutDetail.mediaDisclaimer), nicht diese Komponente.
-import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
+import { shallowRef, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { layout, buildFrame, timelineAt } from '@/utils/exerciseDemo/engine'
 
 const props = defineProps({
@@ -19,18 +19,23 @@ function frameAt(seconds) {
   const { t, holding } = timelineAt(props.demo.phases, seconds)
   return buildFrame(props.demo, lay.value, t, holding)
 }
-const frame = ref(frameAt(0))
+// shallowRef: das Bild wird als Ganzes ersetzt (nie einzeln verändert), spart bei 60 Bildern pro Sekunde das tiefe Beobachten
+const frame = shallowRef(frameAt(0))
 
 let rafId = 0
 let startedAt = 0
 
-function prefersReducedMotion() {
+let motionQuery = null
+
+function reducedMotionQuery() {
   try {
-    return typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    return typeof window !== 'undefined' && typeof window.matchMedia === 'function' ? window.matchMedia('(prefers-reduced-motion: reduce)') : null
   } catch {
-    return false
+    return null
   }
 }
+
+const prefersReducedMotion = () => Boolean(reducedMotionQuery()?.matches)
 
 // Ruhebild: bei bewegungsempfindlichen Einstellungen und für statische Demos die Endhaltung mit Leuchten.
 function showResting() {
@@ -60,8 +65,17 @@ function start() {
   rafId = requestAnimationFrame(tick)
 }
 
-onMounted(start)
-onBeforeUnmount(stop)
+onMounted(() => {
+  start()
+  // Wird "Bewegung reduzieren" bei offener Demo umgestellt, gilt das sofort (nicht erst nach erneutem Öffnen).
+  motionQuery = reducedMotionQuery()
+  motionQuery?.addEventListener?.('change', start)
+})
+onBeforeUnmount(() => {
+  stop()
+  motionQuery?.removeEventListener?.('change', start)
+  motionQuery = null
+})
 watch(() => props.demo, start)
 </script>
 

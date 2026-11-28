@@ -11,9 +11,10 @@ function overlays(source) {
   const found = []
   const hasClass = (node, cls) => (node.props || []).some((p) => p.type === 6 && p.name === 'class' && p.value && p.value.content.split(/\s+/).includes(cls))
   const isFor = (node) => (node.props || []).some((p) => p.type === 7 && p.name === 'for')
-  const walk = (node, insideFor) => {
+  const walk = (node, insideFor, insideTeleport = false) => {
     if (node.type === 1) {
       const inFor = insideFor || isFor(node)
+      const inTeleport = insideTeleport || node.tag === 'Teleport'
       if (hasClass(node, 'media-overlay')) {
         const tags = []
         const collect = (n) => {
@@ -23,11 +24,11 @@ function overlays(source) {
           }
         }
         collect(node)
-        found.push({ insideFor: inFor, tags })
+        found.push({ insideFor: inFor, inTeleport: insideTeleport, tags })
       }
-      for (const child of node.children || []) walk(child, inFor)
+      for (const child of node.children || []) walk(child, inFor, inTeleport)
     } else if (node.children) {
-      for (const child of node.children) walk(child, insideFor)
+      for (const child of node.children) walk(child, insideFor, insideTeleport)
     }
   }
   walk(ast, false)
@@ -43,6 +44,16 @@ describe('WorkoutDetailView: Großansicht-Fenster', () => {
     expect(found[0].insideFor).toBe(false)
   })
 
+  it('Review 28.11.: hängt per Teleport am body und sperrt beim Öffnen das Scrollen des Hintergrunds', () => {
+    const [overlay] = overlays(source)
+    expect(overlay.inTeleport).toBe(true)
+    expect(source).toMatch(/mediaLock\.lock\(\)/)
+    expect(source).toMatch(/mediaLock\.unlock\(\)/)
+    // die Demo richtet sich nach der Übung im Workout (ID zuerst), nicht nach der mit dem Katalog gemischten Quelle
+    expect(source).toMatch(/findExerciseDemo\(mediaDemoSource\.value\)/)
+    expect(source).not.toMatch(/findExerciseDemo\(mediaExercise\.value\)/)
+  })
+
   it('zeigt die Demo, sonst Video oder Foto', () => {
     const [overlay] = overlays(source)
     expect(overlay.tags).toEqual(expect.arrayContaining(['ExerciseDemo', 'video', 'img', 'button']))
@@ -53,5 +64,8 @@ describe('WorkoutDetailView: Großansicht-Fenster', () => {
     const good = '<template><div><div v-for="e in list" :key="e"></div><div v-if="open" class="media-overlay"><img /></div></div></template>'
     expect(overlays(bad)[0].insideFor).toBe(true)
     expect(overlays(good)[0].insideFor).toBe(false)
+    expect(overlays(good)[0].inTeleport).toBe(false)
+    const teleported = '<template><div><Teleport to="body"><div class="media-overlay"></div></Teleport></div></template>'
+    expect(overlays(teleported)[0].inTeleport).toBe(true)
   })
 })
